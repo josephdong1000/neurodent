@@ -1,0 +1,7 @@
+==LINUX==
+pipreqs ./pys --ignore bin,etc,lib,lib64,include --savepath ./requirements.txt --force --mode no-pin
+
+==WINDOWS VM==
+pipreqs .\pys --ignore bin,etc,lib,lib64,include --savepath .\requirements-win.txt --force --mode compat
+python -m venv .venv-win
+pyinstaller --onefile --windowed .\pys\pythoneeg.py

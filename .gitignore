@@ -1,0 +1,7 @@
+/analysis/*
+/bins/*
+/build/*
+/ddfs/*
+/dist/*
+/.venv/
+/.*/
