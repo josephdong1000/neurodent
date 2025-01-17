@@ -4,4 +4,5 @@
 /ddfs/*
 /dist/*
 /.venv/
+/venv-*/
 /.*/
