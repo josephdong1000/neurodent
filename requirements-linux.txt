@@ -1,0 +1,14 @@
+cmasher
+matplotlib
+mne
+mne_connectivity
+mountainsort5
+numpy
+pactools
+pandas
+probeinterface
+pyinstaller
+scipy
+spikeinterface
+ipykernel
+pipreqs

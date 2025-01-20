@@ -3,7 +3,7 @@
 
 # # PythonEEG - Figures
 
-# In[3]:
+# In[6]:
 
 
 import os
@@ -24,7 +24,7 @@ import matplotlib.pyplot as plt
 import matplotlib.axes
 import pandas as pd
 # from scipy import signal, integrate
-from scipy.stats import zscore, gzscore, gaussian_kde
+from scipy.stats import zscore, gzscore, gaussian_kde, linregress
 # import mne
 # import mne_connectivity
 
@@ -48,7 +48,7 @@ import cmasher as cmr
 from pythoneeg import core
 
 
-# In[4]:
+# In[7]:
 
 
 class AnimalFeatureParser:
@@ -149,7 +149,7 @@ class AnimalFeatureParser:
         for k,v in dictionary.items():
             if any([x in searchonvals for x in v]):
                 return k
-        raise ValueError(f"{searchonvals} does not have any matching values\nAvailable values: {dictionary}")
+        raise ValueError(f"{searchonvals} does not have any matching values. Available values: {dictionary}")
     
     def _average_feature(self, df:pd.DataFrame, colname:str, weightsname:str|None='duration'):
         column = df[colname]
@@ -163,7 +163,8 @@ class AnimalFeatureParser:
             case 'rms' | 'ampvar' | 'psdtotal' | 'pcorr':
                 col_agg = np.stack(column, axis=-1)
             case 'psdslope':
-                col_agg = np.stack([np.array(x[1]) for x in column], axis=-1)
+                col_agg = np.array([*column.tolist()])
+                col_agg = col_agg.transpose(1, 2, 0)
             case 'cohere' | 'psdband':
                 col_agg = {k : np.stack([d[k] for d in column], axis=-1) for k in colitem.keys()}
             case 'psd':
@@ -177,7 +178,7 @@ class AnimalFeatureParser:
                 warnings.warn("wavetemp cannot be averaged. Use get_wavetemp() instead")
                 col_agg = np.NaN
             case _:
-                raise TypeError(f"Unrecognized type in column {colname}\n{colitem}")
+                raise TypeError(f"Unrecognized type in column {colname}: {colitem}")
 
         # if type(colitem) is np.ndarray:
         #     col_agg = np.stack(column, axis=-1)
@@ -219,12 +220,22 @@ class AnimalFeatureParser:
         return avg
 
 
-# In[5]:
+# In[8]:
 
 
 class WindowAnalysisResult(AnimalFeatureParser):
-    
+    """
+    Wrapper for output of windowed analysis. Has useful features like group-wise and global averaging, filtering, and saving
+    """
     def __init__(self, result: pd.DataFrame, animal_id:str=None, genotype:str=None, channel_names:list[str]=None, assume_channels=True) -> None:
+        """
+        Args:
+            result (pd.DataFrame): Result comes from AnimalOrganizer.compute_windowed_analysis()
+            animal_id (str, optional): Identifier for the animal where result was computed from. Defaults to None.
+            genotype (str, optional): Genotype of animal. Defaults to None.
+            channel_names (list[str], optional): List of channel names. Defaults to None.
+            assume_channels (bool, optional): If true, assumes channel names according to AnimalFeatureParser.DEFAULT_CHNUM_TO_NAME. Defaults to True.
+        """
         self.result = result
         columns = result.columns
         self.feature_names = [x for x in columns if x in core.LongRecordingAnalyzer.FEATURES]
@@ -245,6 +256,16 @@ class WindowAnalysisResult(AnimalFeatureParser):
         return self.result.__str__()
     
     def get_result(self, features: list[str], exclude: list[str]=[], allow_missing=False):
+        """Get windowed analysis result dataframe, with helpful filters
+
+        Args:
+            features (list[str]): List of features to get from result
+            exclude (list[str], optional): List of features to exclude from result; will override the features parameter. Defaults to [].
+            allow_missing (bool, optional): If True, will return all requested features as columns regardless if they exist in result. Defaults to False.
+
+        Returns:
+            result: pd.DataFrame object with features in columns and windows in rows
+        """
         features = self._sanitize_feature_request(features, exclude)
         if not allow_missing:
             return self.result.loc[:, self._nonfeat_cols + features]
@@ -252,6 +273,17 @@ class WindowAnalysisResult(AnimalFeatureParser):
             return self.result.reindex(columns=self._nonfeat_cols + features)
     
     def get_groupavg_result(self, features: list[str], exclude: list[str]=[], df: pd.DataFrame = None, groupby="animalday"):
+        """Group result and average within groups. Preserves data structure and shape for each feature.
+
+        Args:
+            features (list[str]): List of features to get from result
+            exclude (list[str], optional): List of features to exclude from result. Will override the features parameter. Defaults to [].
+            df (pd.DataFrame, optional): If not None, this function will use this dataframe instead of self.result. Defaults to None.
+            groupby (str, optional): Feature or list of features to group by before averaging. Passed to the `by` parameter in pd.DataFrame.groupby(). Defaults to "animalday".
+
+        Returns:
+            grouped_result: result grouped by `groupby` and averaged for each group.
+        """
         result_grouped, result_validcols = self.__get_groups(features=features, exclude=exclude, df=df, groupby=groupby)
         features = self._sanitize_feature_request(features, exclude)
 
@@ -332,12 +364,14 @@ class WindowAnalysisResult(AnimalFeatureParser):
         filt_bool_all = np.prod(np.stack(filt_bools, axis=-1), axis=-1).astype(bool)
         filtered_result = self._apply_filter(filt_bool_all, verbose=verbose)
         if inplace:
+            del self.result
             self.result = filtered_result
         return filtered_result
 
     # NOTE filter_tfs is a Mfragments x Nchannels numpy array
     def _apply_filter(self, filter_tfs:np.ndarray, verbose=True):
         result = self.result.copy()
+        filter_tfs = np.array(filter_tfs, dtype=bool)
         for feat in core.LongRecordingAnalyzer.FEATURES:
             if verbose:
                 print(f"Filtering {feat}..")
@@ -364,8 +398,8 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     vals = np.array(result[feat].tolist())
                     mask = np.broadcast_to(filter_tfs[:, :, np.newaxis], vals.shape)
                     vals[~mask] = np.nan
-                    vals = [list(map(tuple, x)) for x in vals.tolist()]
-                    result[feat] = vals
+                    # vals = [list(map(tuple, x)) for x in vals.tolist()]
+                    result[feat] = vals.tolist()
                 case 'cohere':
                     vals = pd.DataFrame(result[feat].tolist())
                     shape = np.array(vals.iloc[:, 0].tolist()).shape
@@ -387,8 +421,6 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 case _:
                     raise ValueError(f'Unknown feature to filter {feat}')
         return result
-
-
 
     # def filter_bad_fragments(self, filt_beta=True, beta_prop=0.75):
     #     # STUB filter out whole fragments based on telling channel features
@@ -438,7 +470,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         return avg.filled(np.nan)
 
 
-# In[6]:
+# In[9]:
 
 
 class AnimalOrganizer(AnimalFeatureParser):
@@ -466,7 +498,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         self.__bin_folders = [x for x in self.__bin_folders if not any(y in x for y in skip_days)]
 
         if mode == "noday" and len(self.__bin_folders) > 1:
-            raise ValueError(f"Animal ID '{self.anim_id}' is not unique, found:\n{'\n'.join(self.__bin_folders)}")
+            raise ValueError(f"Animal ID '{self.anim_id}' is not unique, found: {', '.join(self.__bin_folders)}")
         elif len(self.__bin_folders) == 0:
             raise ValueError(f"No files found for animal ID {self.anim_id} and date format {date_format}")
         
@@ -508,6 +540,20 @@ class AnimalOrganizer(AnimalFeatureParser):
             lrec.cleanup_rec()
 
     def compute_windowed_analysis(self, features: list[str], exclude: list[str]=[], window_s=4, **kwargs):
+        """Computes windowed analysis of animal recordings. The data is divided into windows (time bins), then features are extracted from each window. The result is
+        formatted to a Dataframe and wrapped into a WindowAnalysisResult object.
+
+        Args:
+            features (list[str]): List of features to compute. See individual compute_...() functions for output format
+            exclude (list[str], optional): List of features to ignore. Will override the features parameter. Defaults to [].
+            window_s (int, optional): Length of each window in seconds. Note that some features break with very short window times. Defaults to 4.
+
+        Raises:
+            AttributeError: If a feature's compute_...() function was not implemented, this error will be raised.
+
+        Returns:
+            window_analysis_result: a WindowAnalysisResult object
+        """
         features = self._sanitize_feature_request(features, exclude)
 
         dataframes = []
@@ -558,36 +604,14 @@ class AnimalOrganizer(AnimalFeatureParser):
         return self.window_analysis_result
 
 
-# In[7]:
-
-
-get_ipython().run_cell_magic('script', 'false', '\n# ao = AnimalOrganizer(r"Z:\\PythonEEG Data Bins", "F22", mode="concat", skip_days=["12_12-2023", "12_15_2023"], truncate=10)\nao = AnimalOrganizer(r"Z:\\PythonEEG Data Bins", "F22", mode="concat")\nao.convert_colbins_to_rowbins(overwrite=False)\nao.convert_rowbins_to_rec()\n\n# result = ao.compute_windowed_analysis([\'all\'])\n# result = ao.compute_windowed_analysis([\'rms\'])\n# result = ao.compute_windowed_analysis([\'all\'], exclude=[\'nspike\', \'wavetemp\', \'cohere\', \'pcorr\'])\nwar = ao.compute_windowed_analysis([\'all\'], exclude=[\'nspike\', \'wavetemp\'])\n# result = ao.compute_windowed_analysis([\'cohere\', \'pcorr\']) # nspike needs work\n# result = ao.compute_windowed_analysis([\'nspike\', \'wavetemp\']) # nspike needs work\n# result = ao.compute_windowed_analysis([\'psd\', \'cohere\'], welch_bin_t=2, magnitude=False)\n')
-
-
-# In[8]:
-
-
-get_ipython().run_cell_magic('script', 'false', 'ao.cleanup_rec()\n')
-
-
-# In[9]:
-
-
-# display(WindowAnalysisResult(result.result).get_result(['all'], allow_missing=True).head(2))
-# display(WindowAnalysisResult(result.result).get_groupavg_result(['all'], groupby=['day', 'isday']))
-# display(WindowAnalysisResult(result.result).get_grouprows_result(['all']).head(2))
-
-# WindowAnalysisResult(result.result).get_wavetemp()
-
-
-# In[44]:
+# In[10]:
 
 
 class AnimalPlotter(AnimalFeatureParser):
 
     # TODO Plot hist features across every channel as a histogram with standard deviations, as a spectrograph
     # Plot matrix features as several grids per-band for cohere + 1 for pcorr, as a spectrograph flattening channel combinations
-    # TODO Plot linear features as a line over time, as an box plot collapsing over time, as a datapoint on another ExperimentPlotter (wip)
+    # Plot linear features as a line over time, as an box plot collapsing over time, as a datapoint on another ExperimentPlotter (wip)
     # Plot band features as many lines over time, or as a spectrograph over time
     # TODO Plot spike features (wip) as raster plot per channel, as line plot in time bins, as unit traces over channels
     # STUB Plot peri-spike frequency plot, convolving over time based on frequency with an (arbitrarily chosen) gaussian filter
@@ -601,8 +625,9 @@ class AnimalPlotter(AnimalFeatureParser):
         self.__assume_channels = war.assume_channels
         self.short_chnames = war.short_chnames
 
-    def get_animalday_metadata(self, animalday) -> core.DDFBinaryMetadata:
-        return war.meta[self.window_result.animaldays.index(animalday)]
+    # REVIEW this function may not be necessary
+    # def get_animalday_metadata(self, animalday) -> core.DDFBinaryMetadata:
+    #     return self.window_result.meta[self.window_result.animaldays.index(animalday)]
 
     def _abbreviate_channel(self, ch_name:str):
         for k,v in self.CHNAME_TO_ABBREV:
@@ -634,7 +659,7 @@ class AnimalPlotter(AnimalFeatureParser):
         avg_result = self.__get_groupavg_coherecorr(groupby, **kwargs)
         avg_result = avg_result.drop('cohere', axis=1, errors='ignore')
         if len(avg_result.index) != 2:
-            raise ValueError(f"Difference can only be calculated between 2 rows.\n{groupby} resulted in {len(avg_result.index)} rows")
+            raise ValueError(f"Difference can only be calculated between 2 rows. {groupby} resulted in {len(avg_result.index)} rows")
         
         if bands is None:
             bands = list(core.LongRecordingAnalyzer.FREQ_BANDS.keys()) + ['pcorr']
@@ -647,27 +672,6 @@ class AnimalPlotter(AnimalFeatureParser):
         fig, ax = plt.subplots(1, len(bands), squeeze=False, figsize=figsize, **kwargs)
         
         self._plot_coherecorr_matrixgroup(diff_result, bands, ax[0, :], show_bandname=True, center_cmap=True, cmap=cmap, **kwargs)
-
-    def plot_psd_histogram(self, groupby='animalday', figsize=None, log_y=False, **kwargs):
-        avg_result = self.window_result.get_groupavg_result(['psd'], groupby=groupby)
-        
-        n_col = avg_result.index.size
-        fig, ax = plt.subplots(1, n_col, squeeze=False, figsize=figsize, sharex=True, sharey=True, **kwargs)
-        for i, (idx, row) in enumerate(avg_result.iterrows()):
-            freqs = row['psd'][0]
-            psd = row['psd'][1]
-            if log_y:
-                ax[0, i].loglog(freqs, psd, label=self.short_chnames)
-            else:
-                ax[0, i].semilogx(freqs, psd, label=self.short_chnames)
-
-            ax[0, i].set_title(idx)
-            ax[0, i].set_xlabel("Frequency (Hz)")
-        ax[0, 0].set_ylabel("PSD")
-        ax[0, -1].legend(loc='center left', bbox_to_anchor=(1.05, 0.5))
-        # ax[0].set_xlim(core.LongRecordingAnalyzer.FREQ_BAND_TOTAL)
-        plt.show()
-            
 
     def _plot_coherecorr_matrixgroup(self, group:pd.Series, bands:list[str], ax:list[matplotlib.axes.Axes], show_bandname,
                                     center_cmap=False, norm_list=None, show_channelname=True, **kwargs):
@@ -819,7 +823,7 @@ class AnimalPlotter(AnimalFeatureParser):
             case "none" | None:
                 data_Z = X
             case "center":
-                data_Z = X - np.nanmean(X, axis=axis)
+                data_Z = X - np.nanmean(X, axis=axis, keepdims=True)
             case _:
                 raise ValueError(f"Invalid mode {mode}")
         return data_Z
@@ -884,14 +888,98 @@ class AnimalPlotter(AnimalFeatureParser):
         if show_endfile:
             self._plot_filediv_lines(group=group, ax=ax, duration_name=duration_name, endfile_name=endfile_name)
 
+    def plot_psd_histogram(self, groupby='animalday', figsize=None, avg_channels=False, plot_type='loglog', plot_slope=True, xlim=None, **kwargs):
+        avg_result = self.window_result.get_groupavg_result(['psd'], groupby=groupby)
+        
+        n_col = avg_result.index.size
+        fig, ax = plt.subplots(1, n_col, squeeze=False, figsize=figsize, sharex=True, sharey=True, **kwargs)
+        plt.subplots_adjust(wspace=0)
+        for i, (idx, row) in enumerate(avg_result.iterrows()):
+            freqs = row['psd'][0]
+            psd = row['psd'][1]
+            if avg_channels:
+                psd = np.average(psd, axis=-1, keepdims=True)
+                label = 'Average'
+            else:
+                label = self.short_chnames
+            match plot_type:
+                case 'loglog':
+                    ax[0, i].loglog(freqs, psd, label=label)
+                case 'semilogy':
+                    ax[0, i].semilogy(freqs, psd, label=label)
+                case 'semilogx':
+                    ax[0, i].semilogy(freqs, psd, label=label)
+                case 'none':
+                    ax[0, i].plot(freqs, psd, label=label)
+                case _:
+                    raise ValueError(f"Invalid plot type {plot_type}")
+
+            frange = np.logical_and(freqs >= core.LongRecordingAnalyzer.FREQ_BAND_TOTAL[0], 
+                                    freqs <= core.LongRecordingAnalyzer.FREQ_BAND_TOTAL[1])
+            logf = np.log10(freqs[frange])
+            logpsd = np.log10(psd[frange, :])
+
+            linfit = np.zeros((psd.shape[1], 2))
+            for k in range(psd.shape[1]):
+                result = linregress(logf, logpsd[:, k], 'less')
+                linfit[k, :] = [result.slope, result.intercept]
+
+            for j, (m,b) in enumerate(linfit.tolist()):
+                ax[0, i].plot(freqs, 10**(b + m * np.log10(freqs)), c=f'C{j}', alpha=0.75)
+
+            ax[0, i].set_title(idx)
+            ax[0, i].set_xlabel("Frequency (Hz)")
+        ax[0, 0].set_ylabel("PSD (uV^2/Hz)")
+        ax[0, -1].legend(loc='center left', bbox_to_anchor=(1.05, 0.5))
+        ax[0, -1].set_xlim(xlim)
+        plt.show()
 
     # STUB plot spectrogram over time, doing gaussian filter convolving when relevant, scaling logarithmically
-    def plot_psd_spectrogram():
-        ...
+    def plot_psd_spectrogram(self, multiindex=['animalday', 'animal', 'genotype'], freq_range=(1, 50), center_stat='mean', mode='z', figsize=None, cmap='magma', **kwargs):
+        # if features is None:
+        #     features = self.MATRIX_FEATURE
+        # height_ratios = {'cohere' : 5,
+        #                  'pcorr' : 1}
+
+        df_rowgroup = self.window_result.get_grouprows_result(['psd'], multiindex=multiindex)
+        for i, df_row in df_rowgroup.groupby(level=0):
+
+            freqs = df_row.iloc[0]['psd'][0]
+            psd = np.array([x[1] for x in df_row['psd'].tolist()])
+            match center_stat:
+                case 'mean':
+                    psd = np.nanmean(psd, axis=-1).transpose()
+                case 'median':
+                    psd = np.nanmedian(psd, axis=-1).transpose()
+                case _:
+                    raise ValueError(f"Invalid statistic {center_stat}. Pick mean or median")
+            psd = np.log10(psd)
+            psd = self._calculate_standard_data(psd, mode=mode, axis=-1) # FIXME what is the appropriate axis to average on here? if any?
+            freq_mask = np.logical_and((freq_range[0] <= freqs), (freqs <= freq_range[1]))
+            freqs = freqs[freq_mask]
+            psd = psd[freq_mask, :]
+            
+            extent = (0, psd.shape[1] * df_row['duration'].median(), np.min(freqs), np.max(freqs))
+            # print(psd.nanmin(), psd.nanmax())
+            norm = matplotlib.colors.Normalize()
+            # norm = matplotlib.colors.LogNorm()
+            # norm = matplotlib.colors.CenteredNorm()
+
+            
+            fig, ax = plt.subplots(1, 1, figsize=figsize)
+            # ax.pcolormesh(psd, )
+            axim = ax.imshow(np.flip(psd, axis=0), interpolation='none', aspect='auto', norm=norm, cmap=cmap, extent=extent)
+            cbar = fig.colorbar(axim, ax=ax)
+            cbar.set_label(f'log(PSD) {mode}')
+
+            ax.set_xlabel("Time (s)")
+            ax.set_ylabel("Frequency (Hz)")
+            ax.set_title(i)
+            plt.show()
 
 
 
-# In[11]:
+# In[ ]:
 
 
 class ExperimentPlotter(AnimalFeatureParser):
@@ -914,109 +1002,12 @@ class ExperimentPlotter(AnimalFeatureParser):
     
 
 
-# In[12]:
-
-
-get_ipython().run_cell_magic('script', 'false', 'ap = AnimalPlotter(WindowAnalysisResult(war.result, "WT", war.channel_names), assume_channels=True)\nap.plot_coherecorr_matrix([\'isday\'], bands=None, figsize=(16,5), cmap=\'viridis\')\nap.plot_coherecorr_diff([\'isday\'], bands=None, figsize=(16,5))\n# ap.plot_linear_temporal(figsize=(20, 5), score_type=\'z\', lw=1, channels=[0, 1])\nap.plot_linear_temporal([\'isday\'], figsize=(20, 5), score_type=\'z\', lw=1, channels=[0, 1, 2, 3])\n\n# ap.plot_coherecorr_spectral(figsize=(20, 5), score_type=\'center\')\nap.plot_coherecorr_spectral([\'isday\'], figsize=(20, 5), score_type=\'center\')\n')
-
-
 # ## Run All Animals
-
-# In[13]:
-
-
-get_ipython().run_cell_magic('script', 'false', "# animids = ['A5 WT', 'A10 KO', 'F22 KO', 'G25', 'G26', 'N21', 'N22', ]\nanimids = ['N23 Cage 2', 'N24 Cage 3', 'N25']\nwars = []\n")
-
-
-# In[14]:
-
-
-get_ipython().run_cell_magic('script', 'false', 'for animid in animids:\n    ao = AnimalOrganizer(r"Z:\\PythonEEG Data Bins", animid, mode="concat")\n    ao.convert_colbins_to_rowbins(overwrite=False)\n    ao.convert_rowbins_to_rec()\n    war = ao.compute_windowed_analysis([\'all\'], exclude=[\'nspike\', \'wavetemp\'])\n    war.to_pickle_and_json(r\'Z:\\PythonEEG\\analysis\')\n    wars.append(war)\n    try:\n        ao.cleanup_rec()\n    except Exception as e:\n        print(f"ERROR: {e}")\n')
-
-
-# In[15]:
-
-
-get_ipython().run_cell_magic('script', 'false', "\nap = AnimalPlotter(wars[0], assume_channels=True)\n\n# ap.plot_coherecorr_matrix(['isday'], bands=None, figsize=(16,5), cmap='viridis')\n# ap.plot_coherecorr_diff(['isday'], bands=None, figsize=(16,5))\n# ap.plot_linear_temporal(figsize=(20, 5), score_type='z', lw=1, channels=[0, 1, 2, 3], show_endfile=True)\n# ap.plot_coherecorr_spectral(figsize=(20, 5), score_type='z')\nap.plot_coherecorr_spectral(['animalday'], figsize=(20, 5), score_type='z', show_endfile=True)\n")
-
-
-# In[16]:
-
-
-# Load Window Analysis Results from files
-# warnames = ['WT-A5', 'KO-F22', 'KO-A10', 'WT-G25']
-warnames = ['WT-N21']
-reconstruct_war = []
-for i,warname in enumerate(warnames):
-    with open(rf"Z:\PythonEEG\analysis\{warname}.json", 'r') as f:
-        ch_names = json.load(f)
-        war = WindowAnalysisResult(pd.read_pickle(rf"Z:\PythonEEG\analysis\{warname}.pkl"), genotype='WT', channel_names=ch_names)
-    
-    # war.filter_bad_channel_fragments() # Filtering can be done after the fact
-    reconstruct_war.append(war)
-
-
-# In[17]:
-
-
-war = WindowAnalysisResult(war.result, genotype='WT', channel_names=ch_names)
-
-# temp, tfs = war.get_filter_rms_range(z_range=0.5)
-# temp, tfs2 = war.get_filter_high_rms(temp)
-# temp, tfs3 = war.get_filter_high_beta(temp)
-# tfs_all = tfs * tfs2 * tfs3
-# for i in range(10):
-#     # print(f"{tfs.shape[0] - np.count_nonzero(tfs[:, i])}/{tfs.shape[0]}")
-#     # print(f"{tfs2.shape[0] - np.count_nonzero(tfs2[:, i])}/{tfs2.shape[0]}")
-#     # print(f"{tfs3.shape[0] - np.count_nonzero(tfs3[:, i])}/{tfs3.shape[0]}")
-#     print(f"{tfs_all.shape[0] - np.count_nonzero(tfs_all[:, i])}/{tfs_all.shape[0]}")
-# filtout = war._apply_filter(tfs_all)
-filtout = war.filter_all()
-
-# display(filtout.head(2))
-# display(war.result.head(2))
-# print(filtout['cohere'].iloc[2])
-
-# warfilt = WindowAnalysisResult(filtout, genotype='WT', channel_names=ch_names)    
-# warfilt.get_groupavg_result(['all'])
-
-
-# In[18]:
-
-
-get_ipython().run_cell_magic('script', 'false', '# for war in wars:\nfor war in reconstruct_war:\n    # war = WindowAnalysisResult()\n    grs:pd.DataFrame = war.get_grouprows_result([\'all\'], include=[\'duration\', \'timestamp\', \'isday\'])\n    grs = grs.reset_index()\n    \n    temp_short_chnames = [war._parse_chname_to_abbrev(x, assume_channels=True) for x in war.channel_names]\n    outs = []\n    chfeats = [\'rms\', \'ampvar\', \'psdtotal\']\n    for feat in chfeats:\n        temp = pd.DataFrame(grs[feat].tolist(), columns=[f\'{feat}-{i+1}-{temp_short_chnames[i]}\' for i in range(len(war.channel_names))])\n        outs.append(temp)\n\n    temp = pd.DataFrame(grs[\'psdslope\'].apply(lambda x: [y[0] for y in x]).tolist(), columns=[f\'psdslope-{i+1}-{temp_short_chnames[i]}\' for i in range(len(war.channel_names))])\n    outs.append(temp)\n\n\n    bandnames = core.LongRecordingAnalyzer.FREQ_BAND_NAMES\n    temp = pd.DataFrame(grs[\'psdband\'].apply(lambda x: [np.mean(y) for i,y in x.items()]).tolist(), columns=[f\'psdband-{bname}\' for bname in bandnames])\n    outs.append(temp)\n    \n    triinds = np.tril_indices(len(temp_short_chnames), k=-1)\n    temp = pd.DataFrame(grs[\'cohere\'].apply(lambda x: [y[triinds[0], triinds[1]].mean() for i,y in x.items()]).tolist(), columns=[f\'cohere-{bname}\' for bname in bandnames])\n    outs.append(temp)\n    temp = pd.DataFrame(grs[\'pcorr\'].apply(lambda x: x[triinds[0], triinds[1]].mean()).tolist(), columns=[\'pcorr\'])\n    outs.append(temp)\n\n    # for x in outs:\n    #     display(x.head(1))\n    out = pd.concat(outs, axis=1)\n    out = pd.concat([grs[[\'animalday\', \'animal\', \'genotype\', \'duration\', \'timestamp\', \'isday\']], out], axis=1)\n\n    display(out.head(1))\n    with pd.ExcelWriter(rf"C:\\Users\\dongjp\\Downloads\\{war.genotype}-{war.parse_filename_to_animal(war.animaldays[0])}.xlsx") as writer:\n        out.to_excel(writer)\n    # break\n')
-
-
-# In[46]:
-
-
-ap = AnimalPlotter(war)
-# ap.plot_coherecorr_matrix(['isday'], bands=None, figsize=(16,5), cmap='viridis')
-# ap.plot_coherecorr_diff(['isday'], bands=None, figsize=(16,5))
-# # ap.plot_linear_temporal(figsize=(20, 5), score_type='z', lw=1, channels=[0, 1])
-# ap.plot_linear_temporal(['isday'], figsize=(20, 5), score_type='z', lw=1, channels=[0, 1, 2, 3])
-
-# # ap.plot_coherecorr_spectral(figsize=(20, 5), score_type='center')
-# ap.plot_coherecorr_spectral(['isday'], figsize=(20, 5), score_type='center')
-ap.plot_psd_histogram(['isday'], figsize=(10, 4))
-
 
 # ## Miscellaneous Code
 
-# In[20]:
+# In[ ]:
 
 
-get_ipython().run_cell_magic('script', 'false', 'lan = core.LongRecordingAnalyzer(lrec, 100)\nprint(lan.n_fragments)\n\nfor i in range(lan.n_fragments):\n    if i == 10:\n        break\n    lan.compute_rms(i)\n    lan.compute_ampvar(i)\n    f, psd = lan.compute_psd(i)\n    lan.compute_psdband(i, f_psd=(f, psd))\n    lan.compute_psdtotal(i, f_psd=(f, psd))\n    mb = lan.compute_psdslope(i, f_psd=(f, psd))\n    lan.compute_cohere(i)\n    corr = lan.compute_corr(i)\n    print(corr)\n\n    # plt.imshow(corr)\n    # plt.show()\n\nfig, ax = plt.subplots(1, 1, figsize=(8, 3))\nax.loglog(f, psd)\nfor i, (m,b) in enumerate(mb):\n    ax.plot(f, 10**(b + m * np.log10(f)), c=f\'C{i}\')\nax.set_ylabel("PSD (uV^2/Hz)")\nax.set_xlabel("Frequency (Hz)")\nax.axvline(60, c=\'black\', ls=\'--\', alpha=0.25)\nplt.show()\n')
 
-
-# In[21]:
-
-
-get_ipython().run_cell_magic('script', 'false', '# Computationally heavy tests\n# lan.compute_spikes() \n# lan.compute_wavetemp()\n# lan.compute_nspike(10)\nwt, wts = lan.get_temps_from_wavetemp()\n\nfor wtch in wts:\n    if wtch is not None:\n        print(wtch.shape)\n    else:\n        continue\n    fig, ax = plt.subplots(1, 1, figsize=(6, 1.5))\n    for i in range(wtch.shape[0]):\n        ax.plot(wtch[i, :, :])\n')
-
-
-# In[22]:
-
-
-get_ipython().run_cell_magic('script', 'false', "temp = np.array(war.filter_rms_range(war.result)['rms'].tolist())\nprint(temp)\nprint(np.count_nonzero(np.isnan(temp)))\nfor i in range(10):\n    hist, bins = np.histogram(temp[:, i], bins=np.linspace(-4, 4, 100), density=True)\n    plt.hist(temp[:, i], bins=np.linspace(-4, 4, 100), density=True, color=f'C{i}', alpha=0.25)\n    density = gaussian_kde(temp[~np.isnan(temp[:, i]), i])\n    # print(x.shape, density(x).shape)\n    plt.plot(bins, density(bins), c=f'C{i}')\n    # plt.hist(temp[:, i], )\n    \nprint(temp)\n")
 
