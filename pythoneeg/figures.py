@@ -3,7 +3,7 @@
 
 # # PythonEEG - Figures
 
-# In[6]:
+# In[13]:
 
 
 import os
@@ -48,7 +48,7 @@ import cmasher as cmr
 from pythoneeg import core
 
 
-# In[7]:
+# In[14]:
 
 
 class AnimalFeatureParser:
@@ -220,7 +220,7 @@ class AnimalFeatureParser:
         return avg
 
 
-# In[8]:
+# In[15]:
 
 
 class WindowAnalysisResult(AnimalFeatureParser):
@@ -470,7 +470,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         return avg.filled(np.nan)
 
 
-# In[9]:
+# In[16]:
 
 
 class AnimalOrganizer(AnimalFeatureParser):
@@ -604,7 +604,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         return self.window_analysis_result
 
 
-# In[10]:
+# In[21]:
 
 
 class AnimalPlotter(AnimalFeatureParser):
@@ -979,7 +979,7 @@ class AnimalPlotter(AnimalFeatureParser):
 
 
 
-# In[ ]:
+# In[22]:
 
 
 class ExperimentPlotter(AnimalFeatureParser):

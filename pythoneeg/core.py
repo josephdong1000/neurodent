@@ -3,7 +3,7 @@
 
 # # PythonEEG
 
-# In[1]:
+# In[4]:
 
 
 import os
@@ -55,7 +55,15 @@ import PyInstaller.__main__
 
 
 
-# In[2]:
+# In[5]:
+
+
+from platform import python_version
+
+print(python_version())
+
+
+# In[6]:
 
 
 # df = pd.read_csv("https://kanaries-app.s3.ap-northeast-1.amazonaws.com/public-datasets/bike_sharing_dc.csv", parse_dates=['date'])
@@ -68,7 +76,7 @@ import PyInstaller.__main__
 
 # ## Define Metadata Loader
 
-# In[3]:
+# In[7]:
 
 
 def convert_units_to_multiplier(current_units, target_units='µV'):
@@ -86,7 +94,7 @@ def is_day(dt: datetime, sunrise=6, sunset=18):
     return sunrise <= dt.hour < sunset
 
 
-# In[4]:
+# In[8]:
 
 
 class DDFBinaryMetadata:
@@ -131,7 +139,7 @@ class DDFBinaryMetadata:
 
 # ## Define Analysis Pipeline
 
-# In[6]:
+# In[12]:
 
 
 def convert_ddfcolbin_to_ddfrowbin(rowdir_path, colbin_path, metadata, save_gzip=True):
@@ -191,7 +199,7 @@ def convert_ddfrowbin_to_si(bin_rowmajor_path, metadata):
     return rec, temppath
 
 
-# In[7]:
+# In[13]:
 
 
 def filepath_to_index(filepath) -> int:
@@ -205,7 +213,7 @@ def filepath_to_index(filepath) -> int:
     return int(fname[-1])
 
 
-# In[8]:
+# In[14]:
 
 
 class HiddenPrints:
@@ -223,7 +231,7 @@ class HiddenPrints:
             sys.stdout = self._original_stdout
 
 
-# In[9]:
+# In[15]:
 
 
 class LongRecordingOrganizer:
@@ -387,7 +395,7 @@ class LongRecordingOrganizer:
         return startidx, endidx
 
 
-# In[10]:
+# In[16]:
 
 
 class MountainSortOrganizer:
@@ -484,7 +492,7 @@ class MountainSortOrganizer:
         return sorting_analyzer, sorting_analyzers
 
 
-# In[20]:
+# In[17]:
 
 
 class LongRecordingAnalyzer:
@@ -518,29 +526,85 @@ class LongRecordingAnalyzer:
         
 
     def get_fragment_rec(self, index) -> si.BaseRecording:
+        """Get window at index as a spikeinterface recording object
+
+        Args:
+            index (int): Index of time window
+
+        Returns:
+            si.BaseRecording: spikeinterface recording object
+        """
         return self.LongRecording.get_fragment(self.fragment_len_s, index)
 
     def get_fragment_np(self, index, recobj=None) -> np.ndarray:
+        """Get window at index as a numpy array object
+
+        Args:
+            index (int): Index of time window
+            recobj (si.BaseRecording, optional): If not None, uses this recording object to get the numpy array. Defaults to None.
+
+        Returns:
+            np.ndarray: Numpy array with dimensions (N, M), N = number of samples, M = number of channels. Values in uV
+        """
         assert isinstance(recobj, si.BaseRecording) or recobj is None
         if recobj is None:
             return self.get_fragment_rec(index).get_traces(return_scaled=True) # (num_samples, num_channels), in units uV
         else:
             return recobj.get_traces(return_scaled=True)
 
-    # (1 epoch, num_channels, num_samples)
     def get_fragment_mne(self, index, recobj=None) -> np.ndarray:
+        """Get window at index as a numpy array object, formatted for ease of use with MNE functions
+
+        Args:
+            index (int): Index of time window
+            recobj (si.BaseRecording, optional): If not None, uses this recording object to get the numpy array. Defaults to None.
+
+        Returns:
+            np.ndarray: Numpy array with dimensions (1, M, N), M = number of channels, N = number of samples. 1st dimension corresponds
+             to number of epochs, which there is only 1 in a window. Values in uV
+        """
         rec = self.get_fragment_np(index, recobj=recobj)[..., np.newaxis]
-        return np.transpose(rec, (2, 1, 0))
+        return np.transpose(rec, (2, 1, 0)) # (1 epoch, num_channels, num_samples)
 
     def compute_rms(self, index, **kwargs):
+        """Compute average root mean square amplitude
+
+        Args:
+            index (int): Index of time window
+
+        Returns:
+            result: np.ndarray with shape (1, M), M = number of channels
+        """
         rec = self.get_fragment_np(index)
         return np.sqrt((rec ** 2).sum(axis=0) / rec.shape[0])
     
     def compute_ampvar(self, index, **kwargs):
+        """Compute average amplitude variance
+
+        Args:
+            index (int): Index of time window
+
+        Returns:
+            result: np.ndarray with shape (1, M), M = number of channels
+        """
         rec = self.get_fragment_np(index)
         return np.std(rec, axis=0) ** 2
     
     def compute_psd(self, index, welch_bin_t=1, notch_filter=True, multitaper=False, n_jobs=None, **kwargs):
+        """Compute PSD (power spectral density)
+
+        Args:
+            index (int): Index of time window
+            welch_bin_t (int, optional): Length of time bins to use in Welch's method, in seconds. Defaults to 1.
+            notch_filter (bool, optional): If True, inserts a notch filter at the line frequency specified in self.notch_freq. Defaults to True.
+            multitaper (bool, optional): If True, uses the multitaper method in MNE instead of Welch's method to compute the PSD. Defaults to False.
+            n_jobs (int, optional): Number of jobs to use in multitaper computation. Defaults to None.
+
+        Returns:
+            f (np.ndarray): Array of sample frequencies
+            psd (np.ndarray): Array of PSD values at sample frequencies. (X, M), X = number of sample frequencies, M = number of channels.
+            If sample window length is too short, PSD is interpolated
+        """
         rec = self.get_fragment_rec(index)
         if notch_filter:
             rec = spre.notch_filter(rec, freq=self.notch_freq, q=100)
@@ -573,7 +637,22 @@ class LongRecordingAnalyzer:
             out[k] = out_v
         return out
     
-    def compute_psdtotal(self, index, welch_bin_t=1, notch_filter=True, band=None, multitaper=False, f_psd=None, **kwargs):
+    def compute_psdtotal(self, index, welch_bin_t=1, notch_filter=True, band: list[int]=None, multitaper=False, f_psd=None, **kwargs):
+        """Compute total power over PSD (power spectral density) plot within a specified frequency band
+
+        Args:
+            index (int): Index of time window
+            welch_bin_t (int, optional): Length of time bins to use in Welch's method, in seconds. Defaults to 1.
+            notch_filter (bool, optional): If True, inserts a notch filter at the line frequency specified in self.notch_freq. Defaults to True.
+            band (list[int], optional): Frequency band to calculate over. band[0] is the lowest frequency, band[1] is the highest. If None, uses self.FREQ_BAND_TOTAL. Defaults to None.
+            multitaper (bool, optional): If True, uses the multitaper method in MNE instead of Welch's method to compute the PSD. Defaults to False.
+            f_psd (optional): Output of compute_psd. If not None, will be used to calculate statistic, otherwise interally calls compute_psd. Useful to avoid re-computing the PSD. Defaults to None.
+            n_jobs (int, optional): Number of jobs to use in multitaper computation. Defaults to None.
+
+        Returns:
+            psdtotal (np.ndarray): (M,) long array, M = number of channels. Each value corresponds to sum total of PSD in that band at that channel
+        """
+
         fband = self.FREQ_BAND_TOTAL if band is None else band
         if f_psd is not None:
             f, psd = f_psd
