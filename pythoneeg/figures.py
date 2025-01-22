@@ -3,7 +3,7 @@
 
 # # PythonEEG - Figures
 
-# In[13]:
+# In[24]:
 
 
 import os
@@ -48,7 +48,7 @@ import cmasher as cmr
 from pythoneeg import core
 
 
-# In[14]:
+# In[29]:
 
 
 class AnimalFeatureParser:
@@ -78,6 +78,11 @@ class AnimalFeatureParser:
     BAND_FEATURE = ['psdband']
     MATRIX_FEATURE = ['cohere', 'pcorr']
     HIST_FEATURE = ['psd']
+    __DOCSTRING_REPLACE = {
+        'test' : 'value',
+        "<features>" : "features (list[str]): List of features to compute. See individual compute_...() functions for output format",
+        "<exclude>" : "exclude (list[str], optional): List of features to ignore. Will override the features parameter. Defaults to [].",
+    }
 
     def _sanitize_feature_request(self, features: list[str], exclude: list[str]=[]):
         if features == ["all"]:
@@ -180,30 +185,6 @@ class AnimalFeatureParser:
             case _:
                 raise TypeError(f"Unrecognized type in column {colname}: {colitem}")
 
-        # if type(colitem) is np.ndarray:
-        #     col_agg = np.stack(column, axis=-1)
-        # elif type(colitem) is tuple:
-        #     if colname == 'psdslope':
-        #         col_agg = np.stack([np.array(x[1]) for x in column], axis=-1)
-        #     elif colname == 'psd':
-        #         col_agg = np.stack([x[1] for x in column], axis=-1)
-        #         col_agg = (colitem[0], col_agg)
-        #     elif colname == 'nspike':
-        #         agg_all = np.stack([list(map(sum, x[0])) for x in column], axis=-1)
-        #         agg_indiv = np.stack([list(map(sum, x[1])) for x in column], axis=-1)
-        #         col_agg = np.stack([agg_all, agg_indiv], axis=1)
-        #     elif colname == 'wavetemp':
-        #         warnings.warn("wavetemp cannot be averaged. Use get_wavetemp() instead")
-        #         col_agg = np.NaN
-        #     else:
-        #         raise TypeError(f"Unrecognized type in column {colname}\n{colitem}")
-        # elif type(colitem) is dict and all(type(v) is np.ndarray for v in colitem.values()):
-        #     col_agg = {k : np.stack([d[k] for d in column], axis=-1) for k in colitem.keys()}
-        # elif type(colitem) is list and all(type(x) is tuple for x in colitem):
-        #     col_agg = np.stack([np.array(x) for x in column], axis=-1)
-        # else:
-        #     raise TypeError(f"Unrecognized type in column {colname}\n{colitem}")
-
         if type(col_agg) is dict:
             avg = {k:self._nanaverage(v, axis=-1, weights=weights) for k,v in col_agg.items()}
         elif type(col_agg) is tuple:
@@ -219,8 +200,13 @@ class AnimalFeatureParser:
             avg = self._nanaverage(col_agg, axis=-1, weights=weights)
         return avg
 
+    def fixdocstring(func):
+        for key, value in AnimalFeatureParser.__DOCSTRING_REPLACE.items():
+            func.__doc__ = func.__doc__.replace(key, value)
+        return func
 
-# In[15]:
+
+# In[30]:
 
 
 class WindowAnalysisResult(AnimalFeatureParser):
@@ -470,7 +456,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         return avg.filled(np.nan)
 
 
-# In[16]:
+# In[31]:
 
 
 class AnimalOrganizer(AnimalFeatureParser):
@@ -539,13 +525,14 @@ class AnimalOrganizer(AnimalFeatureParser):
         for lrec in self.long_recordings:
             lrec.cleanup_rec()
 
+    @AnimalFeatureParser.fixdocstring
     def compute_windowed_analysis(self, features: list[str], exclude: list[str]=[], window_s=4, **kwargs):
         """Computes windowed analysis of animal recordings. The data is divided into windows (time bins), then features are extracted from each window. The result is
         formatted to a Dataframe and wrapped into a WindowAnalysisResult object.
 
         Args:
-            features (list[str]): List of features to compute. See individual compute_...() functions for output format
-            exclude (list[str], optional): List of features to ignore. Will override the features parameter. Defaults to [].
+            <features>
+            <exclude>
             window_s (int, optional): Length of each window in seconds. Note that some features break with very short window times. Defaults to 4.
 
         Raises:
@@ -604,7 +591,13 @@ class AnimalOrganizer(AnimalFeatureParser):
         return self.window_analysis_result
 
 
-# In[21]:
+# In[33]:
+
+
+
+
+
+# In[11]:
 
 
 class AnimalPlotter(AnimalFeatureParser):
@@ -979,7 +972,7 @@ class AnimalPlotter(AnimalFeatureParser):
 
 
 
-# In[22]:
+# In[12]:
 
 
 class ExperimentPlotter(AnimalFeatureParser):
