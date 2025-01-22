@@ -3,7 +3,7 @@
 
 # # PythonEEG - Figures
 
-# In[24]:
+# In[9]:
 
 
 import os
@@ -48,7 +48,7 @@ import cmasher as cmr
 from pythoneeg import core
 
 
-# In[29]:
+# In[10]:
 
 
 class AnimalFeatureParser:
@@ -78,11 +78,11 @@ class AnimalFeatureParser:
     BAND_FEATURE = ['psdband']
     MATRIX_FEATURE = ['cohere', 'pcorr']
     HIST_FEATURE = ['psd']
-    __DOCSTRING_REPLACE = {
-        'test' : 'value',
-        "<features>" : "features (list[str]): List of features to compute. See individual compute_...() functions for output format",
-        "<exclude>" : "exclude (list[str], optional): List of features to ignore. Will override the features parameter. Defaults to [].",
-    }
+    # __DOCSTRING_REPLACE = {
+    #     'test' : 'value',
+    #     "<features>" : "features (list[str]): List of features to compute. See individual compute_...() functions for output format",
+    #     "<exclude>" : "exclude (list[str], optional): List of features to ignore. Will override the features parameter. Defaults to [].",
+    # }
 
     def _sanitize_feature_request(self, features: list[str], exclude: list[str]=[]):
         if features == ["all"]:
@@ -200,13 +200,13 @@ class AnimalFeatureParser:
             avg = self._nanaverage(col_agg, axis=-1, weights=weights)
         return avg
 
-    def fixdocstring(func):
-        for key, value in AnimalFeatureParser.__DOCSTRING_REPLACE.items():
-            func.__doc__ = func.__doc__.replace(key, value)
-        return func
+    # def fixdocstring(func):
+    #     for key, value in AnimalFeatureParser.__DOCSTRING_REPLACE.items():
+    #         func.__doc__ = func.__doc__.replace(key, value)
+    #     return func
 
 
-# In[30]:
+# In[11]:
 
 
 class WindowAnalysisResult(AnimalFeatureParser):
@@ -456,7 +456,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         return avg.filled(np.nan)
 
 
-# In[31]:
+# In[12]:
 
 
 class AnimalOrganizer(AnimalFeatureParser):
@@ -525,14 +525,13 @@ class AnimalOrganizer(AnimalFeatureParser):
         for lrec in self.long_recordings:
             lrec.cleanup_rec()
 
-    @AnimalFeatureParser.fixdocstring
     def compute_windowed_analysis(self, features: list[str], exclude: list[str]=[], window_s=4, **kwargs):
         """Computes windowed analysis of animal recordings. The data is divided into windows (time bins), then features are extracted from each window. The result is
         formatted to a Dataframe and wrapped into a WindowAnalysisResult object.
 
         Args:
-            <features>
-            <exclude>
+            features (list[str]): List of features to compute. See individual compute_...() functions for output format
+            exclude (list[str], optional): List of features to ignore. Will override the features parameter. Defaults to [].
             window_s (int, optional): Length of each window in seconds. Note that some features break with very short window times. Defaults to 4.
 
         Raises:
@@ -589,12 +588,6 @@ class AnimalOrganizer(AnimalFeatureParser):
         self.window_analysis_result = WindowAnalysisResult(self.features_df, self.animal_id, self.genotype, self.channel_names)
 
         return self.window_analysis_result
-
-
-# In[33]:
-
-
-
 
 
 # In[11]:
