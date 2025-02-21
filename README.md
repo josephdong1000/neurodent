@@ -20,10 +20,24 @@ Linux and Mac are supported (Python 3.10). Windows was supported in an earlier v
   - https://code.visualstudio.com/
 - Program is in `pythoneeg.ipynb`. Set the notebook kernel to `.venv-win`
 
+## Features
+
+- RMS amplitude
+- Amplitude variance
+- Power spectral density
+- Coherence
+- Pearson correlation
+- (WIP) Cross-frequency coherence
+- (WIP) Canonical coherence
+- (WIP) Spike sorting
+- (WIP) Dimensionality reduction
+- (WIP) Peri-spike EEG
+- (WIP) GUI
+
 ## Goals
 
 - [x] Proper git/github repo setup
-- [ ] Summary box plots (and show to other labs)
+- [x] Summary box plots
 - [ ] Test run over all Marsh dataset
 - [ ] Spike sorting
 - [ ] Dimensionality reduction
