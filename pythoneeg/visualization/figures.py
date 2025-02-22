@@ -1,16 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# # PythonEEG - Figures
-
-# In[ ]:
-
-
-dir(core)
-
-
-# In[16]:
-
 
 import os
 import warnings
@@ -34,27 +21,12 @@ from scipy.stats import zscore, gzscore, gaussian_kde, linregress
 # import mne
 # import mne_connectivity
 
-# import spikeinterface.extractors as se
-# import spikeinterface.preprocessing as spre
-# import spikeinterface.sorters as ss
-# import spikeinterface.postprocessing as spost
-# import spikeinterface.qualitymetrics as sqm
-# import spikeinterface.exporters as sexp
-# import spikeinterface.comparison as scmp
-# import spikeinterface.curation as scur
-# import spikeinterface.sortingcomponents as sc
-# import spikeinterface.widgets as sw
-
 import cmasher as cmr
-# import PyQt5.QtWidgets as qw
-# import PyQt5.QtCore as qc
-# import pygwalker as pyg
-# import PyInstaller.__main__
 
-from pythoneeg import core
+from pythoneeg.core import core
 
 
-# In[17]:
+#%%
 
 
 class AnimalFeatureParser:
