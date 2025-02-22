@@ -1,5 +1,6 @@
 /analysis/*
 /bins/*
+**/test-data/
 /build/*
 /ddfs/*
 /dist/*

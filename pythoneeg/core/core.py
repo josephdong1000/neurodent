@@ -10,6 +10,7 @@ import time
 import warnings
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Union
 
 # Third party imports
 import numpy as np
@@ -139,7 +140,20 @@ class LongRecordingOrganizer:
                  colbin_folder_path=None,
                  rowbin_folder_path=None,
                  metadata_path=None,
-                 truncate=False) -> None:
+                 truncate: Union[bool, int]=False) -> None:
+        """Construct a long recording from binary files.
+
+        Args:
+            base_folder_path (str): Path to the base folder containing the binary files.
+            colbin_folder_path (str, optional): If not None, overrides base_folder_path for column-major binary files. Defaults to None.
+            rowbin_folder_path (str, optional): If not None, overrides base_folder_path for row-major binary files. Defaults to None.
+            metadata_path (str, optional): If not None, overrides metadata files at colbin_folder_path. Defaults to None.
+            truncate (Union[bool, int], optional): If True, truncate data to first 10 files. 
+                If an integer, truncate data to the first n files. Defaults to False.
+
+        Raises:
+            ValueError: If no data files are found.
+        """
         
         if type(truncate) is int:
             self.truncate = True
@@ -161,6 +175,7 @@ class LongRecordingOrganizer:
         os.makedirs(self.rowbin_folder_path, exist_ok=True)
 
         self.__update_colbins_rowbins_metas()
+        self.__check_colbin_rowbin_metas_not_empty()
 
         if metadata_path is not None:
             self.meta = DDFBinaryMetadata(metadata_path)
@@ -216,6 +231,15 @@ class LongRecordingOrganizer:
 
         if self.truncate:
             self.colbins, self.rowbins, self.metas = self.__truncate_lists(self.colbins, self.rowbins, self.metas)
+        
+
+    def __check_colbin_rowbin_metas_not_empty(self):
+        if not self.colbins:
+            warnings.warn("No column-major binary files found")
+        if not self.rowbins:
+            warnings.warn("No row-major binary files found")
+        if not self.metas:
+            warnings.warn("No metadata files found")
 
     def _validate_metadata_consistency(self, metadatas:list[DDFBinaryMetadata]):
         meta0 = metadatas[0]

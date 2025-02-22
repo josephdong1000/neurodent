@@ -1,28 +1,22 @@
-
-import os
-import warnings
-import sys
-from pathlib import Path
-import glob
-import math
-import json
+# Standard library imports
 import copy
+import glob
+import json
 import re
-from datetime import datetime
 import time
-from statistics import geometric_mean
+import warnings
+from datetime import datetime
+from pathlib import Path
 
+# Third party imports
+# import cmasher as cmr
 import numpy as np
 import pandas as pd
-# from scipy import signal, integrate
-from scipy.stats import gaussian_kde, zscore
-# import mne
-# import mne_connectivity
+from scipy.stats import zscore
 
-import cmasher as cmr
-
-from ..core import core
+# Local imports
 from .. import constants
+from ..core import core
 
 
 class AnimalFeatureParser:
@@ -510,12 +504,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 case _:
                     raise ValueError(f'Unknown feature to filter {feat}')
         return result
-
-    # def filter_bad_fragments(self, filt_beta=True, beta_prop=0.75):
-    #     # STUB filter out whole fragments based on telling channel features
-    #     ...
-
-
+    
     def to_pickle_and_json(self, folder):
         filebase =  Path(folder) / f"{self.genotype}-{self.animal_id}"
         filebase = str(filebase)

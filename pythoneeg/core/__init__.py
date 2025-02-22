@@ -1,4 +1,5 @@
 from .core import (
+    DDFBinaryMetadata,
     LongRecordingOrganizer,
     convert_ddfcolbin_to_ddfrowbin,
     convert_ddfrowbin_to_si
@@ -16,6 +17,7 @@ from .sorting import (
 )
 
 __all__ = [
+    "DDFBinaryMetadata",
     "LongRecordingOrganizer",
     "convert_ddfcolbin_to_ddfrowbin",
     "convert_ddfrowbin_to_si",
