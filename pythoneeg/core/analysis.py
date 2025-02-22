@@ -25,22 +25,22 @@ import spikeinterface.preprocessing as spre
 # Local imports
 from .core import LongRecordingOrganizer
 from .sorting import MountainSortOrganizer
-
+from .. import constants
 #%%
 
 class LongRecordingAnalyzer:
 
-    FEATURES = ['rms', 'ampvar', 'psd', 'psdtotal', 'psdband', 'psdslope', 'cohere', 'pcorr', 'nspike', 'wavetemp']
-    GLOBAL_FEATURES = ['templates']
-    FREQ_BANDS = {'delta' : (0.1, 4),
-                'theta' : (4, 8),
-                'alpha' : (8, 13),
-                'beta'  : (13, 25),
-                'gamma' : (25, 50)}
-    FREQ_BAND_TOTAL = (0.1, 50)
-    FREQ_MINS = [v[0] for k,v in FREQ_BANDS.items()]
-    FREQ_MAXS = [v[1] for k,v in FREQ_BANDS.items()]
-    FREQ_BAND_NAMES = list(FREQ_BANDS.keys())
+    # FEATURES = ['rms', 'ampvar', 'psd', 'psdtotal', 'psdband', 'psdslope', 'cohere', 'pcorr', 'nspike', 'wavetemp']
+    # GLOBAL_FEATURES = ['templates']
+    # FREQ_BANDS = {'delta' : (0.1, 4),
+    #             'theta' : (4, 8),
+    #             'alpha' : (8, 13),
+    #             'beta'  : (13, 25),
+    #             'gamma' : (25, 50)}
+    # FREQ_BAND_TOTAL = (0.1, 50)
+    # FREQ_MINS = [v[0] for k,v in FREQ_BANDS.items()]
+    # FREQ_MAXS = [v[1] for k,v in FREQ_BANDS.items()]
+    # FREQ_BAND_NAMES = list(FREQ_BANDS.keys())
 
     def __init__(self, longrecording, fragment_len_s=10, notch_freq=60) -> None:
 
@@ -151,13 +151,13 @@ class LongRecordingAnalyzer:
                 psd = Akima1DInterpolator(f, psd, axis=0, extrapolate=True)(f_prev)
                 f = f_prev
         else:
-            psd, f = psd_array_multitaper(rec_np.transpose(), self.f_s, fmax=self.FREQ_BAND_TOTAL[1],
+            psd, f = psd_array_multitaper(rec_np.transpose(), self.f_s, fmax=constants.FREQ_BAND_TOTAL[1],
                                             adaptive=True, n_jobs=n_jobs, normalization='full', low_bias=False, verbose=0)
             psd = psd.transpose()
         return f, psd
 
     def compute_psdband(self, index, welch_bin_t=1, notch_filter=True, bands=None, multitaper=False, f_psd=None, **kwargs):
-        fbands = self.FREQ_BANDS if bands is None else bands
+        fbands = constants.FREQ_BANDS if bands is None else bands
         if f_psd is not None:
             f, psd = f_psd
         else:
@@ -186,7 +186,7 @@ class LongRecordingAnalyzer:
             psdtotal (np.ndarray): (M,) long array, M = number of channels. Each value corresponds to sum total of PSD in that band at that channel
         """
 
-        fband = self.FREQ_BAND_TOTAL if band is None else band
+        fband = constants.FREQ_BAND_TOTAL if band is None else band
         if f_psd is not None:
             f, psd = f_psd
         else:
@@ -196,7 +196,7 @@ class LongRecordingAnalyzer:
         return simpson(psd[np.logical_and(f >= fband[0], f <= fband[1]), :], dx=deltaf, axis=0)
 
     def compute_psdslope(self, index, welch_bin_t=1, notch_filter=True, band=None, multitaper=False, f_psd=None, **kwargs):
-        fband = self.FREQ_BAND_TOTAL if band is None else band
+        fband = constants.FREQ_BAND_TOTAL if band is None else band
         if f_psd is not None:
             f, psd = f_psd
         else:
@@ -291,9 +291,9 @@ class LongRecordingAnalyzer:
 
     def __get_freqs_cycles(self, index, freq_res, n_cycles_max, geomspace, mode:str, epsilon):
         if geomspace:
-            freqs = np.geomspace(self.FREQ_BAND_TOTAL[0], self.FREQ_BAND_TOTAL[1], round((np.diff(self.FREQ_BAND_TOTAL) / freq_res).item()))
+            freqs = np.geomspace(constants.FREQ_BAND_TOTAL[0], constants.FREQ_BAND_TOTAL[1], round((np.diff(constants.FREQ_BAND_TOTAL) / freq_res).item()))
         else:
-            freqs = np.arange(self.FREQ_BAND_TOTAL[0], self.FREQ_BAND_TOTAL[1], freq_res)
+            freqs = np.arange(constants.FREQ_BAND_TOTAL[0], constants.FREQ_BAND_TOTAL[1], freq_res)
 
         frag_len_s = self.LongRecording.get_dur_fragment(self.fragment_len_s, index)
         match mode:
@@ -319,8 +319,8 @@ class LongRecordingAnalyzer:
                                             average=True,
                                             faverage=True,
                                             mode=mode,
-                                            fmin=self.FREQ_MINS,
-                                            fmax=self.FREQ_MAXS,
+                                            fmin=constants.FREQ_MINS,
+                                            fmax=constants.FREQ_MAXS,
                                             sfreq=self.f_s / downsamp_q,
                                             n_cycles=n_cycles,
                                             n_jobs=n_jobs_coh,
@@ -330,7 +330,7 @@ class LongRecordingAnalyzer:
         data = con.get_data()
         out = {}
         for i in range(data.shape[1]):
-            out[self.FREQ_BAND_NAMES[i]] = data[:, i].reshape((self.n_channels, self.n_channels))
+            out[constants.FREQ_BAND_NAMES[i]] = data[:, i].reshape((self.n_channels, self.n_channels))
         return out
 
     def compute_cacoh(self, index, freq_res=1, n_cycles_max=7.0, geomspace=True, mode:str='cwt_morlet', downsamp_q=4, epsilon=1e-2, mag_phase=True, indices=None, **kwargs):
@@ -343,8 +343,8 @@ class LongRecordingAnalyzer:
                                             method='cacoh',
                                             average=True,
                                             mode=mode,
-                                            fmin=self.FREQ_BAND_TOTAL[0],
-                                            fmax=self.FREQ_BAND_TOTAL[1],
+                                            fmin=constants.FREQ_BAND_TOTAL[0],
+                                            fmax=constants.FREQ_BAND_TOTAL[1],
                                             sfreq=self.f_s / downsamp_q,
                                             n_cycles=n_cycles,
                                             indices=indices, # TODO implement L/R hemisphere coherence metrics
@@ -360,8 +360,8 @@ class LongRecordingAnalyzer:
 
     def compute_pcorr(self, index, lower_triag=True, **kwargs) -> np.ndarray:
         rec = spre.bandpass_filter(self.get_fragment_rec(index),
-                                    freq_min=self.FREQ_BAND_TOTAL[0],
-                                    freq_max=self.FREQ_BAND_TOTAL[1])
+                                    freq_min=constants.FREQ_BAND_TOTAL[0],
+                                    freq_max=constants.FREQ_BAND_TOTAL[1])
         rec = self.get_fragment_np(index, rec).transpose()
         result = pearsonr(rec[:, np.newaxis, :], rec, axis=-1)
         if lower_triag:
@@ -372,13 +372,13 @@ class LongRecordingAnalyzer:
     def compute_csd(self, index, magnitude=True, n_jobs=None, **kwargs) -> np.ndarray:
         rec = self.get_fragment_mne(index)
         csd = csd_array_fourier(rec, self.f_s,
-                                fmin=self.FREQ_BAND_TOTAL[0],
-                                fmax=self.FREQ_BAND_TOTAL[1],
+                                fmin=constants.FREQ_BAND_TOTAL[0],
+                                fmax=constants.FREQ_BAND_TOTAL[1],
                                 ch_names=self.channel_names,
                                 n_jobs=n_jobs,
                                 verbose=False)
         out = {}
-        for k,v in self.FREQ_BANDS.items():
+        for k,v in constants.FREQ_BANDS.items():
             try:
                 csd_band = csd.mean(fmin=v[0], fmax=v[1]) # Breaks if slice is too short
             except (IndexError, UnboundLocalError):
@@ -396,8 +396,8 @@ class LongRecordingAnalyzer:
 
     def compute_envcorr(self, index, **kwargs) -> np.ndarray:
         rec = spre.bandpass_filter(self.get_fragment_rec(index),
-                                    freq_min=self.FREQ_BAND_TOTAL[0],
-                                    freq_max=self.FREQ_BAND_TOTAL[1])
+                                    freq_min=constants.FREQ_BAND_TOTAL[0],
+                                    freq_max=constants.FREQ_BAND_TOTAL[1])
         rec = self.get_fragment_mne(index, rec)
         envcor = envelope_correlation(rec, self.channel_names)
         return envcor.get_data().reshape((self.n_channels, self.n_channels))
