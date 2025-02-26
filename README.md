@@ -38,6 +38,7 @@ Linux and Mac are supported (Python 3.10). Windows was supported in an earlier v
 
 - [x] Proper git/github repo setup
 - [x] Summary box plots
+- [x] Parallelized feature computation
 - [ ] Test run over all Marsh dataset
 - [ ] Spike sorting
 - [ ] Dimensionality reduction
@@ -45,15 +46,6 @@ Linux and Mac are supported (Python 3.10). Windows was supported in an earlier v
   - [ ] UMAP / qUMAP
 - [ ] Cross-frequency coherence
 - [ ] Canonical coherence
-- [ ] Peri-spike EEG
+- [ ] Peri-spike EEG (with MNE)
 - [ ] GUI
 
-
-## Notes/Changelog
-
-- [1/23/25] Transition to Linux/Mac for speed, added documentation
-- [10/8/24] Template extractor and function plotter still needed
-- [10/7/24] Can read timestamps from .CSVs, matlab code pulls timestamp information from last modified time of .DDF. Added day/night average analysis.
-- [10/5/24] `compute_cohere` and `compute_psd` fixed. Metadata date reading still needed. Function plotter still needed. Template extractor from sorting analyzers needs to be written for for figures script.
-- [10/4/24] Can read from folders containing BIN and CSV. `compute_cohere` will break if window is too short, added try/except to handle. Same with `compute_psd`, will need to write function to interpolate according to 2nd to last. Metadata needs to read in start timestamp from DDF, or manual input OK
-- [10/2/24] Data paths need to be inputted manually. Analysis functions complete (except multi-channel units), but outputs need to be organized and converted to figures by end user; an example is under **Test Analysis Functions**. GUI in progress. Function documentation not written. Set `CONVERT_TO_PY = False` and `CONVERT_PY_TO_EXE = False`
