@@ -1,5 +1,5 @@
-from pythoneeg.core import core
-from ..results import AnimalFeatureParser, WindowAnalysisResult
+from ... import core
+from ... import visualization as viz
 
 
 import matplotlib
@@ -10,7 +10,7 @@ import pandas as pd
 from scipy.stats import gzscore, linregress, zscore
 
 
-class AnimalPlotter(AnimalFeatureParser):
+class AnimalPlotter(viz.AnimalFeatureParser):
 
     # TODO Plot hist features across every channel as a histogram with standard deviations, as a spectrograph
     # Plot matrix features as several grids per-band for cohere + 1 for pcorr, as a spectrograph flattening channel combinations
@@ -20,7 +20,7 @@ class AnimalPlotter(AnimalFeatureParser):
     # STUB Plot peri-spike frequency plot, convolving over time based on frequency with an (arbitrarily chosen) gaussian filter
     # STUB make experimental UMAP (q-UMAP?) plotter
 
-    def __init__(self, war: WindowAnalysisResult) -> None:
+    def __init__(self, war: viz.WindowAnalysisResult) -> None:
         self.window_result = war
         self.genotype = war.genotype
         self.channel_names = war.channel_names

@@ -23,8 +23,7 @@ import spikeinterface.core as si
 import spikeinterface.preprocessing as spre
 
 # Local imports
-from .core import LongRecordingOrganizer
-from .sorting import MountainSortOrganizer
+from .. import core
 from .. import constants
 #%%
 
@@ -44,7 +43,7 @@ class LongRecordingAnalyzer:
 
     def __init__(self, longrecording, fragment_len_s=10, notch_freq=60) -> None:
 
-        assert isinstance(longrecording, LongRecordingOrganizer)
+        assert isinstance(longrecording, core.LongRecordingOrganizer)
 
         self.LongRecording = longrecording
         self.fragment_len_s = fragment_len_s
@@ -214,7 +213,7 @@ class LongRecordingAnalyzer:
 
     # Needs work; will need to accept a geometry file to effectively find multielectrode events
     def compute_spikes(self, verbose=False, n_jobs_si: None | int = None, **kwargs):
-        mso = MountainSortOrganizer(self.LongRecording.LongRecording, verbose=verbose, n_jobs=n_jobs_si)
+        mso = core.MountainSortOrganizer(self.LongRecording.LongRecording, verbose=verbose, n_jobs=n_jobs_si)
         mso.preprocess_recording()
         mso.extract_spikes()
         mso.preprocess_final_recording()
@@ -330,7 +329,7 @@ class LongRecordingAnalyzer:
         data = con.get_data()
         out = {}
         for i in range(data.shape[1]):
-            out[constants.FREQ_BAND_NAMES[i]] = data[:, i].reshape((self.n_channels, self.n_channels))
+            out[constants.BAND_NAMES[i]] = data[:, i].reshape((self.n_channels, self.n_channels))
         return out
 
     def compute_cacoh(self, index, freq_res=1, n_cycles_max=7.0, geomspace=True, mode:str='cwt_morlet', downsamp_q=4, epsilon=1e-2, mag_phase=True, indices=None, **kwargs):

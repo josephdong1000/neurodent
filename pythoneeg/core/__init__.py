@@ -7,7 +7,8 @@ from .core import (
 from .utils import (
     convert_units_to_multiplier,
     convert_colpath_to_rowpath,
-    filepath_to_index
+    filepath_to_index,
+    is_day
 )
 from .analysis import (
     LongRecordingAnalyzer
@@ -24,6 +25,7 @@ __all__ = [
     "convert_units_to_multiplier",
     "convert_colpath_to_rowpath",
     "filepath_to_index",
+    "is_day",
     "LongRecordingAnalyzer",
     "MountainSortOrganizer"
 ]

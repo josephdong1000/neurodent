@@ -1,3 +1,14 @@
+DEFAULT_ID_TO_LR = {9 : 'L',
+                    10 : 'L',
+                    12 : 'L',
+                    14 : 'L',
+                    15 : 'L',
+                    16 : 'R',
+                    17 : 'R',
+                    19 : 'R',
+                    21 : 'R',
+                    22 : 'R'}
+
 
 GENOTYPE_ALIASES = {'WT' : ['WT', 'wildtype'],
                         'KO' : ['KO', 'knockout']}
@@ -10,8 +21,7 @@ CHNAME_ALIASES = {'A' : ['Aud', 'aud'],
                     }
 LR_ALIASES = {'L' : ['left', 'Left', 'L ', ' L'],
             'R' : ['right', 'Right', 'R ', ' R']}
-
-DEFAULT_CHNUM_TO_NAME = {9: 'LA',
+DEFAULT_ID_TO_NAME = {9: 'LA',
                         10: 'LV',
                         12: 'LH',
                         14: 'LB',
@@ -21,6 +31,7 @@ DEFAULT_CHNUM_TO_NAME = {9: 'LA',
                         19: 'RH',
                         21: 'RV',
                         22: 'RA',}
+
 FEATURES = ['rms', 'ampvar', 'psd', 'psdtotal', 'psdband', 'psdslope', 'cohere', 'pcorr', 'nspike', 'wavetemp']
 LINEAR_FEATURE = ['rms', 'ampvar', 'psdtotal', 'psdslope']
 BAND_FEATURE = ['psdband']

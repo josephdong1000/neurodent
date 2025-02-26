@@ -1,12 +1,12 @@
 
 import pandas as pd
 
-from ..results import AnimalFeatureParser, WindowAnalysisResult
+from ... import visualization as viz
 
 
-class ExperimentPlotter(AnimalFeatureParser):
-    def __init__(self, wars:list[WindowAnalysisResult], features=['all'], exclude=None, groupby=['animalday', 'animal', 'genotype']) -> None:
-        self.results: list[WindowAnalysisResult] = wars
+class ExperimentPlotter(viz.AnimalFeatureParser):
+    def __init__(self, wars:list[viz.WindowAnalysisResult], features=['all'], exclude=None, groupby=['animalday', 'animal', 'genotype']) -> None:
+        self.results: list[viz.WindowAnalysisResult] = wars
         self.channel_names: list[list[str]] = [war.channel_names for war in wars]
         dftemp = []
         for i, war in enumerate(wars):

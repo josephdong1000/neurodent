@@ -7,16 +7,22 @@ import time
 import warnings
 from datetime import datetime
 from pathlib import Path
+from typing import Literal
 
 # Third party imports
 # import cmasher as cmr
 import numpy as np
 import pandas as pd
 from scipy.stats import zscore
+import dask
+from dask import delayed
+from tqdm.dask import TqdmCallback
+from tqdm import tqdm
+from multiprocessing import Pool
 
 # Local imports
 from .. import constants
-from ..core import core
+from .. import core
 
 
 class AnimalFeatureParser:
@@ -85,10 +91,6 @@ class AnimalFeatureParser:
 
     def _parse_filename_to_genotype(self, filename:str):
         name = Path(filename).name
-        # for k,v in self.GENOTYPE_ALIASES.items():
-        #     if any([x in name for x in v]):
-        #         return k
-        # raise ValueError(f"Folder {filename} does not contain genotype\nAvailable genotypes: {self.GENOTYPE_ALIASES}")
         return self.__get_key_from_match_values(name, constants.GENOTYPE_ALIASES)
     
     def _parse_filename_to_day(self, filename:str, date_pattern=None) -> datetime:
@@ -113,7 +115,7 @@ class AnimalFeatureParser:
         except ValueError as e:
             if assume_channels:
                 num = int(channel_name.split('-')[-1])
-                return constants.DEFAULT_CHNUM_TO_NAME[num]
+                return constants.DEFAULT_ID_TO_NAME[num]
             else:
                 raise e
         return lr + chname
@@ -241,7 +243,12 @@ class AnimalOrganizer(AnimalFeatureParser):
         for lrec in self.long_recordings:
             lrec.cleanup_rec()
 
-    def compute_windowed_analysis(self, features: list[str], exclude: list[str]=[], window_s=4, **kwargs):
+    def compute_windowed_analysis(self, 
+                                  features: list[str], 
+                                  exclude: list[str]=[], 
+                                  window_s=4, 
+                                  multiprocess_mode: Literal['dask', 'serial']='dask', 
+                                  **kwargs):
         """Computes windowed analysis of animal recordings. The data is divided into windows (time bins), then features are extracted from each window. The result is
         formatted to a Dataframe and wrapped into a WindowAnalysisResult object.
 
@@ -259,44 +266,30 @@ class AnimalOrganizer(AnimalFeatureParser):
         features = self._sanitize_feature_request(features, exclude)
 
         dataframes = []
-        for lrec in self.long_recordings:
-            out = []
+        for lrec in self.long_recordings: # Iterate over all long recordings
             lan = core.LongRecordingAnalyzer(lrec, fragment_len_s=window_s)
-            for j,feat in enumerate(features):
-                
-                if 'n_jobs_coh' in kwargs and feat == 'cohere':
-                    lan.setup_njobs()
 
-                func_name = f"compute_{feat}"
-                func = getattr(lan, func_name)
-                if callable(func):
-                    print(f"Computing {feat}..")
-                    t = time.process_time()
-                    for idx in range(lan.n_fragments):
-                        if j == 0:
-                            out.append({})
+            # lan.setup_njobs()
+            if 'n_jobs_coh' in kwargs and 'cohere' in features:
+                lan.setup_njobs()
 
-                            lan_folder = lan.LongRecording.base_folder_path
-                            out[idx]["animalday"] = self._parse_filename_to_animalday(lan_folder)
-                            out[idx]["animal"] = self._parse_filename_to_animal(lan_folder)
-                            out[idx]["day"] = self._parse_filename_to_day(lan_folder)
-                            out[idx]["genotype"] = self._parse_filename_to_genotype(lan_folder)
-                            out[idx]["duration"] = lan.LongRecording.get_dur_fragment(window_s, idx)
-                            out[idx]["endfile"] = lan.get_file_end(idx)
-                            
-                            frag_dt = lan.LongRecording.get_datetime_fragment(window_s, idx)
-                            out[idx]["timestamp"] = frag_dt
-                            out[idx]["isday"] = core.is_day(frag_dt)
+            match multiprocess_mode:
+                case 'dask':
+                    # Create delayed tasks for each fragment
+                    delayed_tasks = [delayed(self.__process_fragment)(idx, features, lan, window_s, kwargs) for idx in range(lan.n_fragments)]
+                    # Compute all tasks with progress bar
+                    with TqdmCallback(desc='Processing rows'):
+                        lan_df = dask.compute(*delayed_tasks)
+                case _:
+                    print("Processing serially")
+                    lan_df = []
+                    for idx in tqdm(range(lan.n_fragments)):
+                        lan_df.append(self.__process_fragment(idx, features, lan, window_s, kwargs))
 
-                        out[idx][feat] = func(idx, **kwargs)
-                    print(f"\t..done in {time.process_time() - t} s")
-
-                else:
-                    raise AttributeError(f"Invalid function {func}")
+            lan_df = pd.DataFrame(lan_df)
 
             self.long_analyzers.append(lan)
-            out = pd.DataFrame(out)
-            dataframes.append(out)
+            dataframes.append(lan_df)
         
         self.features_df = pd.concat(dataframes)
         self.features_df.reset_index(inplace=True)
@@ -304,6 +297,29 @@ class AnimalOrganizer(AnimalFeatureParser):
         self.window_analysis_result = WindowAnalysisResult(self.features_df, self.animal_id, self.genotype, self.channel_names)
 
         return self.window_analysis_result
+
+
+    def __process_fragment(self, idx, features, lan: core.LongRecordingAnalyzer, window_s, kwargs: dict):
+        row = pd.Series()
+        lan_folder = lan.LongRecording.base_folder_path
+        row['animalday'] = self._parse_filename_to_animalday(lan_folder)
+        row['animal'] = self._parse_filename_to_animal(lan_folder)
+        row['day'] = self._parse_filename_to_day(lan_folder)
+        row['genotype'] = self._parse_filename_to_genotype(lan_folder)
+        row['duration'] = lan.LongRecording.get_dur_fragment(window_s, idx)
+        row['endfile'] = lan.get_file_end(idx)
+
+        frag_dt = lan.LongRecording.get_datetime_fragment(window_s, idx)
+        row['timestamp'] = frag_dt
+        row['isday'] = core.is_day(frag_dt)
+
+        for feat in features:
+            func = getattr(lan, f"compute_{feat}")
+            if callable(func):
+                row[feat] = func(idx, **kwargs)
+            else:
+                raise AttributeError(f"Invalid function {func}")
+        return row
 
 
 class WindowAnalysisResult(AnimalFeatureParser):
@@ -505,14 +521,18 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     raise ValueError(f'Unknown feature to filter {feat}')
         return result
     
-    def to_pickle_and_json(self, folder):
-        filebase =  Path(folder) / f"{self.genotype}-{self.animal_id}"
+    def to_pickle_and_json(self, folder: str | Path):
+        """Archive window analysis result into the folder specified
+
+        Args:
+            folder (str | Path): Destination folder to save results to
+        """
+        filebase = Path(folder) / f"{self.genotype}-{self.animal_id}"
         filebase = str(filebase)
 
         self.result.to_pickle(filebase + '.pkl')
         with open(filebase + ".json", "w") as f:
             json.dump(self.channel_names, f, indent=2)
-
 
     # def get_temps_from_wavetemp(self, sa_sas=None, **kwargs): # TODO have some way of storing spikes and traces
     #     if sa_sas is None:
