@@ -1,13 +1,13 @@
-from ... import core
-from ... import visualization as viz
-
-
 import matplotlib
 import matplotlib.axes
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from scipy.stats import gzscore, linregress, zscore
+
+from ... import core
+from ... import visualization as viz
+from ... import constants
 
 
 class AnimalPlotter(viz.AnimalFeatureParser):
@@ -45,7 +45,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         avg_result = self.__get_groupavg_coherecorr(groupby, **kwargs)
 
         if bands is None:
-            bands = list(core.LongRecordingAnalyzer.FREQ_BANDS.keys()) + ['pcorr']
+            bands = constants.BAND_NAMES + ['pcorr']
         elif isinstance(bands, str):
             bands = [bands]
         n_row = avg_result.index.size
@@ -65,7 +65,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
             raise ValueError(f"Difference can only be calculated between 2 rows. {groupby} resulted in {len(avg_result.index)} rows")
 
         if bands is None:
-            bands = list(core.LongRecordingAnalyzer.FREQ_BANDS.keys()) + ['pcorr']
+            bands = constants.BAND_NAMES + ['pcorr']
         elif isinstance(bands, str):
             bands = [bands]
 
@@ -103,7 +103,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         ax[0].set_ylabel(rowname, rotation='horizontal', ha='right')
 
     def __get_groupavg_coherecorr(self, groupby="animalday", **kwargs):
-        avg_result = self.window_result.get_groupavg_result(self.MATRIX_FEATURE, groupby=groupby)
+        avg_result = self.window_result.get_groupavg_result(constants.MATRIX_FEATURE, groupby=groupby)
         avg_coheresplit = pd.json_normalize(avg_result['cohere']).set_index(avg_result.index) # Split apart the cohere dictionaries
         return avg_coheresplit.join(avg_result)
 
@@ -317,8 +317,8 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                 case _:
                     raise ValueError(f"Invalid plot type {plot_type}")
 
-            frange = np.logical_and(freqs >= core.LongRecordingAnalyzer.FREQ_BAND_TOTAL[0],
-                                    freqs <= core.LongRecordingAnalyzer.FREQ_BAND_TOTAL[1])
+            frange = np.logical_and(freqs >= constants.FREQ_BAND_TOTAL[0],
+                                    freqs <= constants.FREQ_BAND_TOTAL[1])
             logf = np.log10(freqs[frange])
             logpsd = np.log10(psd[frange, :])
 
