@@ -287,6 +287,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                         lan_df.append(self.__process_fragment(idx, features, lan, window_s, kwargs))
 
             lan_df = pd.DataFrame(lan_df)
+            lan_df.sort_values('timestamp', inplace=True)
 
             self.long_analyzers.append(lan)
             dataframes.append(lan_df)
