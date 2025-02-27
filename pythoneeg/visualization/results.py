@@ -18,7 +18,6 @@ import dask
 from dask import delayed
 from tqdm.dask import TqdmCallback
 from tqdm import tqdm
-from multiprocessing import Pool
 
 # Local imports
 from .. import constants
