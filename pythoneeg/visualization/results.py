@@ -76,13 +76,15 @@ class AnimalFeatureParser:
         # name = Path(filename).name
         return datetime(year=year, month=month, day=day)
 
-    def _parse_chname_to_abbrev(self, channel_name:str, assume_channels=False):
+    def _parse_chname_to_abbrev(self, channel_name:str, assume_from_number=False):
         try:
             lr = self.__get_key_from_match_values(channel_name, constants.LR_ALIASES)
             chname = self.__get_key_from_match_values(channel_name, constants.CHNAME_ALIASES)
         except ValueError as e:
-            if assume_channels:
-                num = int(channel_name.split('-')[-1])
+            if assume_from_number:
+                warnings.warn(f"{channel_name} does not match name aliases. Assuming alias from number in channel name.")
+                nums = re.findall(r'\d+', channel_name)
+                num = int(nums[-1])
                 return constants.DEFAULT_ID_TO_NAME[num]
             else:
                 raise e
@@ -147,16 +149,21 @@ class AnimalFeatureParser:
 
 class AnimalOrganizer(AnimalFeatureParser):
 
-    READ_MODES = ["nest", "concat", "base", "noday"]
-
-    def __init__(self, base_folder_path, anim_id: str, date_format="NN*NN*NNNN", mode="concat", skip_days: list[str] = [], truncate:bool|int=False) -> None:
+    def __init__(self, 
+                 base_folder_path, 
+                 anim_id: str, 
+                 date_format="NN*NN*NNNN", 
+                 mode: Literal["nest", "concat", "base", "noday"] = "concat", 
+                 assume_from_number=False,
+                 skip_days: list[str] = [], 
+                 truncate:bool|int=False) -> None:
         
         self.base_folder_path = Path(base_folder_path)
         self.anim_id = anim_id
         self.date_format = date_format.replace("N", "[0-9]")
         self.__readmode = mode
+        self.assume_from_number = assume_from_number
 
-        assert mode in self.READ_MODES
         match mode:
             case "nest":
                 self.bin_folder_pat = self.base_folder_path / f"*{self.anim_id}*" / f"*{self.date_format}*"
@@ -166,6 +173,9 @@ class AnimalOrganizer(AnimalFeatureParser):
                 self.bin_folder_pat = self.base_folder_path
             case "noday":
                 self.bin_folder_pat = self.base_folder_path / f"*{self.anim_id}*"
+            case _:
+                raise ValueError(f"Invalid mode: {mode}")
+
         self.__bin_folders = glob.glob(str(self.bin_folder_pat))
         self.__bin_folders = [x for x in self.__bin_folders if not any(y in x for y in skip_days)]
 
@@ -241,17 +251,18 @@ class AnimalOrganizer(AnimalFeatureParser):
             if 'n_jobs_coh' in kwargs and 'cohere' in features:
                 lan.setup_njobs()
 
+            miniters = int(lan.n_fragments / 20)
             match multiprocess_mode:
                 case 'dask':
                     # Create delayed tasks for each fragment
                     delayed_tasks = [delayed(self.__process_fragment)(idx, features, lan, window_s, kwargs) for idx in range(lan.n_fragments)]
                     # Compute all tasks with progress bar
-                    with TqdmCallback(desc='Processing rows'):
+                    with TqdmCallback(desc='Processing rows', miniters=miniters):
                         lan_df = dask.compute(*delayed_tasks)
                 case _:
                     print("Processing serially")
                     lan_df = []
-                    for idx in tqdm(range(lan.n_fragments)):
+                    for idx in tqdm(range(lan.n_fragments), desc='Processing rows', miniters=miniters):
                         lan_df.append(self.__process_fragment(idx, features, lan, window_s, kwargs))
 
             lan_df = pd.DataFrame(lan_df)
@@ -263,7 +274,11 @@ class AnimalOrganizer(AnimalFeatureParser):
         self.features_df = pd.concat(dataframes)
         self.features_df.reset_index(inplace=True)
 
-        self.window_analysis_result = WindowAnalysisResult(self.features_df, self.animal_id, self.genotype, self.channel_names)
+        self.window_analysis_result = WindowAnalysisResult(self.features_df, 
+                                                           self.animal_id, 
+                                                           self.genotype, 
+                                                           self.channel_names, 
+                                                           self.assume_from_number)
 
         return self.window_analysis_result
 
@@ -295,14 +310,14 @@ class WindowAnalysisResult(AnimalFeatureParser):
     """
     Wrapper for output of windowed analysis. Has useful features like group-wise and global averaging, filtering, and saving
     """
-    def __init__(self, result: pd.DataFrame, animal_id:str=None, genotype:str=None, channel_names:list[str]=None, assume_channels=True) -> None:
+    def __init__(self, result: pd.DataFrame, animal_id:str=None, genotype:str=None, channel_names:list[str]=None, assume_from_number=False) -> None:
         """
         Args:
             result (pd.DataFrame): Result comes from AnimalOrganizer.compute_windowed_analysis()
             animal_id (str, optional): Identifier for the animal where result was computed from. Defaults to None.
             genotype (str, optional): Genotype of animal. Defaults to None.
             channel_names (list[str], optional): List of channel names. Defaults to None.
-            assume_channels (bool, optional): If true, assumes channel names according to AnimalFeatureParser.DEFAULT_CHNUM_TO_NAME. Defaults to True.
+            assume_channels (bool, optional): If true, assumes channel names according to AnimalFeatureParser.DEFAULT_CHNUM_TO_NAME. Defaults to False.
         """
         self.result = result
         columns = result.columns
@@ -317,8 +332,11 @@ class WindowAnalysisResult(AnimalFeatureParser):
         self.animal_id = animal_id
         self.genotype = genotype
         self.channel_names = channel_names
-        self.assume_channels = assume_channels
-        self.short_chnames = [self._parse_chname_to_abbrev(x, assume_channels=assume_channels) for x in self.channel_names]
+        self.assume_from_number = assume_from_number
+        self.channel_abbrevs = [self._parse_chname_to_abbrev(x, assume_from_number=assume_from_number) for x in self.channel_names]
+
+        print(f"Channel names: \t{self.channel_names}")
+        print(f"Channel abbreviations: \t{self.channel_abbrevs}")
 
     def __str__(self) -> str:
         return self.result.__str__()
@@ -490,18 +508,66 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     raise ValueError(f'Unknown feature to filter {feat}')
         return result
     
-    def to_pickle_and_json(self, folder: str | Path):
-        """Archive window analysis result into the folder specified
+    def to_pickle_and_json(self, folder: str | Path, make_folder=True, save_abbrevs_as_chnames=False):
+        """Archive window analysis result into the folder specified, as a pickle and json file.
 
         Args:
             folder (str | Path): Destination folder to save results to
+            make_folder (bool, optional): If True, create the folder if it doesn't exist. Defaults to True.
+            save_abbrevs_as_chnames (bool, optional): If True, save the channel abbreviations as the channel names in the json file. Defaults to False.
         """
-        filebase = Path(folder) / f"{self.genotype}-{self.animal_id}"
-        filebase = str(filebase)
+        folder = Path(folder)
+        if make_folder:
+            folder.mkdir(parents=True, exist_ok=True)
+
+        filebase = str(folder / f"{self.animal_id}-{self.genotype}")
 
         self.result.to_pickle(filebase + '.pkl')
+        json_dict = {
+            'animal_id': self.animal_id,
+            'genotype': self.genotype,
+            'channel_names': self.channel_abbrevs if save_abbrevs_as_chnames else self.channel_names,
+            'assume_from_number': False if save_abbrevs_as_chnames else self.assume_from_number
+        }
+
         with open(filebase + ".json", "w") as f:
-            json.dump(self.channel_names, f, indent=2)
+            json.dump(json_dict, f, indent=2)
+
+
+    @classmethod
+    def from_pickle_and_json(cls, folder_path=None, df_pickle_path=None, json_path=None):
+        """Load WindowAnalysisResult from folder
+
+        Args:
+            folder_path (str, optional): Path of folder containing one .pkl and .json file each. Defaults to None.
+            df_pickle_path (str, optional): Path of .pkl file. If this and folder_path are not None, raises an error. Defaults to None.
+            json_path (str, optional): Path of .json file. If this and folder_path are not None, raises an error. Defaults to None.
+
+        Raises:
+            ValueError: Both df_pickle_path and json_path must be None if folder_path is provided
+            ValueError: Expected exactly one pickle and one json file in folder_path
+
+        Returns:
+            result: WindowAnalysisResult object
+        """
+        if folder_path is not None:
+            if df_pickle_path is not None or json_path is not None:
+                raise ValueError("df_pickle_path and json_path must be None if folder_path is provided")
+            pkl_files = list(folder_path.glob('*.pkl'))
+            json_files = list(folder_path.glob('*.json'))
+            
+            if not len(pkl_files) == len(json_files) == 1:
+                raise ValueError(f"Expected exactly one pickle and one json file in {folder_path}")
+                
+            df_pickle_path = pkl_files[0]
+            json_path = json_files[0]
+
+        with open(df_pickle_path, 'rb') as f:
+            data = pd.read_pickle(f)
+        with open(json_path, 'r') as f:
+            metadata = json.load(f)
+        return cls(data, **metadata)
+    
 
     # def get_temps_from_wavetemp(self, sa_sas=None, **kwargs): # TODO have some way of storing spikes and traces
     #     if sa_sas is None:

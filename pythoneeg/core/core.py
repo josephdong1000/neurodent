@@ -102,7 +102,7 @@ def convert_ddfcolbin_to_ddfrowbin(rowdir_path, colbin_path, metadata, save_gzip
     return rowbin_path
 
 
-def convert_ddfrowbin_to_si(bin_rowmajor_path, metadata):
+def convert_ddfrowbin_to_si(bin_rowmajor_path, metadata, verbose=False):
     # 1-file .MAT containing entire recording trace
     # Returns as SpikeInterface Recording structure
     assert isinstance(metadata, DDFBinaryMetadata), "Metadata needs to be of type DDFBinaryMetadata"
@@ -118,7 +118,8 @@ def convert_ddfrowbin_to_si(bin_rowmajor_path, metadata):
     # Read either .npy.gz files or .bin files into the recording object
     if ".npy.gz" in str(bin_rowmajor_path):
         temppath = os.path.join(tempfile.gettempdir(), os.urandom(24).hex())
-        print(f"Opening tempfile {temppath}")
+        if verbose:
+            print(f"Opening tempfile {temppath}")
         with open(temppath, "wb") as tmp:
             fcomp = gzip.GzipFile(bin_rowmajor_path, "r")
             bin_rowmajor_decomp = np.load(fcomp)
@@ -140,7 +141,8 @@ class LongRecordingOrganizer:
                  colbin_folder_path=None,
                  rowbin_folder_path=None,
                  metadata_path=None,
-                 truncate: Union[bool, int]=False) -> None:
+                 truncate: Union[bool, int]=False,
+                 verbose: bool=False) -> None:
         """Construct a long recording from binary files.
 
         Args:
@@ -168,6 +170,7 @@ class LongRecordingOrganizer:
             warnings.warn(f"truncate = True. Only the first {self.n_truncate} files of each animal will be used")
 
         self.base_folder_path = Path(base_folder_path)
+        self.verbose = verbose
 
         self.colbin_folder_path = self.base_folder_path if colbin_folder_path is None else Path(colbin_folder_path)
         os.makedirs(self.colbin_folder_path, exist_ok=True)
@@ -256,7 +259,8 @@ class LongRecordingOrganizer:
             #     raise FileExistsError("Row-major binary files already exist! overwrite=False")
         for i, e in enumerate(self.colbins):
             if convert_colpath_to_rowpath(self.rowbin_folder_path, e, aspath=False) not in self.rowbins or overwrite:
-                print(f"Converting {e}")
+                if self.verbose:
+                    print(f"Converting {e}")
                 convert_ddfcolbin_to_ddfrowbin(self.rowbin_folder_path, e, self.meta)
         self.__update_colbins_rowbins_metas()
 
@@ -267,8 +271,9 @@ class LongRecordingOrganizer:
         t_cumulative = 0
         self.temppaths = []
         for i, e in enumerate(self.rowbins):
-            print(f"Reading {e}")
-            rec, temppath = convert_ddfrowbin_to_si(e, self.meta)
+            if self.verbose:
+                print(f"Reading {e}")
+            rec, temppath = convert_ddfrowbin_to_si(e, self.meta, verbose=self.verbose)
             recs.append(rec)
             self.temppaths.append(temppath)
 
