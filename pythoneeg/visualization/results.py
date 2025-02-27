@@ -18,7 +18,6 @@ import dask
 from dask import delayed
 from tqdm.dask import TqdmCallback
 from tqdm import tqdm
-from multiprocessing import Pool
 
 # Local imports
 from .. import constants
@@ -26,37 +25,6 @@ from .. import core
 
 
 class AnimalFeatureParser:
-
-    # GENOTYPE_ALIASES = {'WT' : ['WT', 'wildtype'],
-    #                     'KO' : ['KO', 'knockout']}
-    # CHNAME_ALIASES = {'A' : ['Aud', 'aud'],
-    #                   'V' : ['Vis', 'vis'],
-    #                   'H' : ['Hip', 'hip'],
-    #                   'B' : ['Bar', 'bar'],
-    #                   'M' : ['Mot', 'mot']}
-    # LR_ALIASES = {'L' : ['left', 'Left', 'L ', ' L'],
-    #               'R' : ['right', 'Right', 'R ', ' R']}
-    # DEFAULT_CHNUM_TO_NAME = {9: 'LA',
-    #                       10: 'LV',
-    #                       12: 'LH',
-    #                       14: 'LB',
-    #                       15: 'LM',
-    #                       16: 'RM',
-    #                       17: 'RB',
-    #                       19: 'RH',
-    #                       21: 'RV',
-    #                       22: 'RA',}
-    # BAND_FREQS = core.LongRecordingAnalyzer.FREQ_BANDS
-    # BAND_NAMES = [k for k,_ in BAND_FREQS.items()]
-    # LINEAR_FEATURE = ['rms', 'ampvar', 'psdtotal', 'psdslope']
-    # BAND_FEATURE = ['psdband']
-    # MATRIX_FEATURE = ['cohere', 'pcorr']
-    # HIST_FEATURE = ['psd']
-    # __DOCSTRING_REPLACE = {
-    #     'test' : 'value',
-    #     "<features>" : "features (list[str]): List of features to compute. See individual compute_...() functions for output format",
-    #     "<exclude>" : "exclude (list[str], optional): List of features to ignore. Will override the features parameter. Defaults to [].",
-    # }
 
     def _sanitize_feature_request(self, features: list[str], exclude: list[str]=[]):
         if features == ["all"]:

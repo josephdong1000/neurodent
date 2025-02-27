@@ -1,13 +1,13 @@
-from ... import core
-from ... import visualization as viz
-
-
 import matplotlib
 import matplotlib.axes
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from scipy.stats import gzscore, linregress, zscore
+
+from ... import core
+from ... import visualization as viz
+from ... import constants
 
 
 class AnimalPlotter(viz.AnimalFeatureParser):
@@ -39,13 +39,13 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         return ch_name
 
     def plot_coherecorr_matrix(self, groupby="animalday", bands=None, figsize=None, cmap='viridis', **kwargs):
-        # avg_result = self.window_result.get_grouped_avg(self.MATRIX_FEATURE, groupby=groupby)
+        # avg_result = self.window_result.get_grouped_avg(constants.MATRIX_FEATURE, groupby=groupby)
         # avg_coheresplit = pd.json_normalize(avg_result['cohere']).set_index(avg_result.index)
         # avg_result = avg_coheresplit.join(avg_result)
         avg_result = self.__get_groupavg_coherecorr(groupby, **kwargs)
 
         if bands is None:
-            bands = list(core.LongRecordingAnalyzer.FREQ_BANDS.keys()) + ['pcorr']
+            bands = constants.BAND_NAMES + ['pcorr']
         elif isinstance(bands, str):
             bands = [bands]
         n_row = avg_result.index.size
@@ -65,7 +65,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
             raise ValueError(f"Difference can only be calculated between 2 rows. {groupby} resulted in {len(avg_result.index)} rows")
 
         if bands is None:
-            bands = list(core.LongRecordingAnalyzer.FREQ_BANDS.keys()) + ['pcorr']
+            bands = constants.BAND_NAMES + ['pcorr']
         elif isinstance(bands, str):
             bands = [bands]
 
@@ -103,14 +103,14 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         ax[0].set_ylabel(rowname, rotation='horizontal', ha='right')
 
     def __get_groupavg_coherecorr(self, groupby="animalday", **kwargs):
-        avg_result = self.window_result.get_groupavg_result(self.MATRIX_FEATURE, groupby=groupby)
+        avg_result = self.window_result.get_groupavg_result(constants.MATRIX_FEATURE, groupby=groupby)
         avg_coheresplit = pd.json_normalize(avg_result['cohere']).set_index(avg_result.index) # Split apart the cohere dictionaries
         return avg_coheresplit.join(avg_result)
 
     def plot_linear_temporal(self, multiindex=["animalday", "animal", "genotype"], features:list[str]=None, channels:list[int]=None, figsize=None,
                              score_type='z', show_endfile=False, **kwargs):
         if features is None:
-            features = self.LINEAR_FEATURE + self.BAND_FEATURE
+            features = constants.LINEAR_FEATURE + constants.BAND_FEATURE
         if channels is None:
             channels = np.arange(self.n_channels)
 
@@ -161,7 +161,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
             case 'psdslope':
                 ax.set_yticks(ytick_offset, ['psdslope', 'psdintercept'])
             case 'psdband':
-                ax.set_yticks(ytick_offset, self.BAND_NAMES)
+                ax.set_yticks(ytick_offset, constants.BAND_NAMES)
             case _:
                 raise ValueError(f"Invalid feature {feature}")
 
@@ -239,7 +239,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
     def plot_coherecorr_spectral(self, multiindex=["animalday", "animal", "genotype"], features:list[str]=None, figsize=None, score_type='z', cmap='bwr', triag=True,
                                  show_endfile=False, duration_name='duration', endfile_name='endfile', **kwargs):
         if features is None:
-            features = self.MATRIX_FEATURE
+            features = constants.MATRIX_FEATURE
         height_ratios = {'cohere' : 5,
                          'pcorr' : 1}
 
@@ -270,7 +270,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
             norm = None
 
         n_ch = data_Z.shape[1]
-        n_bands = len(self.BAND_NAMES)
+        n_bands = len(constants.BAND_NAMES)
 
         for i in range(data_Z.shape[-1]):
             extent = (0, data_Z.shape[0] * group['duration'].median(), i * n_ch, (i+1) * n_ch)
@@ -280,7 +280,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
             match feature:
                 case 'cohere':
                     ticks = n_ch * np.linspace(1/2, n_bands + 1/2, n_bands, endpoint=False)
-                    ax.set_yticks(ticks=ticks, labels=self.BAND_NAMES)
+                    ax.set_yticks(ticks=ticks, labels=constants.BAND_NAMES)
                     for ypos in np.linspace(0, n_bands * n_ch, n_bands, endpoint=False):
                         ax.axhline(ypos, lw=1, ls='--', color='black')
                 case 'pcorr':
@@ -317,8 +317,8 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                 case _:
                     raise ValueError(f"Invalid plot type {plot_type}")
 
-            frange = np.logical_and(freqs >= core.LongRecordingAnalyzer.FREQ_BAND_TOTAL[0],
-                                    freqs <= core.LongRecordingAnalyzer.FREQ_BAND_TOTAL[1])
+            frange = np.logical_and(freqs >= constants.FREQ_BAND_TOTAL[0],
+                                    freqs <= constants.FREQ_BAND_TOTAL[1])
             logf = np.log10(freqs[frange])
             logpsd = np.log10(psd[frange, :])
 
@@ -340,7 +340,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
     # STUB plot spectrogram over time, doing gaussian filter convolving when relevant, scaling logarithmically
     def plot_psd_spectrogram(self, multiindex=['animalday', 'animal', 'genotype'], freq_range=(1, 50), center_stat='mean', mode='z', figsize=None, cmap='magma', **kwargs):
         # if features is None:
-        #     features = self.MATRIX_FEATURE
+        #     features = constants.MATRIX_FEATURE
         # height_ratios = {'cohere' : 5,
         #                  'pcorr' : 1}
 
