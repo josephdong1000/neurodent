@@ -1,8 +1,9 @@
 # PythonEEG
 
-**Extracts features from mouse EEG and generates figures.**
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/josephdong1000/PyEEG/HEAD) 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/josephdong1000/PyEEG/)
 
-EEGs are loaded from companion Matlab code that converts .DDF to .BIN. Linux and Mac are supported (Python 3.10). Windows was supported in an earlier version but is currently untested.
+**Extracts features from mouse EEGs and generates figures**
 
 ## Setup (for developing)
 
@@ -23,6 +24,8 @@ EEGs are loaded from companion Matlab code that converts .DDF to .BIN. Linux and
 A module version of this library will be released for production
 
 ## Features
+
+EEGs are loaded from companion Matlab code that converts .DDF to .BIN. Linux and Mac are supported (Python 3.10). Windows was supported in an earlier version but is currently untested.
 
 - RMS amplitude
 - Amplitude variance
