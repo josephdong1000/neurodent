@@ -1,15 +1,11 @@
 
-import pandas as pd
-
-from ... import visualization as viz
-
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 
-from pythoneeg import core
-
+from ... import core
+from ... import visualization as viz
 
 
 class ExperimentPlotter():
