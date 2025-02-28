@@ -225,7 +225,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                                   features: list[str], 
                                   exclude: list[str]=[], 
                                   window_s=4, 
-                                  multiprocess_mode: Literal['dask', 'serial']='dask', 
+                                  multiprocess_mode: Literal['dask', 'serial']='serial', 
                                   **kwargs):
         """Computes windowed analysis of animal recordings. The data is divided into windows (time bins), then features are extracted from each window. The result is
         formatted to a Dataframe and wrapped into a WindowAnalysisResult object.

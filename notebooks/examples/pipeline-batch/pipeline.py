@@ -11,14 +11,12 @@ sys.path.append(str(packageroot))
 
 # %%
 import tempfile
-from tqdm import tqdm
 
 from pythoneeg import core
 from pythoneeg import visualization
 from pythoneeg import constants
 
 tempfile.tempdir = '/scr1/users/dongjp'
-tqdm.set_defaults(miniters=500)
 
 # %%
 base_folder = Path('/mnt/isilon/marsh_single_unit/PythonEEG Data Bins')
@@ -31,12 +29,12 @@ for animal_id in animal_ids:
     ao.convert_colbins_to_rowbins()
     ao.convert_rowbins_to_rec()
 
-    war = ao.compute_windowed_analysis(['all'], exclude=['nspike', 'wavetemp'], multiprocess_mode='dask')
+    war = ao.compute_windowed_analysis(['all'], exclude=['nspike', 'wavetemp'], multiprocess_mode='serial')
     war.to_pickle_and_json(output_folder / animal_id)
 
 
 # %%
 # Run in batch mode
 """
-sbatch --mem 50G -c 20 -t 24:00:00 /mnt/isilon/marsh_single_unit/PythonEEG/notebooks/examples/pipeline-batch/pipeline.sh 
+sbatch --mem 25G -c 20 -t 24:00:00 /mnt/isilon/marsh_single_unit/PythonEEG/notebooks/examples/pipeline-batch/pipeline.sh 
 """
