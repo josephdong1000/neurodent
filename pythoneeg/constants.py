@@ -49,3 +49,4 @@ BAND_NAMES = [k for k,_ in FREQ_BANDS.items()]
 FREQ_BAND_TOTAL = (0.1, 50)
 FREQ_MINS = [v[0] for k,v in FREQ_BANDS.items()]
 FREQ_MAXS = [v[1] for k,v in FREQ_BANDS.items()]
+LINE_FREQ = 60
