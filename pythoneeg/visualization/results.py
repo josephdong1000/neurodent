@@ -1,4 +1,5 @@
 # Standard library imports
+import os
 import copy
 import glob
 import json
@@ -8,6 +9,7 @@ import warnings
 from datetime import datetime
 from pathlib import Path
 from typing import Literal
+import tempfile
 
 # Third party imports
 # import cmasher as cmr
@@ -15,9 +17,13 @@ import numpy as np
 import pandas as pd
 from scipy.stats import zscore
 import dask
+import dask.dataframe as dd
+import dask.array as da
 from dask import delayed
+from dask.distributed import Client
 from tqdm.dask import TqdmCallback
 from tqdm import tqdm
+import h5py
 
 # Local imports
 from .. import constants
@@ -210,11 +216,11 @@ class AnimalOrganizer(AnimalFeatureParser):
         self.features_avg_df: pd.DataFrame = pd.DataFrame()
 
     def convert_colbins_to_rowbins(self, overwrite=False):
-        for lrec in self.long_recordings:
+        for lrec in tqdm(self.long_recordings, desc="Converting column bins to row bins"):
             lrec.convert_colbins_to_rowbins(overwrite=overwrite)
 
     def convert_rowbins_to_rec(self):
-        for lrec in self.long_recordings:
+        for lrec in tqdm(self.long_recordings, desc="Converting row bins to recs"):
             lrec.convert_rowbins_to_rec()
 
     def cleanup_rec(self):
@@ -247,23 +253,35 @@ class AnimalOrganizer(AnimalFeatureParser):
         for lrec in self.long_recordings: # Iterate over all long recordings
             lan = core.LongRecordingAnalyzer(lrec, fragment_len_s=window_s)
 
-            # lan.setup_njobs()
-            if 'n_jobs_coh' in kwargs and 'cohere' in features:
-                lan.setup_njobs()
-
-            miniters = int(lan.n_fragments / 20)
+            miniters = int(lan.n_fragments / 100)
             match multiprocess_mode:
                 case 'dask':
-                    # Create delayed tasks for each fragment
-                    delayed_tasks = [delayed(self.__process_fragment)(idx, features, lan, window_s, kwargs) for idx in range(lan.n_fragments)]
-                    # Compute all tasks with progress bar
-                    with TqdmCallback(desc='Processing rows', miniters=miniters):
-                        lan_df = dask.compute(*delayed_tasks)
+                    # Save fragments to tempfile
+                    tmppath = os.path.join(tempfile.gettempdir(), f"temp_{os.urandom(24).hex()}.h5")
+                    np_fragments = [lan.get_fragment_np(idx) for idx in range(lan.n_fragments - 1)]
+                    with h5py.File(tmppath, 'w') as f:
+                        f.create_dataset('fragments', data=np.array(np_fragments)) # REVIEW unsure if nonhomogenous arrays ok
+                    del np_fragments
+
+                    # This is not parallelized
+                    metadatas = [self._process_fragment_metadata(idx, lan, window_s) for idx in range(lan.n_fragments - 1)]
+
+                    # This is parallelized
+                    f = h5py.File(tmppath, 'r')
+                    np_fragments_reconstruct = da.from_array(f['fragments'], chunks='1 GB')
+                    feature_values = [delayed(core.FragmentAnalyzer._process_fragment_features_dask)(np_fragments_reconstruct[idx], lan.f_s, features, kwargs) for idx in range(lan.n_fragments - 1)]
+                    feature_values = dask.compute(*feature_values)
+
+                    # Combine metadata and feature values
+                    meta_df = pd.DataFrame(metadatas)
+                    feat_df = pd.DataFrame(feature_values)
+                    lan_df = pd.concat([meta_df, feat_df], axis=1)
+                    
                 case _:
                     print("Processing serially")
                     lan_df = []
                     for idx in tqdm(range(lan.n_fragments), desc='Processing rows', miniters=miniters):
-                        lan_df.append(self.__process_fragment(idx, features, lan, window_s, kwargs))
+                        lan_df.append(self._process_fragment_serial(idx, features, lan, window_s, kwargs))
 
             lan_df = pd.DataFrame(lan_df)
             lan_df.sort_values('timestamp', inplace=True)
@@ -282,9 +300,14 @@ class AnimalOrganizer(AnimalFeatureParser):
 
         return self.window_analysis_result
 
+    def _process_fragment_serial(self, idx, features, lan: core.LongRecordingAnalyzer, window_s, kwargs: dict):
+        row = self._process_fragment_metadata(idx, lan, window_s)
+        row.update(self._process_fragment_features(idx, features, lan, kwargs))
+        return row
+    
+    def _process_fragment_metadata(self, idx, lan: core.LongRecordingAnalyzer, window_s):
+        row = {}
 
-    def __process_fragment(self, idx, features, lan: core.LongRecordingAnalyzer, window_s, kwargs: dict):
-        row = pd.Series()
         lan_folder = lan.LongRecording.base_folder_path
         row['animalday'] = self._parse_filename_to_animalday(lan_folder)
         row['animal'] = self._parse_filename_to_animal(lan_folder)
@@ -297,6 +320,10 @@ class AnimalOrganizer(AnimalFeatureParser):
         row['timestamp'] = frag_dt
         row['isday'] = core.is_day(frag_dt)
 
+        return row
+    
+    def _process_fragment_features(self, idx, features, lan: core.LongRecordingAnalyzer, kwargs: dict):
+        row = {}
         for feat in features:
             func = getattr(lan, f"compute_{feat}")
             if callable(func):
