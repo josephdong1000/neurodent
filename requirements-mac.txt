@@ -10,3 +10,5 @@ pyinstaller
 scipy
 spikeinterface
 pactools
+dask
+seaborn

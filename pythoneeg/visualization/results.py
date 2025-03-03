@@ -322,6 +322,17 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
     def __str__(self) -> str:
         return self.result.__str__()
+    
+    def get_info(self):
+        """Returns a formatted string with basic information about the WindowAnalysisResult object"""
+        info = []
+        info.append(f"feature names: {', '.join(self.feature_names)}")
+        info.append(f"animaldays: {', '.join(self.animaldays)}")
+        info.append(f"animal_id: {self.animal_id}")
+        info.append(f"genotype: {self.genotype}")
+        info.append(f"channel_names: {', '.join(self.channel_names) if self.channel_names else 'None'}")
+        
+        return "\n".join(info)
 
     def get_result(self, features: list[str], exclude: list[str]=[], allow_missing=False):
         """Get windowed analysis result dataframe, with helpful filters
