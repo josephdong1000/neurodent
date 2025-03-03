@@ -18,7 +18,7 @@ from pythoneeg import constants  # noqa: E402
 
 if __name__ == '__main__':
 
-    cluster = SLURMCluster(cores=5, memory='20GB')
+    cluster = SLURMCluster(cores=4, memory='20GB', walltime='48:00:00', local_directory='/scr1/users/dongjp')
     cluster.scale(jobs=20)
     client = Client(cluster)
 
@@ -33,6 +33,7 @@ if __name__ == '__main__':
 
     print("\nStarting pipeline execution...")
     for animal_id in animal_ids:
+        print(f"Processing {animal_id}")
         ao = visualization.AnimalOrganizer(base_folder, animal_id, mode="concat", assume_from_number=True)
         ao.convert_colbins_to_rowbins()
         ao.convert_rowbins_to_rec()
@@ -44,5 +45,5 @@ if __name__ == '__main__':
 
 
 """
-sbatch --mem 50G -c 4 -t 24:00:00 /mnt/isilon/marsh_single_unit/PythonEEG/notebooks/examples/pipeline-batch/pipeline.sh
+sbatch --mem 25G -c 4 -t 48:00:00 /mnt/isilon/marsh_single_unit/PythonEEG/notebooks/examples/pipeline-batch/pipeline.sh
 """
