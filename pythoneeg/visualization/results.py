@@ -261,22 +261,34 @@ class AnimalOrganizer(AnimalFeatureParser):
                     np_fragments = [lan.get_fragment_np(idx) for idx in range(lan.n_fragments - 1)]
                     with h5py.File(tmppath, 'w') as f:
                         f.create_dataset('fragments', data=np.array(np_fragments)) # REVIEW unsure if nonhomogenous arrays ok
-                    del np_fragments
+                    del np_fragments # cleanup memory
 
                     # This is not parallelized
                     metadatas = [self._process_fragment_metadata(idx, lan, window_s) for idx in range(lan.n_fragments - 1)]
 
-                    # This is parallelized
-                    f = h5py.File(tmppath, 'r')
-                    np_fragments_reconstruct = da.from_array(f['fragments'], chunks='1 GB')
-                    feature_values = [delayed(core.FragmentAnalyzer._process_fragment_features_dask)(np_fragments_reconstruct[idx], lan.f_s, features, kwargs) for idx in range(lan.n_fragments - 1)]
-                    feature_values = dask.compute(*feature_values)
+                    # Process fragments in parallel using Dask
+                    with h5py.File(tmppath, 'r') as f:
+                        np_fragments_reconstruct = da.from_array(f['fragments'], chunks='1 GB')
+                        feature_values = [delayed(core.FragmentAnalyzer._process_fragment_features_dask)(
+                            np_fragments_reconstruct[idx], 
+                            lan.f_s, 
+                            features, 
+                            kwargs
+                        ) for idx in range(lan.n_fragments - 1)]
+                        feature_values = dask.compute(*feature_values)
+                        del np_fragments_reconstruct # cleanup memory
+
+                    # Clean up temp file after processing
+                    try:
+                        os.remove(tmppath)
+                    except (OSError, FileNotFoundError) as e:
+                        warnings.warn(f"Failed to remove temporary file {tmppath}: {e}")
 
                     # Combine metadata and feature values
                     meta_df = pd.DataFrame(metadatas)
                     feat_df = pd.DataFrame(feature_values)
                     lan_df = pd.concat([meta_df, feat_df], axis=1)
-                    
+
                 case _:
                     print("Processing serially")
                     lan_df = []
