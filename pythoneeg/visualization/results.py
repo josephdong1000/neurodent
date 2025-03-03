@@ -275,8 +275,8 @@ class AnimalOrganizer(AnimalFeatureParser):
                             features, 
                             kwargs
                         ) for idx in range(lan.n_fragments - 1)]
-                        feature_values = dask.compute(*feature_values)
                         del np_fragments_reconstruct # cleanup memory
+                        feature_values = dask.compute(*feature_values)
 
                     # Clean up temp file after processing
                     try:
