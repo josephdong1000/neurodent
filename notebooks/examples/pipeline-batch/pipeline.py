@@ -15,8 +15,7 @@ from pythoneeg import core  # noqa: E402
 from pythoneeg import visualization  # noqa: E402
 from pythoneeg import constants  # noqa: E402
 
-
-if __name__ == '__main__':
+def main():
 
     cluster = SLURMCluster(cores=4, memory='20GB', walltime='48:00:00', local_directory='/scr1/users/dongjp')
     cluster.scale(jobs=20)
@@ -43,6 +42,9 @@ if __name__ == '__main__':
         print(time.time() - start_time)
         # war.to_pickle_and_json(output_folder / animal_id)
 
+
+if __name__ == '__main__':
+    main()
 
 """
 sbatch --mem 25G -c 4 -t 48:00:00 ./notebooks/examples/pipeline-batch/pipeline.sh
