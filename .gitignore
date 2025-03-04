@@ -13,3 +13,4 @@
 *.pyc
 slurm-*.out
 **/pipeline-wars/*
+*.ps1
