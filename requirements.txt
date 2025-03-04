@@ -13,3 +13,4 @@ spikeinterface
 ipykernel
 dask
 seaborn
+pipreqs
