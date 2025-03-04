@@ -45,5 +45,5 @@ if __name__ == '__main__':
 
 
 """
-sbatch --mem 25G -c 4 -t 48:00:00 /mnt/isilon/marsh_single_unit/PythonEEG/notebooks/examples/pipeline-batch/pipeline.sh
+sbatch --mem 25G -c 4 -t 48:00:00 ./notebooks/examples/pipeline-batch/pipeline.sh
 """
