@@ -13,6 +13,7 @@ spikeinterface
 ipykernel
 dask
 dask[distributed]
+bokeh
 dask-jobqueue
 seaborn
 pipreqs
