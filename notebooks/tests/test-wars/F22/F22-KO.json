@@ -1,0 +1,17 @@
+{
+  "animal_id": "F22",
+  "genotype": "KO",
+  "channel_names": [
+    "Intan Input (1)/PortD D-009",
+    "Intan Input (1)/PortD D-010",
+    "Intan Input (1)/PortD D-012",
+    "Intan Input (1)/PortD D-014",
+    "Intan Input (1)/PortD D-015",
+    "Intan Input (1)/PortD D-016",
+    "Intan Input (1)/PortD D-017",
+    "Intan Input (1)/PortD D-019",
+    "Intan Input (1)/PortD D-021",
+    "Intan Input (1)/PortD D-022"
+  ],
+  "assume_from_number": true
+}
