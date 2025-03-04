@@ -1,0 +1,17 @@
+{
+  "animal_id": "A5",
+  "genotype": "WT",
+  "channel_names": [
+    "Intan Input (1)/PortB L Aud Ctx",
+    "Intan Input (1)/PortB L Vis Ctx",
+    "Intan Input (1)/PortB L Hipp",
+    "Intan Input (1)/PortB L Barrel",
+    "Intan Input (1)/PortB L Motor",
+    "Intan Input (1)/PortB R Motor",
+    "Intan Input (1)/PortB R Barrel",
+    "Intan Input (1)/PortB R Hipp",
+    "Intan Input (1)/PortB R Vis Ctx",
+    "Intan Input (1)/PortB R Aud Ctx"
+  ],
+  "assume_from_number": true
+}
