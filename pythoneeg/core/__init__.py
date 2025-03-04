@@ -11,7 +11,8 @@ from .utils import (
     is_day
 )
 from .analysis import (
-    LongRecordingAnalyzer
+    LongRecordingAnalyzer,
+    FragmentAnalyzer
 )
 from .sorting import (
     MountainSortOrganizer
@@ -27,5 +28,6 @@ __all__ = [
     "filepath_to_index",
     "is_day",
     "LongRecordingAnalyzer",
-    "MountainSortOrganizer"
+    "MountainSortOrganizer",
+    "FragmentAnalyzer"
 ]
