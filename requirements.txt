@@ -12,5 +12,6 @@ scipy
 spikeinterface
 ipykernel
 dask
+dask[distributed]
 seaborn
 pipreqs
