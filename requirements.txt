@@ -13,5 +13,6 @@ spikeinterface
 ipykernel
 dask
 dask[distributed]
+dask-jobqueue
 seaborn
 pipreqs
