@@ -10,3 +10,6 @@ probeinterface
 pyinstaller
 scipy
 spikeinterface
+ipykernel
+dask
+seaborn
