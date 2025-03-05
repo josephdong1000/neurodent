@@ -8,7 +8,7 @@ import dask
 from dask.distributed import Client, LocalCluster
 from dask_jobqueue.slurm import SLURMCluster
 
-packageroot = Path('~/source_code/PyEEG')
+packageroot = Path('/home/dongjp/source-code/PyEEG')
 print(packageroot)
 sys.path.append(str(packageroot))
 
@@ -17,14 +17,17 @@ from pythoneeg import visualization  # noqa: E402
 from pythoneeg import constants  # noqa: E402
 
 
+# %%
+cluster = SLURMCluster(cores=4, memory='20GB', walltime='48:00:00', local_directory='/scr1/users/dongjp')
+cluster.scale(jobs=20)
+# cluster = LocalCluster(threads_per_worker=1, memory='auto')
+client = Client(cluster)
+client
+
+# %%
 def main():
 
-    cluster = SLURMCluster(cores=4, memory='20GB', walltime='48:00:00', local_directory='/scr1/users/dongjp')
-    cluster.scale(jobs=20)
-    # cluster = LocalCluster(n_workers=3, threads_per_worker=1)
-    client = Client(cluster)
-
-    print(f"\n\n\tclient.dashboard_link: {client.dashboard_link}\n\n")
+    # print(f"\n\n\tclient.dashboard_link: {client.dashboard_link}\n\n")
 
     tempfile.tempdir = '/scr1/users/dongjp'
 
@@ -46,9 +49,9 @@ def main():
         # war.to_pickle_and_json(output_folder / animal_id)
 
 
-if __name__ == '__main__':
-    cProfile.run('main()')
+if __name__ == "__main__":
+    main()
 
 """
-sbatch --mem 25G -c 4 -t 48:00:00 ./notebooks/examples/pipeline-batch/pipeline.sh
+sbatch --mem 25G -c 4 -t 24:00:00 ./notebooks/examples/pipeline-batch/pipeline.sh
 """

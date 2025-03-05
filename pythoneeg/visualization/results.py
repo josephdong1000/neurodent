@@ -268,7 +268,7 @@ class AnimalOrganizer(AnimalFeatureParser):
 
                     # Process fragments in parallel using Dask
                     with h5py.File(tmppath, 'r') as f:
-                        np_fragments_reconstruct = da.from_array(f['fragments'], chunks='1 GB')
+                        np_fragments_reconstruct = da.from_array(f['fragments'], chunks='2 GB')
                         feature_values = [delayed(core.FragmentAnalyzer._process_fragment_features_dask)(
                             np_fragments_reconstruct[idx], 
                             lan.f_s, 
