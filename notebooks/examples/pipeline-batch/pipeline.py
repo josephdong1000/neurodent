@@ -7,7 +7,7 @@ import dask
 from dask.distributed import Client
 from dask_jobqueue.slurm import SLURMCluster
 
-packageroot = Path('/mnt/isilon/marsh_single_unit/PythonEEG')
+packageroot = Path('~/source_code/PyEEG')
 print(packageroot)
 sys.path.append(str(packageroot))
 
