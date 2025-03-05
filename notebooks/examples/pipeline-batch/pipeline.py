@@ -2,9 +2,10 @@ import sys
 from pathlib import Path
 import tempfile
 import time
+import cProfile
 
 import dask
-from dask.distributed import Client
+from dask.distributed import Client, LocalCluster
 from dask_jobqueue.slurm import SLURMCluster
 
 packageroot = Path('~/source_code/PyEEG')
@@ -15,10 +16,12 @@ from pythoneeg import core  # noqa: E402
 from pythoneeg import visualization  # noqa: E402
 from pythoneeg import constants  # noqa: E402
 
+
 def main():
 
     cluster = SLURMCluster(cores=4, memory='20GB', walltime='48:00:00', local_directory='/scr1/users/dongjp')
     cluster.scale(jobs=20)
+    # cluster = LocalCluster(n_workers=3, threads_per_worker=1)
     client = Client(cluster)
 
     print(f"\n\n\tclient.dashboard_link: {client.dashboard_link}\n\n")
@@ -44,7 +47,7 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    cProfile.run('main()')
 
 """
 sbatch --mem 25G -c 4 -t 48:00:00 ./notebooks/examples/pipeline-batch/pipeline.sh
