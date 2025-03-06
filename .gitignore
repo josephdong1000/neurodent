@@ -21,3 +21,4 @@ slurm-*.out
 **/pipeline-wars/*
 *.ps1
 *.prof
+/notebooks/tests/test-data
