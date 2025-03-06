@@ -1,5 +1,5 @@
 -i https://pypi.org/simple
-aiohappyeyeballs==2.4.8; python_version >= '3.9'
+aiohappyeyeballs==2.5.0; python_version >= '3.9'
 aiohttp==3.11.13; python_version >= '3.9'
 aiosignal==1.3.2; python_version >= '3.9'
 altgraph==0.17.4
@@ -31,7 +31,7 @@ cycler==0.12.1; python_version >= '3.8'
 dask[distributed]==2025.2.0; python_version >= '3.10'
 dask-jobqueue==0.9.0; python_version >= '3.10'
 dask-labextension==7.0.0; python_version >= '3.8'
-debugpy==1.8.12; python_version >= '3.8'
+debugpy==1.8.13; python_version >= '3.8'
 decorator==5.2.1; python_version >= '3.8'
 defusedxml==0.7.1; python_version >= '2.7' and python_version not in '3.0, 3.1, 3.2, 3.3, 3.4'
 distributed==2025.2.0; python_version >= '3.10'
@@ -55,7 +55,7 @@ ipython==8.12.3; python_version >= '3.8'
 isoduration==20.11.0; python_version >= '3.7'
 isosplit6==0.1.4
 jedi==0.19.2; python_version >= '3.6'
-jinja2==3.1.5; python_version >= '3.7'
+jinja2==3.1.6; python_version >= '3.7'
 joblib==1.4.2; python_version >= '3.8'
 json5==0.10.0; python_full_version >= '3.8.0'
 jsonpointer==3.0.0; python_version >= '3.7'
@@ -80,7 +80,7 @@ matplotlib-inline==0.1.7; python_version >= '3.8'
 mistune==3.1.2; python_version >= '3.8'
 mne==1.9.0; python_version >= '3.10'
 mne-connectivity==0.7.0; python_version >= '3.9'
-mountainsort5==0.5.6
+mountainsort5==0.5.7
 msgpack==1.1.0; python_version >= '3.8'
 multidict==6.1.0; python_version >= '3.8'
 nbclient==0.10.2; python_full_version >= '3.9.0'
@@ -115,6 +115,7 @@ propcache==0.3.0; python_version >= '3.9'
 psutil==7.0.0; python_version >= '3.6'
 ptyprocess==0.7.0
 pure-eval==0.2.3
+pyarrow==19.0.1; python_version >= '3.9'
 pycparser==2.22; python_version >= '3.8'
 pygments==2.19.1; python_version >= '3.8'
 pyinstaller==6.12.0; python_version < '3.14' and python_version >= '3.8'
