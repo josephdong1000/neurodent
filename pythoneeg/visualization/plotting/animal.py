@@ -25,8 +25,8 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         self.genotype = war.genotype
         self.channel_names = war.channel_names
         self.n_channels = len(self.channel_names)
-        self.__assume_channels = war.assume_channels
-        self.short_chnames = war.short_chnames
+        self.__assume_from_number = war.assume_from_number
+        self.channel_abbrevs = war.channel_abbrevs
 
     # REVIEW this function may not be necessary
     # def get_animalday_metadata(self, animalday) -> core.DDFBinaryMetadata:
@@ -94,8 +94,8 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                 ax[i].xaxis.set_label_position('top')
 
             if show_channelname:
-                ax[i].set_xticks(range(self.n_channels), self.short_chnames, rotation='vertical')
-                ax[i].set_yticks(range(self.n_channels), self.short_chnames)
+                ax[i].set_xticks(range(self.n_channels), self.channel_abbrevs, rotation='vertical')
+                ax[i].set_yticks(range(self.n_channels), self.channel_abbrevs)
             else:
                 ax[i].set_xticks(range(self.n_channels), " ")
                 ax[i].set_yticks(range(self.n_channels), " ")
@@ -304,7 +304,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                 psd = np.average(psd, axis=-1, keepdims=True)
                 label = 'Average'
             else:
-                label = self.short_chnames
+                label = self.channel_abbrevs
             match plot_type:
                 case 'loglog':
                     ax[0, i].loglog(freqs, psd, label=label)
@@ -312,7 +312,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                     ax[0, i].semilogy(freqs, psd, label=label)
                 case 'semilogx':
                     ax[0, i].semilogy(freqs, psd, label=label)
-                case 'none':
+                case 'linear':
                     ax[0, i].plot(freqs, psd, label=label)
                 case _:
                     raise ValueError(f"Invalid plot type {plot_type}")

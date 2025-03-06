@@ -8,4 +8,10 @@ from .plotting import (
     ExperimentPlotter,
 )
 
-__all__ = ["WindowAnalysisResult", "AnimalFeatureParser", "AnimalOrganizer", "AnimalPlotter", "ExperimentPlotter"]
+__all__ = [
+    "WindowAnalysisResult", 
+    "AnimalFeatureParser", 
+    "AnimalOrganizer", 
+    "AnimalPlotter", 
+    "ExperimentPlotter"
+]
