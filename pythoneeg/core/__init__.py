@@ -10,13 +10,9 @@ from .utils import (
     filepath_to_index,
     is_day
 )
-from .analysis import (
-    LongRecordingAnalyzer,
-    FragmentAnalyzer
-)
-from .sorting import (
-    MountainSortOrganizer
-)
+from .analysis import LongRecordingAnalyzer
+from .analyze_frag import FragmentAnalyzer
+from .analyze_sort import MountainSortAnalyzer
 
 __all__ = [
     "DDFBinaryMetadata",
@@ -28,6 +24,6 @@ __all__ = [
     "filepath_to_index",
     "is_day",
     "LongRecordingAnalyzer",
-    "MountainSortOrganizer",
+    "MountainSortAnalyzer",
     "FragmentAnalyzer"
 ]

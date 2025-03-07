@@ -10,6 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Literal
 import tempfile
+import logging
 
 # Third party imports
 # import cmasher as cmr
@@ -24,10 +25,12 @@ from dask.distributed import Client
 from tqdm.dask import TqdmCallback
 from tqdm import tqdm
 import h5py
-
+import spikeinterface as si
+import mne
 # Local imports
 from .. import constants
 from .. import core
+from ..core import FragmentAnalyzer
 
 
 class AnimalFeatureParser:
@@ -88,7 +91,7 @@ class AnimalFeatureParser:
             chname = self.__get_key_from_match_values(channel_name, constants.CHNAME_ALIASES)
         except ValueError as e:
             if assume_from_number:
-                warnings.warn(f"{channel_name} does not match name aliases. Assuming alias from number in channel name.")
+                logging.warning(f"{channel_name} does not match name aliases. Assuming alias from number in channel name.")
                 nums = re.findall(r'\d+', channel_name)
                 num = int(nums[-1])
                 return constants.DEFAULT_ID_TO_NAME[num]
@@ -219,9 +222,9 @@ class AnimalOrganizer(AnimalFeatureParser):
         for lrec in tqdm(self.long_recordings, desc="Converting column bins to row bins"):
             lrec.convert_colbins_to_rowbins(overwrite=overwrite)
 
-    def convert_rowbins_to_rec(self):
+    def convert_rowbins_to_rec(self, multiprocess_mode: Literal['dask', 'serial']='serial'):
         for lrec in tqdm(self.long_recordings, desc="Converting row bins to recs"):
-            lrec.convert_rowbins_to_rec()
+            lrec.convert_rowbins_to_rec(multiprocess_mode=multiprocess_mode)
 
     def cleanup_rec(self):
         for lrec in self.long_recordings:
@@ -258,9 +261,10 @@ class AnimalOrganizer(AnimalFeatureParser):
                 case 'dask':
                     # Save fragments to tempfile
                     tmppath = os.path.join(tempfile.gettempdir(), f"temp_{os.urandom(24).hex()}.h5")
+                    # NOTE the last fragment is not included because it makes the dask array ragged. Maybe have a small statement that adds it back in
                     np_fragments = [lan.get_fragment_np(idx) for idx in range(lan.n_fragments - 1)]
                     with h5py.File(tmppath, 'w') as f:
-                        f.create_dataset('fragments', data=np.array(np_fragments)) # REVIEW unsure if nonhomogenous arrays ok
+                        f.create_dataset('fragments', data=np.array(np_fragments))
                     del np_fragments # cleanup memory
 
                     # This is not parallelized
@@ -269,7 +273,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                     # Process fragments in parallel using Dask
                     with h5py.File(tmppath, 'r') as f:
                         np_fragments_reconstruct = da.from_array(f['fragments'], chunks='2 GB')
-                        feature_values = [delayed(core.FragmentAnalyzer._process_fragment_features_dask)(
+                        feature_values = [delayed(FragmentAnalyzer._process_fragment_features_dask)(
                             np_fragments_reconstruct[idx], 
                             lan.f_s, 
                             features, 
@@ -282,7 +286,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                     try:
                         os.remove(tmppath)
                     except (OSError, FileNotFoundError) as e:
-                        warnings.warn(f"Failed to remove temporary file {tmppath}: {e}")
+                        logging.warning(f"Failed to remove temporary file {tmppath}: {e}")
 
                     # Combine metadata and feature values
                     meta_df = pd.DataFrame(metadatas)
@@ -311,6 +315,33 @@ class AnimalOrganizer(AnimalFeatureParser):
                                                            self.assume_from_number)
 
         return self.window_analysis_result
+    
+    def compute_spike_analysis(self, multiprocess_mode: Literal['dask', 'serial']='serial'):
+        sars = []
+        lrec_sorts = []
+        lrec_recs = []
+        recs = [lrec.LongRecording for lrec in self.long_recordings]
+        for rec_raw in recs:
+            sortings, recordings = core.MountainSortAnalyzer.sort_recording(rec_raw, multiprocess_mode=multiprocess_mode)
+            lrec_sorts.append(sortings)
+            lrec_recs.append(recordings)
+
+        if multiprocess_mode == 'dask':
+            lrec_sorts = dask.compute(*lrec_sorts)
+
+        lrec_sas = [[si.create_sorting_analyzer(sorting, recording, sparse=False) 
+                    for sorting, recording in zip(sortings, recordings)] 
+                    for sortings, recordings in zip(lrec_sorts, lrec_recs)]
+        sars = [SpikeAnalysisResult(sas,
+                                    self.animal_id,
+                                    self.genotype,
+                                    self.channel_names,
+                                    self.assume_from_number)
+                for sas in lrec_sas]
+
+        self.spike_analysis_results = sars
+        return self.spike_analysis_results
+
 
     def _process_fragment_serial(self, idx, features, lan: core.LongRecordingAnalyzer, window_s, kwargs: dict):
         row = self._process_fragment_metadata(idx, lan, window_s)
@@ -430,7 +461,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 avg_result_col.name = f
                 avg_results.append(avg_result_col)
             else:
-                warnings.warn(f"{f} not calculated, skipping")
+                logging.warning(f"{f} not calculated, skipping")
 
         return pd.concat(avg_results, axis=1)
 
@@ -553,7 +584,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     vals[~mask.transpose(0, 2, 1)] = np.nan
                     result[feat] = vals.tolist()
                 case 'nspike' | 'wavetemp':
-                    warnings.warn('nspike and wavetemp are not supported for filtering yet')
+                    logging.warning('nspike and wavetemp are not supported for filtering yet')
                 case _:
                     raise ValueError(f'Unknown feature to filter {feat}')
         return result
@@ -601,6 +632,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
             result: WindowAnalysisResult object
         """
         if folder_path is not None:
+            folder_path = Path(folder_path)
+            if not folder_path.exists():
+                raise ValueError(f"Folder path {folder_path} does not exist")
             if df_pickle_path is not None or json_path is not None:
                 raise ValueError("df_pickle_path and json_path must be None if folder_path is provided")
             pkl_files = list(folder_path.glob('*.pkl'))
@@ -652,3 +686,101 @@ class WindowAnalysisResult(AnimalFeatureParser):
         avg = np.ma.average(masked, axis=axis, weights=weights)
         return avg.filled(np.nan)
 
+class SpikeAnalysisResult(AnimalFeatureParser):
+    def __init__(self, result: list[si.SortingAnalyzer], animal_id:str=None, genotype:str=None, channel_names:list[str]=None, assume_from_number=False) -> None:
+        """
+        Args:
+            result (list[si.SortingAnalyzer]): Result comes from AnimalOrganizer.compute_spike_analysis(). Each SortingAnalyzer is a single channel.
+            animal_id (str, optional): Identifier for the animal where result was computed from. Defaults to None.
+            genotype (str, optional): Genotype of animal. Defaults to None.
+            channel_names (list[str], optional): List of channel names. Defaults to None.
+            assume_channels (bool, optional): If true, assumes channel names according to AnimalFeatureParser.DEFAULT_CHNUM_TO_NAME. Defaults to False.
+        """
+        self.result = result
+        # self.raws = SpikeAnalysisResult.convert_sas_to_mne(result) # TODO do this automaticallys
+        
+        self.animal_id = animal_id
+        self.genotype = genotype
+        self.channel_names = channel_names
+        self.assume_from_number = assume_from_number
+        self.channel_abbrevs = [self._parse_chname_to_abbrev(x, assume_from_number=assume_from_number) for x in self.channel_names]
+
+        logging.info(f"Channel names: \t{self.channel_names}")
+        logging.info(f"Channel abbreviations: \t{self.channel_abbrevs}")
+
+    @staticmethod
+    def convert_sas_to_mne(sas: list[si.SortingAnalyzer], chunk_len:float=60) -> list[mne.io.RawArray]:
+        """Convert a list of SortingAnalyzers to a MNE RawArray.
+        
+        Args:
+            sas (list[si.SortingAnalyzer]): The list of SortingAnalyzers to convert
+            chunk_len (float, optional): The length of the chunks to use for the conversion. Defaults to 60.
+
+        Returns:
+            mne.io.RawArray: The converted RawArray, with spikes labeled as annotations
+        """
+        # Check that all SortingAnalyzers have the same sampling frequency
+        sfreqs = [sa.recording.get_sampling_frequency() for sa in sas]
+        if not all(sf == sfreqs[0] for sf in sfreqs):
+            raise ValueError(f"All SortingAnalyzers must have the same sampling frequency. Got frequencies: {sfreqs}")
+            
+        data = [SpikeAnalysisResult.convert_sa_to_np(sa, chunk_len) for sa in sas]
+        data = np.concatenate(data, axis=0)
+        logging.debug(f"Data shape: {data.shape}")
+        channel_names = [str(sa.recording.get_channel_ids().item()) for sa in sas]
+        logging.debug(f"Channel names: {channel_names}")
+        sfreq = sfreqs[0]
+
+        info = mne.create_info(ch_names=channel_names, sfreq=sfreq, ch_types='eeg')
+        return mne.io.RawArray(data=data, info=info)
+    
+    @staticmethod
+    def convert_sa_to_np(sa: si.SortingAnalyzer, chunk_len:float=60) -> np.ndarray:
+        """Convert a SortingAnalyzer to an MNE RawArray.
+        
+        Args:
+            sa (si.SortingAnalyzer): The SortingAnalyzer to convert
+            chunk_len (float, optional): The length of the chunks to use for the conversion. Defaults to 60.
+        Returns:
+            mne.RawArray: The converted RawArray
+        """
+        # Check that SortingAnalyzer only has 1 channel
+        if len(sa.recording.get_channel_ids()) != 1:
+            raise ValueError(f"Expected SortingAnalyzer to have 1 channel, but got {len(sa.recording.get_channel_ids())} channels")
+        rec = sa.recording
+        logging.debug(f"Recording info: {rec}")
+        traces = []
+        n_chunks = int(rec.get_duration()) // chunk_len
+        for j in range(n_chunks + 1): # Get all chunks including the last partial one
+            start_frame = j * chunk_len * rec.get_sampling_frequency()
+            if j == n_chunks:  # Last chunk
+                end_frame = int(rec.get_duration() * rec.get_sampling_frequency())
+            else:
+                end_frame = (j + 1) * chunk_len * rec.get_sampling_frequency()
+            traces.append(rec.get_traces(start_frame=start_frame,
+                                       end_frame=end_frame, 
+                                       return_scaled=True))
+        traces = np.concatenate(traces, axis=0)
+        traces = traces.T
+        traces *= 1e-6 # convert from uV to V
+
+        return traces
+
+        
+        # # Extract spike times for each unit and create annotations
+        # onset = []
+        # description = []
+        # for unit_id in sa.sorting.get_unit_ids():
+        #     spike_train = sa.sorting.get_unit_spike_train(unit_id)
+        #     # Convert to seconds and filter to recording duration
+        #     spike_times = spike_train / sa.sorting.get_sampling_frequency()
+        #     mask = spike_times < rec.get_duration()
+        #     spike_times = spike_times[mask]
+            
+        #     # Create annotation for each spike
+        #     onset.extend(spike_times)
+        #     description.extend([f'unit_{unit_id}'] * len(spike_times))
+        # annotations = mne.Annotations(onset, duration=0, description=description)
+        # raw = mne.io.RawArray(data=traces, 
+        #                     info=mne.create_info(ch_names=rec.channel_ids.astype(str).tolist(), sfreq=rec.get_sampling_frequency(), ch_types='eeg'))
+        # raw.set_annotations(annotations)

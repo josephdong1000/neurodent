@@ -4,13 +4,13 @@ import gzip
 import math
 import os
 import statistics
-import sys
 import tempfile
 import time
 import warnings
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Union
+from typing import Union, Literal
+import logging
 
 # Third party imports
 import numpy as np
@@ -18,6 +18,7 @@ import pandas as pd
 import spikeinterface.core as si
 import spikeinterface.extractors as se
 import spikeinterface.widgets as sw
+import dask
 
 # Local imports
 from .utils import convert_colpath_to_rowpath, convert_units_to_multiplier, filepath_to_index
@@ -47,7 +48,7 @@ class DDFBinaryMetadata:
             self.dt_end = datetime.fromisoformat(self.__getsinglecolval("LastEdit"))
         else:
             self.dt_end = None
-            warnings.warn("No LastEdit column provided in metadata. dt_end set to None")
+            logging.warning("No LastEdit column provided in metadata. dt_end set to None")
 
         self.channel_to_info = self.metadata_df.loc[:, ["BinColumn", "ProbeInfo"]].set_index('BinColumn').T.to_dict('list')
         self.channel_to_info = {k:v[0] for k,v in self.channel_to_info.items()}
@@ -65,21 +66,6 @@ class DDFBinaryMetadata:
         if vals.size == 0:
             return None
         return vals.iloc[0]
-
-
-class _HiddenPrints:
-    def __init__(self, silence=True) -> None:
-        self.silence = silence
-
-    def __enter__(self):
-        if self.silence:
-            self._original_stdout = sys.stdout
-            sys.stdout = open(os.devnull, 'w')
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        if self.silence:
-            sys.stdout.close()
-            sys.stdout = self._original_stdout
 
 
 def convert_ddfcolbin_to_ddfrowbin(rowdir_path, colbin_path, metadata, save_gzip=True):
@@ -238,11 +224,11 @@ class LongRecordingOrganizer:
 
     def __check_colbin_rowbin_metas_not_empty(self):
         if not self.colbins:
-            warnings.warn("No column-major binary files found")
+            raise ValueError("No column-major binary files found")
         if not self.rowbins:
-            warnings.warn("No row-major binary files found")
+            logging.warning("No row-major binary files found")
         if not self.metas:
-            warnings.warn("No metadata files found")
+            raise ValueError("No metadata files found")
 
     def _validate_metadata_consistency(self, metadatas:list[DDFBinaryMetadata]):
         meta0 = metadatas[0]
@@ -254,7 +240,7 @@ class LongRecordingOrganizer:
 
     def convert_colbins_to_rowbins(self, overwrite=True):
         if not overwrite and self.rowbins:
-            warnings.warn("Row-major binary files already exist! Skipping existing files")
+            logging.warning("Row-major binary files already exist! Skipping existing files")
             # else:
             #     raise FileExistsError("Row-major binary files already exist! overwrite=False")
         for i, e in enumerate(self.colbins):
@@ -264,16 +250,28 @@ class LongRecordingOrganizer:
                 convert_ddfcolbin_to_ddfrowbin(self.rowbin_folder_path, e, self.meta)
         self.__update_colbins_rowbins_metas()
 
-    def convert_rowbins_to_rec(self):
+    def convert_rowbins_to_rec(self, multiprocess_mode: Literal['dask', 'serial']='serial'):
         recs = []
         self.end_relative = []
         t_to_median = 0
         t_cumulative = 0
         self.temppaths = []
-        for i, e in enumerate(self.rowbins):
-            if self.verbose:
-                print(f"Reading {e}")
-            rec, temppath = convert_ddfrowbin_to_si(e, self.meta, verbose=self.verbose)
+
+        match multiprocess_mode:
+            case 'dask':
+                # Create delayed objects for parallel processing
+                delayed_results = []
+                for i, e in enumerate(self.rowbins):
+                    delayed_results.append(dask.delayed(convert_ddfrowbin_to_si)(e, self.meta, verbose=self.verbose))
+
+                # Compute all conversions in parallel
+                results = dask.compute(*delayed_results)
+
+            case 'serial':
+                results = [convert_ddfrowbin_to_si(e, self.meta, verbose=self.verbose) for e in self.rowbins]
+
+        # Process results
+        for i, (rec, temppath) in enumerate(results):
             recs.append(rec)
             self.temppaths.append(temppath)
 
@@ -281,15 +279,14 @@ class LongRecordingOrganizer:
                 t_to_median += rec.get_duration()
             t_cumulative += rec.get_duration()
             self.end_relative.append(t_cumulative)
-
-        self.LongRecording = si.concatenate_recordings(recs)
+        self.LongRecording = si.concatenate_recordings(recs).rename_channels(self.channel_names)
         self.start_datetime = self._median_datetime - timedelta(seconds=t_to_median)
 
     def cleanup_rec(self):
         try:
             del self.LongRecording
         except AttributeError:
-            warnings.warn("LongRecording does not exist, probably deleted already")
+            logging.warning("LongRecording does not exist, probably deleted already")
         for tpath in self.temppaths:
             Path.unlink(tpath)
 
