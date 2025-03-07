@@ -50,3 +50,28 @@ FREQ_BAND_TOTAL = (0.1, 50)
 FREQ_MINS = [v[0] for k,v in FREQ_BANDS.items()]
 FREQ_MAXS = [v[1] for k,v in FREQ_BANDS.items()]
 LINE_FREQ = 60
+
+SORTING_PARAMS = {
+    'notch_freq' : LINE_FREQ,
+    'common_ref' : True,
+    'scale' : 10,
+    'whiten' : True,
+    'freq_min' : 0.1,
+    'freq_max' : None,
+}
+
+SCHEME2_SORTING_PARAMS = {
+    'detect_channel_radius' : 1,
+    'phase1_detect_channel_radius' : 1,
+    'snippet_T1' : 0.1,
+    'snippet_T2' : 0.1,
+}
+
+WAVEFORM_PARAMS = {
+    'notch_freq' : LINE_FREQ,
+    'common_ref' : False,
+    'scale' : None,
+    'whiten' : False,
+    'freq_min' : None,
+    'freq_max' : None,
+}
