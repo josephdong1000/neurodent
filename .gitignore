@@ -21,3 +21,8 @@ slurm-*.out
 **/pipeline-wars/*
 *.ps1
 *.prof
+
+**/.DS_Store
+notebooks/tests/test_all_functions_Yong.ipynb
+
+/notebooks/tests/test-data
