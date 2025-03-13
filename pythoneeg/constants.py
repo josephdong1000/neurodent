@@ -57,7 +57,7 @@ SORTING_PARAMS = {
     'scale' : 10,
     'whiten' : True,
     'freq_min' : 0.1,
-    'freq_max' : None,
+    'freq_max' : 100,
 }
 
 SCHEME2_SORTING_PARAMS = {
