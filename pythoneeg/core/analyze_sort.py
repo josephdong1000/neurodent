@@ -96,10 +96,12 @@ class MountainSortAnalyzer:
         if params['whiten']:
             rec = spre.whiten(rec)
             
-        if params['freq_min']:
+        if params['freq_min'] and not params['freq_max']:
             rec = spre.highpass_filter(rec, freq_min=params['freq_min'], ftype='bessel')
-        if params['freq_max']:
-            rec = spre.bandpass_filter(rec, freq_min=0, freq_max=params['freq_max'], ftype='bessel')
+        elif params['freq_min'] and params['freq_max']:
+            rec = spre.bandpass_filter(rec, freq_min=params['freq_min'], freq_max=params['freq_max'], ftype='bessel')
+        elif not params['freq_min'] and params['freq_max']:
+            rec = spre.bandpass_filter(rec, freq_min=0.1, freq_max=params['freq_max'], ftype='bessel') # Spike Interface doesn't have a lowpass filter
 
         return rec
 
