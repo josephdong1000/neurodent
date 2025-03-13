@@ -1,3 +1,5 @@
+.cursorignore
+
 /analysis/*
 /bins/*
 
@@ -10,6 +12,7 @@
 /build/*
 /ddfs/*
 /dist/*
+/tmp/*
 /.venv/
 /venv-*/
 **/.*/
