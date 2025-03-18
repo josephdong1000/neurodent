@@ -415,9 +415,3 @@ class LongRecordingAnalyzer:
            if tstart <= tfile < tend:
                return tfile - tstart
         return None
-
-    # def setup_njobs(self):
-    #     set_config('MNE_MEMMAP_MIN_SIZE', '30M')
-    #     set_config('MNE_CACHE_DIR', Path(tempfile.gettempdir()) / os.urandom(24).hex())
-
-        
