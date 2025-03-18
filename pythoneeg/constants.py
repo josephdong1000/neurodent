@@ -54,7 +54,7 @@ LINE_FREQ = 60
 SORTING_PARAMS = {
     'notch_freq' : LINE_FREQ,
     'common_ref' : True,
-    'scale' : 10,
+    'scale' : None,
     'whiten' : True,
     'freq_min' : 0.1,
     'freq_max' : 100,
