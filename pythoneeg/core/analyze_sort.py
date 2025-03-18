@@ -15,9 +15,10 @@ import probeinterface as pi
 from mountainsort5 import Scheme2SortingParameters, sorting_scheme2
 from mountainsort5.util import create_cached_recording
 import dask
+import dask.distributed
 
 # Local imports
-from .utils import _HiddenPrints
+from .utils import _HiddenPrints, get_temp_directory
 from .. import constants
 
 
@@ -112,7 +113,8 @@ class MountainSortAnalyzer:
 
     @staticmethod
     def _cache_recording(recording: si.BaseRecording) -> si.BaseRecording:
-        temp_dir = Path(tempfile.gettempdir()) / os.urandom(24).hex()
+        temp_dir = get_temp_directory() / os.urandom(24).hex()
+        # dask.distributed.print(f"Caching recording to {temp_dir}")
         os.makedirs(temp_dir)
         cached_rec = create_cached_recording(recording.clone(), folder=temp_dir, chunk_duration='60s')
         return cached_rec

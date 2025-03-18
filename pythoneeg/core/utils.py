@@ -42,6 +42,21 @@ def filepath_to_index(filepath) -> int:
     fname = list(filter(None, fname))
     return int(fname[-1])
 
+def set_temp_directory(path):
+    """Set the temporary directory for PyEEG operations.
+    
+    Args:
+        path (str or Path): Path to the temporary directory. Will be created if it doesn't exist.
+    """
+    path = Path(path)
+    if not path.exists():
+        path.mkdir(parents=True, exist_ok=True)
+    os.environ['TMPDIR'] = str(path)
+
+
+def get_temp_directory() -> Path:
+    return Path(os.environ['TMPDIR'])
+
 
 class _CustomNamedTemporaryFile:
     """
@@ -56,7 +71,7 @@ class _CustomNamedTemporaryFile:
 
     def __enter__(self):
         # Generate a random temporary file name
-        file_name = os.path.join(tempfile.gettempdir(), os.urandom(24).hex())
+        file_name = os.path.join(get_temp_directory(), os.urandom(24).hex())
         # Ensure the file is created
         open(file_name, "x").close()
         # Open the file in the given mode

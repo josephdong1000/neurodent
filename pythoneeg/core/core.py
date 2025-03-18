@@ -21,10 +21,7 @@ import spikeinterface.widgets as sw
 import dask
 
 # Local imports
-from .utils import convert_colpath_to_rowpath, convert_units_to_multiplier, filepath_to_index
-
-# Commented out imports
-# from probeinterface.plotting import plot_probe_group, plot_probe
+from .utils import convert_colpath_to_rowpath, convert_units_to_multiplier, filepath_to_index, get_temp_directory
 
 #%%
 
@@ -103,7 +100,7 @@ def convert_ddfrowbin_to_si(bin_rowmajor_path, metadata, verbose=False):
 
     # Read either .npy.gz files or .bin files into the recording object
     if ".npy.gz" in str(bin_rowmajor_path):
-        temppath = os.path.join(tempfile.gettempdir(), os.urandom(24).hex())
+        temppath = os.path.join(get_temp_directory(), os.urandom(24).hex())
         if verbose:
             print(f"Opening tempfile {temppath}")
         with open(temppath, "wb") as tmp:
