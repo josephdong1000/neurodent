@@ -30,8 +30,7 @@ import mne
 # Local imports
 from .. import constants
 from .. import core
-from ..core import FragmentAnalyzer
-
+from ..core import FragmentAnalyzer, get_temp_directory
 
 class AnimalFeatureParser:
 
@@ -254,25 +253,44 @@ class AnimalOrganizer(AnimalFeatureParser):
 
         dataframes = []
         for lrec in self.long_recordings: # Iterate over all long recordings
+            logging.debug(f"Initializing LongRecordingAnalyzer for {lrec.base_folder_path}")
             lan = core.LongRecordingAnalyzer(lrec, fragment_len_s=window_s)
 
+            logging.debug(f"Processing {lan.n_fragments} fragments")
             miniters = int(lan.n_fragments / 100)
             match multiprocess_mode:
                 case 'dask':
                     # Save fragments to tempfile
-                    tmppath = os.path.join(tempfile.gettempdir(), f"temp_{os.urandom(24).hex()}.h5")
+                    tmppath = os.path.join(get_temp_directory(), f"temp_{os.urandom(24).hex()}.h5")
                     # NOTE the last fragment is not included because it makes the dask array ragged. Maybe have a small statement that adds it back in
-                    np_fragments = [lan.get_fragment_np(idx) for idx in range(lan.n_fragments - 1)]
-                    with h5py.File(tmppath, 'w') as f:
-                        f.create_dataset('fragments', data=np.array(np_fragments))
+                    logging.debug("Converting LongRecording to numpy array")
+                    # Pre-allocate array for faster stacking
+                    first_fragment = lan.get_fragment_np(0)
+                    np_fragments = np.empty((lan.n_fragments - 1,) + first_fragment.shape, dtype=first_fragment.dtype)
+                    np_fragments[0] = first_fragment
+                    for idx in range(1, lan.n_fragments - 1):
+                        np_fragments[idx] = lan.get_fragment_np(idx)
+
+                    logging.debug(f"Caching numpy array with h5py in {tmppath}")
+                    with h5py.File(tmppath, 'w', libver='latest') as f:
+                        f.create_dataset('fragments', 
+                                       data=np_fragments,
+                                       chunks=True,  # Let h5py auto-chunk, or specify tuple like (1, -1, -1)
+                                       maxshape=None,  # Allow dataset to be resizable
+                                    #    compression="gzip",  # Use GZIP compression
+                                    #    compression_opts=4,  # Compression level 0-9 (higher = more compression but slower)
+                                    #    rdcc_nbytes=10 * 1024 * 1024  # 10MB chunk cache
+                                       )  
                     del np_fragments # cleanup memory
 
                     # This is not parallelized
+                    logging.debug("Processing metadata serially")
                     metadatas = [self._process_fragment_metadata(idx, lan, window_s) for idx in range(lan.n_fragments - 1)]
 
                     # Process fragments in parallel using Dask
-                    with h5py.File(tmppath, 'r') as f:
-                        np_fragments_reconstruct = da.from_array(f['fragments'], chunks='2 GB')
+                    logging.debug("Processing features in parallel")
+                    with h5py.File(tmppath, 'r', libver='latest') as f:
+                        np_fragments_reconstruct = da.from_array(f['fragments'], chunks='1 GB')
                         feature_values = [delayed(FragmentAnalyzer._process_fragment_features_dask)(
                             np_fragments_reconstruct[idx], 
                             lan.f_s, 
@@ -283,18 +301,20 @@ class AnimalOrganizer(AnimalFeatureParser):
                         feature_values = dask.compute(*feature_values)
 
                     # Clean up temp file after processing
+                    logging.debug("Cleaning up temp file")
                     try:
                         os.remove(tmppath)
                     except (OSError, FileNotFoundError) as e:
                         logging.warning(f"Failed to remove temporary file {tmppath}: {e}")
 
                     # Combine metadata and feature values
+                    logging.debug("Combining metadata and feature values")
                     meta_df = pd.DataFrame(metadatas)
                     feat_df = pd.DataFrame(feature_values)
                     lan_df = pd.concat([meta_df, feat_df], axis=1)
 
                 case _:
-                    print("Processing serially")
+                    logging.debug("Processing serially")
                     lan_df = []
                     for idx in tqdm(range(lan.n_fragments), desc='Processing rows', miniters=miniters):
                         lan_df.append(self._process_fragment_serial(idx, features, lan, window_s, kwargs))
@@ -533,7 +553,11 @@ class WindowAnalysisResult(AnimalFeatureParser):
         if inplace:
             del self.result
             self.result = filtered_result
-        return filtered_result
+        return WindowAnalysisResult(filtered_result,
+                                  self.animal_id,
+                                  self.genotype, 
+                                  self.channel_names,
+                                  self.assume_from_number)
 
     # NOTE filter_tfs is a Mfragments x Nchannels numpy array
     def _apply_filter(self, filter_tfs:np.ndarray, verbose=True):
@@ -735,7 +759,7 @@ class SpikeAnalysisResult(AnimalFeatureParser):
         return mne.io.RawArray(data=data, info=info)
     
     @staticmethod
-    def convert_sa_to_np(sa: si.SortingAnalyzer, chunk_len:float=60) -> np.ndarray:
+    def convert_sa_to_np(sa: si.SortingAnalyzer, chunk_len:float=60, max_spikes:int=1000) -> np.ndarray:
         """Convert a SortingAnalyzer to an MNE RawArray.
         
         Args:
