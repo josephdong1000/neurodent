@@ -759,7 +759,7 @@ class SpikeAnalysisResult(AnimalFeatureParser):
         return mne.io.RawArray(data=data, info=info)
     
     @staticmethod
-    def convert_sa_to_np(sa: si.SortingAnalyzer, chunk_len:float=60, max_spikes:int=1000) -> np.ndarray:
+    def convert_sa_to_np(sa: si.SortingAnalyzer, chunk_len:float=60) -> np.ndarray:
         """Convert a SortingAnalyzer to an MNE RawArray.
         
         Args:
@@ -789,22 +789,3 @@ class SpikeAnalysisResult(AnimalFeatureParser):
         traces *= 1e-6 # convert from uV to V
 
         return traces
-
-        
-        # # Extract spike times for each unit and create annotations
-        # onset = []
-        # description = []
-        # for unit_id in sa.sorting.get_unit_ids():
-        #     spike_train = sa.sorting.get_unit_spike_train(unit_id)
-        #     # Convert to seconds and filter to recording duration
-        #     spike_times = spike_train / sa.sorting.get_sampling_frequency()
-        #     mask = spike_times < rec.get_duration()
-        #     spike_times = spike_times[mask]
-            
-        #     # Create annotation for each spike
-        #     onset.extend(spike_times)
-        #     description.extend([f'unit_{unit_id}'] * len(spike_times))
-        # annotations = mne.Annotations(onset, duration=0, description=description)
-        # raw = mne.io.RawArray(data=traces, 
-        #                     info=mne.create_info(ch_names=rec.channel_ids.astype(str).tolist(), sfreq=rec.get_sampling_frequency(), ch_types='eeg'))
-        # raw.set_annotations(annotations)
