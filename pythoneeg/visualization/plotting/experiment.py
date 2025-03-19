@@ -1,4 +1,3 @@
-
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -6,6 +5,7 @@ import pandas as pd
 
 from ... import core
 from ... import visualization as viz
+from pythoneeg import constants
 
 
 class ExperimentPlotter():
@@ -40,7 +40,9 @@ class ExperimentPlotter():
             wars = [wars]
             
         self.results = wars
-        self.channel_names = [war.channel_names for war in wars]
+        self.channel_names = [list(constants.DEFAULT_ID_TO_NAME.values()) for _ in range(len(wars))]
+        #list(constants.DEFAULT_ID_TO_NAME.values())
+       #self.channel_names = [war.channel_names for war in wars]
         
         # Process all data into DataFrames
         df_all = []
@@ -76,6 +78,7 @@ class ExperimentPlotter():
         dict
             Dictionary containing processed data and metadata for plotting
         """
+        
         # Get the data
         df = self.all.copy()  # Use the combined DataFrame from __init__
         
@@ -100,7 +103,7 @@ class ExperimentPlotter():
         box_width = 0.8
         group_width = len(channels) * box_width
         group_positions = np.arange(len(unique_ids)) * (group_width + 1)
-        
+
         # Collect and process data
         for i, id_val in enumerate(unique_ids):
             id_data = df[df[xgroup] == id_val]
@@ -388,3 +391,285 @@ class ExperimentPlotter():
         self._customize_plot(ax, data_dict, colors, title, feature, xgroup)
         
         return fig, ax, self.stats
+    
+    def plot_2d_feature(self, feature, xgroup='animal', channels='all', 
+                       remove_outliers='iqr', outlier_threshold=3,
+                       title=None, color_palette=None, figsize=None):
+        """
+        Create 2D plots for features that return matrices (e.g., coherence, correlation).
+        
+        Parameters
+        ----------
+        feature : str
+            Name of the feature to plot (e.g., 'cohere', 'pcorr')
+        xgroup : str
+            Column name to group by (e.g., 'animal', 'genotype')
+        channels : str or list
+            Channels to include. Can be 'all' or list of channel indices
+        remove_outliers : str
+            Method to remove outliers: 'iqr', 'zscore', or None
+        outlier_threshold : float
+            Threshold for outlier removal
+        title : str, optional
+            Plot title
+        color_palette : list, optional
+            Custom color palette for the plots
+        figsize : tuple, optional
+            Figure size (width, height)
+            
+        Returns
+        -------
+        tuple
+            (figure, axes, stats)
+        """
+        # Get the data
+        df = self.all.copy()
+        
+        # Handle channel selection
+        if channels == 'all':
+            max_channels = max(len(chnames) for chnames in self.channel_names)
+            channels = list(range(max_channels))
+        elif not isinstance(channels, list):
+            channels = [channels]
+            
+        # Get unique xgroup values
+        unique_ids = sorted(df[xgroup].unique())
+        n_groups = len(unique_ids)
+        
+        # Create figure and axes
+        if figsize is None:
+            figsize = (4 * n_groups, 4)
+        fig, axes = plt.subplots(1, n_groups, figsize=figsize)
+        if n_groups == 1:
+            axes = [axes]
+            
+        # Process each group
+        for idx, (ax, group_id) in enumerate(zip(axes, unique_ids)):
+            group_data = df[df[xgroup] == group_id]
+            
+            # Average the matrices in the group
+            matrices = []
+            for _, row in group_data.iterrows():
+                matrix = row[feature]
+                if isinstance(matrix, np.ndarray) and matrix.ndim == 2:
+                    # Ensure matrix is square and matches channel dimensions
+                    if matrix.shape[0] == len(channels) and matrix.shape[1] == len(channels):
+                        matrices.append(matrix)
+            
+            if matrices:
+                avg_matrix = np.mean(matrices, axis=0)
+                
+                # Create heatmap
+                im = ax.imshow(avg_matrix, cmap='RdBu_r', vmin=-1, vmax=1)
+                
+                # Add colorbar for each subplot
+                plt.colorbar(im, ax=ax, label=feature if idx == n_groups-1 else '', 
+                           fraction=0.046, pad=0.04)
+                
+                # Customize appearance
+                ax.set_title(f"{group_id}")
+                ax.set_xticks(range(len(channels)))
+                ax.set_yticks(range(len(channels)))
+                
+                # Use channel names if available
+                channel_labels = []
+                for ch in channels:
+                    ch_name = f"Ch{ch}"
+                    for chnames in self.channel_names:
+                        if ch < len(chnames):
+                            ch_name = chnames[ch].replace("Intan Input (1)/PortA ", "")
+                            break
+                    channel_labels.append(ch_name)
+                
+                ax.set_xticklabels(channel_labels, rotation=45, ha='right')
+                ax.set_yticklabels(channel_labels)
+            else:
+                ax.text(0.5, 0.5, 'No valid data', 
+                       ha='center', va='center', transform=ax.transAxes)
+        
+        # Set main title if provided
+        if title:
+            fig.suptitle(title, y=1.05)
+            
+        plt.tight_layout()
+        
+        return fig, axes, None
+    
+
+    def plot_2d_feature_freq(self, feature, xgroup='animal', channels='all', 
+                       remove_outliers='iqr', outlier_threshold=3,
+                       title=None, color_palette=None, figsize=None):
+        """
+        Create 2D plots for features that return matrices (e.g., coherence, correlation).
+        Handles both simple 2D matrices and frequency-band specific matrices.
+        
+        Parameters
+        ----------
+        feature : str
+            Name of the feature to plot (e.g., 'cohere', 'pcorr')
+        xgroup : str
+            Column name to group by (e.g., 'animal', 'genotype')
+        channels : str or list
+            Channels to include. Can be 'all' or list of channel indices
+        remove_outliers : str
+            Method to remove outliers: 'iqr', 'zscore', or None
+        outlier_threshold : float
+            Threshold for outlier removal
+        title : str, optional
+            Plot title
+        color_palette : list, optional
+            Custom color palette for the plots
+        figsize : tuple, optional
+            Figure size (width, height)
+            
+        Returns
+        -------
+        tuple
+            (figure, axes, stats)
+        """
+        # Get the data
+        df = self.all.copy()
+        
+        # Handle channel selection
+        if channels == 'all':
+            max_channels = max(len(chnames) for chnames in self.channel_names)
+            channels = list(range(max_channels))
+        elif not isinstance(channels, list):
+            channels = [channels]
+            
+        # Get unique xgroup values
+        unique_ids = sorted(df[xgroup].unique())
+        n_groups = len(unique_ids)
+        
+        # Check if the feature contains frequency bands
+        sample_data = df.iloc[0][feature]
+        has_freq_bands = isinstance(sample_data, dict)
+        
+        if has_freq_bands:
+            freq_bands = list(sample_data.keys())
+            n_bands = len(freq_bands)
+            
+            # Create figure and axes grid
+            if figsize is None:
+                figsize = (4 * n_groups, 3 * n_bands)
+            fig, axes = plt.subplots(n_bands, n_groups, figsize=figsize)
+            if n_groups == 1:
+                axes = axes.reshape(-1, 1)
+            if n_bands == 1:
+                axes = axes.reshape(1, -1)
+            
+            # Process each frequency band and group
+            for band_idx, band in enumerate(freq_bands):
+                for group_idx, group_id in enumerate(unique_ids):
+                    ax = axes[band_idx, group_idx]
+                    group_data = df[df[xgroup] == group_id]
+                    
+                    # Average the matrices in the group
+                    matrices = []
+                    for _, row in group_data.iterrows():
+                        matrix = row[feature][band]
+                        if isinstance(matrix, np.ndarray) and matrix.ndim == 2:
+                            if matrix.shape[0] == len(channels) and matrix.shape[1] == len(channels):
+                                matrices.append(matrix)
+                    
+                    if matrices:
+                        avg_matrix = np.mean(matrices, axis=0)
+                        
+                        # Create heatmap
+                        im = ax.imshow(avg_matrix, cmap='RdBu_r', vmin=-1, vmax=1)
+                        
+                        # Add colorbar
+                        if group_idx == n_groups - 1:  # Only for last column
+                            plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+                        
+                        # Customize appearance
+                        if band_idx == 0:  # Only for first row
+                            ax.set_title(f"{group_id}")
+                        if group_idx == 0:  # Only for first column
+                            ax.set_ylabel(band)
+                        
+                        # Set ticks and labels
+                        ax.set_xticks(range(len(channels)))
+                        ax.set_yticks(range(len(channels)))
+                        
+                        # Use channel names if available
+                        channel_labels = []
+                        for ch in channels:
+                            ch_name = f"Ch{ch}"
+                            for chnames in self.channel_names:
+                                if ch < len(chnames):
+                                    ch_name = chnames[ch].replace("Intan Input (1)/PortA ", "")
+                                    break
+                            channel_labels.append(ch_name)
+                        
+                        if band_idx == n_bands - 1:  # Only for last row
+                            ax.set_xticklabels(channel_labels, rotation=45, ha='right')
+                        else:
+                            ax.set_xticklabels([])
+                        
+                        if group_idx == 0:  # Only for first column
+                            ax.set_yticklabels(channel_labels)
+                        else:
+                            ax.set_yticklabels([])
+                    else:
+                        ax.text(0.5, 0.5, 'No valid data', 
+                               ha='center', va='center', transform=ax.transAxes)
+        
+        else:
+            # Original implementation for non-frequency band data
+            if figsize is None:
+                figsize = (4 * n_groups, 4)
+            fig, axes = plt.subplots(1, n_groups, figsize=figsize)
+            if n_groups == 1:
+                axes = [axes]
+                
+            # Process each group
+            for idx, (ax, group_id) in enumerate(zip(axes, unique_ids)):
+                group_data = df[df[xgroup] == group_id]
+                
+                # Average the matrices in the group
+                matrices = []
+                for _, row in group_data.iterrows():
+                    matrix = row[feature]
+                    if isinstance(matrix, np.ndarray) and matrix.ndim == 2:
+                        if matrix.shape[0] == len(channels) and matrix.shape[1] == len(channels):
+                            matrices.append(matrix)
+                
+                if matrices:
+                    avg_matrix = np.mean(matrices, axis=0)
+                    
+                    # Create heatmap
+                    im = ax.imshow(avg_matrix, cmap='RdBu_r', vmin=-1, vmax=1)
+                    
+                    # Add colorbar
+                    plt.colorbar(im, ax=ax, label=feature if idx == n_groups-1 else '', 
+                               fraction=0.046, pad=0.04)
+                    
+                    # Customize appearance
+                    ax.set_title(f"{group_id}")
+                    ax.set_xticks(range(len(channels)))
+                    ax.set_yticks(range(len(channels)))
+                    
+                    # Use channel names if available
+                    channel_labels = []
+                    for ch in channels:
+                        ch_name = f"Ch{ch}"
+                        for chnames in self.channel_names:
+                            if ch < len(chnames):
+                                ch_name = chnames[ch].replace("Intan Input (1)/PortA ", "")
+                                break
+                        channel_labels.append(ch_name)
+                    
+                    ax.set_xticklabels(channel_labels, rotation=45, ha='right')
+                    ax.set_yticklabels(channel_labels)
+                else:
+                    ax.text(0.5, 0.5, 'No valid data', 
+                           ha='center', va='center', transform=ax.transAxes)
+        
+        # Set main title if provided
+        if title:
+            fig.suptitle(title, y=1.05)
+            
+        plt.tight_layout()
+        
+        return fig, axes, None
