@@ -255,6 +255,9 @@ class AnimalOrganizer(AnimalFeatureParser):
         for lrec in self.long_recordings: # Iterate over all long recordings
             logging.debug(f"Initializing LongRecordingAnalyzer for {lrec.base_folder_path}")
             lan = core.LongRecordingAnalyzer(lrec, fragment_len_s=window_s)
+            if lan.n_fragments == 0:
+                logging.warning(f"No fragments found for {lrec.base_folder_path}. Skipping.")
+                continue
 
             logging.debug(f"Processing {lan.n_fragments} fragments")
             miniters = int(lan.n_fragments / 100)
@@ -341,8 +344,11 @@ class AnimalOrganizer(AnimalFeatureParser):
         lrec_sorts = []
         lrec_recs = []
         recs = [lrec.LongRecording for lrec in self.long_recordings]
-        for rec_raw in recs:
-            sortings, recordings = core.MountainSortAnalyzer.sort_recording(rec_raw, multiprocess_mode=multiprocess_mode)
+        for rec in recs:
+            if rec.get_total_samples() == 0:
+                logging.warning(f"Skipping {rec.__str__()} because it has no samples")
+                continue
+            sortings, recordings = core.MountainSortAnalyzer.sort_recording(rec, multiprocess_mode=multiprocess_mode)
             lrec_sorts.append(sortings)
             lrec_recs.append(recordings)
 
@@ -747,9 +753,16 @@ class SpikeAnalysisResult(AnimalFeatureParser):
         sfreqs = [sa.recording.get_sampling_frequency() for sa in sas]
         if not all(sf == sfreqs[0] for sf in sfreqs):
             raise ValueError(f"All SortingAnalyzers must have the same sampling frequency. Got frequencies: {sfreqs}")
+        
+        # Preallocate data array
+        total_frames = int(sas[0].recording.get_duration() * sfreqs[0])
+        n_channels = len(sas)
+        data = np.empty((total_frames, n_channels))
+        
+        # Fill data array one channel at a time
+        for i, sa in enumerate(sas):
+            data[:, i] = SpikeAnalysisResult.convert_sa_to_np(sa, chunk_len)
             
-        data = [SpikeAnalysisResult.convert_sa_to_np(sa, chunk_len) for sa in sas]
-        data = np.concatenate(data, axis=0)
         logging.debug(f"Data shape: {data.shape}")
         channel_names = [str(sa.recording.get_channel_ids().item()) for sa in sas]
         logging.debug(f"Channel names: {channel_names}")
@@ -794,16 +807,21 @@ class SpikeAnalysisResult(AnimalFeatureParser):
         logging.debug(f"Recording info: {rec}")
         traces = []
         n_chunks = int(rec.get_duration()) // chunk_len
-        for j in range(n_chunks + 1): # Get all chunks including the last partial one
-            start_frame = j * chunk_len * rec.get_sampling_frequency()
+
+        # Calculate total number of frames
+        total_frames = int(rec.get_duration() * rec.get_sampling_frequency())
+        n_channels = len(rec.get_channel_ids())
+        traces = np.empty((total_frames, n_channels))
+
+        for j in range(n_chunks + 1):  # Get all chunks including the last partial one
+            start_frame = round(j * chunk_len * rec.get_sampling_frequency())
             if j == n_chunks:  # Last chunk
-                end_frame = int(rec.get_duration() * rec.get_sampling_frequency())
+                end_frame = total_frames
             else:
-                end_frame = (j + 1) * chunk_len * rec.get_sampling_frequency()
-            traces.append(rec.get_traces(start_frame=start_frame,
-                                       end_frame=end_frame, 
-                                       return_scaled=True))
-        traces = np.concatenate(traces, axis=0)
+                end_frame = round((j + 1) * chunk_len * rec.get_sampling_frequency())
+            traces[start_frame:end_frame] = rec.get_traces(start_frame=start_frame,
+                                                            end_frame=end_frame,
+                                                            return_scaled=True)
         traces = traces.T
         traces *= 1e-6 # convert from uV to V
 
