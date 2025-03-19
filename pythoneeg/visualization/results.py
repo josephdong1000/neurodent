@@ -347,8 +347,9 @@ class AnimalOrganizer(AnimalFeatureParser):
         for rec in recs:
             if rec.get_total_samples() == 0:
                 logging.warning(f"Skipping {rec.__str__()} because it has no samples")
-                continue
-            sortings, recordings = core.MountainSortAnalyzer.sort_recording(rec, multiprocess_mode=multiprocess_mode)
+                sortings, recordings = [], []
+            else:
+                sortings, recordings = core.MountainSortAnalyzer.sort_recording(rec, multiprocess_mode=multiprocess_mode)
             lrec_sorts.append(sortings)
             lrec_recs.append(recordings)
 
@@ -358,13 +359,16 @@ class AnimalOrganizer(AnimalFeatureParser):
         lrec_sas = [[si.create_sorting_analyzer(sorting, recording, sparse=False) 
                     for sorting, recording in zip(sortings, recordings)] 
                     for sortings, recordings in zip(lrec_sorts, lrec_recs)]
-        sars = [SpikeAnalysisResult(sas,
-                                    self.animal_id,
-                                    self.genotype,
-                                    self.channel_names,
-                                    self.assume_from_number)
-                for sas in lrec_sas]
-
+        sars = [SpikeAnalysisResult(result_sas=sas,
+                                    result_mne=None,
+                                    animal_id=self.animal_id,
+                                    genotype=self.genotype,
+                                    animal_day=self.animaldays[i],
+                                    metadata=self.metadatas[i],
+                                    channel_names=self.channel_names,
+                                    assume_from_number=self.assume_from_number)
+                for i, sas in enumerate(lrec_sas)]
+        
         self.spike_analysis_results = sars
         return self.spike_analysis_results
 
@@ -619,7 +623,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     raise ValueError(f'Unknown feature to filter {feat}')
         return result
     
-    def to_pickle_and_json(self, folder: str | Path, make_folder=True, save_abbrevs_as_chnames=False):
+    def save_pickle_and_json(self, folder: str | Path, make_folder=True, save_abbrevs_as_chnames=False):
         """Archive window analysis result into the folder specified, as a pickle and json file.
 
         Args:
@@ -646,7 +650,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
 
     @classmethod
-    def from_pickle_and_json(cls, folder_path=None, df_pickle_path=None, json_path=None):
+    def load_pickle_and_json(cls, folder_path=None):
         """Load WindowAnalysisResult from folder
 
         Args:
@@ -665,12 +669,11 @@ class WindowAnalysisResult(AnimalFeatureParser):
             folder_path = Path(folder_path)
             if not folder_path.exists():
                 raise ValueError(f"Folder path {folder_path} does not exist")
-            if df_pickle_path is not None or json_path is not None:
-                raise ValueError("df_pickle_path and json_path must be None if folder_path is provided")
+            
             pkl_files = list(folder_path.glob('*.pkl'))
             json_files = list(folder_path.glob('*.json'))
             
-            if not len(pkl_files) == len(json_files) == 1:
+            if len(pkl_files) != 1 or len(json_files) != 1:
                 raise ValueError(f"Expected exactly one pickle and one json file in {folder_path}")
                 
             df_pickle_path = pkl_files[0]
@@ -717,7 +720,14 @@ class WindowAnalysisResult(AnimalFeatureParser):
         return avg.filled(np.nan)
 
 class SpikeAnalysisResult(AnimalFeatureParser):
-    def __init__(self, result: list[si.SortingAnalyzer], animal_id:str=None, genotype:str=None, channel_names:list[str]=None, assume_from_number=False) -> None:
+    def __init__(self, result_sas: list[si.SortingAnalyzer], 
+                 result_mne: mne.io.RawArray=None,
+                 animal_id:str=None, 
+                 genotype:str=None, 
+                 animal_day:str=None,
+                 metadata:core.DDFBinaryMetadata=None,
+                 channel_names:list[str]=None, 
+                 assume_from_number=False) -> None:
         """
         Args:
             result (list[si.SortingAnalyzer]): Result comes from AnimalOrganizer.compute_spike_analysis(). Each SortingAnalyzer is a single channel.
@@ -726,17 +736,105 @@ class SpikeAnalysisResult(AnimalFeatureParser):
             channel_names (list[str], optional): List of channel names. Defaults to None.
             assume_channels (bool, optional): If true, assumes channel names according to AnimalFeatureParser.DEFAULT_CHNUM_TO_NAME. Defaults to False.
         """
-        self.result = result
-        # self.raws = SpikeAnalysisResult.convert_sas_to_mne(result) # TODO do this automaticallys
-        
+        self.result_sas = result_sas
+        self.result_mne = result_mne
+        if (result_mne is None) == (result_sas is None):
+            raise ValueError("Exactly one of result_sas or result_mne must be provided")
         self.animal_id = animal_id
         self.genotype = genotype
+        self.animal_day = animal_day
+        self.metadata = metadata
         self.channel_names = channel_names
         self.assume_from_number = assume_from_number
         self.channel_abbrevs = [self._parse_chname_to_abbrev(x, assume_from_number=assume_from_number) for x in self.channel_names]
 
         logging.info(f"Channel names: \t{self.channel_names}")
         logging.info(f"Channel abbreviations: \t{self.channel_abbrevs}")
+
+    def convert_to_mne(self, chunk_len:float=60, save_raw=True) -> mne.io.RawArray:
+        if self.result_mne is None:
+            result_mne = SpikeAnalysisResult.convert_sas_to_mne(self.result_sas, chunk_len)
+            if save_raw:
+                self.result_mne = result_mne
+            else:
+                return result_mne
+        return self.result_mne
+            
+
+    def save_fif_and_json(self, folder: str | Path,
+                          convert_to_mne=True,
+                          make_folder=True, 
+                          save_abbrevs_as_chnames=False,
+                          overwrite=False):
+        """Archive spike analysis result into the folder specified, as a fif and json file.
+
+        Args:
+            folder (str | Path): Destination folder to save results to
+            convert_to_mne (bool, optional): If True, convert the SortingAnalyzers to a MNE RawArray if self.result_mne is None. Defaults to True.
+            make_folder (bool, optional): If True, create the folder if it doesn't exist. Defaults to True.
+            save_abbrevs_as_chnames (bool, optional): If True, save the channel abbreviations as the channel names in the json file. Defaults to False.
+            overwrite (bool, optional): If True, overwrite the existing files. Defaults to False.
+        """
+        if self.result_mne is None:
+            if convert_to_mne:
+                result_mne = self.convert_to_mne(save_raw=True)
+                if result_mne is None:
+                    warnings.warn("No SortingAnalyzers found, skipping saving")
+                    return
+            else:
+                raise ValueError("No MNE RawArray found, and convert_to_mne is False. Run convert_to_mne() first.")
+        else:
+            result_mne = self.result_mne
+        
+        folder = Path(folder)
+        if make_folder:
+            folder.mkdir(parents=True, exist_ok=True)
+
+        filebase = str(folder / f"{self.animal_id}-{self.genotype}-{self.animal_day}")
+        if not overwrite:
+            if filebase + '.json' in folder.glob('*.json'):
+                raise FileExistsError(f"File {filebase}.json already exists")
+            if filebase + '.fif' in folder.glob('*.fif'):
+                raise FileExistsError(f"File {filebase}.fif already exists")
+        else:
+            for f in folder.glob('*'):
+                f.unlink()
+        result_mne.save(filebase + '-raw.fif')
+        del result_mne
+
+        json_dict = {
+            'animal_id': self.animal_id,
+            'genotype': self.genotype,
+            'animal_day': self.animal_day,
+            'metadata': self.metadata.metadata_path,
+            'channel_names': self.channel_abbrevs if save_abbrevs_as_chnames else self.channel_names,
+            'assume_from_number': False if save_abbrevs_as_chnames else self.assume_from_number
+        }
+        with open(filebase + ".json", "w") as f:
+            json.dump(json_dict, f, indent=2)
+
+    @classmethod
+    def load_fif_and_json(cls, folder: str | Path):
+        folder = Path(folder)
+        if not folder.exists():
+            raise ValueError(f"Folder {folder} does not exist")
+        
+        fif_files = list(folder.glob('*.fif')) # there may be more than 1 fif file
+        json_files = list(folder.glob('*.json'))
+
+        if len(json_files) != 1: 
+            raise ValueError(f"Expected exactly one json file in {folder}")
+        
+        fif_path = fif_files[0]
+        json_path = json_files[0]
+
+        with open(json_path, 'r') as f:
+            data = json.load(f)
+        data['metadata'] = core.DDFBinaryMetadata(data['metadata'])
+        data['result_mne'] = mne.io.read_raw_fif(fif_path)
+        data['result_sas'] = None
+        return cls(**data)
+
 
     @staticmethod
     def convert_sas_to_mne(sas: list[si.SortingAnalyzer], chunk_len:float=60) -> mne.io.RawArray:
@@ -749,6 +847,9 @@ class SpikeAnalysisResult(AnimalFeatureParser):
         Returns:
             mne.io.RawArray: The converted RawArray, with spikes labeled as annotations
         """
+        if len(sas) == 0:
+            return None
+
         # Check that all SortingAnalyzers have the same sampling frequency
         sfreqs = [sa.recording.get_sampling_frequency() for sa in sas]
         if not all(sf == sfreqs[0] for sf in sfreqs):
@@ -757,11 +858,12 @@ class SpikeAnalysisResult(AnimalFeatureParser):
         # Preallocate data array
         total_frames = int(sas[0].recording.get_duration() * sfreqs[0])
         n_channels = len(sas)
-        data = np.empty((total_frames, n_channels))
+        data = np.empty((n_channels, total_frames))
         
         # Fill data array one channel at a time
         for i, sa in enumerate(sas):
-            data[:, i] = SpikeAnalysisResult.convert_sa_to_np(sa, chunk_len)
+            logging.debug(f"Converting channel {i} of {n_channels}")
+            data[i, :] = SpikeAnalysisResult.convert_sa_to_np(sa, chunk_len)[:, 0]
             
         logging.debug(f"Data shape: {data.shape}")
         channel_names = [str(sa.recording.get_channel_ids().item()) for sa in sas]
@@ -824,5 +926,4 @@ class SpikeAnalysisResult(AnimalFeatureParser):
                                                             return_scaled=True)
         traces = traces.T
         traces *= 1e-6 # convert from uV to V
-
         return traces
