@@ -865,10 +865,9 @@ class SpikeAnalysisResult(AnimalFeatureParser):
         for i, sa in enumerate(sas):
             logging.debug(f"Converting channel {i} of {n_channels}")
             data[i, :] = SpikeAnalysisResult.convert_sa_to_np(sa, chunk_len)
-            logging.debug(f"Data: {data[i, :]}")
             
-        logging.debug(f"Data shape: {data.shape}")
         channel_names = [str(sa.recording.get_channel_ids().item()) for sa in sas]
+        logging.debug(f"Data shape: {data.shape}")
         logging.debug(f"Channel names: {channel_names}")
         sfreq = sfreqs[0]
 
@@ -890,8 +889,6 @@ class SpikeAnalysisResult(AnimalFeatureParser):
 
         info = mne.create_info(ch_names=channel_names, sfreq=sfreq, ch_types='eeg')
         raw = mne.io.RawArray(data=data, info=info)
-        # Scale to reasonable values for visualization
-        raw.plot(duration=10, scalings='auto')
         raw = raw.set_annotations(annotations)
         return raw
 
@@ -924,7 +921,6 @@ class SpikeAnalysisResult(AnimalFeatureParser):
                 end_frame = total_frames
             else:
                 end_frame = round((j + 1) * chunk_len * rec.get_sampling_frequency())
-            logging.debug(f"Start frame: {start_frame}, end frame: {end_frame}")
             traces[start_frame:end_frame] = rec.get_traces(start_frame=start_frame,
                                                             end_frame=end_frame,
                                                             return_scaled=True).flatten()
