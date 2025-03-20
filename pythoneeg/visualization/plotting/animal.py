@@ -12,13 +12,7 @@ from ... import constants
 
 class AnimalPlotter(viz.AnimalFeatureParser):
 
-    # TODO Plot hist features across every channel as a histogram with standard deviations, as a spectrograph
-    # Plot matrix features as several grids per-band for cohere + 1 for pcorr, as a spectrograph flattening channel combinations
-    # Plot linear features as a line over time, as an box plot collapsing over time, as a datapoint on another ExperimentPlotter (wip)
-    # Plot band features as many lines over time, or as a spectrograph over time
-    # TODO Plot spike features (wip) as raster plot per channel, as line plot in time bins, as unit traces over channels
-    # STUB Plot peri-spike frequency plot, convolving over time based on frequency with an (arbitrarily chosen) gaussian filter
-    # STUB make experimental UMAP (q-UMAP?) plotter
+    # TODO make experimental UMAP (q-UMAP?) plotter
 
     def __init__(self, war: viz.WindowAnalysisResult) -> None:
         self.window_result = war
