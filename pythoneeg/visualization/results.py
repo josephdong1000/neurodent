@@ -799,7 +799,7 @@ class SpikeAnalysisResult(AnimalFeatureParser):
         else:
             for f in folder.glob('*'):
                 f.unlink()
-        result_mne.save(filebase + '-raw.fif')
+        result_mne.save(filebase + '-raw.fif', overwrite=overwrite)
         del result_mne
 
         json_dict = {
@@ -812,6 +812,7 @@ class SpikeAnalysisResult(AnimalFeatureParser):
         }
         with open(filebase + ".json", "w") as f:
             json.dump(json_dict, f, indent=2)
+
 
     @classmethod
     def load_fif_and_json(cls, folder: str | Path):
@@ -863,7 +864,8 @@ class SpikeAnalysisResult(AnimalFeatureParser):
         # Fill data array one channel at a time
         for i, sa in enumerate(sas):
             logging.debug(f"Converting channel {i} of {n_channels}")
-            data[i, :] = SpikeAnalysisResult.convert_sa_to_np(sa, chunk_len)[:, 0]
+            data[i, :] = SpikeAnalysisResult.convert_sa_to_np(sa, chunk_len)
+            logging.debug(f"Data: {data[i, :]}")
             
         logging.debug(f"Data shape: {data.shape}")
         channel_names = [str(sa.recording.get_channel_ids().item()) for sa in sas]
@@ -883,11 +885,13 @@ class SpikeAnalysisResult(AnimalFeatureParser):
                 
                 # Create annotation for each spike
                 onset.extend(spike_times)
-                description.extend([f'{sa.recording.get_channel_ids().item()}_{unit_id}'] * len(spike_times))
+                description.extend([sa.recording.get_channel_ids().item()] * len(spike_times)) # collapse all units into 1 spike train
         annotations = mne.Annotations(onset, duration=0, description=description)
 
         info = mne.create_info(ch_names=channel_names, sfreq=sfreq, ch_types='eeg')
         raw = mne.io.RawArray(data=data, info=info)
+        # Scale to reasonable values for visualization
+        raw.plot(duration=10, scalings='auto')
         raw = raw.set_annotations(annotations)
         return raw
 
@@ -897,23 +901,22 @@ class SpikeAnalysisResult(AnimalFeatureParser):
         """Convert a SortingAnalyzer to an MNE RawArray.
         
         Args:
-            sa (si.SortingAnalyzer): The SortingAnalyzer to convert
+            sa (si.SortingAnalyzer): The SortingAnalyzer to convert. Must have only 1 channel.
             chunk_len (float, optional): The length of the chunks to use for the conversion. Defaults to 60.
         Returns:
-            mne.RawArray: The converted RawArray
+            np.ndarray: The converted traces
         """
         # Check that SortingAnalyzer only has 1 channel
         if len(sa.recording.get_channel_ids()) != 1:
             raise ValueError(f"Expected SortingAnalyzer to have 1 channel, but got {len(sa.recording.get_channel_ids())} channels")
+        
         rec = sa.recording
         logging.debug(f"Recording info: {rec}")
-        traces = []
         n_chunks = int(rec.get_duration()) // chunk_len
 
         # Calculate total number of frames
         total_frames = int(rec.get_duration() * rec.get_sampling_frequency())
-        n_channels = len(rec.get_channel_ids())
-        traces = np.empty((total_frames, n_channels))
+        traces = np.empty(total_frames)
 
         for j in range(n_chunks + 1):  # Get all chunks including the last partial one
             start_frame = round(j * chunk_len * rec.get_sampling_frequency())
@@ -921,9 +924,9 @@ class SpikeAnalysisResult(AnimalFeatureParser):
                 end_frame = total_frames
             else:
                 end_frame = round((j + 1) * chunk_len * rec.get_sampling_frequency())
+            logging.debug(f"Start frame: {start_frame}, end frame: {end_frame}")
             traces[start_frame:end_frame] = rec.get_traces(start_frame=start_frame,
                                                             end_frame=end_frame,
-                                                            return_scaled=True)
-        traces = traces.T
+                                                            return_scaled=True).flatten()
         traces *= 1e-6 # convert from uV to V
         return traces
