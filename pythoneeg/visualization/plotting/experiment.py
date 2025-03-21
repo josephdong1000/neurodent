@@ -19,7 +19,8 @@ class ExperimentPlotter():
     """
 
 
-    def __init__(self, wars, features: list[str] = None,
+    def __init__(self, wars: viz.WindowAnalysisResult | list[viz.WindowAnalysisResult], 
+                 features: list[str] = None,
                  exclude: list[str] = None):
         """
         Initialize plotter with WindowAnalysisResult object(s).
@@ -41,9 +42,7 @@ class ExperimentPlotter():
             wars = [wars]
             
         self.results = wars
-        self.channel_names = [list(constants.DEFAULT_ID_TO_NAME.values()) for _ in range(len(wars))]
-        #list(constants.DEFAULT_ID_TO_NAME.values())
-       #self.channel_names = [war.channel_names for war in wars]
+        self.channel_names = [war.channel_names for war in wars]
         
         # Process all data into DataFrames
         df_all = []
@@ -56,8 +55,9 @@ class ExperimentPlotter():
         self.stats = None
 
 
-    def _process_feature_data(self, feature, xgroup, channels='all', 
-                        remove_outliers='iqr', outlier_threshold=3):
+    def _process_feature_data(self, feature: str, xgroup: str | list[str], 
+                              channels: str | list[str]='all', 
+                              remove_outliers: str='iqr', outlier_threshold: float=3):
         """
         Process feature data for plotting.
         
@@ -79,19 +79,24 @@ class ExperimentPlotter():
         dict
             Dictionary containing processed data and metadata for plotting
         """
+
+        # REVIEW this script might be better off with a rewrite
+        # Input: feature, xgroup(s)
+        # Output (currently): dictionary with info about how to plot
+        # Output (todo): parsed/channel-flattened dataframe with single feature + xgroup info. Tidy table
         
         # Get the data
         df = self.all.copy()  # Use the combined DataFrame from __init__
         
         # Handle channel selection
         if channels == 'all':
-            max_channels = max(len(chnames) for chnames in self.channel_names)
+            max_channels = max(len(chnames) for chnames in self.channel_names) # REVIEW what if non-homogenous channels/names?
             channels = list(range(max_channels))
         elif not isinstance(channels, list):
             channels = [channels]
         
         # Get unique xgroup from the DataFrame
-        unique_ids = sorted(df[xgroup].unique())  # Sort to ensure consistent ordering
+        unique_ids = sorted(df[xgroup].unique())  # Sort to ensure consistent ordering # REVIEW handle list xgroup, with dataframe working and seaborn probably.
         
         # Prepare data for plotting
         plot_data = []
@@ -115,7 +120,8 @@ class ExperimentPlotter():
                     ch_data = []
                     for _, row in id_data.iterrows():
                         feature_values = row[feature]
-                        if hasattr(feature_values, '__len__') and len(feature_values) > ch:
+                        if hasattr(feature_values, '__len__') and len(feature_values) > ch: # REVIEW should be able to handle extra channels. Also will this trigger ever? 
+                            # maybe flatten out and then grab features
                             ch_data.append(feature_values[ch])
                     
                     if not ch_data:
@@ -125,15 +131,13 @@ class ExperimentPlotter():
                     ch_data = np.array(ch_data)
                     # Remove any NaN values
                     ch_data = ch_data[~np.isnan(ch_data)]
-                    original_data = ch_data.copy()
 
                     if remove_outliers:
-                        clean_data, outliers = self._handle_outliers(ch_data, 
-                                                                remove_outliers, 
-                                                                outlier_threshold)
+                        clean_data, _ = self._handle_outliers(ch_data, 
+                                                            remove_outliers, 
+                                                            outlier_threshold)
                     else:
                         clean_data = ch_data
-                        outliers = np.array([])
 
                     if len(clean_data) > 0:
                         plot_data.append(clean_data)
@@ -142,7 +146,8 @@ class ExperimentPlotter():
                         ch_name = f"Ch{ch}"  # Default name
                         for chnames in self.channel_names:
                             if ch < len(chnames):
-                                ch_name = chnames[ch].replace("Intan Input (1)/PortA ", "")
+                                ch_name = chnames[ch].replace("Intan Input (1)/PortA ", "") # REVIEW Feels gimmicky. Have an option to by default pull out the channel names according to constants, otherwise
+                                # use the war embedded channel names
                                 break
                         channel_names.append(ch_name)
                         labels.append(f"{id_val}\n{ch_name}")
@@ -169,44 +174,6 @@ class ExperimentPlotter():
             'group_width': group_width
         }
     
-    def _extract_channel_data(self, id_data, feature, channel, remove_outliers, outlier_threshold):
-        """
-        Extract and process data for a single channel.
-        """
-        try:
-            # Extract feature data for this channel
-            ch_data = []
-            for _, row in id_data.iterrows():
-                feature_values = row[feature]
-                if hasattr(feature_values, '__len__') and len(feature_values) > channel:
-                    ch_data.append(feature_values[channel])
-            
-            if not ch_data:
-                print(f"No data collected for channel {channel}")
-                return None
-                
-            ch_data = np.array(ch_data)
-            # Remove any NaN values
-            ch_data = ch_data[~np.isnan(ch_data)]
-            original_data = ch_data.copy()
-
-            # Process outliers
-            clean_data, outliers = self._handle_outliers(ch_data, remove_outliers, outlier_threshold)
-            
-            if len(clean_data) > 0:
-                return {
-                    'clean_data': clean_data,
-                    'original_data': original_data,
-                    'outliers': outliers
-                }
-            else:
-                print(f"No valid data after processing for channel {channel}")
-                return None
-                
-        except Exception as e:
-            print(f"Warning: Error processing channel {channel}: {e}")
-            return None
-        
 
     def _handle_outliers(self, data, method, threshold):
         """
