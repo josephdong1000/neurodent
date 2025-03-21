@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
+import logging
 
 from ... import core
 from ... import visualization as viz
@@ -232,7 +233,7 @@ class ExperimentPlotter():
         """
         Remove outliers using z-score method.
         """
-        z_scores = np.abs((data - np.mean(data)) / np.std(data))
+        z_scores = np.abs((data - np.nanmean(data)) / np.nanstd(data))
         outlier_mask = z_scores >= threshold
         return data[~outlier_mask], data[outlier_mask]
 
@@ -244,8 +245,8 @@ class ExperimentPlotter():
         for i, data in enumerate(plot_data):
             stats[labels[i]] = {
                 'n_total': len(original_data),
-                'mean': np.mean(data),
-                'std': np.std(data),
+                'mean': np.nanmean(data),
+                'std': np.nanstd(data),
                 'median': np.median(data),
                 'n_outliers': len(outliers),
                 'outlier_values': outliers.tolist(),
@@ -451,14 +452,15 @@ class ExperimentPlotter():
             matrices = []
             for _, row in group_data.iterrows():
                 matrix = row[feature]
+                if isinstance(matrix, list): # FIXME hotfix, refactor this code with 2d_feat_freq perhaps
+                    matrix = np.array(matrix)
                 if isinstance(matrix, np.ndarray) and matrix.ndim == 2:
                     # Ensure matrix is square and matches channel dimensions
                     if matrix.shape[0] == len(channels) and matrix.shape[1] == len(channels):
                         matrices.append(matrix)
-            
+
             if matrices:
-                avg_matrix = np.mean(matrices, axis=0)
-                
+                avg_matrix = np.nanmean(matrices, axis=0)
                 # Create heatmap
                 im = ax.imshow(avg_matrix, cmap='RdBu_r', vmin=-1, vmax=1)
                 
@@ -568,12 +570,14 @@ class ExperimentPlotter():
                     matrices = []
                     for _, row in group_data.iterrows():
                         matrix = row[feature][band]
+                        if isinstance(matrix, list): # FIXME hotfix, refactor this code with 2d_feat_freq perhaps
+                            matrix = np.array(matrix)
                         if isinstance(matrix, np.ndarray) and matrix.ndim == 2:
                             if matrix.shape[0] == len(channels) and matrix.shape[1] == len(channels):
                                 matrices.append(matrix)
                     
                     if matrices:
-                        avg_matrix = np.mean(matrices, axis=0)
+                        avg_matrix = np.nanmean(matrices, axis=0)
                         
                         # Create heatmap
                         im = ax.imshow(avg_matrix, cmap='RdBu_r', vmin=-1, vmax=1)
@@ -636,7 +640,7 @@ class ExperimentPlotter():
                             matrices.append(matrix)
                 
                 if matrices:
-                    avg_matrix = np.mean(matrices, axis=0)
+                    avg_matrix = np.nanmean(matrices, axis=0)
                     
                     # Create heatmap
                     im = ax.imshow(avg_matrix, cmap='RdBu_r', vmin=-1, vmax=1)
