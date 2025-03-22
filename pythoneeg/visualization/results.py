@@ -123,13 +123,6 @@ class AnimalFeatureParser:
             case 'psd':
                 col_agg = np.stack([x[1] for x in column], axis=-1)
                 col_agg = (colitem[0], col_agg)
-            case 'nspike':
-                agg_all = np.stack([list(map(sum, x[0])) for x in column], axis=-1)
-                agg_indiv = np.stack([list(map(sum, x[1])) for x in column], axis=-1)
-                col_agg = np.stack([agg_all, agg_indiv], axis=1)
-            case 'wavetemp':
-                warnings.warn("wavetemp cannot be averaged. Use get_wavetemp() instead")
-                col_agg = np.NaN
             case _:
                 raise TypeError(f"Unrecognized type in column {colname}: {colitem}")
 
@@ -138,8 +131,6 @@ class AnimalFeatureParser:
         elif type(col_agg) is tuple:
             if colname == 'psd':
                 avg = (col_agg[0], self._nanaverage(col_agg[1], axis=-1, weights=weights))
-            elif colname == 'nspike':
-                avg = col_agg.sum(axis=-1) / np.sum(weights)
             else:
                 avg = None
         elif np.isnan(col_agg).all():
@@ -617,8 +608,6 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     vals[~mask] = np.nan
                     vals[~mask.transpose(0, 2, 1)] = np.nan
                     result[feat] = vals.tolist()
-                case 'nspike' | 'wavetemp':
-                    logging.warning('nspike and wavetemp are not supported for filtering yet')
                 case _:
                     raise ValueError(f'Unknown feature to filter {feat}')
         return result
