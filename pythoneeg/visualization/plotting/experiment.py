@@ -21,7 +21,8 @@ class ExperimentPlotter():
 
     def __init__(self, wars: viz.WindowAnalysisResult | list[viz.WindowAnalysisResult], 
                  features: list[str] = None,
-                 exclude: list[str] = None):
+                 exclude: list[str] = None,
+                 use_abbreviations: bool = True):
         """
         Initialize plotter with WindowAnalysisResult object(s).
         
@@ -33,6 +34,8 @@ class ExperimentPlotter():
             List of features to extract. If None, defaults to ['all']
         exclude : list[str], optional
             List of features to exclude from extraction
+        use_abbreviations : bool, optional
+            Whether to use abbreviations for channel names
         """
         # Handle default arguments
         features = features if features else ['all']
@@ -42,17 +45,72 @@ class ExperimentPlotter():
             wars = [wars]
             
         self.results = wars
-        self.channel_names = [war.channel_names for war in wars]
+        if use_abbreviations:
+            self.channel_names = [war.channel_abbrevs for war in wars]
+        else:
+            self.channel_names = [war.channel_names for war in wars]
+        self.channel_to_idx = [{e:i for i,e in enumerate(chnames)} for chnames in self.channel_names]
+        self.all_channel_names = sorted(list(set([name for chnames in self.channel_names for name in chnames])))
+        logging.info(f'channel_names: {self.channel_names}')
+        logging.info(f'channel_to_idx: {self.channel_to_idx}')
+        logging.info(f'all_channel_names: {self.all_channel_names}')
         
         # Process all data into DataFrames
-        df_all = []
+        df_wars = []
         for war in wars:
             # Get all data
             dftemp = war.get_result(features=features, exclude=exclude, allow_missing=True)
-            df_all.append(dftemp)
+            df_wars.append(dftemp)
 
-        self.all = pd.concat(df_all, axis=0, ignore_index=True)
+        self.df_wars: list[pd.DataFrame] = df_wars
+        self.all = pd.concat(df_wars, axis=0, ignore_index=True)
         self.stats = None
+
+
+    def _pull_flat_dataframe(self, feature:str, groupby:str | list[str], 
+                            channels:str|list[str]='all', 
+                            remove_outliers:str='iqr', outlier_threshold:float=3):
+        """
+        Process feature data for plotting.
+        """
+
+        if channels == 'all':
+            channels = self.all_channel_names
+        elif not isinstance(channels, list):
+            channels = [channels]
+        logging.debug(f'channels: {channels}')
+        df = self.all.copy()  # Use the combined DataFrame from __init__
+        
+        if isinstance(groupby, str):
+            groupby = [groupby]
+        groups = list(df.groupby(groupby).groups.keys())
+        logging.debug(f'groups: {groups}')
+        
+        # first iterate through animals, since that determines channel idx
+        # then pull out feature into matrix, assign channels, and add to dataframe 
+        # meawhile carrying over the groupby feature
+
+        dataframes = []
+        for i, war in enumerate(self.results):
+            df_war = self.df_wars[i]
+            ch_to_idx = self.channel_to_idx[i]
+            ch_names = self.channel_names[i]
+            match feature:
+                case 'rms' | 'ampvar' | 'psdtotal' | 'psdslope':
+                    vals = np.array(df_war[feature].tolist())
+                    logging.debug(f'vals.shape: {vals.shape}')
+
+                    vals = {ch: vals[:, ch_to_idx[ch]] for ch in channels if ch in ch_names}
+                    vals = df_war[groupby].to_dict('list') | vals
+                    df_feature = pd.DataFrame.from_dict(vals, orient='columns')
+                    dataframes.append(df_feature)
+
+                case _:
+                    raise ValueError(f'Feature {feature} is not supported')
+
+        return pd.concat(dataframes, axis=0, ignore_index=True) # TODO working on this
+
+
 
 
     def _process_feature_data(self, feature: str, xgroup: str | list[str], 
