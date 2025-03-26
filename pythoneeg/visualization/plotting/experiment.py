@@ -3,11 +3,11 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 import logging
+from scipy import stats
 
 from ... import core
 from ... import visualization as viz
 from pythoneeg import constants
-
 
 class ExperimentPlotter():
 
@@ -67,8 +67,9 @@ class ExperimentPlotter():
         self.stats = None
 
 
-    def _pull_flat_dataframe(self, feature:str, groupby:str | list[str], 
+    def _pull_timeseries_dataframe(self, feature:str, groupby:str | list[str], 
                             channels:str|list[str]='all', 
+                            collapse_channels: bool=False,
                             remove_outliers:str='iqr', outlier_threshold:float=3):
         """
         Process feature data for plotting.
@@ -88,7 +89,7 @@ class ExperimentPlotter():
         
         # first iterate through animals, since that determines channel idx
         # then pull out feature into matrix, assign channels, and add to dataframe 
-        # meawhile carrying over the groupby feature
+        # meanwhile carrying over the groupby feature
 
         dataframes = []
         for i, war in enumerate(self.results):
@@ -96,19 +97,48 @@ class ExperimentPlotter():
             ch_to_idx = self.channel_to_idx[i]
             ch_names = self.channel_names[i]
             match feature:
-                case 'rms' | 'ampvar' | 'psdtotal' | 'psdslope':
-                    vals = np.array(df_war[feature].tolist())
-                    logging.debug(f'vals.shape: {vals.shape}')
+                case 'rms' | 'ampvar' | 'psdtotal' | 'psdslope' | 'psdband':
+                    if feature == 'psdband':
+                        df_bands = pd.DataFrame(df_war[feature].tolist())
+                        vals = np.array(df_bands.values.tolist())
+                        vals = vals.transpose((0, 2, 1))
+                    else:
+                        vals = np.array(df_war[feature].tolist())
 
-                    vals = {ch: vals[:, ch_to_idx[ch]] for ch in channels if ch in ch_names}
+                    logging.debug(f'vals.shape: {vals.shape}')
+                    if collapse_channels:
+                        vals = vals.mean(axis=1) # REVIEW this value
+                        logging.debug(f'collapsed vals.shape: {vals.shape}')
+                        vals = {'average': vals[ch_to_idx[ch]].tolist() for ch in channels if ch in ch_names}
+                    else:
+                        vals = {ch: vals[:, ch_to_idx[ch]].tolist() for ch in channels if ch in ch_names}
                     vals = df_war[groupby].to_dict('list') | vals
                     df_feature = pd.DataFrame.from_dict(vals, orient='columns')
                     dataframes.append(df_feature)
-
                 case _:
                     raise ValueError(f'Feature {feature} is not supported')
+        df = pd.concat(dataframes, axis=0, ignore_index=True)
 
-        return pd.concat(dataframes, axis=0, ignore_index=True) # TODO working on this
+        feature_cols = [col for col in df.columns if col not in groupby]
+        df = df.melt(id_vars=groupby, value_vars=feature_cols, var_name='channel', value_name=feature)
+        
+        # Remove outliers if specified
+        # REVIEW WIP code
+        # if remove_outliers:
+        #     numeric_cols = df.select_dtypes(include=[np.number]).columns
+        #     for col in numeric_cols:
+        #         if remove_outliers == 'iqr':
+        #             Q1 = df[col].quantile(0.25)
+        #             Q3 = df[col].quantile(0.75)
+        #             IQR = Q3 - Q1
+        #             mask = ~((df[col] < (Q1 - outlier_threshold * IQR)) | 
+        #                     (df[col] > (Q3 + outlier_threshold * IQR)))
+        #             df = df[mask]
+        #         elif remove_outliers == 'zscore':
+        #             z_scores = np.abs(stats.zscore(df[col], nan_policy='omit'))
+        #             mask = z_scores < outlier_threshold
+        #             df = df[mask]
+        return df
 
 
 
@@ -346,6 +376,41 @@ class ExperimentPlotter():
             if show_outliers and len(bp['fliers']) > i:
                 bp['fliers'][i].set_markerfacecolor(colors[channel_idx])
                 bp['fliers'][i].set_markeredgecolor(colors[channel_idx])
+
+
+    def plot_boxplot_2(self, feature: str, groupby: str | list[str], 
+                channels: str | list[str]='all', 
+                collapse_channels: bool=False,
+                remove_outliers: str='iqr', outlier_threshold: float=3, 
+                show_outliers: bool=True,
+                title: str=None, color_palette: list[str]=None, figsize: tuple[float, float]=None):
+        """
+        Create a boxplot of the feature data.
+        """
+        if isinstance(groupby, str):
+            groupby = [groupby]
+        df = self._pull_timeseries_dataframe(feature, groupby, channels, collapse_channels, remove_outliers, outlier_threshold)
+        
+        # TODO handle psdband and psdslope
+
+        # Create boxplot using seaborn
+        g = sns.catplot(data=df, 
+                    x=groupby[0], 
+                    y=feature, 
+                    hue='channel',
+                    col=groupby[1] if len(groupby) > 1 else None,
+                    kind='box',
+                    palette=color_palette, 
+                    showfliers=show_outliers)
+        g.set_xticklabels(rotation=45, ha='right')
+        g.set_titles(title)
+        # Add grid to y-axis for all subplots
+        for ax in g.axes.flat:
+            ax.yaxis.grid(True, linestyle='--', which='major', color='grey', alpha=.25)
+        
+        plt.tight_layout()
+        
+        return g
 
     def plot_boxplot(self, feature, xgroup='animal', channels='all', 
                 remove_outliers='iqr', outlier_threshold=3, show_outliers=True,
