@@ -121,6 +121,14 @@ class ExperimentPlotter():
         feature_cols = [col for col in df.columns if col not in groupby]
         df = df.melt(id_vars=groupby, value_vars=feature_cols, var_name='channel', value_name=feature)
         
+        if feature == 'psdslope':
+            df[feature] = df[feature].apply(lambda x: x[0]) # get slope from [slope, intercept]
+        elif feature == 'psdband':
+            df[feature] = df[feature].apply(lambda x: list(zip(x, constants.BAND_NAMES)))
+            df = df.explode(feature)
+            df[[feature, 'band']] = pd.DataFrame(df[feature].tolist(), index=df.index)
+        
+
         # Remove outliers if specified
         # REVIEW WIP code
         # if remove_outliers:
@@ -377,42 +385,52 @@ class ExperimentPlotter():
                 bp['fliers'][i].set_markeredgecolor(colors[channel_idx])
 
 
-    def plot_boxplot_2(self, feature: str, groupby: str | list[str], 
-                channels: str | list[str]='all', 
-                collapse_channels: bool=False,
-                remove_outliers: str='iqr', outlier_threshold: float=3, 
-                show_outliers: bool=True,
-                title: str=None, color_palette: list[str]=None, figsize: tuple[float, float]=None):
+    def plot_catplot(self, feature: str, 
+                    groupby: str | list[str], 
+                    x: str=None,
+                    col: str=None,
+                    hue: str=None,
+                    kind: str='box',
+                    catplot_params: dict=None,
+                    channels: str | list[str]='all', 
+                    collapse_channels: bool=False,
+                    remove_outliers: str='iqr', outlier_threshold: float=3,
+                    title: str=None, color_palette: list[str]=None, figsize: tuple[float, float]=None):
         """
         Create a boxplot of the feature data.
         """
-        if isinstance(groupby, str):
-            groupby = [groupby]
         df = self._pull_timeseries_dataframe(feature, groupby, channels, collapse_channels, remove_outliers, outlier_threshold)
         
-        # TODO handle psdband and psdslope
-        if feature == 'psdslope':
-            df[feature] = df[feature].apply(lambda x: x[0]) # get slope from [slope, intercept]
-        elif feature == 'psdband':
-            df[feature] = df[feature].apply(lambda x: list(zip(x, constants.BAND_NAMES)))
-            df = df.explode(feature)
-            df[['psdband', 'band']] = pd.DataFrame(df[feature].tolist(), index=df.index)
+        if isinstance(groupby, str):
+            groupby = [groupby]
         
-        
-        # elif feature == 'psdband':
-        #     df = df.melt(id_vars=groupby, value_vars=constants.BAND_NAMES, var_name='band', value_name='psd')
-        
+        # By default, just map x = groupby0, col = groupby1, hue = channel
+        default_params = {
+            'data': df,
+            'x': groupby[0],
+            'y': feature,
+            'hue': 'channel',
+            'col': groupby[1] if len(groupby) > 1 else None,
+            'kind': kind,
+            'palette': color_palette,
+            # 'showfliers': show_outliers,
+        }
+        # Update default params if x, col, or hue are explicitly provided
+        if x is not None:
+            default_params['x'] = x
+        if col is not None:
+            default_params['col'] = col
+        if hue is not None:
+            default_params['hue'] = hue
+        if catplot_params:
+            default_params.update(catplot_params)
+
         # Create boxplot using seaborn
-        g = sns.catplot(data=df, 
-                    x=groupby[0], 
-                    y=feature, 
-                    hue='channel',
-                    col=groupby[1] if len(groupby) > 1 else None,
-                    kind='box',
-                    palette=color_palette, 
-                    showfliers=show_outliers)
+        g = sns.catplot(**default_params)
         g.set_xticklabels(rotation=45, ha='right')
         g.set_titles(title)
+        g.legend.set_loc('center left')
+        g.legend.set_bbox_to_anchor((1.0, 0.5))
         # Add grid to y-axis for all subplots
         for ax in g.axes.flat:
             ax.yaxis.grid(True, linestyle='--', which='major', color='grey', alpha=.25)
