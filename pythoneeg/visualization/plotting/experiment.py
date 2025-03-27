@@ -112,10 +112,42 @@ class ExperimentPlotter():
                         logging.debug(f'vals.shape: {vals.shape}')
                         vals = {ch: vals[:, ch_to_idx[ch]].tolist() for ch in channels if ch in ch_names}
                     vals = df_war[groupby].to_dict('list') | vals
-                    df_feature = pd.DataFrame.from_dict(vals, orient='columns')
-                    dataframes.append(df_feature)
+
+                case 'pcorr':
+                    vals = np.array(df_war[feature].tolist())
+                    if collapse_channels:
+                        # Get lower triangular elements (excluding diagonal)
+                        tril_indices = np.tril_indices(vals.shape[1], k=-1)
+                        # Take mean across pairs
+                        vals = np.mean(vals[:, tril_indices[0], tril_indices[1]], axis=-1)
+                        logging.debug(f'vals.shape: {vals.shape}')
+                        vals = {'average': vals.tolist()}
+                    else:
+                        logging.debug(f'vals.shape: {vals.shape}')
+                        vals = {'all' : vals.tolist()}
+                    vals = df_war[groupby].to_dict('list') | vals
+
+                case 'cohere':
+                    df_bands = pd.DataFrame(df_war[feature].tolist())
+                    vals = np.array(df_bands.values.tolist())
+                    logging.debug(f'vals.shape: {vals.shape}')
+
+                    if collapse_channels:
+                        tril_indices = np.tril_indices(vals.shape[1], k=-1)
+                        vals = np.mean(vals[:, :, tril_indices[0], tril_indices[1]], axis=-1)
+                        logging.debug(f'vals.shape: {vals.shape}')
+                        vals = {'average': vals.tolist()}
+                    else:
+                        logging.debug(f'vals.shape: {vals.shape}')
+                        vals = {'all' : vals.tolist()}
+                    vals = df_war[groupby].to_dict('list') | vals
+                    
                 case _:
                     raise ValueError(f'Feature {feature} is not supported')
+                
+            df_feature = pd.DataFrame.from_dict(vals, orient='columns')
+            dataframes.append(df_feature)
+            
         df = pd.concat(dataframes, axis=0, ignore_index=True)
 
         feature_cols = [col for col in df.columns if col not in groupby]
@@ -123,7 +155,7 @@ class ExperimentPlotter():
         
         if feature == 'psdslope':
             df[feature] = df[feature].apply(lambda x: x[0]) # get slope from [slope, intercept]
-        elif feature == 'psdband':
+        elif feature == 'psdband' or feature == 'cohere':
             df[feature] = df[feature].apply(lambda x: list(zip(x, constants.BAND_NAMES)))
             df = df.explode(feature)
             df[[feature, 'band']] = pd.DataFrame(df[feature].tolist(), index=df.index)
@@ -146,8 +178,6 @@ class ExperimentPlotter():
         #             mask = z_scores < outlier_threshold
         #             df = df[mask]
         return df
-
-
 
 
     def _process_feature_data(self, feature: str, xgroup: str | list[str], 
