@@ -540,6 +540,64 @@ class ExperimentPlotter():
         
         return fig, ax, self.stats
     
+    def plot_2d_feature_2(self,
+                        feature: str, 
+                        groupby: str | list[str], 
+                        col: str=None,
+                        row: str=None,
+                        channels: str | list[str]='all', 
+                        collapse_channels: bool=False,
+                        remove_outliers: str='iqr', outlier_threshold: float=3,
+                        title: str=None, color_palette: list[str]=None, figsize: tuple[float, float]=None):
+        
+        df = self._pull_timeseries_dataframe(feature, groupby, channels, collapse_channels, remove_outliers, outlier_threshold)
+
+        if isinstance(groupby, str):
+            groupby = [groupby]
+        # REVIEW review this code, edit X/Y tick labels, enable other colormaps
+        # Define the plotting function for each facet
+        def plot_matrix(data, color_palette=None, **kwargs):
+            matrices = np.array(data[feature].tolist())
+            avg_matrix = np.nanmean(matrices, axis=0)
+            
+            # Create heatmap
+            plt.imshow(avg_matrix, cmap='RdBu_r', vmin=-1, vmax=1)
+            plt.colorbar(fraction=0.046, pad=0.04)
+            
+            # Set ticks and labels
+            n_channels = avg_matrix.shape[0]
+            plt.xticks(range(n_channels), range(n_channels), rotation=45, ha='right')
+            plt.yticks(range(n_channels), range(n_channels))
+            
+            # Remove axis labels since they're redundant for correlation matrices
+            plt.xlabel('')
+            plt.ylabel('')
+        
+        # Create FacetGrid
+        facet_vars = {
+            'col': groupby[0],
+            'row': groupby[1] if len(groupby) > 1 else None
+        }
+        if col is not None:
+            facet_vars['col'] = col
+        if row is not None:
+            facet_vars['row'] = row
+        
+        g = sns.FacetGrid(df, **facet_vars, height=4 if figsize is None else figsize[0]/2)
+        
+        # Map the plotting function
+        g.map_dataframe(plot_matrix, color_palette=color_palette)
+        
+        # Add titles
+        if title:
+            g.fig.suptitle(title, y=1.02)
+        
+        # Adjust layout
+        plt.tight_layout()
+        
+        return g
+
+
     def plot_2d_feature(self, feature, xgroup='animal', channels='all', 
                        remove_outliers='iqr', outlier_threshold=3,
                        title=None, color_palette=None, figsize=None):
