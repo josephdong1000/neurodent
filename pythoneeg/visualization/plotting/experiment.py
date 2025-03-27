@@ -79,7 +79,6 @@ class ExperimentPlotter():
             channels = self.all_channel_names
         elif not isinstance(channels, list):
             channels = [channels]
-        logging.debug(f'channels: {channels}')
         df = self.all.copy()  # Use the combined DataFrame from __init__
         
         if isinstance(groupby, str):
@@ -105,12 +104,12 @@ class ExperimentPlotter():
                     else:
                         vals = np.array(df_war[feature].tolist())
 
-                    logging.debug(f'vals.shape: {vals.shape}')
                     if collapse_channels:
-                        vals = vals.mean(axis=1) # REVIEW this value
-                        logging.debug(f'collapsed vals.shape: {vals.shape}')
-                        vals = {'average': vals[ch_to_idx[ch]].tolist() for ch in channels if ch in ch_names}
+                        vals = vals.mean(axis=1)
+                        logging.debug(f'vals.shape: {vals.shape}')
+                        vals = {'average': vals.tolist()}
                     else:
+                        logging.debug(f'vals.shape: {vals.shape}')
                         vals = {ch: vals[:, ch_to_idx[ch]].tolist() for ch in channels if ch in ch_names}
                     vals = df_war[groupby].to_dict('list') | vals
                     df_feature = pd.DataFrame.from_dict(vals, orient='columns')
@@ -392,7 +391,17 @@ class ExperimentPlotter():
         df = self._pull_timeseries_dataframe(feature, groupby, channels, collapse_channels, remove_outliers, outlier_threshold)
         
         # TODO handle psdband and psdslope
-
+        if feature == 'psdslope':
+            df[feature] = df[feature].apply(lambda x: x[0]) # get slope from [slope, intercept]
+        elif feature == 'psdband':
+            df[feature] = df[feature].apply(lambda x: list(zip(x, constants.BAND_NAMES)))
+            df = df.explode(feature)
+            df[['psdband', 'band']] = pd.DataFrame(df[feature].tolist(), index=df.index)
+        
+        
+        # elif feature == 'psdband':
+        #     df = df.melt(id_vars=groupby, value_vars=constants.BAND_NAMES, var_name='band', value_name='psd')
+        
         # Create boxplot using seaborn
         g = sns.catplot(data=df, 
                     x=groupby[0], 
