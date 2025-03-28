@@ -61,7 +61,7 @@ ep = visualization.ExperimentPlotter(wars)
 
 catplot_params = {'showfliers': False}
 
-ep.plot_catplot('rms', groupby='animal', kind='box', catplot_params=catplot_params)
+ep.plot_catplot('rms', groupby='animal', kind='box', catplot_params={'showfliers': False, 'aspect': 4})
 plt.savefig('/home/dongjp/Downloads/3-28-25/AAAA every animal.png')
 
 for feature in constants.LINEAR_FEATURE:
