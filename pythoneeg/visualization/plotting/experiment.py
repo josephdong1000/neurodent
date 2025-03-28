@@ -69,8 +69,7 @@ class ExperimentPlotter():
 
     def _pull_timeseries_dataframe(self, feature:str, groupby:str | list[str], 
                             channels:str|list[str]='all', 
-                            collapse_channels: bool=False,
-                            remove_outliers:str='iqr', outlier_threshold:float=3):
+                            collapse_channels: bool=False):
         """
         Process feature data for plotting.
         """
@@ -105,7 +104,7 @@ class ExperimentPlotter():
                         vals = np.array(df_war[feature].tolist())
 
                     if collapse_channels:
-                        vals = vals.mean(axis=1)
+                        vals = np.nanmean(vals, axis=1)
                         logging.debug(f'vals.shape: {vals.shape}')
                         vals = {'average': vals.tolist()}
                     else:
@@ -119,7 +118,7 @@ class ExperimentPlotter():
                         # Get lower triangular elements (excluding diagonal)
                         tril_indices = np.tril_indices(vals.shape[1], k=-1)
                         # Take mean across pairs
-                        vals = np.mean(vals[:, tril_indices[0], tril_indices[1]], axis=-1)
+                        vals = np.nanmean(vals[:, tril_indices[0], tril_indices[1]], axis=-1)
                         logging.debug(f'vals.shape: {vals.shape}')
                         vals = {'average': vals.tolist()}
                     else:
@@ -134,7 +133,7 @@ class ExperimentPlotter():
 
                     if collapse_channels:
                         tril_indices = np.tril_indices(vals.shape[1], k=-1)
-                        vals = np.mean(vals[:, :, tril_indices[0], tril_indices[1]], axis=-1)
+                        vals = np.nanmean(vals[:, :, tril_indices[0], tril_indices[1]], axis=-1)
                         logging.debug(f'vals.shape: {vals.shape}')
                         vals = {'average': vals.tolist()}
                     else:
@@ -160,23 +159,8 @@ class ExperimentPlotter():
             df = df.explode(feature)
             df[[feature, 'band']] = pd.DataFrame(df[feature].tolist(), index=df.index)
         
+        df.reset_index(drop=True, inplace=True)
 
-        # Remove outliers if specified
-        # REVIEW WIP code
-        # if remove_outliers:
-        #     numeric_cols = df.select_dtypes(include=[np.number]).columns
-        #     for col in numeric_cols:
-        #         if remove_outliers == 'iqr':
-        #             Q1 = df[col].quantile(0.25)
-        #             Q3 = df[col].quantile(0.75)
-        #             IQR = Q3 - Q1
-        #             mask = ~((df[col] < (Q1 - outlier_threshold * IQR)) | 
-        #                     (df[col] > (Q3 + outlier_threshold * IQR)))
-        #             df = df[mask]
-        #         elif remove_outliers == 'zscore':
-        #             z_scores = np.abs(stats.zscore(df[col], nan_policy='omit'))
-        #             mask = z_scores < outlier_threshold
-        #             df = df[mask]
         return df
 
 
@@ -424,12 +408,11 @@ class ExperimentPlotter():
                     catplot_params: dict=None,
                     channels: str | list[str]='all', 
                     collapse_channels: bool=False,
-                    remove_outliers: str='iqr', outlier_threshold: float=3,
                     title: str=None, color_palette: list[str]=None, figsize: tuple[float, float]=None):
         """
         Create a boxplot of the feature data.
         """
-        df = self._pull_timeseries_dataframe(feature, groupby, channels, collapse_channels, remove_outliers, outlier_threshold)
+        df = self._pull_timeseries_dataframe(feature, groupby, channels, collapse_channels)
         
         if isinstance(groupby, str):
             groupby = [groupby]
@@ -547,10 +530,9 @@ class ExperimentPlotter():
                         row: str=None,
                         channels: str | list[str]='all', 
                         collapse_channels: bool=False,
-                        remove_outliers: str='iqr', outlier_threshold: float=3,
                         title: str=None, color_palette: list[str]=None, figsize: tuple[float, float]=None):
         
-        df = self._pull_timeseries_dataframe(feature, groupby, channels, collapse_channels, remove_outliers, outlier_threshold)
+        df = self._pull_timeseries_dataframe(feature, groupby, channels, collapse_channels)
 
         if isinstance(groupby, str):
             groupby = [groupby]
@@ -570,8 +552,9 @@ class ExperimentPlotter():
             plt.yticks(range(n_channels), range(n_channels))
             
             # Remove axis labels since they're redundant for correlation matrices
-            plt.xlabel('')
-            plt.ylabel('')
+            ch_names = self.channel_names[0]
+            plt.xticks(range(n_channels), ch_names, rotation=45, ha='right')
+            plt.yticks(range(n_channels), ch_names)
         
         # Create FacetGrid
         facet_vars = {
@@ -590,7 +573,7 @@ class ExperimentPlotter():
         
         # Add titles
         if title:
-            g.fig.suptitle(title, y=1.02)
+            g.figure.suptitle(title, y=1.02)
         
         # Adjust layout
         plt.tight_layout()
