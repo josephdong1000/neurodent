@@ -21,7 +21,7 @@ from pythoneeg import constants
 
 core.set_temp_directory('/scr1/users/dongjp')
 
-logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.DEBUG, stream=sys.stdout, force=True)
+logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO, stream=sys.stdout, force=True)
 logger = logging.getLogger()
 
 
@@ -59,29 +59,34 @@ ep = visualization.ExperimentPlotter(wars)
 # TODO pcorr vs. genotype/isday
 # TODO pcorr vs. genotype
 
+catplot_params = {'showfliers': False}
+
+ep.plot_catplot('rms', groupby='animal', kind='box', catplot_params=catplot_params)
+plt.savefig('/home/dongjp/Downloads/3-28-25/AAAA every animal.png')
+
 for feature in constants.LINEAR_FEATURE:
     for kind in ['box', 'violin']:
         for groupby in ['genotype', ['genotype', 'isday']]:
             for collapse in [False, True]:
-                ep.plot_catplot(feature, groupby=groupby, kind=kind, collapse_channels=collapse)
+                ep.plot_catplot(feature, groupby=groupby, kind=kind, collapse_channels=collapse, catplot_params=catplot_params if kind == 'box' else None)
                 plt.savefig(f'/home/dongjp/Downloads/3-28-25/{feature}-{groupby}-{kind}-{collapse}.png')
 for kind in ['box', 'violin']:
     ep.plot_catplot('psdband', groupby=['genotype', 'isday'], 
                     x='genotype',
                     col='isday',
                     hue='band',
-                    kind=kind, collapse_channels=True)
+                    kind=kind, collapse_channels=True, catplot_params=catplot_params if kind == 'box' else None)
     plt.savefig(f'/home/dongjp/Downloads/3-28-25/psdband-genotype-isday-{kind}-True.png')
     ep.plot_catplot('psdband', groupby=['genotype'], 
                     x='genotype',
                     hue='band',
-                    kind=kind, collapse_channels=True)
+                    kind=kind, collapse_channels=True, catplot_params=catplot_params if kind == 'box' else None)
     plt.savefig(f'/home/dongjp/Downloads/3-28-25/psdband-genotype-{kind}-True.png')
 
 for feature in constants.MATRIX_FEATURE:
     for kind in ['box', 'violin']:
         for groupby in [['genotype', 'isday'], 'genotype']:
-            ep.plot_catplot(feature, groupby=groupby, kind=kind, collapse_channels=True)
+            ep.plot_catplot(feature, groupby=groupby, kind=kind, collapse_channels=True, catplot_params=catplot_params if kind == 'box' else None)
             plt.savefig(f'/home/dongjp/Downloads/3-28-25/{feature}-{groupby}-{kind}-True.png')
 
 ep.plot_2d_feature_2('cohere', groupby=['genotype', 'isday'])
@@ -93,23 +98,6 @@ ep.plot_2d_feature_2('pcorr', groupby=['genotype', 'isday'])
 plt.savefig(f'/home/dongjp/Downloads/3-28-25/pcorr-genotype-isday-matrix-False.png')
 ep.plot_2d_feature_2('pcorr', groupby='genotype')
 plt.savefig(f'/home/dongjp/Downloads/3-28-25/pcorr-genotype-matrix-False.png')
-
-
-
-# features = ['rms','ampvar', 'psdtotal', 'psdslope']
-# for feature in features:
-#     for plot in ['boxplot', 'scatter', 'violin']:
-#         for xgroup, size in zip(['animal', 'isday', 'genotype'], [(30,5), (10,5), (10,5)]):
-#             plot_func = getattr(ep, f'plot_{plot}')
-#             plot_func(feature, figsize=size, xgroup=xgroup)
-#             plt.savefig(f'/home/dongjp/Downloads/3-28-25/{xgroup}-{feature}-{plot}.png')
-
-# for xgroup in ['animal', 'isday', 'genotype']:
-
-#     ep.plot_2d_feature('pcorr', xgroup=xgroup)
-#     plt.savefig(f'/home/dongjp/Downloads/3-21-25/{xgroup}-pcorr-2d.png')
-#     ep.plot_2d_feature_freq('cohere', xgroup=xgroup)
-#     plt.savefig(f'/home/dongjp/Downloads/3-21-25/{xgroup}-cohere-2d.png')
 
 
 """
