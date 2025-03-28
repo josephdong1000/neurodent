@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 import logging
+from typing import Literal
+
 from scipy import stats
 
 from ... import core
@@ -404,7 +406,7 @@ class ExperimentPlotter():
                     x: str=None,
                     col: str=None,
                     hue: str=None,
-                    kind: str='box',
+                    kind: Literal['box', 'boxen', 'violin']='box',
                     catplot_params: dict=None,
                     channels: str | list[str]='all', 
                     collapse_channels: bool=False,
@@ -440,6 +442,17 @@ class ExperimentPlotter():
 
         # Create boxplot using seaborn
         g = sns.catplot(**default_params)
+        # for ax in g.axes.flat: # TODO update box/violin aesthetics
+        #     if kind == 'box':
+        #         for box in ax.patches:
+        #             color = box.get_facecolor()
+        #             box.set_edgecolor(color[:3] + (1.0,))
+        #             box.set_facecolor(color[:3] + (0.7,))
+        #     elif kind == 'violin':
+        #         for violin in ax.collections:
+        #             color = violin.get_facecolor()[0]
+        #             violin.set_edgecolor(color[:3] + (1.0,))
+        #             violin.set_facecolor(color[:3] + (0.7,))
         g.set_xticklabels(rotation=45, ha='right')
         g.set_titles(title)
         g.legend.set_loc('center left')
