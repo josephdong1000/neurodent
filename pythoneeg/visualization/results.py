@@ -541,16 +541,37 @@ class WindowAnalysisResult(AnimalFeatureParser):
         out = np.broadcast_to(np.all(out, axis=-1)[:, np.newaxis], out.shape)
         return out
 
-    def filter_all(self, df:pd.DataFrame=None, verbose=True, inplace=True, **kwargs):
+    def get_filter_reject_channels(self, channels: list[str]):
+        n_samples = len(self.result)
+        n_channels = len(self.channel_abbrevs)
+        mask = np.ones((n_samples, n_channels), dtype=bool)
+        # Set False for channels to reject
+        for ch in channels:
+            if ch in self.channel_abbrevs:
+                mask[:, self.channel_abbrevs.index(ch)] = False
+            else:
+                warnings.warn(f"Channel {ch} not found in {self.channel_abbrevs}")
+        return mask
+
+    def filter_all(self, df:pd.DataFrame=None,
+                   inplace=True, 
+                   reject_channels: list[str]=None, 
+                   **kwargs):
         filters = [self.get_filter_rms_range, self.get_filter_high_rms, self.get_filter_high_beta]
         filt_bools = []
+        # Automatically filter bad windows
         for filt in filters:
             filt_bool = filt(df, **kwargs)
             filt_bools.append(filt_bool)
-            if verbose:
-                print(f"{filt.__name__}:\tfiltered {filt_bool.size - np.count_nonzero(filt_bool)}/{filt_bool.size}")
+            logging.info(f"{filt.__name__}:\tfiltered {filt_bool.size - np.count_nonzero(filt_bool)}/{filt_bool.size}")
+        # Filter channels manually
+        # REVIEW add a function that just filters out bad channels separately?
+        if reject_channels is not None:
+            filt_bools.append(self.get_filter_reject_channels(reject_channels))
+            logging.debug(f"Reject channels: {filt_bools[-1]}")
+        # Apply all filters
         filt_bool_all = np.prod(np.stack(filt_bools, axis=-1), axis=-1).astype(bool)
-        filtered_result = self._apply_filter(filt_bool_all, verbose=verbose)
+        filtered_result = self._apply_filter(filt_bool_all)
         if inplace:
             del self.result
             self.result = filtered_result
@@ -674,35 +695,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             metadata = json.load(f)
         return cls(data, **metadata)
     
-
-    # def get_temps_from_wavetemp(self, sa_sas=None, **kwargs): # TODO have some way of storing spikes and traces
-    #     if sa_sas is None:
-    #         if not hasattr(self, "computed_sorting_analyzer") or not hasattr(self, "computed_sorting_analyzers"):
-    #             self.compute_wavetemp(sa_sas, **kwargs)
-    #         sa_sas = (self.computed_sorting_analyzer, self.computed_sorting_analyzers)
-    #     sa, sas = sa_sas
-    #     assert isinstance(sa, si.SortingAnalyzer)
-    #     for e in sas:
-    #         assert isinstance(e, si.SortingAnalyzer)
-
-    #     if sa.get_num_units() > 0:
-    #         ext_temps = sa.get_extension("templates")
-    #         temp_out = ext_temps.get_data("average")
-    #     else:
-    #         print("No units across all channels, skipping..")
-
-    #     temps_out = []
-    #     for i,e in enumerate(sas): # across sorting analyzers
-    #         if e.get_num_units() == 0:
-    #             print(f"No units in channel {i}, skipping..")
-    #             temps_out.append(None)
-    #             continue
-    #         ext_temps = e.get_extension("templates")
-    #         avg_temps = ext_temps.get_data("average")
-    #         temps_out.append(avg_temps)
-
-    #     return temp_out, temps_out
-
+    # REVIEW this doesn't need to be an instance function. Could be a static
     def _nanaverage(self, A, weights, axis=-1):
         masked = np.ma.masked_array(A, np.isnan(A))
         avg = np.ma.average(masked, axis=axis, weights=weights)
