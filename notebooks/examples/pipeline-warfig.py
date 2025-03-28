@@ -60,44 +60,50 @@ ep = visualization.ExperimentPlotter(wars)
 # TODO pcorr vs. genotype
 
 catplot_params = {'showfliers': False}
+kinds = ['box', 'bar']
 
-ep.plot_catplot('rms', groupby='animal', kind='box', catplot_params={'showfliers': False, 'aspect': 4})
-plt.savefig('/home/dongjp/Downloads/3-28-25/AAAA every animal.png')
+g = ep.plot_catplot('rms', groupby='animal', kind='box', catplot_params={'showfliers': False, 'aspect': 4})
+g.savefig('/home/dongjp/Downloads/3-28-25/AAAA every animal box.png', dpi=300)
+g = ep.plot_2d_feature_2('pcorr', groupby='animal')
+g.savefig('/home/dongjp/Downloads/3-28-25/AAAA every animal pcorr.png', dpi=300)
+g = ep.plot_2d_feature_2('cohere', groupby='animal')
+g.savefig('/home/dongjp/Downloads/3-28-25/AAAA every animal cohere.png', dpi=300)
+
 
 for feature in constants.LINEAR_FEATURE:
-    for kind in ['box', 'violin']:
+    for kind in kinds:
         for groupby in ['genotype', ['genotype', 'isday']]:
             for collapse in [False, True]:
-                ep.plot_catplot(feature, groupby=groupby, kind=kind, collapse_channels=collapse, catplot_params=catplot_params if kind == 'box' else None)
-                plt.savefig(f'/home/dongjp/Downloads/3-28-25/{feature}-{groupby}-{kind}-{collapse}.png')
-for kind in ['box', 'violin']:
-    ep.plot_catplot('psdband', groupby=['genotype', 'isday'], 
+                g = ep.plot_catplot(feature, groupby=groupby, kind=kind, collapse_channels=collapse, catplot_params=catplot_params if kind == 'box' else None)
+                g.savefig(f'/home/dongjp/Downloads/3-28-25/{feature}-{groupby}-{kind}-{collapse}.png', dpi=300)
+for kind in kinds:
+    g = ep.plot_catplot('psdband', groupby=['genotype', 'isday'], 
                     x='genotype',
                     col='isday',
                     hue='band',
                     kind=kind, collapse_channels=True, catplot_params=catplot_params if kind == 'box' else None)
-    plt.savefig(f'/home/dongjp/Downloads/3-28-25/psdband-genotype-isday-{kind}-True.png')
-    ep.plot_catplot('psdband', groupby=['genotype'], 
+    g.savefig(f'/home/dongjp/Downloads/3-28-25/psdband-genotype-isday-{kind}-True.png', dpi=300)
+    g = ep.plot_catplot('psdband', groupby=['genotype'], 
                     x='genotype',
                     hue='band',
                     kind=kind, collapse_channels=True, catplot_params=catplot_params if kind == 'box' else None)
-    plt.savefig(f'/home/dongjp/Downloads/3-28-25/psdband-genotype-{kind}-True.png')
+    g.savefig(f'/home/dongjp/Downloads/3-28-25/psdband-genotype-{kind}-True.png', dpi=300)
 
 for feature in constants.MATRIX_FEATURE:
-    for kind in ['box', 'violin']:
+    for kind in kinds:
         for groupby in [['genotype', 'isday'], 'genotype']:
-            ep.plot_catplot(feature, groupby=groupby, kind=kind, collapse_channels=True, catplot_params=catplot_params if kind == 'box' else None)
-            plt.savefig(f'/home/dongjp/Downloads/3-28-25/{feature}-{groupby}-{kind}-True.png')
+            g = ep.plot_catplot(feature, groupby=groupby, kind=kind, collapse_channels=True, catplot_params=catplot_params if kind == 'box' else None)
+            g.savefig(f'/home/dongjp/Downloads/3-28-25/{feature}-{groupby}-{kind}-True.png', dpi=300)
 
-ep.plot_2d_feature_2('cohere', groupby=['genotype', 'isday'])
-plt.savefig(f'/home/dongjp/Downloads/3-28-25/cohere-genotype-isday-matrix-False.png')
-ep.plot_2d_feature_2('cohere', groupby='genotype', col='band', row='genotype')
-plt.savefig(f'/home/dongjp/Downloads/3-28-25/cohere-genotype-band-matrix-False.png')
+g = ep.plot_2d_feature_2('cohere', groupby=['genotype', 'isday'])
+g.savefig(f'/home/dongjp/Downloads/3-28-25/cohere-genotype-isday-matrix-False.png', dpi=300)
+g = ep.plot_2d_feature_2('cohere', groupby='genotype', col='band', row='genotype')
+g.savefig(f'/home/dongjp/Downloads/3-28-25/cohere-genotype-band-matrix-False.png', dpi=300)
 
-ep.plot_2d_feature_2('pcorr', groupby=['genotype', 'isday'])
-plt.savefig(f'/home/dongjp/Downloads/3-28-25/pcorr-genotype-isday-matrix-False.png')
-ep.plot_2d_feature_2('pcorr', groupby='genotype')
-plt.savefig(f'/home/dongjp/Downloads/3-28-25/pcorr-genotype-matrix-False.png')
+g = ep.plot_2d_feature_2('pcorr', groupby=['genotype', 'isday'])
+g.savefig(f'/home/dongjp/Downloads/3-28-25/pcorr-genotype-isday-matrix-False.png', dpi=300)
+g = ep.plot_2d_feature_2('pcorr', groupby='genotype')
+g.savefig(f'/home/dongjp/Downloads/3-28-25/pcorr-genotype-matrix-False.png', dpi=300)
 
 
 """
