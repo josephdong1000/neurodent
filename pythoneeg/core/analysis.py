@@ -196,6 +196,21 @@ class LongRecordingAnalyzer:
                                                 multitaper=multitaper,
                                                 **kwargs)
 
+    def compute_psdfrac(self, index, welch_bin_t=1, notch_filter=True, bands: list[tuple[float, float]]=constants.FREQ_BANDS, total_band: tuple[float, float]=constants.FREQ_BAND_TOTAL, multitaper=False, **kwargs):
+        """Compute the power spectral density in each band as a fraction of the total power.
+        """
+        rec = self.get_fragment_np(index)
+
+        return FragmentAnalyzer.compute_psdfrac(rec=rec,
+                                                f_s=self.f_s,
+                                                welch_bin_t=welch_bin_t,
+                                                notch_filter=notch_filter,
+                                                bands=bands,
+                                                total_band=total_band,
+                                                multitaper=multitaper,
+                                                **kwargs)
+
+
     def compute_psdslope(self, index, welch_bin_t=1, notch_filter=True, band: tuple[float, float]=constants.FREQ_BAND_TOTAL, multitaper=False, **kwargs):
         """Compute the slope of the power spectral density of the signal.
 

@@ -120,6 +120,23 @@ class FragmentAnalyzer:
         return simpson(psd[np.logical_and(f >= band[0], f <= band[1]), :], dx=deltaf, axis=0)
 
     @staticmethod
+    def compute_psdfrac(rec: np.ndarray,
+                        f_s: float,
+                        welch_bin_t: float=1,
+                        notch_filter: bool=True,
+                        bands: list[tuple[float, float]]=constants.FREQ_BANDS,
+                        total_band: tuple[float, float]=constants.FREQ_BAND_TOTAL,
+                        multitaper: bool=False,
+                        **kwargs) -> np.ndarray:
+        """Compute the power spectral density of the signal as a fraction of the total power.
+        """
+        FragmentAnalyzer._check_rec_np(rec)
+
+        psd = FragmentAnalyzer.compute_psdband(rec, f_s, welch_bin_t, notch_filter, bands, multitaper, **kwargs)
+        psdtotal = FragmentAnalyzer.compute_psdtotal(rec, f_s, welch_bin_t, notch_filter, total_band, multitaper, **kwargs)
+        return {k: v / psdtotal for k, v in psd.items()}
+
+    @staticmethod
     def compute_psdslope(rec: np.ndarray,
                          f_s: float,
                          welch_bin_t: float=1,
