@@ -5,7 +5,14 @@ import tempfile
 import re
 from datetime import datetime
 from pathlib import Path
+import platform
 
+def convert_path(inputPath):
+    # Convert path string to match the os
+    system = platform.system()
+    home = str(Path.home())
+
+    
 
 def convert_units_to_multiplier(current_units, target_units='µV'):
     units_to_mult = {'µV' : 1e-6,
