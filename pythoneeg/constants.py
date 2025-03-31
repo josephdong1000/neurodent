@@ -46,8 +46,8 @@ FREQ_BANDS = {'delta' : (0.1, 4),
 BAND_NAMES = [k for k,_ in FREQ_BANDS.items()]
 
 FREQ_BAND_TOTAL = (0.1, 50)
-FREQ_MINS = [v[0] for k,v in FREQ_BANDS.items()]
-FREQ_MAXS = [v[1] for k,v in FREQ_BANDS.items()]
+FREQ_MINS = [v[0] for _,v in FREQ_BANDS.items()]
+FREQ_MAXS = [v[1] for _,v in FREQ_BANDS.items()]
 LINE_FREQ = 60
 
 SORTING_PARAMS = {
