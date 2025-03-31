@@ -6,6 +6,7 @@ from scipy.signal import butter, decimate, filtfilt, iirnotch, sosfiltfilt, welc
 from scipy.stats import linregress, pearsonr
 
 from typing import Literal
+import logging
 
 from .. import constants
 
@@ -26,7 +27,7 @@ class FragmentAnalyzer:
         return row
 
     @staticmethod
-    def _check_rec(rec: np.ndarray, **kwargs):
+    def _check_rec_np(rec: np.ndarray, **kwargs):
         """Check if the recording is a numpy array and has the correct shape.
         """
         if not isinstance(rec, np.ndarray):
@@ -35,10 +36,21 @@ class FragmentAnalyzer:
             raise ValueError("rec must be a 2D numpy array")
 
     @staticmethod
-    def _reshape_np_for_mne(rec: np.ndarray, **kwargs) -> np.ndarray:
-        """Reshape numpy array of (N x M) to (1 x M x N) array for MNE.
+    def _check_rec_mne(rec: np.ndarray, **kwargs):
+        """Check if the recording is a MNE-ready numpy array.
         """
-        FragmentAnalyzer._check_rec(rec)
+        if not isinstance(rec, np.ndarray):
+            raise ValueError("rec must be a numpy array")
+        if rec.ndim != 3:
+            raise ValueError("rec must be a 3D numpy array")
+        if rec.shape[0] != 1:
+            raise ValueError("rec must be a 1 x M x N array")
+
+    @staticmethod
+    def _reshape_np_for_mne(rec: np.ndarray, **kwargs) -> np.ndarray:
+        """Reshape numpy array of (N x M) to (1 x M x N) array for MNE. N = number of samples, M = number of channels.
+        """
+        FragmentAnalyzer._check_rec_np(rec)
         rec = rec[..., np.newaxis]
         return np.transpose(rec, (2, 1, 0))
 
@@ -46,7 +58,7 @@ class FragmentAnalyzer:
     def compute_rms(rec: np.ndarray, **kwargs) -> np.ndarray:
         """Compute the root mean square of the signal.
         """
-        FragmentAnalyzer._check_rec(rec)
+        FragmentAnalyzer._check_rec_np(rec)
         out = np.sqrt((rec ** 2).sum(axis=0) / rec.shape[0])
         # del rec
         return out
@@ -55,7 +67,7 @@ class FragmentAnalyzer:
     def compute_ampvar(rec: np.ndarray, **kwargs) -> np.ndarray:
         """Compute the amplitude variance of the signal.
         """
-        FragmentAnalyzer._check_rec(rec)
+        FragmentAnalyzer._check_rec_np(rec)
         return np.std(rec, axis=0) ** 2
 
     @staticmethod
@@ -67,7 +79,7 @@ class FragmentAnalyzer:
                     **kwargs) -> np.ndarray:
         """Compute the power spectral density of the signal.
         """
-        FragmentAnalyzer._check_rec(rec)
+        FragmentAnalyzer._check_rec_np(rec)
 
         if notch_filter:
             b, a = iirnotch(constants.LINE_FREQ, 30, fs=f_s)
@@ -93,10 +105,10 @@ class FragmentAnalyzer:
                         notch_filter: bool=True,
                         bands: list[tuple[float, float]]=constants.FREQ_BANDS,
                         multitaper: bool=False,
-                        **kwargs) -> np.ndarray:
+                        **kwargs) -> dict[str, np.ndarray]:
         """Compute the power spectral density of the signal for each frequency band.
         """
-        FragmentAnalyzer._check_rec(rec)
+        FragmentAnalyzer._check_rec_np(rec)
 
         f, psd = FragmentAnalyzer.compute_psd(rec, f_s, welch_bin_t, notch_filter, multitaper, **kwargs)
         deltaf = np.median(np.diff(f))
@@ -112,7 +124,7 @@ class FragmentAnalyzer:
                          **kwargs) -> np.ndarray:
         """Compute the total power spectral density of the signal.
         """
-        FragmentAnalyzer._check_rec(rec)
+        FragmentAnalyzer._check_rec_np(rec)
 
         f, psd = FragmentAnalyzer.compute_psd(rec, f_s, welch_bin_t, notch_filter, multitaper, **kwargs)
         deltaf = np.median(np.diff(f))
@@ -129,7 +141,7 @@ class FragmentAnalyzer:
                          **kwargs) -> np.ndarray:
         """Compute the slope of the power spectral density of the signal.
         """
-        FragmentAnalyzer._check_rec(rec)
+        FragmentAnalyzer._check_rec_np(rec)
 
         f, psd = FragmentAnalyzer.compute_psd(rec, f_s, welch_bin_t, notch_filter, multitaper, **kwargs)
 
@@ -146,7 +158,7 @@ class FragmentAnalyzer:
         return np.array(out)
 
     @staticmethod
-    def __get_freqs_cycles(
+    def _get_freqs_cycles(
         rec: np.ndarray,
         f_s: float,
         freq_res: float,
@@ -156,13 +168,16 @@ class FragmentAnalyzer:
         epsilon: float
     ) -> tuple[np.ndarray, np.ndarray]:
         """Get the frequencies and number of cycles for the signal.
+        rec is a (1 x M x N) numpy array for MNE. N = number of samples, M = number of channels.
         """
+        FragmentAnalyzer._check_rec_mne(rec)
+
         if geomspace:
             freqs = np.geomspace(constants.FREQ_BAND_TOTAL[0], constants.FREQ_BAND_TOTAL[1], round((np.diff(constants.FREQ_BAND_TOTAL) / freq_res).item()))
         else:
             freqs = np.arange(constants.FREQ_BAND_TOTAL[0], constants.FREQ_BAND_TOTAL[1], freq_res)
 
-        frag_len_s = rec.shape[0] / f_s
+        frag_len_s = rec.shape[2] / f_s
         match mode:
             case 'cwt_morlet':
                 maximum_cyc = (frag_len_s * f_s + 1) * np.pi / 5 * freqs / f_s
@@ -185,16 +200,16 @@ class FragmentAnalyzer:
                        **kwargs) -> np.ndarray:
         """Compute the coherence of the signal.
         """
-        FragmentAnalyzer._check_rec(rec)
-        rec = FragmentAnalyzer._reshape_np_for_mne(rec)
+        FragmentAnalyzer._check_rec_np(rec)
 
-        rec = decimate(rec, q=downsamp_q, axis=-1)
+        rec_mne = FragmentAnalyzer._reshape_np_for_mne(rec)
+        rec_mne = decimate(rec_mne, q=downsamp_q, axis=2) # Along the time axis
         f_s = int(f_s / downsamp_q)
 
-        f, n_cycles = FragmentAnalyzer.__get_freqs_cycles(rec, f_s, freq_res, n_cycles_max, geomspace, mode, epsilon)
+        f, n_cycles = FragmentAnalyzer._get_freqs_cycles(rec_mne, f_s, freq_res, n_cycles_max, geomspace, mode, epsilon)
 
         try:
-            con = spectral_connectivity_time(rec,
+            con = spectral_connectivity_time(rec_mne,
                                             freqs=f,
                                             method='coh',
                                             average=True,
@@ -218,7 +233,7 @@ class FragmentAnalyzer:
     def compute_pcorr(rec: np.ndarray, f_s: float, lower_triag: bool=True, **kwargs) -> np.ndarray:
         """Compute the Pearson correlation coefficient of the signal.
         """
-        FragmentAnalyzer._check_rec(rec)
+        FragmentAnalyzer._check_rec_np(rec)
 
         sos = butter(2, constants.FREQ_BAND_TOTAL, btype='bandpass', output='sos', fs=f_s)
         rec = sosfiltfilt(sos, rec, axis=0)
