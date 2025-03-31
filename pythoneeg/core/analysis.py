@@ -26,7 +26,7 @@ from .analyze_frag import FragmentAnalyzer
 
 class LongRecordingAnalyzer:
 
-    # FEATURES = ['rms', 'ampvar', 'psd', 'psdtotal', 'psdband', 'psdslope', 'cohere', 'pcorr', 'nspike', 'wavetemp']
+    # FEATURES = ['rms', 'ampvar', 'psd', 'psdtotal', 'psdband', 'psdslope', 'cohere', 'pcorr']
     # GLOBAL_FEATURES = ['templates']
     # FREQ_BANDS = {'delta' : (0.1, 4),
     #             'theta' : (4, 8),
@@ -229,36 +229,6 @@ class LongRecordingAnalyzer:
     #     self.sorting_analyzer, self.sorting_analyzers = mso.get_final_analyzer()
     #     return self.sorting_analyzer, self.sorting_analyzers
 
-    def compute_nspike(self, index, sa_sas=None, **kwargs):
-        if sa_sas is None:
-            if not hasattr(self, "sorting_analyzer") or not hasattr(self, "sorting_analyzers"):
-                self.compute_spikes(**kwargs)
-            sa_sas = (self.sorting_analyzer, self.sorting_analyzers)
-        sa, sas = sa_sas
-        assert isinstance(sa, si.SortingAnalyzer)
-        for e in sas:
-            assert isinstance(e, si.SortingAnalyzer)
-
-        tbound = self.convert_idx_to_timebound(index)
-        nspike_unit = []
-        if sa.get_num_units() > 0:
-            for unit_id in sa.sorting.unit_ids:
-                t_spike = sa.sorting.get_unit_spike_train(unit_id=unit_id) / self.f_s
-                nspike_unit.append(((tbound[0] <= t_spike) & (t_spike < tbound[1])).sum())
-        else:
-            print("No units across all channels, skipping..")
-
-        nspikes_unit = []
-        for i,e in enumerate(sas):
-            nspikes_unit.append([])
-            if e.get_num_units() == 0:
-                # print(f"No units in channel {i}, skipping..")
-                continue
-            for unit_id in e.sorting.unit_ids:
-                t_spike = e.sorting.get_unit_spike_train(unit_id=unit_id) / self.f_s
-                nspikes_unit[-1].append(((tbound[0] <= t_spike) & (t_spike < tbound[1])).sum())
-
-        return nspikes_unit, nspikes_unit
 
     def convert_idx_to_timebound(self, index: int) -> tuple[float, float]:
         """Convert fragment index to timebound (start time, end time)

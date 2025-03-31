@@ -32,12 +32,11 @@ DEFAULT_ID_TO_NAME = {9: 'LAud',
                         21: 'RVis',
                         22: 'RAud',}
 
-FEATURES = ['rms', 'ampvar', 'psd', 'psdtotal', 'psdband', 'psdslope', 'cohere', 'pcorr', 'nspike', 'wavetemp']
+FEATURES = ['rms', 'ampvar', 'psd', 'psdtotal', 'psdband', 'psdslope', 'cohere', 'pcorr']
 LINEAR_FEATURE = ['rms', 'ampvar', 'psdtotal', 'psdslope']
 BAND_FEATURE = ['psdband']
 MATRIX_FEATURE = ['cohere', 'pcorr']
 HIST_FEATURE = ['psd']
-GLOBAL_FEATURES = ['templates']
 
 FREQ_BANDS = {'delta' : (0.1, 4),
             'theta' : (4, 8),

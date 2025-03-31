@@ -2,11 +2,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
+import logging
+from typing import Literal
+
+from scipy import stats
 
 from ... import core
 from ... import visualization as viz
 from pythoneeg import constants
-
 
 class ExperimentPlotter():
 
@@ -18,8 +21,10 @@ class ExperimentPlotter():
     """
 
 
-    def __init__(self, wars, features: list[str] = None,
-                 exclude: list[str] = None):
+    def __init__(self, wars: viz.WindowAnalysisResult | list[viz.WindowAnalysisResult], 
+                 features: list[str] = None,
+                 exclude: list[str] = None,
+                 use_abbreviations: bool = True):
         """
         Initialize plotter with WindowAnalysisResult object(s).
         
@@ -31,6 +36,8 @@ class ExperimentPlotter():
             List of features to extract. If None, defaults to ['all']
         exclude : list[str], optional
             List of features to exclude from extraction
+        use_abbreviations : bool, optional
+            Whether to use abbreviations for channel names
         """
         # Handle default arguments
         features = features if features else ['all']
@@ -40,23 +47,128 @@ class ExperimentPlotter():
             wars = [wars]
             
         self.results = wars
-        self.channel_names = [list(constants.DEFAULT_ID_TO_NAME.values()) for _ in range(len(wars))]
-        #list(constants.DEFAULT_ID_TO_NAME.values())
-       #self.channel_names = [war.channel_names for war in wars]
+        if use_abbreviations:
+            self.channel_names = [war.channel_abbrevs for war in wars]
+        else:
+            self.channel_names = [war.channel_names for war in wars]
+        self.channel_to_idx = [{e:i for i,e in enumerate(chnames)} for chnames in self.channel_names]
+        self.all_channel_names = sorted(list(set([name for chnames in self.channel_names for name in chnames])))
+        logging.info(f'channel_names: {self.channel_names}')
+        logging.info(f'channel_to_idx: {self.channel_to_idx}')
+        logging.info(f'all_channel_names: {self.all_channel_names}')
         
         # Process all data into DataFrames
-        df_all = []
+        df_wars = []
         for war in wars:
             # Get all data
             dftemp = war.get_result(features=features, exclude=exclude, allow_missing=True)
-            df_all.append(dftemp)
+            df_wars.append(dftemp)
 
-        self.all = pd.concat(df_all, axis=0, ignore_index=True)
+        self.df_wars: list[pd.DataFrame] = df_wars
+        self.all = pd.concat(df_wars, axis=0, ignore_index=True)
         self.stats = None
 
 
-    def _process_feature_data(self, feature, xgroup, channels='all', 
-                        remove_outliers='iqr', outlier_threshold=3):
+    def _pull_timeseries_dataframe(self, feature:str, groupby:str | list[str], 
+                            channels:str|list[str]='all', 
+                            collapse_channels: bool=False):
+        """
+        Process feature data for plotting.
+        """
+
+        if channels == 'all':
+            channels = self.all_channel_names
+        elif not isinstance(channels, list):
+            channels = [channels]
+        df = self.all.copy()  # Use the combined DataFrame from __init__
+        
+        if isinstance(groupby, str):
+            groupby = [groupby]
+        groups = list(df.groupby(groupby).groups.keys())
+        logging.debug(f'groups: {groups}')
+        
+        # first iterate through animals, since that determines channel idx
+        # then pull out feature into matrix, assign channels, and add to dataframe 
+        # meanwhile carrying over the groupby feature
+
+        dataframes = []
+        for i, war in enumerate(self.results):
+            df_war = self.df_wars[i]
+            ch_to_idx = self.channel_to_idx[i]
+            ch_names = self.channel_names[i]
+            match feature:
+                case 'rms' | 'ampvar' | 'psdtotal' | 'psdslope' | 'psdband':
+                    if feature == 'psdband':
+                        df_bands = pd.DataFrame(df_war[feature].tolist())
+                        vals = np.array(df_bands.values.tolist())
+                        vals = vals.transpose((0, 2, 1))
+                    else:
+                        vals = np.array(df_war[feature].tolist())
+
+                    if collapse_channels:
+                        vals = np.nanmean(vals, axis=1)
+                        logging.debug(f'vals.shape: {vals.shape}')
+                        vals = {'average': vals.tolist()}
+                    else:
+                        logging.debug(f'vals.shape: {vals.shape}')
+                        vals = {ch: vals[:, ch_to_idx[ch]].tolist() for ch in channels if ch in ch_names}
+                    vals = df_war[groupby].to_dict('list') | vals
+
+                case 'pcorr':
+                    vals = np.array(df_war[feature].tolist())
+                    if collapse_channels:
+                        # Get lower triangular elements (excluding diagonal)
+                        tril_indices = np.tril_indices(vals.shape[1], k=-1)
+                        # Take mean across pairs
+                        vals = np.nanmean(vals[:, tril_indices[0], tril_indices[1]], axis=-1)
+                        logging.debug(f'vals.shape: {vals.shape}')
+                        vals = {'average': vals.tolist()}
+                    else:
+                        logging.debug(f'vals.shape: {vals.shape}')
+                        vals = {'all' : vals.tolist()}
+                    vals = df_war[groupby].to_dict('list') | vals
+
+                case 'cohere':
+                    df_bands = pd.DataFrame(df_war[feature].tolist())
+                    vals = np.array(df_bands.values.tolist())
+                    logging.debug(f'vals.shape: {vals.shape}')
+
+                    if collapse_channels:
+                        tril_indices = np.tril_indices(vals.shape[1], k=-1)
+                        vals = np.nanmean(vals[:, :, tril_indices[0], tril_indices[1]], axis=-1)
+                        logging.debug(f'vals.shape: {vals.shape}')
+                        vals = {'average': vals.tolist()}
+                    else:
+                        logging.debug(f'vals.shape: {vals.shape}')
+                        vals = {'all' : vals.tolist()}
+                    vals = df_war[groupby].to_dict('list') | vals
+                    
+                case _:
+                    raise ValueError(f'Feature {feature} is not supported')
+                
+            df_feature = pd.DataFrame.from_dict(vals, orient='columns')
+            dataframes.append(df_feature)
+            
+        df = pd.concat(dataframes, axis=0, ignore_index=True)
+
+        feature_cols = [col for col in df.columns if col not in groupby]
+        df = df.melt(id_vars=groupby, value_vars=feature_cols, var_name='channel', value_name=feature)
+        
+        if feature == 'psdslope':
+            df[feature] = df[feature].apply(lambda x: x[0]) # get slope from [slope, intercept]
+        elif feature == 'psdband' or feature == 'cohere':
+            df[feature] = df[feature].apply(lambda x: list(zip(x, constants.BAND_NAMES)))
+            df = df.explode(feature)
+            df[[feature, 'band']] = pd.DataFrame(df[feature].tolist(), index=df.index)
+        
+        df.reset_index(drop=True, inplace=True)
+
+        return df
+
+
+    def _process_feature_data(self, feature: str, xgroup: str | list[str], 
+                              channels: str | list[str]='all', 
+                              remove_outliers: str='iqr', outlier_threshold: float=3):
         """
         Process feature data for plotting.
         
@@ -78,19 +190,24 @@ class ExperimentPlotter():
         dict
             Dictionary containing processed data and metadata for plotting
         """
+
+        # REVIEW this script might be better off with a rewrite
+        # Input: feature, xgroup(s)
+        # Output (currently): dictionary with info about how to plot
+        # Output (todo): parsed/channel-flattened dataframe with single feature + xgroup info. Tidy table
         
         # Get the data
         df = self.all.copy()  # Use the combined DataFrame from __init__
         
         # Handle channel selection
         if channels == 'all':
-            max_channels = max(len(chnames) for chnames in self.channel_names)
+            max_channels = max(len(chnames) for chnames in self.channel_names) # REVIEW what if non-homogenous channels/names?
             channels = list(range(max_channels))
         elif not isinstance(channels, list):
             channels = [channels]
         
         # Get unique xgroup from the DataFrame
-        unique_ids = sorted(df[xgroup].unique())  # Sort to ensure consistent ordering
+        unique_ids = sorted(df[xgroup].unique())  # Sort to ensure consistent ordering # REVIEW handle list xgroup, with dataframe working and seaborn probably.
         
         # Prepare data for plotting
         plot_data = []
@@ -114,7 +231,8 @@ class ExperimentPlotter():
                     ch_data = []
                     for _, row in id_data.iterrows():
                         feature_values = row[feature]
-                        if hasattr(feature_values, '__len__') and len(feature_values) > ch:
+                        if hasattr(feature_values, '__len__') and len(feature_values) > ch: # REVIEW should be able to handle extra channels. Also will this trigger ever? 
+                            # maybe flatten out and then grab features
                             ch_data.append(feature_values[ch])
                     
                     if not ch_data:
@@ -124,15 +242,13 @@ class ExperimentPlotter():
                     ch_data = np.array(ch_data)
                     # Remove any NaN values
                     ch_data = ch_data[~np.isnan(ch_data)]
-                    original_data = ch_data.copy()
 
                     if remove_outliers:
-                        clean_data, outliers = self._handle_outliers(ch_data, 
-                                                                remove_outliers, 
-                                                                outlier_threshold)
+                        clean_data, _ = self._handle_outliers(ch_data, 
+                                                            remove_outliers, 
+                                                            outlier_threshold)
                     else:
                         clean_data = ch_data
-                        outliers = np.array([])
 
                     if len(clean_data) > 0:
                         plot_data.append(clean_data)
@@ -141,7 +257,8 @@ class ExperimentPlotter():
                         ch_name = f"Ch{ch}"  # Default name
                         for chnames in self.channel_names:
                             if ch < len(chnames):
-                                ch_name = chnames[ch].replace("Intan Input (1)/PortA ", "")
+                                ch_name = chnames[ch].replace("Intan Input (1)/PortA ", "") # REVIEW Feels gimmicky. Have an option to by default pull out the channel names according to constants, otherwise
+                                # use the war embedded channel names
                                 break
                         channel_names.append(ch_name)
                         labels.append(f"{id_val}\n{ch_name}")
@@ -168,44 +285,6 @@ class ExperimentPlotter():
             'group_width': group_width
         }
     
-    def _extract_channel_data(self, id_data, feature, channel, remove_outliers, outlier_threshold):
-        """
-        Extract and process data for a single channel.
-        """
-        try:
-            # Extract feature data for this channel
-            ch_data = []
-            for _, row in id_data.iterrows():
-                feature_values = row[feature]
-                if hasattr(feature_values, '__len__') and len(feature_values) > channel:
-                    ch_data.append(feature_values[channel])
-            
-            if not ch_data:
-                print(f"No data collected for channel {channel}")
-                return None
-                
-            ch_data = np.array(ch_data)
-            # Remove any NaN values
-            ch_data = ch_data[~np.isnan(ch_data)]
-            original_data = ch_data.copy()
-
-            # Process outliers
-            clean_data, outliers = self._handle_outliers(ch_data, remove_outliers, outlier_threshold)
-            
-            if len(clean_data) > 0:
-                return {
-                    'clean_data': clean_data,
-                    'original_data': original_data,
-                    'outliers': outliers
-                }
-            else:
-                print(f"No valid data after processing for channel {channel}")
-                return None
-                
-        except Exception as e:
-            print(f"Warning: Error processing channel {channel}: {e}")
-            return None
-        
 
     def _handle_outliers(self, data, method, threshold):
         """
@@ -232,7 +311,7 @@ class ExperimentPlotter():
         """
         Remove outliers using z-score method.
         """
-        z_scores = np.abs((data - np.mean(data)) / np.std(data))
+        z_scores = np.abs((data - np.nanmean(data)) / np.nanstd(data))
         outlier_mask = z_scores >= threshold
         return data[~outlier_mask], data[outlier_mask]
 
@@ -244,8 +323,8 @@ class ExperimentPlotter():
         for i, data in enumerate(plot_data):
             stats[labels[i]] = {
                 'n_total': len(original_data),
-                'mean': np.mean(data),
-                'std': np.std(data),
+                'mean': np.nanmean(data),
+                'std': np.nanstd(data),
                 'median': np.median(data),
                 'n_outliers': len(outliers),
                 'outlier_values': outliers.tolist(),
@@ -321,6 +400,71 @@ class ExperimentPlotter():
                 bp['fliers'][i].set_markerfacecolor(colors[channel_idx])
                 bp['fliers'][i].set_markeredgecolor(colors[channel_idx])
 
+
+    def plot_catplot(self, feature: str, 
+                    groupby: str | list[str], 
+                    x: str=None,
+                    col: str=None,
+                    hue: str=None,
+                    kind: Literal['box', 'boxen', 'violin']='box',
+                    catplot_params: dict=None,
+                    channels: str | list[str]='all', 
+                    collapse_channels: bool=False,
+                    title: str=None, color_palette: list[str]=None, figsize: tuple[float, float]=None):
+        """
+        Create a boxplot of the feature data.
+        """
+        df = self._pull_timeseries_dataframe(feature, groupby, channels, collapse_channels)
+        
+        if isinstance(groupby, str):
+            groupby = [groupby]
+        
+        # By default, just map x = groupby0, col = groupby1, hue = channel
+        default_params = {
+            'data': df,
+            'x': groupby[0],
+            'y': feature,
+            'hue': 'channel',
+            'col': groupby[1] if len(groupby) > 1 else None,
+            'kind': kind,
+            'palette': color_palette,
+            # 'showfliers': show_outliers,
+        }
+        # Update default params if x, col, or hue are explicitly provided
+        if x is not None:
+            default_params['x'] = x
+        if col is not None:
+            default_params['col'] = col
+        if hue is not None:
+            default_params['hue'] = hue
+        if catplot_params:
+            default_params.update(catplot_params)
+
+        # Create boxplot using seaborn
+        g = sns.catplot(**default_params)
+        # for ax in g.axes.flat: # TODO update box/violin aesthetics
+        #     if kind == 'box':
+        #         for box in ax.patches:
+        #             color = box.get_facecolor()
+        #             box.set_edgecolor(color[:3] + (1.0,))
+        #             box.set_facecolor(color[:3] + (0.7,))
+        #     elif kind == 'violin':
+        #         for violin in ax.collections:
+        #             color = violin.get_facecolor()[0]
+        #             violin.set_edgecolor(color[:3] + (1.0,))
+        #             violin.set_facecolor(color[:3] + (0.7,))
+        g.set_xticklabels(rotation=45, ha='right')
+        g.set_titles(title)
+        g.legend.set_loc('center left')
+        g.legend.set_bbox_to_anchor((1.0, 0.5))
+        # Add grid to y-axis for all subplots
+        for ax in g.axes.flat:
+            ax.yaxis.grid(True, linestyle='--', which='major', color='grey', alpha=.25)
+        
+        plt.tight_layout()
+        
+        return g
+
     def plot_boxplot(self, feature, xgroup='animal', channels='all', 
                 remove_outliers='iqr', outlier_threshold=3, show_outliers=True,
                 title=None, color_palette=None, figsize=None):
@@ -392,6 +536,64 @@ class ExperimentPlotter():
         
         return fig, ax, self.stats
     
+    def plot_2d_feature_2(self,
+                        feature: str, 
+                        groupby: str | list[str], 
+                        col: str=None,
+                        row: str=None,
+                        channels: str | list[str]='all', 
+                        collapse_channels: bool=False,
+                        title: str=None, color_palette: list[str]=None, figsize: tuple[float, float]=None):
+        
+        df = self._pull_timeseries_dataframe(feature, groupby, channels, collapse_channels)
+
+        if isinstance(groupby, str):
+            groupby = [groupby]
+        # REVIEW review this code, edit X/Y tick labels, enable other colormaps
+        # Define the plotting function for each facet
+        def plot_matrix(data, color_palette=None, **kwargs):
+            matrices = np.array(data[feature].tolist())
+            avg_matrix = np.nanmean(matrices, axis=0)
+            
+            # Create heatmap
+            plt.imshow(avg_matrix, cmap='RdBu_r', vmin=-1, vmax=1)
+            plt.colorbar(fraction=0.046, pad=0.04)
+            
+            # Set ticks and labels
+            n_channels = avg_matrix.shape[0]
+            plt.xticks(range(n_channels), range(n_channels), rotation=45, ha='right')
+            plt.yticks(range(n_channels), range(n_channels))
+            
+            # Remove axis labels since they're redundant for correlation matrices
+            ch_names = self.channel_names[0]
+            plt.xticks(range(n_channels), ch_names, rotation=45, ha='right')
+            plt.yticks(range(n_channels), ch_names)
+        
+        # Create FacetGrid
+        facet_vars = {
+            'col': groupby[0],
+            'row': groupby[1] if len(groupby) > 1 else None
+        }
+        if col is not None:
+            facet_vars['col'] = col
+        if row is not None:
+            facet_vars['row'] = row
+        
+        g = sns.FacetGrid(df, **facet_vars, height=4 if figsize is None else figsize[0]/2)
+        
+        # Map the plotting function
+        g.map_dataframe(plot_matrix, color_palette=color_palette)
+        
+        # Add titles
+        if title:
+            g.figure.suptitle(title, y=1.02)
+        
+        # Adjust layout
+        plt.tight_layout()
+        
+        return g
+
+
     def plot_2d_feature(self, feature, xgroup='animal', channels='all', 
                        remove_outliers='iqr', outlier_threshold=3,
                        title=None, color_palette=None, figsize=None):
@@ -451,14 +653,15 @@ class ExperimentPlotter():
             matrices = []
             for _, row in group_data.iterrows():
                 matrix = row[feature]
+                if isinstance(matrix, list): # FIXME hotfix, refactor this code with 2d_feat_freq perhaps
+                    matrix = np.array(matrix)
                 if isinstance(matrix, np.ndarray) and matrix.ndim == 2:
                     # Ensure matrix is square and matches channel dimensions
                     if matrix.shape[0] == len(channels) and matrix.shape[1] == len(channels):
                         matrices.append(matrix)
-            
+
             if matrices:
-                avg_matrix = np.mean(matrices, axis=0)
-                
+                avg_matrix = np.nanmean(matrices, axis=0)
                 # Create heatmap
                 im = ax.imshow(avg_matrix, cmap='RdBu_r', vmin=-1, vmax=1)
                 
@@ -568,12 +771,14 @@ class ExperimentPlotter():
                     matrices = []
                     for _, row in group_data.iterrows():
                         matrix = row[feature][band]
+                        if isinstance(matrix, list): # FIXME hotfix, refactor this code with 2d_feat_freq perhaps
+                            matrix = np.array(matrix)
                         if isinstance(matrix, np.ndarray) and matrix.ndim == 2:
                             if matrix.shape[0] == len(channels) and matrix.shape[1] == len(channels):
                                 matrices.append(matrix)
                     
                     if matrices:
-                        avg_matrix = np.mean(matrices, axis=0)
+                        avg_matrix = np.nanmean(matrices, axis=0)
                         
                         # Create heatmap
                         im = ax.imshow(avg_matrix, cmap='RdBu_r', vmin=-1, vmax=1)
@@ -636,7 +841,7 @@ class ExperimentPlotter():
                             matrices.append(matrix)
                 
                 if matrices:
-                    avg_matrix = np.mean(matrices, axis=0)
+                    avg_matrix = np.nanmean(matrices, axis=0)
                     
                     # Create heatmap
                     im = ax.imshow(avg_matrix, cmap='RdBu_r', vmin=-1, vmax=1)
