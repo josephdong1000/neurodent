@@ -76,6 +76,9 @@ class ExperimentPlotter():
         Process feature data for plotting.
         """
 
+        if 'band' in groupby or groupby == 'band':
+            raise ValueError("'band' is not supported as a groupby variable. Use 'band' as a col/row/hue/x variable instead.") # REVIEW
+
         if channels == 'all':
             channels = self.all_channel_names
         elif not isinstance(channels, list):
@@ -144,7 +147,7 @@ class ExperimentPlotter():
                     vals = df_war[groupby].to_dict('list') | vals
                     
                 case _:
-                    raise ValueError(f'Feature {feature} is not supported')
+                    raise ValueError(f'{feature} is not supported in _pull_timeseries_dataframe')
                 
             df_feature = pd.DataFrame.from_dict(vals, orient='columns')
             dataframes.append(df_feature)
@@ -179,6 +182,9 @@ class ExperimentPlotter():
         """
         Create a boxplot of feature data.
         """
+        if feature in constants.MATRIX_FEATURE and not collapse_channels:
+            raise ValueError("To plot matrix features, collapse_channels must be True")
+
         df = self._pull_timeseries_dataframe(feature, groupby, channels, collapse_channels)
         
         if isinstance(groupby, str):
@@ -205,6 +211,13 @@ class ExperimentPlotter():
         if catplot_params:
             default_params.update(catplot_params)
 
+        # Check that x, col, and hue parameters exist in dataframe columns
+        for param_name in ['x', 'col', 'hue']:
+            if default_params[param_name] == feature:
+                raise ValueError(f"'{param_name}' cannot be the same as 'feature'")
+            if default_params[param_name] is not None and default_params[param_name] not in df.columns:
+                raise ValueError(f"Parameter '{param_name}={default_params[param_name]}' not found in dataframe columns: {df.columns.tolist()}")
+
         # Create boxplot using seaborn
         g = sns.catplot(**default_params)
 
@@ -230,27 +243,45 @@ class ExperimentPlotter():
                         row: str=None,
                         channels: str | list[str]='all', 
                         collapse_channels: bool=False,
-                        title: str=None, color_palette: list[str]=None, figsize: tuple[float, float]=None):
-        
-        df = self._pull_timeseries_dataframe(feature, groupby, channels, collapse_channels)
+                        title: str=None, 
+                        cmap: str=None, 
+                        figsize: tuple[float, float]=None):
+        """
+        Create a 2D feature plot.
+        """
+        if feature not in constants.MATRIX_FEATURE:
+            raise ValueError(f'{feature} is not supported for 2D feature plots') # REVIEW
 
         if isinstance(groupby, str):
-            groupby = [groupby]
+            groupby = [groupby]  
+        if feature != 'cohere' and ('band' in groupby or 'band' == col or 'band' == row):
+            raise ValueError(f'{feature} does not support band plots') # REVIEW
+        
+        df = self._pull_timeseries_dataframe(feature, groupby, channels, collapse_channels)
         
         # Create FacetGrid
         facet_vars = {
             'col': groupby[0],
-            'row': groupby[1] if len(groupby) > 1 else None
+            'row': groupby[1] if len(groupby) > 1 else None,
+            'height': 4 if figsize is None else figsize[1],
+            'aspect': 1 if figsize is None else figsize[0]/figsize[1]
         }
         if col is not None:
             facet_vars['col'] = col
         if row is not None:
             facet_vars['row'] = row
         
-        g = sns.FacetGrid(df, **facet_vars, height=4 if figsize is None else figsize[0]/2)
-        
+        # Check that x, col, and hue parameters exist in dataframe columns
+        for param_name in ['col', 'row']:
+            if facet_vars[param_name] == feature:
+                raise ValueError(f"'{param_name}' cannot be the same as 'feature'")
+            if facet_vars[param_name] is not None and facet_vars[param_name] not in df.columns:
+                raise ValueError(f"Parameter '{param_name}={facet_vars[param_name]}' not found in dataframe columns: {df.columns.tolist()}")
+
+        g = sns.FacetGrid(df, **facet_vars)
+
         # Map the plotting function
-        g.map_dataframe(self._plot_matrix, feature=feature, color_palette=color_palette)
+        g.map_dataframe(self._plot_matrix, feature=feature, color_palette=cmap)
         
         # Add titles
         if title:
