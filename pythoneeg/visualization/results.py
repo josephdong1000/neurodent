@@ -813,7 +813,7 @@ class SpikeAnalysisResult(AnimalFeatureParser):
 
         with open(json_path, 'r') as f:
             data = json.load(f)
-        data['metadata'] = core.DDFBinaryMetadata(data['metadata'])
+        #data['metadata'] = core.DDFBinaryMetadata(data['metadata'])
         data['result_mne'] = mne.io.read_raw_fif(fif_path)
         data['result_sas'] = None
         return cls(**data)
