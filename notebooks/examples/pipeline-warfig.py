@@ -64,9 +64,9 @@ kinds = ['box', 'bar']
 
 g = ep.plot_catplot('rms', groupby='animal', kind='box', catplot_params={'showfliers': False, 'aspect': 4})
 g.savefig('/home/dongjp/Downloads/3-28-25/AAAA every animal box.png', dpi=300)
-g = ep.plot_2d_feature_2('pcorr', groupby='animal')
+g = ep.plot_matrixplot('pcorr', groupby='animal')
 g.savefig('/home/dongjp/Downloads/3-28-25/AAAA every animal pcorr.png', dpi=300)
-g = ep.plot_2d_feature_2('cohere', groupby='animal')
+g = ep.plot_matrixplot('cohere', groupby='animal')
 g.savefig('/home/dongjp/Downloads/3-28-25/AAAA every animal cohere.png', dpi=300)
 
 
@@ -95,14 +95,14 @@ for feature in constants.MATRIX_FEATURE:
             g = ep.plot_catplot(feature, groupby=groupby, kind=kind, collapse_channels=True, catplot_params=catplot_params if kind == 'box' else None)
             g.savefig(f'/home/dongjp/Downloads/3-28-25/{feature}-{groupby}-{kind}-True.png', dpi=300)
 
-g = ep.plot_2d_feature_2('cohere', groupby=['genotype', 'isday'])
+g = ep.plot_matrixplot('cohere', groupby=['genotype', 'isday'])
 g.savefig(f'/home/dongjp/Downloads/3-28-25/cohere-genotype-isday-matrix-False.png', dpi=300)
-g = ep.plot_2d_feature_2('cohere', groupby='genotype', col='band', row='genotype')
+g = ep.plot_matrixplot('cohere', groupby='genotype', col='band', row='genotype')
 g.savefig(f'/home/dongjp/Downloads/3-28-25/cohere-genotype-band-matrix-False.png', dpi=300)
 
-g = ep.plot_2d_feature_2('pcorr', groupby=['genotype', 'isday'])
+g = ep.plot_matrixplot('pcorr', groupby=['genotype', 'isday'])
 g.savefig(f'/home/dongjp/Downloads/3-28-25/pcorr-genotype-isday-matrix-False.png', dpi=300)
-g = ep.plot_2d_feature_2('pcorr', groupby='genotype')
+g = ep.plot_matrixplot('pcorr', groupby='genotype')
 g.savefig(f'/home/dongjp/Downloads/3-28-25/pcorr-genotype-matrix-False.png', dpi=300)
 
 
