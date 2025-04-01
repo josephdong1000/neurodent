@@ -196,6 +196,21 @@ class LongRecordingAnalyzer:
                                                 multitaper=multitaper,
                                                 **kwargs)
 
+    def compute_psdfrac(self, index, welch_bin_t=1, notch_filter=True, bands: list[tuple[float, float]]=constants.FREQ_BANDS, total_band: tuple[float, float]=constants.FREQ_BAND_TOTAL, multitaper=False, **kwargs):
+        """Compute the power spectral density in each band as a fraction of the total power.
+        """
+        rec = self.get_fragment_np(index)
+
+        return FragmentAnalyzer.compute_psdfrac(rec=rec,
+                                                f_s=self.f_s,
+                                                welch_bin_t=welch_bin_t,
+                                                notch_filter=notch_filter,
+                                                bands=bands,
+                                                total_band=total_band,
+                                                multitaper=multitaper,
+                                                **kwargs)
+
+
     def compute_psdslope(self, index, welch_bin_t=1, notch_filter=True, band: tuple[float, float]=constants.FREQ_BAND_TOTAL, multitaper=False, **kwargs):
         """Compute the slope of the power spectral density of the signal.
 
@@ -219,17 +234,7 @@ class LongRecordingAnalyzer:
                                                 multitaper=multitaper,
                                                 **kwargs)
     
-    # Needs work; will need to accept a geometry file to effectively find multielectrode events
-    # ... that actually sounds like a lot of work
-    # def compute_spikes(self, verbose=False, n_jobs_si: None | int = None, **kwargs):
-    #     mso = core.MountainSortAnalyzer(self.LongRecording.LongRecording, verbose=verbose, n_jobs=n_jobs_si)
-    #     mso.preprocess_recording()
-    #     mso.extract_spikes()
-    #     mso.preprocess_final_recording()
-    #     self.sorting_analyzer, self.sorting_analyzers = mso.get_final_analyzer()
-    #     return self.sorting_analyzer, self.sorting_analyzers
-
-
+    
     def convert_idx_to_timebound(self, index: int) -> tuple[float, float]:
         """Convert fragment index to timebound (start time, end time)
 
@@ -243,56 +248,6 @@ class LongRecordingAnalyzer:
         startidx = frag_len_idx * index
         endidx = min(frag_len_idx * (index + 1), self.LongRecording.LongRecording.get_num_frames())
         return (startidx / self.f_s, endidx / self.f_s)
-
-    def compute_wavetemp(self, index, sa_sas=None, ms_before=200, ms_after=200, **kwargs):
-        if sa_sas is None:
-            if not hasattr(self, "sorting_analyzer") or not hasattr(self, "sorting_analyzers"):
-                self.compute_spikes()
-            sa_sas = (self.sorting_analyzer, self.sorting_analyzers)
-        sa, sas = sa_sas
-        assert isinstance(sa, si.SortingAnalyzer)
-        for e in sas:
-            assert isinstance(e, si.SortingAnalyzer)
-
-        if hasattr(self, 'computed_sorting_analyzer') and hasattr(self, 'computed_sorting_analyzers'):
-            return self.computed_sorting_analyzer, self.computed_sorting_analyzers
-        else:
-            if sa.get_num_units() > 0:
-                sa.compute("random_spikes", max_spikes_per_unit=1000)
-                sa.compute("waveforms", ms_before=ms_before, ms_after=ms_after)
-                sa.compute("templates", operators=["average", "median", "std"])
-            else:
-                print("No units across all channels, skipping..")
-            for i,e in enumerate(sas):
-                if e.get_num_units() == 0:
-                    # print(f"No units in channel {i}, skipping..")
-                    continue
-                e.compute("random_spikes", max_spikes_per_unit=1000)
-                e.compute("waveforms", ms_before=ms_before, ms_after=ms_after)
-                e.compute("templates", operators=["average", "median", "std"])
-
-            self.computed_sorting_analyzer = sa
-            self.computed_sorting_analyzers = sas
-            return sa, sas
-
-    # def __get_freqs_cycles(self, index, freq_res, n_cycles_max, geomspace, mode:str, epsilon):
-    #     if geomspace:
-    #         freqs = np.geomspace(constants.FREQ_BAND_TOTAL[0], constants.FREQ_BAND_TOTAL[1], round((np.diff(constants.FREQ_BAND_TOTAL) / freq_res).item()))
-    #     else:
-    #         freqs = np.arange(constants.FREQ_BAND_TOTAL[0], constants.FREQ_BAND_TOTAL[1], freq_res)
-
-    #     frag_len_s = self.LongRecording.get_dur_fragment(self.fragment_len_s, index)
-    #     match mode:
-    #         case 'cwt_morlet':
-    #             maximum_cyc = (frag_len_s * self.f_s + 1) * np.pi / 5 * freqs / self.f_s
-    #             # print(fwhm(freqs, n_cycles_max))
-    #         case 'multitaper':
-    #             maximum_cyc = frag_len_s * freqs
-    #         case _:
-    #             raise ValueError(f"Invalid mode {mode}, pick 'cwt_morlet' or 'multitaper'")
-    #     maximum_cyc = maximum_cyc - epsilon # Shave off a bit to avoid indexing errors
-    #     n_cycles = np.minimum(np.full(maximum_cyc.shape, n_cycles_max), maximum_cyc)
-    #     return freqs, n_cycles
 
     def compute_cohere(self, index, freq_res: float=1, n_cycles_max: float=7, 
                        geomspace: bool=True, 
