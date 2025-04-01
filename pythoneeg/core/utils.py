@@ -7,6 +7,11 @@ from datetime import datetime
 from pathlib import Path
 import platform
 import logging
+import copy
+
+import numpy as np
+
+from .. import constants
 
 def convert_path(inputPath):
     # Convert path string to match the os
@@ -14,7 +19,6 @@ def convert_path(inputPath):
     home = str(Path.home())
 
     
-
 def convert_units_to_multiplier(current_units, target_units='µV'):
     units_to_mult = {'µV' : 1e-6,
                      'mV' : 1e-3,
@@ -50,6 +54,144 @@ def filepath_to_index(filepath) -> int:
     fname = list(filter(None, fname))
     return int(fname[-1])
 
+def nanaverage(A, weights, axis=-1):
+    """
+    Average of an array, ignoring NaNs.
+    """
+    masked = np.ma.masked_array(A, np.isnan(A))
+    avg = np.ma.average(masked, axis=axis, weights=weights)
+    return avg.filled(np.nan)
+
+def _sanitize_feature_request(features: list[str], exclude: list[str]=[]):
+    """
+    Sanitizes a list of requested features.
+
+    Args:
+        features (list[str]): List of features to include. If "all", include all features in constants.FEATURES.
+        exclude (list[str], optional): List of features to exclude. Defaults to [].
+
+    Returns:
+        list[str]: Sanitized list of features.
+    """
+    if features == ["all"]:
+        feat = copy.deepcopy(constants.FEATURES)
+    elif not features:
+        raise ValueError("Features cannot be empty")
+    else:
+        assert all(f in constants.FEATURES for f in features), f"Available features are: {constants.FEATURES}"
+        feat = copy.deepcopy(features)
+    if exclude is not None:
+        for e in exclude:
+            try:
+                feat.remove(e)
+            except ValueError:
+                pass
+    return feat
+
+def parse_path_to_animalday(filepath:str|Path, id_index:int=0, delimiter:str=' ', date_pattern=None):
+    """
+    Parses the filename of a binfolder to get the animalday identifier (animal id, genotype, and day).
+
+    Args:
+        filepath (str | Path): Filepath of the binfolder.
+        id_index (int, optional): Index of the animal id in the filename. Defaults to 0, i.e. the first element in the filename.
+        delimiter (str, optional): Delimiter in the filename. Defaults to ' '.
+        date_pattern (str, optional): Date pattern in the filename. If None, the date pattern is assumed to be "MM DD YYYY".
+
+    Returns:
+        str: Animal day in the format "animal-id genotype day".
+    """
+    # not tested if this handles alternative __readmodes yet
+    geno = parse_path_to_genotype(filepath)
+
+    animid = parse_path_to_animal(filepath, id_index, delimiter)
+    
+    day = parse_path_to_day(filepath, date_pattern=date_pattern).strftime("%b-%d-%Y")
+
+    return f"{animid} {geno} {day}"
+
+def parse_path_to_genotype(filepath:str|Path):
+    """
+    Parses the filename of a binfolder to get the genotype.
+
+    Args:
+        filepath (str | Path): Filepath of the binfolder.
+
+    Returns:
+        str: Genotype.
+    """
+    name = Path(filepath).name
+    return __get_key_from_match_values(name, constants.GENOTYPE_ALIASES)
+
+def parse_path_to_animal(filepath:str|Path, id_index:int=0, delimiter:str=' '):
+    """
+    Parses the filename of a binfolder to get the animal id.
+
+    Args:
+        filepath (str | Path): Filepath of the binfolder.
+        id_index (int, optional): Index of the animal id in the filename. Defaults to 0, i.e. the first element in the filename.
+        delimiter (str, optional): Delimiter in the filename. Defaults to ' '.
+
+    Returns:
+        str: Animal id.
+    """
+    animid = Path(filepath).name.split(delimiter)
+    animid = animid[id_index]
+    return animid
+
+def parse_path_to_day(filepath:str|Path, date_pattern=None) -> datetime:
+    """
+    Parses the filename of a binfolder to get the day.
+
+    Args:
+        filepath (str | Path): Filepath of the binfolder.
+        date_pattern (str, optional): Date pattern in the filename. If None, the date pattern is assumed to be "MM DD YYYY".
+
+    Returns:
+        datetime: Day of the binfolder.
+    """
+    date_pattern = r'(\d{2})\D*(\d{2})\D*(\d{4})' if date_pattern is None else date_pattern
+    match = re.search(date_pattern, Path(filepath).name)
+    if match:
+        month, day, year = match.groups()
+        month = int(month)
+        day = int(day)
+        year = int(year)
+    else:
+        month, day, year = (1, 1, 1)
+    return datetime(year=year, month=month, day=day)
+
+def parse_chname_to_abbrev(channel_name:str, assume_from_number=False):
+    """
+    Parses the channel name to get the abbreviation.
+
+    Args:
+        channel_name (str): Name of the channel.
+        assume_from_number (bool, optional): If True, assume the abbreviation based on the last number in the channel name. Defaults to False.
+
+    Returns:
+        str: Abbreviation of the channel name.
+    """
+    try:
+        lr = __get_key_from_match_values(channel_name, constants.LR_ALIASES)
+        chname = __get_key_from_match_values(channel_name, constants.CHNAME_ALIASES)
+    except ValueError as e:
+        if assume_from_number:
+            logging.warning(f"{channel_name} does not match name aliases. Assuming alias from number in channel name.")
+            nums = re.findall(r'\d+', channel_name)
+            num = int(nums[-1])
+            return constants.DEFAULT_ID_TO_NAME[num]
+        else:
+            raise e
+    return lr + chname
+
+def __get_key_from_match_values(searchonvals:str, dictionary:dict):
+    for k,v in dictionary.items():
+        if any([x in searchonvals for x in v]):
+            return k
+    raise ValueError(f"{searchonvals} does not have any matching values. Available values: {dictionary}")
+    
+
 def set_temp_directory(path):
     """Set the temporary directory for PyEEG operations.
     
@@ -64,6 +206,9 @@ def set_temp_directory(path):
 
 
 def get_temp_directory() -> Path:
+    """
+    Returns the temporary directory.
+    """
     return Path(os.environ['TMPDIR'])
 
 

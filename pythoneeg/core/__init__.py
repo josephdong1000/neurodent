@@ -15,7 +15,13 @@ from .utils import (
     filepath_to_index,
     is_day,
     set_temp_directory,
-    get_temp_directory
+    get_temp_directory,
+    parse_path_to_animalday,
+    parse_path_to_genotype,
+    parse_path_to_animal,
+    parse_path_to_day,
+    parse_chname_to_abbrev,
+    nanaverage
 )
 from .analysis import LongRecordingAnalyzer
 from .analyze_frag import FragmentAnalyzer
@@ -32,6 +38,12 @@ __all__ = [
     "is_day",
     "set_temp_directory",
     "get_temp_directory",
+    "parse_path_to_animalday",
+    "parse_path_to_genotype",
+    "parse_path_to_animal",
+    "parse_path_to_day",
+    "parse_chname_to_abbrev",
+    "nanaverage",
     "LongRecordingAnalyzer",
     "MountainSortAnalyzer",
     "FragmentAnalyzer"

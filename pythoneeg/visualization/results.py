@@ -34,76 +34,6 @@ from ..core import FragmentAnalyzer, get_temp_directory
 
 class AnimalFeatureParser:
 
-    def _sanitize_feature_request(self, features: list[str], exclude: list[str]=[]):
-        if features == ["all"]:
-            feat = copy.deepcopy(constants.FEATURES)
-        elif not features:
-            raise ValueError("Features cannot be empty")
-        else:
-            assert all(f in constants.FEATURES for f in features), f"Available features are: {constants.FEATURES}"
-            feat = copy.deepcopy(features)
-        if exclude is not None:
-            for e in exclude:
-                try:
-                    feat.remove(e)
-                except ValueError:
-                    pass
-        return feat
-    
-    def _parse_filename_to_animalday(self, binfolder:str|Path, id_index:int=0, delimiter:str=' ', date_pattern=None):
-        # not tested if this handles alternative __readmodes yet
-        geno = self._parse_filename_to_genotype(binfolder)
-
-        animid = self._parse_filename_to_animal(binfolder, id_index, delimiter)
-        
-        day = self._parse_filename_to_day(binfolder, date_pattern=date_pattern).strftime("%b-%d-%Y")
-
-        return f"{animid} {geno} {day}"
-    
-    def _parse_filename_to_animal(self,binfolder:str|Path, id_index:int=0, delimiter:str=' '):
-        animid = Path(binfolder).name.split(delimiter)
-        animid = animid[id_index]
-        return animid
-
-    def _parse_filename_to_genotype(self, filename:str):
-        name = Path(filename).name
-        return self.__get_key_from_match_values(name, constants.GENOTYPE_ALIASES)
-    
-    def _parse_filename_to_day(self, filename:str, date_pattern=None) -> datetime:
-        date_pattern = r'(\d{2})\D*(\d{2})\D*(\d{4})' if date_pattern is None else date_pattern
-        # self.date_format = date_format.replace("N", "[0-9]")
-        match = re.search(date_pattern, Path(filename).name)
-        if match:
-            month, day, year = match.groups()
-            month = int(month)
-            day = int(day)
-            year = int(year)
-        else:
-            month, day, year = (1, 1, 1)
-
-        # name = Path(filename).name
-        return datetime(year=year, month=month, day=day)
-
-    def _parse_chname_to_abbrev(self, channel_name:str, assume_from_number=False):
-        try:
-            lr = self.__get_key_from_match_values(channel_name, constants.LR_ALIASES)
-            chname = self.__get_key_from_match_values(channel_name, constants.CHNAME_ALIASES)
-        except ValueError as e:
-            if assume_from_number:
-                logging.warning(f"{channel_name} does not match name aliases. Assuming alias from number in channel name.")
-                nums = re.findall(r'\d+', channel_name)
-                num = int(nums[-1])
-                return constants.DEFAULT_ID_TO_NAME[num]
-            else:
-                raise e
-        return lr + chname
-
-    def __get_key_from_match_values(self, searchonvals:str, dictionary:dict):
-        for k,v in dictionary.items():
-            if any([x in searchonvals for x in v]):
-                return k
-        raise ValueError(f"{searchonvals} does not have any matching values. Available values: {dictionary}")
-    
     def _average_feature(self, df:pd.DataFrame, colname:str, weightsname:str|None='duration'):
         column = df[colname]
         if weightsname is None:
@@ -127,24 +57,18 @@ class AnimalFeatureParser:
                 raise TypeError(f"Unrecognized type in column {colname}: {colitem}")
 
         if type(col_agg) is dict:
-            avg = {k:self._nanaverage(v, axis=-1, weights=weights) for k,v in col_agg.items()}
+            avg = {k:core.nanaverage(v, axis=-1, weights=weights) for k,v in col_agg.items()}
         elif type(col_agg) is tuple:
             if colname == 'psd':
-                avg = (col_agg[0], self._nanaverage(col_agg[1], axis=-1, weights=weights))
+                avg = (col_agg[0], core.nanaverage(col_agg[1], axis=-1, weights=weights))
             else:
                 avg = None
         elif np.isnan(col_agg).all():
             avg = np.nan
         else:
-            avg = self._nanaverage(col_agg, axis=-1, weights=weights)
+            avg = core.nanaverage(col_agg, axis=-1, weights=weights)
         return avg
-
-    # def fixdocstring(func):
-    #     for key, value in AnimalFeatureParser.__DOCSTRING_REPLACE.items():
-    #         func.__doc__ = func.__doc__.replace(key, value)
-    #     return func
-
-
+    
 
 class AnimalOrganizer(AnimalFeatureParser):
 
@@ -190,9 +114,9 @@ class AnimalOrganizer(AnimalFeatureParser):
         for e in self.__bin_folders:
             self.long_recordings.append(core.LongRecordingOrganizer(e, truncate=truncate))
             self.metadatas.append(self.long_recordings[-1].meta)
-            self.animaldays.append(self._parse_filename_to_animalday(e))
+            self.animaldays.append(core.parse_path_to_animalday(e))
 
-        self.__genotypes = [self._parse_filename_to_genotype(x) for x in self.animaldays]
+        self.__genotypes = [core.parse_path_to_genotype(x) for x in self.animaldays]
         if len(set(self.__genotypes)) > 1:
             raise ValueError(f"Inconsistent genotypes in {self.animaldays}")
         self.genotype = self.__genotypes[0]
@@ -200,7 +124,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         if len(set([" ".join(x) for x in self.__channel_names])) > 1:
             raise ValueError(f"Inconsistent channel names in {self.__channel_names}")
         self.channel_names = self.__channel_names[0]
-        self.__animal_ids = [self._parse_filename_to_animal(x) for x in self.animaldays]
+        self.__animal_ids = [core.parse_path_to_animal(x) for x in self.animaldays]
         if len(set(self.__animal_ids)) > 1:
             raise ValueError(f"Inconsistent animal IDs in {self.animaldays}")
         self.animal_id = self.__animal_ids[0]
@@ -240,7 +164,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         Returns:
             window_analysis_result: a WindowAnalysisResult object
         """
-        features = self._sanitize_feature_request(features, exclude)
+        features = core.utils._sanitize_feature_request(features, exclude)
 
         dataframes = []
         for lrec in self.long_recordings: # Iterate over all long recordings
@@ -383,10 +307,10 @@ class AnimalOrganizer(AnimalFeatureParser):
         row = {}
 
         lan_folder = lan.LongRecording.base_folder_path
-        row['animalday'] = self._parse_filename_to_animalday(lan_folder)
-        row['animal'] = self._parse_filename_to_animal(lan_folder)
-        row['day'] = self._parse_filename_to_day(lan_folder)
-        row['genotype'] = self._parse_filename_to_genotype(lan_folder)
+        row['animalday'] = core.parse_path_to_animalday(lan_folder)
+        row['animal'] = core.parse_path_to_animal(lan_folder)
+        row['day'] = core.parse_path_to_day(lan_folder)
+        row['genotype'] = core.parse_path_to_genotype(lan_folder)
         row['duration'] = lan.LongRecording.get_dur_fragment(window_s, idx)
         row['endfile'] = lan.get_file_end(idx)
 
@@ -425,16 +349,14 @@ class WindowAnalysisResult(AnimalFeatureParser):
         self.feature_names = [x for x in columns if x in constants.FEATURES]
         self._nonfeat_cols = [x for x in columns if x not in constants.FEATURES]
         animaldays = result.loc[:, "animalday"].unique()
-        # print(animaldays)
-        # animaldays = [self._parse_filename_to_animalday(x) for x in animaldays]
-        # animaldays.sort()
+        
         self.animaldays = animaldays
         self.avg_result: pd.DataFrame
         self.animal_id = animal_id
         self.genotype = genotype
         self.channel_names = channel_names
         self.assume_from_number = assume_from_number
-        self.channel_abbrevs = [self._parse_chname_to_abbrev(x, assume_from_number=assume_from_number) for x in self.channel_names]
+        self.channel_abbrevs = [core.parse_chname_to_abbrev(x, assume_from_number=assume_from_number) for x in self.channel_names]
 
         print(f"Channel names: \t{self.channel_names}")
         print(f"Channel abbreviations: \t{self.channel_abbrevs}")
@@ -464,7 +386,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         Returns:
             result: pd.DataFrame object with features in columns and windows in rows
         """
-        features = self._sanitize_feature_request(features, exclude)
+        features = core.utils._sanitize_feature_request(features, exclude)
         if not allow_missing:
             return self.result.loc[:, self._nonfeat_cols + features]
         else:
@@ -483,7 +405,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             grouped_result: result grouped by `groupby` and averaged for each group.
         """
         result_grouped, result_validcols = self.__get_groups(features=features, exclude=exclude, df=df, groupby=groupby)
-        features = self._sanitize_feature_request(features, exclude)
+        features = core.utils._sanitize_feature_request(features, exclude)
 
         avg_results = []
         for f in features:
@@ -497,13 +419,13 @@ class WindowAnalysisResult(AnimalFeatureParser):
         return pd.concat(avg_results, axis=1)
 
     def __get_groups(self, features: list[str], exclude: list[str]=[], df: pd.DataFrame = None, groupby="animalday"):
-        features = self._sanitize_feature_request(features, exclude)
+        features = core.utils._sanitize_feature_request(features, exclude)
         result_win = self.result if df is None else df
         return result_win.groupby(groupby), result_win.columns
 
     def get_grouprows_result(self, features: list[str], exclude: list[str]=[], df: pd.DataFrame = None,
                             multiindex=["animalday", "animal", "genotype"], include=["duration", "endfile"]):
-        features = self._sanitize_feature_request(features, exclude)
+        features = core.utils._sanitize_feature_request(features, exclude)
         result_win = self.result if df is None else df
         result_win = result_win.filter(features + multiindex + include)
         return result_win.set_index(multiindex)
@@ -597,7 +519,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         filter_tfs = np.array(filter_tfs, dtype=bool)
         for feat in constants.FEATURES:
             if verbose:
-                print(f"Filtering {feat}..")
+                logging.info(f"Filtering {feat}")
             match feat:
                 case 'rms' | 'ampvar' | 'psdtotal':
                     vals = np.array(result[feat].tolist())
@@ -705,11 +627,6 @@ class WindowAnalysisResult(AnimalFeatureParser):
             metadata = json.load(f)
         return cls(data, **metadata)
     
-    # REVIEW this doesn't need to be an instance function. Could be a static
-    def _nanaverage(self, A, weights, axis=-1):
-        masked = np.ma.masked_array(A, np.isnan(A))
-        avg = np.ma.average(masked, axis=axis, weights=weights)
-        return avg.filled(np.nan)
 
 class SpikeAnalysisResult(AnimalFeatureParser):
     def __init__(self, result_sas: list[si.SortingAnalyzer], 
@@ -738,7 +655,7 @@ class SpikeAnalysisResult(AnimalFeatureParser):
         self.metadata = metadata
         self.channel_names = channel_names
         self.assume_from_number = assume_from_number
-        self.channel_abbrevs = [self._parse_chname_to_abbrev(x, assume_from_number=assume_from_number) for x in self.channel_names]
+        self.channel_abbrevs = [core.parse_chname_to_abbrev(x, assume_from_number=assume_from_number) for x in self.channel_names]
 
         logging.info(f"Channel names: \t{self.channel_names}")
         logging.info(f"Channel abbreviations: \t{self.channel_abbrevs}")
