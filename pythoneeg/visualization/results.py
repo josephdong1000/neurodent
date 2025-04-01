@@ -293,6 +293,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                         ) for idx in range(lan.n_fragments - 1)]
                         del np_fragments_reconstruct # cleanup memory
                         feature_values = dask.compute(*feature_values)
+                        f.close() # ensure file is closed
 
                     # Clean up temp file after processing
                     logging.debug("Cleaning up temp file")
@@ -331,6 +332,15 @@ class AnimalOrganizer(AnimalFeatureParser):
         return self.window_analysis_result
     
     def compute_spike_analysis(self, multiprocess_mode: Literal['dask', 'serial']='serial'):
+        """Compute spike sorting on all long recordings and return a list of SpikeAnalysisResult objects
+
+        Args:
+            multiprocess_mode (Literal['dask', 'serial']): Whether to use Dask for parallel processing. Defaults to 'serial'.
+
+        Returns:
+            spike_analysis_results: list[SpikeAnalysisResult]. Each SpikeAnalysisResult object corresponds to a LongRecording object,
+            typically a different day or recording session.
+        """
         sars = []
         lrec_sorts = []
         lrec_recs = []

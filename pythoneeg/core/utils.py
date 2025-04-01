@@ -6,6 +6,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 import platform
+import logging
 
 def convert_path(inputPath):
     # Convert path string to match the os
@@ -59,6 +60,7 @@ def set_temp_directory(path):
     if not path.exists():
         path.mkdir(parents=True, exist_ok=True)
     os.environ['TMPDIR'] = str(path)
+    logging.info(f"Temporary directory set to {path}")
 
 
 def get_temp_directory() -> Path:
