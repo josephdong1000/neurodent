@@ -22,21 +22,8 @@ from .. import core
 from .. import constants
 from .analyze_frag import FragmentAnalyzer
 
-#%%
 
 class LongRecordingAnalyzer:
-
-    # FEATURES = ['rms', 'ampvar', 'psd', 'psdtotal', 'psdband', 'psdslope', 'cohere', 'pcorr']
-    # GLOBAL_FEATURES = ['templates']
-    # FREQ_BANDS = {'delta' : (0.1, 4),
-    #             'theta' : (4, 8),
-    #             'alpha' : (8, 13),
-    #             'beta'  : (13, 25),
-    #             'gamma' : (25, 50)}
-    # FREQ_BAND_TOTAL = (0.1, 50)
-    # FREQ_MINS = [v[0] for k,v in FREQ_BANDS.items()]
-    # FREQ_MAXS = [v[1] for k,v in FREQ_BANDS.items()]
-    # FREQ_BAND_NAMES = list(FREQ_BANDS.keys())
 
     def __init__(self, longrecording, fragment_len_s=10, notch_freq=60) -> None:
 
