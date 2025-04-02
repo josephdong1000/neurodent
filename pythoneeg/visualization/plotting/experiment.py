@@ -100,8 +100,8 @@ class ExperimentPlotter():
             ch_to_idx = self.channel_to_idx[i]
             ch_names = self.channel_names[i]
             match feature:
-                case 'rms' | 'ampvar' | 'psdtotal' | 'psdslope' | 'psdband':
-                    if feature == 'psdband':
+                case 'rms' | 'ampvar' | 'psdtotal' | 'psdslope' | 'psdband' | 'psdfrac':
+                    if feature in constants.BAND_FEATURE:
                         df_bands = pd.DataFrame(df_war[feature].tolist())
                         vals = np.array(df_bands.values.tolist())
                         vals = vals.transpose((0, 2, 1))
@@ -159,7 +159,7 @@ class ExperimentPlotter():
         
         if feature == 'psdslope':
             df[feature] = df[feature].apply(lambda x: x[0]) # get slope from [slope, intercept]
-        elif feature == 'psdband' or feature == 'cohere':
+        elif feature in constants.BAND_FEATURE + ['cohere']:
             df[feature] = df[feature].apply(lambda x: list(zip(x, constants.BAND_NAMES)))
             df = df.explode(feature)
             df[[feature, 'band']] = pd.DataFrame(df[feature].tolist(), index=df.index)

@@ -112,7 +112,8 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                          'ampvar' : 1,
                          'psdtotal' : 1,
                          'psdslope' : 2,
-                         'psdband' : 5}
+                         'psdband' : 5,
+                         'psdfrac' : 5}
 
         # df_featgroups = self.window_result.get_grouped(features, groupby=groupby)
         df_rowgroup = self.window_result.get_grouprows_result(features, multiindex=multiindex)
@@ -154,7 +155,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                 ax.set_yticks([ytick_offset], [feature])
             case 'psdslope':
                 ax.set_yticks(ytick_offset, ['psdslope', 'psdintercept'])
-            case 'psdband':
+            case 'psdband' | 'psdfrac':
                 ax.set_yticks(ytick_offset, constants.BAND_NAMES)
             case _:
                 raise ValueError(f"Invalid feature {feature}")
@@ -164,7 +165,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
 
     def __get_linear_feature(self, group:pd.DataFrame, feature:str, score_type='z', triag=True):
         match feature:
-            case 'psdband':
+            case 'psdband' | 'psdfrac':
                 data_X = np.array([list(d.values()) for d in group[feature]])
                 data_X = np.stack(data_X, axis=-1)
                 data_X = np.transpose(data_X)
