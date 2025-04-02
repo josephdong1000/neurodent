@@ -48,7 +48,7 @@ class AnimalFeatureParser:
             case 'psdslope':
                 col_agg = np.array([*column.tolist()])
                 col_agg = col_agg.transpose(1, 2, 0)
-            case 'cohere' | 'psdband':
+            case 'cohere' | 'psdband' | 'psdfrac':
                 col_agg = {k : np.stack([d[k] for d in column], axis=-1) for k in colitem.keys()}
             case 'psd':
                 col_agg = np.stack([x[1] for x in column], axis=-1)
@@ -462,7 +462,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
     def get_filter_high_beta(self, df:pd.DataFrame=None, max_beta=0.25, throw_all=True, **kwargs):
         result = df.copy() if df is not None else self.result.copy()
-        df_cohere = pd.DataFrame(result['psdband'].tolist())
+        df_cohere = pd.DataFrame(result['psdband'].tolist()) # TODO implement this with psdfrac instead; more clean
         np_beta = np.array(df_cohere['beta'].tolist())
         np_allbands = np.array(df_cohere.values.tolist())
         np_allbands = np_allbands.sum(axis=1)
@@ -532,7 +532,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     vals[~mask] = np.nan
                     outs = [(c, vals[i, :, :]) for i,c in enumerate(coords)]
                     result[feat] = outs
-                case 'psdband':
+                case 'psdband' | 'psdfrac':
                     vals = pd.DataFrame(result[feat].tolist())
                     for colname in vals.columns:
                         v = np.array(vals[colname].tolist())
