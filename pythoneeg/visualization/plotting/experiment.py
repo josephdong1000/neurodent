@@ -6,6 +6,7 @@ import logging
 from typing import Literal
 
 from scipy import stats
+from statannotations.Annotator import Annotator
 
 from ... import core
 from ... import visualization as viz
@@ -180,7 +181,8 @@ class ExperimentPlotter():
                     collapse_channels: bool=False,
                     title: str=None, 
                     cmap: str=None, 
-                    figsize: tuple[float, float]=None):
+                    stat_pairs: list[tuple[str, str]]=None,
+                    ) -> sns.FacetGrid:
         """
         Create a boxplot of feature data.
         """
@@ -201,7 +203,6 @@ class ExperimentPlotter():
             'col': groupby[1] if len(groupby) > 1 else None,
             'kind': kind,
             'palette': cmap,
-            # 'showfliers': show_outliers,
         }
         # Update default params if x, col, or hue are explicitly provided
         if x is not None:
@@ -237,6 +238,29 @@ class ExperimentPlotter():
         for ax in g.axes.flat:
             ax.yaxis.grid(True, linestyle='--', which='major', color='grey', alpha=.25)
         
+        if stat_pairs:
+            # annot = Annotator(None, stat_pairs)
+            # plot_params = default_params.copy()
+            # plot_params.pop('data')
+            # plot_params.pop('hue')
+            # plot_params.pop('col')
+            # plot_params.pop('kind')
+            # logging.debug(f'plot params: {plot_params}')
+            # g.map_dataframe(annot.plot_and_annotate_facets, 
+            #                 plot=f'{kind}plot', # REVIEW this might not work for all plot types
+            #                 plot_params=plot_params,
+            #                 configuration=dict(test='t-test_ind', text_format='star', loc='inside'),
+            #                 annotation_func='apply_test')
+            for ax in g.axes.flat:
+                annot_params = default_params.copy()
+                # annot_params['data'] = annot_params['data'].dropna()
+                annotator = Annotator(ax, stat_pairs, **annot_params)
+                # annotator.configure(test='Mann-Whitney', text_format='star', loc='inside')
+                annotator.configure(test='Brunner-Munzel', text_format='star', loc='inside')
+                # annotator.apply_test('Brunner-Munzel', nan_policy='omit')
+                annotator.apply_test(nan_policy='raise')
+                annotator.apply_and_annotate()
+
         plt.tight_layout()
         
         return g
