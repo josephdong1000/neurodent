@@ -178,7 +178,9 @@ class ExperimentPlotter():
                     catplot_params: dict=None,
                     channels: str | list[str]='all', 
                     collapse_channels: bool=False,
-                    title: str=None, color_palette: list[str]=None, figsize: tuple[float, float]=None):
+                    title: str=None, 
+                    cmap: str=None, 
+                    figsize: tuple[float, float]=None):
         """
         Create a boxplot of feature data.
         """
@@ -198,7 +200,7 @@ class ExperimentPlotter():
             'hue': 'channel',
             'col': groupby[1] if len(groupby) > 1 else None,
             'kind': kind,
-            'palette': color_palette,
+            'palette': cmap,
             # 'showfliers': show_outliers,
         }
         # Update default params if x, col, or hue are explicitly provided
@@ -225,8 +227,12 @@ class ExperimentPlotter():
 
         g.set_xticklabels(rotation=45, ha='right')
         g.set_titles(title)
-        g.legend.set_loc('center left')
-        g.legend.set_bbox_to_anchor((1.0, 0.5))
+        
+        # Only try to modify legend if it exists
+        if g.legend is not None:
+            g.legend.set_loc('center left')
+            g.legend.set_bbox_to_anchor((1.0, 0.5))
+            
         # Add grid to y-axis for all subplots
         for ax in g.axes.flat:
             ax.yaxis.grid(True, linestyle='--', which='major', color='grey', alpha=.25)
@@ -244,7 +250,7 @@ class ExperimentPlotter():
                         channels: str | list[str]='all', 
                         collapse_channels: bool=False,
                         title: str=None, 
-                        cmap: str=None, 
+                        cmap: str='RdBu_r', 
                         figsize: tuple[float, float]=None):
         """
         Create a 2D feature plot.
@@ -292,13 +298,13 @@ class ExperimentPlotter():
         
         return g
 
-    def _plot_matrix(self, data, feature, color_palette=None, **kwargs):
+    def _plot_matrix(self, data, feature, color_palette='RdBu_r', **kwargs):
         matrices = np.array(data[feature].tolist())
         avg_matrix = np.nanmean(matrices, axis=0)
         
         # Create heatmap
         plt.imshow(avg_matrix,
-                   cmap=color_palette if color_palette else 'RdBu_r', 
+                   cmap=color_palette, 
                    vmin=-1, vmax=1)
         plt.colorbar(fraction=0.046, pad=0.04)
         
