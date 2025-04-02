@@ -182,6 +182,7 @@ class ExperimentPlotter():
                     title: str=None, 
                     cmap: str=None, 
                     stat_pairs: list[tuple[str, str]]=None,
+                    stat_test: Literal['Mann-Whitney', 'Brunner-Munzel']='Brunner-Munzel',
                     ) -> sns.FacetGrid:
         """
         Create a boxplot of feature data.
@@ -256,7 +257,7 @@ class ExperimentPlotter():
                 # annot_params['data'] = annot_params['data'].dropna()
                 annotator = Annotator(ax, stat_pairs, **annot_params)
                 # annotator.configure(test='Mann-Whitney', text_format='star', loc='inside')
-                annotator.configure(test='Brunner-Munzel', text_format='star', loc='inside')
+                annotator.configure(test=stat_test, text_format='star', loc='inside')
                 # annotator.apply_test('Brunner-Munzel', nan_policy='omit')
                 annotator.apply_test(nan_policy='raise')
                 annotator.apply_and_annotate()
