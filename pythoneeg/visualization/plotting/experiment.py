@@ -7,6 +7,7 @@ from typing import Literal
 
 from scipy import stats
 from statannotations.Annotator import Annotator
+import statsmodels.api as sm
 
 from ... import core
 from ... import visualization as viz
@@ -320,9 +321,7 @@ class ExperimentPlotter():
             raise ValueError(f'{feature} is not supported for 2D feature plots') # REVIEW
 
         if isinstance(groupby, str):
-            groupby = [groupby]  
-        if feature != 'cohere' and ('band' in groupby or 'band' == col or 'band' == row):
-            raise ValueError(f'{feature} does not support band plots') # REVIEW
+            groupby = [groupby]
         
         df = self._pull_timeseries_dataframe(feature, groupby, channels, collapse_channels)
         
@@ -330,7 +329,7 @@ class ExperimentPlotter():
         facet_vars = {
             'col': groupby[0],
             'row': groupby[1] if len(groupby) > 1 else None,
-            'height': 4 if figsize is None else figsize[1],
+            'height': 4 if figsize is None else figsize[1], # REVIEW maybe change to height aspect parameters instead
             'aspect': 1 if figsize is None else figsize[0]/figsize[1]
         }
         if col is not None:
@@ -338,7 +337,7 @@ class ExperimentPlotter():
         if row is not None:
             facet_vars['row'] = row
         
-        # Check that x, col, and hue parameters exist in dataframe columns
+        # Check that col and row parameters exist in dataframe columns
         for param_name in ['col', 'row']:
             if facet_vars[param_name] == feature:
                 raise ValueError(f"'{param_name}' cannot be the same as 'feature'")
@@ -378,12 +377,64 @@ class ExperimentPlotter():
         plt.xticks(range(n_channels), ch_names, rotation=45, ha='right')
         plt.yticks(range(n_channels), ch_names)
 
+    # TODO implement in the style of matrixplot
+    def plot_qqplot(self, feature: str, groupby: str | list[str], col: str=None, row: str=None, log: bool=False,
+                    channels: str | list[str]='all', collapse_channels: bool=False, height: float=3, aspect: float=1, **kwargs):
+        """
+        Create a QQ plot of the feature data.
+        """
+        if feature in constants.MATRIX_FEATURE and not collapse_channels:
+            raise ValueError("To plot matrix features, collapse_channels must be True")
+
+        if isinstance(groupby, str):
+            groupby = [groupby]
+
+        df = self._pull_timeseries_dataframe(feature, groupby, channels, collapse_channels, average_groupby=False)
+
+        # Create FacetGrid
+        facet_vars = {
+            'col': groupby[0],
+            'row': groupby[1] if len(groupby) > 1 else None,
+            'height': height,
+            'aspect': aspect
+        }
+        if col is not None:
+            facet_vars['col'] = col
+        if row is not None:
+            facet_vars['row'] = row
+
+        # Check that col and row parameters exist in dataframe columns
+        for param_name in ['col', 'row']:
+            if facet_vars[param_name] == feature:
+                raise ValueError(f"'{param_name}' cannot be the same as 'feature'")
+            if facet_vars[param_name] is not None and facet_vars[param_name] not in df.columns:
+                raise ValueError(f"Parameter '{param_name}={facet_vars[param_name]}' not found in dataframe columns: {df.columns.tolist()}")
+
+        g = sns.FacetGrid(df, margin_titles=True, **facet_vars)
+        g.map_dataframe(self._plot_qqplot, feature=feature, log=log, **kwargs)
+
+        g.set_titles(row_template="{row_name}", col_template="{col_name}")
+
+        plt.tight_layout()
+
+        return g
+
+    def _plot_qqplot(self, data: pd.DataFrame, feature: str, log: bool=False, **kwargs):
+        x = data[feature].dropna()
+        if log:
+            x = np.log(x)
+        ax = plt.gca()
+        pp = sm.ProbPlot(x, fit=True)
+        pp.qqplot(line='45', ax=ax)
+
+
     def _run_kstest(self,
                     df: pd.DataFrame,
                     feature: str,
                     groupby: str | list[str]):
         """
         Run a Kolmogorov-Smirnov test for normality on the feature data.
+        This is not recommended as the test is sensitive to large values.
         """
         return df.groupby(groupby)[feature].apply(lambda x: stats.kstest(x, cdf='norm', nan_policy='omit'))
 
