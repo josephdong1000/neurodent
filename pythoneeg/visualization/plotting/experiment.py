@@ -71,8 +71,9 @@ class ExperimentPlotter():
 
 
     def _pull_timeseries_dataframe(self, feature:str, groupby:str | list[str], 
-                            channels:str|list[str]='all', 
-                            collapse_channels: bool=False):
+                                channels:str|list[str]='all', 
+                                collapse_channels: bool=False,
+                                average_groupby: bool=False):
         """
         Process feature data for plotting.
         """
@@ -167,6 +168,11 @@ class ExperimentPlotter():
         
         df.reset_index(drop=True, inplace=True)
 
+        if average_groupby:
+            groupby_cols = df.columns.drop(feature).tolist()
+            logging.debug(f'groupby_cols: {groupby_cols}')
+            df = df.groupby(groupby_cols).apply(lambda x: x.apply(lambda y: np.nanmean(y))).reset_index()
+
         return df
 
 
@@ -179,10 +185,11 @@ class ExperimentPlotter():
                     catplot_params: dict=None,
                     channels: str | list[str]='all', 
                     collapse_channels: bool=False,
+                    average_groupby: bool=False,
                     title: str=None, 
                     cmap: str=None, 
                     stat_pairs: list[tuple[str, str]] | Literal['all', 'x', 'hue']=None,
-                    stat_test: Literal['Mann-Whitney', 'Brunner-Munzel']='Mann-Whitney',
+                    stat_test: str='Mann-Whitney',
                     norm_test: Literal[None, 'D-Agostino', 'log-D-Agostino', 'K-S']=None,
                     ) -> sns.FacetGrid:
         """
@@ -191,7 +198,7 @@ class ExperimentPlotter():
         if feature in constants.MATRIX_FEATURE and not collapse_channels:
             raise ValueError("To plot matrix features, collapse_channels must be True")
 
-        df = self._pull_timeseries_dataframe(feature, groupby, channels, collapse_channels)
+        df = self._pull_timeseries_dataframe(feature, groupby, channels, collapse_channels, average_groupby)
         
         if isinstance(groupby, str):
             groupby = [groupby]
