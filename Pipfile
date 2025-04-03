@@ -26,6 +26,7 @@ seaborn = "*"
 pipreqs = "*"
 pyarrow = "*"
 mountainsort5 = "*"
+statannotations = "*"
 
 [dev-packages]
 snakeviz = "*"
