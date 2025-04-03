@@ -22,7 +22,7 @@ core.set_temp_directory('/scr1/users/dongjp')
 
 cluster_window = SLURMCluster(
         cores=10,
-        processes=2,
+        processes=1,
         memory='30GB',
         walltime='24:00:00',
         interface=None,
