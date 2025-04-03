@@ -181,8 +181,9 @@ class ExperimentPlotter():
                     collapse_channels: bool=False,
                     title: str=None, 
                     cmap: str=None, 
-                    stat_pairs: list[tuple[str, str]]=None,
-                    stat_test: Literal['Mann-Whitney', 'Brunner-Munzel']='Brunner-Munzel',
+                    stat_pairs: list[tuple[str, str]] | Literal['all', 'x', 'hue']=None,
+                    stat_test: Literal['Mann-Whitney', 'Brunner-Munzel']='Mann-Whitney',
+                    norm_test: Literal[None, 'D-Agostino', 'log-D-Agostino', 'K-S']=None,
                     ) -> sns.FacetGrid:
         """
         Create a boxplot of feature data.
@@ -203,7 +204,7 @@ class ExperimentPlotter():
             'hue': 'channel',
             'col': groupby[1] if len(groupby) > 1 else None,
             'kind': kind,
-            'palette': cmap,
+            'palette': cmap
         }
         # Update default params if x, col, or hue are explicitly provided
         if x is not None:
@@ -239,33 +240,68 @@ class ExperimentPlotter():
         for ax in g.axes.flat:
             ax.yaxis.grid(True, linestyle='--', which='major', color='grey', alpha=.25)
         
+        groupby_test = [default_params[x] 
+                        for x in ['x', 'col', 'hue'] 
+                        if default_params[x] is not None]
+        match norm_test:
+            case None:
+                pass
+            case 'D-Agostino':
+                normality_test = self._run_normaltest(df, feature, groupby_test)
+                print(f'D-Agostino normality test: {normality_test}')
+            case 'log-D-Agostino':
+                df_log = df.copy()
+                df_log[feature] = np.log(df_log[feature])
+                normality_test = self._run_normaltest(df_log, feature, groupby_test)
+                print(f'D-Agostino log-transformed normality test: {normality_test}')
+            case 'K-S':
+                normality_test = self._run_kstest(df, feature, groupby_test)
+                print(f'K-S normality test: {normality_test}')
+            case _:
+                raise ValueError(f'{norm_test} is not supported')
+
         if stat_pairs:
-            # annot = Annotator(None, stat_pairs)
-            # plot_params = default_params.copy()
-            # plot_params.pop('data')
-            # plot_params.pop('hue')
-            # plot_params.pop('col')
-            # plot_params.pop('kind')
-            # logging.debug(f'plot params: {plot_params}')
-            # g.map_dataframe(annot.plot_and_annotate_facets, 
-            #                 plot=f'{kind}plot', # REVIEW this might not work for all plot types
-            #                 plot_params=plot_params,
-            #                 configuration=dict(test='t-test_ind', text_format='star', loc='inside'),
-            #                 annotation_func='apply_test')
-            for ax in g.axes.flat:
-                annot_params = default_params.copy()
-                # annot_params['data'] = annot_params['data'].dropna()
-                annotator = Annotator(ax, stat_pairs, **annot_params)
-                # annotator.configure(test='Mann-Whitney', text_format='star', loc='inside')
-                annotator.configure(test=stat_test, text_format='star', loc='inside')
-                # annotator.apply_test('Brunner-Munzel', nan_policy='omit')
-                annotator.apply_test(nan_policy='raise')
-                annotator.apply_and_annotate()
+            annot_params = default_params.copy()
+            for (i, j, k), df in g.facet_data():
+                ax = g.facet_axis(i, j)
+                match stat_pairs:
+                    case 'all':
+                        items = core.utils._get_groupby_keys(df, [default_params['x'], default_params['hue']])
+                        pairs = core.utils._get_pairwise_combinations(items)
+                    case 'x':
+                        items_x = core.utils._get_groupby_keys(df, default_params['x'])
+                        pairs_x = core.utils._get_pairwise_combinations(items_x)
+                        items_hue = core.utils._get_groupby_keys(df, default_params['hue'])
+                        pairs = [((pair[0], hue_item), (pair[1], hue_item)) 
+                                for hue_item in items_hue 
+                                for pair in pairs_x]
+                        logging.debug(f'pairs: {pairs}')
+                    case 'hue':
+                        items_hue = core.utils._get_groupby_keys(df, default_params['hue'])
+                        pairs_hue = core.utils._get_pairwise_combinations(items_hue)
+                        items_x = core.utils._get_groupby_keys(df, default_params['x'])
+                        pairs = [((x_item, pair[0]), (x_item, pair[1])) 
+                                for x_item in items_x 
+                                for pair in pairs_hue]
+                        logging.debug(f'pairs: {pairs}')
+                    case list():
+                        pairs = stat_pairs
+                    case _:
+                        raise ValueError(f'{stat_pairs} is not supported')
+                    
+                if not pairs:
+                    logging.warning('No pairs found for annotation')
+                    continue
+
+                annot_params['data'] = annot_params['data'].dropna()
+                annotator = Annotator(ax, pairs, verbose=0, **annot_params)
+                annotator.configure(test=stat_test, text_format='star', loc='inside', verbose=1)
+                annotator.apply_test(nan_policy='omit')
+                annotator.annotate()
 
         plt.tight_layout()
         
         return g
-
 
     def plot_matrixplot(self,
                         feature: str, 
@@ -341,3 +377,21 @@ class ExperimentPlotter():
         ch_names = self.channel_names[0] # REVIEW what if the channel names are not the same for all animals?
         plt.xticks(range(n_channels), ch_names, rotation=45, ha='right')
         plt.yticks(range(n_channels), ch_names)
+
+    def _run_kstest(self,
+                    df: pd.DataFrame,
+                    feature: str,
+                    groupby: str | list[str]):
+        """
+        Run a Kolmogorov-Smirnov test for normality on the feature data.
+        """
+        return df.groupby(groupby)[feature].apply(lambda x: stats.kstest(x, cdf='norm', nan_policy='omit'))
+
+    def _run_normaltest(self,
+                        df: pd.DataFrame,
+                        feature: str,
+                        groupby: str | list[str]):
+        """
+        Run a D'Agostino-Pearson normality test on the feature data.
+        """
+        return df.groupby(groupby)[feature].apply(lambda x: stats.normaltest(x, nan_policy='omit'))
