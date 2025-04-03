@@ -8,8 +8,10 @@ from pathlib import Path
 import platform
 import logging
 import copy
+import itertools
 
 import numpy as np
+import pandas as pd
 
 from .. import constants
 
@@ -210,6 +212,19 @@ def get_temp_directory() -> Path:
     Returns the temporary directory.
     """
     return Path(os.environ['TMPDIR'])
+
+
+def _get_groupby_keys(df: pd.DataFrame, groupby: str | list[str]):
+    """
+    Get the unique values of the groupby variable.
+    """
+    return list(df.groupby(groupby).groups.keys())
+
+def _get_pairwise_combinations(x: list):
+    """
+    Get all pairwise combinations of a list.
+    """
+    return list(itertools.combinations(x, 2))
 
 
 class _CustomNamedTemporaryFile:
