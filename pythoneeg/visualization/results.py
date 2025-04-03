@@ -436,7 +436,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         return result_win.groupby(animalcol)[[animalcol, wavetempcol]].head(1).set_index(animalcol)
 
     # NOTE add this info to documentation: False = remove, True = keep. Will need to AND the arrays together to get the final list
-    def get_filter_rms_range(self, df:pd.DataFrame=None, z_range=2, **kwargs):
+    def get_filter_rms_range(self, df:pd.DataFrame=None, z_range=3, **kwargs):
         result = df.copy() if df is not None else self.result.copy()
         z_range = abs(z_range)
         np_rms = np.array(result['rms'].tolist())
