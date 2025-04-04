@@ -427,9 +427,10 @@ class ExperimentPlotter():
         return g
 
     def _plot_qqplot(self, data: pd.DataFrame, feature: str, log: bool=False, **kwargs):
-        x = data[feature].dropna()
+        x = data[feature]
         if log:
             x = np.log(x)
+        x = x[np.isfinite(x)]
         ax = plt.gca()
         pp = sm.ProbPlot(x, fit=True)
         pp.qqplot(line='45', ax=ax)
