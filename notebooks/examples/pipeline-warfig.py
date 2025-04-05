@@ -39,6 +39,8 @@ for animal_id in animal_ids:
         war.filter_all(reject_channels=['RBar'])
     elif animal_id == 'G25':
         war.filter_all(reject_channels=['LAud', 'LHip'])
+    else:
+        war.filter_all()
 
     wars.append(war)
 ep = visualization.ExperimentPlotter(wars)
