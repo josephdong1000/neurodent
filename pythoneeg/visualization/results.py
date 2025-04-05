@@ -364,6 +364,12 @@ class WindowAnalysisResult(AnimalFeatureParser):
     def __str__(self) -> str:
         return self.result.__str__()
 
+    # TODO: read in spike counts/instantaneous firing rate from spike analysis result.
+    # I think I'm assuming that the SARs are in order and total lengths add up to individual WAR segment lengths
+    def read_sars_features(self, sar: core.SpikeAnalysisResult):
+        pass
+
+
     def get_info(self):
         """Returns a formatted string with basic information about the WindowAnalysisResult object"""
         info = []
@@ -429,11 +435,6 @@ class WindowAnalysisResult(AnimalFeatureParser):
         result_win = self.result if df is None else df
         result_win = result_win.filter(features + multiindex + include)
         return result_win.set_index(multiindex)
-
-    # Must output by animal only, unless writing some way to mix inhomogenous spike outputs
-    def get_wavetemp(self, df:pd.DataFrame=None, animalcol="animalday", wavetempcol="wavetemp"):
-        result_win = self.result if df is None else df
-        return result_win.groupby(animalcol)[[animalcol, wavetempcol]].head(1).set_index(animalcol)
 
     # NOTE add this info to documentation: False = remove, True = keep. Will need to AND the arrays together to get the final list
     def get_filter_rms_range(self, df:pd.DataFrame=None, z_range=3, **kwargs):
