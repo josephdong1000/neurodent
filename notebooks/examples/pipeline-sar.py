@@ -23,7 +23,7 @@ core.set_temp_directory('/scr1/users/dongjp')
 cluster_spike = SLURMCluster(
         cores=1,
         processes=1,
-        memory='10GB',
+        memory='20GB',
         walltime='24:00:00',
         interface=None,
         scheduler_options={'interface': 'eth1'},
@@ -49,12 +49,14 @@ for animal_id in animal_ids:
 
     with Client(cluster_spike) as client:
         client.upload_file(str(packageroot / 'pythoneeg.zip'))
-        ao.convert_rowbins_to_rec(multiprocess_mode='dask') # paralleization breaks if not enough memory
-        war = ao.compute_windowed_analysis(['all'], multiprocess_mode='dask')
-        war.save_pickle_and_json(Path(f'/home/dongjp/source-code/PyEEG/notebooks/tests/test-wars-full/{animal_id}').resolve())
+        ao.convert_rowbins_to_rec(multiprocess_mode='dask')
+        sar: list[visualization.SpikeAnalysisResult] = ao.compute_spike_analysis(multiprocess_mode='dask')
+        for s in sar:
+            s.save_fif_and_json(Path(f'/home/dongjp/source-code/PyEEG/notebooks/tests/test-sars-full/{s.animal_day}').resolve(),
+                                overwrite=True)
 
     logging.info(f"\tDone with {animal_id}")
 
 """
-sbatch --mem 50G -c 5 -t 24:00:00 ./notebooks/examples/pipeline-war.sh
+sbatch --mem 100G -c 10 -t 24:00:00 ./notebooks/examples/pipeline-sar.sh
 """
