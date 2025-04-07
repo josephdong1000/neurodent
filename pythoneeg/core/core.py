@@ -47,11 +47,12 @@ class DDFBinaryMetadata:
             self.dt_end = None
             logging.warning("No LastEdit column provided in metadata. dt_end set to None")
 
-        self.channel_to_info = self.metadata_df.loc[:, ["BinColumn", "ProbeInfo"]].set_index('BinColumn').T.to_dict('list')
+        self.channel_to_info = self.metadata_df.loc[:, ["BinColumn", "ProbeInfo"]].set_index('BinColumn')
+        self.channel_to_info = self.channel_to_info.T.to_dict('list')
         self.channel_to_info = {k:v[0] for k,v in self.channel_to_info.items()}
-        self.id_to_info = {k-1:v for k,v in self.channel_to_info.items()}
-        self.entity_to_info = self.metadata_df.loc[:, ["Entity", "ProbeInfo"]].set_index('Entity').T.to_dict('list')
-        self.entity_to_info = {k:v[0] for k,v in self.entity_to_info.items()}
+        # self.id_to_info = {k-1:v for k,v in self.channel_to_info.items()}
+        # self.entity_to_info = self.metadata_df.loc[:, ["Entity", "ProbeInfo"]].set_index('Entity').T.to_dict('list')
+        # self.entity_to_info = {k:v[0] for k,v in self.entity_to_info.items()}
         self.channel_names = list(self.channel_to_info.values())
 
         # TODO read probe geometry information, may be user-defined
