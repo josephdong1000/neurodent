@@ -27,6 +27,7 @@ pipreqs = "*"
 pyarrow = "*"
 mountainsort5 = "*"
 statannotations = "*"
+statsmodels = "*"
 
 [dev-packages]
 snakeviz = "*"
