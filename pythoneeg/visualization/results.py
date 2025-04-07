@@ -366,7 +366,8 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
     # TODO: read in spike counts/instantaneous firing rate from spike analysis result.
     # I think I'm assuming that the SARs are in order and total lengths add up to individual WAR segment lengths
-    def read_sars_features(self, sar: core.SpikeAnalysisResult):
+    def read_sars_features(self, sars: list['SpikeAnalysisResult']):
+        # for sar in sars:
         pass
 
 
