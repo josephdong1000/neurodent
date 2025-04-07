@@ -462,9 +462,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
     def get_filter_high_beta(self, df:pd.DataFrame=None, max_beta=0.25, throw_all=True, **kwargs):
         result = df.copy() if df is not None else self.result.copy()
-        df_cohere = pd.DataFrame(result['psdband'].tolist()) # TODO implement this with psdfrac instead; more clean
-        np_beta = np.array(df_cohere['beta'].tolist())
-        np_allbands = np.array(df_cohere.values.tolist())
+        df_psdband = pd.DataFrame(result['psdband'].tolist()) # REVIEW implement this with psdfrac instead?
+        np_beta = np.array(df_psdband['beta'].tolist())
+        np_allbands = np.array(df_psdband.values.tolist())
         np_allbands = np_allbands.sum(axis=1)
         np_prop = np_beta / np_allbands
 

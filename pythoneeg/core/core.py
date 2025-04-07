@@ -54,8 +54,6 @@ class DDFBinaryMetadata:
         self.entity_to_info = {k:v[0] for k,v in self.entity_to_info.items()}
         self.channel_names = list(self.channel_to_info.values())
 
-        # TODO read probe geometry information, may be user-defined
-
     def __getsinglecolval(self, colname):
         vals = self.metadata_df.loc[:, colname]
         if len(np.unique(vals)) > 1:

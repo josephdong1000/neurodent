@@ -12,8 +12,6 @@ from ... import constants
 
 class AnimalPlotter(viz.AnimalFeatureParser):
 
-    # TODO make experimental UMAP (q-UMAP?) plotter
-
     def __init__(self, war: viz.WindowAnalysisResult) -> None:
         self.window_result = war
         self.genotype = war.genotype
@@ -352,7 +350,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                 case _:
                     raise ValueError(f"Invalid statistic {center_stat}. Pick mean or median")
             psd = np.log10(psd)
-            psd = self._calculate_standard_data(psd, mode=mode, axis=-1) # FIXME what is the appropriate axis to average on here? if any?
+            psd = self._calculate_standard_data(psd, mode=mode, axis=-1)
             freq_mask = np.logical_and((freq_range[0] <= freqs), (freqs <= freq_range[1]))
             freqs = freqs[freq_mask]
             psd = psd[freq_mask, :]
