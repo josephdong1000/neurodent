@@ -38,6 +38,14 @@ BAND_FEATURE = ['psdband', 'psdfrac'] # Coherence is kind of like a band feature
 MATRIX_FEATURE = ['cohere', 'pcorr']
 HIST_FEATURE = ['psd']
 
+LINPLOT_HEIGHT_RATIOS = {'rms' : 1,
+                         'ampvar' : 1,
+                         'psdtotal' : 1,
+                         'psdslope' : 2,
+                         'psdband' : 5,
+                         'psdfrac' : 5,
+                         'nspike' : 1}
+
 FREQ_BANDS = {'delta' : (0.1, 4),
             'theta' : (4, 8),
             'alpha' : (8, 13),

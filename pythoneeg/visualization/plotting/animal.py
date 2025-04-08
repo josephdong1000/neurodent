@@ -106,18 +106,11 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         if channels is None:
             channels = np.arange(self.n_channels)
 
-        height_ratios = {'rms' : 1,
-                         'ampvar' : 1,
-                         'psdtotal' : 1,
-                         'psdslope' : 2,
-                         'psdband' : 5,
-                         'psdfrac' : 5}
-
         # df_featgroups = self.window_result.get_grouped(features, groupby=groupby)
         df_rowgroup = self.window_result.get_grouprows_result(features, multiindex=multiindex)
         for i, df_row in df_rowgroup.groupby(level=0):
             fig, ax = plt.subplots(len(features), 1, figsize=figsize, sharex=True,
-                                   gridspec_kw={'height_ratios' : [height_ratios[x] for x in features]})
+                                   gridspec_kw={'height_ratios' : [constants.LINPLOT_HEIGHT_RATIOS[x] for x in features]})
             plt.subplots_adjust(hspace=0)
 
             for j, feat in enumerate(features):
