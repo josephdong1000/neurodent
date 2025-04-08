@@ -366,9 +366,67 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
     # TODO: read in spike counts/instantaneous firing rate from spike analysis result.
     # I think I'm assuming that the SARs are in order and total lengths add up to individual WAR segment lengths
-    def read_sars_features(self, sars: list['SpikeAnalysisResult']):
-        # for sar in sars:
-        pass
+    def read_sars_spikes(self, sars: list['SpikeAnalysisResult'], inplace=True):
+        spikes_all = []
+        for sar in sars: # for each continuous recording session
+            spikes_channel = []
+            for i, sa in enumerate(sar.result_sas): # for each channel
+                spike_times = []
+                for unit in sa.sorting.get_unit_ids(): # Flatten units
+                    spike_times.extend(sa.sorting.get_unit_spike_train(unit_id=unit).tolist())
+                spike_times = np.array(spike_times) / sa.sorting.get_sampling_frequency()
+                spikes_channel.append(spike_times)
+            spikes_all.append(spikes_channel)
+        
+        # Each groupby animalday is a recording session
+        grouped = self.result.groupby('animalday')
+        animaldays = grouped.groups.keys()
+        logging.debug(f"Animal days: {animaldays}")
+        spike_counts = dict(zip(animaldays, spikes_all))
+        spike_counts = grouped.apply(lambda x: _bin_spike_df(x, spikes_channel=spike_counts[x.name]))
+        spike_counts = spike_counts.explode()
+
+        result = self.result.copy()
+        result['nspikes'] = spike_counts.tolist()
+        if inplace:
+            self.result = result
+        return result
+
+    def read_mnes_spikes(self, raws: list[mne.io.RawArray], inplace=True):
+        spikes_all = []
+        for raw in raws:
+            # each mne is a contiguous recording session
+            events, event_id = mne.events_from_annotations(raw)
+            event_id = {k.item(): v for k, v in event_id.items()}
+            logging.debug(f"Events: {events}")
+            logging.debug(f"Event ID: {event_id}")
+
+            spikes_channel = []
+            for channel in raw.ch_names:
+                if channel not in event_id.keys():
+                    logging.warning(f"Channel {channel} not found in event_id")
+                    spikes_channel.append([])
+                    continue
+                event_id_channel = event_id[channel]
+                spike_times = events[events[:, 2] == event_id_channel, 0]
+                spike_times = spike_times / raw.info['sfreq']
+                spikes_channel.append(spike_times)
+            spikes_all.append(spikes_channel)
+
+        # Each groupby animalday is a recording session
+        grouped = self.result.groupby('animalday')
+        animaldays = grouped.groups.keys()
+        logging.debug(f"Animal days: {animaldays}")
+        spike_counts = dict(zip(animaldays, spikes_all))
+        spike_counts = grouped.apply(lambda x: _bin_spike_df(x, spikes_channel=spike_counts[x.name]))
+        spike_counts = spike_counts.explode()
+
+        result = self.result.copy()
+        result['nspikes'] = spike_counts.tolist()
+        if inplace:
+            self.result = result
+        return result
+
 
 
     def get_info(self):
@@ -629,6 +687,34 @@ class WindowAnalysisResult(AnimalFeatureParser):
             metadata = json.load(f)
         return cls(data, **metadata)
     
+def bin_spike_times(spike_times: list[float], fragment_durations: list[float]) -> list[int]:
+    """Bin spike times into counts based on fragment durations.
+    
+    Args:
+        spike_times (list[float]): List of spike timestamps in seconds
+        fragment_durations (list[float]): List of fragment durations in seconds
+    
+    Returns:
+        list[int]: List of spike counts per fragment
+    """
+    # Convert fragment durations to bin edges
+    bin_edges = np.cumsum([0] + fragment_durations)
+    
+    # Use numpy's histogram function to count spikes in each bin
+    counts, _ = np.histogram(spike_times, bins=bin_edges)
+    
+    return counts.tolist()
+
+def _bin_spike_df(df: pd.DataFrame, spikes_channel: list[list[float]]):
+        """
+        Bins spike times into a matrix of shape (n_windows, n_channels), based on duration of each window in df
+        """
+        durations = df['duration'].tolist()
+        out = np.empty((len(durations), len(spikes_channel)))
+        for i, spike_times in enumerate(spikes_channel):
+            out[:, i] = bin_spike_times(spike_times, durations)
+        return out
+
 
 class SpikeAnalysisResult(AnimalFeatureParser):
     def __init__(self, result_sas: list[si.SortingAnalyzer], 
