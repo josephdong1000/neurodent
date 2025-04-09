@@ -43,7 +43,7 @@ class AnimalFeatureParser:
         colitem = column.iloc[0]
 
         match colname:
-            case 'rms' | 'ampvar' | 'psdtotal' | 'pcorr':
+            case 'rms' | 'ampvar' | 'psdtotal' | 'pcorr' | 'nspike':
                 col_agg = np.stack(column, axis=-1)
             case 'psdslope':
                 col_agg = np.array([*column.tolist()])
