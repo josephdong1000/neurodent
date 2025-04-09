@@ -340,15 +340,16 @@ class ExperimentPlotter():
                         col: str=None,
                         row: str=None,
                         channels: str | list[str]='all', 
-                        collapse_channels: bool=False,
+                        collapse_channels: bool=False, # REVIEW what happens if collapse_channels is true?
                         title: str=None, 
                         cmap: str='RdBu_r', 
-                        figsize: tuple[float, float]=None):
+                        height: float=3, 
+                        aspect: float=1):
         """
         Create a 2D feature plot.
         """
         if feature not in constants.MATRIX_FEATURE:
-            raise ValueError(f'{feature} is not supported for 2D feature plots') # REVIEW
+            raise ValueError(f'{feature} is not supported for 2D feature plots')
 
         if isinstance(groupby, str):
             groupby = [groupby]
@@ -359,8 +360,8 @@ class ExperimentPlotter():
         facet_vars = {
             'col': groupby[0],
             'row': groupby[1] if len(groupby) > 1 else None,
-            'height': 4 if figsize is None else figsize[1], # REVIEW maybe change to height aspect parameters instead
-            'aspect': 1 if figsize is None else figsize[0]/figsize[1]
+            'height': height,
+            'aspect': aspect
         }
         if col is not None:
             facet_vars['col'] = col
@@ -407,6 +408,43 @@ class ExperimentPlotter():
         plt.xticks(range(n_channels), ch_names, rotation=45, ha='right')
         plt.yticks(range(n_channels), ch_names)
 
+    def plot_matrixdiffplot(self,
+                            feature: str,
+                            groupby: str | list[str],
+                            baseline: str | list[str],
+                            col: str=None,
+                            row: str=None,
+                            channels: str | list[str]='all',
+                            collapse_channels: bool=False,
+                            title: str=None,
+                            cmap: str='RdBu_r',
+                            height: float=3,
+                            aspect: float=1):
+        """
+        Create a 2D feature plot of differences between groups. Baseline is subtracted from other groups.
+        """
+        if feature not in constants.MATRIX_FEATURE:
+            raise ValueError(f'{feature} is not supported for 2D feature plots')
+
+        if isinstance(groupby, str):
+            groupby = [groupby]
+
+        if isinstance(baseline, str):
+            baseline = [baseline]
+
+        df = self.pull_timeseries_dataframe(feature, groupby, channels, collapse_channels)
+        
+        # groupby = df.groupby(groupby).groups.keys()
+        baseline_matrix = df.groupby(groupby)[baseline].values
+        logging.debug(f'baseline_matrix: {baseline_matrix}')
+
+        # Create FacetGrid
+        facet_vars = {
+            'col': groupby[0],
+            'row': groupby[1] if len(groupby) > 1 else None,
+            'height': height,
+            'aspect': aspect
+        }
 
     def plot_qqplot(self, feature: str, groupby: str | list[str], col: str=None, row: str=None, log: bool=False,
                     channels: str | list[str]='all', collapse_channels: bool=False, height: float=3, aspect: float=1, **kwargs):
