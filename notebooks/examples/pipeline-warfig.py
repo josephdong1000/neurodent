@@ -47,7 +47,9 @@ ep = visualization.ExperimentPlotter(wars)
 
 catplot_params = {'showfliers': False}
 kinds = ['box', 'bar']
-save_folder = Path('/home/dongjp/Downloads/4-3-25/remake').resolve()
+save_folder = Path('/home/dongjp/Downloads/4-3-25').resolve()
+if not save_folder.exists():
+    save_folder.mkdir(parents=True)
 
 # SECTION CATPLOTS
 
@@ -72,27 +74,39 @@ save_folder = Path('/home/dongjp/Downloads/4-3-25/remake').resolve()
 #                     kind=kind, collapse_channels=True, catplot_params=catplot_params if kind == 'box' else None)
 #     g.savefig(save_folder / f'psdband-genotype-{kind}-True.png', dpi=300)
 
-# SECTION MATRIX PLOTS
+# for feature in constants.MATRIX_FEATURE:
+#     for kind in kinds:
+#         for groupby in [['genotype', 'isday'], 'genotype']:
+#             g = ep.plot_catplot(feature, groupby=groupby, kind=kind, collapse_channels=True, catplot_params=catplot_params if kind == 'box' else None)
+#             g.savefig(save_folder / f'{feature}-{groupby}-{kind}-True.png', dpi=300)
 
-g = ep.plot_heatmap('pcorr', groupby='animal')
-g.savefig(save_folder / 'AAAA every animal pcorr.png', dpi=300)
-g = ep.plot_heatmap('cohere', groupby='animal')
-g.savefig(save_folder / 'AAAA every animal cohere.png', dpi=300)
+# SECTION HEATMAP PLOTS
 
-for feature in constants.MATRIX_FEATURE:
-    for kind in kinds:
-        for groupby in [['genotype', 'isday'], 'genotype']:
-            g = ep.plot_catplot(feature, groupby=groupby, kind=kind, collapse_channels=True, catplot_params=catplot_params if kind == 'box' else None)
-            g.savefig(save_folder / f'{feature}-{groupby}-{kind}-True.png', dpi=300)
+# g = ep.plot_heatmap('pcorr', groupby='animal')
+# g.savefig(save_folder / 'AAAA every animal pcorr.png', dpi=300)
+# g = ep.plot_heatmap('cohere', groupby='animal')
+# g.savefig(save_folder / 'AAAA every animal cohere.png', dpi=300)
 
-g = ep.plot_heatmap('cohere', groupby=['genotype', 'isday'])
+# g = ep.plot_heatmap('cohere', groupby=['genotype', 'isday'])
+# g.savefig(save_folder / 'cohere-genotype-isday-matrix-False.png', dpi=300)
+# g = ep.plot_heatmap('cohere', groupby='genotype', col='band', row='genotype')
+# g.savefig(save_folder / 'cohere-genotype-band-matrix-False.png', dpi=300)
+
+# g = ep.plot_heatmap('pcorr', groupby=['genotype', 'isday'])
+# g.savefig(save_folder / 'pcorr-genotype-isday-matrix-False.png', dpi=300)
+# g = ep.plot_heatmap('pcorr', groupby='genotype')
+# g.savefig(save_folder / 'pcorr-genotype-matrix-False.png', dpi=300)
+
+# SECTION DIFF HEATMAP PLOTS
+
+g = ep.plot_diffheatmap('cohere', groupby=['genotype', 'isday'])
 g.savefig(save_folder / 'cohere-genotype-isday-matrix-False.png', dpi=300)
-g = ep.plot_heatmap('cohere', groupby='genotype', col='band', row='genotype')
+g = ep.plot_diffheatmap('cohere', groupby='genotype', col='band', row='genotype')
 g.savefig(save_folder / 'cohere-genotype-band-matrix-False.png', dpi=300)
 
-g = ep.plot_heatmap('pcorr', groupby=['genotype', 'isday'])
+g = ep.plot_diffheatmap('pcorr', groupby=['genotype', 'isday'])
 g.savefig(save_folder / 'pcorr-genotype-isday-matrix-False.png', dpi=300)
-g = ep.plot_heatmap('pcorr', groupby='genotype')
+g = ep.plot_diffheatmap('pcorr', groupby='genotype')
 g.savefig(save_folder / 'pcorr-genotype-matrix-False.png', dpi=300)
 
 # SECTION QQ PLOTS
