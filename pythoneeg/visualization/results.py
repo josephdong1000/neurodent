@@ -33,7 +33,7 @@ from .. import core
 from ..core import FragmentAnalyzer, get_temp_directory
 
 class AnimalFeatureParser:
-
+    # REVIEW make this a utility function and refactor across codebase
     def _average_feature(self, df:pd.DataFrame, colname:str, weightsname:str|None='duration'):
         column = df[colname]
         if weightsname is None:
