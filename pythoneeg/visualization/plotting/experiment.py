@@ -259,8 +259,6 @@ class ExperimentPlotter():
         # Create boxplot using seaborn
         g = sns.catplot(**default_params)
 
-        # TODO update plot aesthetics with more pretty outline/fill
-
         g.set_xticklabels(rotation=45, ha='right')
         g.set_titles(title)
         
@@ -409,7 +407,7 @@ class ExperimentPlotter():
         plt.xticks(range(n_channels), ch_names, rotation=45, ha='right')
         plt.yticks(range(n_channels), ch_names)
 
-    # TODO implement in the style of matrixplot
+
     def plot_qqplot(self, feature: str, groupby: str | list[str], col: str=None, row: str=None, log: bool=False,
                     channels: str | list[str]='all', collapse_channels: bool=False, height: float=3, aspect: float=1, **kwargs):
         """
