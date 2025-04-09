@@ -146,7 +146,7 @@ class AnimalOrganizer(AnimalFeatureParser):
 
     def compute_windowed_analysis(self, 
                                   features: list[str], 
-                                  exclude: list[str]=[], 
+                                  exclude: list[str]=['nspike'], 
                                   window_s=4, 
                                   multiprocess_mode: Literal['dask', 'serial']='serial', 
                                   **kwargs):
@@ -164,7 +164,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         Returns:
             window_analysis_result: a WindowAnalysisResult object
         """
-        features = core.utils._sanitize_feature_request(features, exclude)
+        features = _sanitize_feature_request(features, exclude)
 
         dataframes = []
         for lrec in self.long_recordings: # Iterate over all long recordings
@@ -330,6 +330,33 @@ class AnimalOrganizer(AnimalFeatureParser):
                 raise AttributeError(f"Invalid function {func}")
         return row
 
+def _sanitize_feature_request(features: list[str], exclude: list[str]=[]):
+    """
+    Sanitizes a list of requested features for WindowAnalysisResult
+
+    Args:
+        features (list[str]): List of features to include. If "all", include all features in constants.FEATURES except for exclude.
+        exclude (list[str], optional): List of features to exclude. Defaults to [].
+
+    Returns:
+        list[str]: Sanitized list of features.
+    """
+    if features == ["all"]:
+        feat = copy.deepcopy(constants.FEATURES)
+    elif not features:
+        raise ValueError("Features cannot be empty")
+    else:
+        if not all(f in constants.FEATURES for f in features):
+            raise ValueError(f"Available features are: {constants.FEATURES}")
+        feat = copy.deepcopy(features)
+    if exclude is not None:
+        for e in exclude:
+            try:
+                feat.remove(e)
+            except ValueError:
+                pass
+    return feat
+
 
 class WindowAnalysisResult(AnimalFeatureParser):
     """
@@ -362,7 +389,67 @@ class WindowAnalysisResult(AnimalFeatureParser):
         print(f"Channel abbreviations: \t{self.channel_abbrevs}")
 
     def __str__(self) -> str:
-        return self.result.__str__()
+        return f"{self.animal_id} {self.genotype} {self.animaldays}"
+
+    def read_sars_spikes(self, sars: list['SpikeAnalysisResult'], read_mode: Literal['sa', 'mne']='sa', inplace=True):
+        match read_mode:
+            case 'sa':
+                spikes_all = []
+                for sar in sars: # for each continuous recording session
+                    spikes_channel = []
+                    for i, sa in enumerate(sar.result_sas): # for each channel
+                        spike_times = []
+                        for unit in sa.sorting.get_unit_ids(): # Flatten units
+                            spike_times.extend(sa.sorting.get_unit_spike_train(unit_id=unit).tolist())
+                        spike_times = np.array(spike_times) / sa.sorting.get_sampling_frequency()
+                        spikes_channel.append(spike_times)
+                    spikes_all.append(spikes_channel)
+                return self._read_from_spikes_all(spikes_all, inplace=inplace)
+            case 'mne':
+                raws = [sar.result_mne for sar in sars]
+                return self.read_mnes_spikes(raws, inplace=inplace)
+            case _:
+                raise ValueError(f"Invalid read_mode: {read_mode}")
+        
+    def read_mnes_spikes(self, raws: list[mne.io.RawArray], inplace=True):
+        spikes_all = []
+        for raw in raws:
+            # each mne is a contiguous recording session
+            events, event_id = mne.events_from_annotations(raw)
+            event_id = {k.item(): v for k, v in event_id.items()}
+            logging.debug(f"Events: {events}")
+            logging.debug(f"Event ID: {event_id}")
+
+            spikes_channel = []
+            for channel in raw.ch_names:
+                if channel not in event_id.keys():
+                    logging.warning(f"Channel {channel} not found in event_id")
+                    spikes_channel.append([])
+                    continue
+                event_id_channel = event_id[channel]
+                spike_times = events[events[:, 2] == event_id_channel, 0]
+                spike_times = spike_times / raw.info['sfreq']
+                spikes_channel.append(spike_times)
+            spikes_all.append(spikes_channel)
+        return self._read_from_spikes_all(spikes_all, inplace=inplace)
+    
+    def _read_from_spikes_all(self, spikes_all: list[list[list[float]]], inplace=True):
+        # Each groupby animalday is a recording session
+        grouped = self.result.groupby('animalday')
+        animaldays = grouped.groups.keys()
+        logging.debug(f"Animal days: {animaldays}")
+        spike_counts = dict(zip(animaldays, spikes_all))
+        spike_counts = grouped.apply(lambda x: _bin_spike_df(x, spikes_channel=spike_counts[x.name]))
+        spike_counts: pd.Series = spike_counts.explode()
+
+        if spike_counts.size != self.result.shape[0]:
+            logging.warning(f"Spike counts size {spike_counts.size} does not match result size {self.result.shape[0]}")
+
+        result = self.result.copy()
+        result['nspike'] = spike_counts.tolist()
+        if inplace:
+            self.result = result
+        return result
 
     def get_info(self):
         """Returns a formatted string with basic information about the WindowAnalysisResult object"""
@@ -386,7 +473,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         Returns:
             result: pd.DataFrame object with features in columns and windows in rows
         """
-        features = core.utils._sanitize_feature_request(features, exclude)
+        features = _sanitize_feature_request(features, exclude)
         if not allow_missing:
             return self.result.loc[:, self._nonfeat_cols + features]
         else:
@@ -405,7 +492,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             grouped_result: result grouped by `groupby` and averaged for each group.
         """
         result_grouped, result_validcols = self.__get_groups(features=features, exclude=exclude, df=df, groupby=groupby)
-        features = core.utils._sanitize_feature_request(features, exclude)
+        features = _sanitize_feature_request(features, exclude)
 
         avg_results = []
         for f in features:
@@ -419,21 +506,16 @@ class WindowAnalysisResult(AnimalFeatureParser):
         return pd.concat(avg_results, axis=1)
 
     def __get_groups(self, features: list[str], exclude: list[str]=[], df: pd.DataFrame = None, groupby="animalday"):
-        features = core.utils._sanitize_feature_request(features, exclude)
+        features = _sanitize_feature_request(features, exclude)
         result_win = self.result if df is None else df
         return result_win.groupby(groupby), result_win.columns
 
     def get_grouprows_result(self, features: list[str], exclude: list[str]=[], df: pd.DataFrame = None,
                             multiindex=["animalday", "animal", "genotype"], include=["duration", "endfile"]):
-        features = core.utils._sanitize_feature_request(features, exclude)
+        features = _sanitize_feature_request(features, exclude)
         result_win = self.result if df is None else df
         result_win = result_win.filter(features + multiindex + include)
         return result_win.set_index(multiindex)
-
-    # Must output by animal only, unless writing some way to mix inhomogenous spike outputs
-    def get_wavetemp(self, df:pd.DataFrame=None, animalcol="animalday", wavetempcol="wavetemp"):
-        result_win = self.result if df is None else df
-        return result_win.groupby(animalcol)[[animalcol, wavetempcol]].head(1).set_index(animalcol)
 
     # NOTE add this info to documentation: False = remove, True = keep. Will need to AND the arrays together to get the final list
     def get_filter_rms_range(self, df:pd.DataFrame=None, z_range=3, **kwargs):
@@ -513,15 +595,17 @@ class WindowAnalysisResult(AnimalFeatureParser):
                                   self.channel_names,
                                   self.assume_from_number)
 
-    # NOTE filter_tfs is a Mfragments x Nchannels numpy array
     def _apply_filter(self, filter_tfs:np.ndarray, verbose=True):
         result = self.result.copy()
-        filter_tfs = np.array(filter_tfs, dtype=bool)
+        filter_tfs = np.array(filter_tfs, dtype=bool) # (M fragments, N channels)
         for feat in constants.FEATURES:
+            if feat not in result.columns:
+                logging.info(f"Skipping {feat} because it is not in result")
+                continue
             if verbose:
                 logging.info(f"Filtering {feat}")
             match feat:
-                case 'rms' | 'ampvar' | 'psdtotal':
+                case 'rms' | 'ampvar' | 'psdtotal' | 'nspike':
                     vals = np.array(result[feat].tolist())
                     vals[~filter_tfs] = np.nan
                     result[feat] = vals.tolist()
@@ -627,6 +711,34 @@ class WindowAnalysisResult(AnimalFeatureParser):
             metadata = json.load(f)
         return cls(data, **metadata)
     
+def bin_spike_times(spike_times: list[float], fragment_durations: list[float]) -> list[int]:
+    """Bin spike times into counts based on fragment durations.
+    
+    Args:
+        spike_times (list[float]): List of spike timestamps in seconds
+        fragment_durations (list[float]): List of fragment durations in seconds
+    
+    Returns:
+        list[int]: List of spike counts per fragment
+    """
+    # Convert fragment durations to bin edges
+    bin_edges = np.cumsum([0] + fragment_durations)
+    
+    # Use numpy's histogram function to count spikes in each bin
+    counts, _ = np.histogram(spike_times, bins=bin_edges)
+    
+    return counts.tolist()
+
+def _bin_spike_df(df: pd.DataFrame, spikes_channel: list[list[float]]) -> np.ndarray:
+        """
+        Bins spike times into a matrix of shape (n_windows, n_channels), based on duration of each window in df
+        """
+        durations = df['duration'].tolist()
+        out = np.empty((len(durations), len(spikes_channel)))
+        for i, spike_times in enumerate(spikes_channel):
+            out[:, i] = bin_spike_times(spike_times, durations)
+        return out
+
 
 class SpikeAnalysisResult(AnimalFeatureParser):
     def __init__(self, result_sas: list[si.SortingAnalyzer], 

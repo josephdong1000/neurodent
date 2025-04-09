@@ -63,22 +63,43 @@ class ExperimentPlotter():
         df_wars = []
         for war in wars:
             # Get all data
-            dftemp = war.get_result(features=features, exclude=exclude, allow_missing=True)
-            df_wars.append(dftemp)
+            try:
+                dftemp = war.get_result(features=features, exclude=exclude, allow_missing=False)
+                df_wars.append(dftemp)
+            except KeyError as e:
+                logging.error(f"Features missing in {war}")
+                raise e
 
         self.df_wars: list[pd.DataFrame] = df_wars
         self.all = pd.concat(df_wars, axis=0, ignore_index=True)
         self.stats = None
 
 
-    def _pull_timeseries_dataframe(self, feature:str, groupby:str | list[str], 
+    def pull_timeseries_dataframe(self, feature:str, groupby:str | list[str], 
                                 channels:str|list[str]='all', 
                                 collapse_channels: bool=False,
                                 average_groupby: bool=False):
         """
         Process feature data for plotting.
-        """
 
+        Parameters
+        ----------
+        feature : str
+            The feature to get.
+        groupby : str or list[str]
+            The variable(s) to group by.
+        channels : str or list[str], optional
+            The channels to get. If 'all', all channels are used.
+        collapse_channels : bool, optional
+            Whether to average the channels to one value.
+        average_groupby : bool, optional
+            Whether to average the groupby variable(s).
+
+        Returns
+        -------
+        df : pd.DataFrame
+            A DataFrame with the feature data.
+        """
         if 'band' in groupby or groupby == 'band':
             raise ValueError("'band' is not supported as a groupby variable. Use 'band' as a col/row/hue/x variable instead.") # REVIEW
 
@@ -102,8 +123,12 @@ class ExperimentPlotter():
             df_war = self.df_wars[i]
             ch_to_idx = self.channel_to_idx[i]
             ch_names = self.channel_names[i]
+
+            if feature not in df_war.columns:
+                raise ValueError(f"'{feature}' feature not found in {war}")
+
             match feature:
-                case 'rms' | 'ampvar' | 'psdtotal' | 'psdslope' | 'psdband' | 'psdfrac':
+                case 'rms' | 'ampvar' | 'psdtotal' | 'psdslope' | 'psdband' | 'psdfrac' | 'nspike':
                     if feature in constants.BAND_FEATURE:
                         df_bands = pd.DataFrame(df_war[feature].tolist())
                         vals = np.array(df_bands.values.tolist())
@@ -199,7 +224,7 @@ class ExperimentPlotter():
         if feature in constants.MATRIX_FEATURE and not collapse_channels:
             raise ValueError("To plot matrix features, collapse_channels must be True")
 
-        df = self._pull_timeseries_dataframe(feature, groupby, channels, collapse_channels, average_groupby)
+        df = self.pull_timeseries_dataframe(feature, groupby, channels, collapse_channels, average_groupby)
         
         if isinstance(groupby, str):
             groupby = [groupby]
@@ -330,7 +355,7 @@ class ExperimentPlotter():
         if isinstance(groupby, str):
             groupby = [groupby]
         
-        df = self._pull_timeseries_dataframe(feature, groupby, channels, collapse_channels)
+        df = self.pull_timeseries_dataframe(feature, groupby, channels, collapse_channels)
         
         # Create FacetGrid
         facet_vars = {
@@ -396,7 +421,7 @@ class ExperimentPlotter():
         if isinstance(groupby, str):
             groupby = [groupby]
 
-        df = self._pull_timeseries_dataframe(feature, groupby, channels, collapse_channels, average_groupby=False)
+        df = self.pull_timeseries_dataframe(feature, groupby, channels, collapse_channels, average_groupby=False)
 
         # Create FacetGrid
         facet_vars = {
