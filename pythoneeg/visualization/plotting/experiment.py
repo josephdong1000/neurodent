@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.colors as colors
 import seaborn as sns
 import pandas as pd
 import logging
@@ -394,9 +395,10 @@ class ExperimentPlotter():
         avg_matrix = np.nanmean(matrices, axis=0)
         
         # Create heatmap
+        # vmax = max(1, np.abs(avg_matrix).max())
         plt.imshow(avg_matrix,
-                   cmap=color_palette, 
-                   vmin=-1, vmax=1)
+                   cmap=color_palette,
+                   norm=colors.CenteredNorm(vcenter=0, halfrange=1))
         plt.colorbar(fraction=0.046, pad=0.04)
         
         # Set ticks and labels
@@ -408,10 +410,11 @@ class ExperimentPlotter():
         plt.xticks(range(n_channels), ch_names, rotation=45, ha='right')
         plt.yticks(range(n_channels), ch_names)
 
+    # STUB working on this
     def plot_matrixdiffplot(self,
                             feature: str,
                             groupby: str | list[str],
-                            baseline: str | list[str],
+                            baseline_key: str | tuple[str, ...],
                             col: str=None,
                             row: str=None,
                             channels: str | list[str]='all',
@@ -429,22 +432,59 @@ class ExperimentPlotter():
         if isinstance(groupby, str):
             groupby = [groupby]
 
-        if isinstance(baseline, str):
-            baseline = [baseline]
+        if isinstance(baseline_key, str):
+            baseline_key = (baseline_key, )
 
         df = self.pull_timeseries_dataframe(feature, groupby, channels, collapse_channels)
         
-        # groupby = df.groupby(groupby).groups.keys()
-        baseline_matrix = df.groupby(groupby)[baseline].values
-        logging.debug(f'baseline_matrix: {baseline_matrix}')
+        gb = df.groupby(groupby)
+        logging.debug(f'Groupby keys: {gb.groups.keys()}')
+        baseline_matrix = gb.get_group(baseline_key)[feature]
+        baseline_matrix = np.array(baseline_matrix.tolist())
+        baseline_matrix = np.nanmean(baseline_matrix, axis=0)
+
+        # Filter out baseline rows
+        df = df.loc[(df[groupby] != baseline_key).all(axis=1)]
+        if df.empty:
+            raise ValueError(f'No rows found for {groupby} != {baseline_key}')
+        # Subtract baseline matrix from feature
+        df.loc[:, feature] = list(np.array(list(df[feature])) - baseline_matrix)
 
         # Create FacetGrid
+        # REVIEW the rest of this is copied from plot_matrixplot, and should be refactored
         facet_vars = {
             'col': groupby[0],
             'row': groupby[1] if len(groupby) > 1 else None,
             'height': height,
             'aspect': aspect
         }
+        if col is not None:
+            facet_vars['col'] = col
+        if row is not None:
+            facet_vars['row'] = row
+        
+        # Check that col and row parameters exist in dataframe columns
+        for param_name in ['col', 'row']:
+            if facet_vars[param_name] == feature:
+                raise ValueError(f"'{param_name}' cannot be the same as 'feature'")
+            if facet_vars[param_name] is not None and facet_vars[param_name] not in df.columns:
+                raise ValueError(f"Parameter '{param_name}={facet_vars[param_name]}' not found in dataframe columns: {df.columns.tolist()}")
+
+        g = sns.FacetGrid(df, **facet_vars)
+
+        # Map the plotting function
+        g.map_dataframe(self._plot_matrix, feature=feature, color_palette=cmap)
+        
+        # STUB implement statistical testing with big N and small N?
+
+        # Add titles
+        if title:
+            g.figure.suptitle(title, y=1.02)
+        
+        # Adjust layout
+        plt.tight_layout()
+        
+        return g
 
     def plot_qqplot(self, feature: str, groupby: str | list[str], col: str=None, row: str=None, log: bool=False,
                     channels: str | list[str]='all', collapse_channels: bool=False, height: float=3, aspect: float=1, **kwargs):
