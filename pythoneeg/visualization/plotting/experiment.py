@@ -437,22 +437,10 @@ class ExperimentPlotter():
             baseline_key = (baseline_key, )
 
         df = self.pull_timeseries_dataframe(feature, groupby, channels, collapse_channels)
-        
-        gb = df.groupby(groupby)
-        logging.debug(f'Groupby keys: {gb.groups.keys()}')
-        baseline_matrix = gb.get_group(baseline_key)[feature]
-        baseline_matrix = np.array(baseline_matrix.tolist())
-        baseline_matrix = np.nanmean(baseline_matrix, axis=0)
+        df = df_subtract_baseline(feature, groupby, baseline_key)
 
-        # Filter out baseline rows
-        df = df.loc[(df[groupby] != baseline_key).all(axis=1)]
-        if df.empty:
-            raise ValueError(f'No rows found for {groupby} != {baseline_key}')
-        # Subtract baseline matrix from feature
-        df.loc[:, feature] = list(np.array(list(df[feature])) - baseline_matrix)
+        return # STUB remove
 
-        # Create FacetGrid
-        # REVIEW the rest of this is copied from plot_heatmap, and should be refactored
         facet_vars = {
             'col': groupby[0],
             'row': groupby[1] if len(groupby) > 1 else None,
@@ -470,7 +458,31 @@ class ExperimentPlotter():
                 raise ValueError(f"'{param_name}' cannot be the same as 'feature'")
             if facet_vars[param_name] is not None and facet_vars[param_name] not in df.columns:
                 raise ValueError(f"Parameter '{param_name}={facet_vars[param_name]}' not found in dataframe columns: {df.columns.tolist()}")
+            
 
+        groupby = [facet_vars['col'], facet_vars['row']]
+        logging.debug(f'Groupby: {groupby}')
+        gb = df.groupby(groupby)
+        logging.debug(f'Groupby keys: {gb.groups.keys()}')
+        try:
+            baseline_matrix = gb.get_group(baseline_key)[feature]
+        except KeyError:
+            raise ValueError(f'Baseline key {baseline_key} not found in groupby keys: {list(gb.groups.keys())}')
+        except ValueError:
+            raise ValueError(f'Baseline key {baseline_key} is not a valid groupby key: {list(gb.groups.keys())}')
+        baseline_matrix = np.array(baseline_matrix.tolist())
+        baseline_matrix = np.nanmean(baseline_matrix, axis=0)
+
+        # Filter out baseline rows
+        df = df.loc[~(df[groupby] == baseline_key).all(axis=1)]
+        if df.empty:
+            raise ValueError(f'No rows found for {groupby} != {baseline_key}')
+        # Subtract baseline matrix from feature
+        df.loc[:, feature] = list(np.array(list(df[feature])) - baseline_matrix)
+
+        
+
+        # Create FacetGrid
         g = sns.FacetGrid(df, **facet_vars)
 
         # Map the plotting function
@@ -556,3 +568,31 @@ class ExperimentPlotter():
         Run a D'Agostino-Pearson normality test on the feature data.
         """
         return df.groupby(groupby)[feature].apply(lambda x: stats.normaltest(x, nan_policy='omit'))
+    
+def df_subtract_baseline(df: pd.DataFrame, feature: str, groupby: str | list[str], baseline_key: str | tuple[str, ...], baseline_groupby: str | list[str]=None):
+    """
+    Subtract the baseline from the feature data.
+    """
+    # Handle input types
+    if isinstance(groupby, str):
+        groupby = [groupby]
+    if isinstance(baseline_groupby, str):
+        baseline_groupby = [baseline_groupby]
+    if isinstance(baseline_key, str):
+        baseline_key = (baseline_key,)
+        
+    # If baseline_groupby not specified, use groupby
+    if baseline_groupby is None:
+        baseline_groupby = groupby
+        
+    # Validate baseline_key length matches baseline_groupby length
+    if len(baseline_key) != len(baseline_groupby):
+        raise ValueError(f"baseline_key length ({len(baseline_key)}) must match "
+                        f"baseline_groupby length ({len(baseline_groupby)})")
+
+    df_base = df.groupby(baseline_groupby, as_index=False).get_group(baseline_key)
+    display(df_base)
+    remaining_groupby = [col for col in groupby if col not in baseline_groupby]
+    logging.debug(f'Remaining groupby: {remaining_groupby}')
+    # if remaining_groupby:
+    #     baseline_means = 
