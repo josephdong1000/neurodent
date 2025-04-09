@@ -7,6 +7,7 @@ from typing import Literal
 
 from scipy import stats
 from statannotations.Annotator import Annotator
+import statsmodels.api as sm
 
 from ... import core
 from ... import visualization as viz
@@ -62,22 +63,43 @@ class ExperimentPlotter():
         df_wars = []
         for war in wars:
             # Get all data
-            dftemp = war.get_result(features=features, exclude=exclude, allow_missing=True)
-            df_wars.append(dftemp)
+            try:
+                dftemp = war.get_result(features=features, exclude=exclude, allow_missing=False)
+                df_wars.append(dftemp)
+            except KeyError as e:
+                logging.error(f"Features missing in {war}")
+                raise e
 
         self.df_wars: list[pd.DataFrame] = df_wars
         self.all = pd.concat(df_wars, axis=0, ignore_index=True)
         self.stats = None
 
 
-    def _pull_timeseries_dataframe(self, feature:str, groupby:str | list[str], 
+    def pull_timeseries_dataframe(self, feature:str, groupby:str | list[str], 
                                 channels:str|list[str]='all', 
                                 collapse_channels: bool=False,
                                 average_groupby: bool=False):
         """
         Process feature data for plotting.
-        """
 
+        Parameters
+        ----------
+        feature : str
+            The feature to get.
+        groupby : str or list[str]
+            The variable(s) to group by.
+        channels : str or list[str], optional
+            The channels to get. If 'all', all channels are used.
+        collapse_channels : bool, optional
+            Whether to average the channels to one value.
+        average_groupby : bool, optional
+            Whether to average the groupby variable(s).
+
+        Returns
+        -------
+        df : pd.DataFrame
+            A DataFrame with the feature data.
+        """
         if 'band' in groupby or groupby == 'band':
             raise ValueError("'band' is not supported as a groupby variable. Use 'band' as a col/row/hue/x variable instead.") # REVIEW
 
@@ -101,8 +123,12 @@ class ExperimentPlotter():
             df_war = self.df_wars[i]
             ch_to_idx = self.channel_to_idx[i]
             ch_names = self.channel_names[i]
+
+            if feature not in df_war.columns:
+                raise ValueError(f"'{feature}' feature not found in {war}")
+
             match feature:
-                case 'rms' | 'ampvar' | 'psdtotal' | 'psdslope' | 'psdband' | 'psdfrac':
+                case 'rms' | 'ampvar' | 'psdtotal' | 'psdslope' | 'psdband' | 'psdfrac' | 'nspike':
                     if feature in constants.BAND_FEATURE:
                         df_bands = pd.DataFrame(df_war[feature].tolist())
                         vals = np.array(df_bands.values.tolist())
@@ -198,7 +224,7 @@ class ExperimentPlotter():
         if feature in constants.MATRIX_FEATURE and not collapse_channels:
             raise ValueError("To plot matrix features, collapse_channels must be True")
 
-        df = self._pull_timeseries_dataframe(feature, groupby, channels, collapse_channels, average_groupby)
+        df = self.pull_timeseries_dataframe(feature, groupby, channels, collapse_channels, average_groupby)
         
         if isinstance(groupby, str):
             groupby = [groupby]
@@ -327,17 +353,15 @@ class ExperimentPlotter():
             raise ValueError(f'{feature} is not supported for 2D feature plots') # REVIEW
 
         if isinstance(groupby, str):
-            groupby = [groupby]  
-        if feature != 'cohere' and ('band' in groupby or 'band' == col or 'band' == row):
-            raise ValueError(f'{feature} does not support band plots') # REVIEW
+            groupby = [groupby]
         
-        df = self._pull_timeseries_dataframe(feature, groupby, channels, collapse_channels)
+        df = self.pull_timeseries_dataframe(feature, groupby, channels, collapse_channels)
         
         # Create FacetGrid
         facet_vars = {
             'col': groupby[0],
             'row': groupby[1] if len(groupby) > 1 else None,
-            'height': 4 if figsize is None else figsize[1],
+            'height': 4 if figsize is None else figsize[1], # REVIEW maybe change to height aspect parameters instead
             'aspect': 1 if figsize is None else figsize[0]/figsize[1]
         }
         if col is not None:
@@ -345,7 +369,7 @@ class ExperimentPlotter():
         if row is not None:
             facet_vars['row'] = row
         
-        # Check that x, col, and hue parameters exist in dataframe columns
+        # Check that col and row parameters exist in dataframe columns
         for param_name in ['col', 'row']:
             if facet_vars[param_name] == feature:
                 raise ValueError(f"'{param_name}' cannot be the same as 'feature'")
@@ -385,12 +409,65 @@ class ExperimentPlotter():
         plt.xticks(range(n_channels), ch_names, rotation=45, ha='right')
         plt.yticks(range(n_channels), ch_names)
 
+    # TODO implement in the style of matrixplot
+    def plot_qqplot(self, feature: str, groupby: str | list[str], col: str=None, row: str=None, log: bool=False,
+                    channels: str | list[str]='all', collapse_channels: bool=False, height: float=3, aspect: float=1, **kwargs):
+        """
+        Create a QQ plot of the feature data.
+        """
+        if feature in constants.MATRIX_FEATURE and not collapse_channels:
+            raise ValueError("To plot matrix features, collapse_channels must be True")
+
+        if isinstance(groupby, str):
+            groupby = [groupby]
+
+        df = self.pull_timeseries_dataframe(feature, groupby, channels, collapse_channels, average_groupby=False)
+
+        # Create FacetGrid
+        facet_vars = {
+            'col': groupby[0],
+            'row': groupby[1] if len(groupby) > 1 else None,
+            'height': height,
+            'aspect': aspect
+        }
+        if col is not None:
+            facet_vars['col'] = col
+        if row is not None:
+            facet_vars['row'] = row
+
+        # Check that col and row parameters exist in dataframe columns
+        for param_name in ['col', 'row']:
+            if facet_vars[param_name] == feature:
+                raise ValueError(f"'{param_name}' cannot be the same as 'feature'")
+            if facet_vars[param_name] is not None and facet_vars[param_name] not in df.columns:
+                raise ValueError(f"Parameter '{param_name}={facet_vars[param_name]}' not found in dataframe columns: {df.columns.tolist()}")
+
+        g = sns.FacetGrid(df, margin_titles=True, **facet_vars)
+        g.map_dataframe(self._plot_qqplot, feature=feature, log=log, **kwargs)
+
+        g.set_titles(row_template="{row_name}", col_template="{col_name}")
+
+        plt.tight_layout()
+
+        return g
+
+    def _plot_qqplot(self, data: pd.DataFrame, feature: str, log: bool=False, **kwargs):
+        x = data[feature]
+        if log:
+            x = np.log(x)
+        x = x[np.isfinite(x)]
+        ax = plt.gca()
+        pp = sm.ProbPlot(x, fit=True)
+        pp.qqplot(line='45', ax=ax)
+
+
     def _run_kstest(self,
                     df: pd.DataFrame,
                     feature: str,
                     groupby: str | list[str]):
         """
         Run a Kolmogorov-Smirnov test for normality on the feature data.
+        This is not recommended as the test is sensitive to large values.
         """
         return df.groupby(groupby)[feature].apply(lambda x: stats.kstest(x, cdf='norm', nan_policy='omit'))
 

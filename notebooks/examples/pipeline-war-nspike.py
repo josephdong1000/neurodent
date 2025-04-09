@@ -20,6 +20,7 @@ from pythoneeg import visualization
 
 core.set_temp_directory('/scr1/users/dongjp')
 
+# SECTION 1: Set up clusters
 cluster_window = SLURMCluster(
         cores=10,
         processes=1,
@@ -30,14 +31,27 @@ cluster_window = SLURMCluster(
         job_extra_directives=['--output=/dev/null',
                              '--error=/dev/null']
     )
-cluster_window.scale(jobs=15)  # Scale to 15 workers
 print(f"\n\n\tcluster_window.dashboard_link: {cluster_window.dashboard_link}\n\n")
+cluster_spike = SLURMCluster(
+        cores=1,
+        memory='10GB',
+        processes=1,
+        walltime='12:00:00',
+        interface=None,
+        scheduler_options={'interface': 'eth1'},
+        job_extra_directives=['--output=/dev/null',
+                             '--error=/dev/null']
+    )
+print(f"\n\n\tcluster_spike.dashboard_link: {cluster_spike.dashboard_link}\n\n")
+cluster_window.scale(jobs=10)  # Scale to 15 workers
+cluster_spike.scale(12)
+cluster_window.wait_for_workers(10)
+cluster_spike.wait_for_workers(12)
 
-cluster_window.wait_for_workers(15)
 
+# SECTION 2: Compute windowed analysis
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.DEBUG, stream=sys.stdout, force=True)
 logger = logging.getLogger()
-
 
 animal_ids = ['A5', 'A10', 'F22', 'G25', 'G26', 'N21', 'N22', 'N23', 'N24', 'N25']
 # animal_ids = ['A5']
@@ -51,10 +65,23 @@ for animal_id in animal_ids:
         client.upload_file(str(packageroot / 'pythoneeg.zip'))
         ao.convert_rowbins_to_rec(multiprocess_mode='dask') # paralleization breaks if not enough memory
         war = ao.compute_windowed_analysis(['all'], multiprocess_mode='dask')
-        war.save_pickle_and_json(Path(f'/home/dongjp/source-code/PyEEG/notebooks/tests/test-wars-full/{animal_id}').resolve())
+
+    with Client(cluster_spike) as client:
+        client.upload_file(str(packageroot / 'pythoneeg.zip'))
+        sars = ao.compute_spike_analysis(multiprocess_mode='dask')
+    for sar in sars:
+        sar.save_fif_and_json(Path(f'/home/dongjp/source-code/PyEEG/notebooks/tests/test-sars-full/{sar.animal_day}').resolve(),
+                                overwrite=True)
+    raws = [sar.convert_to_mne() for sar in sars]
+    war.read_mnes_spikes(raws)
+
+    war.save_pickle_and_json(Path(f'/home/dongjp/source-code/PyEEG/notebooks/tests/test-wars-full/{animal_id}').resolve())
+
 
     logging.info(f"\tDone with {animal_id}")
 
+
+
 """
-sbatch --mem 50G -c 5 -t 24:00:00 ./notebooks/examples/pipeline-war.sh
+sbatch --mem 50G -c 5 -t 24:00:00 ./notebooks/examples/pipeline-war-nspike.sh
 """

@@ -42,7 +42,7 @@ class MountainSortAnalyzer:
         logging.debug(f"Sorting recording channel names: {recording.get_channel_ids()}")
         
         rec = recording.clone()
-        probe = MountainSortAnalyzer._get_dummy_probe(rec) # TODO at some point, we should use a map of probe geometry instead
+        probe = MountainSortAnalyzer._get_dummy_probe(rec)
         rec = rec.set_probe(probe)
 
         if plot_probe:
