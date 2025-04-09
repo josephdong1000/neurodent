@@ -335,7 +335,7 @@ class ExperimentPlotter():
         
         return g
 
-    def plot_matrixplot(self,
+    def plot_heatmap(self,
                         feature: str, 
                         groupby: str | list[str], 
                         col: str=None,
@@ -390,6 +390,7 @@ class ExperimentPlotter():
         
         return g
 
+    # REVIEW this could also be refactored per repeated code in heatmap and diffheatmap
     def _plot_matrix(self, data, feature, color_palette='RdBu_r', **kwargs):
         matrices = np.array(data[feature].tolist())
         avg_matrix = np.nanmean(matrices, axis=0)
@@ -411,7 +412,7 @@ class ExperimentPlotter():
         plt.yticks(range(n_channels), ch_names)
 
     # STUB working on this
-    def plot_matrixdiffplot(self,
+    def plot_diffheatmap(self,
                             feature: str,
                             groupby: str | list[str],
                             baseline_key: str | tuple[str, ...],
@@ -451,7 +452,7 @@ class ExperimentPlotter():
         df.loc[:, feature] = list(np.array(list(df[feature])) - baseline_matrix)
 
         # Create FacetGrid
-        # REVIEW the rest of this is copied from plot_matrixplot, and should be refactored
+        # REVIEW the rest of this is copied from plot_heatmap, and should be refactored
         facet_vars = {
             'col': groupby[0],
             'row': groupby[1] if len(groupby) > 1 else None,
