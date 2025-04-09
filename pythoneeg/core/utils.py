@@ -64,31 +64,6 @@ def nanaverage(A, weights, axis=-1):
     avg = np.ma.average(masked, axis=axis, weights=weights)
     return avg.filled(np.nan)
 
-def _sanitize_feature_request(features: list[str], exclude: list[str]=[]):
-    """
-    Sanitizes a list of requested features.
-
-    Args:
-        features (list[str]): List of features to include. If "all", include all features in constants.FEATURES.
-        exclude (list[str], optional): List of features to exclude. Defaults to [].
-
-    Returns:
-        list[str]: Sanitized list of features.
-    """
-    if features == ["all"]:
-        feat = copy.deepcopy(constants.FEATURES)
-    elif not features:
-        raise ValueError("Features cannot be empty")
-    else:
-        assert all(f in constants.FEATURES for f in features), f"Available features are: {constants.FEATURES}"
-        feat = copy.deepcopy(features)
-    if exclude is not None:
-        for e in exclude:
-            try:
-                feat.remove(e)
-            except ValueError:
-                pass
-    return feat
 
 def parse_path_to_animalday(filepath:str|Path, id_index:int=0, delimiter:str=' ', date_pattern=None):
     """

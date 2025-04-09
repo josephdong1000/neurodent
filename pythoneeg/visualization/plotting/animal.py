@@ -142,7 +142,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         for i in range(n_feat):
             ax.plot(data_T, data_Z[:, :, i], c=f'C{i}', **kwargs)
         match feature:
-            case 'rms' | 'ampvar' | 'psdtotal':
+            case 'rms' | 'ampvar' | 'psdtotal' | 'nspike':
                 ax.set_yticks([ytick_offset], [feature])
             case 'psdslope':
                 ax.set_yticks(ytick_offset, ['psdslope', 'psdintercept'])
@@ -163,7 +163,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
             case 'psdslope':
                 data_X = np.array(group[feature].to_list())
                 data_X[:, :, 0] = -data_X[:, :, 0]
-            case 'rms' | 'ampvar' | 'psdtotal':
+            case 'rms' | 'ampvar' | 'psdtotal' | 'nspike':
                 data_X = np.array(group[feature].to_list())
                 data_X = np.expand_dims(data_X, axis=-1)
             case 'cohere':

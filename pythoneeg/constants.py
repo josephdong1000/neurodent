@@ -32,8 +32,9 @@ DEFAULT_ID_TO_NAME = {9: 'LAud',
                         21: 'RVis',
                         22: 'RAud',}
 
-FEATURES = ['rms', 'ampvar', 'psd', 'psdtotal', 'psdband', 'psdfrac', 'psdslope', 'cohere', 'pcorr']
-LINEAR_FEATURE = ['rms', 'ampvar', 'psdtotal', 'psdslope']
+FEATURES = ['rms', 'ampvar', 'psd', 'psdtotal', 'psdband', 'psdfrac', 'psdslope', 'cohere', 'pcorr', 'nspike']
+WAR_FEATURES = ['rms', 'ampvar', 'psd', 'psdtotal', 'psdband', 'psdfrac', 'psdslope', 'cohere', 'pcorr']
+LINEAR_FEATURE = ['rms', 'ampvar', 'psdtotal', 'psdslope', 'nspike']
 BAND_FEATURE = ['psdband', 'psdfrac'] # Coherence is kind of like a band feature
 MATRIX_FEATURE = ['cohere', 'pcorr']
 HIST_FEATURE = ['psd']
