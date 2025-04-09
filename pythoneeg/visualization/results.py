@@ -417,8 +417,6 @@ class WindowAnalysisResult(AnimalFeatureParser):
             # each mne is a contiguous recording session
             events, event_id = mne.events_from_annotations(raw)
             event_id = {k.item(): v for k, v in event_id.items()}
-            logging.debug(f"Events: {events}")
-            logging.debug(f"Event ID: {event_id}")
 
             spikes_channel = []
             for channel in raw.ch_names:
