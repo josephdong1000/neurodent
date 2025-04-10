@@ -129,7 +129,7 @@ class ExperimentPlotter():
                 raise ValueError(f"'{feature}' feature not found in {war}")
 
             match feature:
-                case 'rms' | 'ampvar' | 'psdtotal' | 'psdslope' | 'psdband' | 'psdfrac' | 'nspike':
+                case _ if feature in constants.LINEAR_FEATURES + constants.BAND_FEATURES:
                     if feature in constants.BAND_FEATURES:
                         df_bands = pd.DataFrame(df_war[feature].tolist())
                         vals = np.array(df_bands.values.tolist())
@@ -145,7 +145,7 @@ class ExperimentPlotter():
                         logging.debug(f'vals.shape: {vals.shape}')
                         vals = {ch: vals[:, ch_to_idx[ch]].tolist() for ch in channels if ch in ch_names}
                     vals = df_war[groupby].to_dict('list') | vals
-
+                    
                 case 'pcorr':
                     vals = np.array(df_war[feature].tolist())
                     if collapse_channels:

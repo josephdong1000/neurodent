@@ -42,13 +42,15 @@ class AnimalFeatureParser:
             weights = df[weightsname]
         colitem = column.iloc[0]
 
-        match colname:
-            case 'rms' | 'ampvar' | 'psdtotal' | 'pcorr' | 'nspike':
+        match colname: # TODO refactor this to use constants
+            case 'rms' | 'ampvar' | 'psdtotal' | 'pcorr' | 'nspike' | \
+                'logrms' | 'logampvar' | 'logpsdtotal' | 'lognspike':
                 col_agg = np.stack(column, axis=-1)
             case 'psdslope':
                 col_agg = np.array([*column.tolist()])
                 col_agg = col_agg.transpose(1, 2, 0)
-            case 'cohere' | 'psdband' | 'psdfrac':
+            case 'cohere' | 'psdband' | 'psdfrac' | \
+                'logpsdband' | 'logpsdfrac':
                 col_agg = {k : np.stack([d[k] for d in column], axis=-1) for k in colitem.keys()}
             case 'psd':
                 col_agg = np.stack([x[1] for x in column], axis=-1)
@@ -146,7 +148,7 @@ class AnimalOrganizer(AnimalFeatureParser):
 
     def compute_windowed_analysis(self, 
                                   features: list[str], 
-                                  exclude: list[str]=['nspike'], 
+                                  exclude: list[str]=['nspike', 'lognspike'], 
                                   window_s=4, 
                                   multiprocess_mode: Literal['dask', 'serial']='serial', 
                                   **kwargs):
@@ -444,7 +446,8 @@ class WindowAnalysisResult(AnimalFeatureParser):
             logging.warning(f"Spike counts size {spike_counts.size} does not match result size {self.result.shape[0]}")
 
         result = self.result.copy()
-        result['nspike'] = spike_counts.tolist()
+        result['nspike'] = spike_counts.tolist() # REVIEW this is a little hardcoded
+        result['lognspike'] = list(core._log_transform(np.stack(result['nspike'].tolist(), axis=0)))
         if inplace:
             self.result = result
         return result
@@ -602,8 +605,8 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 continue
             if verbose:
                 logging.info(f"Filtering {feat}")
-            match feat:
-                case 'rms' | 'ampvar' | 'psdtotal' | 'nspike':
+            match feat: # TODO refactor this to use constants
+                case 'rms' | 'ampvar' | 'psdtotal' | 'nspike' | 'logrms' | 'logampvar' | 'logpsdtotal' | 'lognspike':
                     vals = np.array(result[feat].tolist())
                     vals[~filter_tfs] = np.nan
                     result[feat] = vals.tolist()
@@ -614,7 +617,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     vals[~mask] = np.nan
                     outs = [(c, vals[i, :, :]) for i,c in enumerate(coords)]
                     result[feat] = outs
-                case 'psdband' | 'psdfrac':
+                case 'psdband' | 'psdfrac' | 'logpsdband' | 'logpsdfrac':
                     vals = pd.DataFrame(result[feat].tolist())
                     for colname in vals.columns:
                         v = np.array(vals[colname].tolist())

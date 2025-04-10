@@ -32,8 +32,10 @@ DEFAULT_ID_TO_NAME = {9: 'LAud',
                         21: 'RVis',
                         22: 'RAud',}
 
-LINEAR_FEATURES = ['rms', 'ampvar', 'psdtotal', 'psdslope', 'nspike', 'logrms', 'logampvar', 'logpsdtotal', 'lognspike'] # TODO implement this, and perhaps substitute the match notation across the repo
-BAND_FEATURES = ['psdband', 'psdfrac'] + ['logpsdband', 'logpsdfrac']
+LINEAR_FEATURES = ['rms', 'ampvar', 'psdtotal', 'psdslope', 'nspike'] + \
+                  ['logrms', 'logampvar', 'logpsdtotal', 'lognspike'] # TODO implement this, and perhaps substitute the match notation across the repo
+BAND_FEATURES = ['psdband', 'psdfrac'] + \
+                ['logpsdband', 'logpsdfrac']
 MATRIX_FEATURES = ['cohere', 'pcorr']
 HIST_FEATURES = ['psd']
 FEATURES = LINEAR_FEATURES + BAND_FEATURES + MATRIX_FEATURES + HIST_FEATURES

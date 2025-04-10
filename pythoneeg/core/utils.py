@@ -128,9 +128,9 @@ def parse_path_to_day(filepath:str|Path, date_pattern=None) -> datetime:
         datetime: Day of the binfolder.
     """
     date_pattern = r'(\d{2})\D*(\d{2})\D*(\d{4})' if date_pattern is None else date_pattern
-    match = re.search(date_pattern, Path(filepath).name)
-    if match:
-        month, day, year = match.groups()
+    matches = re.search(date_pattern, Path(filepath).name)
+    if matches:
+        month, day, year = matches.groups()
         month = int(month)
         day = int(day)
         year = int(year)

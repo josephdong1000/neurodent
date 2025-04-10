@@ -204,9 +204,13 @@ class FragmentAnalyzer:
         """
         FragmentAnalyzer._check_rec_np(rec)
 
-        logpsd = FragmentAnalyzer.compute_logpsdband(rec, f_s, welch_bin_t, notch_filter, bands, multitaper, **kwargs)
-        logpsdtotal = FragmentAnalyzer.compute_logpsdtotal(rec, f_s, welch_bin_t, notch_filter, total_band, multitaper, **kwargs)
-        return {k: v / logpsdtotal for k, v in logpsd.items()}
+        # logpsd = FragmentAnalyzer.compute_logpsdband(rec, f_s, welch_bin_t, notch_filter, bands, multitaper, **kwargs)
+        # logpsdtotal = FragmentAnalyzer.compute_logpsdtotal(rec, f_s, welch_bin_t, notch_filter, total_band, multitaper, **kwargs)
+        # return {k: v / logpsdtotal for k, v in logpsd.items()}
+
+        psd_band = FragmentAnalyzer.compute_psdband(rec, f_s, welch_bin_t, notch_filter, bands, multitaper, **kwargs)
+        psd_total = FragmentAnalyzer.compute_psdtotal(rec, f_s, welch_bin_t, notch_filter, total_band, multitaper, **kwargs)
+        return {k: _log_transform(v / psd_total) for k, v in psd_band.items()}
 
     @staticmethod
     def compute_psdslope(rec: np.ndarray,
@@ -323,6 +327,12 @@ class FragmentAnalyzer:
             return result.correlation
         
 def _log_transform(rec: np.ndarray, **kwargs) -> np.ndarray:
-    """Log transform the signal.
+    """Log transform the signal
+
+    Args:
+        rec (np.ndarray): The signal to log transform.
+
+    Returns:
+        np.ndarray: ln(rec + 1)
     """
     return np.log(rec + 1)
