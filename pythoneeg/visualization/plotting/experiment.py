@@ -72,7 +72,7 @@ class ExperimentPlotter():
                 raise e
 
         self.df_wars: list[pd.DataFrame] = df_wars
-        self.all = pd.concat(df_wars, axis=0, ignore_index=True)
+        self.all = pd.concat(df_wars, axis=0, ignore_index=True) # FIXME this raises a warning about df wars having columns that are none I think
         self.stats = None
 
 
@@ -195,10 +195,19 @@ class ExperimentPlotter():
         
         df.reset_index(drop=True, inplace=True)
 
+        def nanmean_series_of_np(x): # REVIEW worth refactoring and reusing across classes? See the below implementation
+            xmean = np.nanmean(np.array(list(x)), axis=0)
+            return xmean
+
         if average_groupby:
             groupby_cols = df.columns.drop(feature).tolist()
             logging.debug(f'groupby_cols: {groupby_cols}')
-            df = df.groupby(groupby_cols).apply(lambda x: x.apply(lambda y: np.nanmean(y))).reset_index()
+            grouped = df.groupby(groupby_cols)
+            df = grouped[feature].apply(nanmean_series_of_np).reset_index()
+
+        # baseline_means = (df_base
+        #                   .groupby(remaining_groupby)[feature]
+        #                   .apply(nanmean_series_of_np))
 
         return df
 
@@ -208,7 +217,7 @@ class ExperimentPlotter():
                     x: str=None,
                     col: str=None,
                     hue: str=None,
-                    kind: Literal['box', 'boxen', 'violin']='box',
+                    kind: Literal['box', 'boxen', 'violin', 'strip', 'swarm', 'bar', 'point']='box',
                     catplot_params: dict=None,
                     channels: str | list[str]='all', 
                     collapse_channels: bool=False,
@@ -342,6 +351,7 @@ class ExperimentPlotter():
                         row: str=None,
                         channels: str | list[str]='all', 
                         collapse_channels: bool=False, # REVIEW what happens if collapse_channels is true?
+                        average_groupby: bool=False,
                         cmap: str='RdBu_r', 
                         height: float=3, 
                         aspect: float=1):
@@ -354,7 +364,7 @@ class ExperimentPlotter():
         if isinstance(groupby, str):
             groupby = [groupby]
         
-        df = self.pull_timeseries_dataframe(feature, groupby, channels, collapse_channels)
+        df = self.pull_timeseries_dataframe(feature, groupby, channels, collapse_channels, average_groupby)
         
         # Create FacetGrid
         facet_vars = {
@@ -417,6 +427,7 @@ class ExperimentPlotter():
                             row: str=None,
                             channels: str | list[str]='all',
                             collapse_channels: bool=False,
+                            average_groupby: bool=False,
                             cmap: str='RdBu_r',
                             height: float=3,
                             aspect: float=1):
@@ -432,7 +443,7 @@ class ExperimentPlotter():
         if isinstance(baseline_key, str):
             baseline_key = (baseline_key, )
 
-        df = self.pull_timeseries_dataframe(feature, groupby, channels, collapse_channels)
+        df = self.pull_timeseries_dataframe(feature, groupby, channels, collapse_channels, average_groupby)
 
         facet_vars = {
             'col': groupby[0],
