@@ -175,7 +175,7 @@ class LongRecordingOrganizer:
         if all(x is None for x in dt_ends):
             raise ValueError("No dates found in any metadata object!")
         
-        self._median_datetime = statistics.median_low(pd.Series(dt_ends).dropna())
+        self._median_datetime = statistics.median_low(pd.Series(dt_ends).dropna()) # REVIEW is this being calculated correctly?
         self._idx_median_datetime = dt_ends.index(self._median_datetime)
 
     def __truncate_lists(self, colbins, rowbins, metas):
@@ -271,7 +271,7 @@ class LongRecordingOrganizer:
             recs.append(rec)
             self.temppaths.append(temppath)
 
-            if i <= self._idx_median_datetime:
+            if i <= self._idx_median_datetime: # REVIEW is this being calculated correctly? 
                 t_to_median += rec.get_duration()
             t_cumulative += rec.get_duration()
             self.end_relative.append(t_cumulative)
