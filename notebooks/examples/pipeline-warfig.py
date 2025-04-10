@@ -47,7 +47,7 @@ ep = visualization.ExperimentPlotter(wars)
 
 catplot_params = {'showfliers': False}
 kinds = ['box', 'bar']
-save_folder = Path('/home/dongjp/Downloads/4-3-25').resolve()
+save_folder = Path('/home/dongjp/Downloads/4-9-25').resolve()
 if not save_folder.exists():
     save_folder.mkdir(parents=True)
 
@@ -99,15 +99,18 @@ if not save_folder.exists():
 
 # SECTION DIFF HEATMAP PLOTS
 
-g = ep.plot_diffheatmap('cohere', groupby=['genotype', 'isday'])
-g.savefig(save_folder / 'cohere-genotype-isday-matrix-False.png', dpi=300)
-g = ep.plot_diffheatmap('cohere', groupby='genotype', col='band', row='genotype')
-g.savefig(save_folder / 'cohere-genotype-band-matrix-False.png', dpi=300)
+for feature in constants.MATRIX_FEATURE:
+    g = ep.plot_diffheatmap(feature, groupby=['genotype', 'isday'], baseline_key=('WT', True))
+    g.savefig(save_folder / f'diff-{feature}-WT-day.png', dpi=300)
+    g = ep.plot_diffheatmap(feature, groupby=['genotype', 'isday'], baseline_key='WT', baseline_groupby='genotype')
+    g.savefig(save_folder / f'diff-{feature}-WT.png', dpi=300)
+    g = ep.plot_diffheatmap(feature, groupby=['genotype', 'isday'], baseline_key=(True,), baseline_groupby='isday')
+    g.savefig(save_folder / f'diff-{feature}-day.png', dpi=300)
 
-g = ep.plot_diffheatmap('pcorr', groupby=['genotype', 'isday'])
-g.savefig(save_folder / 'pcorr-genotype-isday-matrix-False.png', dpi=300)
-g = ep.plot_diffheatmap('pcorr', groupby='genotype')
-g.savefig(save_folder / 'pcorr-genotype-matrix-False.png', dpi=300)
+g = ep.plot_diffheatmap('cohere', groupby=['genotype', 'isday'], baseline_key='WT', baseline_groupby='genotype', col='band', row='isday', remove_baseline=True)
+g.savefig(save_folder / 'diff-band-cohere-WT-day.png', dpi=300)
+g = ep.plot_diffheatmap('cohere', groupby='genotype', baseline_key='WT', baseline_groupby='genotype', col='band', row='genotype', remove_baseline=True)
+g.savefig(save_folder / 'diff-band-cohere-WT.png', dpi=300)
 
 # SECTION QQ PLOTS
 
