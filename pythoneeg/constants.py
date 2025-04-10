@@ -32,11 +32,20 @@ DEFAULT_ID_TO_NAME = {9: 'LAud',
                         21: 'RVis',
                         22: 'RAud',}
 
-FEATURES = ['rms', 'ampvar', 'psd', 'psdtotal', 'psdband', 'psdslope', 'cohere', 'pcorr']
-LINEAR_FEATURE = ['rms', 'ampvar', 'psdtotal', 'psdslope']
-BAND_FEATURE = ['psdband']
+FEATURES = ['rms', 'ampvar', 'psd', 'psdtotal', 'psdband', 'psdfrac', 'psdslope', 'cohere', 'pcorr', 'nspike']
+WAR_FEATURES = ['rms', 'ampvar', 'psd', 'psdtotal', 'psdband', 'psdfrac', 'psdslope', 'cohere', 'pcorr']
+LINEAR_FEATURE = ['rms', 'ampvar', 'psdtotal', 'psdslope', 'nspike']
+BAND_FEATURE = ['psdband', 'psdfrac'] # Coherence is kind of like a band feature
 MATRIX_FEATURE = ['cohere', 'pcorr']
 HIST_FEATURE = ['psd']
+
+LINPLOT_HEIGHT_RATIOS = {'rms' : 1,
+                         'ampvar' : 1,
+                         'psdtotal' : 1,
+                         'psdslope' : 2,
+                         'psdband' : 5,
+                         'psdfrac' : 5,
+                         'nspike' : 1}
 
 FREQ_BANDS = {'delta' : (0.1, 4),
             'theta' : (4, 8),
@@ -46,8 +55,8 @@ FREQ_BANDS = {'delta' : (0.1, 4),
 BAND_NAMES = [k for k,_ in FREQ_BANDS.items()]
 
 FREQ_BAND_TOTAL = (0.1, 50)
-FREQ_MINS = [v[0] for k,v in FREQ_BANDS.items()]
-FREQ_MAXS = [v[1] for k,v in FREQ_BANDS.items()]
+FREQ_MINS = [v[0] for _,v in FREQ_BANDS.items()]
+FREQ_MAXS = [v[1] for _,v in FREQ_BANDS.items()]
 LINE_FREQ = 60
 
 SORTING_PARAMS = {

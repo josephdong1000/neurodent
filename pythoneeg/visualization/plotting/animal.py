@@ -12,8 +12,6 @@ from ... import constants
 
 class AnimalPlotter(viz.AnimalFeatureParser):
 
-    # TODO make experimental UMAP (q-UMAP?) plotter
-
     def __init__(self, war: viz.WindowAnalysisResult) -> None:
         self.window_result = war
         self.genotype = war.genotype
@@ -108,17 +106,11 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         if channels is None:
             channels = np.arange(self.n_channels)
 
-        height_ratios = {'rms' : 1,
-                         'ampvar' : 1,
-                         'psdtotal' : 1,
-                         'psdslope' : 2,
-                         'psdband' : 5}
-
         # df_featgroups = self.window_result.get_grouped(features, groupby=groupby)
         df_rowgroup = self.window_result.get_grouprows_result(features, multiindex=multiindex)
         for i, df_row in df_rowgroup.groupby(level=0):
             fig, ax = plt.subplots(len(features), 1, figsize=figsize, sharex=True,
-                                   gridspec_kw={'height_ratios' : [height_ratios[x] for x in features]})
+                                   gridspec_kw={'height_ratios' : [constants.LINPLOT_HEIGHT_RATIOS[x] for x in features]})
             plt.subplots_adjust(hspace=0)
 
             for j, feat in enumerate(features):
@@ -150,11 +142,11 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         for i in range(n_feat):
             ax.plot(data_T, data_Z[:, :, i], c=f'C{i}', **kwargs)
         match feature:
-            case 'rms' | 'ampvar' | 'psdtotal':
+            case 'rms' | 'ampvar' | 'psdtotal' | 'nspike':
                 ax.set_yticks([ytick_offset], [feature])
             case 'psdslope':
                 ax.set_yticks(ytick_offset, ['psdslope', 'psdintercept'])
-            case 'psdband':
+            case 'psdband' | 'psdfrac':
                 ax.set_yticks(ytick_offset, constants.BAND_NAMES)
             case _:
                 raise ValueError(f"Invalid feature {feature}")
@@ -164,14 +156,14 @@ class AnimalPlotter(viz.AnimalFeatureParser):
 
     def __get_linear_feature(self, group:pd.DataFrame, feature:str, score_type='z', triag=True):
         match feature:
-            case 'psdband':
+            case 'psdband' | 'psdfrac':
                 data_X = np.array([list(d.values()) for d in group[feature]])
                 data_X = np.stack(data_X, axis=-1)
                 data_X = np.transpose(data_X)
             case 'psdslope':
                 data_X = np.array(group[feature].to_list())
                 data_X[:, :, 0] = -data_X[:, :, 0]
-            case 'rms' | 'ampvar' | 'psdtotal':
+            case 'rms' | 'ampvar' | 'psdtotal' | 'nspike':
                 data_X = np.array(group[feature].to_list())
                 data_X = np.expand_dims(data_X, axis=-1)
             case 'cohere':
@@ -351,7 +343,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                 case _:
                     raise ValueError(f"Invalid statistic {center_stat}. Pick mean or median")
             psd = np.log10(psd)
-            psd = self._calculate_standard_data(psd, mode=mode, axis=-1) # FIXME what is the appropriate axis to average on here? if any?
+            psd = self._calculate_standard_data(psd, mode=mode, axis=-1)
             freq_mask = np.logical_and((freq_range[0] <= freqs), (freqs <= freq_range[1]))
             freqs = freqs[freq_mask]
             psd = psd[freq_mask, :]
