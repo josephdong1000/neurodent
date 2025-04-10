@@ -104,3 +104,23 @@ class _HiddenPrints:
         if self.silence:
             sys.stdout.close()
             sys.stdout = self._original_stdout
+
+
+def clean_channel_name(name):
+    # Get the parts after the last '/'
+    if '/' in name:
+        name = name.split('/')[-1]
+    
+    # Split by spaces
+    parts = name.split()
+    
+    # For channels with Ctx at the end (L Aud Ctx, R Vis Ctx)
+    if parts[-1] == 'Ctx' and len(parts) >= 3:
+        return f"{parts[-3]}_{parts[-2]}_{parts[-1]}"
+    
+    # For other channels (L Hipp, R Barrel, etc.)
+    if len(parts) >= 2:
+        return f"{parts[-2]}_{parts[-1]}"
+    
+    # Fallback for anything else
+    return name
