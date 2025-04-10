@@ -342,7 +342,6 @@ class ExperimentPlotter():
                         row: str=None,
                         channels: str | list[str]='all', 
                         collapse_channels: bool=False, # REVIEW what happens if collapse_channels is true?
-                        title: str=None, 
                         cmap: str='RdBu_r', 
                         height: float=3, 
                         aspect: float=1):
@@ -381,10 +380,6 @@ class ExperimentPlotter():
         # Map the plotting function
         g.map_dataframe(self._plot_matrix, feature=feature, color_palette=cmap)
         
-        # Add titles
-        if title:
-            g.figure.suptitle(title, y=1.02)
-        
         # Adjust layout
         plt.tight_layout()
         
@@ -420,7 +415,6 @@ class ExperimentPlotter():
                             row: str=None,
                             channels: str | list[str]='all',
                             collapse_channels: bool=False,
-                            title: str=None,
                             cmap: str='RdBu_r',
                             height: float=3,
                             aspect: float=1):
@@ -488,12 +482,8 @@ class ExperimentPlotter():
         # Map the plotting function
         g.map_dataframe(self._plot_matrix, feature=feature, color_palette=cmap)
         
-        # STUB implement statistical testing with big N and small N?
+        # STUB implement statistical testing with big N and small N
 
-        # Add titles
-        if title:
-            g.figure.suptitle(title, y=1.02)
-        
         # Adjust layout
         plt.tight_layout()
         
