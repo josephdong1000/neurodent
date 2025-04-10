@@ -411,6 +411,8 @@ class ExperimentPlotter():
                             feature: str,
                             groupby: str | list[str],
                             baseline_key: str | tuple[str, ...],
+                            baseline_groupby: str | list[str]=None,
+                            remove_baseline: bool=False,
                             col: str=None,
                             row: str=None,
                             channels: str | list[str]='all',
@@ -431,9 +433,6 @@ class ExperimentPlotter():
             baseline_key = (baseline_key, )
 
         df = self.pull_timeseries_dataframe(feature, groupby, channels, collapse_channels)
-        df = df_subtract_baseline(feature, groupby, baseline_key)
-
-        return # STUB remove
 
         facet_vars = {
             'col': groupby[0],
@@ -453,28 +452,9 @@ class ExperimentPlotter():
             if facet_vars[param_name] is not None and facet_vars[param_name] not in df.columns:
                 raise ValueError(f"Parameter '{param_name}={facet_vars[param_name]}' not found in dataframe columns: {df.columns.tolist()}")
             
-
-        groupby = [facet_vars['col'], facet_vars['row']]
-        logging.debug(f'Groupby: {groupby}')
-        gb = df.groupby(groupby)
-        logging.debug(f'Groupby keys: {gb.groups.keys()}')
-        try:
-            baseline_matrix = gb.get_group(baseline_key)[feature]
-        except KeyError:
-            raise ValueError(f'Baseline key {baseline_key} not found in groupby keys: {list(gb.groups.keys())}')
-        except ValueError:
-            raise ValueError(f'Baseline key {baseline_key} is not a valid groupby key: {list(gb.groups.keys())}')
-        baseline_matrix = np.array(baseline_matrix.tolist())
-        baseline_matrix = np.nanmean(baseline_matrix, axis=0)
-
-        # Filter out baseline rows
-        df = df.loc[~(df[groupby] == baseline_key).all(axis=1)]
-        if df.empty:
-            raise ValueError(f'No rows found for {groupby} != {baseline_key}')
-        # Subtract baseline matrix from feature
-        df.loc[:, feature] = list(np.array(list(df[feature])) - baseline_matrix)
-
-        
+        # Subtract baseline from feature
+        groupby = [x for x in [facet_vars['col'], facet_vars['row']] if x is not None]
+        df = df_subtract_baseline(df, feature, groupby, baseline_key, baseline_groupby, remove_baseline)
 
         # Create FacetGrid
         g = sns.FacetGrid(df, **facet_vars)
