@@ -95,14 +95,14 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         ax[0].set_ylabel(rowname, rotation='horizontal', ha='right')
 
     def __get_groupavg_coherecorr(self, groupby="animalday", **kwargs):
-        avg_result = self.window_result.get_groupavg_result(constants.MATRIX_FEATURE, groupby=groupby)
+        avg_result = self.window_result.get_groupavg_result(constants.MATRIX_FEATURES, groupby=groupby)
         avg_coheresplit = pd.json_normalize(avg_result['cohere']).set_index(avg_result.index) # Split apart the cohere dictionaries
         return avg_coheresplit.join(avg_result)
 
     def plot_linear_temporal(self, multiindex=["animalday", "animal", "genotype"], features:list[str]=None, channels:list[int]=None, figsize=None,
                              score_type='z', show_endfile=False, **kwargs):
         if features is None:
-            features = constants.LINEAR_FEATURE + constants.BAND_FEATURE
+            features = constants.LINEAR_FEATURES + constants.BAND_FEATURES
         if channels is None:
             channels = np.arange(self.n_channels)
 
@@ -225,7 +225,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
     def plot_coherecorr_spectral(self, multiindex=["animalday", "animal", "genotype"], features:list[str]=None, figsize=None, score_type='z', cmap='bwr', triag=True,
                                  show_endfile=False, duration_name='duration', endfile_name='endfile', **kwargs):
         if features is None:
-            features = constants.MATRIX_FEATURE
+            features = constants.MATRIX_FEATURES
         height_ratios = {'cohere' : 5,
                          'pcorr' : 1}
 

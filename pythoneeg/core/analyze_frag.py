@@ -62,6 +62,13 @@ class FragmentAnalyzer:
         out = np.sqrt((rec ** 2).sum(axis=0) / rec.shape[0])
         # del rec
         return out
+    
+    @staticmethod
+    def compute_logrms(rec: np.ndarray, **kwargs) -> np.ndarray:
+        """Compute the log of the root mean square of the signal.
+        """
+        FragmentAnalyzer._check_rec_np(rec)
+        return _log_transform(FragmentAnalyzer.compute_rms(rec, **kwargs))
 
     @staticmethod
     def compute_ampvar(rec: np.ndarray, **kwargs) -> np.ndarray:
@@ -69,6 +76,13 @@ class FragmentAnalyzer:
         """
         FragmentAnalyzer._check_rec_np(rec)
         return np.std(rec, axis=0) ** 2
+
+    @staticmethod
+    def compute_logampvar(rec: np.ndarray, **kwargs) -> np.ndarray:
+        """Compute the log of the amplitude variance of the signal.
+        """
+        FragmentAnalyzer._check_rec_np(rec)
+        return _log_transform(FragmentAnalyzer.compute_ampvar(rec, **kwargs))
 
     @staticmethod
     def compute_psd(rec: np.ndarray,
@@ -115,6 +129,21 @@ class FragmentAnalyzer:
         return {k: simpson(psd[np.logical_and(f >= v[0], f <= v[1]), :], dx=deltaf, axis=0) for k, v in bands.items()}
 
     @staticmethod
+    def compute_logpsdband(rec: np.ndarray,
+                           f_s: float,
+                           welch_bin_t: float=1,
+                           notch_filter: bool=True,
+                           bands: list[tuple[float, float]]=constants.FREQ_BANDS,
+                           multitaper: bool=False,
+                           **kwargs) -> dict[str, np.ndarray]:
+        """Compute the log of the power spectral density of the signal for each frequency band.
+        """
+        FragmentAnalyzer._check_rec_np(rec)
+
+        psd = FragmentAnalyzer.compute_psdband(rec, f_s, welch_bin_t, notch_filter, bands, multitaper, **kwargs)
+        return {k: _log_transform(v) for k, v in psd.items()}
+
+    @staticmethod
     def compute_psdtotal(rec: np.ndarray,
                          f_s: float,
                          welch_bin_t: float=1,
@@ -132,6 +161,20 @@ class FragmentAnalyzer:
         return simpson(psd[np.logical_and(f >= band[0], f <= band[1]), :], dx=deltaf, axis=0)
 
     @staticmethod
+    def compute_logpsdtotal(rec: np.ndarray,
+                            f_s: float,
+                            welch_bin_t: float=1,
+                            notch_filter: bool=True,
+                            band: tuple[float, float]=constants.FREQ_BAND_TOTAL,
+                            multitaper: bool=False,
+                            **kwargs) -> np.ndarray:
+        """Compute the log of the total power spectral density of the signal.
+        """
+        FragmentAnalyzer._check_rec_np(rec)
+
+        return _log_transform(FragmentAnalyzer.compute_psdtotal(rec, f_s, welch_bin_t, notch_filter, band, multitaper, **kwargs))
+    
+    @staticmethod
     def compute_psdfrac(rec: np.ndarray,
                         f_s: float,
                         welch_bin_t: float=1,
@@ -140,13 +183,30 @@ class FragmentAnalyzer:
                         total_band: tuple[float, float]=constants.FREQ_BAND_TOTAL,
                         multitaper: bool=False,
                         **kwargs) -> np.ndarray:
-        """Compute the power spectral density of the signal as a fraction of the total power.
+        """Compute the power spectral density of bands as a fraction of the total power.
         """
         FragmentAnalyzer._check_rec_np(rec)
 
         psd = FragmentAnalyzer.compute_psdband(rec, f_s, welch_bin_t, notch_filter, bands, multitaper, **kwargs)
         psdtotal = FragmentAnalyzer.compute_psdtotal(rec, f_s, welch_bin_t, notch_filter, total_band, multitaper, **kwargs)
         return {k: v / psdtotal for k, v in psd.items()}
+
+    @staticmethod
+    def compute_logpsdfrac(rec: np.ndarray,
+                           f_s: float,
+                           welch_bin_t: float=1,
+                           notch_filter: bool=True,
+                           bands: list[tuple[float, float]]=constants.FREQ_BANDS,
+                           total_band: tuple[float, float]=constants.FREQ_BAND_TOTAL,
+                           multitaper: bool=False,
+                           **kwargs) -> dict[str, np.ndarray]:
+        """Compute the log of the power spectral density of bands as a fraction of the log total power.
+        """
+        FragmentAnalyzer._check_rec_np(rec)
+
+        logpsd = FragmentAnalyzer.compute_logpsdband(rec, f_s, welch_bin_t, notch_filter, bands, multitaper, **kwargs)
+        logpsdtotal = FragmentAnalyzer.compute_logpsdtotal(rec, f_s, welch_bin_t, notch_filter, total_band, multitaper, **kwargs)
+        return {k: v / logpsdtotal for k, v in logpsd.items()}
 
     @staticmethod
     def compute_psdslope(rec: np.ndarray,
@@ -156,7 +216,7 @@ class FragmentAnalyzer:
                          band: tuple[float, float]=constants.FREQ_BAND_TOTAL,
                          multitaper: bool=False,
                          **kwargs) -> np.ndarray:
-        """Compute the slope of the power spectral density of the signal.
+        """Compute the slope of the power spectral density of the signal on a log-log scale.
         """
         FragmentAnalyzer._check_rec_np(rec)
 
@@ -261,3 +321,8 @@ class FragmentAnalyzer:
             return np.tril(result.correlation, k=-1)
         else:
             return result.correlation
+        
+def _log_transform(rec: np.ndarray, **kwargs) -> np.ndarray:
+    """Log transform the signal.
+    """
+    return np.log(rec + 1)

@@ -130,7 +130,7 @@ class ExperimentPlotter():
 
             match feature:
                 case 'rms' | 'ampvar' | 'psdtotal' | 'psdslope' | 'psdband' | 'psdfrac' | 'nspike':
-                    if feature in constants.BAND_FEATURE:
+                    if feature in constants.BAND_FEATURES:
                         df_bands = pd.DataFrame(df_war[feature].tolist())
                         vals = np.array(df_bands.values.tolist())
                         vals = vals.transpose((0, 2, 1))
@@ -188,7 +188,7 @@ class ExperimentPlotter():
         
         if feature == 'psdslope':
             df[feature] = df[feature].apply(lambda x: x[0]) # get slope from [slope, intercept]
-        elif feature in constants.BAND_FEATURE + ['cohere']:
+        elif feature in constants.BAND_FEATURES + ['cohere']:
             df[feature] = df[feature].apply(lambda x: list(zip(x, constants.BAND_NAMES)))
             df = df.explode(feature)
             df[[feature, 'band']] = pd.DataFrame(df[feature].tolist(), index=df.index)
@@ -231,7 +231,7 @@ class ExperimentPlotter():
         """
         Create a boxplot of feature data.
         """
-        if feature in constants.MATRIX_FEATURE and not collapse_channels:
+        if feature in constants.MATRIX_FEATURES and not collapse_channels:
             raise ValueError("To plot matrix features, collapse_channels must be True")
 
         df = self.pull_timeseries_dataframe(feature, groupby, channels, collapse_channels, average_groupby)
@@ -358,7 +358,7 @@ class ExperimentPlotter():
         """
         Create a 2D feature plot.
         """
-        if feature not in constants.MATRIX_FEATURE:
+        if feature not in constants.MATRIX_FEATURES:
             raise ValueError(f'{feature} is not supported for 2D feature plots')
 
         if isinstance(groupby, str):
@@ -434,7 +434,7 @@ class ExperimentPlotter():
         """
         Create a 2D feature plot of differences between groups. Baseline is subtracted from other groups.
         """
-        if feature not in constants.MATRIX_FEATURE:
+        if feature not in constants.MATRIX_FEATURES:
             raise ValueError(f'{feature} is not supported for 2D feature plots')
 
         if isinstance(groupby, str):
@@ -485,7 +485,7 @@ class ExperimentPlotter():
         """
         Create a QQ plot of the feature data.
         """
-        if feature in constants.MATRIX_FEATURE and not collapse_channels:
+        if feature in constants.MATRIX_FEATURES and not collapse_channels:
             raise ValueError("To plot matrix features, collapse_channels must be True")
 
         if isinstance(groupby, str):
