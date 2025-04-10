@@ -80,6 +80,46 @@ if not save_folder.exists():
 #             g = ep.plot_catplot(feature, groupby=groupby, kind=kind, collapse_channels=True, catplot_params=catplot_params if kind == 'box' else None)
 #             g.savefig(save_folder / f'{feature}-{groupby}-{kind}-True.png', dpi=300)
 
+# SECTION CATPLOTS, AVERAGE GROUPBY
+for kind in ['swarm', 'point']:
+    for feature in constants.LINEAR_FEATURE:
+        for collapse in [False, True]:
+            g = ep.plot_catplot(feature, groupby=['animal', 'genotype'], x='genotype', hue='channel', kind=kind, average_groupby=True, collapse_channels=collapse, 
+                                catplot_params={'dodge': (kind == 'swarm' or not collapse), 'col': None, 'errorbar': 'ci'})
+            g.savefig(save_folder / f'{kind}-{feature}-genotype-{"avgch" if collapse else "no avgch"}.png', dpi=300)
+        for collapse in [False, True]:
+            g = ep.plot_catplot(feature, groupby=['animal', 'genotype', 'isday'], x='genotype', col='isday', hue='channel', kind=kind, average_groupby=True, collapse_channels=collapse, 
+                                catplot_params={'dodge': (kind == 'swarm' or not collapse), 'errorbar': 'ci'})
+            g.savefig(save_folder / f'{kind}-{feature}-genotype-isday-{"avgch" if collapse else "no avgch"}.png', dpi=300)
+    
+    for feature in constants.BAND_FEATURE:
+        g = ep.plot_catplot(feature, groupby=['animal', 'genotype'], 
+                            x='genotype',
+                            hue='band',
+                            kind=kind, collapse_channels=True, average_groupby=True, 
+                            catplot_params={'dodge': True, 'col': None, 'errorbar': 'ci'})
+        g.savefig(save_folder / f'{kind}-{feature}-genotype-avgch.png', dpi=300)
+        g = ep.plot_catplot(feature, groupby=['animal', 'genotype', 'isday'], 
+                            x='genotype',
+                            col='isday',
+                            hue='band',
+                            kind=kind, collapse_channels=True, average_groupby=True, 
+                            catplot_params={'dodge': True, 'errorbar': 'ci'})
+        g.savefig(save_folder / f'{kind}-{feature}-genotype-isday-avgch.png', dpi=300)
+
+    g = ep.plot_catplot('cohere', groupby=['animal', 'genotype'], x='genotype', hue='band', kind=kind, collapse_channels=True, average_groupby=True, 
+                        catplot_params={'dodge': True, 'col': None, 'errorbar': 'ci'})
+    g.savefig(save_folder / f'{kind}-cohere-genotype-avgch.png', dpi=300)
+    g = ep.plot_catplot('cohere', groupby=['animal', 'genotype', 'isday'], x='genotype', col='isday', hue='band', kind=kind, collapse_channels=True, average_groupby=True, 
+                        catplot_params={'dodge': True, 'errorbar': 'ci'})
+    g.savefig(save_folder / f'{kind}-cohere-genotype-isday-avgch.png', dpi=300)
+    g = ep.plot_catplot('pcorr', groupby=['animal', 'genotype'], x='genotype', kind=kind, collapse_channels=True, average_groupby=True, 
+                        catplot_params={'dodge': kind == 'swarm', 'col': None, 'errorbar': 'ci'})
+    g.savefig(save_folder / f'{kind}-pcorr-genotype-avgch.png', dpi=300)
+    g = ep.plot_catplot('pcorr', groupby=['animal', 'genotype', 'isday'], x='genotype', col='isday', kind=kind, collapse_channels=True, average_groupby=True, 
+                        catplot_params={'dodge': kind == 'swarm', 'errorbar': 'ci'})
+    g.savefig(save_folder / f'{kind}-pcorr-genotype-isday-avgch.png', dpi=300)
+
 # SECTION HEATMAP PLOTS
 
 # g = ep.plot_heatmap('pcorr', groupby='animal')
@@ -99,18 +139,18 @@ if not save_folder.exists():
 
 # SECTION DIFF HEATMAP PLOTS
 
-for feature in constants.MATRIX_FEATURE:
-    g = ep.plot_diffheatmap(feature, groupby=['genotype', 'isday'], baseline_key=('WT', True))
-    g.savefig(save_folder / f'diff-{feature}-WT-day.png', dpi=300)
-    g = ep.plot_diffheatmap(feature, groupby=['genotype', 'isday'], baseline_key='WT', baseline_groupby='genotype')
-    g.savefig(save_folder / f'diff-{feature}-WT.png', dpi=300)
-    g = ep.plot_diffheatmap(feature, groupby=['genotype', 'isday'], baseline_key=(True,), baseline_groupby='isday')
-    g.savefig(save_folder / f'diff-{feature}-day.png', dpi=300)
+# for feature in constants.MATRIX_FEATURE:
+#     g = ep.plot_diffheatmap(feature, groupby=['genotype', 'isday'], baseline_key=('WT', True))
+#     g.savefig(save_folder / f'diff-{feature}-WT-day.png', dpi=300)
+#     g = ep.plot_diffheatmap(feature, groupby=['genotype', 'isday'], baseline_key='WT', baseline_groupby='genotype')
+#     g.savefig(save_folder / f'diff-{feature}-WT.png', dpi=300)
+#     g = ep.plot_diffheatmap(feature, groupby=['genotype', 'isday'], baseline_key=(True,), baseline_groupby='isday')
+#     g.savefig(save_folder / f'diff-{feature}-day.png', dpi=300)
 
-g = ep.plot_diffheatmap('cohere', groupby=['genotype', 'isday'], baseline_key='WT', baseline_groupby='genotype', col='band', row='isday', remove_baseline=True)
-g.savefig(save_folder / 'diff-band-cohere-WT-day.png', dpi=300)
-g = ep.plot_diffheatmap('cohere', groupby='genotype', baseline_key='WT', baseline_groupby='genotype', col='band', row='genotype', remove_baseline=True)
-g.savefig(save_folder / 'diff-band-cohere-WT.png', dpi=300)
+# g = ep.plot_diffheatmap('cohere', groupby=['genotype', 'isday'], baseline_key='WT', baseline_groupby='genotype', col='band', row='isday', remove_baseline=True)
+# g.savefig(save_folder / 'diff-band-cohere-WT-day.png', dpi=300)
+# g = ep.plot_diffheatmap('cohere', groupby='genotype', baseline_key='WT', baseline_groupby='genotype', col='band', row='genotype', remove_baseline=True)
+# g.savefig(save_folder / 'diff-band-cohere-WT.png', dpi=300)
 
 # SECTION QQ PLOTS
 
