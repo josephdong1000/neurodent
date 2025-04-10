@@ -559,30 +559,56 @@ class ExperimentPlotter():
         """
         return df.groupby(groupby)[feature].apply(lambda x: stats.normaltest(x, nan_policy='omit'))
     
-def df_subtract_baseline(df: pd.DataFrame, feature: str, groupby: str | list[str], baseline_key: str | tuple[str, ...], baseline_groupby: str | list[str]=None):
+def df_subtract_baseline(df: pd.DataFrame, feature: str, groupby: str | list[str], baseline_key: str | tuple[str, ...], baseline_groupby: str | list[str]=None, remove_baseline: bool=False):
     """
     Subtract the baseline from the feature data.
     """
     # Handle input types
     if isinstance(groupby, str):
         groupby = [groupby]
+    if baseline_groupby is None:
+        # If baseline_groupby not specified, use groupby
+        baseline_groupby = groupby
     if isinstance(baseline_groupby, str):
         baseline_groupby = [baseline_groupby]
     if isinstance(baseline_key, str):
         baseline_key = (baseline_key,)
-        
-    # If baseline_groupby not specified, use groupby
-    if baseline_groupby is None:
-        baseline_groupby = groupby
-        
+    remaining_groupby = [col for col in groupby if col not in baseline_groupby]
+    logging.debug(f'Groupby: {groupby}')
+    logging.debug(f'Baseline groupby: {baseline_groupby}')
+    logging.debug(f'Baseline key: {baseline_key}')
+    logging.debug(f'Remaining groupby: {remaining_groupby}')
+    
     # Validate baseline_key length matches baseline_groupby length
     if len(baseline_key) != len(baseline_groupby):
         raise ValueError(f"baseline_key length ({len(baseline_key)}) must match "
                         f"baseline_groupby length ({len(baseline_groupby)})")
 
-    df_base = df.groupby(baseline_groupby, as_index=False).get_group(baseline_key)
-    display(df_base)
-    remaining_groupby = [col for col in groupby if col not in baseline_groupby]
-    logging.debug(f'Remaining groupby: {remaining_groupby}')
-    # if remaining_groupby:
-    #     baseline_means = 
+    try:
+        df_base = df.groupby(baseline_groupby, as_index=False).get_group(baseline_key)
+    except KeyError:
+        raise ValueError(f'Baseline key {baseline_key} not found in groupby keys: {list(df.groupby(baseline_groupby).groups.keys())}')
+
+    def nanmean_series_of_np(x): # REVIEW worth refactoring and reusing across classes?
+        xmean = np.nanmean(np.array(list(x)), axis=0)
+        return xmean
+
+    if remaining_groupby:
+        baseline_means = (df_base
+                          .groupby(remaining_groupby)[feature]
+                          .apply(nanmean_series_of_np))
+        df_merge = df.merge(baseline_means, how='left', on=remaining_groupby, suffixes=('', '_baseline'))
+    else:
+        baseline_means = (df_base
+                          .groupby(baseline_groupby)[feature]
+                          .apply(nanmean_series_of_np)) # Global baseline
+        assert len(baseline_means) == 1
+        df_merge = df.assign(**{f'{feature}_baseline': [baseline_means.iloc[0] for _ in range(len(df))]})
+
+    if remove_baseline:
+        df_merge = df_merge.loc[~(df_merge[baseline_groupby] == baseline_key).all(axis=1)]
+        if df_merge.empty:
+            raise ValueError(f'No rows found for {groupby} != {baseline_key}')
+    df_merge[feature] = df_merge[feature].subtract(df_merge[f'{feature}_baseline'], fill_value=0)
+
+    return df_merge
