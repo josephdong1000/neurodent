@@ -33,7 +33,7 @@ from .. import core
 from ..core import FragmentAnalyzer, get_temp_directory
 
 class AnimalFeatureParser:
-
+    # REVIEW make this a utility function and refactor across codebase
     def _average_feature(self, df:pd.DataFrame, colname:str, weightsname:str|None='duration'):
         column = df[colname]
         if weightsname is None:
@@ -43,7 +43,7 @@ class AnimalFeatureParser:
         colitem = column.iloc[0]
 
         match colname:
-            case 'rms' | 'ampvar' | 'psdtotal' | 'pcorr':
+            case 'rms' | 'ampvar' | 'psdtotal' | 'pcorr' | 'nspike':
                 col_agg = np.stack(column, axis=-1)
             case 'psdslope':
                 col_agg = np.array([*column.tolist()])
@@ -417,8 +417,6 @@ class WindowAnalysisResult(AnimalFeatureParser):
             # each mne is a contiguous recording session
             events, event_id = mne.events_from_annotations(raw)
             event_id = {k.item(): v for k, v in event_id.items()}
-            logging.debug(f"Events: {events}")
-            logging.debug(f"Event ID: {event_id}")
 
             spikes_channel = []
             for channel in raw.ch_names:

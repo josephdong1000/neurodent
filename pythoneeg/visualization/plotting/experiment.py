@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.colors as colors
 import seaborn as sns
 import pandas as pd
 import logging
@@ -259,8 +260,6 @@ class ExperimentPlotter():
         # Create boxplot using seaborn
         g = sns.catplot(**default_params)
 
-        # TODO update plot aesthetics with more pretty outline/fill
-
         g.set_xticklabels(rotation=45, ha='right')
         g.set_titles(title)
         
@@ -336,21 +335,21 @@ class ExperimentPlotter():
         
         return g
 
-    def plot_matrixplot(self,
+    def plot_heatmap(self,
                         feature: str, 
                         groupby: str | list[str], 
                         col: str=None,
                         row: str=None,
                         channels: str | list[str]='all', 
-                        collapse_channels: bool=False,
-                        title: str=None, 
+                        collapse_channels: bool=False, # REVIEW what happens if collapse_channels is true?
                         cmap: str='RdBu_r', 
-                        figsize: tuple[float, float]=None):
+                        height: float=3, 
+                        aspect: float=1):
         """
         Create a 2D feature plot.
         """
         if feature not in constants.MATRIX_FEATURE:
-            raise ValueError(f'{feature} is not supported for 2D feature plots') # REVIEW
+            raise ValueError(f'{feature} is not supported for 2D feature plots')
 
         if isinstance(groupby, str):
             groupby = [groupby]
@@ -361,8 +360,8 @@ class ExperimentPlotter():
         facet_vars = {
             'col': groupby[0],
             'row': groupby[1] if len(groupby) > 1 else None,
-            'height': 4 if figsize is None else figsize[1], # REVIEW maybe change to height aspect parameters instead
-            'aspect': 1 if figsize is None else figsize[0]/figsize[1]
+            'height': height,
+            'aspect': aspect
         }
         if col is not None:
             facet_vars['col'] = col
@@ -381,23 +380,21 @@ class ExperimentPlotter():
         # Map the plotting function
         g.map_dataframe(self._plot_matrix, feature=feature, color_palette=cmap)
         
-        # Add titles
-        if title:
-            g.figure.suptitle(title, y=1.02)
-        
         # Adjust layout
         plt.tight_layout()
         
         return g
 
+    # REVIEW this could also be refactored per repeated code in heatmap and diffheatmap
     def _plot_matrix(self, data, feature, color_palette='RdBu_r', **kwargs):
         matrices = np.array(data[feature].tolist())
         avg_matrix = np.nanmean(matrices, axis=0)
         
         # Create heatmap
+        # vmax = max(1, np.abs(avg_matrix).max())
         plt.imshow(avg_matrix,
-                   cmap=color_palette, 
-                   vmin=-1, vmax=1)
+                   cmap=color_palette,
+                   norm=colors.CenteredNorm(vcenter=0, halfrange=1))
         plt.colorbar(fraction=0.046, pad=0.04)
         
         # Set ticks and labels
@@ -409,7 +406,69 @@ class ExperimentPlotter():
         plt.xticks(range(n_channels), ch_names, rotation=45, ha='right')
         plt.yticks(range(n_channels), ch_names)
 
-    # TODO implement in the style of matrixplot
+    # STUB working on this
+    def plot_diffheatmap(self,
+                            feature: str,
+                            groupby: str | list[str],
+                            baseline_key: str | tuple[str, ...],
+                            baseline_groupby: str | list[str]=None,
+                            remove_baseline: bool=False,
+                            col: str=None,
+                            row: str=None,
+                            channels: str | list[str]='all',
+                            collapse_channels: bool=False,
+                            cmap: str='RdBu_r',
+                            height: float=3,
+                            aspect: float=1):
+        """
+        Create a 2D feature plot of differences between groups. Baseline is subtracted from other groups.
+        """
+        if feature not in constants.MATRIX_FEATURE:
+            raise ValueError(f'{feature} is not supported for 2D feature plots')
+
+        if isinstance(groupby, str):
+            groupby = [groupby]
+
+        if isinstance(baseline_key, str):
+            baseline_key = (baseline_key, )
+
+        df = self.pull_timeseries_dataframe(feature, groupby, channels, collapse_channels)
+
+        facet_vars = {
+            'col': groupby[0],
+            'row': groupby[1] if len(groupby) > 1 else None,
+            'height': height,
+            'aspect': aspect
+        }
+        if col is not None:
+            facet_vars['col'] = col
+        if row is not None:
+            facet_vars['row'] = row
+        
+        # Check that col and row parameters exist in dataframe columns
+        for param_name in ['col', 'row']:
+            if facet_vars[param_name] == feature:
+                raise ValueError(f"'{param_name}' cannot be the same as 'feature'")
+            if facet_vars[param_name] is not None and facet_vars[param_name] not in df.columns:
+                raise ValueError(f"Parameter '{param_name}={facet_vars[param_name]}' not found in dataframe columns: {df.columns.tolist()}")
+            
+        # Subtract baseline from feature
+        groupby = [x for x in [facet_vars['col'], facet_vars['row']] if x is not None]
+        df = df_subtract_baseline(df, feature, groupby, baseline_key, baseline_groupby, remove_baseline)
+
+        # Create FacetGrid
+        g = sns.FacetGrid(df, **facet_vars)
+
+        # Map the plotting function
+        g.map_dataframe(self._plot_matrix, feature=feature, color_palette=cmap)
+        
+        # STUB implement statistical testing with big N and small N
+
+        # Adjust layout
+        plt.tight_layout()
+        
+        return g
+
     def plot_qqplot(self, feature: str, groupby: str | list[str], col: str=None, row: str=None, log: bool=False,
                     channels: str | list[str]='all', collapse_channels: bool=False, height: float=3, aspect: float=1, **kwargs):
         """
@@ -479,3 +538,57 @@ class ExperimentPlotter():
         Run a D'Agostino-Pearson normality test on the feature data.
         """
         return df.groupby(groupby)[feature].apply(lambda x: stats.normaltest(x, nan_policy='omit'))
+    
+def df_subtract_baseline(df: pd.DataFrame, feature: str, groupby: str | list[str], baseline_key: str | tuple[str, ...], baseline_groupby: str | list[str]=None, remove_baseline: bool=False):
+    """
+    Subtract the baseline from the feature data.
+    """
+    # Handle input types
+    if isinstance(groupby, str):
+        groupby = [groupby]
+    if baseline_groupby is None:
+        # If baseline_groupby not specified, use groupby
+        baseline_groupby = groupby
+    if isinstance(baseline_groupby, str):
+        baseline_groupby = [baseline_groupby]
+    if isinstance(baseline_key, str):
+        baseline_key = (baseline_key,)
+    remaining_groupby = [col for col in groupby if col not in baseline_groupby]
+    logging.debug(f'Groupby: {groupby}')
+    logging.debug(f'Baseline groupby: {baseline_groupby}')
+    logging.debug(f'Baseline key: {baseline_key}')
+    logging.debug(f'Remaining groupby: {remaining_groupby}')
+    
+    # Validate baseline_key length matches baseline_groupby length
+    if len(baseline_key) != len(baseline_groupby):
+        raise ValueError(f"baseline_key length ({len(baseline_key)}) must match "
+                        f"baseline_groupby length ({len(baseline_groupby)})")
+
+    try:
+        df_base = df.groupby(baseline_groupby, as_index=False).get_group(baseline_key)
+    except KeyError:
+        raise ValueError(f'Baseline key {baseline_key} not found in groupby keys: {list(df.groupby(baseline_groupby).groups.keys())}')
+
+    def nanmean_series_of_np(x): # REVIEW worth refactoring and reusing across classes?
+        xmean = np.nanmean(np.array(list(x)), axis=0)
+        return xmean
+
+    if remaining_groupby:
+        baseline_means = (df_base
+                          .groupby(remaining_groupby)[feature]
+                          .apply(nanmean_series_of_np))
+        df_merge = df.merge(baseline_means, how='left', on=remaining_groupby, suffixes=('', '_baseline'))
+    else:
+        baseline_means = (df_base
+                          .groupby(baseline_groupby)[feature]
+                          .apply(nanmean_series_of_np)) # Global baseline
+        assert len(baseline_means) == 1
+        df_merge = df.assign(**{f'{feature}_baseline': [baseline_means.iloc[0] for _ in range(len(df))]})
+
+    if remove_baseline:
+        df_merge = df_merge.loc[~(df_merge[baseline_groupby] == baseline_key).all(axis=1)]
+        if df_merge.empty:
+            raise ValueError(f'No rows found for {groupby} != {baseline_key}')
+    df_merge[feature] = df_merge[feature].subtract(df_merge[f'{feature}_baseline'], fill_value=0)
+
+    return df_merge
