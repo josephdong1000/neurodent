@@ -24,7 +24,7 @@ from .utils import (
     nanaverage
 )
 from .analysis import LongRecordingAnalyzer
-from .analyze_frag import FragmentAnalyzer
+from .analyze_frag import FragmentAnalyzer, _log_transform
 from .analyze_sort import MountainSortAnalyzer
 
 __all__ = [
@@ -46,5 +46,6 @@ __all__ = [
     "nanaverage",
     "LongRecordingAnalyzer",
     "MountainSortAnalyzer",
-    "FragmentAnalyzer"
+    "FragmentAnalyzer",
+    "_log_transform"
 ]
