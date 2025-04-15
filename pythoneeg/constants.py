@@ -32,14 +32,16 @@ DEFAULT_ID_TO_NAME = {9: 'LAud',
                         21: 'RVis',
                         22: 'RAud',}
 
-FEATURES = ['rms', 'ampvar', 'psd', 'psdtotal', 'psdband', 'psdfrac', 'psdslope', 'cohere', 'pcorr', 'nspike']
-WAR_FEATURES = ['rms', 'ampvar', 'psd', 'psdtotal', 'psdband', 'psdfrac', 'psdslope', 'cohere', 'pcorr']
-LINEAR_FEATURE = ['rms', 'ampvar', 'psdtotal', 'psdslope', 'nspike']
-BAND_FEATURE = ['psdband', 'psdfrac'] # Coherence is kind of like a band feature
-MATRIX_FEATURE = ['cohere', 'pcorr']
-HIST_FEATURE = ['psd']
+LINEAR_FEATURES = ['rms', 'ampvar', 'psdtotal', 'psdslope', 'nspike'] + \
+                  ['logrms', 'logampvar', 'logpsdtotal', 'lognspike'] # TODO implement this, and perhaps substitute the match notation across the repo
+BAND_FEATURES = ['psdband', 'psdfrac'] + \
+                ['logpsdband', 'logpsdfrac']
+MATRIX_FEATURES = ['cohere', 'pcorr']
+HIST_FEATURES = ['psd']
+FEATURES = LINEAR_FEATURES + BAND_FEATURES + MATRIX_FEATURES + HIST_FEATURES
+WAR_FEATURES = [f for f in FEATURES if 'nspike' not in f]
 
-LINPLOT_HEIGHT_RATIOS = {'rms' : 1,
+LINPLOT_HEIGHT_RATIOS = {'rms' : 1, # REVIEW add in log features?
                          'ampvar' : 1,
                          'psdtotal' : 1,
                          'psdslope' : 2,
