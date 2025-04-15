@@ -82,7 +82,7 @@ if not save_folder.exists():
 
 # SECTION CATPLOTS, AVERAGE GROUPBY
 for kind in ['swarm', 'point']:
-    for feature in constants.LINEAR_FEATURE:
+    for feature in constants.LINEAR_FEATURES:
         for collapse in [False, True]:
             g = ep.plot_catplot(feature, groupby=['animal', 'genotype'], x='genotype', hue='channel', kind=kind, average_groupby=True, collapse_channels=collapse, 
                                 catplot_params={'dodge': (kind == 'swarm' or not collapse), 'col': None, 'errorbar': 'ci'})
@@ -92,7 +92,7 @@ for kind in ['swarm', 'point']:
                                 catplot_params={'dodge': (kind == 'swarm' or not collapse), 'errorbar': 'ci'})
             g.savefig(save_folder / f'{kind}-{feature}-genotype-isday-{"avgch" if collapse else "no avgch"}.png', dpi=300)
     
-    for feature in constants.BAND_FEATURE:
+    for feature in constants.BAND_FEATURES:
         g = ep.plot_catplot(feature, groupby=['animal', 'genotype'], 
                             x='genotype',
                             hue='band',

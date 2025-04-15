@@ -94,6 +94,12 @@ class LongRecordingAnalyzer:
         rec = self.get_fragment_np(index)
         return FragmentAnalyzer.compute_rms(rec=rec, **kwargs)
     
+    def compute_logrms(self, index, **kwargs):
+        """Compute the log of the root mean square amplitude
+        """
+        rec = self.get_fragment_np(index)
+        return FragmentAnalyzer.compute_logrms(rec=rec, **kwargs)
+
     def compute_ampvar(self, index, **kwargs):
         """Compute average amplitude variance
 
@@ -105,6 +111,12 @@ class LongRecordingAnalyzer:
         """
         rec = self.get_fragment_np(index)
         return FragmentAnalyzer.compute_ampvar(rec=rec, **kwargs)
+    
+    def compute_logampvar(self, index, **kwargs):
+        """Compute the log of the amplitude variance
+        """
+        rec = self.get_fragment_np(index)
+        return FragmentAnalyzer.compute_logampvar(rec=rec, **kwargs)
 
     def compute_psd(self, index, welch_bin_t=1, notch_filter=True, multitaper=False, **kwargs):
         """Compute PSD (power spectral density)
@@ -160,6 +172,19 @@ class LongRecordingAnalyzer:
                                                 multitaper=multitaper,
                                                 **kwargs)
 
+    def compute_logpsdband(self, index, welch_bin_t=1, notch_filter=True, bands: list[tuple[float, float]]=constants.FREQ_BANDS, multitaper=False, **kwargs):
+        """Compute the log of the power spectral density of the signal for each frequency band.
+        """
+        rec = self.get_fragment_np(index)
+
+        return FragmentAnalyzer.compute_logpsdband(rec=rec,
+                                                   f_s=self.f_s,
+                                                   welch_bin_t=welch_bin_t,
+                                                   notch_filter=notch_filter,
+                                                   bands=bands,
+                                                   multitaper=multitaper,
+                                                   **kwargs)
+
     def compute_psdtotal(self, index, welch_bin_t=1, notch_filter=True, band: tuple[float, float]=constants.FREQ_BAND_TOTAL, multitaper=False, **kwargs):
         """Compute total power over PSD (power spectral density) plot within a specified frequency band
 
@@ -183,6 +208,19 @@ class LongRecordingAnalyzer:
                                                 multitaper=multitaper,
                                                 **kwargs)
 
+    def compute_logpsdtotal(self, index, welch_bin_t=1, notch_filter=True, band: tuple[float, float]=constants.FREQ_BAND_TOTAL, multitaper=False, **kwargs):
+        """Compute the log of the total power over PSD (power spectral density) plot within a specified frequency band
+        """
+        rec = self.get_fragment_np(index)
+
+        return FragmentAnalyzer.compute_logpsdtotal(rec=rec,
+                                                    f_s=self.f_s,
+                                                    welch_bin_t=welch_bin_t,
+                                                    notch_filter=notch_filter,
+                                                    band=band,
+                                                    multitaper=multitaper,
+                                                    **kwargs)
+
     def compute_psdfrac(self, index, welch_bin_t=1, notch_filter=True, bands: list[tuple[float, float]]=constants.FREQ_BANDS, total_band: tuple[float, float]=constants.FREQ_BAND_TOTAL, multitaper=False, **kwargs):
         """Compute the power spectral density in each band as a fraction of the total power.
         """
@@ -197,6 +235,19 @@ class LongRecordingAnalyzer:
                                                 multitaper=multitaper,
                                                 **kwargs)
 
+    def compute_logpsdfrac(self, index, welch_bin_t=1, notch_filter=True, bands: list[tuple[float, float]]=constants.FREQ_BANDS, total_band: tuple[float, float]=constants.FREQ_BAND_TOTAL, multitaper=False, **kwargs):
+        """Compute the log of the power spectral density in each band as a fraction of the total power.
+        """
+        rec = self.get_fragment_np(index)
+
+        return FragmentAnalyzer.compute_logpsdfrac(rec=rec,
+                                                   f_s=self.f_s,
+                                                   welch_bin_t=welch_bin_t,
+                                                   notch_filter=notch_filter,
+                                                   bands=bands,
+                                                   total_band=total_band,
+                                                   multitaper=multitaper,
+                                                   **kwargs)
 
     def compute_psdslope(self, index, welch_bin_t=1, notch_filter=True, band: tuple[float, float]=constants.FREQ_BAND_TOTAL, multitaper=False, **kwargs):
         """Compute the slope of the power spectral density of the signal.

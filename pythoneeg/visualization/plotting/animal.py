@@ -95,14 +95,14 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         ax[0].set_ylabel(rowname, rotation='horizontal', ha='right')
 
     def __get_groupavg_coherecorr(self, groupby="animalday", **kwargs):
-        avg_result = self.window_result.get_groupavg_result(constants.MATRIX_FEATURE, groupby=groupby)
+        avg_result = self.window_result.get_groupavg_result(constants.MATRIX_FEATURES, groupby=groupby)
         avg_coheresplit = pd.json_normalize(avg_result['cohere']).set_index(avg_result.index) # Split apart the cohere dictionaries
         return avg_coheresplit.join(avg_result)
 
     def plot_linear_temporal(self, multiindex=["animalday", "animal", "genotype"], features:list[str]=None, channels:list[int]=None, figsize=None,
                              score_type='z', show_endfile=False, **kwargs):
         if features is None:
-            features = constants.LINEAR_FEATURE + constants.BAND_FEATURE
+            features = constants.LINEAR_FEATURES + constants.BAND_FEATURES
         if channels is None:
             channels = np.arange(self.n_channels)
 
@@ -141,12 +141,12 @@ class AnimalPlotter(viz.AnimalFeatureParser):
 
         for i in range(n_feat):
             ax.plot(data_T, data_Z[:, :, i], c=f'C{i}', **kwargs)
-        match feature:
-            case 'rms' | 'ampvar' | 'psdtotal' | 'nspike':
+        match feature: # TODO refactor this to use constants
+            case 'rms' | 'ampvar' | 'psdtotal' | 'nspike' | 'logrms' | 'logampvar' | 'logpsdtotal' | 'lognspike':
                 ax.set_yticks([ytick_offset], [feature])
             case 'psdslope':
                 ax.set_yticks(ytick_offset, ['psdslope', 'psdintercept'])
-            case 'psdband' | 'psdfrac':
+            case 'psdband' | 'psdfrac' | 'logpsdband' | 'logpsdfrac':
                 ax.set_yticks(ytick_offset, constants.BAND_NAMES)
             case _:
                 raise ValueError(f"Invalid feature {feature}")
@@ -155,17 +155,17 @@ class AnimalPlotter(viz.AnimalFeatureParser):
             self._plot_filediv_lines(group=group, ax=ax, duration_name=duration_name, endfile_name=endfile_name)
 
     def __get_linear_feature(self, group:pd.DataFrame, feature:str, score_type='z', triag=True):
-        match feature:
-            case 'psdband' | 'psdfrac':
+        match feature: # TODO refactor this to use constants
+            case 'rms' | 'ampvar' | 'psdtotal' | 'nspike' | 'logrms' | 'logampvar' | 'logpsdtotal' | 'lognspike':
+                data_X = np.array(group[feature].to_list())
+                data_X = np.expand_dims(data_X, axis=-1)
+            case 'psdband' | 'psdfrac' | 'logpsdband' | 'logpsdfrac':
                 data_X = np.array([list(d.values()) for d in group[feature]])
                 data_X = np.stack(data_X, axis=-1)
                 data_X = np.transpose(data_X)
             case 'psdslope':
                 data_X = np.array(group[feature].to_list())
                 data_X[:, :, 0] = -data_X[:, :, 0]
-            case 'rms' | 'ampvar' | 'psdtotal' | 'nspike':
-                data_X = np.array(group[feature].to_list())
-                data_X = np.expand_dims(data_X, axis=-1)
             case 'cohere':
                 data_X = np.array([list(d.values()) for d in group[feature]])
                 data_X = np.stack(data_X, axis=-1)
@@ -225,7 +225,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
     def plot_coherecorr_spectral(self, multiindex=["animalday", "animal", "genotype"], features:list[str]=None, figsize=None, score_type='z', cmap='bwr', triag=True,
                                  show_endfile=False, duration_name='duration', endfile_name='endfile', **kwargs):
         if features is None:
-            features = constants.MATRIX_FEATURE
+            features = constants.MATRIX_FEATURES
         height_ratios = {'cohere' : 5,
                          'pcorr' : 1}
 
