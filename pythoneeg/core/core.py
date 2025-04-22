@@ -30,9 +30,9 @@ class DDFBinaryMetadata:
     def __init__(self, metadata_path, verbose=False) -> None:
         self.metadata_path = metadata_path
         self.metadata_df = pd.read_csv(metadata_path)
+        if self.metadata_df.empty:
+            raise ValueError(f"Metadata file is empty: {metadata_path}")
         self.verbose = verbose
-        if verbose > 0:
-            print(self.metadata_df)
 
         self.n_channels = len(self.metadata_df.index)
         self.f_s = self.__getsinglecolval("SampleRate")
@@ -100,14 +100,22 @@ def convert_ddfrowbin_to_si(bin_rowmajor_path, metadata, verbose=False):
     # Read either .npy.gz files or .bin files into the recording object
     if ".npy.gz" in str(bin_rowmajor_path):
         temppath = os.path.join(get_temp_directory(), os.urandom(24).hex())
-        if verbose:
-            print(f"Opening tempfile {temppath}")
-        with open(temppath, "wb") as tmp:
-            fcomp = gzip.GzipFile(bin_rowmajor_path, "r")
-            bin_rowmajor_decomp = np.load(fcomp)
-            bin_rowmajor_decomp.tofile(tmp)
+        try:
+            with open(temppath, "wb") as tmp:
+                try:
+                    fcomp = gzip.GzipFile(bin_rowmajor_path, "r")
+                    bin_rowmajor_decomp = np.load(fcomp)
+                    bin_rowmajor_decomp.tofile(tmp)
+                except (EOFError, OSError) as e:
+                    logging.error(f"Failed to read .npy.gz file: {bin_rowmajor_path}. Try regenerating row-major files.")
+                    raise
 
             rec = se.read_binary(tmp.name, **params)
+        except Exception as e:
+            # Clean up temp file if it exists
+            if os.path.exists(temppath):
+                os.remove(temppath)
+            raise e
     else:
         rec = se.read_binary(bin_rowmajor_path, **params)
         temppath = None
@@ -123,6 +131,7 @@ class LongRecordingOrganizer:
                  colbin_folder_path=None,
                  rowbin_folder_path=None,
                  metadata_path=None,
+                 make_folders=False,
                  truncate: Union[bool, int]=False,
                  verbose: bool=False) -> None:
         """Construct a long recording from binary files.
@@ -155,12 +164,15 @@ class LongRecordingOrganizer:
         self.verbose = verbose
 
         self.colbin_folder_path = self.base_folder_path if colbin_folder_path is None else Path(colbin_folder_path)
-        os.makedirs(self.colbin_folder_path, exist_ok=True)
+        if make_folders:
+            os.makedirs(self.colbin_folder_path, exist_ok=True)
         self.rowbin_folder_path = self.colbin_folder_path if rowbin_folder_path is None else Path(rowbin_folder_path)
-        os.makedirs(self.rowbin_folder_path, exist_ok=True)
+        if make_folders:
+            os.makedirs(self.rowbin_folder_path, exist_ok=True)
 
         self.__update_colbins_rowbins_metas()
-        self.__check_colbin_rowbin_metas_not_empty()
+        self.__check_colbins_rowbins_metas_folders_exist()
+        self.__check_colbins_rowbins_metas_not_empty()
 
         if metadata_path is not None:
             self.meta = DDFBinaryMetadata(metadata_path)
@@ -217,12 +229,19 @@ class LongRecordingOrganizer:
         if self.truncate:
             self.colbins, self.rowbins, self.metas = self.__truncate_lists(self.colbins, self.rowbins, self.metas)
         
+    def __check_colbins_rowbins_metas_folders_exist(self):
+        if not self.colbin_folder_path.exists():
+            raise FileNotFoundError(f"Column-major binary files folder not found: {self.colbin_folder_path}")
+        if not self.rowbin_folder_path.exists():
+            logging.warning(f"Row-major binary files folder not found: {self.rowbin_folder_path}")
+        if not self.metas:
+            raise FileNotFoundError(f"Metadata files folder not found: {self.metas}")
 
-    def __check_colbin_rowbin_metas_not_empty(self):
+    def __check_colbins_rowbins_metas_not_empty(self):
         if not self.colbins:
             raise ValueError("No column-major binary files found")
         if not self.rowbins:
-            logging.warning("No row-major binary files found")
+            warnings.warn("No row-major binary files found. Convert with convert_colbins_to_rowbins()")
         if not self.metas:
             raise ValueError("No metadata files found")
 
@@ -231,22 +250,62 @@ class LongRecordingOrganizer:
         attributes = ['f_s', 'n_channels', 'precision', 'V_units', 'channel_names']
         for attr in attributes:
             if not all([getattr(meta0, attr) == getattr(x, attr) for x in metadatas]):
+                unequal_values = [getattr(x, attr) for x in metadatas if getattr(x, attr) != getattr(meta0, attr)]
+                logging.error(f"Inconsistent {attr} values across metadata files: {getattr(meta0, attr)} != {unequal_values}")
                 raise ValueError(f"Metadata files inconsistent at attribute {attr}")
         return
 
-    def convert_colbins_to_rowbins(self, overwrite=True):
-        if not overwrite and self.rowbins:
-            logging.warning("Row-major binary files already exist! Skipping existing files")
-            # else:
-            #     raise FileExistsError("Row-major binary files already exist! overwrite=False")
+    def convert_colbins_to_rowbins(self, overwrite=False, multiprocess_mode: Literal['dask', 'serial']='serial'):
+        """
+        Convert column-major binary files to row-major binary files, and save them in the rowbin_folder_path.
+
+        Args:
+            overwrite (bool, optional): If True, overwrite existing row-major binary files. Defaults to True.
+            multiprocess_mode (Literal['dask', 'serial'], optional): If 'dask', use dask to convert the files in parallel.
+                If 'serial', convert the files in serial. Defaults to 'serial'.
+        """
+        
+        # if overwrite, regenerate regardless of existence
+        # else, read them (they exist) or make them (they don't exist)
+        # there is no error condition, and rowbins will be recreated regardless of choice
+
+        logging.info(f"Converting {len(self.colbins)} column-major binary files to row-major format")
+        if overwrite:
+            logging.info("Overwrite flag set - regenerating all row-major files")
+        else:
+            logging.info("Overwrite flag not set - only generating missing row-major files")
+
+        delayed = []
         for i, e in enumerate(self.colbins):
             if convert_colpath_to_rowpath(self.rowbin_folder_path, e, aspath=False) not in self.rowbins or overwrite:
-                if self.verbose:
-                    print(f"Converting {e}")
-                convert_ddfcolbin_to_ddfrowbin(self.rowbin_folder_path, e, self.meta)
+                logging.info(f"Converting {e}")
+                match multiprocess_mode:
+                    case 'dask':
+                        delayed.append(dask.delayed(convert_ddfcolbin_to_ddfrowbin)(self.rowbin_folder_path, e, self.meta, save_gzip=True))
+                    case 'serial':
+                        convert_ddfcolbin_to_ddfrowbin(self.rowbin_folder_path, e, self.meta, save_gzip=True)
+                    case _:
+                        raise ValueError(f"Invalid multiprocess_mode: {multiprocess_mode}")
+
+        if multiprocess_mode == 'dask':
+            # Run all conversions in parallel
+            dask.compute(*delayed)
+
         self.__update_colbins_rowbins_metas()
 
     def convert_rowbins_to_rec(self, multiprocess_mode: Literal['dask', 'serial']='serial'):
+        """
+        Convert row-major binary files to SpikeInterface Recording structure.
+
+        Args:
+            multiprocess_mode (Literal['dask', 'serial'], optional): If 'dask', use dask to convert the files in parallel.
+                If 'serial', convert the files in serial. Defaults to 'serial'.
+        """
+        if len(self.rowbins) < len(self.colbins):
+            warnings.warn(f"{len(self.colbins)} column-major files found, but only {len(self.rowbins)} row-major files found. Some column-major files may be missing.")
+        elif len(self.rowbins) > len(self.colbins):
+            warnings.warn(f"{len(self.rowbins)} row-major files found, but only {len(self.colbins)} column-major files found. Some row-major files will be ignored.")
+
         recs = []
         self.end_relative = []
         t_to_median = 0
@@ -275,7 +334,12 @@ class LongRecordingOrganizer:
                 t_to_median += rec.get_duration()
             t_cumulative += rec.get_duration()
             self.end_relative.append(t_cumulative)
-        self.LongRecording = si.concatenate_recordings(recs).rename_channels(self.channel_names)
+
+        if not recs:
+            raise ValueError("No recordings generated. Check that all row-major files are present and readable.")
+        elif len(recs) < len(self.rowbins):
+            logging.warning(f"Only {len(recs)} recordings generated. Some row-major files may be missing.")
+        self.LongRecording: si.BaseRecording = si.concatenate_recordings(recs).rename_channels(self.channel_names)
         self.start_datetime = self._median_datetime - timedelta(seconds=t_to_median)
 
     def cleanup_rec(self):
@@ -315,3 +379,5 @@ class LongRecordingOrganizer:
         endidx = min(frag_len_idx * (fragment_idx + 1), self.LongRecording.get_num_frames())
         return startidx, endidx
 
+
+# %%

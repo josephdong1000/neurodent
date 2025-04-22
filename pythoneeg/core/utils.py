@@ -4,11 +4,15 @@ import sys
 import tempfile
 import re
 from datetime import datetime
+import dateutil.parser
+from dateutil.parser import ParserError
 from pathlib import Path
 import platform
 import logging
 import copy
 import itertools
+from typing import Literal
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -65,78 +69,142 @@ def nanaverage(A, weights, axis=-1):
     return avg.filled(np.nan)
 
 
-def parse_path_to_animalday(filepath:str|Path, id_index:int=0, delimiter:str=' ', date_pattern=None):
+def parse_path_to_animalday(filepath:str|Path, 
+                            animal_param:tuple[int, str]|str|list[str] = (0, None),
+                            day_sep:str|None = None,
+                            mode:Literal['nest', 'concat', 'base', 'noday']='concat'): # TODO implement this
     """
     Parses the filename of a binfolder to get the animalday identifier (animal id, genotype, and day).
 
     Args:
         filepath (str | Path): Filepath of the binfolder.
-        id_index (int, optional): Index of the animal id in the filename. Defaults to 0, i.e. the first element in the filename.
-        delimiter (str, optional): Delimiter in the filename. Defaults to ' '.
-        date_pattern (str, optional): Date pattern in the filename. If None, the date pattern is assumed to be "MM DD YYYY".
-
+        animal_param (tuple[int, str] | str | list[str], optional): Parameter specifying how to parse the animal ID:
+            tuple[int, str]: (index, separator) for simple split and index
+            str: regex pattern to extract ID
+            list[str]: list of possible animal IDs to match against
+        day_sep (str, optional): Separator for day in filename. Defaults to None.
+        mode (Literal['nest', 'concat', 'base', 'noday'], optional): Mode to parse the filename. Defaults to 'concat'.
     Returns:
-        str: Animal day in the format "animal-id genotype day".
+        dict[str, str]: Dictionary with keys "animal", "genotype", "day", and "animalday" (concatenated).
     """
-    # not tested if this handles alternative __readmodes yet
-    geno = parse_path_to_genotype(filepath)
+    filepath = Path(filepath)
+    match mode:
+        case 'nest':
+            geno = parse_str_to_genotype(filepath.parent.name)
+            animid = parse_str_to_animal(filepath.parent.name, animal_param=animal_param)
+            day = parse_str_to_day(filepath.name, sep=day_sep).strftime("%b-%d-%Y")
+        case 'concat' | 'base':
+            geno = parse_str_to_genotype(filepath.name)
+            animid = parse_str_to_animal(filepath.name, animal_param=animal_param)
+            day = parse_str_to_day(filepath.name, sep=day_sep).strftime("%b-%d-%Y")
+        case 'noday':
+            geno = parse_str_to_genotype(filepath.name)
+            animid = parse_str_to_animal(filepath.name, animal_param=animal_param)
+            day = constants.DEFAULT_DAY.strftime("%b-%d-%Y")
+        case _:
+            raise ValueError(f"Invalid mode: {mode}")
+    return {'animal': animid, 'genotype': geno, 'day': day, 'animalday': f"{animid} {geno} {day}"}
 
-    animid = parse_path_to_animal(filepath, id_index, delimiter)
-    
-    day = parse_path_to_day(filepath, date_pattern=date_pattern).strftime("%b-%d-%Y")
-
-    return f"{animid} {geno} {day}"
-
-def parse_path_to_genotype(filepath:str|Path):
+# NOTE the rest of the functions should just parse out strings. Which part of the filepath to parse should be handled higher up or by parse_path_to_animalday
+def parse_str_to_genotype(string:str):
     """
     Parses the filename of a binfolder to get the genotype.
 
     Args:
-        filepath (str | Path): Filepath of the binfolder.
+        string (str): String to parse.
 
     Returns:
         str: Genotype.
     """
-    name = Path(filepath).name
-    return __get_key_from_match_values(name, constants.GENOTYPE_ALIASES)
+    return __get_key_from_match_values(string, constants.GENOTYPE_ALIASES)
 
-def parse_path_to_animal(filepath:str|Path, id_index:int=0, delimiter:str=' '):
+def parse_str_to_animal(string:str, animal_param:tuple[int, str]|str|list[str] = (0, None)): # TODO fix animal parsing, animal IDs have a variety of formats
     """
     Parses the filename of a binfolder to get the animal id.
 
     Args:
-        filepath (str | Path): Filepath of the binfolder.
-        id_index (int, optional): Index of the animal id in the filename. Defaults to 0, i.e. the first element in the filename.
-        delimiter (str, optional): Delimiter in the filename. Defaults to ' '.
+        string (str): String to parse.
+        animal_param: Parameter specifying how to parse the animal ID:
+            tuple[int, str]: (index, separator) for simple split and index
+            str: regex pattern to extract ID
+            list[str]: list of possible animal IDs to match against
 
     Returns:
         str: Animal id.
     """
-    animid = Path(filepath).name.split(delimiter)
-    animid = animid[id_index]
-    return animid
+    match animal_param:
+        case (index, sep):
+            # 1. split, and get by index. Simple to use, but sometimes inconsistent
+            animid = string.split(sep)
+            return animid[index]
+        case str() as pattern:
+            # 2. use regex to pull info. Most general, but hard to use for some users
+            match = re.search(pattern, string)
+            if match:
+                return match.group()
+            raise ValueError(f"No match found for pattern {pattern} in string {string}")
+        case list() as possible_ids:
+            # 3. match to list. Simple to understand, but tedious for users
+            for id in possible_ids:
+                if id in string:
+                    return id
+            raise ValueError(f"No matching ID found in {string} from possible IDs: {possible_ids}")
+        case _:
+            raise ValueError(f"Invalid animal_param type: {type(animal_param)}")
 
-def parse_path_to_day(filepath:str|Path, date_pattern=None) -> datetime:
+def parse_str_to_day(string:str, sep:str=None, parse_params:dict={'fuzzy':True}) -> datetime:
     """
     Parses the filename of a binfolder to get the day.
 
     Args:
-        filepath (str | Path): Filepath of the binfolder.
-        date_pattern (str, optional): Date pattern in the filename. If None, the date pattern is assumed to be "MM DD YYYY".
+        string (str): String to parse.
+        sep (str, optional): Separator to split string by. If None, split by whitespace. Defaults to None. 
+        parse_params (dict, optional): Parameters to pass to dateutil.parser.parse. Defaults to {'fuzzy':True}.
 
     Returns:
-        datetime: Day of the binfolder.
+        datetime: Datetime object corresponding to the day of the binfolder.
+        
+    Raises:
+        ValueError: If no valid date token is found in the string.
     """
-    date_pattern = r'(\d{2})\D*(\d{2})\D*(\d{4})' if date_pattern is None else date_pattern
-    matches = re.search(date_pattern, Path(filepath).name)
-    if matches:
-        month, day, year = matches.groups()
-        month = int(month)
-        day = int(day)
-        year = int(year)
-    else:
-        month, day, year = (1, 1, 1)
-    return datetime(year=year, month=month, day=day)
+    clean_str = _clean_str_for_date(string)
+    logging.debug(f'raw str: {string}, clean_str: {clean_str}')
+    
+    tokens = clean_str.split(sep)
+    for token in tokens:
+        try:
+            logging.debug(f'token: {token}')
+            date = dateutil.parser.parse(token, default=constants.DEFAULT_DAY, **parse_params)
+            if date.year <= 1980:
+                continue
+            return date
+        except ParserError:
+            continue
+            
+    raise ValueError(f"No valid date token found in string: {string}")
+
+def _clean_str_for_date(string:str):
+    """
+    Clean a string by removing common non-date tokens and patterns.
+    
+    Args:
+        string (str): Input string containing date
+        
+    Returns:
+        str: Cleaned string with non-date tokens removed
+    """
+    
+    # Create one pattern that matches any of the above
+    patterns = constants.DATEPARSER_PATTERNS_TO_REMOVE
+    combined_pattern = '|'.join(patterns)
+    
+    # Remove all matching patterns, replace with space
+    cleaned = re.sub(combined_pattern, ' ', string, flags=re.IGNORECASE)
+    
+    # Clean up extra whitespace
+    cleaned = ' '.join(cleaned.split())
+    
+    return cleaned
 
 def parse_chname_to_abbrev(channel_name:str, assume_from_number=False):
     """

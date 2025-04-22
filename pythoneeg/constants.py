@@ -1,36 +1,63 @@
-DEFAULT_ID_TO_LR = {9 : 'L',
-                    10 : 'L',
-                    12 : 'L',
-                    14 : 'L',
-                    15 : 'L',
-                    16 : 'R',
-                    17 : 'R',
-                    19 : 'R',
-                    21 : 'R',
-                    22 : 'R'}
+from datetime import datetime
 
+DEFAULT_ID_TO_LR = {
+    9 : 'L',
+    10 : 'L',
+    12 : 'L',
+    14 : 'L',
+    15 : 'L',
+    16 : 'R',
+    17 : 'R',
+    19 : 'R',
+    21 : 'R',
+    22 : 'R'
+}
 
-GENOTYPE_ALIASES = {'WT' : ['WT', 'wildtype'],
-                        'KO' : ['KO', 'knockout']}
-CHNAME_ALIASES = {'Aud' : ['Aud', 'aud'],
-                    'Vis' : ['Vis', 'vis'],
-                    'Hip' : ['Hip', 'hip'],
-                    'Bar' : ['Bar', 'bar'],
-                    'Mot' : ['Mot', 'mot'],
-                    # 'S' : ['Som', 'som']
-                    }
-LR_ALIASES = {'L' : ['left', 'Left', 'L ', ' L'],
-            'R' : ['right', 'Right', 'R ', ' R']}
-DEFAULT_ID_TO_NAME = {9: 'LAud',
-                        10: 'LVis',
-                        12: 'LHip',
-                        14: 'LBar',
-                        15: 'LMot',
-                        16: 'RMot',
-                        17: 'RBar',
-                        19: 'RHip',
-                        21: 'RVis',
-                        22: 'RAud',}
+GENOTYPE_ALIASES = {
+    'WT' : ['WT', 'wildtype'],
+    'KO' : ['KO', 'knockout']
+}
+CHNAME_ALIASES = {
+    'Aud' : ['Aud', 'aud'],
+    'Vis' : ['Vis', 'vis'],
+    'Hip' : ['Hip', 'hip'],
+    'Bar' : ['Bar', 'bar'],
+    'Mot' : ['Mot', 'mot'],
+    # 'S' : ['Som', 'som']
+}
+LR_ALIASES = {
+    'L' : ['left', 'Left', 'L ', ' L'],
+    'R' : ['right', 'Right', 'R ', ' R']
+}
+
+DEFAULT_ID_TO_NAME = {
+    9: 'LAud',
+    10: 'LVis',
+    12: 'LHip',
+    14: 'LBar',
+    15: 'LMot',
+    16: 'RMot',
+    17: 'RBar',
+    19: 'RHip',
+    21: 'RVis',
+    22: 'RAud',
+}
+
+DATEPARSER_PATTERNS_TO_REMOVE = [
+    r'[A-Z]+\d+',      # Matches patterns like 'A5', 'G20'
+    r'\([0-9]+\)',     # Matches patterns like '(2)', '(15)'
+    r'(?:\b\d\s){1,}(\d\b)?',
+    r'\s\d$',
+    # r'WT',             # Common lab identifiers
+    # r'KO',
+    # r'Mouse[- ]?',     # Mouse with optional hyphen/space
+    # r'test',
+    # r'_+',             # Multiple underscores
+    # r'\.+',            # Multiple dots
+    # r'\s\d\s',         # Single numbers
+    # r'^\d\s'
+]
+DEFAULT_DAY = datetime(2000, 1, 1)
 
 LINEAR_FEATURES = ['rms', 'ampvar', 'psdtotal', 'psdslope', 'nspike'] + \
                   ['logrms', 'logampvar', 'logpsdtotal', 'lognspike'] # TODO implement this, and perhaps substitute the match notation across the repo

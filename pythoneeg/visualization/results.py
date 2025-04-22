@@ -21,12 +21,11 @@ import dask
 import dask.dataframe as dd
 import dask.array as da
 from dask import delayed
-from dask.distributed import Client
-from tqdm.dask import TqdmCallback
 from tqdm import tqdm
 import h5py
 import spikeinterface as si
 import mne
+
 # Local imports
 from .. import constants
 from .. import core
@@ -77,66 +76,93 @@ class AnimalOrganizer(AnimalFeatureParser):
     def __init__(self, 
                  base_folder_path, 
                  anim_id: str, 
-                 date_format="NN*NN*NNNN", 
+                 day_sep:str|None = None,
                  mode: Literal["nest", "concat", "base", "noday"] = "concat", 
                  assume_from_number=False,
                  skip_days: list[str] = [], 
                  truncate:bool|int=False) -> None:
+
+        """
+        AnimalOrganizer is used to organize data from a single animal into a format that can be used for analysis.
+        It is used to organize data from a single animal into a format that can be used for analysis.
+
+        Args:
+            base_folder_path (str): The path to the base folder of the animal data.
+            anim_id (str): The ID of the animal. This should correspond to only one animal.
+            day_sep (str, optional): Separator for day in folder name. Set to None or empty string to get all folders. Defaults to None.
+            mode (Literal["nest", "concat", "base", "noday"], optional): The mode of the AnimalOrganizer. Defaults to "concat".
+                "nest": base_folder_path / animal_id / date_format
+                "concat": base_folder_path / animal_id*date_format
+                "base": base_folder_path
+                "noday": base_folder_path / animal_id
+            assume_from_number (bool, optional): Whether to assume the animal ID is a number. Defaults to False.
+            skip_days (list[str], optional): The days to skip. Defaults to [].
+            truncate (bool|int, optional): Whether to truncate the data. Defaults to False.
+        """
         
         self.base_folder_path = Path(base_folder_path)
         self.anim_id = anim_id
-        self.date_format = date_format.replace("N", "[0-9]")
-        self.__readmode = mode
+        self.animal_param = [anim_id]
+        self.day_sep = day_sep
+        self.read_mode = mode
         self.assume_from_number = assume_from_number
 
         match mode:
-            case "nest":
-                self.bin_folder_pat = self.base_folder_path / f"*{self.anim_id}*" / f"*{self.date_format}*"
-            case "concat":
-                self.bin_folder_pat = self.base_folder_path / f"*{self.anim_id}*{self.date_format}*"
-            case "base":
-                self.bin_folder_pat = self.base_folder_path
-            case "noday":
-                self.bin_folder_pat = self.base_folder_path / f"*{self.anim_id}*"
+            case 'nest':
+                self.bin_folder_pattern = self.base_folder_path / f"*{self.anim_id}*" / '*'
+            case 'concat' | 'noday':
+                self.bin_folder_pattern = self.base_folder_path / f"*{self.anim_id}*"
+                # self.bin_folder_pat = self.base_folder_path / f"*{self.anim_id}*{self.date_format}*"
+            case 'base':
+                self.bin_folder_pattern = self.base_folder_path
+            # case 'noday':
+            #     self.bin_folder_pat = self.base_folder_path / f"*{self.anim_id}*"
             case _:
                 raise ValueError(f"Invalid mode: {mode}")
+            
+        self._bin_folders = glob.glob(str(self.bin_folder_pattern))
+        # if mode != 'noday':
+        #     self.__bin_folders = [x for x in self.__bin_folders if datetime.strptime(Path(x).name, self.date_format)]
+        self._bin_folders = [x for x in self._bin_folders if not any(y in x for y in skip_days)]
+        self.bin_folder_names = [Path(x).name for x in self._bin_folders]
+        logging.info(f"bin_folder_pattern: {self.bin_folder_pattern}")
+        logging.info(f"self._bin_folders: {self._bin_folders}")
+        logging.info(f"self.bin_folder_names: {self.bin_folder_names}")
 
-        self.__bin_folders = glob.glob(str(self.bin_folder_pat))
-        self.__bin_folders = [x for x in self.__bin_folders if not any(y in x for y in skip_days)]
-
-        if mode == "noday" and len(self.__bin_folders) > 1:
-            raise ValueError(f"Animal ID '{self.anim_id}' is not unique, found: {', '.join(self.__bin_folders)}")
-        elif len(self.__bin_folders) == 0:
-            raise ValueError(f"No files found for animal ID {self.anim_id} and date format {date_format}")
+        if mode == "noday" and len(self._bin_folders) > 1:
+            raise ValueError(f"Animal ID '{self.anim_id}' is not unique, found: {', '.join(self._bin_folders)}")
+        elif len(self._bin_folders) == 0:
+            raise ValueError(f"No files found for animal ID {self.anim_id}")
         
-        self.long_recordings: list[core.LongRecordingOrganizer] = []
         self.long_analyzers: list[core.LongRecordingAnalyzer] = []
-        self.metadatas: list[core.DDFBinaryMetadata] = []
-        self.animaldays: list[str] = []
-        for e in self.__bin_folders:
-            self.long_recordings.append(core.LongRecordingOrganizer(e, truncate=truncate))
-            self.metadatas.append(self.long_recordings[-1].meta)
-            self.animaldays.append(core.parse_path_to_animalday(e))
+        self.long_recordings = [core.LongRecordingOrganizer(e, truncate=truncate) for e in self._bin_folders]
+        self.metadatas = [lrec.meta for lrec in self.long_recordings]
 
-        self.__genotypes = [core.parse_path_to_genotype(x) for x in self.animaldays]
-        if len(set(self.__genotypes)) > 1:
+        animalday_dicts = [core.parse_path_to_animalday(e, animal_param=self.animal_param, day_sep=self.day_sep, mode=self.read_mode) for e in self._bin_folders]
+        self.animaldays = [x['animalday'] for x in animalday_dicts]
+        logging.info(f"self.animaldays: {self.animaldays}")
+
+        genotypes = [x['genotype'] for x in animalday_dicts]
+        if len(set(genotypes)) > 1:
             raise ValueError(f"Inconsistent genotypes in {self.animaldays}")
-        self.genotype = self.__genotypes[0]
-        self.__channel_names = [x.channel_names for x in self.long_recordings]
-        if len(set([" ".join(x) for x in self.__channel_names])) > 1:
-            raise ValueError(f"Inconsistent channel names in {self.__channel_names}")
-        self.channel_names = self.__channel_names[0]
-        self.__animal_ids = [core.parse_path_to_animal(x) for x in self.animaldays]
-        if len(set(self.__animal_ids)) > 1:
+        self.genotype = genotypes[0]
+
+        channel_names = [x.channel_names for x in self.long_recordings]
+        if len(set([" ".join(x) for x in channel_names])) > 1:
+            raise ValueError(f"Inconsistent channel names in {channel_names}")
+        self.channel_names = channel_names[0]
+
+        animal_ids = [x['animal'] for x in animalday_dicts]
+        if len(set(animal_ids)) > 1:
             raise ValueError(f"Inconsistent animal IDs in {self.animaldays}")
-        self.animal_id = self.__animal_ids[0]
+        self.animal_id = animal_ids[0]
 
         self.features_df: pd.DataFrame = pd.DataFrame()
         self.features_avg_df: pd.DataFrame = pd.DataFrame()
 
-    def convert_colbins_to_rowbins(self, overwrite=False):
+    def convert_colbins_to_rowbins(self, overwrite=False, multiprocess_mode: Literal['dask', 'serial']='serial'):
         for lrec in tqdm(self.long_recordings, desc="Converting column bins to row bins"):
-            lrec.convert_colbins_to_rowbins(overwrite=overwrite)
+            lrec.convert_colbins_to_rowbins(overwrite=overwrite, multiprocess_mode=multiprocess_mode)
 
     def convert_rowbins_to_rec(self, multiprocess_mode: Literal['dask', 'serial']='serial'):
         for lrec in tqdm(self.long_recordings, desc="Converting row bins to recs"):
@@ -291,6 +317,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                                     animal_id=self.animal_id,
                                     genotype=self.genotype,
                                     animal_day=self.animaldays[i],
+                                    bin_folder_name=self.bin_folder_names[i],
                                     metadata=self.metadatas[i],
                                     channel_names=self.channel_names,
                                     assume_from_number=self.assume_from_number)
@@ -309,10 +336,11 @@ class AnimalOrganizer(AnimalFeatureParser):
         row = {}
 
         lan_folder = lan.LongRecording.base_folder_path
-        row['animalday'] = core.parse_path_to_animalday(lan_folder)
-        row['animal'] = core.parse_path_to_animal(lan_folder)
-        row['day'] = core.parse_path_to_day(lan_folder)
-        row['genotype'] = core.parse_path_to_genotype(lan_folder)
+        animalday_dict = core.parse_path_to_animalday(lan_folder, animal_param=self.animal_param, day_sep=self.day_sep, mode=self.read_mode)
+        row['animalday'] = animalday_dict['animalday']
+        row['animal'] = animalday_dict['animal']
+        row['day'] = animalday_dict['day']
+        row['genotype'] = animalday_dict['genotype']
         row['duration'] = lan.LongRecording.get_dur_fragment(window_s, idx)
         row['endfile'] = lan.get_file_end(idx)
 
@@ -391,7 +419,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         print(f"Channel abbreviations: \t{self.channel_abbrevs}")
 
     def __str__(self) -> str:
-        return f"{self.animal_id} {self.genotype} {self.animaldays}"
+        return f"{self.animaldays}"
 
     def read_sars_spikes(self, sars: list['SpikeAnalysisResult'], read_mode: Literal['sa', 'mne']='sa', inplace=True):
         match read_mode:
@@ -747,6 +775,7 @@ class SpikeAnalysisResult(AnimalFeatureParser):
                  animal_id:str=None, 
                  genotype:str=None, 
                  animal_day:str=None,
+                 bin_folder_name:str=None,
                  metadata:core.DDFBinaryMetadata=None,
                  channel_names:list[str]=None, 
                  assume_from_number=False) -> None:
@@ -765,6 +794,7 @@ class SpikeAnalysisResult(AnimalFeatureParser):
         self.animal_id = animal_id
         self.genotype = genotype
         self.animal_day = animal_day
+        self.bin_folder_name = bin_folder_name
         self.metadata = metadata
         self.channel_names = channel_names
         self.assume_from_number = assume_from_number
@@ -828,6 +858,7 @@ class SpikeAnalysisResult(AnimalFeatureParser):
             'animal_id': self.animal_id,
             'genotype': self.genotype,
             'animal_day': self.animal_day,
+            'bin_folder_name': self.bin_folder_name,
             'metadata': self.metadata.metadata_path,
             'channel_names': self.channel_abbrevs if save_abbrevs_as_chnames else self.channel_names,
             'assume_from_number': False if save_abbrevs_as_chnames else self.assume_from_number
