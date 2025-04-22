@@ -28,6 +28,7 @@ pyarrow = "*"
 mountainsort5 = "*"
 statannotations = "*"
 statsmodels = "*"
+django = "*"
 
 [dev-packages]
 snakeviz = "*"
