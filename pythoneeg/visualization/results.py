@@ -144,17 +144,17 @@ class AnimalOrganizer(AnimalFeatureParser):
 
         genotypes = [x['genotype'] for x in animalday_dicts]
         if len(set(genotypes)) > 1:
-            raise ValueError(f"Inconsistent genotypes in {self.animaldays}")
+            warnings.warn(f"Inconsistent genotypes in {genotypes}")
         self.genotype = genotypes[0]
 
         channel_names = [x.channel_names for x in self.long_recordings]
         if len(set([" ".join(x) for x in channel_names])) > 1:
-            raise ValueError(f"Inconsistent channel names in {channel_names}")
+            warnings.warn(f"Inconsistent channel names in long_recordings: {channel_names}")
         self.channel_names = channel_names[0]
 
         animal_ids = [x['animal'] for x in animalday_dicts]
         if len(set(animal_ids)) > 1:
-            raise ValueError(f"Inconsistent animal IDs in {self.animaldays}")
+            warnings.warn(f"Inconsistent animal IDs in {animal_ids}")
         self.animal_id = animal_ids[0]
 
         self.features_df: pd.DataFrame = pd.DataFrame()
@@ -196,7 +196,7 @@ class AnimalOrganizer(AnimalFeatureParser):
 
         dataframes = []
         for lrec in self.long_recordings: # Iterate over all long recordings
-            logging.debug(f"Initializing LongRecordingAnalyzer for {lrec.base_folder_path}")
+            logging.info(f"Computing windowed analysis for {lrec.base_folder_path}")
             lan = core.LongRecordingAnalyzer(lrec, fragment_len_s=window_s)
             if lan.n_fragments == 0:
                 logging.warning(f"No fragments found for {lrec.base_folder_path}. Skipping.")
@@ -297,6 +297,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         lrec_sorts = []
         lrec_recs = []
         recs = [lrec.LongRecording for lrec in self.long_recordings]
+        logging.info(f"Sorting {len(recs)} recordings")
         for rec in recs:
             if rec.get_total_samples() == 0:
                 logging.warning(f"Skipping {rec.__str__()} because it has no samples")

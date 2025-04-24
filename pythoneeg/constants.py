@@ -59,6 +59,8 @@ DATEPARSER_PATTERNS_TO_REMOVE = [
 ]
 DEFAULT_DAY = datetime(2000, 1, 1)
 
+GLOBAL_SAMPLING_RATE = 2000
+
 LINEAR_FEATURES = ['rms', 'ampvar', 'psdtotal', 'psdslope', 'nspike'] + \
                   ['logrms', 'logampvar', 'logpsdtotal', 'lognspike'] # TODO implement this, and perhaps substitute the match notation across the repo
 BAND_FEATURES = ['psdband', 'psdfrac'] + \

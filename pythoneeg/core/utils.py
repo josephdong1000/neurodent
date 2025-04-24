@@ -168,12 +168,12 @@ def parse_str_to_day(string:str, sep:str=None, parse_params:dict={'fuzzy':True})
         ValueError: If no valid date token is found in the string.
     """
     clean_str = _clean_str_for_date(string)
-    logging.debug(f'raw str: {string}, clean_str: {clean_str}')
+    # logging.debug(f'raw str: {string}, clean_str: {clean_str}')
     
     tokens = clean_str.split(sep)
     for token in tokens:
         try:
-            logging.debug(f'token: {token}')
+            # logging.debug(f'token: {token}')
             date = dateutil.parser.parse(token, default=constants.DEFAULT_DAY, **parse_params)
             if date.year <= 1980:
                 continue
