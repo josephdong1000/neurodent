@@ -17,11 +17,13 @@ import numpy as np
 import pandas as pd
 import spikeinterface.core as si
 import spikeinterface.extractors as se
+import spikeinterface.preprocessing as spre
 import spikeinterface.widgets as sw
 import dask
 
 # Local imports
 from .utils import convert_colpath_to_rowpath, convert_units_to_multiplier, filepath_to_index, get_temp_directory
+from .. import constants
 
 #%%
 
@@ -30,8 +32,9 @@ class DDFBinaryMetadata:
     def __init__(self, metadata_path, verbose=False) -> None:
         self.metadata_path = metadata_path
         self.metadata_df = pd.read_csv(metadata_path)
-        if self.metadata_df.empty:
+        if self.metadata_df.empty: # Handle empty metadata more elegantly?
             raise ValueError(f"Metadata file is empty: {metadata_path}")
+
         self.verbose = verbose
 
         self.n_channels = len(self.metadata_df.index)
@@ -119,6 +122,10 @@ def convert_ddfrowbin_to_si(bin_rowmajor_path, metadata, verbose=False):
     else:
         rec = se.read_binary(bin_rowmajor_path, **params)
         temppath = None
+
+    if rec.sampling_frequency != constants.GLOBAL_SAMPLING_RATE:
+        warnings.warn(f"Sampling rate {rec.sampling_frequency} Hz != {constants.GLOBAL_SAMPLING_RATE} Hz. Resampling")
+        rec = spre.resample(rec, constants.GLOBAL_SAMPLING_RATE)
 
     return rec, temppath
 
@@ -218,17 +225,40 @@ class LongRecordingOrganizer:
         self.rowbins.sort(key=filepath_to_index)
         self.metas.sort(key=filepath_to_index)
 
+        logging.debug(f"Before prune: {len(self.colbins)} colbins, {len(self.rowbins)} rowbins, {len(self.metas)} metas")
+        self.__prune_empty_files()
+        logging.debug(f"After prune: {len(self.colbins)} colbins, {len(self.rowbins)} rowbins, {len(self.metas)} metas")
+        if len(self.colbins) != len(self.metas):
+            logging.warning("Number of column-major and metadata files do not match")
+
         metadatas = [DDFBinaryMetadata(x) for x in self.metas]
         for meta in metadatas:
+            # if metadata file is empty, remove it and the corresponding column-major and row-major files
             if meta.metadata_df.empty:
                 searchstr = Path(meta.metadata_path).name.replace("_Meta", "")
-                self.colbins = [x for x in self.colbins if searchstr not in x]
-                self.rowbins = [x for x in self.rowbins if searchstr not in x]
-                self.metas = [x for x in self.metas if searchstr not in x]
+                self.colbins = [x for x in self.colbins if searchstr + "_ColMajor.bin" not in x]
+                self.rowbins = [x for x in self.rowbins if searchstr + "_RowMajor.npy.gz" not in x]
+                self.metas = [x for x in self.metas if searchstr + "_Meta.csv" not in x]
 
+        # if truncate is True, truncate the lists
         if self.truncate:
             self.colbins, self.rowbins, self.metas = self.__truncate_lists(self.colbins, self.rowbins, self.metas)
-        
+
+    def __prune_empty_files(self):
+        # if the column-major file is empty, remove the corresponding row-major and metadata files
+        colbins = self.colbins.copy()
+        for i, e in enumerate(colbins):
+            if Path(e).stat().st_size == 0:
+                name = Path(e).name.replace("_ColMajor.bin", "")
+                logging.debug(f"Removing {name}")
+                self.colbins.remove(e)
+                self.rowbins = [x for x in self.rowbins if name + "_RowMajor.npy.gz" not in x]
+                self.metas = [x for x in self.metas if name + "_Meta.csv" not in x]
+        # remove None values
+        self.colbins = [x for x in self.colbins if x is not None]
+        self.rowbins = [x for x in self.rowbins if x is not None]
+        self.metas = [x for x in self.metas if x is not None]
+
     def __check_colbins_rowbins_metas_folders_exist(self):
         if not self.colbin_folder_path.exists():
             raise FileNotFoundError(f"Column-major binary files folder not found: {self.colbin_folder_path}")
@@ -247,7 +277,8 @@ class LongRecordingOrganizer:
 
     def _validate_metadata_consistency(self, metadatas:list[DDFBinaryMetadata]):
         meta0 = metadatas[0]
-        attributes = ['f_s', 'n_channels', 'precision', 'V_units', 'channel_names']
+        # attributes = ['f_s', 'n_channels', 'precision', 'V_units', 'channel_names']
+        attributes = ['n_channels', 'precision', 'V_units', 'channel_names']
         for attr in attributes:
             if not all([getattr(meta0, attr) == getattr(x, attr) for x in metadatas]):
                 unequal_values = [getattr(x, attr) for x in metadatas if getattr(x, attr) != getattr(meta0, attr)]
