@@ -25,7 +25,7 @@ from .analyze_frag import FragmentAnalyzer
 
 class LongRecordingAnalyzer:
 
-    def __init__(self, longrecording, fragment_len_s=10, notch_freq=60) -> None:
+    def __init__(self, longrecording: core.LongRecordingOrganizer, fragment_len_s=10, notch_freq=60) -> None:
 
         assert isinstance(longrecording, core.LongRecordingOrganizer)
 
