@@ -26,7 +26,7 @@ core.set_temp_directory('/scr1/users/dongjp')
 
 # SECTION 1: Set up clusters
 cluster_window = SLURMCluster(
-        cores=4,
+        cores=8,
         memory='100GB',
         walltime='24:00:00',
         interface=None,
@@ -46,14 +46,14 @@ cluster_spike = SLURMCluster(
                              '--error=/dev/null']
     )
 print(f"\n\n\tcluster_spike.dashboard_link: {cluster_spike.dashboard_link}\n\n")
-cluster_window.scale(jobs=10)  # Scale to 15 workers
+cluster_window.scale(10)
 cluster_spike.scale(12)
 cluster_window.wait_for_workers(10)
 cluster_spike.wait_for_workers(12)
 
 
 # SECTION 2: Compute windowed analysis
-logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO, stream=sys.stdout, force=True)
+logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.DEBUG, stream=sys.stdout, force=True)
 logger = logging.getLogger()
 
 with open(Path('./notebooks/tests/sox5.json').resolve(), 'r') as f:
@@ -88,5 +88,5 @@ for data_folder, animal_ids in data_folders_to_animal_ids.items():
         wars.append(war)
 
 """
-sbatch --mem 100G -c 5 -t 24:00:00 ./notebooks/examples/pipeline.sh ./notebooks/examples/pipeline-war-sox5.py
+sbatch --mem 100G -c 5 -t 48:00:00 ./notebooks/examples/pipeline.sh ./notebooks/examples/pipeline-war-sox5.py
 """
