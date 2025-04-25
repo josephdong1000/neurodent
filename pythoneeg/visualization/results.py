@@ -226,7 +226,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                                     #    compression="gzip",  # Use GZIP compression
                                     #    compression_opts=4,  # Compression level 0-9 (higher = more compression but slower)
                                     #    rdcc_nbytes=10 * 1024 * 1024  # 10MB chunk cache
-                                       )  
+                                       )
                     del np_fragments # cleanup memory
 
                     # This is not parallelized
@@ -236,14 +236,14 @@ class AnimalOrganizer(AnimalFeatureParser):
                     # Process fragments in parallel using Dask
                     logging.debug("Processing features in parallel")
                     with h5py.File(tmppath, 'r', libver='latest') as f:
-                        np_fragments_reconstruct = da.from_array(f['fragments'], chunks='1 GB')
+                        np_fragments_reconstruct = da.from_array(f['fragments'], chunks='100 MB') # REVIEW maybe different chunk sizes. Originally 1GB
                         feature_values = [delayed(FragmentAnalyzer._process_fragment_features_dask)(
                             np_fragments_reconstruct[idx], 
                             lan.f_s, 
                             features, 
                             kwargs
                         ) for idx in range(lan.n_fragments - 1)]
-                        del np_fragments_reconstruct # cleanup memory
+                        # del np_fragments_reconstruct # cleanup memory
                         feature_values = dask.compute(*feature_values)
                         f.close() # ensure file is closed
 
