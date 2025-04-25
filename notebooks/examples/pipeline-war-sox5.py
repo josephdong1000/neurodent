@@ -25,9 +25,10 @@ core.set_temp_directory('/scr1/users/dongjp')
 
 # SECTION 1: Set up clusters
 cluster_window = SLURMCluster(
-        cores=9,
+        cores=20,
         memory='100GB',
-        walltime='24:00:00',
+        # processes=1,
+        walltime='12:00:00',
         interface=None,
         scheduler_options={'interface': 'eth1'}, # Look at `nmcli dev status` to find the correct interface
         job_extra_directives=['--output=/dev/null',
@@ -46,9 +47,8 @@ cluster_spike = SLURMCluster(
     )
 print(f"\n\n\tcluster_spike.dashboard_link: {cluster_spike.dashboard_link}\n\n")
 cluster_window.scale(10)
-cluster_spike.scale(10)
 cluster_window.wait_for_workers(10)
-cluster_spike.wait_for_workers(10)
+cluster_spike.adapt(maximum_jobs=10)
 
 
 # SECTION 2: Compute windowed analysis
@@ -60,14 +60,17 @@ with open(base_folder / 'notebooks' / 'tests' / 'sox5.json', 'r') as f:
 data_parent_folder = Path(data['data_parent_folder'])
 constants.GENOTYPE_ALIASES = data['GENOTYPE_ALIASES']
 data_folders_to_animal_ids = data['data_folders_to_animal_ids']
-wars = []
 
 for data_folder, animal_ids in data_folders_to_animal_ids.items():
     for animal_id in animal_ids:
+
+        # SECTION 1: Find bin files
         ao = visualization.AnimalOrganizer(data_parent_folder / data_folder, animal_id,
                                     mode="nest", 
                                     assume_from_number=True,
                                     skip_days=['bad'])
+
+        # SECTION 2: Make WAR
         with Client(cluster_window) as client:
             client.upload_file(str(base_folder / 'pythoneeg.zip'))
             
@@ -75,6 +78,7 @@ for data_folder, animal_ids in data_folders_to_animal_ids.items():
             ao.convert_rowbins_to_rec(multiprocess_mode='dask') # paralleization breaks if not enough memory
             war = ao.compute_windowed_analysis(['all'], multiprocess_mode='dask')
 
+        # SECTION 3: Make SARs, save SARs and load into WAR
         with Client(cluster_spike) as client:
             client.upload_file(str(base_folder / 'pythoneeg.zip'))
             
@@ -83,8 +87,10 @@ for data_folder, animal_ids in data_folders_to_animal_ids.items():
                 sar.save_fif_and_json(base_folder / 'notebooks' / 'tests' / 'test-sars-full' / f'{data_folder} {slugify(sar.animal_day, allow_unicode=True)}', overwrite=True) # animal_day not unique for Sox5 rec sessions, so add bin_folder_name
             war.read_sars_spikes(sars)
             
+        # SECTION 4: Save WARs and cleanup
         war.save_pickle_and_json(base_folder / 'notebooks' / 'tests' / 'test-wars-full' / f'{data_folder} {animal_id}')
-        wars.append(war)
+        del war
+        del sars
 
 """
 sbatch --mem 200G -c 4 -t 48:00:00 /mnt/isilon/marsh_single_unit/PythonEEG/notebooks/examples/pipeline.sh /mnt/isilon/marsh_single_unit/PythonEEG/notebooks/examples/pipeline-war-sox5.py
