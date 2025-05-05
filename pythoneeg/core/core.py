@@ -9,7 +9,7 @@ import time
 import warnings
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Union, Literal
+from typing import Union, Literal, Callable
 import logging
 
 # Third party imports
@@ -20,6 +20,8 @@ import spikeinterface.extractors as se
 import spikeinterface.preprocessing as spre
 import spikeinterface.widgets as sw
 import dask
+import neo
+import mne
 
 # Local imports
 from .utils import convert_colpath_to_rowpath, convert_units_to_multiplier, filepath_to_index, get_temp_directory
@@ -29,34 +31,67 @@ from .. import constants
 
 class DDFBinaryMetadata:
 
-    def __init__(self, metadata_path, verbose=False) -> None:
+    def __init__(self, 
+                 metadata_path: str | Path | None, 
+                 *, 
+                 n_channels: int | None = None, 
+                 f_s: float | None = None, 
+                 dt_end: datetime | None = None, 
+                 channel_names: list[str] | None = None) -> None:
+        """Initialize DDFBinaryMetadata either from a file path or direct parameters.
+        
+        Args:
+            metadata_path (str, optional): Path to metadata CSV file. If provided, other parameters are ignored.
+            n_channels (int, optional): Number of channels
+            f_s (float, optional): Sampling frequency in Hz
+            dt_end (datetime, optional): End datetime of recording
+            channel_names (list, optional): List of channel names
+        """
+        if metadata_path is not None:
+            self._init_from_path(metadata_path)
+        else:
+            self._init_from_params(n_channels, f_s, dt_end, channel_names)
+
+    def _init_from_path(self, metadata_path):
         self.metadata_path = metadata_path
         self.metadata_df = pd.read_csv(metadata_path)
-        if self.metadata_df.empty: # Handle empty metadata more elegantly?
+        if self.metadata_df.empty:
             raise ValueError(f"Metadata file is empty: {metadata_path}")
-
-        self.verbose = verbose
 
         self.n_channels = len(self.metadata_df.index)
         self.f_s = self.__getsinglecolval("SampleRate")
         self.V_units = self.__getsinglecolval("Units")
         self.mult_to_uV = convert_units_to_multiplier(self.V_units)
         self.precision = self.__getsinglecolval("Precision")
-        self.dt_end: datetime
-        self.dt_start: datetime
+        
         if "LastEdit" in self.metadata_df.keys():
             self.dt_end = datetime.fromisoformat(self.__getsinglecolval("LastEdit"))
         else:
             self.dt_end = None
             logging.warning("No LastEdit column provided in metadata. dt_end set to None")
 
-        self.channel_to_info = self.metadata_df.loc[:, ["BinColumn", "ProbeInfo"]].set_index('BinColumn')
-        self.channel_to_info = self.channel_to_info.T.to_dict('list')
-        self.channel_to_info = {k:v[0] for k,v in self.channel_to_info.items()}
-        # self.id_to_info = {k-1:v for k,v in self.channel_to_info.items()}
-        # self.entity_to_info = self.metadata_df.loc[:, ["Entity", "ProbeInfo"]].set_index('Entity').T.to_dict('list')
-        # self.entity_to_info = {k:v[0] for k,v in self.entity_to_info.items()}
-        self.channel_names = list(self.channel_to_info.values())
+        self.channel_names = self.metadata_df["ProbeInfo"].tolist()
+
+    def _init_from_params(self, n_channels, f_s, dt_end, channel_names):
+        if None in (n_channels, f_s, channel_names):
+            raise ValueError("All parameters must be provided when not using metadata_path")
+            
+        self.metadata_path = None
+        self.metadata_df = None
+        self.n_channels = n_channels
+        self.f_s = f_s
+        # self.V_units = V_units
+        self.V_units = None
+        # self.mult_to_uV = convert_units_to_multiplier(V_units)
+        self.mult_to_uV = None
+        # self.precision = precision
+        self.precision = None
+        self.dt_end = dt_end
+        
+        if not isinstance(channel_names, list):
+            raise ValueError("channel_names must be a list")
+        
+        self.channel_names = channel_names
 
     def __getsinglecolval(self, colname):
         vals = self.metadata_df.loc[:, colname]
@@ -87,7 +122,7 @@ def convert_ddfcolbin_to_ddfrowbin(rowdir_path, colbin_path, metadata, save_gzip
     return rowbin_path
 
 
-def convert_ddfrowbin_to_si(bin_rowmajor_path, metadata, verbose=False):
+def convert_ddfrowbin_to_si(bin_rowmajor_path, metadata):
     # 1-file .MAT containing entire recording trace
     # Returns as SpikeInterface Recording structure
     assert isinstance(metadata, DDFBinaryMetadata), "Metadata needs to be of type DDFBinaryMetadata"
@@ -97,6 +132,7 @@ def convert_ddfrowbin_to_si(bin_rowmajor_path, metadata, verbose=False):
               "dtype" : metadata.precision,
               "num_channels" : metadata.n_channels,
               "gain_to_uV" : metadata.mult_to_uV,
+              "offset_to_uV" : 0,
               "time_axis" : 0,
               "is_filtered" : False}
 
@@ -127,32 +163,37 @@ def convert_ddfrowbin_to_si(bin_rowmajor_path, metadata, verbose=False):
         warnings.warn(f"Sampling rate {rec.sampling_frequency} Hz != {constants.GLOBAL_SAMPLING_RATE} Hz. Resampling")
         rec = spre.resample(rec, constants.GLOBAL_SAMPLING_RATE)
 
+    rec = spre.astype(rec, dtype=np.longlong)
+
     return rec, temppath
-
-
-# In[15]:
 
 
 class LongRecordingOrganizer:
     def __init__(self, base_folder_path, 
-                 colbin_folder_path=None,
-                 rowbin_folder_path=None,
-                 metadata_path=None,
-                 make_folders=False,
+                 mode: Literal['bin', 'si', 'mne', None]='bin',
                  truncate: Union[bool, int]=False,
-                 verbose: bool=False) -> None:
-        """Construct a long recording from binary files.
+                 overwrite_rowbins: bool=False,
+                 multiprocess_mode: Literal['dask', 'serial']='serial',
+                 extract_func: Union[Callable[..., si.BaseRecording], Callable[..., mne.io.Raw]]=None,
+                 input_type: Literal['folder', 'file', 'files']='folder',
+                 file_pattern: str=None,
+                 **kwargs):
+        """Construct a long recording from binary files or EDF files.
 
         Args:
-            base_folder_path (str): Path to the base folder containing the binary files.
-            colbin_folder_path (str, optional): If not None, overrides base_folder_path for column-major binary files. Defaults to None.
-            rowbin_folder_path (str, optional): If not None, overrides base_folder_path for row-major binary files. Defaults to None.
-            metadata_path (str, optional): If not None, overrides metadata files at colbin_folder_path. Defaults to None.
+            base_folder_path (str): Path to the base folder containing the data files.
+            mode (Literal['bin', 'si', 'mne', None]): Mode to load data in. Defaults to 'bin'.
             truncate (Union[bool, int], optional): If True, truncate data to first 10 files. 
                 If an integer, truncate data to the first n files. Defaults to False.
+            overwrite_rowbins (bool, optional): If True, overwrite existing row-major binary files. Defaults to False.
+            multiprocess_mode (Literal['dask', 'serial'], optional): Processing mode for parallel operations. Defaults to 'serial'.
+            extract_func (Callable, optional): Function to extract data when using 'si' or 'mne' mode. Required for those modes.
+            input_type (Literal['folder', 'file', 'files'], optional): Type of input to load. Defaults to 'folder'.
+            file_pattern (str, optional): Pattern to match files when using 'file' or 'files' input type. Defaults to '*'.
+            **kwargs: Additional arguments passed to the data loading functions.
 
         Raises:
-            ValueError: If no data files are found.
+            ValueError: If no data files are found or if the folder contains mixed file types.
         """
         
         if type(truncate) is int:
@@ -168,53 +209,124 @@ class LongRecordingOrganizer:
             warnings.warn(f"truncate = True. Only the first {self.n_truncate} files of each animal will be used")
 
         self.base_folder_path = Path(base_folder_path)
-        self.verbose = verbose
+        
+        # Initialize core attributes
+        self.meta = None
+        self.channel_names = None
+        self.LongRecording = None
+        self.temppaths = []
+        self.start_datetime = None
+        self.end_relative = []
+        
+        # Load data if mode is specified
+        if mode is not None:
+            self.detect_and_load_data(
+                mode=mode,
+                overwrite_rowbins=overwrite_rowbins,
+                multiprocess_mode=multiprocess_mode,
+                extract_func=extract_func,
+                input_type=input_type,
+                file_pattern=file_pattern,
+                **kwargs
+            )
 
-        self.colbin_folder_path = self.base_folder_path if colbin_folder_path is None else Path(colbin_folder_path)
-        if make_folders:
-            os.makedirs(self.colbin_folder_path, exist_ok=True)
-        self.rowbin_folder_path = self.colbin_folder_path if rowbin_folder_path is None else Path(rowbin_folder_path)
-        if make_folders:
-            os.makedirs(self.rowbin_folder_path, exist_ok=True)
+    def detect_and_load_data(self, 
+            mode: Literal['bin', 'si', 'mne', None]='bin', 
+            overwrite_rowbins: bool=False,
+            multiprocess_mode: Literal['dask', 'serial']='serial',
+            extract_func: Union[Callable[..., si.BaseRecording], Callable[..., mne.io.Raw]]=None,
+            input_type: Literal['folder', 'file', 'files']='folder',
+            file_pattern: str=None,
+            **kwargs):
+        """Load in recording based on mode."""
+
+        if mode == 'bin':
+            # Binary file pipeline
+            self.convert_colbins_rowbins_to_rec(overwrite_rowbins=overwrite_rowbins, multiprocess_mode=multiprocess_mode)
+        elif mode == 'si':
+            # EDF file pipeline
+            self.convert_file_with_si_to_recording(
+                extract_func=extract_func,
+                input_type=input_type,
+                file_pattern=file_pattern,
+                **kwargs
+            )
+        elif mode == 'mne':
+            # MNE file pipeline
+            self.convert_file_with_mne_to_recording(
+                extract_func=extract_func,
+                input_type=input_type,
+                file_pattern=file_pattern,
+                **kwargs
+            )
+        elif mode is None:
+            pass
+        else:
+            raise ValueError(f"Invalid mode: {mode}")
+
+    def prepare_colbins_rowbins_metas(self):
+
+        self.colbin_folder_path = self.base_folder_path 
+        self.rowbin_folder_path = self.base_folder_path
 
         self.__update_colbins_rowbins_metas()
         self.__check_colbins_rowbins_metas_folders_exist()
         self.__check_colbins_rowbins_metas_not_empty()
 
-        if metadata_path is not None:
-            self.meta = DDFBinaryMetadata(metadata_path)
-            self.metadata_objects = [self.meta]
-        else:
-            self.meta = DDFBinaryMetadata(self.metas[0])
-            self.metadata_objects = [DDFBinaryMetadata(x) for x in self.metas]
-            self._validate_metadata_consistency(self.metadata_objects)
+        self.meta = DDFBinaryMetadata(self.metas[0])
+        self.__metadata_objects = [DDFBinaryMetadata(x) for x in self.metas]
+        self._validate_metadata_consistency(self.__metadata_objects)
+
         self.channel_names = self.meta.channel_names
 
-        dt_ends = [x.dt_end for x in self.metadata_objects]
+        dt_ends = [x.dt_end for x in self.__metadata_objects]
         if all(x is None for x in dt_ends):
             raise ValueError("No dates found in any metadata object!")
         
         self._median_datetime = statistics.median_low(pd.Series(dt_ends).dropna())
         self._idx_median_datetime = dt_ends.index(self._median_datetime)
 
-    def __truncate_lists(self, colbins, rowbins, metas):
-        if len(colbins) > self.n_truncate:
-            out_colbins = colbins[:self.n_truncate]
+
+    # def __truncate_lists(self, colbins, rowbins, metas):
+    #     if len(colbins) > self.n_truncate:
+    #         out_colbins = colbins[:self.n_truncate]
+    #     else:
+    #         out_colbins = colbins
+
+    #     out_rowbins = []
+    #     out_metas = []
+    #     for i, e in enumerate(rowbins):
+    #         tempcolname = Path(e).name.replace("RowMajor.npy.gz", "ColMajor.bin")
+    #         if str(self.colbin_folder_path / tempcolname) in out_colbins:
+    #             out_rowbins.append(e)
+    #     for i, e in enumerate(metas):
+    #         tempcolname = Path(e).name.replace("Meta.csv", "ColMajor.bin")
+    #         if str(self.colbin_folder_path / tempcolname) in out_colbins:
+    #             out_metas.append(e)
+
+    #     return out_colbins, out_rowbins, out_metas
+
+    def _truncate_file_list(self, files: list[Union[str, Path]], 
+                            ref_list: list[Union[str, Path]] = None) -> list[Union[str, Path]]:
+        """Unified method to truncate any list of files.
+        
+        Args:
+            files: List of files to truncate
+            ref_list: Optional list of files to maintain relationships between. Only stems will be compared.
+        """
+
+        if not ref_list:
+            if not self.truncate or len(files) <= self.n_truncate:
+                return files
+                
+            # Sort and truncate primary files
+            truncated = sorted(files)[:self.n_truncate]
+            return truncated
         else:
-            out_colbins = colbins
-
-        out_rowbins = []
-        out_metas = []
-        for i, e in enumerate(rowbins):
-            tempcolname = Path(e).name.replace("RowMajor.npy.gz", "ColMajor.bin")
-            if str(self.colbin_folder_path / tempcolname) in out_colbins:
-                out_rowbins.append(e)
-        for i, e in enumerate(metas):
-            tempcolname = Path(e).name.replace("Meta.csv", "ColMajor.bin")
-            if str(self.colbin_folder_path / tempcolname) in out_colbins:
-                out_metas.append(e)
-
-        return out_colbins, out_rowbins, out_metas
+            # Get a subset of files that match with ref_list
+            ref_list = [Path(f).stem for f in ref_list]
+            files = [f for f in files if Path(f).stem in ref_list]
+            return files
 
     def __update_colbins_rowbins_metas(self):
         self.colbins = glob.glob(str(self.colbin_folder_path / "*_ColMajor.bin"))
@@ -242,7 +354,13 @@ class LongRecordingOrganizer:
 
         # if truncate is True, truncate the lists
         if self.truncate:
-            self.colbins, self.rowbins, self.metas = self.__truncate_lists(self.colbins, self.rowbins, self.metas)
+            self.colbins = self._truncate_file_list(self.colbins)
+            self.rowbins = self._truncate_file_list(self.rowbins, 
+                                                    ref_list=[x.replace("_ColMajor.bin", "_RowMajor.npy.gz") for x in self.colbins])
+            self.metas = self._truncate_file_list(self.metas, 
+                                                  ref_list=[x.replace("_ColMajor.bin", "_Meta.csv") for x in self.colbins])
+
+            # self.colbins, self.rowbins, self.metas = self.__truncate_lists(self.colbins, self.rowbins, self.metas)
 
     def __prune_empty_files(self):
         # if the column-major file is empty, remove the corresponding row-major and metadata files
@@ -285,6 +403,11 @@ class LongRecordingOrganizer:
                 logging.error(f"Inconsistent {attr} values across metadata files: {getattr(meta0, attr)} != {unequal_values}")
                 raise ValueError(f"Metadata files inconsistent at attribute {attr}")
         return
+
+    def convert_colbins_rowbins_to_rec(self, overwrite_rowbins: bool=False, multiprocess_mode: Literal['dask', 'serial']='serial'):
+        self.prepare_colbins_rowbins_metas()
+        self.convert_colbins_to_rowbins(overwrite=overwrite_rowbins, multiprocess_mode=multiprocess_mode)
+        self.convert_rowbins_to_rec(multiprocess_mode=multiprocess_mode)
 
     def convert_colbins_to_rowbins(self, overwrite=False, multiprocess_mode: Literal['dask', 'serial']='serial'):
         """
@@ -348,13 +471,15 @@ class LongRecordingOrganizer:
                 # Create delayed objects for parallel processing
                 delayed_results = []
                 for i, e in enumerate(self.rowbins):
-                    delayed_results.append(dask.delayed(convert_ddfrowbin_to_si)(e, self.meta, verbose=self.verbose))
+                    delayed_results.append(dask.delayed(convert_ddfrowbin_to_si)(e, self.meta))
 
                 # Compute all conversions in parallel
                 results = dask.compute(*delayed_results)
 
             case 'serial':
-                results = [convert_ddfrowbin_to_si(e, self.meta, verbose=self.verbose) for e in self.rowbins]
+                results = [convert_ddfrowbin_to_si(e, self.meta) for e in self.rowbins]
+            case _:
+                raise ValueError(f"Invalid multiprocess_mode: {multiprocess_mode}")
 
         # Process results
         for i, (rec, temppath) in enumerate(results):
@@ -370,8 +495,106 @@ class LongRecordingOrganizer:
             raise ValueError("No recordings generated. Check that all row-major files are present and readable.")
         elif len(recs) < len(self.rowbins):
             logging.warning(f"Only {len(recs)} recordings generated. Some row-major files may be missing.")
-        self.LongRecording: si.BaseRecording = si.concatenate_recordings(recs).rename_channels(self.channel_names)
+
+        self.LongRecording: si.BaseRecording = si.concatenate_recordings(recs).rename_channels(self.channel_names) # TODO support LongRecording + other parameters with Neo
         self.start_datetime = self._median_datetime - timedelta(seconds=t_to_median)
+
+    def convert_file_with_si_to_recording(self, 
+                                          extract_func: Callable[..., si.BaseRecording], 
+                                          input_type: Literal['folder', 'file', 'files']='folder', 
+                                          file_pattern: str='*', 
+                                          **kwargs):
+        if input_type == 'folder':
+            datafolder = self.base_folder_path
+            rec: si.BaseRecording = extract_func(datafolder, **kwargs)
+        elif input_type == 'file':
+            datafiles = glob.glob(str(self.base_folder_path / file_pattern))
+            if len(datafiles) == 0:
+                raise ValueError(f"No files found matching pattern: {file_pattern}")
+            elif len(datafiles) > 1:
+                warnings.warn(f"Multiple files found matching pattern: {file_pattern}. Using first file.")
+            datafile = datafiles[0]
+            rec: si.BaseRecording = extract_func(datafile, **kwargs)
+        elif input_type == 'files':
+            datafiles = [str(x) for x in self.base_folder_path.glob(file_pattern)]
+            if len(datafiles) == 0:
+                raise ValueError(f"No files found matching pattern: {file_pattern}")
+            datafiles = self._truncate_file_list(datafiles)
+            datafiles.sort() # TODO sort by index, or some other logic.
+            recs: list[si.BaseRecording] = [extract_func(x, **kwargs) for x in datafiles]
+            rec = si.concatenate_recordings(recs)
+        else:
+            raise ValueError(f"Invalid mode: {input_type}")
+
+        self.LongRecording = rec
+        self.meta = DDFBinaryMetadata(n_channels=self.LongRecording.get_num_channels(),
+                                      f_s=self.LongRecording.get_sampling_frequency(),
+                                      dt_end=constants.DEFAULT_DAY, # TODO some way to parse from file date
+                                      channel_names=self.LongRecording.get_channel_ids().tolist())
+        
+    def convert_file_with_mne_to_recording(self, 
+                                           extract_func: Callable[..., mne.io.Raw], 
+                                           input_type: Literal['folder', 'file', 'files']='folder', 
+                                           file_pattern: str='*', 
+                                           intermediate: Literal['edf', 'bin'] = 'edf',
+                                           intermediate_name = None,
+                                           overwrite = True,
+                                           **kwargs):
+        
+        if input_type == 'folder':
+            datafolder = self.base_folder_path
+            raw: mne.io.Raw = extract_func(datafolder, **kwargs)
+        elif input_type == 'file':
+            datafiles = list(self.base_folder_path.glob(file_pattern))
+            if len(datafiles) == 0:
+                raise ValueError(f"No files found matching pattern: {file_pattern}")
+            elif len(datafiles) > 1:
+                warnings.warn(f"Multiple files found matching pattern: {file_pattern}. Using first file.")
+            datafile = datafiles[0]
+            raw: mne.io.Raw = extract_func(datafile, **kwargs)
+        elif input_type == 'files':
+            datafiles = list(self.base_folder_path.glob(file_pattern))
+            if len(datafiles) == 0:
+                raise ValueError(f"No files found matching pattern: {file_pattern}")
+            datafiles = self._truncate_file_list(datafiles)
+            datafiles.sort() # TODO sort by index, or some other logic.
+            raws: list[mne.io.Raw] = [extract_func(x, **kwargs) for x in datafiles]
+            raw: mne.io.Raw = mne.concatenate_raws(raws)
+        else:
+            raise ValueError(f"Invalid mode: {input_type}")
+        
+        # Cache raw to binary
+        intermediate_name = f"{self.base_folder_path.name}_mne-to-rec" if intermediate_name is None else intermediate_name
+        if intermediate == 'edf':
+            fname = self.base_folder_path / f"{intermediate_name}.edf"
+            mne.export.export_raw(fname, raw=raw, fmt='edf', overwrite=overwrite) # FIXME this takes up a lot of memory
+            rec = se.read_edf(fname)
+        elif intermediate == 'bin':
+            fname = self.base_folder_path / f"{intermediate_name}.bin"
+            data: np.ndarray = raw.get_data() # (n channels, n samples)
+            data = data.T # (n samples, n channels)
+            data.tofile(fname)
+
+            params = {
+                "sampling_frequency" : raw.info.sfreq,
+                "dtype" : data.dtype,
+                "num_channels" : raw.info.nchan,
+                "gain_to_uV" : 1,
+                "offset_to_uV" : 0,
+                "time_axis" : 0,
+                "is_filtered" : False
+            }
+            rec = se.read_binary(fname, **params)
+
+        else:
+            raise ValueError(f"Invalid intermediate: {intermediate}")
+
+        self.LongRecording = rec
+        self.meta = DDFBinaryMetadata(n_channels=self.LongRecording.get_num_channels(),
+                                      f_s=self.LongRecording.get_sampling_frequency(),
+                                      dt_end=constants.DEFAULT_DAY, # TODO some way to parse from file date
+                                      channel_names=self.LongRecording.get_channel_ids().tolist())
+
 
     def cleanup_rec(self):
         try:
@@ -409,6 +632,3 @@ class LongRecordingOrganizer:
         startidx = frag_len_idx * fragment_idx
         endidx = min(frag_len_idx * (fragment_idx + 1), self.LongRecording.get_num_frames())
         return startidx, endidx
-
-
-# %%

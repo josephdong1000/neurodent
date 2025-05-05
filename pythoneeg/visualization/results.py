@@ -25,6 +25,7 @@ from tqdm import tqdm
 import h5py
 import spikeinterface as si
 import mne
+from django.utils.text import slugify
 
 # Local imports
 from .. import constants
@@ -80,7 +81,8 @@ class AnimalOrganizer(AnimalFeatureParser):
                  mode: Literal["nest", "concat", "base", "noday"] = "concat", 
                  assume_from_number=False,
                  skip_days: list[str] = [], 
-                 truncate:bool|int=False) -> None:
+                 truncate:bool|int=False,
+                 lro_kwargs: dict = {}) -> None:
 
         """
         AnimalOrganizer is used to organize data from a single animal into a format that can be used for analysis.
@@ -135,8 +137,8 @@ class AnimalOrganizer(AnimalFeatureParser):
             raise ValueError(f"No files found for animal ID {self.anim_id}")
         
         self.long_analyzers: list[core.LongRecordingAnalyzer] = []
-        self.long_recordings = [core.LongRecordingOrganizer(e, truncate=truncate) for e in self._bin_folders]
-        self.metadatas = [lrec.meta for lrec in self.long_recordings]
+        self.long_recordings = [core.LongRecordingOrganizer(e, truncate=truncate, **lro_kwargs) for e in self._bin_folders]
+        # self.metadatas = [lrec.meta for lrec in self.long_recordings]
 
         animalday_dicts = [core.parse_path_to_animalday(e, animal_param=self.animal_param, day_sep=self.day_sep, mode=self.read_mode) for e in self._bin_folders]
         self.animaldays = [x['animalday'] for x in animalday_dicts]
@@ -208,13 +210,15 @@ class AnimalOrganizer(AnimalFeatureParser):
                 case 'dask':
                     # Save fragments to tempfile
                     tmppath = os.path.join(get_temp_directory(), f"temp_{os.urandom(24).hex()}.h5")
-                    # NOTE the last fragment is not included because it makes the dask array ragged. Maybe have a small statement that adds it back in
+                    
+                    # NOTE the last fragment is not included because it makes the dask array ragged
                     logging.debug("Converting LongRecording to numpy array")
-                    # Pre-allocate array for faster stacking
+                    
+                    n_fragments_war = max(lan.n_fragments - 1, 1)
                     first_fragment = lan.get_fragment_np(0)
-                    np_fragments = np.empty((lan.n_fragments - 1,) + first_fragment.shape, dtype=first_fragment.dtype)
-                    np_fragments[0] = first_fragment
-                    for idx in range(1, lan.n_fragments - 1):
+                    np_fragments = np.empty((n_fragments_war,) + first_fragment.shape, dtype=first_fragment.dtype)
+                    logging.debug(f"np_fragments.shape: {np_fragments.shape}")
+                    for idx in range(n_fragments_war):
                         np_fragments[idx] = lan.get_fragment_np(idx)
 
                     logging.debug(f"Caching numpy array with h5py in {tmppath}")
@@ -231,7 +235,7 @@ class AnimalOrganizer(AnimalFeatureParser):
 
                     # This is not parallelized
                     logging.debug("Processing metadata serially")
-                    metadatas = [self._process_fragment_metadata(idx, lan, window_s) for idx in range(lan.n_fragments - 1)]
+                    metadatas = [self._process_fragment_metadata(idx, lan, window_s) for idx in range(n_fragments_war)]
 
                     # Process fragments in parallel using Dask
                     logging.debug("Processing features in parallel")
@@ -242,7 +246,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                             lan.f_s, 
                             features, 
                             kwargs
-                        ) for idx in range(lan.n_fragments - 1)]
+                        ) for idx in range(n_fragments_war)]
                         # del np_fragments_reconstruct # cleanup memory
                         feature_values = dask.compute(*feature_values)
                         f.close() # ensure file is closed
@@ -319,7 +323,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                                     genotype=self.genotype,
                                     animal_day=self.animaldays[i],
                                     bin_folder_name=self.bin_folder_names[i],
-                                    metadata=self.metadatas[i],
+                                    metadata=self.long_recordings[i].meta,
                                     channel_names=self.channel_names,
                                     assume_from_number=self.assume_from_number)
                 for i, sas in enumerate(lrec_sas)]
@@ -625,15 +629,14 @@ class WindowAnalysisResult(AnimalFeatureParser):
                                   self.channel_names,
                                   self.assume_from_number)
 
-    def _apply_filter(self, filter_tfs:np.ndarray, verbose=True):
+    def _apply_filter(self, filter_tfs:np.ndarray):
         result = self.result.copy()
         filter_tfs = np.array(filter_tfs, dtype=bool) # (M fragments, N channels)
         for feat in constants.FEATURES:
             if feat not in result.columns:
                 logging.info(f"Skipping {feat} because it is not in result")
                 continue
-            if verbose:
-                logging.info(f"Filtering {feat}")
+            logging.info(f"Filtering {feat}")
             match feat: # TODO refactor this to use constants
                 case 'rms' | 'ampvar' | 'psdtotal' | 'nspike' | 'logrms' | 'logampvar' | 'logpsdtotal' | 'lognspike':
                     vals = np.array(result[feat].tolist())
@@ -679,19 +682,24 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     raise ValueError(f'Unknown feature to filter {feat}')
         return result
     
-    def save_pickle_and_json(self, folder: str | Path, make_folder=True, save_abbrevs_as_chnames=False):
+    def save_pickle_and_json(self, folder: str | Path, make_folder=True, slugify_filebase=True, save_abbrevs_as_chnames=False):
         """Archive window analysis result into the folder specified, as a pickle and json file.
 
         Args:
             folder (str | Path): Destination folder to save results to
             make_folder (bool, optional): If True, create the folder if it doesn't exist. Defaults to True.
+            slugify_filebase (bool, optional): If True, slugify the filebase (replace special characters). Defaults to True.
             save_abbrevs_as_chnames (bool, optional): If True, save the channel abbreviations as the channel names in the json file. Defaults to False.
         """
         folder = Path(folder)
         if make_folder:
             folder.mkdir(parents=True, exist_ok=True)
 
-        filebase = str(folder / f"{self.animal_id}-{self.genotype}")
+        if slugify_filebase:
+            filebase = folder / slugify(f"{self.animal_id}-{self.genotype}")
+        else:
+            filebase = folder / f"{self.animal_id}-{self.genotype}"
+        filebase = str(filebase)
 
         self.result.to_pickle(filebase + '.pkl')
         json_dict = {
@@ -817,6 +825,7 @@ class SpikeAnalysisResult(AnimalFeatureParser):
     def save_fif_and_json(self, folder: str | Path,
                           convert_to_mne=True,
                           make_folder=True, 
+                          slugify_filebase=True,
                           save_abbrevs_as_chnames=False,
                           overwrite=False):
         """Archive spike analysis result into the folder specified, as a fif and json file.
@@ -825,6 +834,7 @@ class SpikeAnalysisResult(AnimalFeatureParser):
             folder (str | Path): Destination folder to save results to
             convert_to_mne (bool, optional): If True, convert the SortingAnalyzers to a MNE RawArray if self.result_mne is None. Defaults to True.
             make_folder (bool, optional): If True, create the folder if it doesn't exist. Defaults to True.
+            slugify_filebase (bool, optional): If True, slugify the filebase (replace special characters). Defaults to True.
             save_abbrevs_as_chnames (bool, optional): If True, save the channel abbreviations as the channel names in the json file. Defaults to False.
             overwrite (bool, optional): If True, overwrite the existing files. Defaults to False.
         """
@@ -843,7 +853,12 @@ class SpikeAnalysisResult(AnimalFeatureParser):
         if make_folder:
             folder.mkdir(parents=True, exist_ok=True)
 
-        filebase = str(folder / f"{self.animal_id}-{self.genotype}-{self.animal_day}")
+        if slugify_filebase:
+            filebase = folder / slugify(f"{self.animal_id}-{self.genotype}-{self.animal_day}")
+        else:
+            filebase = folder / f"{self.animal_id}-{self.genotype}-{self.animal_day}"
+        filebase = str(filebase)
+            
         if not overwrite:
             if filebase + '.json' in folder.glob('*.json'):
                 raise FileExistsError(f"File {filebase}.json already exists")
