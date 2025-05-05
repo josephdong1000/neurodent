@@ -28,7 +28,7 @@ cluster_window = SLURMCluster(
         cores=20,
         memory='100GB',
         # processes=1,
-        walltime='12:00:00',
+        walltime='48:00:00',
         interface=None,
         scheduler_options={'interface': 'eth1'}, # Look at `nmcli dev status` to find the correct interface
         job_extra_directives=['--output=/dev/null',
@@ -37,13 +37,13 @@ cluster_window = SLURMCluster(
 print(f"\n\n\tcluster_window.dashboard_link: {cluster_window.dashboard_link}\n\n")
 cluster_spike = SLURMCluster(
         cores=1,
-        memory='20GB',
+        memory='100GB',
         processes=1,
         walltime='12:00:00',
         interface=None,
         scheduler_options={'interface': 'eth1'}, # Look at `nmcli dev status` to find the correct interface
-        job_extra_directives=['--output=/dev/null',
-                             '--error=/dev/null']
+        # job_extra_directives=['--output=/dev/null',
+        #                      '--error=/dev/null']
     )
 print(f"\n\n\tcluster_spike.dashboard_link: {cluster_spike.dashboard_link}\n\n")
 cluster_window.scale(10)
@@ -55,7 +55,7 @@ cluster_spike.adapt(maximum_jobs=10)
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.DEBUG, stream=sys.stdout, force=True)
 logger = logging.getLogger()
 
-with open(base_folder / 'notebooks' / 'tests' / 'sox5.json', 'r') as f:
+with open(base_folder / 'notebooks' / 'tests' / 'sox5 combine genotypes.json', 'r') as f:
     data = json.load(f)
 data_parent_folder = Path(data['data_parent_folder'])
 constants.GENOTYPE_ALIASES = data['GENOTYPE_ALIASES']
@@ -64,23 +64,25 @@ data_folders_to_animal_ids = data['data_folders_to_animal_ids']
 for data_folder, animal_ids in data_folders_to_animal_ids.items():
     for animal_id in animal_ids:
 
-        # SECTION 1: Find bin files
-        ao = visualization.AnimalOrganizer(data_parent_folder / data_folder, animal_id,
-                                    mode="nest", 
-                                    assume_from_number=True,
-                                    skip_days=['bad'])
-
-        # SECTION 2: Make WAR
         with Client(cluster_window) as client:
-            client.upload_file(str(base_folder / 'pythoneeg.zip'))
+            client.upload_file(str(base_folder / 'pythoneeg.tar.gz'))
+            # SECTION 1: Find bin files
+            ao = visualization.AnimalOrganizer(data_parent_folder / data_folder, animal_id,
+                                        mode="nest", 
+                                        assume_from_number=True,
+                                        skip_days=['bad'],
+                                        truncate=1, # FIXME remove later
+                                        lro_kwargs={'mode': 'bin', 'multiprocess_mode': 'dask'}
+            )
+            # ao.convert_colbins_to_rowbins(overwrite=True, multiprocess_mode='dask')
+            # ao.convert_rowbins_to_rec(multiprocess_mode='dask')
             
-            ao.convert_colbins_to_rowbins(overwrite=True, multiprocess_mode='dask')
-            ao.convert_rowbins_to_rec(multiprocess_mode='dask') # paralleization breaks if not enough memory
+            # SECTION 2: Make WAR
             war = ao.compute_windowed_analysis(['all'], multiprocess_mode='dask')
 
         # SECTION 3: Make SARs, save SARs and load into WAR
         with Client(cluster_spike) as client:
-            client.upload_file(str(base_folder / 'pythoneeg.zip'))
+            client.upload_file(str(base_folder / 'pythoneeg.tar.gz'))
             
             sars = ao.compute_spike_analysis(multiprocess_mode='dask')
             for sar in sars:
