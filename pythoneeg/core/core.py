@@ -163,7 +163,7 @@ def convert_ddfrowbin_to_si(bin_rowmajor_path, metadata):
         warnings.warn(f"Sampling rate {rec.sampling_frequency} Hz != {constants.GLOBAL_SAMPLING_RATE} Hz. Resampling")
         rec = spre.resample(rec, constants.GLOBAL_SAMPLING_RATE)
 
-    rec = spre.astype(rec, dtype=np.longlong)
+    rec = spre.astype(rec, dtype=constants.GLOBAL_DTYPE)
 
     return rec, temppath
 
