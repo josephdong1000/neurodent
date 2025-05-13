@@ -2,6 +2,7 @@
 module load Python/3.10.8-GCCcore-12.2.0.lua
 # cd ~/source-code/PyEEG
 cd /mnt/isilon/marsh_single_unit/PythonEEG
+tar -zcvf pythoneeg.tar.gz ./pythoneeg/
 source .venv/bin/activate
 
 python -u $1

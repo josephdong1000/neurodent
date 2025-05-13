@@ -119,6 +119,7 @@ class MountainSortAnalyzer:
         # dask.distributed.print(f"Caching recording to {temp_dir}")
         os.makedirs(temp_dir)
         cached_rec = create_cached_recording(recording.clone(), folder=temp_dir, chunk_duration='60s')
+        cached_rec = spre.astype(cached_rec, dtype=constants.GLOBAL_DTYPE)
         return cached_rec
 
     @staticmethod
@@ -136,7 +137,8 @@ class MountainSortAnalyzer:
             snippet_T2=snippet_T2_samples,
         )
 
-        with _HiddenPrints(): # REVIEW could also dask delay this. Same problem
+        # dask.distributed.print(f"recording.dtype: {recording.dtype}")
+        with _HiddenPrints():
             sorting = sorting_scheme2(
                 recording=recording,
                 sorting_parameters=sort_params

@@ -1,4 +1,5 @@
 from datetime import datetime
+import numpy as np
 
 DEFAULT_ID_TO_LR = {
     9 : 'L',
@@ -59,10 +60,11 @@ DATEPARSER_PATTERNS_TO_REMOVE = [
 ]
 DEFAULT_DAY = datetime(2000, 1, 1)
 
-GLOBAL_SAMPLING_RATE = 2000
+GLOBAL_SAMPLING_RATE = 1000
+GLOBAL_DTYPE = np.float64
 
 LINEAR_FEATURES = ['rms', 'ampvar', 'psdtotal', 'psdslope', 'nspike'] + \
-                  ['logrms', 'logampvar', 'logpsdtotal', 'lognspike'] # TODO implement this, and perhaps substitute the match notation across the repo
+                  ['logrms', 'logampvar', 'logpsdtotal', 'lognspike']
 BAND_FEATURES = ['psdband', 'psdfrac'] + \
                 ['logpsdband', 'logpsdfrac']
 MATRIX_FEATURES = ['cohere', 'pcorr']
@@ -93,8 +95,10 @@ LINE_FREQ = 60
 SORTING_PARAMS = {
     'notch_freq' : LINE_FREQ,
     'common_ref' : True,
+    # 'common_ref' : False,
     'scale' : None,
     'whiten' : True,
+    # 'whiten' : False,
     'freq_min' : 0.1,
     'freq_max' : 100,
 }

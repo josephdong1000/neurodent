@@ -29,9 +29,13 @@ mountainsort5 = "*"
 statannotations = "*"
 statsmodels = "*"
 django = "*"
+neo = "*"
+pyedflib = "*"
+edfio = "*"
 
 [dev-packages]
 snakeviz = "*"
+pyqt5 = "*"
 
 [requires]
 python_version = "3.10"
