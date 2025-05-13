@@ -32,7 +32,7 @@ cluster_window = SLURMCluster(
         interface=None,
         scheduler_options={'interface': 'eth1'}, # Look at `nmcli dev status` to find the correct interface
         job_extra_directives=['--output=/dev/null',
-                             '--error=/dev/null']
+                              '--error=/dev/null']
     )
 print(f"\n\n\tcluster_window.dashboard_link: {cluster_window.dashboard_link}\n\n")
 cluster_spike = SLURMCluster(
@@ -42,8 +42,8 @@ cluster_spike = SLURMCluster(
         walltime='12:00:00',
         interface=None,
         scheduler_options={'interface': 'eth1'}, # Look at `nmcli dev status` to find the correct interface
-        # job_extra_directives=['--output=/dev/null',
-        #                      '--error=/dev/null']
+        job_extra_directives=['--output=/dev/null',
+                              '--error=/dev/null']
     )
 print(f"\n\n\tcluster_spike.dashboard_link: {cluster_spike.dashboard_link}\n\n")
 cluster_window.scale(10)
