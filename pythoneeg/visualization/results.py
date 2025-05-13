@@ -100,6 +100,7 @@ class AnimalOrganizer(AnimalFeatureParser):
             assume_from_number (bool, optional): Whether to assume the animal ID is a number. Defaults to False.
             skip_days (list[str], optional): The days to skip. Defaults to [].
             truncate (bool|int, optional): Whether to truncate the data. Defaults to False.
+            lro_kwargs (dict, optional): Keyword arguments for LongRecordingOrganizer. Defaults to {}.
         """
         
         self.base_folder_path = Path(base_folder_path)
