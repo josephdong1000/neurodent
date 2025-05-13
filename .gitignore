@@ -4,6 +4,8 @@
 /bins/*
 
 **/test-*/*
+**/wars-*/*
+**/sars-*/*
 !notebooks/tests/test-data/A10*
 !notebooks/tests/test-data/F22*
 !notebooks/tests/test-wars/A10*

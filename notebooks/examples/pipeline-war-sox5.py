@@ -28,7 +28,7 @@ core.set_temp_directory('/scr1/users/dongjp')
 cluster_window = SLURMCluster(
         cores=8,
         memory='100GB',
-        walltime='24:00:00',
+        walltime='48:00:00',
         interface=None,
         scheduler_options={'interface': 'eth1'},
         job_extra_directives=['--output=/dev/null',
@@ -41,7 +41,7 @@ cluster_spike = SLURMCluster(
         processes=1,
         walltime='12:00:00',
         interface=None,
-        scheduler_options={'interface': 'eth1'},
+        scheduler_options={'interface': 'eth1'}, # Look at `nmcli dev status` to find the correct interface
         job_extra_directives=['--output=/dev/null',
                              '--error=/dev/null']
     )
@@ -63,6 +63,9 @@ constants.GENOTYPE_ALIASES = data['GENOTYPE_ALIASES']
 data_folders_to_animal_ids = data['data_folders_to_animal_ids']
 wars = []
 
+# constants.SORTING_PARAMS['freq_min'] = 60
+# constants.SORTING_PARAMS['freq_max'] = 400
+
 for data_folder, animal_ids in data_folders_to_animal_ids.items():
     for animal_id in animal_ids:
         ao = visualization.AnimalOrganizer(data_parent_folder / data_folder, animal_id,
@@ -70,7 +73,17 @@ for data_folder, animal_ids in data_folders_to_animal_ids.items():
                                     assume_from_number=True,
                                     skip_days=['bad'])
         with Client(cluster_window) as client:
-            client.upload_file(str(packageroot / 'pythoneeg.zip'))
+            client.upload_file(str(packageroot / 'pythoneeg.tar.gz'))
+
+            # SECTION 1: Find bin files
+            ao = visualization.AnimalOrganizer(data_parent_folder / data_folder, animal_id,
+                                        mode="nest", 
+                                        assume_from_number=True,
+                                        skip_days=['bad'],
+                                        lro_kwargs={'mode': 'bin',
+                                                    'multiprocess_mode': 'dask',
+                                                    'overwrite_rowbins': True}
+            )
             
             ao.convert_colbins_to_rowbins(overwrite=True, multiprocess_mode='dask')
             ao.convert_rowbins_to_rec(multiprocess_mode='dask') # paralleization breaks if not enough memory
@@ -88,5 +101,5 @@ for data_folder, animal_ids in data_folders_to_animal_ids.items():
         wars.append(war)
 
 """
-sbatch --mem 100G -c 5 -t 48:00:00 ./notebooks/examples/pipeline.sh ./notebooks/examples/pipeline-war-sox5.py
+sbatch --mem 300G -c 4 -t 48:00:00 /mnt/isilon/marsh_single_unit/PythonEEG/notebooks/examples/pipeline.sh /mnt/isilon/marsh_single_unit/PythonEEG/notebooks/examples/pipeline-war-sox5.py
 """
