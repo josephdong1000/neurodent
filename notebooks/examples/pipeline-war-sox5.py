@@ -36,8 +36,8 @@ cluster_window = SLURMCluster(
     )
 print(f"\n\n\tcluster_window.dashboard_link: {cluster_window.dashboard_link}\n\n")
 cluster_spike = SLURMCluster(
-        cores=1,
-        memory='20GB',
+        cores=4,
+        memory='100GB',
         processes=1,
         walltime='12:00:00',
         interface=None,
