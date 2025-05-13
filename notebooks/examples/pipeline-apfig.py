@@ -23,7 +23,6 @@ core.set_temp_directory('/scr1/users/dongjp')
 
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO, stream=sys.stdout, force=True)
 logger = logging.getLogger()
-
 # animal_ids = ['A5', 'A10', 'F22', 'G25', 'G26', 'N21', 'N22', 'N23', 'N24', 'N25']
 animal_ids = ['031722_cohort_6_group1_3mice_MMUT_MMUT_MWT M7',
               '031722_cohort_6_group1_3mice_MMUT_MMUT_MWT MMUT(1)',

@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import matplotlib
 import matplotlib.axes
 import matplotlib.pyplot as plt
@@ -12,13 +14,15 @@ from ... import constants
 
 class AnimalPlotter(viz.AnimalFeatureParser):
 
-    def __init__(self, war: viz.WindowAnalysisResult) -> None:
+    def __init__(self, war: viz.WindowAnalysisResult, save_fig: bool = False, save_path: Path = None) -> None:
         self.window_result = war
         self.genotype = war.genotype
         self.channel_names = war.channel_names
         self.n_channels = len(self.channel_names)
         self.__assume_from_number = war.assume_from_number
         self.channel_abbrevs = war.channel_abbrevs
+        self.save_fig = save_fig
+        self.save_path: Path = save_path
 
     # REVIEW this function may not be necessary
     # def get_animalday_metadata(self, animalday) -> core.DDFBinaryMetadata:
@@ -48,7 +52,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         for i, (_, row) in enumerate(avg_result.iterrows()):
             self._plot_coherecorr_matrixgroup(row, bands, ax[i, :], show_bandname=i == 0, norm_list=normlist, cmap=cmap, **kwargs)
             # rowcount += 1
-        plt.show()
+        self._handle_figure(fig, title="coherecorr_matrix")
 
     def plot_coherecorr_diff(self, groupby="isday", bands=None, figsize=None, cmap='bwr', **kwargs):
         avg_result = self.__get_groupavg_coherecorr(groupby, **kwargs)
@@ -67,6 +71,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         fig, ax = plt.subplots(1, len(bands), squeeze=False, figsize=figsize, **kwargs)
 
         self._plot_coherecorr_matrixgroup(diff_result, bands, ax[0, :], show_bandname=True, center_cmap=True, cmap=cmap, **kwargs)
+        self._handle_figure(fig, title="coherecorr_diff")
 
     def _plot_coherecorr_matrixgroup(self, group:pd.Series, bands:list[str], ax:list[matplotlib.axes.Axes], show_bandname,
                                     center_cmap=False, norm_list=None, show_channelname=True, **kwargs):
@@ -117,7 +122,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                 self._plot_linear_temporalgroup(group=df_row, feature=feat, ax=ax[j], score_type=score_type, channels=channels, show_endfile=show_endfile, **kwargs)
             ax[-1].set_xlabel("Time (s)")
             fig.suptitle(i)
-            plt.show()
+            self._handle_figure(fig, title=f"linear_temporal_{i}")
 
     def _plot_linear_temporalgroup(self, group:pd.DataFrame, feature:str, ax:matplotlib.axes.Axes, channels:list[int]=None, score_type:str='z',
                                      duration_name='duration', channel_y_offset=10, feature_y_offset=10, endfile_name='endfile', show_endfile=False, show_channelname=True, **kwargs):
@@ -239,7 +244,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                                                     duration_name=duration_name, endfile_name=endfile_name, **kwargs)
             ax[-1].set_xlabel("Time (s)")
             fig.suptitle(i)
-            plt.show()
+            self._handle_figure(fig, title=f"coherecorr_spectral_{i}")
 
     def _plot_coherecorr_spectralgroup(self, group:pd.DataFrame, feature:str, ax:matplotlib.axes.Axes,
                                         center_cmap=True, score_type='z', norm_list=None, show_featurename=True, show_endfile=False,
@@ -251,7 +256,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         # data_flat = data_Z.reshape(data_Z.shape[0], -1).transpose()
 
         if center_cmap:
-            norm = matplotlib.colors.CenteredNorm(halfrange=std_dev * 2)
+            norm = matplotlib.colors.CenteredNorm(vcenter=0, halfrange=std_dev * 2)
         else:
             norm = None
 
@@ -321,7 +326,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         ax[0, 0].set_ylabel("PSD (uV^2/Hz)")
         ax[0, -1].legend(loc='center left', bbox_to_anchor=(1.05, 0.5))
         ax[0, -1].set_xlim(xlim)
-        plt.show()
+        self._handle_figure(fig, title="psd_histogram")
 
     # STUB plot spectrogram over time, doing gaussian filter convolving when relevant, scaling logarithmically
     def plot_psd_spectrogram(self, multiindex=['animalday', 'animal', 'genotype'], freq_range=(1, 50), center_stat='mean', mode='z', figsize=None, cmap='magma', **kwargs):
@@ -364,4 +369,17 @@ class AnimalPlotter(viz.AnimalFeatureParser):
             ax.set_xlabel("Time (s)")
             ax.set_ylabel("Frequency (Hz)")
             ax.set_title(i)
+            self._handle_figure(fig, title=f"psd_spectrogram_{i}")
+
+    def _handle_figure(self, fig, title=None):
+        if self.save_fig:
+            if self.save_path is None:
+                raise ValueError("save_path must be provided when save_fig is True")
+            if title:
+                save_name = f"{self.save_path}_{title}.png"
+            else:
+                save_name = f"{self.save_path}.png"
+            fig.savefig(save_name, bbox_inches='tight', dpi=300)
+            plt.close(fig)
+        else:
             plt.show()

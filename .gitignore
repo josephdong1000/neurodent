@@ -31,7 +31,6 @@ slurm-*.out
 notebooks/tests/test_all_functions_Yong.ipynb
 
 /notebooks/tests/test-data
-*.json
 *.pkl
 *.bin
 *.csv
