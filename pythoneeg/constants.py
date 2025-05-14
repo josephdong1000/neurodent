@@ -61,7 +61,7 @@ DATEPARSER_PATTERNS_TO_REMOVE = [
 DEFAULT_DAY = datetime(2000, 1, 1)
 
 GLOBAL_SAMPLING_RATE = 1000
-GLOBAL_DTYPE = np.float64
+GLOBAL_DTYPE = np.float32
 
 LINEAR_FEATURES = ['rms', 'ampvar', 'psdtotal', 'psdslope', 'nspike'] + \
                   ['logrms', 'logampvar', 'logpsdtotal', 'lognspike']
