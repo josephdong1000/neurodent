@@ -74,7 +74,13 @@
         ]
     },
     "data_folders_to_animal_ids": {
+        "031621_cohort 2 group 2 and group 5": [
+            "F10",
+            "M2"
+        ],
         "031722_cohort_6_group1_3mice_MMUT_MMUT_MWT": [
+            "M7",
+            "MMUT(1)",
             "MMUT(2)"
         ],
         "031921_cohort 2 group 5 and group 6": [
