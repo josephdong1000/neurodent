@@ -25,7 +25,7 @@ core.set_temp_directory('/scr1/users/dongjp')
 
 # SECTION 1: Set up clusters
 cluster_window = SLURMCluster(
-        cores=20,
+        cores=30,
         memory='100GB',
         walltime='48:00:00',
         interface=None,
@@ -38,16 +38,17 @@ cluster_spike = SLURMCluster(
         cores=1,
         memory='100GB',
         processes=1,
-        walltime='12:00:00',
+        walltime='6:00:00',
         interface=None,
         scheduler_options={'interface': 'eth1'}, # Look at `nmcli dev status` to find the correct interface
         job_extra_directives=['--output=/dev/null',
                               '--error=/dev/null']
     )
 print(f"\n\n\tcluster_spike.dashboard_link: {cluster_spike.dashboard_link}\n\n")
-cluster_window.scale(10)
-cluster_window.wait_for_workers(10)
-cluster_spike.adapt(maximum_jobs=10)
+# cluster_window.scale(10)
+# cluster_window.wait_for_workers(10)
+cluster_window.scale(jobs=3)
+cluster_spike.adapt(maximum_jobs=15)
 
 
 # SECTION 2: Compute windowed analysis
