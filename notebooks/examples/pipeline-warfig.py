@@ -12,7 +12,8 @@ import mne
 from dask_jobqueue import SLURMCluster
 from dask.distributed import Client
 
-packageroot = Path('/home/dongjp/source-code/PyEEG').resolve()
+base_folder = Path('/mnt/isilon/marsh_single_unit/PythonEEG').resolve()
+packageroot = base_folder
 sys.path.append(str(packageroot))
 
 from pythoneeg import core
@@ -24,30 +25,33 @@ core.set_temp_directory('/scr1/users/dongjp')
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO, stream=sys.stdout, force=True)
 logger = logging.getLogger()
 
-
-animal_ids = ['A5', 'A10', 'F22', 'G25', 'G26', 'N21', 'N22', 'N23', 'N24', 'N25']
+# animal_ids = ['A5', 'A10', 'F22', 'G25', 'G26', 'N21', 'N22', 'N23', 'N24', 'N25']
 # animal_ids = ['A5', 'A10']
-base_folder = Path('/mnt/isilon/marsh_single_unit/PythonEEG Data Bins').resolve()
+animal_ids = [p.name for p in (base_folder / 'notebooks' / 'tests' / 'test-wars-full').glob('*') if p.is_dir()]
 
 # TODO reject all the bad channels by eye when constructing EP
 wars = []
-for animal_id in animal_ids:
-    war = visualization.WindowAnalysisResult.load_pickle_and_json(Path(f'/home/dongjp/source-code/PyEEG/notebooks/tests/test-wars-full/{animal_id}').resolve())
-    if animal_id == 'F22':
-        war.filter_all(reject_channels=['LMot', 'RBar', 'RVis', 'RAud'])
-    elif animal_id == 'N21':
-        war.filter_all(reject_channels=['RBar'])
-    elif animal_id == 'G25':
-        war.filter_all(reject_channels=['LAud', 'LHip'])
+for i, animal_id in enumerate(animal_ids):
+    print(f'Loading {i+1}/{len(animal_ids)} {animal_id}')
+    war = visualization.WindowAnalysisResult.load_pickle_and_json(Path(base_folder / 'notebooks' / 'tests' / 'test-wars-full' / f'{animal_id}').resolve())
+    # if animal_id == 'F22':
+    #     war.filter_all(reject_channels=['LMot', 'RBar', 'RVis', 'RAud'])
+    # elif animal_id == 'N21':
+    #     war.filter_all(reject_channels=['RBar'])
+    # elif animal_id == 'G25':
+    #     war.filter_all(reject_channels=['LAud', 'LHip'])
+    # else:
+    #     war.filter_all()
+    if war.genotype != 'Unknown': # Remove pathological recordings
+        wars.append(war)
     else:
-        war.filter_all()
-
-    wars.append(war)
-ep = visualization.ExperimentPlotter(wars)
+        print(f'Skipping {animal_id} because genotype is Unknown')
+ep = visualization.ExperimentPlotter(wars,
+                                     features=[f for f in constants.FEATURES if f not in ['nspike', 'lognspike']])
 
 catplot_params = {'showfliers': False}
 kinds = ['box', 'bar']
-save_folder = Path('/home/dongjp/Downloads/4-9-25').resolve()
+save_folder = Path('/home/dongjp/Downloads/5-14-25 ep sox5').resolve()
 if not save_folder.exists():
     save_folder.mkdir(parents=True)
 
@@ -82,7 +86,8 @@ if not save_folder.exists():
 
 # SECTION CATPLOTS, AVERAGE GROUPBY
 for kind in ['swarm', 'point']:
-    for feature in constants.LINEAR_FEATURES:
+    # for feature in constants.LINEAR_FEATURES:
+    for feature in ['rms', 'ampvar', 'psdtotal', 'psdslope', 'logrms', 'logampvar', 'logpsdtotal']:
         for collapse in [False, True]:
             g = ep.plot_catplot(feature, groupby=['animal', 'genotype'], x='genotype', hue='channel', kind=kind, average_groupby=True, collapse_channels=collapse, 
                                 catplot_params={'dodge': (kind == 'swarm' or not collapse), 'col': None, 'errorbar': 'ci'})
@@ -162,5 +167,5 @@ for kind in ['swarm', 'point']:
 #         g.savefig(save_folder / f'qq-{feature}-genotype-channel-{log}.png', dpi=300)
 
 """
-sbatch --mem 100G -c 8 -t 24:00:00 ./notebooks/examples/pipeline-warfig.sh
+sbatch --mem 700G -c 8 -t 24:00:00 ./notebooks/examples/pipeline.sh ./notebooks/examples/pipeline-warfig.py
 """
