@@ -72,7 +72,7 @@ def nanaverage(A, weights, axis=-1):
 def parse_path_to_animalday(filepath:str|Path, 
                             animal_param:tuple[int, str]|str|list[str] = (0, None),
                             day_sep:str|None = None,
-                            mode:Literal['nest', 'concat', 'base', 'noday']='concat'): # TODO implement this
+                            mode:Literal['nest', 'concat', 'base', 'noday']='concat'):
     """
     Parses the filename of a binfolder to get the animalday identifier (animal id, genotype, and day).
 
@@ -105,8 +105,7 @@ def parse_path_to_animalday(filepath:str|Path,
             raise ValueError(f"Invalid mode: {mode}")
     return {'animal': animid, 'genotype': geno, 'day': day, 'animalday': f"{animid} {geno} {day}"}
 
-# NOTE the rest of the functions should just parse out strings. Which part of the filepath to parse should be handled higher up or by parse_path_to_animalday
-def parse_str_to_genotype(string:str):
+def parse_str_to_genotype(string:str) -> str:
     """
     Parses the filename of a binfolder to get the genotype.
 
@@ -118,7 +117,7 @@ def parse_str_to_genotype(string:str):
     """
     return __get_key_from_match_values(string, constants.GENOTYPE_ALIASES)
 
-def parse_str_to_animal(string:str, animal_param:tuple[int, str]|str|list[str] = (0, None)): # TODO fix animal parsing, animal IDs have a variety of formats
+def parse_str_to_animal(string:str, animal_param:tuple[int, str]|str|list[str] = (0, None)) -> str:
     """
     Parses the filename of a binfolder to get the animal id.
 
@@ -206,7 +205,7 @@ def _clean_str_for_date(string:str):
     
     return cleaned
 
-def parse_chname_to_abbrev(channel_name:str, assume_from_number=False):
+def parse_chname_to_abbrev(channel_name:str, assume_from_number=False) -> str:
     """
     Parses the channel name to get the abbreviation.
 

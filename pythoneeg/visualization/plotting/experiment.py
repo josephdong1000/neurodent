@@ -72,7 +72,7 @@ class ExperimentPlotter():
                 raise e
 
         self.df_wars: list[pd.DataFrame] = df_wars
-        self.all = pd.concat(df_wars, axis=0, ignore_index=True) # FIXME this raises a warning about df wars having columns that are none I think
+        self.all = pd.concat(df_wars, axis=0, ignore_index=True) # TODO this raises a warning about df wars having columns that are none I think
         self.stats = None
 
 
@@ -102,7 +102,7 @@ class ExperimentPlotter():
             A DataFrame with the feature data.
         """
         if 'band' in groupby or groupby == 'band':
-            raise ValueError("'band' is not supported as a groupby variable. Use 'band' as a col/row/hue/x variable instead.") # REVIEW
+            raise ValueError("'band' is not supported as a groupby variable. Use 'band' as a col/row/hue/x variable instead.")
 
         if channels == 'all':
             channels = self.all_channel_names
@@ -187,6 +187,11 @@ class ExperimentPlotter():
         df = df.melt(id_vars=groupby, value_vars=feature_cols, var_name='channel', value_name=feature)
         
         if feature == 'psdslope':
+            # FIXME for some pathological recordings this raise a TypeError 'float' object is not subscriptable
+            # Probabky because its just empty? Are some slopes just encoded as integers not a integer+intercept?
+
+            # Well np.NaN is a float, so maybe this is trying to get the slope of a NaN-only slice. Have a check for this.
+            
             df[feature] = df[feature].apply(lambda x: x[0]) # get slope from [slope, intercept]
         elif feature in constants.BAND_FEATURES + ['cohere']:
             df[feature] = df[feature].apply(lambda x: list(zip(x, constants.BAND_NAMES)))
@@ -350,7 +355,7 @@ class ExperimentPlotter():
                         col: str=None,
                         row: str=None,
                         channels: str | list[str]='all', 
-                        collapse_channels: bool=False, # REVIEW what happens if collapse_channels is true?
+                        collapse_channels: bool=False, # REVIEW what happens if collapse_channels is true? Might not need this parameter
                         average_groupby: bool=False,
                         cmap: str='RdBu_r', 
                         height: float=3, 
@@ -416,7 +421,6 @@ class ExperimentPlotter():
         plt.xticks(range(n_channels), ch_names, rotation=45, ha='right')
         plt.yticks(range(n_channels), ch_names)
 
-    # STUB working on this
     def plot_diffheatmap(self,
                             feature: str,
                             groupby: str | list[str],
@@ -473,7 +477,7 @@ class ExperimentPlotter():
         # Map the plotting function
         g.map_dataframe(self._plot_matrix, feature=feature, color_palette=cmap)
         
-        # STUB implement statistical testing with big N and small N
+        # NOTE implement statistical testing with big N and small N
 
         # Adjust layout
         plt.tight_layout()

@@ -315,7 +315,7 @@ class LongRecordingAnalyzer:
     #                                         fmax=constants.FREQ_BAND_TOTAL[1],
     #                                         sfreq=self.f_s / downsamp_q,
     #                                         n_cycles=n_cycles,
-    #                                         indices=indices, # TODO implement L/R hemisphere coherence metrics
+    #                                         indices=indices, # NOTE implement L/R hemisphere coherence metrics
     #                                         verbose=False)
     #     except MemoryError as e:
     #         raise MemoryError("Out of memory, use a larger freq_res parameter") from e
@@ -368,7 +368,7 @@ class LongRecordingAnalyzer:
     #     return envcor.get_data().reshape((self.n_channels, self.n_channels))
 
     # def compute_pac(self, index):
-    #     ... # TODO implement CFC measures
+    #     ... # NOTE implement CFC measures
 
 
     def get_file_end(self, index, **kwargs):

@@ -496,7 +496,7 @@ class LongRecordingOrganizer:
         elif len(recs) < len(self.rowbins):
             logging.warning(f"Only {len(recs)} recordings generated. Some row-major files may be missing.")
 
-        self.LongRecording: si.BaseRecording = si.concatenate_recordings(recs).rename_channels(self.channel_names) # TODO support LongRecording + other parameters with Neo
+        self.LongRecording: si.BaseRecording = si.concatenate_recordings(recs).rename_channels(self.channel_names)
         self.start_datetime = self._median_datetime - timedelta(seconds=t_to_median)
 
     def convert_file_with_si_to_recording(self, 
@@ -529,7 +529,7 @@ class LongRecordingOrganizer:
         self.LongRecording = rec
         self.meta = DDFBinaryMetadata(n_channels=self.LongRecording.get_num_channels(),
                                       f_s=self.LongRecording.get_sampling_frequency(),
-                                      dt_end=constants.DEFAULT_DAY, # TODO some way to parse from file date
+                                      dt_end=constants.DEFAULT_DAY, # NOTE parse timestamp from SI file date/metadata?
                                       channel_names=self.LongRecording.get_channel_ids().tolist())
         
     def convert_file_with_mne_to_recording(self, 
@@ -539,6 +539,7 @@ class LongRecordingOrganizer:
                                            intermediate: Literal['edf', 'bin'] = 'edf',
                                            intermediate_name = None,
                                            overwrite = True,
+                                           multiprocess_mode: Literal['dask', 'serial']='serial',
                                            **kwargs):
         
         if input_type == 'folder':
@@ -558,21 +559,33 @@ class LongRecordingOrganizer:
                 raise ValueError(f"No files found matching pattern: {file_pattern}")
             datafiles = self._truncate_file_list(datafiles)
             datafiles.sort() # TODO sort by index, or some other logic.
+            logging.debug(f"Running extract_func on {len(datafiles)} files")
             raws: list[mne.io.Raw] = [extract_func(x, **kwargs) for x in datafiles]
+            logging.debug(f"Concatenating {len(raws)} raws")
             raw: mne.io.Raw = mne.concatenate_raws(raws)
+            del raws
         else:
             raise ValueError(f"Invalid mode: {input_type}")
+        
+        logging.info(raw.info)
+        logging.debug(f"Old sampling frequency: {raw.info['sfreq']}")
+        raw = raw.resample(constants.GLOBAL_SAMPLING_RATE)
+        logging.debug(f"New sampling frequency: {raw.info['sfreq']}")
         
         # Cache raw to binary
         intermediate_name = f"{self.base_folder_path.name}_mne-to-rec" if intermediate_name is None else intermediate_name
         if intermediate == 'edf':
             fname = self.base_folder_path / f"{intermediate_name}.edf"
-            mne.export.export_raw(fname, raw=raw, fmt='edf', overwrite=overwrite) # FIXME this takes up a lot of memory
+            logging.debug(f"Exporting raw to {fname}")
+            mne.export.export_raw(fname, raw=raw, fmt='edf', overwrite=overwrite) # NOTE this causes a lot of OOM issues
+            logging.debug("Reading edf file")
             rec = se.read_edf(fname)
         elif intermediate == 'bin':
             fname = self.base_folder_path / f"{intermediate_name}.bin"
+            logging.debug(f"Exporting raw to {fname}")
             data: np.ndarray = raw.get_data() # (n channels, n samples)
             data = data.T # (n samples, n channels)
+            logging.debug(f"Writing to {fname}")
             data.tofile(fname)
 
             params = {
@@ -584,6 +597,7 @@ class LongRecordingOrganizer:
                 "time_axis" : 0,
                 "is_filtered" : False
             }
+            logging.debug(f"Reading from {fname}")
             rec = se.read_binary(fname, **params)
 
         else:
@@ -592,7 +606,7 @@ class LongRecordingOrganizer:
         self.LongRecording = rec
         self.meta = DDFBinaryMetadata(n_channels=self.LongRecording.get_num_channels(),
                                       f_s=self.LongRecording.get_sampling_frequency(),
-                                      dt_end=constants.DEFAULT_DAY, # TODO some way to parse from file date
+                                      dt_end=constants.DEFAULT_DAY, # NOTE parse timestamp from MNE file date/metadata?
                                       channel_names=self.LongRecording.get_channel_ids().tolist())
 
 
