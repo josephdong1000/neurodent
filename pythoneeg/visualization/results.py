@@ -33,7 +33,7 @@ from .. import core
 from ..core import FragmentAnalyzer, get_temp_directory
 
 class AnimalFeatureParser:
-    # REVIEW make this a utility function and refactor across codebase
+    # REVIEW make this a utility function and refactor across codebase?
     def _average_feature(self, df:pd.DataFrame, colname:str, weightsname:str|None='duration'):
         column = df[colname]
         if weightsname is None:
@@ -42,7 +42,7 @@ class AnimalFeatureParser:
             weights = df[weightsname]
         colitem = column.iloc[0]
 
-        match colname: # TODO refactor this to use constants
+        match colname: # NOTE refactor this to use constants
             case 'rms' | 'ampvar' | 'psdtotal' | 'pcorr' | 'nspike' | \
                 'logrms' | 'logampvar' | 'logpsdtotal' | 'lognspike':
                 col_agg = np.stack(column, axis=-1)
@@ -212,7 +212,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                     # Save fragments to tempfile
                     tmppath = os.path.join(get_temp_directory(), f"temp_{os.urandom(24).hex()}.h5")
                     
-                    # NOTE the last fragment is not included because it makes the dask array ragged
+                    # The last fragment is not included because it makes the dask array ragged
                     logging.debug("Converting LongRecording to numpy array")
                     
                     n_fragments_war = max(lan.n_fragments - 1, 1)
@@ -241,7 +241,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                     # Process fragments in parallel using Dask
                     logging.debug("Processing features in parallel")
                     with h5py.File(tmppath, 'r', libver='latest') as f:
-                        np_fragments_reconstruct = da.from_array(f['fragments'], chunks='100 MB') # REVIEW maybe different chunk sizes. Originally 1GB
+                        np_fragments_reconstruct = da.from_array(f['fragments'], chunks='100 MB') # NOTE allow the user to specify chunk size
                         feature_values = [delayed(FragmentAnalyzer._process_fragment_features_dask)(
                             np_fragments_reconstruct[idx], 
                             lan.f_s, 
@@ -480,7 +480,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             logging.warning(f"Spike counts size {spike_counts.size} does not match result size {self.result.shape[0]}")
 
         result = self.result.copy()
-        result['nspike'] = spike_counts.tolist() # REVIEW this is a little hardcoded
+        result['nspike'] = spike_counts.tolist()
         result['lognspike'] = list(core._log_transform(np.stack(result['nspike'].tolist(), axis=0)))
         if inplace:
             self.result = result
@@ -579,7 +579,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
     def get_filter_high_beta(self, df:pd.DataFrame=None, max_beta=0.25, throw_all=True, **kwargs):
         result = df.copy() if df is not None else self.result.copy()
-        df_psdband = pd.DataFrame(result['psdband'].tolist()) # REVIEW implement this with psdfrac instead?
+        df_psdband = pd.DataFrame(result['psdband'].tolist()) # NOTE implement this with psdfrac instead?
         np_beta = np.array(df_psdband['beta'].tolist())
         np_allbands = np.array(df_psdband.values.tolist())
         np_allbands = np_allbands.sum(axis=1)
@@ -614,7 +614,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             filt_bools.append(filt_bool)
             logging.info(f"{filt.__name__}:\tfiltered {filt_bool.size - np.count_nonzero(filt_bool)}/{filt_bool.size}")
         # Filter channels manually
-        # REVIEW add a function that just filters out bad channels separately?
+        # NOTE add a function that just filters out bad channels separately?
         if reject_channels is not None:
             filt_bools.append(self.get_filter_reject_channels(reject_channels))
             logging.debug(f"Reject channels: {filt_bools[-1]}")
@@ -638,12 +638,20 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 logging.info(f"Skipping {feat} because it is not in result")
                 continue
             logging.info(f"Filtering {feat}")
-            match feat: # TODO refactor this to use constants
+            match feat: # NOTE refactor this to use constants
                 case 'rms' | 'ampvar' | 'psdtotal' | 'nspike' | 'logrms' | 'logampvar' | 'logpsdtotal' | 'lognspike':
                     vals = np.array(result[feat].tolist())
                     vals[~filter_tfs] = np.nan
                     result[feat] = vals.tolist()
                 case 'psd':
+                    # FIXME this breaks at 121821_cohort4_Group1_2mice M4. Presumably the 
+                    # WARs are too short maybe and causes inhomogeneity.
+                    # Maybe doing this at the WAR level instead of across all WARs will help
+                    # Or prefilter out the pathological
+
+                    # Actually I figured it out. The sampling rates have changed between computation passes so WARs have different shapes.
+                    # I'll need to rerun at 1000Hz
+                    # Also add a check for equal sampling frequency etc. I dont think this is encoded yet
                     coords = np.array([x[0] for x in result[feat].tolist()])
                     vals = np.array([x[1] for x in result[feat].tolist()])
                     mask = np.broadcast_to(filter_tfs[:, np.newaxis, :], vals.shape)
@@ -930,10 +938,11 @@ class SpikeAnalysisResult(AnimalFeatureParser):
         total_frames = int(sas[0].recording.get_duration() * sfreqs[0])
         n_channels = len(sas)
         data = np.empty((n_channels, total_frames))
+        logging.debug(f"Data shape: {data.shape}")
         
         # Fill data array one channel at a time
         for i, sa in enumerate(sas):
-            logging.debug(f"Converting channel {i} of {n_channels}")
+            logging.debug(f"Converting channel {i+1} of {n_channels}")
             data[i, :] = SpikeAnalysisResult.convert_sa_to_np(sa, chunk_len)
             
         channel_names = [str(sa.recording.get_channel_ids().item()) for sa in sas]

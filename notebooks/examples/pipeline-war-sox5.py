@@ -77,7 +77,7 @@ for data_folder, animal_ids in data_folders_to_animal_ids.items():
                                         skip_days=['bad'],
                                         lro_kwargs={'mode': 'bin',
                                                     'multiprocess_mode': 'dask',
-                                                    'overwrite_rowbins': True}
+                                                    'overwrite_rowbins': True},
             )
             
             # SECTION 2: Make WAR

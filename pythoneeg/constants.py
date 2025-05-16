@@ -72,7 +72,7 @@ HIST_FEATURES = ['psd']
 FEATURES = LINEAR_FEATURES + BAND_FEATURES + MATRIX_FEATURES + HIST_FEATURES
 WAR_FEATURES = [f for f in FEATURES if 'nspike' not in f]
 
-LINPLOT_HEIGHT_RATIOS = {'rms' : 1, # REVIEW add in log features?
+LINPLOT_HEIGHT_RATIOS = {'rms' : 1, # NOTE add in log features?
                          'ampvar' : 1,
                          'psdtotal' : 1,
                          'psdslope' : 2,

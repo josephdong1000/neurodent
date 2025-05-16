@@ -74,3 +74,6 @@ EEGs are loaded from companion Matlab code that converts .DDF to .BIN. Linux and
 - [ ] Peri-spike EEG (with MNE)
 - [ ] GUI
 
+# Utilities
+
+To get the total number of CPUs and memory reserved, use `squeue -u $USER -o "%.6C %.6m" | awk '{cpu+=$1; mem+=$2} END {print "Total CPUs:", cpu, "\nTotal Memory (GB):", mem}'`

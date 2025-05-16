@@ -28,6 +28,9 @@ animal_ids = ['031722_cohort_6_group1_3mice_MMUT_MMUT_MWT M7',
               '031722_cohort_6_group1_3mice_MMUT_MMUT_MWT MMUT(1)',
               '031722_cohort_6_group1_3mice_MMUT_MMUT_MWT MMUT(2)'
               ]
+
+# /mnt/isilon/marsh_single_unit/PythonEEG Data Bins/Sox5/Dr. Lefebvre Project/061022_group 9 M1, M2, M3/group9_M2_Cage 3/061122_group9_M2_Cage 3_files0-24
+
 base_folder = Path('/mnt/isilon/marsh_single_unit/PythonEEG').resolve()
 save_folder = Path('/home/dongjp/Downloads/5-12-25 C6-G1 mice').resolve()
 if not save_folder.exists():

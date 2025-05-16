@@ -24,10 +24,6 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         self.save_fig = save_fig
         self.save_path: Path = save_path
 
-    # REVIEW this function may not be necessary
-    # def get_animalday_metadata(self, animalday) -> core.DDFBinaryMetadata:
-    #     return self.window_result.meta[self.window_result.animaldays.index(animalday)]
-
     def _abbreviate_channel(self, ch_name:str):
         for k,v in self.CHNAME_TO_ABBREV:
             if k in ch_name:
@@ -146,7 +142,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
 
         for i in range(n_feat):
             ax.plot(data_T, data_Z[:, :, i], c=f'C{i}', **kwargs)
-        match feature: # TODO refactor this to use constants
+        match feature: # NOTE refactor this to use constants
             case 'rms' | 'ampvar' | 'psdtotal' | 'nspike' | 'logrms' | 'logampvar' | 'logpsdtotal' | 'lognspike':
                 ax.set_yticks([ytick_offset], [feature])
             case 'psdslope':
@@ -160,7 +156,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
             self._plot_filediv_lines(group=group, ax=ax, duration_name=duration_name, endfile_name=endfile_name)
 
     def __get_linear_feature(self, group:pd.DataFrame, feature:str, score_type='z', triag=True):
-        match feature: # TODO refactor this to use constants
+        match feature: # NOTE refactor this to use constants
             case 'rms' | 'ampvar' | 'psdtotal' | 'nspike' | 'logrms' | 'logampvar' | 'logpsdtotal' | 'lognspike':
                 data_X = np.array(group[feature].to_list())
                 data_X = np.expand_dims(data_X, axis=-1)
@@ -328,12 +324,8 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         ax[0, -1].set_xlim(xlim)
         self._handle_figure(fig, title="psd_histogram")
 
-    # STUB plot spectrogram over time, doing gaussian filter convolving when relevant, scaling logarithmically
     def plot_psd_spectrogram(self, multiindex=['animalday', 'animal', 'genotype'], freq_range=(1, 50), center_stat='mean', mode='z', figsize=None, cmap='magma', **kwargs):
-        # if features is None:
-        #     features = constants.MATRIX_FEATURE
-        # height_ratios = {'cohere' : 5,
-        #                  'pcorr' : 1}
+        # NOTE plot spectrogram over time, doing gaussian filter convolving when relevant, scaling logarithmically
 
         df_rowgroup = self.window_result.get_grouprows_result(['psd'], multiindex=multiindex)
         for i, df_row in df_rowgroup.groupby(level=0):
