@@ -979,20 +979,24 @@ class SpikeAnalysisResult(AnimalFeatureParser):
         
         rec = sa.recording
         logging.debug(f"Recording info: {rec}")
-        n_chunks = int(rec.get_duration()) // chunk_len
-
-        # Calculate total number of frames
+        
+        # Calculate total number of frames and chunks
         total_frames = int(rec.get_duration() * rec.get_sampling_frequency())
+        frames_per_chunk = round(chunk_len * rec.get_sampling_frequency())
+        # n_chunks = -(total_frames // -frames_per_chunk)  # Ceiling division
+        n_chunks = total_frames // frames_per_chunk  # Floor division
+        
         traces = np.empty(total_frames)
 
-        for j in range(n_chunks + 1):  # Get all chunks including the last partial one
-            start_frame = round(j * chunk_len * rec.get_sampling_frequency())
-            if j == n_chunks:  # Last chunk
+        for j in range(n_chunks):
+            start_frame = j * frames_per_chunk
+            if j == n_chunks-1:
                 end_frame = total_frames
             else:
-                end_frame = round((j + 1) * chunk_len * rec.get_sampling_frequency())
+                end_frame = (j + 1) * frames_per_chunk
+            logging.debug(f"start_frame: {start_frame}, end_frame: {end_frame}")
             traces[start_frame:end_frame] = rec.get_traces(start_frame=start_frame,
-                                                            end_frame=end_frame,
-                                                            return_scaled=True).flatten()
+                                                          end_frame=end_frame,
+                                                          return_scaled=True).flatten()
         traces *= 1e-6 # convert from uV to V
         return traces
