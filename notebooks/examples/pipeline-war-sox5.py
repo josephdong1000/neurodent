@@ -45,9 +45,7 @@ cluster_spike = SLURMCluster(
                               '--error=/dev/null']
     )
 print(f"\n\n\tcluster_spike.dashboard_link: {cluster_spike.dashboard_link}\n\n")
-# cluster_window.scale(10)
-# cluster_window.wait_for_workers(10)
-cluster_window.scale(jobs=3)
+cluster_window.scale(jobs=5)
 cluster_spike.adapt(maximum_jobs=15)
 
 
