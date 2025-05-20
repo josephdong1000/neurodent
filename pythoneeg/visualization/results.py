@@ -946,7 +946,6 @@ class SpikeAnalysisResult(AnimalFeatureParser):
             data[i, :] = SpikeAnalysisResult.convert_sa_to_np(sa, chunk_len)
             
         channel_names = [str(sa.recording.get_channel_ids().item()) for sa in sas]
-        logging.debug(f"Data shape: {data.shape}")
         logging.debug(f"Channel names: {channel_names}")
         sfreq = sfreqs[0]
 
@@ -992,8 +991,7 @@ class SpikeAnalysisResult(AnimalFeatureParser):
         # Calculate total number of frames and chunks
         total_frames = int(rec.get_duration() * rec.get_sampling_frequency())
         frames_per_chunk = round(chunk_len * rec.get_sampling_frequency())
-        # n_chunks = -(total_frames // -frames_per_chunk)  # Ceiling division
-        n_chunks = total_frames // frames_per_chunk  # Floor division
+        n_chunks = total_frames // frames_per_chunk
         
         traces = np.empty(total_frames)
 
@@ -1003,7 +1001,6 @@ class SpikeAnalysisResult(AnimalFeatureParser):
                 end_frame = total_frames
             else:
                 end_frame = (j + 1) * frames_per_chunk
-            logging.debug(f"start_frame: {start_frame}, end_frame: {end_frame}")
             traces[start_frame:end_frame] = rec.get_traces(start_frame=start_frame,
                                                           end_frame=end_frame,
                                                           return_scaled=True).flatten()
