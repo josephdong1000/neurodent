@@ -14,9 +14,6 @@ from dask_jobqueue import SLURMCluster
 from dask.distributed import Client
 from django.utils.text import slugify
 
-base_folder = Path('/mnt/isilon/marsh_single_unit/PythonEEG')
-sys.path.append(str(base_folder))
-
 from pythoneeg import core
 from pythoneeg import visualization
 from pythoneeg import constants
@@ -48,12 +45,13 @@ print(f"\n\n\tcluster_spike.dashboard_link: {cluster_spike.dashboard_link}\n\n")
 cluster_window.scale(10)
 cluster_window.wait_for_workers(10)
 cluster_spike.adapt(maximum_jobs=10)
-
+# !SECTION
 
 # SECTION 2: Compute windowed analysis
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.DEBUG, stream=sys.stdout, force=True)
 logger = logging.getLogger()
 
+base_folder = Path('/mnt/isilon/marsh_single_unit/PythonEEG')
 with open(base_folder / 'notebooks' / 'tests' / 'sox5 combine genotypes.json', 'r') as f:
     data = json.load(f)
 data_parent_folder = Path(data['data_parent_folder'])
@@ -67,8 +65,8 @@ for data_folder, animal_ids in data_folders_to_animal_ids.items():
     for animal_id in animal_ids:
 
         with Client(cluster_window) as client:
-            client.upload_file(str(base_folder / 'pythoneeg.tar.gz'))
-  
+            client.run(lambda: os.system(f"pip install -e {base_folder}"))
+            
             # SECTION 1: Find bin files
             ao = visualization.AnimalOrganizer(data_parent_folder / data_folder, animal_id,
                                         mode="nest", 
@@ -78,23 +76,28 @@ for data_folder, animal_ids in data_folders_to_animal_ids.items():
                                                     'multiprocess_mode': 'dask',
                                                     'overwrite_rowbins': True},
             )
-            
+            # !SECTION
+
             # SECTION 2: Make WAR
             war = ao.compute_windowed_analysis(['all'], multiprocess_mode='dask')
+            # !SECTION
 
         # SECTION 3: Make SARs, save SARs and load into WAR
         with Client(cluster_spike) as client:
-            client.upload_file(str(base_folder / 'pythoneeg.tar.gz'))
+            client.run(lambda: os.system(f"pip install -e {base_folder}"))
             
             sars = ao.compute_spike_analysis(multiprocess_mode='dask')
             for sar in sars:
                 sar.save_fif_and_json(base_folder / 'notebooks' / 'tests' / 'test-sars-full' / f'{data_folder} {slugify(sar.animal_day, allow_unicode=True)}', overwrite=True) # animal_day not unique for Sox5 rec sessions, so add bin_folder_name
             war.read_sars_spikes(sars)
-            
+        # !SECTION
+
         # SECTION 4: Save WARs and cleanup
         war.save_pickle_and_json(base_folder / 'notebooks' / 'tests' / 'test-wars-full' / f'{data_folder} {animal_id}')
         del war
         del sars
+        # !SECTION
+# !SECTION
 
 """
 sbatch --mem 300G -c 4 -t 48:00:00 /mnt/isilon/marsh_single_unit/PythonEEG/notebooks/examples/pipeline.sh /mnt/isilon/marsh_single_unit/PythonEEG/notebooks/examples/pipeline-war-sox5.py
