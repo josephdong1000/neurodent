@@ -47,11 +47,12 @@ for i, animal_id in enumerate(animal_ids):
     else:
         print(f'Skipping {animal_id} because genotype is Unknown')
 ep = visualization.ExperimentPlotter(wars,
-                                     features=[f for f in constants.FEATURES if f not in ['nspike', 'lognspike']])
+                                    #  features=[f for f in constants.FEATURES if f not in ['nspike', 'lognspike']],
+                                     )
 
 catplot_params = {'showfliers': False}
 kinds = ['box', 'bar']
-save_folder = Path('/home/dongjp/Downloads/5-14-25 ep sox5').resolve()
+save_folder = Path('/home/dongjp/Downloads/5-20-25 sox5 ep figs').resolve()
 if not save_folder.exists():
     save_folder.mkdir(parents=True)
 
@@ -88,6 +89,7 @@ if not save_folder.exists():
 for kind in ['swarm', 'point']:
     # for feature in constants.LINEAR_FEATURES:
     for feature in ['rms', 'ampvar', 'psdtotal', 'psdslope', 'logrms', 'logampvar', 'logpsdtotal']:
+        print(f'Plotting {feature}')
         for collapse in [False, True]:
             g = ep.plot_catplot(feature, groupby=['animal', 'genotype'], x='genotype', hue='channel', kind=kind, average_groupby=True, collapse_channels=collapse, 
                                 catplot_params={'dodge': (kind == 'swarm' or not collapse), 'col': None, 'errorbar': 'ci'})
