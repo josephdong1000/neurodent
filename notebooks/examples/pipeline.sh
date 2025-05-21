@@ -1,10 +1,30 @@
-#!/bin/sh
+#!/bin/bash
+
+# Exit on error
+set -e
+
+# Load Python module
 module load Python/3.10.8-GCCcore-12.2.0.lua
-# cd ~/source-code/PyEEG
+
+# Set working directory
 cd /mnt/isilon/marsh_single_unit/PythonEEG
-tar -zcvf pythoneeg.tar.gz ./pythoneeg/
+
+# Activate virtual environment
+if [ ! -f .venv/bin/activate ]; then
+    echo "Error: Virtual environment not found at .venv/bin/activate"
+    exit 1
+fi
 source .venv/bin/activate
 
-python -u $1
+# Check if script argument is provided
+if [ -z "$1" ]; then
+    echo "Error: No Python script provided"
+    echo "Usage: $0 <python_script.py>"
+    exit 1
+fi
 
-echo "Pipeline finished."
+# Run the Python script with unbuffered output
+echo "Starting pipeline with script: $1"
+python -u "$1"
+
+echo "Pipeline finished successfully."
