@@ -32,6 +32,7 @@ django = "*"
 neo = "*"
 pyedflib = "*"
 edfio = "*"
+build = "*"
 
 [dev-packages]
 snakeviz = "*"
