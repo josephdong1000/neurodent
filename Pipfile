@@ -33,6 +33,7 @@ neo = "*"
 pyedflib = "*"
 edfio = "*"
 build = "*"
+pythoneeg = {path = ".", editable = true}
 
 [dev-packages]
 snakeviz = "*"
