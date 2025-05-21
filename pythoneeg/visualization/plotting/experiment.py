@@ -188,10 +188,13 @@ class ExperimentPlotter():
         
         if feature == 'psdslope':
             # FIXME for some pathological recordings this raise a TypeError 'float' object is not subscriptable
-            # Probabky because its just empty? Are some slopes just encoded as integers not a integer+intercept?
+            # Probably because its just empty? Are some slopes just encoded as integers not a integer+intercept?
 
             # Well np.NaN is a float, so maybe this is trying to get the slope of a NaN-only slice. Have a check for this.
             
+            if df[feature].isna().any():
+                logging.warning(f'{feature} contains NaNs')
+                df = df[df[feature].notna()]
             df[feature] = df[feature].apply(lambda x: x[0]) # get slope from [slope, intercept]
         elif feature in constants.BAND_FEATURES + ['cohere']:
             df[feature] = df[feature].apply(lambda x: list(zip(x, constants.BAND_NAMES)))
