@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pythoneeg"
+version = "0.1.0"
+description = "Mouse EEG analysis tools"
+readme = "README.md"
+authors = [
+    { name="Joseph Dong", email="dongjp@chop.edu" },
+    { name="Yongtaek Oh", email="ohy2@chop.edu" },
+    { name="Eric Marsh", email="marshe@chop.edu" },
+]
+dependencies = [
+    "cmasher",
+    "matplotlib",
+    "mne",
+    "mne-connectivity",
+    "numpy",
+    "pactools",
+    "pandas",
+    "probeinterface",
+    "pyinstaller",
+    "scipy",
+    "spikeinterface",
+    "ipykernel",
+    "dask[distributed]",
+    "nodejs",
+    "npm",
+    "dask-labextension",
+    "bokeh",
+    "dask-jobqueue",
+    "seaborn",
+    "pipreqs",
+    "pyarrow",
+    "mountainsort5",
+    "statannotations",
+    "statsmodels",
+    "django",
+    "neo",
+    "pyedflib",
+    "edfio",
+]
+requires-python = ">=3.10"
+keywords = ["EEG", "rodent", "mouse", "neuroscience", "data analysis"]
+
+[project.optional-dependencies]
+dev = [
+    "snakeviz",
+    "pyqt5",
+]
+
+[tool.setuptools.packages.find]
+include = ["pythoneeg*"]
+exclude = ["notebooks", "docs", "tmp"]
+

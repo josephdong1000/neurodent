@@ -15,6 +15,9 @@
 /ddfs/*
 /dist/*
 /tmp/*
+*.egg-info/
+*.egg
+dist/
 /.venv/
 /venv-*/
 **/.*/
@@ -37,3 +40,4 @@ notebooks/tests/test_all_functions_Yong.ipynb
 *.gz
 .DS_Store
 *.dat
+
