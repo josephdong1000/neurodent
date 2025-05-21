@@ -49,7 +49,7 @@ ep = visualization.ExperimentPlotter(wars,
 
 catplot_params = {'showfliers': False}
 kinds = ['box', 'bar']
-save_folder = Path('/home/dongjp/Downloads/5-20-25 sox5 ep figs').resolve()
+save_folder = Path('/home/dongjp/Downloads/5-20-25 ep sox5 allplots').resolve()
 if not save_folder.exists():
     save_folder.mkdir(parents=True)
 
