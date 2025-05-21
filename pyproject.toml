@@ -50,3 +50,8 @@ dev = [
     "snakeviz",
     "pyqt5",
 ]
+
+[tool.setuptools.packages.find]
+include = ["pythoneeg*"]
+exclude = ["notebooks", "docs", "tmp"]
+
