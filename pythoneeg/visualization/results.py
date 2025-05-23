@@ -518,11 +518,15 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 case _:
                     raise Exception(f"Invalid feature: {feature}")
                     
+        logging.debug(f'Old channel names: {self.channel_names}')
         self.channel_names = target_channels
+        logging.debug(f'New channel names: {self.channel_names}')
+        logging.debug(f'Old channel abbreviations: {self.channel_abbrevs}')
         if not abbrev:
             self.channel_abbrevs = [core.parse_chname_to_abbrev(x, assume_from_number=self.assume_from_number) for x in self.channel_names]
         else:
             self.channel_abbrevs = self.channel_names
+        logging.debug(f'New channel abbreviations: {self.channel_abbrevs}')
         
         return result
 
