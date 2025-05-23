@@ -427,6 +427,105 @@ class WindowAnalysisResult(AnimalFeatureParser):
     def __str__(self) -> str:
         return f"{self.animaldays}"
 
+    def reorder_and_pad_channels(self, target_channels: list[str], inplace: bool = True, abbrev: bool = True) -> pd.DataFrame:
+        """Reorder and pad channels to match a target channel list.
+        
+        This method ensures that the data has a consistent channel order and structure
+        by reordering existing channels and padding missing channels with NaNs.
+        
+        Args:
+            target_channels (list[str]): List of target channel names to match
+            inplace (bool, optional): If True, modify the result in place. Defaults to True.
+            abbrev (bool, optional): If True, use channel abbreviations instead of channel names. Defaults to False.
+        Returns:
+            pd.DataFrame: DataFrame with reordered and padded channels
+        """
+        duplicates = [ch for ch in target_channels if target_channels.count(ch) > 1]
+        if duplicates:
+            raise ValueError(f"Target channels must be unique. Found duplicates: {duplicates}")
+
+        if not inplace:
+            result = self.result.copy()
+        else:
+            result = self.result
+            
+        channel_map = {ch: i for i, ch in enumerate(target_channels)}
+        channel_names = self.channel_names if not abbrev else self.channel_abbrevs
+        
+        for feature in self.feature_names:
+            match feature:
+                case _ if feature in constants.LINEAR_FEATURES + constants.BAND_FEATURES:
+                    if feature in constants.BAND_FEATURES:
+                        df_bands = pd.DataFrame(result[feature].tolist())
+                        vals = np.array(df_bands.values.tolist())
+                        vals = vals.transpose((0, 2, 1))
+                        keys = df_bands.keys()
+                    else:
+                        vals = np.array(result[feature].tolist())
+                        
+                    new_vals = np.full((vals.shape[0], len(target_channels), *vals.shape[2:]), np.nan) # dubious
+                    
+                    for i, ch in enumerate(channel_names):
+                        if ch in channel_map:
+                            new_vals[:, channel_map[ch]] = vals[:, i]
+                    
+                    if feature in constants.BAND_FEATURES:
+                        new_vals = new_vals.transpose((0, 2, 1))
+                        result[feature] = [dict(zip(keys, vals)) for vals in new_vals]
+                    else:
+                        result[feature] = [list(x) for x in new_vals]
+                        
+                case _ if feature in constants.MATRIX_FEATURES:
+                    if feature == 'cohere':
+                        df_bands = pd.DataFrame(result[feature].tolist())
+                        vals = np.array(df_bands.values.tolist())
+                        keys = df_bands.keys()
+                    else:
+                        vals = np.array(result[feature].tolist())
+                        
+                    logging.debug(f'vals.shape: {vals.shape}')
+                    new_shape = list(vals.shape[:-2]) + [len(target_channels), len(target_channels)]
+                    new_vals = np.full(new_shape, np.nan)
+                    
+                    ch1_valid = np.array([ch in channel_map for ch in channel_names])
+                    ch2_valid = ch1_valid.copy()
+                    valid_pairs = np.logical_and(ch1_valid[:, None], ch2_valid[None, :]) # 2D boolean mask
+                    
+                    for i, j in zip(*np.where(valid_pairs)):
+                        ch1, ch2 = channel_names[i], channel_names[j]
+                        new_vals[..., channel_map[ch1], channel_map[ch2]] = vals[..., i, j]
+
+                    triu_mask = np.triu_indices(len(target_channels), k=0)
+                    new_vals += new_vals.transpose((*range(new_vals.ndim-2), -1, -2))
+                    new_vals[..., triu_mask[0], triu_mask[1]] = 0
+                    
+                    if feature == 'cohere':
+                        result[feature] = [dict(zip(keys, vals)) for vals in new_vals]
+                    else:
+                        result[feature] = [list(x) for x in new_vals]
+                
+                case _ if feature in constants.HIST_FEATURES:
+                    coords = np.array([x[0] for x in result[feature].tolist()])
+                    vals = np.array([x[1] for x in result[feature].tolist()])
+                    new_vals = np.full((*vals.shape[0:-1], len(target_channels)), np.nan)
+                    
+                    for i, ch in enumerate(channel_names):
+                        if ch in channel_map:
+                            new_vals[:, ..., channel_map[ch]] = vals[:, ..., i]
+                            
+                    result[feature] = [(coords[i], new_vals[i]) for i in range(len(coords))]
+
+                case _:
+                    raise Exception(f"Invalid feature: {feature}")
+                    
+        self.channel_names = target_channels
+        if not abbrev:
+            self.channel_abbrevs = [core.parse_chname_to_abbrev(x, assume_from_number=self.assume_from_number) for x in self.channel_names]
+        else:
+            self.channel_abbrevs = self.channel_names
+        
+        return result
+
     def read_sars_spikes(self, sars: list['SpikeAnalysisResult'], read_mode: Literal['sa', 'mne']='sa', inplace=True):
         match read_mode:
             case 'sa':
