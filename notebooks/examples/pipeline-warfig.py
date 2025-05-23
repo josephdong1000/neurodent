@@ -19,11 +19,11 @@ logger = logging.getLogger()
 base_folder = Path('/mnt/isilon/marsh_single_unit/PythonEEG')
 # animal_ids = ['A5', 'A10', 'F22', 'G25', 'G26', 'N21', 'N22', 'N23', 'N24', 'N25']
 # animal_ids = ['A5', 'A10']
-# animal_ids = [p.name for p in (base_folder / 'notebooks' / 'tests' / 'test-wars-full').glob('*') if p.is_dir()]
-animal_ids = [
-    '081922_cohort10_group4_2mice_FMut_FHet FHET',
-    '062921_Cohort 3_AM3_AM5_CM9_BM6_CM5_CF2_IF5_BF3 CF2',
-]
+animal_ids = [p.name for p in (base_folder / 'notebooks' / 'tests' / 'test-wars-full').glob('*') if p.is_dir()]
+# animal_ids = [
+#     '081922_cohort10_group4_2mice_FMut_FHet FHET',
+#     '062921_Cohort 3_AM3_AM5_CM9_BM6_CM5_CF2_IF5_BF3 CF2',
+# ]
 
 # TODO reject all the bad channels by eye when constructing EP
 def load_war(animal_id):
@@ -36,6 +36,7 @@ def load_war(animal_id):
         return None
     
     # war.filter_all()
+    war.reorder_and_pad_channels(['LAud', 'LVis', 'LHip', 'LBar', 'LMot', 'RMot', 'RBar', 'RHip', 'RVis', 'RAud'], inplace=True, abbrev=True)
 
     return war
 
@@ -60,36 +61,36 @@ logger.info("Generating box plot for rms for every animal")
 g = ep.plot_catplot('rms', groupby='animal', kind='box', catplot_params={'showfliers': False, 'aspect': 4})
 g.savefig(save_folder / 'AAAA every animal box.png', dpi=300)
 
-# for feature in constants.LINEAR_FEATURES:
-#     for kind in kinds:
-#         for groupby in ['genotype', ['genotype', 'isday']]:
-#             for collapse in [False, True]:
-#                 logger.info(f"Generating {kind} plot for {feature} with {groupby} grouping, collapse={collapse}")
-#                 g = ep.plot_catplot(feature, groupby=groupby, kind=kind, collapse_channels=collapse, catplot_params=catplot_params if kind == 'box' else None)
-#                 g.savefig(save_folder / f'{feature}-{groupby}-{kind}-{collapse}.png', dpi=300)
+for feature in constants.LINEAR_FEATURES:
+    for kind in kinds:
+        for groupby in ['genotype', ['genotype', 'isday']]:
+            for collapse in [False, True]:
+                logger.info(f"Generating {kind} plot for {feature} with {groupby} grouping, collapse={collapse}")
+                g = ep.plot_catplot(feature, groupby=groupby, kind=kind, collapse_channels=collapse, catplot_params=catplot_params if kind == 'box' else None)
+                g.savefig(save_folder / f'{feature}-{groupby}-{kind}-{collapse}.png', dpi=300)
 
-# for kind in kinds:
-#     logger.info(f"Generating {kind} plot for psdband with genotype and isday grouping")
-#     g = ep.plot_catplot('psdband', groupby=['genotype', 'isday'], 
-#                     x='genotype',
-#                     col='isday',
-#                     hue='band',
-#                     kind=kind, collapse_channels=True, catplot_params=catplot_params if kind == 'box' else None)
-#     g.savefig(save_folder / f'psdband-genotype-isday-{kind}-True.png', dpi=300)
+for kind in kinds:
+    logger.info(f"Generating {kind} plot for psdband with genotype and isday grouping")
+    g = ep.plot_catplot('psdband', groupby=['genotype', 'isday'], 
+                    x='genotype',
+                    col='isday',
+                    hue='band',
+                    kind=kind, collapse_channels=True, catplot_params=catplot_params if kind == 'box' else None)
+    g.savefig(save_folder / f'psdband-genotype-isday-{kind}-True.png', dpi=300)
     
-#     logger.info(f"Generating {kind} plot for psdband with genotype grouping")
-#     g = ep.plot_catplot('psdband', groupby=['genotype'], 
-#                     x='genotype',
-#                     hue='band',
-#                     kind=kind, collapse_channels=True, catplot_params=catplot_params if kind == 'box' else None)
-#     g.savefig(save_folder / f'psdband-genotype-{kind}-True.png', dpi=300)
+    logger.info(f"Generating {kind} plot for psdband with genotype grouping")
+    g = ep.plot_catplot('psdband', groupby=['genotype'], 
+                    x='genotype',
+                    hue='band',
+                    kind=kind, collapse_channels=True, catplot_params=catplot_params if kind == 'box' else None)
+    g.savefig(save_folder / f'psdband-genotype-{kind}-True.png', dpi=300)
 
-# for feature in constants.MATRIX_FEATURES:
-#     for kind in kinds:
-#         for groupby in [['genotype', 'isday'], 'genotype']:
-#             logger.info(f"Generating {kind} plot for {feature} with {groupby} grouping")
-#             g = ep.plot_catplot(feature, groupby=groupby, kind=kind, collapse_channels=True, catplot_params=catplot_params if kind == 'box' else None)
-#             g.savefig(save_folder / f'{feature}-{groupby}-{kind}-True.png', dpi=300)
+for feature in constants.MATRIX_FEATURES:
+    for kind in kinds:
+        for groupby in [['genotype', 'isday'], 'genotype']:
+            logger.info(f"Generating {kind} plot for {feature} with {groupby} grouping")
+            g = ep.plot_catplot(feature, groupby=groupby, kind=kind, collapse_channels=True, catplot_params=catplot_params if kind == 'box' else None)
+            g.savefig(save_folder / f'{feature}-{groupby}-{kind}-True.png', dpi=300)
 # !SECTION
 
 # SECTION CATPLOTS, AVERAGE GROUPBY
