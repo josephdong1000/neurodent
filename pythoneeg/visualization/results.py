@@ -408,26 +408,36 @@ class WindowAnalysisResult(AnimalFeatureParser):
             assume_channels (bool, optional): If true, assumes channel names according to AnimalFeatureParser.DEFAULT_CHNUM_TO_NAME. Defaults to False.
         """
         self.result = result
-        columns = result.columns
-        self.feature_names = [x for x in columns if x in constants.FEATURES]
-        self._nonfeat_cols = [x for x in columns if x not in constants.FEATURES]
-        animaldays = result.loc[:, "animalday"].unique()
-        
-        self.animaldays = animaldays
-        self.avg_result: pd.DataFrame
         self.animal_id = animal_id
         self.genotype = genotype
         self.channel_names = channel_names
         self.assume_from_number = assume_from_number
-        self.channel_abbrevs = [core.parse_chname_to_abbrev(x, assume_from_number=assume_from_number) for x in self.channel_names]
+
+        self.__update_instance_vars()
 
         print(f"Channel names: \t{self.channel_names}")
         print(f"Channel abbreviations: \t{self.channel_abbrevs}")
 
     def __str__(self) -> str:
         return f"{self.animaldays}"
+    
+    def __update_instance_vars(self):
+        """Run after updating self.result, or other init values
+        """
+        self._feature_columns = [x for x in self.result.columns if x in constants.FEATURES]
+        self._nonfeature_columns = [x for x in self.result.columns if x not in constants.FEATURES]
+        self.animaldays = self.result.loc[:, "animalday"].unique()
+        
+        # REVIEW channel_names might be full names, or might be abbreviations according to reorder function. 
+        # You are supposed to rename reorder based on the abbreviation. If renaming reordering on custom (variable) channel
+        # names, thats just reinventing the wheel. Those abbreviations should work.
 
-    def reorder_and_pad_channels(self, target_channels: list[str], inplace: bool = True, abbrev: bool = True) -> pd.DataFrame:
+        # But then will setting abbreviations = channel_names break anything?
+
+        # Also should parse_chname_to_abbrev map abbreviations to themselves? What if there was a workaround for that?
+        self.channel_abbrevs = [core.parse_chname_to_abbrev(x, assume_from_number=self.assume_from_number) for x in self.channel_names]
+
+    def reorder_and_pad_channels(self, target_channels: list[str], use_abbrevs: bool = True, inplace: bool = True) -> pd.DataFrame:
         """Reorder and pad channels to match a target channel list.
         
         This method ensures that the data has a consistent channel order and structure
@@ -435,8 +445,8 @@ class WindowAnalysisResult(AnimalFeatureParser):
         
         Args:
             target_channels (list[str]): List of target channel names to match
+            use_abbrevs (bool, optional): If True, target channel names are read as channel abbreviations instead of channel names. Defaults to True.
             inplace (bool, optional): If True, modify the result in place. Defaults to True.
-            abbrev (bool, optional): If True, use channel abbreviations instead of channel names. Defaults to False.
         Returns:
             pd.DataFrame: DataFrame with reordered and padded channels
         """
@@ -444,15 +454,16 @@ class WindowAnalysisResult(AnimalFeatureParser):
         if duplicates:
             raise ValueError(f"Target channels must be unique. Found duplicates: {duplicates}")
 
-        if not inplace:
-            result = self.result.copy()
-        else:
-            result = self.result
+        result = self.result.copy()
             
         channel_map = {ch: i for i, ch in enumerate(target_channels)}
-        channel_names = self.channel_names if not abbrev else self.channel_abbrevs
+        channel_names = self.channel_names if not use_abbrevs else self.channel_abbrevs
         
-        for feature in self.feature_names:
+        valid_channels = [ch for ch in channel_names if ch in channel_map]
+        if not valid_channels:
+            warnings.warn(f"None of the channel names {channel_names} were found in target channels {target_channels}. Is use_abbrevs correctly set?")
+        
+        for feature in self._feature_columns:
             match feature:
                 case _ if feature in constants.LINEAR_FEATURES + constants.BAND_FEATURES:
                     if feature in constants.BAND_FEATURES:
@@ -518,11 +529,17 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 case _:
                     raise Exception(f"Invalid feature: {feature}")
                     
-        self.channel_names = target_channels
-        if not abbrev:
-            self.channel_abbrevs = [core.parse_chname_to_abbrev(x, assume_from_number=self.assume_from_number) for x in self.channel_names]
-        else:
-            self.channel_abbrevs = self.channel_names
+        if inplace:
+            self.result = result
+            self.channel_names = target_channels
+
+            self.__update_instance_vars()
+
+            # if not abbrev:
+            #     self.channel_abbrevs = [core.parse_chname_to_abbrev(x, assume_from_number=self.assume_from_number) for x in self.channel_names]
+            # else:
+            #     self.channel_abbrevs = self.channel_names
+
         
         return result
 
@@ -588,7 +605,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
     def get_info(self):
         """Returns a formatted string with basic information about the WindowAnalysisResult object"""
         info = []
-        info.append(f"feature names: {', '.join(self.feature_names)}")
+        info.append(f"feature names: {', '.join(self._feature_columns)}")
         info.append(f"animaldays: {', '.join(self.result['animalday'].unique())}")
         info.append(f"animal_id: {self.result['animal'].unique()[0] if 'animal' in self.result.columns else self.animal_id}")
         info.append(f"genotype: {self.result['genotype'].unique()[0] if 'genotype' in self.result.columns else self.genotype}")
@@ -609,9 +626,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
         """
         features = _sanitize_feature_request(features, exclude)
         if not allow_missing:
-            return self.result.loc[:, self._nonfeat_cols + features]
+            return self.result.loc[:, self._nonfeature_columns + features]
         else:
-            return self.result.reindex(columns=self._nonfeat_cols + features)
+            return self.result.reindex(columns=self._nonfeature_columns + features)
 
     def get_groupavg_result(self, features: list[str], exclude: list[str]=[], df: pd.DataFrame = None, groupby="animalday"):
         """Group result and average within groups. Preserves data structure and shape for each feature.
