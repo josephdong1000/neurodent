@@ -5,6 +5,7 @@ import seaborn as sns
 import pandas as pd
 import logging
 from typing import Literal
+import warnings
 
 from scipy import stats
 from statannotations.Annotator import Annotator
@@ -42,10 +43,8 @@ class ExperimentPlotter():
         use_abbreviations : bool, optional
             Whether to use abbreviations for channel names
         """
-        # Handle default arguments
         features = features if features else ['all']
         
-        # Convert single WindowAnalysisResult to list
         if not isinstance(wars, list):
             wars = [wars]
             
@@ -56,6 +55,17 @@ class ExperimentPlotter():
             self.channel_names = [war.channel_names for war in wars]
         self.channel_to_idx = [{e:i for i,e in enumerate(chnames)} for chnames in self.channel_names]
         self.all_channel_names = sorted(list(set([name for chnames in self.channel_names for name in chnames])))
+        
+        # Check for inhomogeneous channel numbers/names
+        if len(set(len(channels) for channels in self.channel_names)) > 1:
+            warnings.warn("Inhomogeneous channel numbers across WindowAnalysisResult objects, which may cause errors. Run WAR.reorder_and_pad_channels() to fix.")
+        
+        # Check if channel names are consistent across all results
+        first_channels = set(self.channel_names[0])
+        for i, channels in enumerate(self.channel_names[1:], 1):
+            if set(channels) != first_channels:
+                warnings.warn(f"Inhomogeneous channel names between WindowAnalysisResult {wars[i].animal_id} and first result, which may cause errors. Run WAR.reorder_and_pad_channels() to fix.")
+        
         logging.info(f'channel_names: {self.channel_names}')
         logging.info(f'channel_to_idx: {self.channel_to_idx}')
         logging.info(f'all_channel_names: {self.all_channel_names}')
@@ -72,9 +82,27 @@ class ExperimentPlotter():
                 raise e
 
         self.df_wars: list[pd.DataFrame] = df_wars
-        self.all = pd.concat(df_wars, axis=0, ignore_index=True) # TODO this raises a warning about df wars having columns that are none I think
+        self.concat_df_wars: pd.DataFrame = pd.concat(df_wars, axis=0, ignore_index=True) # TODO this raises a warning about df wars having columns that are none I think
         self.stats = None
 
+    # def reorder_and_pad_channels(self, target_channels: list[str], use_abbrevs: bool=True):
+    #     # REVIEW this probably shouldn't be a function. Channel reordering is handled at the window analysis level, and this is just convenience
+    #     # Implementing this also means reimplementing the init function. If another class derives from this that means 
+    #     # reimplementing that class's init as well. EP is cheap to instantiate, and reordering shouldnt be handled in the
+    #     # init function just to speed things up
+    #     """
+    #     Reorder and pad channels across all WindowAnalysisResult objects. Missing channels are padded with NaNs.
+    #     The ExperimentPlotter's window analysis result objects are modified in-place.
+
+    #     Parameters
+    #     ----------
+    #     target_channels : (list[str])
+    #         List of target channel names to match
+    #     use_abbrevs : (bool, optional)
+    #         If True, target channel names are read as channel abbreviations instead of channel names. Defaults to True.
+    #     """
+    #     for war in self.results:
+    #         war.reorder_and_pad_channels(target_channels, use_abbrevs=use_abbrevs, inplace=True)
 
     def pull_timeseries_dataframe(self, feature:str, groupby:str | list[str], 
                                 channels:str|list[str]='all', 
@@ -108,7 +136,7 @@ class ExperimentPlotter():
             channels = self.all_channel_names
         elif not isinstance(channels, list):
             channels = [channels]
-        df = self.all.copy()  # Use the combined DataFrame from __init__
+        df = self.concat_df_wars.copy()  # Use the combined DataFrame from __init__
         
         if isinstance(groupby, str):
             groupby = [groupby]
@@ -403,7 +431,6 @@ class ExperimentPlotter():
         
         return g
 
-    # REVIEW this could also be refactored per repeated code in heatmap and diffheatmap
     def _plot_matrix(self, data, feature, color_palette='RdBu_r', **kwargs):
         matrices = np.array(data[feature].tolist())
         avg_matrix = np.nanmean(matrices, axis=0)
@@ -417,10 +444,7 @@ class ExperimentPlotter():
         
         # Set ticks and labels
         n_channels = avg_matrix.shape[0]
-        plt.xticks(range(n_channels), range(n_channels), rotation=45, ha='right')
-        plt.yticks(range(n_channels), range(n_channels))
-        
-        ch_names = self.channel_names[0] # REVIEW what if the channel names are not the same for all animals?
+        ch_names = self.channel_names[0]
         plt.xticks(range(n_channels), ch_names, rotation=45, ha='right')
         plt.yticks(range(n_channels), ch_names)
 
@@ -588,6 +612,7 @@ def df_subtract_baseline(df: pd.DataFrame, feature: str, groupby: str | list[str
         raise ValueError(f'Baseline key {baseline_key} not found in groupby keys: {list(df.groupby(baseline_groupby).groups.keys())}')
 
     def nanmean_series_of_np(x): # REVIEW worth refactoring and reusing across classes?
+        logging.debug(f'Unique shapes in x: {set(np.shape(item) for item in x)}')
         xmean = np.nanmean(np.array(list(x)), axis=0)
         return xmean
 
