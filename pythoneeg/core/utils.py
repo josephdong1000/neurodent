@@ -216,6 +216,10 @@ def parse_chname_to_abbrev(channel_name:str, assume_from_number=False) -> str:
     Returns:
         str: Abbreviation of the channel name.
     """
+    # REVIEW maybe DEFAULT_ID_TO_NAME is not the right place to get default abbreviations
+    if channel_name in constants.DEFAULT_ID_TO_NAME.values():
+        logging.debug(f"{channel_name} is already an abbreviation")
+        return channel_name
     try:
         lr = __get_key_from_match_values(channel_name, constants.LR_ALIASES)
         chname = __get_key_from_match_values(channel_name, constants.CHNAME_ALIASES)
