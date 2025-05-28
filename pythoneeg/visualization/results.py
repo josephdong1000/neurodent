@@ -408,24 +408,139 @@ class WindowAnalysisResult(AnimalFeatureParser):
             assume_channels (bool, optional): If true, assumes channel names according to AnimalFeatureParser.DEFAULT_CHNUM_TO_NAME. Defaults to False.
         """
         self.result = result
-        columns = result.columns
-        self.feature_names = [x for x in columns if x in constants.FEATURES]
-        self._nonfeat_cols = [x for x in columns if x not in constants.FEATURES]
-        animaldays = result.loc[:, "animalday"].unique()
-        
-        self.animaldays = animaldays
-        self.avg_result: pd.DataFrame
         self.animal_id = animal_id
         self.genotype = genotype
         self.channel_names = channel_names
         self.assume_from_number = assume_from_number
-        self.channel_abbrevs = [core.parse_chname_to_abbrev(x, assume_from_number=assume_from_number) for x in self.channel_names]
+
+        self.__update_instance_vars()
 
         print(f"Channel names: \t{self.channel_names}")
         print(f"Channel abbreviations: \t{self.channel_abbrevs}")
 
     def __str__(self) -> str:
         return f"{self.animaldays}"
+    
+    def __update_instance_vars(self):
+        """Run after updating self.result, or other init values
+        """
+        self._feature_columns = [x for x in self.result.columns if x in constants.FEATURES]
+        self._nonfeature_columns = [x for x in self.result.columns if x not in constants.FEATURES]
+        self.animaldays = self.result.loc[:, "animalday"].unique()
+        
+        # REVIEW channel_names might be full names, or might be abbreviations according to reorder function. 
+        # You are supposed to rename reorder based on the abbreviation. If renaming reordering on custom (variable) channel
+        # names, thats just reinventing the wheel. Those abbreviations should work.
+
+        # But then will setting abbreviations = channel_names break anything?
+
+        # Also should parse_chname_to_abbrev map abbreviations to themselves? What if there was a workaround for that?
+        self.channel_abbrevs = [core.parse_chname_to_abbrev(x, assume_from_number=self.assume_from_number) for x in self.channel_names]
+
+    def reorder_and_pad_channels(self, target_channels: list[str], use_abbrevs: bool = True, inplace: bool = True) -> pd.DataFrame:
+        """Reorder and pad channels to match a target channel list.
+        
+        This method ensures that the data has a consistent channel order and structure
+        by reordering existing channels and padding missing channels with NaNs.
+        
+        Args:
+            target_channels (list[str]): List of target channel names to match
+            use_abbrevs (bool, optional): If True, target channel names are read as channel abbreviations instead of channel names. Defaults to True.
+            inplace (bool, optional): If True, modify the result in place. Defaults to True.
+        Returns:
+            pd.DataFrame: DataFrame with reordered and padded channels
+        """
+        duplicates = [ch for ch in target_channels if target_channels.count(ch) > 1]
+        if duplicates:
+            raise ValueError(f"Target channels must be unique. Found duplicates: {duplicates}")
+
+        result = self.result.copy()
+            
+        channel_map = {ch: i for i, ch in enumerate(target_channels)}
+        channel_names = self.channel_names if not use_abbrevs else self.channel_abbrevs
+        
+        valid_channels = [ch for ch in channel_names if ch in channel_map]
+        if not valid_channels:
+            warnings.warn(f"None of the channel names {channel_names} were found in target channels {target_channels}. Is use_abbrevs correctly set?")
+        
+        for feature in self._feature_columns:
+            match feature:
+                case _ if feature in constants.LINEAR_FEATURES + constants.BAND_FEATURES:
+                    if feature in constants.BAND_FEATURES:
+                        df_bands = pd.DataFrame(result[feature].tolist())
+                        vals = np.array(df_bands.values.tolist())
+                        vals = vals.transpose((0, 2, 1))
+                        keys = df_bands.keys()
+                    else:
+                        vals = np.array(result[feature].tolist())
+                        
+                    new_vals = np.full((vals.shape[0], len(target_channels), *vals.shape[2:]), np.nan) # dubious
+                    
+                    for i, ch in enumerate(channel_names):
+                        if ch in channel_map:
+                            new_vals[:, channel_map[ch]] = vals[:, i]
+                    
+                    if feature in constants.BAND_FEATURES:
+                        new_vals = new_vals.transpose((0, 2, 1))
+                        result[feature] = [dict(zip(keys, vals)) for vals in new_vals]
+                    else:
+                        result[feature] = [list(x) for x in new_vals]
+                        
+                case _ if feature in constants.MATRIX_FEATURES:
+                    if feature == 'cohere':
+                        df_bands = pd.DataFrame(result[feature].tolist())
+                        vals = np.array(df_bands.values.tolist())
+                        keys = df_bands.keys()
+                    else:
+                        vals = np.array(result[feature].tolist())
+                        
+                    logging.debug(f'vals.shape: {vals.shape}')
+                    new_shape = list(vals.shape[:-2]) + [len(target_channels), len(target_channels)]
+                    new_vals = np.full(new_shape, np.nan)
+                    
+                    ch1_valid = np.array([ch in channel_map for ch in channel_names])
+                    ch2_valid = ch1_valid.copy()
+                    valid_pairs = np.logical_and(ch1_valid[:, None], ch2_valid[None, :]) # 2D boolean mask
+                    
+                    for i, j in zip(*np.where(valid_pairs)):
+                        ch1, ch2 = channel_names[i], channel_names[j]
+                        new_vals[..., channel_map[ch1], channel_map[ch2]] = vals[..., i, j]
+
+                    triu_mask = np.triu_indices(len(target_channels), k=0)
+                    new_vals += new_vals.transpose((*range(new_vals.ndim-2), -1, -2))
+                    new_vals[..., triu_mask[0], triu_mask[1]] = 0
+                    
+                    if feature == 'cohere':
+                        result[feature] = [dict(zip(keys, vals)) for vals in new_vals]
+                    else:
+                        result[feature] = [list(x) for x in new_vals]
+                
+                case _ if feature in constants.HIST_FEATURES:
+                    coords = np.array([x[0] for x in result[feature].tolist()])
+                    vals = np.array([x[1] for x in result[feature].tolist()])
+                    new_vals = np.full((*vals.shape[0:-1], len(target_channels)), np.nan)
+                    
+                    for i, ch in enumerate(channel_names):
+                        if ch in channel_map:
+                            new_vals[:, ..., channel_map[ch]] = vals[:, ..., i]
+                            
+                    result[feature] = [(coords[i], new_vals[i]) for i in range(len(coords))]
+
+                case _:
+                    raise Exception(f"Invalid feature: {feature}")
+                    
+        if inplace:
+            self.result = result
+            
+            logging.debug(f'Old channel names: {self.channel_names}')
+            self.channel_names = target_channels
+            logging.debug(f'New channel names: {self.channel_names}')
+
+            logging.debug(f'Old channel abbreviations: {self.channel_abbrevs}')
+            self.__update_instance_vars()
+            logging.debug(f'New channel abbreviations: {self.channel_abbrevs}')
+        
+        return result
 
     def read_sars_spikes(self, sars: list['SpikeAnalysisResult'], read_mode: Literal['sa', 'mne']='sa', inplace=True):
         match read_mode:
@@ -489,7 +604,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
     def get_info(self):
         """Returns a formatted string with basic information about the WindowAnalysisResult object"""
         info = []
-        info.append(f"feature names: {', '.join(self.feature_names)}")
+        info.append(f"feature names: {', '.join(self._feature_columns)}")
         info.append(f"animaldays: {', '.join(self.result['animalday'].unique())}")
         info.append(f"animal_id: {self.result['animal'].unique()[0] if 'animal' in self.result.columns else self.animal_id}")
         info.append(f"genotype: {self.result['genotype'].unique()[0] if 'genotype' in self.result.columns else self.genotype}")
@@ -510,9 +625,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
         """
         features = _sanitize_feature_request(features, exclude)
         if not allow_missing:
-            return self.result.loc[:, self._nonfeat_cols + features]
+            return self.result.loc[:, self._nonfeature_columns + features]
         else:
-            return self.result.reindex(columns=self._nonfeat_cols + features)
+            return self.result.reindex(columns=self._nonfeature_columns + features)
 
     def get_groupavg_result(self, features: list[str], exclude: list[str]=[], df: pd.DataFrame = None, groupby="animalday"):
         """Group result and average within groups. Preserves data structure and shape for each feature.
