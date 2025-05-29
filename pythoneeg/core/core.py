@@ -520,7 +520,7 @@ class LongRecordingOrganizer:
             if len(datafiles) == 0:
                 raise ValueError(f"No files found matching pattern: {file_pattern}")
             datafiles = self._truncate_file_list(datafiles)
-            datafiles.sort() # TODO sort by index, or some other logic.
+            datafiles.sort() # FIXME sort by index, or some other logic. Files may be out of order otherwise, messing up isday calculation
             recs: list[si.BaseRecording] = [extract_func(x, **kwargs) for x in datafiles]
             rec = si.concatenate_recordings(recs)
         else:
@@ -558,7 +558,7 @@ class LongRecordingOrganizer:
             if len(datafiles) == 0:
                 raise ValueError(f"No files found matching pattern: {file_pattern}")
             datafiles = self._truncate_file_list(datafiles)
-            datafiles.sort() # TODO sort by index, or some other logic.
+            datafiles.sort() # FIXME sort by index, or some other logic. Files may be out of order otherwise, messing up isday calculation
             logging.debug(f"Running extract_func on {len(datafiles)} files")
             raws: list[mne.io.Raw] = [extract_func(x, **kwargs) for x in datafiles]
             logging.debug(f"Concatenating {len(raws)} raws")

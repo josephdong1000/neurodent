@@ -428,13 +428,6 @@ class WindowAnalysisResult(AnimalFeatureParser):
         self._nonfeature_columns = [x for x in self.result.columns if x not in constants.FEATURES]
         self.animaldays = self.result.loc[:, "animalday"].unique()
         
-        # REVIEW channel_names might be full names, or might be abbreviations according to reorder function. 
-        # You are supposed to rename reorder based on the abbreviation. If renaming reordering on custom (variable) channel
-        # names, thats just reinventing the wheel. Those abbreviations should work.
-
-        # But then will setting abbreviations = channel_names break anything?
-
-        # Also should parse_chname_to_abbrev map abbreviations to themselves? What if there was a workaround for that?
         self.channel_abbrevs = [core.parse_chname_to_abbrev(x, assume_from_number=self.assume_from_number) for x in self.channel_names]
 
     def reorder_and_pad_channels(self, target_channels: list[str], use_abbrevs: bool = True, inplace: bool = True) -> pd.DataFrame:
@@ -531,7 +524,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     
         if inplace:
             self.result = result
-            
+
             logging.debug(f'Old channel names: {self.channel_names}')
             self.channel_names = target_channels
             logging.debug(f'New channel names: {self.channel_names}')

@@ -85,25 +85,6 @@ class ExperimentPlotter():
         self.concat_df_wars: pd.DataFrame = pd.concat(df_wars, axis=0, ignore_index=True) # TODO this raises a warning about df wars having columns that are none I think
         self.stats = None
 
-    # def reorder_and_pad_channels(self, target_channels: list[str], use_abbrevs: bool=True):
-    #     # REVIEW this probably shouldn't be a function. Channel reordering is handled at the window analysis level, and this is just convenience
-    #     # Implementing this also means reimplementing the init function. If another class derives from this that means 
-    #     # reimplementing that class's init as well. EP is cheap to instantiate, and reordering shouldnt be handled in the
-    #     # init function just to speed things up
-    #     """
-    #     Reorder and pad channels across all WindowAnalysisResult objects. Missing channels are padded with NaNs.
-    #     The ExperimentPlotter's window analysis result objects are modified in-place.
-
-    #     Parameters
-    #     ----------
-    #     target_channels : (list[str])
-    #         List of target channel names to match
-    #     use_abbrevs : (bool, optional)
-    #         If True, target channel names are read as channel abbreviations instead of channel names. Defaults to True.
-    #     """
-    #     for war in self.results:
-    #         war.reorder_and_pad_channels(target_channels, use_abbrevs=use_abbrevs, inplace=True)
-
     def pull_timeseries_dataframe(self, feature:str, groupby:str | list[str], 
                                 channels:str|list[str]='all', 
                                 collapse_channels: bool=False,
@@ -215,11 +196,6 @@ class ExperimentPlotter():
         df = df.melt(id_vars=groupby, value_vars=feature_cols, var_name='channel', value_name=feature)
         
         if feature == 'psdslope':
-            # FIXME for some pathological recordings this raise a TypeError 'float' object is not subscriptable
-            # Probably because its just empty? Are some slopes just encoded as integers not a integer+intercept?
-
-            # Well np.NaN is a float, so maybe this is trying to get the slope of a NaN-only slice. Have a check for this.
-            
             if df[feature].isna().any():
                 logging.warning(f'{feature} contains NaNs')
                 df = df[df[feature].notna()]
