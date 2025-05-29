@@ -231,15 +231,11 @@ class ExperimentPlotter():
         
         df.reset_index(drop=True, inplace=True)
 
-        def nanmean_series_of_np(x): # REVIEW worth refactoring and reusing across classes? See the below implementation
-            xmean = np.nanmean(np.array(list(x)), axis=0)
-            return xmean
-
         if average_groupby:
             groupby_cols = df.columns.drop(feature).tolist()
             logging.debug(f'groupby_cols: {groupby_cols}')
             grouped = df.groupby(groupby_cols)
-            df = grouped[feature].apply(nanmean_series_of_np).reset_index()
+            df = grouped[feature].apply(core.utils.nanmean_series_of_np).reset_index()
 
         # baseline_means = (df_base
         #                   .groupby(remaining_groupby)[feature]
@@ -611,20 +607,15 @@ def df_subtract_baseline(df: pd.DataFrame, feature: str, groupby: str | list[str
     except KeyError:
         raise ValueError(f'Baseline key {baseline_key} not found in groupby keys: {list(df.groupby(baseline_groupby).groups.keys())}')
 
-    def nanmean_series_of_np(x): # REVIEW worth refactoring and reusing across classes?
-        logging.debug(f'Unique shapes in x: {set(np.shape(item) for item in x)}')
-        xmean = np.nanmean(np.array(list(x)), axis=0)
-        return xmean
-
     if remaining_groupby:
         baseline_means = (df_base
                           .groupby(remaining_groupby)[feature]
-                          .apply(nanmean_series_of_np))
+                          .apply(core.utils.nanmean_series_of_np))
         df_merge = df.merge(baseline_means, how='left', on=remaining_groupby, suffixes=('', '_baseline'))
     else:
         baseline_means = (df_base
                           .groupby(baseline_groupby)[feature]
-                          .apply(nanmean_series_of_np)) # Global baseline
+                          .apply(core.utils.nanmean_series_of_np)) # Global baseline
         assert len(baseline_means) == 1
         df_merge = df.assign(**{f'{feature}_baseline': [baseline_means.iloc[0] for _ in range(len(df))]})
 

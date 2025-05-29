@@ -332,3 +332,8 @@ def clean_channel_name(name):
     
     # Fallback for anything else
     return name
+
+def nanmean_series_of_np(x: pd.Series, axis: int = 0):
+    logging.debug(f'Unique shapes in x: {set(np.shape(item) for item in x)}')
+    xmean: np.ndarray = np.nanmean(np.array(list(x)), axis=axis)
+    return xmean
