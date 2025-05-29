@@ -44,9 +44,9 @@ cluster_spike = SLURMCluster(
 print(f"\n\n\tcluster_spike.dashboard_link: {cluster_spike.dashboard_link}\n\n")
 cluster_window.scale(jobs=5)
 cluster_spike.adapt(maximum_jobs=15)
+# !SECTION
 
-
-# SECTION 2: Compute windowed analysis
+# SECTION 2: Setup parameters
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.DEBUG, stream=sys.stdout, force=True)
 logger = logging.getLogger()
 
@@ -59,7 +59,9 @@ data_folders_to_animal_ids = data['data_folders_to_animal_ids']
 
 # constants.SORTING_PARAMS['freq_min'] = 60
 # constants.SORTING_PARAMS['freq_max'] = 400
+# !SECTION
 
+# SECTION 3: Run pipeline
 for data_folder, animal_ids in data_folders_to_animal_ids.items():
     for animal_id in animal_ids:
 
