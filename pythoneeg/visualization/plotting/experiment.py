@@ -6,6 +6,7 @@ import pandas as pd
 import logging
 from typing import Literal
 import warnings
+from collections import Counter
 
 from scipy import stats
 from statannotations.Annotator import Annotator
@@ -70,6 +71,12 @@ class ExperimentPlotter():
         logging.info(f'channel_to_idx: {self.channel_to_idx}')
         logging.info(f'all_channel_names: {self.all_channel_names}')
         
+        animal_ids = [war.animal_id for war in wars]
+        counts = Counter(animal_ids)
+        duplicates = [animal_id for animal_id, count in counts.items() if count > 1]
+        if duplicates:
+            warnings.warn(f'Duplicate animal IDs found: {duplicates}. Figures will still generate, but there may be data overlap. Change WAR.animal_id to avoid this issue.')
+
         # Process all data into DataFrames
         df_wars = []
         for war in wars:
@@ -403,15 +410,17 @@ class ExperimentPlotter():
         
         return g
 
-    def _plot_matrix(self, data, feature, color_palette='RdBu_r', **kwargs):
+    def _plot_matrix(self, data, feature, color_palette='RdBu_r', norm=None, **kwargs):
         matrices = np.array(data[feature].tolist())
         avg_matrix = np.nanmean(matrices, axis=0)
         
+        if norm is None:
+            norm = colors.CenteredNorm(vcenter=0, halfrange=1)
+
         # Create heatmap
-        # vmax = max(1, np.abs(avg_matrix).max())
         plt.imshow(avg_matrix,
                    cmap=color_palette,
-                   norm=colors.CenteredNorm(vcenter=0, halfrange=1))
+                   norm=norm)
         plt.colorbar(fraction=0.046, pad=0.04)
         
         # Set ticks and labels
@@ -474,7 +483,7 @@ class ExperimentPlotter():
         g = sns.FacetGrid(df, **facet_vars)
 
         # Map the plotting function
-        g.map_dataframe(self._plot_matrix, feature=feature, color_palette=cmap)
+        g.map_dataframe(self._plot_matrix, feature=feature, color_palette=cmap, norm=colors.CenteredNorm(vcenter=0, halfrange=0.5))
         
         # NOTE implement statistical testing with big N and small N
 
