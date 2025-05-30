@@ -660,21 +660,36 @@ class WindowAnalysisResult(AnimalFeatureParser):
         result_win = result_win.filter(features + multiindex + include)
         return result_win.set_index(multiindex)
 
-    # NOTE add this info to documentation: False = remove, True = keep. Will need to AND the arrays together to get the final list
-    def get_filter_rms_range(self, df:pd.DataFrame=None, z_range=3, **kwargs):
+    def get_filter_logrms_range(self, df:pd.DataFrame=None, z_range=3, **kwargs):
+        """Filter windows based on log(rms).
+
+        Args:
+            df (pd.DataFrame, optional): If not None, this function will use this dataframe instead of self.result. Defaults to None.
+            z_range (float, optional): The z-score range to filter by. Values outside this range will be set to NaN.
+
+        Returns:
+            out: np.ndarray of bool, (M fragments, N channels). True = keep window, False = remove window
+        """
         result = df.copy() if df is not None else self.result.copy()
         z_range = abs(z_range)
-        np_rms = np.array(result['rms'].tolist())
-        np_rms = np.log(np_rms)
-        np_rmsz = zscore(np_rms, axis=0, nan_policy='omit')
-        np_rms[(np_rmsz > z_range) | (np_rmsz < -z_range)] = np.nan
-        result['rms'] = np_rms.tolist()
+        np_logrms = np.array(result['logrms'].tolist())
+        np_logrmsz = zscore(np_logrms, axis=0, nan_policy='omit')
+        np_logrms[(np_logrmsz > z_range) | (np_logrmsz < -z_range)] = np.nan
 
-        out = np.full(np_rms.shape, True)
-        out[(np_rmsz > z_range) | (np_rmsz < -z_range)] = False
+        out = np.full(np_logrms.shape, True)
+        out[(np_logrmsz > z_range) | (np_logrmsz < -z_range)] = False
         return out
 
-    def get_filter_high_rms(self, df:pd.DataFrame=None, max_rms=3000, **kwargs):
+    def get_filter_high_rms(self, df:pd.DataFrame=None, max_rms=500, **kwargs):
+        """Filter windows based on rms.
+
+        Args:
+            df (pd.DataFrame, optional): If not None, this function will use this dataframe instead of self.result. Defaults to None.
+            max_rms (float, optional): The maximum rms value to filter by. Values above this will be set to NaN.
+
+        Returns:
+            out: np.ndarray of bool, (M fragments, N channels). True = keep window, False = remove window
+        """
         result = df.copy() if df is not None else self.result.copy()
         np_rms = np.array(result['rms'].tolist())
         np_rmsnan = np_rms.copy()
@@ -684,37 +699,74 @@ class WindowAnalysisResult(AnimalFeatureParser):
         out = np.full(np_rms.shape, True)
         out[np_rms > max_rms] = False
         return out
+    
+    def get_filter_low_rms(self, df:pd.DataFrame=None, min_rms=50, **kwargs):
+        """Filter windows based on rms.
 
-    def get_filter_high_beta(self, df:pd.DataFrame=None, max_beta=0.25, throw_all=True, **kwargs):
+        Args:
+            df (pd.DataFrame, optional): If not None, this function will use this dataframe instead of self.result. Defaults to None.
+            min_rms (float, optional): The minimum rms value to filter by. Values below this will be set to NaN.
+
+        Returns:
+            out: np.ndarray of bool, (M fragments, N channels). True = keep window, False = remove window
+        """
         result = df.copy() if df is not None else self.result.copy()
-        df_psdband = pd.DataFrame(result['psdband'].tolist()) # NOTE implement this with psdfrac instead?
-        np_beta = np.array(df_psdband['beta'].tolist())
-        np_allbands = np.array(df_psdband.values.tolist())
-        np_allbands = np_allbands.sum(axis=1)
-        np_prop = np_beta / np_allbands
+        np_rms = np.array(result['rms'].tolist())
+        np_rmsnan = np_rms.copy()
+        np_rmsnan[np_rms < min_rms] = np.nan
+        result['rms'] = np_rmsnan.tolist()
+
+        out = np.full(np_rms.shape, True)
+        out[np_rms < min_rms] = False
+        return out
+
+    def get_filter_high_beta(self, df:pd.DataFrame=None, max_beta_prop=0.4, **kwargs):
+        """Filter windows based on beta power.
+
+        Args:
+            df (pd.DataFrame, optional): If not None, this function will use this dataframe instead of self.result. Defaults to None.
+            max_beta_prop (float, optional): The maximum beta power to filter by. Values above this will be set to NaN. Defaults to 0.4.
+
+        Returns:
+            out: np.ndarray of bool, (M fragments, N channels). True = keep window, False = remove window
+        """
+        result = df.copy() if df is not None else self.result.copy()
+        df_psdfrac = pd.DataFrame(result['psdfrac'].tolist())
+        np_prop = np.array(df_psdfrac['beta'].tolist())
 
         out = np.full(np_prop.shape, True)
-        out[np_prop > max_beta] = False
+        out[np_prop > max_beta_prop] = False
         out = np.broadcast_to(np.all(out, axis=-1)[:, np.newaxis], out.shape)
         return out
 
-    def get_filter_reject_channels(self, channels: list[str]):
+    def get_filter_reject_channels(self, channels: list[str], use_abbrevs=True):
+        """Filter windows based on channels to reject.
+
+        Args:
+            channels (list[str]): List of channels to reject.
+            use_abbrevs (bool, optional): If True, use channel abbreviations. Defaults to True.
+
+        Returns:
+            out: np.ndarray of bool, (M fragments, N channels). True = keep window, False = remove window
+        """
         n_samples = len(self.result)
-        n_channels = len(self.channel_abbrevs)
+        ch_names = self.channel_abbrevs if use_abbrevs else self.channel_names
+        n_channels = len(ch_names)
         mask = np.ones((n_samples, n_channels), dtype=bool)
-        # Set False for channels to reject
+        
         for ch in channels:
-            if ch in self.channel_abbrevs:
-                mask[:, self.channel_abbrevs.index(ch)] = False
+            if ch in ch_names:
+                mask[:, ch_names.index(ch)] = False
             else:
-                warnings.warn(f"Channel {ch} not found in {self.channel_abbrevs}")
+                warnings.warn(f"Channel {ch} not found in {ch_names}")
         return mask
 
     def filter_all(self, df:pd.DataFrame=None,
                    inplace=True, 
                    reject_channels: list[str]=None, 
+                   min_valid_channels=3,
                    **kwargs):
-        filters = [self.get_filter_rms_range, self.get_filter_high_rms, self.get_filter_high_beta]
+        filters = [self.get_filter_logrms_range, self.get_filter_high_rms, self.get_filter_low_rms, self.get_filter_high_beta]
         filt_bools = []
         # Automatically filter bad windows
         for filt in filters:
@@ -722,12 +774,19 @@ class WindowAnalysisResult(AnimalFeatureParser):
             filt_bools.append(filt_bool)
             logging.info(f"{filt.__name__}:\tfiltered {filt_bool.size - np.count_nonzero(filt_bool)}/{filt_bool.size}")
         # Filter channels manually
-        # NOTE add a function that just filters out bad channels separately?
+        # REVIEW add a function that just filters out bad channels separately?
         if reject_channels is not None:
             filt_bools.append(self.get_filter_reject_channels(reject_channels))
             logging.debug(f"Reject channels: {filt_bools[-1]}")
         # Apply all filters
         filt_bool_all = np.prod(np.stack(filt_bools, axis=-1), axis=-1).astype(bool)
+        logging.debug(f"filt_bool_all.shape: {filt_bool_all.shape}")
+
+        # Filter windows based on number of valid channels
+        valid_channels_per_window = np.sum(filt_bool_all, axis=1)  # axis 1 = channel
+        window_mask = valid_channels_per_window >= min_valid_channels  # True if window has enough valid channels
+        filt_bool_all = filt_bool_all & window_mask[:, np.newaxis]  # Apply window mask to all channels
+        
         filtered_result = self._apply_filter(filt_bool_all)
         if inplace:
             del self.result
@@ -752,14 +811,8 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     vals[~filter_tfs] = np.nan
                     result[feat] = vals.tolist()
                 case 'psd':
-                    # FIXME this breaks at 121821_cohort4_Group1_2mice M4. Presumably the 
-                    # WARs are too short maybe and causes inhomogeneity.
-                    # Maybe doing this at the WAR level instead of across all WARs will help
-                    # Or prefilter out the pathological
-
-                    # Actually I figured it out. The sampling rates have changed between computation passes so WARs have different shapes.
-                    # I'll need to rerun at 1000Hz
-                    # Also add a check for equal sampling frequency etc. I dont think this is encoded yet
+                    # FIXME The sampling rates have changed between computation passes so WARs have different shapes.
+                    # Add a check for same sampling frequency, other war-relevant properties etc.
                     coords = np.array([x[0] for x in result[feat].tolist()])
                     vals = np.array([x[1] for x in result[feat].tolist()])
                     mask = np.broadcast_to(filter_tfs[:, np.newaxis, :], vals.shape)
