@@ -739,26 +739,32 @@ class WindowAnalysisResult(AnimalFeatureParser):
         out = np.broadcast_to(np.all(out, axis=-1)[:, np.newaxis], out.shape)
         return out
 
-    def get_filter_reject_channels(self, channels: list[str], use_abbrevs=True):
+    def get_filter_reject_channels(self, channels: list[str], use_abbrevs: bool = None):
         """Filter windows based on channels to reject.
 
         Args:
-            channels (list[str]): List of channels to reject.
-            use_abbrevs (bool, optional): If True, use channel abbreviations. Defaults to True.
+            channels (list[str]): List of channels to reject. Can be either full channel names or abbreviations.
+                The method will automatically detect which format is being used.
+            use_abbrevs (bool, optional): Override automatic detection. If True, channels are assumed to be channel abbreviations. If False, channels are assumed to be channel names.
+                If None, channels are parsed to abbreviations and matched against self.channel_abbrevs.
 
         Returns:
             out: np.ndarray of bool, (M fragments, N channels). True = keep window, False = remove window
         """
+        channel_targets = self.channel_abbrevs if use_abbrevs or use_abbrevs is None else self.channel_names # Match to appropriate target
+        if use_abbrevs is None: # Match channels as abbreviations
+            channels = [core.utils.parse_chname_to_abbrev(ch, assume_from_number=self.assume_from_number) for ch in channels]
+
         n_samples = len(self.result)
-        ch_names = self.channel_abbrevs if use_abbrevs else self.channel_names
-        n_channels = len(ch_names)
+        n_channels = len(channel_targets)
         mask = np.ones((n_samples, n_channels), dtype=bool)
-        
+
+        # Match channels to channel_targets
         for ch in channels:
-            if ch in ch_names:
-                mask[:, ch_names.index(ch)] = False
+            if ch in channel_targets:
+                mask[:, channel_targets.index(ch)] = False
             else:
-                warnings.warn(f"Channel {ch} not found in {ch_names}")
+                warnings.warn(f'Channel {ch} not found in {channel_targets}')
         return mask
 
     def filter_all(self, df:pd.DataFrame=None,
