@@ -13,6 +13,7 @@ import mne
 from dask_jobqueue import SLURMCluster
 from dask.distributed import Client
 from django.utils.text import slugify
+import joblib
 
 from pythoneeg import core
 from pythoneeg import visualization
@@ -25,8 +26,8 @@ cluster_window = SLURMCluster(
         cores=30,
         memory='100GB',
         walltime='48:00:00',
-        interface=None,
-        scheduler_options={'interface': 'eth1'}, # Look at `nmcli dev status` to find the correct interface
+        # interface=None,
+        # scheduler_options={'interface': 'eth1'}, # Look at `nmcli dev status` to find the correct interface
         job_extra_directives=['--output=/dev/null',
                               '--error=/dev/null']
     )
@@ -36,8 +37,8 @@ cluster_spike = SLURMCluster(
         memory='100GB',
         processes=1,
         walltime='6:00:00',
-        interface=None,
-        scheduler_options={'interface': 'eth1'}, # Look at `nmcli dev status` to find the correct interface
+        # interface=None,
+        # scheduler_options={'interface': 'eth1'}, # Look at `nmcli dev status` to find the correct interface
         job_extra_directives=['--output=/dev/null',
                               '--error=/dev/null']
     )
@@ -75,31 +76,31 @@ for data_folder, animal_ids in data_folders_to_animal_ids.items():
                                         skip_days=['bad'],
                                         lro_kwargs={'mode': 'bin',
                                                     'multiprocess_mode': 'dask',
-                                                    'overwrite_rowbins': True},
+                                                    'overwrite_rowbins': False},
             )
-            # !SECTION
+            ao.compute_bad_channels()
 
             # SECTION 2: Make WAR
             war = ao.compute_windowed_analysis(['all'], multiprocess_mode='dask')
             # !SECTION
 
         # SECTION 3: Make SARs, save SARs and load into WAR
-        with Client(cluster_spike) as client:
-            client.run(lambda: os.system(f"pip install -e {base_folder}"))
+        # with Client(cluster_spike) as client:
+        #     client.run(lambda: os.system(f"pip install -e {base_folder}"))
             
-            sars = ao.compute_spike_analysis(multiprocess_mode='dask')
-            for sar in sars:
-                sar.save_fif_and_json(base_folder / 'notebooks' / 'tests' / 'test-sars-full' / f'{data_folder} {slugify(sar.animal_day, allow_unicode=True)}', overwrite=True) # animal_day not unique for Sox5 rec sessions, so add bin_folder_name
-            war.read_sars_spikes(sars)
+        #     sars = ao.compute_spike_analysis(multiprocess_mode='dask')
+        #     for sar in sars:
+        #         sar.save_fif_and_json(base_folder / 'notebooks' / 'tests' / 'test-sars-full' / f'{data_folder} {slugify(sar.animal_day, allow_unicode=True)}', overwrite=True) # animal_day not unique for Sox5 rec sessions, so add bin_folder_name
+        #     war.read_sars_spikes(sars)
         # !SECTION
 
         # SECTION 4: Save WARs and cleanup
-        war.save_pickle_and_json(base_folder / 'notebooks' / 'tests' / 'test-wars-full' / f'{data_folder} {animal_id}')
+        war.save_pickle_and_json(base_folder / 'notebooks' / 'tests' / 'test-wars-sox5-2' / f'{data_folder} {animal_id}')
         del war
-        del sars
+        # del sars
         # !SECTION
 # !SECTION
 
 """
-sbatch --mem 300G -c 4 -t 48:00:00 /mnt/isilon/marsh_single_unit/PythonEEG/notebooks/examples/pipeline.sh /mnt/isilon/marsh_single_unit/PythonEEG/notebooks/examples/pipeline-war-sox5.py
+sbatch --mem 700G -c 4 -t 48:00:00 /mnt/isilon/marsh_single_unit/PythonEEG/notebooks/examples/pipeline.sh /mnt/isilon/marsh_single_unit/PythonEEG/notebooks/examples/pipeline-war-sox5.py
 """
