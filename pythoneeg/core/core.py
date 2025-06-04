@@ -19,12 +19,13 @@ import spikeinterface.core as si
 import spikeinterface.extractors as se
 import spikeinterface.preprocessing as spre
 import spikeinterface.widgets as sw
+from sklearn.neighbors import LocalOutlierFactor
 import dask
 import neo
 import mne
 
 # Local imports
-from .utils import convert_colpath_to_rowpath, convert_units_to_multiplier, filepath_to_index, get_temp_directory
+from .utils import convert_colpath_to_rowpath, convert_units_to_multiplier, filepath_to_index, get_temp_directory, Natural_Neighbor
 from .. import constants
 
 #%%
@@ -217,6 +218,7 @@ class LongRecordingOrganizer:
         self.temppaths = []
         self.start_datetime = None
         self.end_relative = []
+        self.bad_channel_names = []
         
         # Load data if mode is specified
         if mode is not None:
@@ -646,3 +648,49 @@ class LongRecordingOrganizer:
         startidx = frag_len_idx * fragment_idx
         endidx = min(frag_len_idx * (fragment_idx + 1), self.LongRecording.get_num_frames())
         return startidx, endidx
+    
+    def convert_to_mne(self) -> mne.io.RawArray:
+        """Convert this LongRecording object to an MNE RawArray.
+            
+        Returns:
+            mne.io.RawArray: The converted MNE RawArray
+        """
+        data = self.LongRecording.get_traces(return_scaled=True)  # This gets data in (n_samples, n_channels) format
+        data = data.T  # Convert to (n_channels, n_samples) format for MNE
+        
+        info = mne.create_info(
+            ch_names=self.channel_names,
+            sfreq=self.LongRecording.get_sampling_frequency(),
+            ch_types='eeg'
+        )
+
+        return mne.io.RawArray(data=data, info=info)
+
+    def compute_bad_channels(self, lof_threshold: float = 2):
+        nn = Natural_Neighbor()
+        rec = self.LongRecording
+        rec.resample()
+        logging.info(f"Computing bad channels for {rec.__str__()}")
+        logging.debug("Getting traces from recording object")
+        rec_np = rec.get_traces(return_scaled=True) # (n_samples, n_channels)
+        rec_np = rec_np.T # (n_channels, n_samples)
+
+        # Compute the optimal number of neighbors
+        nn.read(rec_np)
+        n_neighbors = nn.algorithm()
+        logging.info(f"n_neighbors for bad channel detection: {n_neighbors}")
+
+        # Initialize LocalOutlierFactor
+        lof = LocalOutlierFactor(n_neighbors=n_neighbors, metric='minkowski', p=2)
+
+        # Compute the outlier scores
+        logging.debug("Computing outlier scores")
+        lof.fit(rec_np)
+        del rec_np
+        scores = lof.negative_outlier_factor_ * -1
+        is_inlier = scores < lof_threshold
+        logging.debug(f"is_inlier: {is_inlier}")
+        logging.debug(f"lof scores: {scores}")
+
+        self.bad_channel_names = [self.channel_names[i] for i in np.where(~is_inlier)[0]]
+        logging.info(f"lrec.bad_channel_names: {self.bad_channel_names}")
