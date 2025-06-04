@@ -669,7 +669,7 @@ class LongRecordingOrganizer:
     def compute_bad_channels(self, lof_threshold: float = 2):
         nn = Natural_Neighbor()
         rec = self.LongRecording
-        rec.resample()
+        
         logging.info(f"Computing bad channels for {rec.__str__()}")
         logging.debug("Getting traces from recording object")
         rec_np = rec.get_traces(return_scaled=True) # (n_samples, n_channels)
