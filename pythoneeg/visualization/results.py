@@ -177,7 +177,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         for lrec in self.long_recordings:
             lrec.cleanup_rec()
 
-    def compute_bad_channels(self, lof_threshold: float = 2):
+    def compute_bad_channels(self, lof_threshold: float = 1.5):
         for lrec in self.long_recordings:
             lrec.compute_bad_channels(lof_threshold=lof_threshold)
         self.bad_channels_dict = {animalday : lrec.bad_channel_names for animalday, lrec in zip(self.animaldays, self.long_recordings)}
@@ -445,7 +445,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         self.animaldays = self.result.loc[:, "animalday"].unique()
         
         self.channel_abbrevs = [core.parse_chname_to_abbrev(x, assume_from_number=self.assume_from_number) for x in self.channel_names]
-        
+
     def reorder_and_pad_channels(self, target_channels: list[str], use_abbrevs: bool = True, inplace: bool = True) -> pd.DataFrame:
         """Reorder and pad channels to match a target channel list.
         

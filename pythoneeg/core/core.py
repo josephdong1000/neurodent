@@ -20,6 +20,7 @@ import spikeinterface.extractors as se
 import spikeinterface.preprocessing as spre
 import spikeinterface.widgets as sw
 from sklearn.neighbors import LocalOutlierFactor
+from scipy.signal import decimate
 import dask
 import neo
 import mne
@@ -666,13 +667,16 @@ class LongRecordingOrganizer:
 
         return mne.io.RawArray(data=data, info=info)
 
-    def compute_bad_channels(self, lof_threshold: float = 2):
+    def compute_bad_channels(self, lof_threshold: float = 1.5, limit_memory: bool = True):
         nn = Natural_Neighbor()
         rec = self.LongRecording
-        
+
         logging.info(f"Computing bad channels for {rec.__str__()}")
         logging.debug("Getting traces from recording object")
         rec_np = rec.get_traces(return_scaled=True) # (n_samples, n_channels)
+        if limit_memory:
+            rec_np = rec_np.astype(np.float16)
+            rec_np = decimate(rec_np, 10, axis=0)
         rec_np = rec_np.T # (n_channels, n_samples)
 
         # Compute the optimal number of neighbors
@@ -685,6 +689,7 @@ class LongRecordingOrganizer:
 
         # Compute the outlier scores
         logging.debug("Computing outlier scores")
+        del nn
         lof.fit(rec_np)
         del rec_np
         scores = lof.negative_outlier_factor_ * -1
