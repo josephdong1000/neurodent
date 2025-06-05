@@ -1055,8 +1055,8 @@ class SpikeAnalysisResult(AnimalFeatureParser):
             channel_names (list[str], optional): List of channel names. Defaults to None.
             assume_channels (bool, optional): If true, assumes channel names according to AnimalFeatureParser.DEFAULT_CHNUM_TO_NAME. Defaults to False.
         """
-        self.result_sas: list[si.SortingAnalyzer] | None = result_sas
-        self.result_mne: mne.io.RawArray | None = result_mne
+        self.result_sas = result_sas
+        self.result_mne = result_mne
         if (result_mne is None) == (result_sas is None):
             raise ValueError("Exactly one of result_sas or result_mne must be provided")
         self.animal_id = animal_id
