@@ -34,6 +34,7 @@ pyedflib = "*"
 edfio = "*"
 build = "*"
 pythoneeg = {path = ".", editable = true}
+pyprep = "*"
 
 [dev-packages]
 snakeviz = "*"

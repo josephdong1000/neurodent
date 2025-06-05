@@ -74,7 +74,73 @@
         ]
     },
     "data_folders_to_animal_ids": {
+        "010822_cohort4_group2_2mice_MWT_MHET": [
+            "M3",
+            "M10"
+        ],
+        "011322_cohort4_group3_4mice_AllM_MT_WT_HET_WT": [
+            "M2",
+            "M3",
+            "M4",
+            "M8"
+        ],
+        "011622_cohort4_group4_3mice_MMutOLD_FMUT_FMUT_FWT": [
+            "FMUT_",
+            "FMUT(2)",
+            "FWT",
+            "OLDMMT"
+        ],
+        "012022_cohort4_group5_3mice__FWT_MMUT_FMUT": [
+            "FMUT",
+            "FWT",
+            "MMUT"
+        ],
+        "012322_cohort4_group6_3mice_FMUT___MMUT_MWT": [
+            "FMUT",
+            "MHET",
+            "MMUT"
+        ],
+        "013122_cohort4_group7_2mice both_FHET": [
+            "FHET(1)",
+            "FHET(2)"
+        ],
+        "031021_cohort 2, group 3 and 4": [
+            "#8 Cage 3A",
+            "#8 Cage 1A",
+            "#3 Cage 4A"
+        ],
+        "031122_cohort5_group1_2mice_FHET_MWT": [
+            "F4",
+            "M2"
+        ],
+        "031621_cohort 2 group 2 and group 5": [
+            "F5",
+            "F6",
+            "F10",
+            "M2"
+        ],
+        "031722_cohort_6_group1_3mice_MMUT_MMUT_MWT": [
+            "M7",
+            "MMUT(1)",
+            "MMUT(2)"
+        ],
+        "031921_cohort 2 group 5 and group 6": [
+            "mouse M3 cage1A",
+            "mouse M5 cage2A",
+            "mouse M3 cage3A",
+            "mouse M5 cage4A"
+        ],
+        "": [
+            "032221_cohort 2, Group 3, Mouse 6 Cage 2A Re-Recording",
+            "040221_Group 1 Mouse 9 Recording"
+        ],
+        "060921_Cohort 3_EM1_AM2_GF4": [
+            "AM2",
+            "EM1",
+            "GF4"
+        ],
         "061022_group 9 M1, M2, M3": [
+            "group9_M1_Cage1",
             "group9_M2_Cage 3",
             "group9_M3_Cage 4"
         ],

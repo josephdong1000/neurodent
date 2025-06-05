@@ -17,6 +17,7 @@ import logging
 import numpy as np
 import pandas as pd
 from scipy.stats import zscore
+from sklearn.neighbors import LocalOutlierFactor
 import dask
 import dask.dataframe as dd
 import dask.array as da
@@ -154,6 +155,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         if len(set([" ".join(x) for x in channel_names])) > 1:
             warnings.warn(f"Inconsistent channel names in long_recordings: {channel_names}")
         self.channel_names = channel_names[0]
+        self.bad_channels_dict = {}
 
         animal_ids = [x['animal'] for x in animalday_dicts]
         if len(set(animal_ids)) > 1:
@@ -174,6 +176,11 @@ class AnimalOrganizer(AnimalFeatureParser):
     def cleanup_rec(self):
         for lrec in self.long_recordings:
             lrec.cleanup_rec()
+
+    def compute_bad_channels(self, lof_threshold: float = 1.5):
+        for lrec in self.long_recordings:
+            lrec.compute_bad_channels(lof_threshold=lof_threshold)
+        self.bad_channels_dict = {animalday : lrec.bad_channel_names for animalday, lrec in zip(self.animaldays, self.long_recordings)}
 
     def compute_windowed_analysis(self, 
                                   features: list[str], 
@@ -284,7 +291,8 @@ class AnimalOrganizer(AnimalFeatureParser):
                                                            self.animal_id, 
                                                            self.genotype, 
                                                            self.channel_names, 
-                                                           self.assume_from_number)
+                                                           self.assume_from_number,
+                                                           self.bad_channels_dict)
 
         return self.window_analysis_result
     
@@ -398,7 +406,13 @@ class WindowAnalysisResult(AnimalFeatureParser):
     """
     Wrapper for output of windowed analysis. Has useful features like group-wise and global averaging, filtering, and saving
     """
-    def __init__(self, result: pd.DataFrame, animal_id:str=None, genotype:str=None, channel_names:list[str]=None, assume_from_number=False) -> None:
+    def __init__(self, 
+                 result: pd.DataFrame, 
+                 animal_id:str=None, 
+                 genotype:str=None, 
+                 channel_names:list[str]=None, 
+                 assume_from_number=False, 
+                 bad_channels_dict:dict[str, list[str]]={}) -> None:
         """
         Args:
             result (pd.DataFrame): Result comes from AnimalOrganizer.compute_windowed_analysis()
@@ -406,12 +420,14 @@ class WindowAnalysisResult(AnimalFeatureParser):
             genotype (str, optional): Genotype of animal. Defaults to None.
             channel_names (list[str], optional): List of channel names. Defaults to None.
             assume_channels (bool, optional): If true, assumes channel names according to AnimalFeatureParser.DEFAULT_CHNUM_TO_NAME. Defaults to False.
+            bad_channels_dict (dict[str, list[str]], optional): Dictionary of channels to reject for each recording session. Defaults to {}.
         """
         self.result = result
         self.animal_id = animal_id
         self.genotype = genotype
         self.channel_names = channel_names
         self.assume_from_number = assume_from_number
+        self.bad_channels_dict = bad_channels_dict
 
         self.__update_instance_vars()
 
@@ -428,13 +444,6 @@ class WindowAnalysisResult(AnimalFeatureParser):
         self._nonfeature_columns = [x for x in self.result.columns if x not in constants.FEATURES]
         self.animaldays = self.result.loc[:, "animalday"].unique()
         
-        # REVIEW channel_names might be full names, or might be abbreviations according to reorder function. 
-        # You are supposed to rename reorder based on the abbreviation. If renaming reordering on custom (variable) channel
-        # names, thats just reinventing the wheel. Those abbreviations should work.
-
-        # But then will setting abbreviations = channel_names break anything?
-
-        # Also should parse_chname_to_abbrev map abbreviations to themselves? What if there was a workaround for that?
         self.channel_abbrevs = [core.parse_chname_to_abbrev(x, assume_from_number=self.assume_from_number) for x in self.channel_names]
 
     def reorder_and_pad_channels(self, target_channels: list[str], use_abbrevs: bool = True, inplace: bool = True) -> pd.DataFrame:
@@ -531,7 +540,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     
         if inplace:
             self.result = result
-            
+
             logging.debug(f'Old channel names: {self.channel_names}')
             self.channel_names = target_channels
             logging.debug(f'New channel names: {self.channel_names}')
@@ -667,21 +676,38 @@ class WindowAnalysisResult(AnimalFeatureParser):
         result_win = result_win.filter(features + multiindex + include)
         return result_win.set_index(multiindex)
 
-    # NOTE add this info to documentation: False = remove, True = keep. Will need to AND the arrays together to get the final list
-    def get_filter_rms_range(self, df:pd.DataFrame=None, z_range=3, **kwargs):
+    def get_filter_logrms_range(self, df:pd.DataFrame=None, z_range=3, **kwargs):
+        """Filter windows based on log(rms).
+
+        Args:
+            df (pd.DataFrame, optional): If not None, this function will use this dataframe instead of self.result. Defaults to None.
+            z_range (float, optional): The z-score range to filter by. Values outside this range will be set to NaN.
+
+        Returns:
+            out: np.ndarray of bool, (M fragments, N channels). True = keep window, False = remove window
+        """
         result = df.copy() if df is not None else self.result.copy()
         z_range = abs(z_range)
         np_rms = np.array(result['rms'].tolist())
-        np_rms = np.log(np_rms)
-        np_rmsz = zscore(np_rms, axis=0, nan_policy='omit')
-        np_rms[(np_rmsz > z_range) | (np_rmsz < -z_range)] = np.nan
-        result['rms'] = np_rms.tolist()
+        np_logrms = np.log(np_rms)
+        del np_rms
+        np_logrmsz = zscore(np_logrms, axis=0, nan_policy='omit')
+        np_logrms[(np_logrmsz > z_range) | (np_logrmsz < -z_range)] = np.nan
 
-        out = np.full(np_rms.shape, True)
-        out[(np_rmsz > z_range) | (np_rmsz < -z_range)] = False
+        out = np.full(np_logrms.shape, True)
+        out[(np_logrmsz > z_range) | (np_logrmsz < -z_range)] = False
         return out
 
-    def get_filter_high_rms(self, df:pd.DataFrame=None, max_rms=3000, **kwargs):
+    def get_filter_high_rms(self, df:pd.DataFrame=None, max_rms=1000, **kwargs):
+        """Filter windows based on rms.
+
+        Args:
+            df (pd.DataFrame, optional): If not None, this function will use this dataframe instead of self.result. Defaults to None.
+            max_rms (float, optional): The maximum rms value to filter by. Values above this will be set to NaN.
+
+        Returns:
+            out: np.ndarray of bool, (M fragments, N channels). True = keep window, False = remove window
+        """
         result = df.copy() if df is not None else self.result.copy()
         np_rms = np.array(result['rms'].tolist())
         np_rmsnan = np_rms.copy()
@@ -691,50 +717,164 @@ class WindowAnalysisResult(AnimalFeatureParser):
         out = np.full(np_rms.shape, True)
         out[np_rms > max_rms] = False
         return out
+    
+    def get_filter_low_rms(self, df:pd.DataFrame=None, min_rms=30, **kwargs):
+        """Filter windows based on rms.
 
-    def get_filter_high_beta(self, df:pd.DataFrame=None, max_beta=0.25, throw_all=True, **kwargs):
+        Args:
+            df (pd.DataFrame, optional): If not None, this function will use this dataframe instead of self.result. Defaults to None.
+            min_rms (float, optional): The minimum rms value to filter by. Values below this will be set to NaN.
+
+        Returns:
+            out: np.ndarray of bool, (M fragments, N channels). True = keep window, False = remove window
+        """
         result = df.copy() if df is not None else self.result.copy()
-        df_psdband = pd.DataFrame(result['psdband'].tolist()) # NOTE implement this with psdfrac instead?
-        np_beta = np.array(df_psdband['beta'].tolist())
-        np_allbands = np.array(df_psdband.values.tolist())
-        np_allbands = np_allbands.sum(axis=1)
-        np_prop = np_beta / np_allbands
+        np_rms = np.array(result['rms'].tolist())
+        np_rmsnan = np_rms.copy()
+        np_rmsnan[np_rms < min_rms] = np.nan
+        result['rms'] = np_rmsnan.tolist()
+
+        out = np.full(np_rms.shape, True)
+        out[np_rms < min_rms] = False
+        return out
+
+    def get_filter_high_beta(self, df:pd.DataFrame=None, max_beta_prop=0.4, **kwargs):
+        """Filter windows based on beta power.
+
+        Args:
+            df (pd.DataFrame, optional): If not None, this function will use this dataframe instead of self.result. Defaults to None.
+            max_beta_prop (float, optional): The maximum beta power to filter by. Values above this will be set to NaN. Defaults to 0.4.
+
+        Returns:
+            out: np.ndarray of bool, (M fragments, N channels). True = keep window, False = remove window
+        """
+        result = df.copy() if df is not None else self.result.copy()
+        df_psdfrac = pd.DataFrame(result['psdfrac'].tolist())
+        np_prop = np.array(df_psdfrac['beta'].tolist())
 
         out = np.full(np_prop.shape, True)
-        out[np_prop > max_beta] = False
+        out[np_prop > max_beta_prop] = False
         out = np.broadcast_to(np.all(out, axis=-1)[:, np.newaxis], out.shape)
         return out
 
-    def get_filter_reject_channels(self, channels: list[str]):
+    def get_filter_reject_channels(self, bad_channels: list[str], use_abbrevs: bool = None, **kwargs):
+        """Filter channels to reject.
+
+        Args:
+            bad_channels (list[str]): List of channels to reject. Can be either full channel names or abbreviations.
+                The method will automatically detect which format is being used.
+            use_abbrevs (bool, optional): Override automatic detection. If True, channels are assumed to be channel abbreviations. If False, channels are assumed to be channel names.
+                If None, channels are parsed to abbreviations and matched against self.channel_abbrevs.
+
+        Returns:
+            out: np.ndarray of bool, (M fragments, N channels). True = keep window, False = remove window
+        """
+        channel_targets = self.channel_abbrevs if use_abbrevs or use_abbrevs is None else self.channel_names # Match to appropriate target
+        if use_abbrevs is None: # Match channels as abbreviations
+            bad_channels = [core.utils.parse_chname_to_abbrev(ch, assume_from_number=self.assume_from_number) for ch in bad_channels]
+
         n_samples = len(self.result)
-        n_channels = len(self.channel_abbrevs)
+        n_channels = len(channel_targets)
         mask = np.ones((n_samples, n_channels), dtype=bool)
-        # Set False for channels to reject
-        for ch in channels:
-            if ch in self.channel_abbrevs:
-                mask[:, self.channel_abbrevs.index(ch)] = False
+
+        # Match channels to channel_targets
+        for ch in bad_channels:
+            if ch in channel_targets:
+                mask[:, channel_targets.index(ch)] = False
             else:
-                warnings.warn(f"Channel {ch} not found in {self.channel_abbrevs}")
+                warnings.warn(f'Channel {ch} not found in {channel_targets}')
+        return mask
+    
+    def get_filter_reject_channels_by_recording_session(self, bad_channels_dict: dict[str, list[str]] = None, use_abbrevs: bool = None):
+        """Filter channels to reject for each recording session
+
+        Args:
+            bad_channels_dict (dict[str, list[str]]): Dictionary of list of channels to reject for each recording session.
+                Can be either full channel names or abbreviations. The method will automatically detect which format is being used.
+                If None, the method will use the bad_channels_dict passed to the constructor.
+            use_abbrevs (bool, optional): Override automatic detection. If True, channels are assumed to be channel abbreviations. If False, channels are assumed to be channel names.
+                If None, channels are parsed to abbreviations and matched against self.channel_abbrevs.
+
+        Returns:
+            out: np.ndarray of bool, (M fragments, N channels). True = keep window, False = remove window
+        """
+        if bad_channels_dict is None:
+            bad_channels_dict = self.bad_channels_dict
+
+        n_samples = len(self.result)
+        n_channels = len(self.channel_names)
+        mask = np.ones((n_samples, n_channels), dtype=bool)
+
+        # Group by animalday to apply filters per recording session
+        for animalday, group in self.result.groupby('animalday'):
+            if animalday not in bad_channels_dict:
+                logging.warning(f"No bad channels specified for recording session {animalday}")
+                continue
+
+            bad_channels = bad_channels_dict[animalday]
+            channel_targets = self.channel_abbrevs if use_abbrevs or use_abbrevs is None else self.channel_names
+            if use_abbrevs is None:
+                bad_channels = [core.parse_chname_to_abbrev(ch, assume_from_number=self.assume_from_number) for ch in bad_channels]
+
+            # Get indices for this recording session
+            session_indices = group.index
+
+            # Apply channel filtering for this session
+            for ch in bad_channels:
+                if ch in channel_targets:
+                    ch_idx = channel_targets.index(ch)
+                    mask[session_indices, ch_idx] = False
+                else:
+                    logging.warning(f'Channel {ch} not found in {channel_targets} for session {animalday}')
+
         return mask
 
     def filter_all(self, df:pd.DataFrame=None,
                    inplace=True, 
-                   reject_channels: list[str]=None, 
+                   bad_channels: list[str]=None, 
+                   min_valid_channels=3,
+                   filters: list[callable]=None,
                    **kwargs):
-        filters = [self.get_filter_rms_range, self.get_filter_high_rms, self.get_filter_high_beta]
+        """Apply a list of filters to the data.
+
+        Args:
+            df (pd.DataFrame, optional): If not None, this function will use this dataframe instead of self.result. Defaults to None.
+            inplace (bool, optional): If True, modify the result in place. Defaults to True.
+            bad_channels (list[str], optional): List of channels to reject. Defaults to None.
+            min_valid_channels (int, optional): Minimum number of valid channels required per window. Defaults to 3.
+            filters (list[callable], optional): List of filter functions to apply. Each function should return a boolean mask.
+                If None, uses default filters: [get_filter_logrms_range, get_filter_high_rms, get_filter_low_rms, get_filter_high_beta].
+                Defaults to None.
+            **kwargs: Additional keyword arguments to pass to filter functions.
+
+        Returns:
+            WindowAnalysisResult: Filtered result
+        """
+        if filters is None:
+            filters = [self.get_filter_logrms_range, self.get_filter_high_rms, self.get_filter_low_rms, self.get_filter_high_beta, self.get_filter_reject_channels_by_recording_session]
+        
         filt_bools = []
-        # Automatically filter bad windows
+        # Apply each filter function
         for filt in filters:
             filt_bool = filt(df, **kwargs)
             filt_bools.append(filt_bool)
             logging.info(f"{filt.__name__}:\tfiltered {filt_bool.size - np.count_nonzero(filt_bool)}/{filt_bool.size}")
+        
         # Filter channels manually
-        # NOTE add a function that just filters out bad channels separately?
-        if reject_channels is not None:
-            filt_bools.append(self.get_filter_reject_channels(reject_channels))
+        # REVIEW add a function that just filters out bad channels separately?
+        if bad_channels is not None:
+            filt_bools.append(self.get_filter_reject_channels(bad_channels))
             logging.debug(f"Reject channels: {filt_bools[-1]}")
+        
         # Apply all filters
         filt_bool_all = np.prod(np.stack(filt_bools, axis=-1), axis=-1).astype(bool)
+        logging.debug(f"filt_bool_all.shape: {filt_bool_all.shape}")
+
+        # Filter windows based on number of valid channels
+        valid_channels_per_window = np.sum(filt_bool_all, axis=1)  # axis 1 = channel
+        window_mask = valid_channels_per_window >= min_valid_channels  # True if window has enough valid channels
+        filt_bool_all = filt_bool_all & window_mask[:, np.newaxis]  # Apply window mask to all channels
+        
         filtered_result = self._apply_filter(filt_bool_all)
         if inplace:
             del self.result
@@ -759,14 +899,8 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     vals[~filter_tfs] = np.nan
                     result[feat] = vals.tolist()
                 case 'psd':
-                    # FIXME this breaks at 121821_cohort4_Group1_2mice M4. Presumably the 
-                    # WARs are too short maybe and causes inhomogeneity.
-                    # Maybe doing this at the WAR level instead of across all WARs will help
-                    # Or prefilter out the pathological
-
-                    # Actually I figured it out. The sampling rates have changed between computation passes so WARs have different shapes.
-                    # I'll need to rerun at 1000Hz
-                    # Also add a check for equal sampling frequency etc. I dont think this is encoded yet
+                    # FIXME The sampling rates have changed between computation passes so WARs have different shapes.
+                    # Add a check for same sampling frequency, other war-relevant properties etc.
                     coords = np.array([x[0] for x in result[feat].tolist()])
                     vals = np.array([x[1] for x in result[feat].tolist()])
                     mask = np.broadcast_to(filter_tfs[:, np.newaxis, :], vals.shape)
@@ -830,7 +964,8 @@ class WindowAnalysisResult(AnimalFeatureParser):
             'animal_id': self.animal_id,
             'genotype': self.genotype,
             'channel_names': self.channel_abbrevs if save_abbrevs_as_chnames else self.channel_names,
-            'assume_from_number': False if save_abbrevs_as_chnames else self.assume_from_number
+            'assume_from_number': False if save_abbrevs_as_chnames else self.assume_from_number,
+            'bad_channels_dict': self.bad_channels_dict
         }
 
         with open(filebase + ".json", "w") as f:

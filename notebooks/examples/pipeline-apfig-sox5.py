@@ -35,7 +35,7 @@ cluster_window = SLURMCluster(
     )
 print(f"\n\n\tcluster_window.dashboard_link: {cluster_window.dashboard_link}\n\n")
 cluster_window.scale(jobs=10)
-
+# !SECTION
 
 # SECTION 2: Setup windowed analysis
 logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.DEBUG, stream=sys.stdout, force=True)
@@ -50,6 +50,7 @@ data_folders_to_animal_ids = data['data_folders_to_animal_ids']
 save_folder = Path('/home/dongjp/Downloads/5-19-25 apfig sox5').resolve()
 if not save_folder.exists():
     save_folder.mkdir(parents=True)
+# !SECTION
 
 # SECTION 3: Run and plot windowed analysis
 
@@ -68,23 +69,27 @@ for data_folder, animal_ids in data_folders_to_animal_ids.items():
                                                     'multiprocess_mode': 'dask',
                                                     'overwrite_rowbins': True},
             )
-            
+            # !SECTION
+
             # SECTION 2: Make WAR
             war = ao.compute_windowed_analysis(['all'], multiprocess_mode='dask')
+            # !SECTION
 
-        # SECTION load into AP
+        # SECTION 3: load into AP
         save_path = save_folder / f"{data_folder} {animal_id}"
         if not save_path.exists():
             save_path.mkdir(parents=True)
         ap = visualization.AnimalPlotter(war, save_fig=True, save_path=save_path / animal_id)
+        # !SECTION
 
-        # SECTION plot
+        # SECTION 4: plot
         ap.plot_coherecorr_spectral(figsize=(20, 5), score_type='z')
         ap.plot_psd_histogram(figsize=(10, 4), avg_channels=True, plot_type='loglog')
         ap.plot_psd_spectrogram(figsize=(20, 4), mode='none')
-
-        # SECTION cleanup WAR
+        
         del war
+        # !SECTION
+# !SECTION
 
 """
 sbatch --mem 300G -c 4 -t 48:00:00 /mnt/isilon/marsh_single_unit/PythonEEG/notebooks/examples/pipeline.sh /mnt/isilon/marsh_single_unit/PythonEEG/notebooks/examples/pipeline-apfig-sox5.py

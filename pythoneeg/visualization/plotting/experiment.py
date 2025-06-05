@@ -6,6 +6,7 @@ import pandas as pd
 import logging
 from typing import Literal
 import warnings
+from collections import Counter
 
 from scipy import stats
 from statannotations.Annotator import Annotator
@@ -70,6 +71,12 @@ class ExperimentPlotter():
         logging.info(f'channel_to_idx: {self.channel_to_idx}')
         logging.info(f'all_channel_names: {self.all_channel_names}')
         
+        animal_ids = [war.animal_id for war in wars]
+        counts = Counter(animal_ids)
+        duplicates = [animal_id for animal_id, count in counts.items() if count > 1]
+        if duplicates:
+            warnings.warn(f'Duplicate animal IDs found: {duplicates}. Figures will still generate, but there may be data overlap. Change WAR.animal_id to avoid this issue.')
+
         # Process all data into DataFrames
         df_wars = []
         for war in wars:
@@ -84,25 +91,6 @@ class ExperimentPlotter():
         self.df_wars: list[pd.DataFrame] = df_wars
         self.concat_df_wars: pd.DataFrame = pd.concat(df_wars, axis=0, ignore_index=True) # TODO this raises a warning about df wars having columns that are none I think
         self.stats = None
-
-    # def reorder_and_pad_channels(self, target_channels: list[str], use_abbrevs: bool=True):
-    #     # REVIEW this probably shouldn't be a function. Channel reordering is handled at the window analysis level, and this is just convenience
-    #     # Implementing this also means reimplementing the init function. If another class derives from this that means 
-    #     # reimplementing that class's init as well. EP is cheap to instantiate, and reordering shouldnt be handled in the
-    #     # init function just to speed things up
-    #     """
-    #     Reorder and pad channels across all WindowAnalysisResult objects. Missing channels are padded with NaNs.
-    #     The ExperimentPlotter's window analysis result objects are modified in-place.
-
-    #     Parameters
-    #     ----------
-    #     target_channels : (list[str])
-    #         List of target channel names to match
-    #     use_abbrevs : (bool, optional)
-    #         If True, target channel names are read as channel abbreviations instead of channel names. Defaults to True.
-    #     """
-    #     for war in self.results:
-    #         war.reorder_and_pad_channels(target_channels, use_abbrevs=use_abbrevs, inplace=True)
 
     def pull_timeseries_dataframe(self, feature:str, groupby:str | list[str], 
                                 channels:str|list[str]='all', 
@@ -215,11 +203,6 @@ class ExperimentPlotter():
         df = df.melt(id_vars=groupby, value_vars=feature_cols, var_name='channel', value_name=feature)
         
         if feature == 'psdslope':
-            # FIXME for some pathological recordings this raise a TypeError 'float' object is not subscriptable
-            # Probably because its just empty? Are some slopes just encoded as integers not a integer+intercept?
-
-            # Well np.NaN is a float, so maybe this is trying to get the slope of a NaN-only slice. Have a check for this.
-            
             if df[feature].isna().any():
                 logging.warning(f'{feature} contains NaNs')
                 df = df[df[feature].notna()]
@@ -231,15 +214,11 @@ class ExperimentPlotter():
         
         df.reset_index(drop=True, inplace=True)
 
-        def nanmean_series_of_np(x): # REVIEW worth refactoring and reusing across classes? See the below implementation
-            xmean = np.nanmean(np.array(list(x)), axis=0)
-            return xmean
-
         if average_groupby:
             groupby_cols = df.columns.drop(feature).tolist()
             logging.debug(f'groupby_cols: {groupby_cols}')
             grouped = df.groupby(groupby_cols)
-            df = grouped[feature].apply(nanmean_series_of_np).reset_index()
+            df = grouped[feature].apply(core.utils.nanmean_series_of_np).reset_index()
 
         # baseline_means = (df_base
         #                   .groupby(remaining_groupby)[feature]
@@ -431,15 +410,17 @@ class ExperimentPlotter():
         
         return g
 
-    def _plot_matrix(self, data, feature, color_palette='RdBu_r', **kwargs):
+    def _plot_matrix(self, data, feature, color_palette='RdBu_r', norm=None, **kwargs):
         matrices = np.array(data[feature].tolist())
         avg_matrix = np.nanmean(matrices, axis=0)
         
+        if norm is None:
+            norm = colors.CenteredNorm(vcenter=0, halfrange=1)
+
         # Create heatmap
-        # vmax = max(1, np.abs(avg_matrix).max())
         plt.imshow(avg_matrix,
                    cmap=color_palette,
-                   norm=colors.CenteredNorm(vcenter=0, halfrange=1))
+                   norm=norm)
         plt.colorbar(fraction=0.046, pad=0.04)
         
         # Set ticks and labels
@@ -502,7 +483,7 @@ class ExperimentPlotter():
         g = sns.FacetGrid(df, **facet_vars)
 
         # Map the plotting function
-        g.map_dataframe(self._plot_matrix, feature=feature, color_palette=cmap)
+        g.map_dataframe(self._plot_matrix, feature=feature, color_palette=cmap, norm=colors.CenteredNorm(vcenter=0, halfrange=0.5))
         
         # NOTE implement statistical testing with big N and small N
 
@@ -611,20 +592,15 @@ def df_subtract_baseline(df: pd.DataFrame, feature: str, groupby: str | list[str
     except KeyError:
         raise ValueError(f'Baseline key {baseline_key} not found in groupby keys: {list(df.groupby(baseline_groupby).groups.keys())}')
 
-    def nanmean_series_of_np(x): # REVIEW worth refactoring and reusing across classes?
-        logging.debug(f'Unique shapes in x: {set(np.shape(item) for item in x)}')
-        xmean = np.nanmean(np.array(list(x)), axis=0)
-        return xmean
-
     if remaining_groupby:
         baseline_means = (df_base
                           .groupby(remaining_groupby)[feature]
-                          .apply(nanmean_series_of_np))
+                          .apply(core.utils.nanmean_series_of_np))
         df_merge = df.merge(baseline_means, how='left', on=remaining_groupby, suffixes=('', '_baseline'))
     else:
         baseline_means = (df_base
                           .groupby(baseline_groupby)[feature]
-                          .apply(nanmean_series_of_np)) # Global baseline
+                          .apply(core.utils.nanmean_series_of_np)) # Global baseline
         assert len(baseline_means) == 1
         df_merge = df.assign(**{f'{feature}_baseline': [baseline_means.iloc[0] for _ in range(len(df))]})
 

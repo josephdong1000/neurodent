@@ -325,8 +325,6 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         self._handle_figure(fig, title="psd_histogram")
 
     def plot_psd_spectrogram(self, multiindex=['animalday', 'animal', 'genotype'], freq_range=(1, 50), center_stat='mean', mode='z', figsize=None, cmap='magma', **kwargs):
-        # NOTE plot spectrogram over time, doing gaussian filter convolving when relevant, scaling logarithmically
-
         df_rowgroup = self.window_result.get_grouprows_result(['psd'], multiindex=multiindex)
         for i, df_row in df_rowgroup.groupby(level=0):
 
@@ -350,7 +348,6 @@ class AnimalPlotter(viz.AnimalFeatureParser):
             norm = matplotlib.colors.Normalize()
             # norm = matplotlib.colors.LogNorm()
             # norm = matplotlib.colors.CenteredNorm()
-
 
             fig, ax = plt.subplots(1, 1, figsize=figsize)
             # ax.pcolormesh(psd, )
