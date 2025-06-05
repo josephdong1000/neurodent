@@ -127,6 +127,10 @@ class AnimalOrganizer(AnimalFeatureParser):
         self._bin_folders = glob.glob(str(self.bin_folder_pattern))
         # if mode != 'noday':
         #     self.__bin_folders = [x for x in self.__bin_folders if datetime.strptime(Path(x).name, self.date_format)]
+        truncate = core.utils.parse_truncate(truncate)
+        if truncate:
+            warnings.warn(f"AnimalOrganizer will be truncated to the first {truncate} LongRecordings")
+            self._bin_folders = self._bin_folders[:truncate]
         self._bin_folders = [x for x in self._bin_folders if not any(y in x for y in skip_days)]
         self.bin_folder_names = [Path(x).name for x in self._bin_folders]
         logging.info(f"bin_folder_pattern: {self.bin_folder_pattern}")
@@ -138,10 +142,6 @@ class AnimalOrganizer(AnimalFeatureParser):
         elif len(self._bin_folders) == 0:
             raise ValueError(f"No files found for animal ID {self.anim_id}")
         
-        self.long_analyzers: list[core.LongRecordingAnalyzer] = []
-        self.long_recordings = [core.LongRecordingOrganizer(e, truncate=truncate, **lro_kwargs) for e in self._bin_folders]
-        # self.metadatas = [lrec.meta for lrec in self.long_recordings]
-
         animalday_dicts = [core.parse_path_to_animalday(e, animal_param=self.animal_param, day_sep=self.day_sep, mode=self.read_mode) for e in self._bin_folders]
         self.animaldays = [x['animalday'] for x in animalday_dicts]
         logging.info(f"self.animaldays: {self.animaldays}")
@@ -150,6 +150,11 @@ class AnimalOrganizer(AnimalFeatureParser):
         if len(set(genotypes)) > 1:
             warnings.warn(f"Inconsistent genotypes in {genotypes}")
         self.genotype = genotypes[0]
+        logging.info(f"self.genotype: {self.genotype}")
+
+        self.long_analyzers: list[core.LongRecordingAnalyzer] = []
+        logging.debug(f"Creating {len(self._bin_folders)} LongRecordings")
+        self.long_recordings = [core.LongRecordingOrganizer(e, **lro_kwargs) for e in self._bin_folders]
 
         channel_names = [x.channel_names for x in self.long_recordings]
         if len(set([" ".join(x) for x in channel_names])) > 1:

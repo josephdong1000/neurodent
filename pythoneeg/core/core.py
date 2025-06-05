@@ -26,7 +26,7 @@ import neo
 import mne
 
 # Local imports
-from .utils import convert_colpath_to_rowpath, convert_units_to_multiplier, filepath_to_index, get_temp_directory, Natural_Neighbor
+from .utils import convert_colpath_to_rowpath, convert_units_to_multiplier, filepath_to_index, get_temp_directory, Natural_Neighbor, parse_truncate
 from .. import constants
 
 #%%
@@ -198,17 +198,10 @@ class LongRecordingOrganizer:
             ValueError: If no data files are found or if the folder contains mixed file types.
         """
         
-        if type(truncate) is int:
-            self.truncate = True
-            self.n_truncate = truncate
-        elif type(truncate) is bool:
-            self.truncate = truncate
-            self.n_truncate = 10
-        else:
-            self.truncate = False
-            warnings.warn("Invalid truncate parameter, setting truncate = False")
+        self.n_truncate = parse_truncate(truncate)
+        self.truncate = True if self.n_truncate > 0 else False
         if self.truncate:
-            warnings.warn(f"truncate = True. Only the first {self.n_truncate} files of each animal will be used")
+            warnings.warn(f"LongRecording will be truncated to the first {self.n_truncate} files")
 
         self.base_folder_path = Path(base_folder_path)
         
