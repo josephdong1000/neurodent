@@ -19,17 +19,16 @@ logger = logging.getLogger()
 base_folder = Path('/mnt/isilon/marsh_single_unit/PythonEEG')
 # animal_ids = ['A5', 'A10', 'F22', 'G25', 'G26', 'N21', 'N22', 'N23', 'N24', 'N25']
 # animal_ids = ['A5', 'A10']
-animal_ids = [p.name for p in (base_folder / 'notebooks' / 'tests' / 'test-wars-full').glob('*') if p.is_dir()]
+animal_ids = [p.name for p in (base_folder / 'notebooks' / 'tests' / 'test-wars-sox5-2').glob('*') if p.is_dir()]
 # animal_ids = [
 #     '081922_cohort10_group4_2mice_FMut_FHet FHET',
 #     '062921_Cohort 3_AM3_AM5_CM9_BM6_CM5_CF2_IF5_BF3 CF2',
 # ]
 
-# TODO reject all the bad channels by eye when constructing EP
 def load_war(animal_id):
     logger.info(f'Loading {animal_id}')
     war = visualization.WindowAnalysisResult.load_pickle_and_json(
-        Path(base_folder / 'notebooks' / 'tests' / 'test-wars-full' / f'{animal_id}').resolve()
+        Path(base_folder / 'notebooks' / 'tests' / 'test-wars-sox5-2' / f'{animal_id}').resolve()
     )
     if war.genotype == 'Unknown': # Remove pathological recordings
         logger.info(f'Skipping {animal_id} because genotype is Unknown')
@@ -47,14 +46,12 @@ for animal_id in animal_ids:
     if war is not None:
         wars.append(war)
 logger.info(f'{len(wars)} wars loaded')
-ep = visualization.ExperimentPlotter(wars)
-
-raise Exception('halt')
+ep = visualization.ExperimentPlotter(wars, exclude=['nspike', 'lognspike'])
 
 # SECTION Define parameters
 catplot_params = {'showfliers': False}
 kinds = ['box']
-save_folder = Path('/home/dongjp/Downloads/5-29 every-fig').resolve()
+save_folder = Path('/home/dongjp/Downloads/6-4 sox5-2').resolve()
 if not save_folder.exists():
     save_folder.mkdir(parents=True)
 # !SECTION
@@ -63,6 +60,8 @@ if not save_folder.exists():
 logger.info("Generating box plot for rms for every animal")
 g = ep.plot_catplot('rms', groupby='animal', kind='box', catplot_params={'showfliers': False, 'aspect': 4})
 g.savefig(save_folder / 'AAAA every animal box.png', dpi=300)
+
+raise Exception('halt')
 
 for feature in constants.LINEAR_FEATURES:
     for kind in kinds:

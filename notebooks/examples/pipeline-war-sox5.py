@@ -26,8 +26,8 @@ cluster_window = SLURMCluster(
         cores=30,
         memory='100GB',
         walltime='48:00:00',
-        # interface=None,
-        # scheduler_options={'interface': 'eth1'}, # Look at `nmcli dev status` to find the correct interface
+        interface=None,
+        scheduler_options={'interface': 'eth1'}, # Look at `nmcli dev status` to find the correct interface
         job_extra_directives=['--output=/dev/null',
                               '--error=/dev/null']
     )
@@ -37,8 +37,8 @@ cluster_spike = SLURMCluster(
         memory='100GB',
         processes=1,
         walltime='6:00:00',
-        # interface=None,
-        # scheduler_options={'interface': 'eth1'}, # Look at `nmcli dev status` to find the correct interface
+        interface=None,
+        scheduler_options={'interface': 'eth1'}, # Look at `nmcli dev status` to find the correct interface
         job_extra_directives=['--output=/dev/null',
                               '--error=/dev/null']
     )
