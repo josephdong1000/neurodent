@@ -61,7 +61,7 @@ logger.info("Generating box plot for rms for every animal")
 g = ep.plot_catplot('rms', groupby='animal', kind='box', catplot_params={'showfliers': False, 'aspect': 4})
 g.savefig(save_folder / 'AAAA every animal box.png', dpi=300)
 
-raise Exception('halt')
+# raise Exception('halt')
 
 for feature in constants.LINEAR_FEATURES:
     for kind in kinds:
