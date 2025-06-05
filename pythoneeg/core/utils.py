@@ -63,6 +63,14 @@ def filepath_to_index(filepath) -> int:
     fname = list(filter(None, fname))
     return int(fname[-1])
 
+def parse_truncate(truncate: int | bool) -> int:
+    if isinstance(truncate, bool):
+        return 10 if truncate else 0
+    elif isinstance(truncate, int):
+        return truncate
+    else:
+        raise ValueError(f"Invalid truncate value: {truncate}")
+
 def nanaverage(A, weights, axis=-1):
     """
     Average of an array, ignoring NaNs.
