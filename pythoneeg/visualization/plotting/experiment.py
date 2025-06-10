@@ -281,6 +281,12 @@ class ExperimentPlotter():
             if default_params[param_name] is not None and default_params[param_name] not in df.columns:
                 raise ValueError(f"Parameter '{param_name}={default_params[param_name]}' not found in dataframe columns: {df.columns.tolist()}")
 
+        # # Apply ordering to x, col, and hue if not already provided
+        # for param_name in ['x', 'col', 'hue']:
+        #     param_order_name = 'order' if param_name == 'x' else param_name + '_order'
+        #     if default_params[param_name] in constants.PLOT_ORDER and not (catplot_params is not None and param_order_name in catplot_params):
+        #         default_params[param_order_name] = constants.PLOT_ORDER[default_params[param_name]]
+            
         # Create boxplot using seaborn
         g = sns.catplot(**default_params)
 
