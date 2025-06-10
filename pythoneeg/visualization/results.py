@@ -42,34 +42,31 @@ class AnimalFeatureParser:
         else:
             weights = df[weightsname]
         colitem = column.iloc[0]
-
+        weights = np.asarray(weights)
+        
         match colname: # NOTE refactor this to use constants
             case 'rms' | 'ampvar' | 'psdtotal' | 'pcorr' | 'nspike' | \
-                'logrms' | 'logampvar' | 'logpsdtotal' | 'lognspike':
-                col_agg = np.stack(column, axis=-1)
-            case 'psdslope':
-                col_agg = np.array([*column.tolist()])
-                col_agg = col_agg.transpose(1, 2, 0)
+                'logrms' | 'logampvar' | 'logpsdtotal' | 'lognspike' | \
+                'psdslope':
+                col_agg = np.array(column.tolist())
+                avg = core.nanaverage(col_agg, axis=0, weights=weights)
+
             case 'cohere' | 'psdband' | 'psdfrac' | \
                 'logpsdband' | 'logpsdfrac':
-                col_agg = {k : np.stack([d[k] for d in column], axis=-1) for k in colitem.keys()}
+                keys = colitem.keys()
+                avg = {}
+                for k in keys:
+                    v = np.array([d[k] for d in column])
+                    avg[k] = core.nanaverage(v, axis=0, weights=weights)
+
             case 'psd':
-                col_agg = np.stack([x[1] for x in column], axis=-1)
-                col_agg = (colitem[0], col_agg)
+                coords = colitem[0]
+                values = np.array([x[1] for x in column])
+                avg = (coords, core.nanaverage(values, axis=0, weights=weights))
+                
             case _:
                 raise TypeError(f"Unrecognized type in column {colname}: {colitem}")
 
-        if type(col_agg) is dict:
-            avg = {k:core.nanaverage(v, axis=-1, weights=weights) for k,v in col_agg.items()}
-        elif type(col_agg) is tuple:
-            if colname == 'psd':
-                avg = (col_agg[0], core.nanaverage(col_agg[1], axis=-1, weights=weights))
-            else:
-                avg = None
-        elif np.isnan(col_agg).all():
-            avg = np.nan
-        else:
-            avg = core.nanaverage(col_agg, axis=-1, weights=weights)
         return avg
     
 
