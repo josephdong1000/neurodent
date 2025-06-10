@@ -43,6 +43,12 @@ DEFAULT_ID_TO_NAME = {
     21: 'RVis',
     22: 'RAud',
 }
+PLOT_ORDER = {
+    'channel' : ['LMot', 'RMot', 'LBar', 'RBar', 'LAud', 'RAud', 'LVis', 'RVis', 'LHip', 'RHip'],
+    'genotype' : ['WT', 'KO'],
+    'isday' : [True, False],
+    'band' : ['delta', 'theta', 'alpha', 'beta', 'gamma']
+}
 
 DATEPARSER_PATTERNS_TO_REMOVE = [
     r'[A-Z]+\d+',      # Matches patterns like 'A5', 'G20'
