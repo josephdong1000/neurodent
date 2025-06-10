@@ -287,7 +287,7 @@ class AnimalOrganizer(AnimalFeatureParser):
             dataframes.append(lan_df)
         
         self.features_df = pd.concat(dataframes)
-        self.features_df.reset_index(inplace=True)
+        self.features_df = self.features_df.reset_index(drop=True)
 
         self.window_analysis_result = WindowAnalysisResult(self.features_df, 
                                                            self.animal_id, 
@@ -442,6 +442,17 @@ class WindowAnalysisResult(AnimalFeatureParser):
     def __update_instance_vars(self):
         """Run after updating self.result, or other init values
         """
+        if 'index' in self.result.columns:
+            warnings.warn("Dropping column 'index'")
+            self.result = self.result.drop(columns=['index'])
+
+        if 'animal' in self.result.columns:
+            unique_animals = self.result['animal'].unique()
+            if len(unique_animals) > 1:
+                raise ValueError(f"Multiple animals found in result: {unique_animals}")
+            if unique_animals[0] != self.animal_id:
+                raise ValueError(f"Animal ID mismatch: result has {unique_animals[0]}, but self.animal_id is {self.animal_id}")
+            
         self._feature_columns = [x for x in self.result.columns if x in constants.FEATURES]
         self._nonfeature_columns = [x for x in self.result.columns if x not in constants.FEATURES]
         self.animaldays = self.result.loc[:, "animalday"].unique()
