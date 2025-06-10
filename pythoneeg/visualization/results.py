@@ -762,8 +762,16 @@ class WindowAnalysisResult(AnimalFeatureParser):
             out: np.ndarray of bool, (M fragments, N channels). True = keep window, False = remove window
         """
         result = df.copy() if df is not None else self.result.copy()
-        df_psdfrac = pd.DataFrame(result['psdfrac'].tolist())
-        np_prop = np.array(df_psdfrac['beta'].tolist())
+        if 'psdfrac' in result.columns:
+            df_psdfrac = pd.DataFrame(result['psdfrac'].tolist())
+            np_prop = np.array(df_psdfrac['beta'].tolist())
+        elif 'psdband' in result.columns and 'psdtotal' in result.columns:
+            df_psdband = pd.DataFrame(result['psdband'].tolist())
+            np_beta = np.array(df_psdband['beta'].tolist())
+            np_total = np.array(result['psdtotal'].tolist())
+            np_prop = np_beta / np_total
+        else:
+            raise ValueError("psdfrac or psdband+psdtotal required for beta power filtering")
 
         out = np.full(np_prop.shape, True)
         out[np_prop > max_beta_prop] = False
@@ -848,7 +856,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                    min_valid_channels=3,
                    filters: list[callable]=None,
                    **kwargs):
-        """Apply a list of filters to the data.
+        """Apply a list of filters to the data. Filtering should be performed before aggregation.
 
         Args:
             df (pd.DataFrame, optional): If not None, this function will use this dataframe instead of self.result. Defaults to None.
@@ -1020,6 +1028,83 @@ class WindowAnalysisResult(AnimalFeatureParser):
         with open(json_path, 'r') as f:
             metadata = json.load(f)
         return cls(data, **metadata)
+    
+
+    def aggregate_time_windows(self, groupby=['animalday', 'isday']):
+        """Aggregate time windows into a single data point per groupby by averaging features. This reduces the number of rows in the result.
+
+        Args:
+            groupby (list[str], optional): Columns to group by. Defaults to ['animalday', 'isday'], which groups by animalday (recording session) and isday (day/night).
+
+        Raises:
+            ValueError: groupby must be from ['animalday', 'isday']
+            ValueError: Columns in groupby not found in result
+            ValueError: Columns in groupby are not constant in groups
+        """
+        if not all(col in ['animalday', 'isday'] for col in groupby):
+            raise ValueError(f"groupby must be from ['animalday', 'isday']. Got {groupby}")
+        if not all(col in self.result.columns for col in groupby):
+            raise ValueError(f"Columns {groupby} not found in result. Columns: {self.result.columns.tolist()}")
+        
+        features = [f for f in constants.FEATURES if f in self.result.columns]
+        logging.debug(f"Aggregating {features}")
+        result_grouped = self.result.groupby(groupby)
+
+        agg_dict = {}
+        
+        if 'animalday' not in groupby:
+            agg_dict['animalday'] = lambda df: None
+        if 'isday' not in groupby:
+            agg_dict['isday'] = lambda df: None
+
+        constant_cols = ['animal', 'day', 'genotype']
+        for col in constant_cols:
+            if col in self.result.columns:
+                is_constant = result_grouped[col].nunique() == 1
+                if not is_constant.all():
+                    non_constant_groups = is_constant[~is_constant].index.tolist()
+                    raise ValueError(f"Column {col} is not constant in groups: {non_constant_groups}")
+                agg_dict[col] = lambda df, col=col: df[col].iloc[0]
+
+        if 'duration' in self.result.columns:
+            agg_dict['duration'] = lambda df: np.sum(df['duration'])
+
+        if 'endfile' in self.result.columns:
+            agg_dict['endfile'] = lambda df: df['endfile'].iloc[-1]
+
+        if 'timestamp' in self.result.columns:
+            agg_dict['timestamp'] = lambda df: df['timestamp'].iloc[0]
+
+        for feat in features:
+            agg_dict[feat] = lambda df, feat=feat: self._average_feature(df, feat, 'duration')
+
+        aggregated_df = result_grouped.apply(lambda df: pd.Series({
+            col: agg_dict[col](df)
+            for col in self.result.columns if col not in groupby
+        }))
+        
+        self.result = aggregated_df.reset_index(drop=False) # Keep animalday/isday as a column
+        self.__update_instance_vars()
+
+    def add_unique_hash(self, nbytes: int | None = None):
+        """Adds a hex hash to the animal ID to ensure uniqueness. This prevents collisions when, for example, multiple animals in ExperimentPlotter have the same animal ID.
+
+        Args:
+            nbytes (int, optional): Number of bytes to generate. This is passed directly to secrets.token_hex(). Defaults to None, which generates 16 hex characters (8 bytes).
+        """
+        import secrets
+
+        hash_suffix = secrets.token_hex(nbytes)
+        new_animal_id = f"{self.animal_id}_{hash_suffix}"
+
+        if 'animal' in self.result.columns:
+            self.result['animal'] = new_animal_id
+        if 'animalday' in self.result.columns:
+            self.result['animalday'] = self.result['animalday'].str.replace(self.animal_id, new_animal_id)
+        self.animal_id = new_animal_id
+
+        self.__update_instance_vars()
+
     
 def bin_spike_times(spike_times: list[float], fragment_durations: list[float]) -> list[int]:
     """Bin spike times into counts based on fragment durations.
