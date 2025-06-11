@@ -38,7 +38,7 @@ def load_war(animal_id):
     
     war.filter_all()
     war.aggregate_time_windows()
-    war.add_unique_hash(4)
+    war.add_unique_hash()
     war.reorder_and_pad_channels(['LMot', 'RMot', 'LBar', 'RBar', 'LAud', 'RAud', 'LVis', 'RVis', 'LHip', 'RHip'], use_abbrevs=True)
 
     return war
@@ -109,10 +109,6 @@ for kind in ['swarm', 'point']:
             g = ep.plot_catplot(feature, groupby=['animal', 'genotype'], x='genotype', hue='channel', kind=kind, average_groupby=True, collapse_channels=collapse, 
                                 catplot_params={'dodge': (kind == 'swarm' or not collapse), 'col': None, 'errorbar': 'ci'})
             g.savefig(save_folder / f'{kind}-{feature}-genotype-{"avgch" if collapse else "no avgch"}.png', dpi=300)
-        for collapse in [False, True]:
-            g = ep.plot_catplot(feature, groupby=['animal', 'genotype'], x='genotype', hue='channel', kind=kind, average_groupby=True, collapse_channels=collapse, 
-                                catplot_params={'dodge': (kind == 'swarm' or not collapse), 'col': None, 'errorbar': 'ci', 'marker': 'animal'})
-            g.savefig(save_folder / f'{kind}-{feature}-genotype-namemark-{"avgch" if collapse else "no avgch"}.png', dpi=300)
         for collapse in [False, True]:
             logger.info(f"Generating {kind} plot for {feature} with genotype and isday grouping")
             g = ep.plot_catplot(feature, groupby=['animal', 'genotype', 'isday'], x='genotype', col='isday', hue='channel', kind=kind, average_groupby=True, collapse_channels=collapse, 
