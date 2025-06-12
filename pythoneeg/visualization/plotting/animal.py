@@ -382,7 +382,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
             freqs = row["psd"][0]
             psd = row["psd"][1]
             if avg_channels:
-                psd = np.average(psd, axis=-1, keepdims=True)
+                psd = np.nanmean(psd, axis=-1, keepdims=True)
                 label = "Average"
             else:
                 label = self.channel_abbrevs
