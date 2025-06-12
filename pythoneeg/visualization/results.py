@@ -1,41 +1,37 @@
-# Standard library imports
-import os
 import copy
 import glob
 import json
+import logging
+import os
 import re
+import tempfile
 import time
 import warnings
 from datetime import datetime
 from pathlib import Path
 from typing import Literal
-import tempfile
-import logging
 
-# Third party imports
-# import cmasher as cmr
+import dask
+import dask.array as da
+import dask.dataframe as dd
+import h5py
+import mne
 import numpy as np
 import pandas as pd
+import spikeinterface as si
+from dask import delayed
+from django.utils.text import slugify
 from scipy.stats import zscore
 from sklearn.neighbors import LocalOutlierFactor
-import dask
-import dask.dataframe as dd
-import dask.array as da
-from dask import delayed
 from tqdm import tqdm
-import h5py
-import spikeinterface as si
-import mne
-from django.utils.text import slugify
 
-# Local imports
-from .. import constants
-from .. import core
+from .. import constants, core
 from ..core import FragmentAnalyzer, get_temp_directory
+
 
 class AnimalFeatureParser:
     # REVIEW make this a utility function and refactor across codebase?
-    def _average_feature(self, df:pd.DataFrame, colname:str, weightsname:str|None='duration'):
+    def _average_feature(self, df: pd.DataFrame, colname: str, weightsname: str | None = "duration"):
         column = df[colname]
         if weightsname is None:
             weights = np.ones(column.size)
@@ -43,45 +39,53 @@ class AnimalFeatureParser:
             weights = df[weightsname]
         colitem = column.iloc[0]
         weights = np.asarray(weights)
-        
-        match colname: # NOTE refactor this to use constants
-            case 'rms' | 'ampvar' | 'psdtotal' | 'pcorr' | 'nspike' | \
-                'logrms' | 'logampvar' | 'logpsdtotal' | 'lognspike' | \
-                'psdslope':
+
+        match colname:  # NOTE refactor this to use constants
+            case (
+                "rms"
+                | "ampvar"
+                | "psdtotal"
+                | "pcorr"
+                | "nspike"
+                | "logrms"
+                | "logampvar"
+                | "logpsdtotal"
+                | "lognspike"
+                | "psdslope"
+            ):
                 col_agg = np.array(column.tolist())
                 avg = core.nanaverage(col_agg, axis=0, weights=weights)
 
-            case 'cohere' | 'psdband' | 'psdfrac' | \
-                'logpsdband' | 'logpsdfrac':
+            case "cohere" | "psdband" | "psdfrac" | "logpsdband" | "logpsdfrac":
                 keys = colitem.keys()
                 avg = {}
                 for k in keys:
                     v = np.array([d[k] for d in column])
                     avg[k] = core.nanaverage(v, axis=0, weights=weights)
 
-            case 'psd':
+            case "psd":
                 coords = colitem[0]
                 values = np.array([x[1] for x in column])
                 avg = (coords, core.nanaverage(values, axis=0, weights=weights))
-                
+
             case _:
                 raise TypeError(f"Unrecognized type in column {colname}: {colitem}")
 
         return avg
-    
+
 
 class AnimalOrganizer(AnimalFeatureParser):
-
-    def __init__(self, 
-                 base_folder_path, 
-                 anim_id: str, 
-                 day_sep:str|None = None,
-                 mode: Literal["nest", "concat", "base", "noday"] = "concat", 
-                 assume_from_number=False,
-                 skip_days: list[str] = [], 
-                 truncate:bool|int=False,
-                 lro_kwargs: dict = {}) -> None:
-
+    def __init__(
+        self,
+        base_folder_path,
+        anim_id: str,
+        day_sep: str | None = None,
+        mode: Literal["nest", "concat", "base", "noday"] = "concat",
+        assume_from_number=False,
+        skip_days: list[str] = [],
+        truncate: bool | int = False,
+        lro_kwargs: dict = {},
+    ) -> None:
         """
         AnimalOrganizer is used to organize data from a single animal into a format that can be used for analysis.
         It is used to organize data from a single animal into a format that can be used for analysis.
@@ -100,7 +104,7 @@ class AnimalOrganizer(AnimalFeatureParser):
             truncate (bool|int, optional): Whether to truncate the data. Defaults to False.
             lro_kwargs (dict, optional): Keyword arguments for LongRecordingOrganizer. Defaults to {}.
         """
-        
+
         self.base_folder_path = Path(base_folder_path)
         self.anim_id = anim_id
         self.animal_param = [anim_id]
@@ -109,18 +113,18 @@ class AnimalOrganizer(AnimalFeatureParser):
         self.assume_from_number = assume_from_number
 
         match mode:
-            case 'nest':
-                self.bin_folder_pattern = self.base_folder_path / f"*{self.anim_id}*" / '*'
-            case 'concat' | 'noday':
+            case "nest":
+                self.bin_folder_pattern = self.base_folder_path / f"*{self.anim_id}*" / "*"
+            case "concat" | "noday":
                 self.bin_folder_pattern = self.base_folder_path / f"*{self.anim_id}*"
                 # self.bin_folder_pat = self.base_folder_path / f"*{self.anim_id}*{self.date_format}*"
-            case 'base':
+            case "base":
                 self.bin_folder_pattern = self.base_folder_path
             # case 'noday':
             #     self.bin_folder_pat = self.base_folder_path / f"*{self.anim_id}*"
             case _:
                 raise ValueError(f"Invalid mode: {mode}")
-            
+
         self._bin_folders = glob.glob(str(self.bin_folder_pattern))
         # if mode != 'noday':
         #     self.__bin_folders = [x for x in self.__bin_folders if datetime.strptime(Path(x).name, self.date_format)]
@@ -138,12 +142,15 @@ class AnimalOrganizer(AnimalFeatureParser):
             raise ValueError(f"Animal ID '{self.anim_id}' is not unique, found: {', '.join(self._bin_folders)}")
         elif len(self._bin_folders) == 0:
             raise ValueError(f"No files found for animal ID {self.anim_id}")
-        
-        animalday_dicts = [core.parse_path_to_animalday(e, animal_param=self.animal_param, day_sep=self.day_sep, mode=self.read_mode) for e in self._bin_folders]
-        self.animaldays = [x['animalday'] for x in animalday_dicts]
+
+        animalday_dicts = [
+            core.parse_path_to_animalday(e, animal_param=self.animal_param, day_sep=self.day_sep, mode=self.read_mode)
+            for e in self._bin_folders
+        ]
+        self.animaldays = [x["animalday"] for x in animalday_dicts]
         logging.info(f"self.animaldays: {self.animaldays}")
 
-        genotypes = [x['genotype'] for x in animalday_dicts]
+        genotypes = [x["genotype"] for x in animalday_dicts]
         if len(set(genotypes)) > 1:
             warnings.warn(f"Inconsistent genotypes in {genotypes}")
         self.genotype = genotypes[0]
@@ -159,7 +166,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         self.channel_names = channel_names[0]
         self.bad_channels_dict = {}
 
-        animal_ids = [x['animal'] for x in animalday_dicts]
+        animal_ids = [x["animal"] for x in animalday_dicts]
         if len(set(animal_ids)) > 1:
             warnings.warn(f"Inconsistent animal IDs in {animal_ids}")
         self.animal_id = animal_ids[0]
@@ -167,11 +174,11 @@ class AnimalOrganizer(AnimalFeatureParser):
         self.features_df: pd.DataFrame = pd.DataFrame()
         self.features_avg_df: pd.DataFrame = pd.DataFrame()
 
-    def convert_colbins_to_rowbins(self, overwrite=False, multiprocess_mode: Literal['dask', 'serial']='serial'):
+    def convert_colbins_to_rowbins(self, overwrite=False, multiprocess_mode: Literal["dask", "serial"] = "serial"):
         for lrec in tqdm(self.long_recordings, desc="Converting column bins to row bins"):
             lrec.convert_colbins_to_rowbins(overwrite=overwrite, multiprocess_mode=multiprocess_mode)
 
-    def convert_rowbins_to_rec(self, multiprocess_mode: Literal['dask', 'serial']='serial'):
+    def convert_rowbins_to_rec(self, multiprocess_mode: Literal["dask", "serial"] = "serial"):
         for lrec in tqdm(self.long_recordings, desc="Converting row bins to recs"):
             lrec.convert_rowbins_to_rec(multiprocess_mode=multiprocess_mode)
 
@@ -182,14 +189,18 @@ class AnimalOrganizer(AnimalFeatureParser):
     def compute_bad_channels(self, lof_threshold: float = 1.5):
         for lrec in self.long_recordings:
             lrec.compute_bad_channels(lof_threshold=lof_threshold)
-        self.bad_channels_dict = {animalday : lrec.bad_channel_names for animalday, lrec in zip(self.animaldays, self.long_recordings)}
+        self.bad_channels_dict = {
+            animalday: lrec.bad_channel_names for animalday, lrec in zip(self.animaldays, self.long_recordings)
+        }
 
-    def compute_windowed_analysis(self, 
-                                  features: list[str], 
-                                  exclude: list[str]=['nspike', 'lognspike'], 
-                                  window_s=4, 
-                                  multiprocess_mode: Literal['dask', 'serial']='serial', 
-                                  **kwargs):
+    def compute_windowed_analysis(
+        self,
+        features: list[str],
+        exclude: list[str] = ["nspike", "lognspike"],
+        window_s=4,
+        multiprocess_mode: Literal["dask", "serial"] = "serial",
+        **kwargs,
+    ):
         """Computes windowed analysis of animal recordings. The data is divided into windows (time bins), then features are extracted from each window. The result is
         formatted to a Dataframe and wrapped into a WindowAnalysisResult object.
 
@@ -207,7 +218,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         features = _sanitize_feature_request(features, exclude)
 
         dataframes = []
-        for lrec in self.long_recordings: # Iterate over all long recordings
+        for lrec in self.long_recordings:  # Iterate over all long recordings
             logging.info(f"Computing windowed analysis for {lrec.base_folder_path}")
             lan = core.LongRecordingAnalyzer(lrec, fragment_len_s=window_s)
             if lan.n_fragments == 0:
@@ -217,13 +228,13 @@ class AnimalOrganizer(AnimalFeatureParser):
             logging.debug(f"Processing {lan.n_fragments} fragments")
             miniters = int(lan.n_fragments / 100)
             match multiprocess_mode:
-                case 'dask':
+                case "dask":
                     # Save fragments to tempfile
                     tmppath = os.path.join(get_temp_directory(), f"temp_{os.urandom(24).hex()}.h5")
-                    
+
                     # The last fragment is not included because it makes the dask array ragged
                     logging.debug("Converting LongRecording to numpy array")
-                    
+
                     n_fragments_war = max(lan.n_fragments - 1, 1)
                     first_fragment = lan.get_fragment_np(0)
                     np_fragments = np.empty((n_fragments_war,) + first_fragment.shape, dtype=first_fragment.dtype)
@@ -232,16 +243,17 @@ class AnimalOrganizer(AnimalFeatureParser):
                         np_fragments[idx] = lan.get_fragment_np(idx)
 
                     logging.debug(f"Caching numpy array with h5py in {tmppath}")
-                    with h5py.File(tmppath, 'w', libver='latest') as f:
-                        f.create_dataset('fragments', 
-                                       data=np_fragments,
-                                       chunks=True,  # Let h5py auto-chunk, or specify tuple like (1, -1, -1)
-                                       maxshape=None,  # Allow dataset to be resizable
-                                    #    compression="gzip",  # Use GZIP compression
-                                    #    compression_opts=4,  # Compression level 0-9 (higher = more compression but slower)
-                                    #    rdcc_nbytes=10 * 1024 * 1024  # 10MB chunk cache
-                                       )
-                    del np_fragments # cleanup memory
+                    with h5py.File(tmppath, "w", libver="latest") as f:
+                        f.create_dataset(
+                            "fragments",
+                            data=np_fragments,
+                            chunks=True,  # Let h5py auto-chunk, or specify tuple like (1, -1, -1)
+                            maxshape=None,  # Allow dataset to be resizable
+                            #    compression="gzip",  # Use GZIP compression
+                            #    compression_opts=4,  # Compression level 0-9 (higher = more compression but slower)
+                            #    rdcc_nbytes=10 * 1024 * 1024  # 10MB chunk cache
+                        )
+                    del np_fragments  # cleanup memory
 
                     # This is not parallelized
                     logging.debug("Processing metadata serially")
@@ -249,17 +261,19 @@ class AnimalOrganizer(AnimalFeatureParser):
 
                     # Process fragments in parallel using Dask
                     logging.debug("Processing features in parallel")
-                    with h5py.File(tmppath, 'r', libver='latest') as f:
-                        np_fragments_reconstruct = da.from_array(f['fragments'], chunks='100 MB') # NOTE allow the user to specify chunk size
-                        feature_values = [delayed(FragmentAnalyzer._process_fragment_features_dask)(
-                            np_fragments_reconstruct[idx], 
-                            lan.f_s, 
-                            features, 
-                            kwargs
-                        ) for idx in range(n_fragments_war)]
+                    with h5py.File(tmppath, "r", libver="latest") as f:
+                        np_fragments_reconstruct = da.from_array(
+                            f["fragments"], chunks="100 MB"
+                        )  # NOTE allow the user to specify chunk size
+                        feature_values = [
+                            delayed(FragmentAnalyzer._process_fragment_features_dask)(
+                                np_fragments_reconstruct[idx], lan.f_s, features, kwargs
+                            )
+                            for idx in range(n_fragments_war)
+                        ]
                         # del np_fragments_reconstruct # cleanup memory
                         feature_values = dask.compute(*feature_values)
-                        f.close() # ensure file is closed
+                        f.close()  # ensure file is closed
 
                     # Clean up temp file after processing
                     logging.debug("Cleaning up temp file")
@@ -277,28 +291,30 @@ class AnimalOrganizer(AnimalFeatureParser):
                 case _:
                     logging.debug("Processing serially")
                     lan_df = []
-                    for idx in tqdm(range(lan.n_fragments), desc='Processing rows', miniters=miniters):
+                    for idx in tqdm(range(lan.n_fragments), desc="Processing rows", miniters=miniters):
                         lan_df.append(self._process_fragment_serial(idx, features, lan, window_s, kwargs))
 
             lan_df = pd.DataFrame(lan_df)
-            lan_df.sort_values('timestamp', inplace=True)
+            lan_df.sort_values("timestamp", inplace=True)
 
             self.long_analyzers.append(lan)
             dataframes.append(lan_df)
-        
+
         self.features_df = pd.concat(dataframes)
         self.features_df = self.features_df.reset_index(drop=True)
 
-        self.window_analysis_result = WindowAnalysisResult(self.features_df, 
-                                                           self.animal_id, 
-                                                           self.genotype, 
-                                                           self.channel_names, 
-                                                           self.assume_from_number,
-                                                           self.bad_channels_dict)
+        self.window_analysis_result = WindowAnalysisResult(
+            self.features_df,
+            self.animal_id,
+            self.genotype,
+            self.channel_names,
+            self.assume_from_number,
+            self.bad_channels_dict,
+        )
 
         return self.window_analysis_result
-    
-    def compute_spike_analysis(self, multiprocess_mode: Literal['dask', 'serial']='serial'):
+
+    def compute_spike_analysis(self, multiprocess_mode: Literal["dask", "serial"] = "serial"):
         """Compute spike sorting on all long recordings and return a list of SpikeAnalysisResult objects
 
         Args:
@@ -318,54 +334,65 @@ class AnimalOrganizer(AnimalFeatureParser):
                 logging.warning(f"Skipping {rec.__str__()} because it has no samples")
                 sortings, recordings = [], []
             else:
-                sortings, recordings = core.MountainSortAnalyzer.sort_recording(rec, multiprocess_mode=multiprocess_mode)
+                sortings, recordings = core.MountainSortAnalyzer.sort_recording(
+                    rec, multiprocess_mode=multiprocess_mode
+                )
             lrec_sorts.append(sortings)
             lrec_recs.append(recordings)
 
-        if multiprocess_mode == 'dask':
+        if multiprocess_mode == "dask":
             lrec_sorts = dask.compute(*lrec_sorts)
 
-        lrec_sas = [[si.create_sorting_analyzer(sorting, recording, sparse=False) 
-                    for sorting, recording in zip(sortings, recordings)] 
-                    for sortings, recordings in zip(lrec_sorts, lrec_recs)]
-        sars = [SpikeAnalysisResult(result_sas=sas,
-                                    result_mne=None,
-                                    animal_id=self.animal_id,
-                                    genotype=self.genotype,
-                                    animal_day=self.animaldays[i],
-                                    bin_folder_name=self.bin_folder_names[i],
-                                    metadata=self.long_recordings[i].meta,
-                                    channel_names=self.channel_names,
-                                    assume_from_number=self.assume_from_number)
-                for i, sas in enumerate(lrec_sas)]
-        
+        lrec_sas = [
+            [
+                si.create_sorting_analyzer(sorting, recording, sparse=False)
+                for sorting, recording in zip(sortings, recordings)
+            ]
+            for sortings, recordings in zip(lrec_sorts, lrec_recs)
+        ]
+        sars = [
+            SpikeAnalysisResult(
+                result_sas=sas,
+                result_mne=None,
+                animal_id=self.animal_id,
+                genotype=self.genotype,
+                animal_day=self.animaldays[i],
+                bin_folder_name=self.bin_folder_names[i],
+                metadata=self.long_recordings[i].meta,
+                channel_names=self.channel_names,
+                assume_from_number=self.assume_from_number,
+            )
+            for i, sas in enumerate(lrec_sas)
+        ]
+
         self.spike_analysis_results = sars
         return self.spike_analysis_results
-
 
     def _process_fragment_serial(self, idx, features, lan: core.LongRecordingAnalyzer, window_s, kwargs: dict):
         row = self._process_fragment_metadata(idx, lan, window_s)
         row.update(self._process_fragment_features(idx, features, lan, kwargs))
         return row
-    
+
     def _process_fragment_metadata(self, idx, lan: core.LongRecordingAnalyzer, window_s):
         row = {}
 
         lan_folder = lan.LongRecording.base_folder_path
-        animalday_dict = core.parse_path_to_animalday(lan_folder, animal_param=self.animal_param, day_sep=self.day_sep, mode=self.read_mode)
-        row['animalday'] = animalday_dict['animalday']
-        row['animal'] = animalday_dict['animal']
-        row['day'] = animalday_dict['day']
-        row['genotype'] = animalday_dict['genotype']
-        row['duration'] = lan.LongRecording.get_dur_fragment(window_s, idx)
-        row['endfile'] = lan.get_file_end(idx)
+        animalday_dict = core.parse_path_to_animalday(
+            lan_folder, animal_param=self.animal_param, day_sep=self.day_sep, mode=self.read_mode
+        )
+        row["animalday"] = animalday_dict["animalday"]
+        row["animal"] = animalday_dict["animal"]
+        row["day"] = animalday_dict["day"]
+        row["genotype"] = animalday_dict["genotype"]
+        row["duration"] = lan.LongRecording.get_dur_fragment(window_s, idx)
+        row["endfile"] = lan.get_file_end(idx)
 
         frag_dt = lan.LongRecording.get_datetime_fragment(window_s, idx)
-        row['timestamp'] = frag_dt
-        row['isday'] = core.is_day(frag_dt)
+        row["timestamp"] = frag_dt
+        row["isday"] = core.is_day(frag_dt)
 
         return row
-    
+
     def _process_fragment_features(self, idx, features, lan: core.LongRecordingAnalyzer, kwargs: dict):
         row = {}
         for feat in features:
@@ -376,7 +403,8 @@ class AnimalOrganizer(AnimalFeatureParser):
                 raise AttributeError(f"Invalid function {func}")
         return row
 
-def _sanitize_feature_request(features: list[str], exclude: list[str]=[]):
+
+def _sanitize_feature_request(features: list[str], exclude: list[str] = []):
     """
     Sanitizes a list of requested features for WindowAnalysisResult
 
@@ -408,13 +436,16 @@ class WindowAnalysisResult(AnimalFeatureParser):
     """
     Wrapper for output of windowed analysis. Has useful features like group-wise and global averaging, filtering, and saving
     """
-    def __init__(self, 
-                 result: pd.DataFrame, 
-                 animal_id:str=None, 
-                 genotype:str=None, 
-                 channel_names:list[str]=None, 
-                 assume_from_number=False, 
-                 bad_channels_dict:dict[str, list[str]]={}) -> None:
+
+    def __init__(
+        self,
+        result: pd.DataFrame,
+        animal_id: str = None,
+        genotype: str = None,
+        channel_names: list[str] = None,
+        assume_from_number=False,
+        bad_channels_dict: dict[str, list[str]] = {},
+    ) -> None:
         """
         Args:
             result (pd.DataFrame): Result comes from AnimalOrganizer.compute_windowed_analysis()
@@ -438,33 +469,38 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
     def __str__(self) -> str:
         return f"{self.animaldays}"
-    
-    def __update_instance_vars(self):
-        """Run after updating self.result, or other init values
-        """
-        if 'index' in self.result.columns:
-            warnings.warn("Dropping column 'index'")
-            self.result = self.result.drop(columns=['index'])
 
-        if 'animal' in self.result.columns:
-            unique_animals = self.result['animal'].unique()
+    def __update_instance_vars(self):
+        """Run after updating self.result, or other init values"""
+        if "index" in self.result.columns:
+            warnings.warn("Dropping column 'index'")
+            self.result = self.result.drop(columns=["index"])
+
+        if "animal" in self.result.columns:
+            unique_animals = self.result["animal"].unique()
             if len(unique_animals) > 1:
                 raise ValueError(f"Multiple animals found in result: {unique_animals}")
             if unique_animals[0] != self.animal_id:
-                raise ValueError(f"Animal ID mismatch: result has {unique_animals[0]}, but self.animal_id is {self.animal_id}")
-            
+                raise ValueError(
+                    f"Animal ID mismatch: result has {unique_animals[0]}, but self.animal_id is {self.animal_id}"
+                )
+
         self._feature_columns = [x for x in self.result.columns if x in constants.FEATURES]
         self._nonfeature_columns = [x for x in self.result.columns if x not in constants.FEATURES]
         self.animaldays = self.result.loc[:, "animalday"].unique()
-        
-        self.channel_abbrevs = [core.parse_chname_to_abbrev(x, assume_from_number=self.assume_from_number) for x in self.channel_names]
 
-    def reorder_and_pad_channels(self, target_channels: list[str], use_abbrevs: bool = True, inplace: bool = True) -> pd.DataFrame:
+        self.channel_abbrevs = [
+            core.parse_chname_to_abbrev(x, assume_from_number=self.assume_from_number) for x in self.channel_names
+        ]
+
+    def reorder_and_pad_channels(
+        self, target_channels: list[str], use_abbrevs: bool = True, inplace: bool = True
+    ) -> pd.DataFrame:
         """Reorder and pad channels to match a target channel list.
-        
+
         This method ensures that the data has a consistent channel order and structure
         by reordering existing channels and padding missing channels with NaNs.
-        
+
         Args:
             target_channels (list[str]): List of target channel names to match
             use_abbrevs (bool, optional): If True, target channel names are read as channel abbreviations instead of channel names. Defaults to True.
@@ -477,14 +513,16 @@ class WindowAnalysisResult(AnimalFeatureParser):
             raise ValueError(f"Target channels must be unique. Found duplicates: {duplicates}")
 
         result = self.result.copy()
-            
+
         channel_map = {ch: i for i, ch in enumerate(target_channels)}
         channel_names = self.channel_names if not use_abbrevs else self.channel_abbrevs
-        
+
         valid_channels = [ch for ch in channel_names if ch in channel_map]
         if not valid_channels:
-            warnings.warn(f"None of the channel names {channel_names} were found in target channels {target_channels}. Is use_abbrevs correctly set?")
-        
+            warnings.warn(
+                f"None of the channel names {channel_names} were found in target channels {target_channels}. Is use_abbrevs correctly set?"
+            )
+
         for feature in self._feature_columns:
             match feature:
                 case _ if feature in constants.LINEAR_FEATURES + constants.BAND_FEATURES:
@@ -495,95 +533,95 @@ class WindowAnalysisResult(AnimalFeatureParser):
                         keys = df_bands.keys()
                     else:
                         vals = np.array(result[feature].tolist())
-                        
-                    new_vals = np.full((vals.shape[0], len(target_channels), *vals.shape[2:]), np.nan) # dubious
-                    
+
+                    new_vals = np.full((vals.shape[0], len(target_channels), *vals.shape[2:]), np.nan)  # dubious
+
                     for i, ch in enumerate(channel_names):
                         if ch in channel_map:
                             new_vals[:, channel_map[ch]] = vals[:, i]
-                    
+
                     if feature in constants.BAND_FEATURES:
                         new_vals = new_vals.transpose((0, 2, 1))
                         result[feature] = [dict(zip(keys, vals)) for vals in new_vals]
                     else:
                         result[feature] = [list(x) for x in new_vals]
-                        
+
                 case _ if feature in constants.MATRIX_FEATURES:
-                    if feature == 'cohere':
+                    if feature == "cohere":
                         df_bands = pd.DataFrame(result[feature].tolist())
                         vals = np.array(df_bands.values.tolist())
                         keys = df_bands.keys()
                     else:
                         vals = np.array(result[feature].tolist())
-                        
-                    logging.debug(f'vals.shape: {vals.shape}')
+
+                    logging.debug(f"vals.shape: {vals.shape}")
                     new_shape = list(vals.shape[:-2]) + [len(target_channels), len(target_channels)]
                     new_vals = np.full(new_shape, np.nan)
-                    
+
                     ch1_valid = np.array([ch in channel_map for ch in channel_names])
                     ch2_valid = ch1_valid.copy()
-                    valid_pairs = np.logical_and(ch1_valid[:, None], ch2_valid[None, :]) # 2D boolean mask
-                    
+                    valid_pairs = np.logical_and(ch1_valid[:, None], ch2_valid[None, :])  # 2D boolean mask
+
                     for i, j in zip(*np.where(valid_pairs)):
                         ch1, ch2 = channel_names[i], channel_names[j]
                         new_vals[..., channel_map[ch1], channel_map[ch2]] = vals[..., i, j]
 
                     triu_mask = np.triu_indices(len(target_channels), k=0)
-                    new_vals += new_vals.transpose((*range(new_vals.ndim-2), -1, -2))
+                    new_vals += new_vals.transpose((*range(new_vals.ndim - 2), -1, -2))
                     new_vals[..., triu_mask[0], triu_mask[1]] = 0
-                    
-                    if feature == 'cohere':
+
+                    if feature == "cohere":
                         result[feature] = [dict(zip(keys, vals)) for vals in new_vals]
                     else:
                         result[feature] = [list(x) for x in new_vals]
-                
+
                 case _ if feature in constants.HIST_FEATURES:
                     coords = np.array([x[0] for x in result[feature].tolist()])
                     vals = np.array([x[1] for x in result[feature].tolist()])
                     new_vals = np.full((*vals.shape[0:-1], len(target_channels)), np.nan)
-                    
+
                     for i, ch in enumerate(channel_names):
                         if ch in channel_map:
                             new_vals[:, ..., channel_map[ch]] = vals[:, ..., i]
-                            
+
                     result[feature] = [(coords[i], new_vals[i]) for i in range(len(coords))]
 
                 case _:
                     raise Exception(f"Invalid feature: {feature}")
-                    
+
         if inplace:
             self.result = result
 
-            logging.debug(f'Old channel names: {self.channel_names}')
+            logging.debug(f"Old channel names: {self.channel_names}")
             self.channel_names = target_channels
-            logging.debug(f'New channel names: {self.channel_names}')
+            logging.debug(f"New channel names: {self.channel_names}")
 
-            logging.debug(f'Old channel abbreviations: {self.channel_abbrevs}')
+            logging.debug(f"Old channel abbreviations: {self.channel_abbrevs}")
             self.__update_instance_vars()
-            logging.debug(f'New channel abbreviations: {self.channel_abbrevs}')
-        
+            logging.debug(f"New channel abbreviations: {self.channel_abbrevs}")
+
         return result
 
-    def read_sars_spikes(self, sars: list['SpikeAnalysisResult'], read_mode: Literal['sa', 'mne']='sa', inplace=True):
+    def read_sars_spikes(self, sars: list["SpikeAnalysisResult"], read_mode: Literal["sa", "mne"] = "sa", inplace=True):
         match read_mode:
-            case 'sa':
+            case "sa":
                 spikes_all = []
-                for sar in sars: # for each continuous recording session
+                for sar in sars:  # for each continuous recording session
                     spikes_channel = []
-                    for i, sa in enumerate(sar.result_sas): # for each channel
+                    for i, sa in enumerate(sar.result_sas):  # for each channel
                         spike_times = []
-                        for unit in sa.sorting.get_unit_ids(): # Flatten units
+                        for unit in sa.sorting.get_unit_ids():  # Flatten units
                             spike_times.extend(sa.sorting.get_unit_spike_train(unit_id=unit).tolist())
                         spike_times = np.array(spike_times) / sa.sorting.get_sampling_frequency()
                         spikes_channel.append(spike_times)
                     spikes_all.append(spikes_channel)
                 return self._read_from_spikes_all(spikes_all, inplace=inplace)
-            case 'mne':
+            case "mne":
                 raws = [sar.result_mne for sar in sars]
                 return self.read_mnes_spikes(raws, inplace=inplace)
             case _:
                 raise ValueError(f"Invalid read_mode: {read_mode}")
-        
+
     def read_mnes_spikes(self, raws: list[mne.io.RawArray], inplace=True):
         spikes_all = []
         for raw in raws:
@@ -599,14 +637,14 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     continue
                 event_id_channel = event_id[channel]
                 spike_times = events[events[:, 2] == event_id_channel, 0]
-                spike_times = spike_times / raw.info['sfreq']
+                spike_times = spike_times / raw.info["sfreq"]
                 spikes_channel.append(spike_times)
             spikes_all.append(spikes_channel)
         return self._read_from_spikes_all(spikes_all, inplace=inplace)
-    
+
     def _read_from_spikes_all(self, spikes_all: list[list[list[float]]], inplace=True):
         # Each groupby animalday is a recording session
-        grouped = self.result.groupby('animalday')
+        grouped = self.result.groupby("animalday")
         animaldays = grouped.groups.keys()
         logging.debug(f"Animal days: {animaldays}")
         spike_counts = dict(zip(animaldays, spikes_all))
@@ -617,8 +655,8 @@ class WindowAnalysisResult(AnimalFeatureParser):
             logging.warning(f"Spike counts size {spike_counts.size} does not match result size {self.result.shape[0]}")
 
         result = self.result.copy()
-        result['nspike'] = spike_counts.tolist()
-        result['lognspike'] = list(core._log_transform(np.stack(result['nspike'].tolist(), axis=0)))
+        result["nspike"] = spike_counts.tolist()
+        result["lognspike"] = list(core._log_transform(np.stack(result["nspike"].tolist(), axis=0)))
         if inplace:
             self.result = result
         return result
@@ -628,13 +666,17 @@ class WindowAnalysisResult(AnimalFeatureParser):
         info = []
         info.append(f"feature names: {', '.join(self._feature_columns)}")
         info.append(f"animaldays: {', '.join(self.result['animalday'].unique())}")
-        info.append(f"animal_id: {self.result['animal'].unique()[0] if 'animal' in self.result.columns else self.animal_id}")
-        info.append(f"genotype: {self.result['genotype'].unique()[0] if 'genotype' in self.result.columns else self.genotype}")
+        info.append(
+            f"animal_id: {self.result['animal'].unique()[0] if 'animal' in self.result.columns else self.animal_id}"
+        )
+        info.append(
+            f"genotype: {self.result['genotype'].unique()[0] if 'genotype' in self.result.columns else self.genotype}"
+        )
         info.append(f"channel_names: {', '.join(self.channel_names) if self.channel_names else 'None'}")
-        
+
         return "\n".join(info)
 
-    def get_result(self, features: list[str], exclude: list[str]=[], allow_missing=False):
+    def get_result(self, features: list[str], exclude: list[str] = [], allow_missing=False):
         """Get windowed analysis result dataframe, with helpful filters
 
         Args:
@@ -651,7 +693,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
         else:
             return self.result.reindex(columns=self._nonfeature_columns + features)
 
-    def get_groupavg_result(self, features: list[str], exclude: list[str]=[], df: pd.DataFrame = None, groupby="animalday"):
+    def get_groupavg_result(
+        self, features: list[str], exclude: list[str] = [], df: pd.DataFrame = None, groupby="animalday"
+    ):
         """Group result and average within groups. Preserves data structure and shape for each feature.
 
         Args:
@@ -677,19 +721,25 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
         return pd.concat(avg_results, axis=1)
 
-    def __get_groups(self, features: list[str], exclude: list[str]=[], df: pd.DataFrame = None, groupby="animalday"):
+    def __get_groups(self, features: list[str], exclude: list[str] = [], df: pd.DataFrame = None, groupby="animalday"):
         features = _sanitize_feature_request(features, exclude)
         result_win = self.result if df is None else df
         return result_win.groupby(groupby), result_win.columns
 
-    def get_grouprows_result(self, features: list[str], exclude: list[str]=[], df: pd.DataFrame = None,
-                            multiindex=["animalday", "animal", "genotype"], include=["duration", "endfile"]):
+    def get_grouprows_result(
+        self,
+        features: list[str],
+        exclude: list[str] = [],
+        df: pd.DataFrame = None,
+        multiindex=["animalday", "animal", "genotype"],
+        include=["duration", "endfile"],
+    ):
         features = _sanitize_feature_request(features, exclude)
         result_win = self.result if df is None else df
         result_win = result_win.filter(features + multiindex + include)
         return result_win.set_index(multiindex)
 
-    def get_filter_logrms_range(self, df:pd.DataFrame=None, z_range=3, **kwargs):
+    def get_filter_logrms_range(self, df: pd.DataFrame = None, z_range=3, **kwargs):
         """Filter windows based on log(rms).
 
         Args:
@@ -701,17 +751,17 @@ class WindowAnalysisResult(AnimalFeatureParser):
         """
         result = df.copy() if df is not None else self.result.copy()
         z_range = abs(z_range)
-        np_rms = np.array(result['rms'].tolist())
+        np_rms = np.array(result["rms"].tolist())
         np_logrms = np.log(np_rms)
         del np_rms
-        np_logrmsz = zscore(np_logrms, axis=0, nan_policy='omit')
+        np_logrmsz = zscore(np_logrms, axis=0, nan_policy="omit")
         np_logrms[(np_logrmsz > z_range) | (np_logrmsz < -z_range)] = np.nan
 
         out = np.full(np_logrms.shape, True)
         out[(np_logrmsz > z_range) | (np_logrmsz < -z_range)] = False
         return out
 
-    def get_filter_high_rms(self, df:pd.DataFrame=None, max_rms=1000, **kwargs):
+    def get_filter_high_rms(self, df: pd.DataFrame = None, max_rms=1000, **kwargs):
         """Filter windows based on rms.
 
         Args:
@@ -722,16 +772,16 @@ class WindowAnalysisResult(AnimalFeatureParser):
             out: np.ndarray of bool, (M fragments, N channels). True = keep window, False = remove window
         """
         result = df.copy() if df is not None else self.result.copy()
-        np_rms = np.array(result['rms'].tolist())
+        np_rms = np.array(result["rms"].tolist())
         np_rmsnan = np_rms.copy()
         np_rmsnan[np_rms > max_rms] = np.nan
-        result['rms'] = np_rmsnan.tolist()
+        result["rms"] = np_rmsnan.tolist()
 
         out = np.full(np_rms.shape, True)
         out[np_rms > max_rms] = False
         return out
-    
-    def get_filter_low_rms(self, df:pd.DataFrame=None, min_rms=30, **kwargs):
+
+    def get_filter_low_rms(self, df: pd.DataFrame = None, min_rms=30, **kwargs):
         """Filter windows based on rms.
 
         Args:
@@ -742,16 +792,16 @@ class WindowAnalysisResult(AnimalFeatureParser):
             out: np.ndarray of bool, (M fragments, N channels). True = keep window, False = remove window
         """
         result = df.copy() if df is not None else self.result.copy()
-        np_rms = np.array(result['rms'].tolist())
+        np_rms = np.array(result["rms"].tolist())
         np_rmsnan = np_rms.copy()
         np_rmsnan[np_rms < min_rms] = np.nan
-        result['rms'] = np_rmsnan.tolist()
+        result["rms"] = np_rmsnan.tolist()
 
         out = np.full(np_rms.shape, True)
         out[np_rms < min_rms] = False
         return out
 
-    def get_filter_high_beta(self, df:pd.DataFrame=None, max_beta_prop=0.4, **kwargs):
+    def get_filter_high_beta(self, df: pd.DataFrame = None, max_beta_prop=0.4, **kwargs):
         """Filter windows based on beta power.
 
         Args:
@@ -762,13 +812,13 @@ class WindowAnalysisResult(AnimalFeatureParser):
             out: np.ndarray of bool, (M fragments, N channels). True = keep window, False = remove window
         """
         result = df.copy() if df is not None else self.result.copy()
-        if 'psdfrac' in result.columns:
-            df_psdfrac = pd.DataFrame(result['psdfrac'].tolist())
-            np_prop = np.array(df_psdfrac['beta'].tolist())
-        elif 'psdband' in result.columns and 'psdtotal' in result.columns:
-            df_psdband = pd.DataFrame(result['psdband'].tolist())
-            np_beta = np.array(df_psdband['beta'].tolist())
-            np_total = np.array(result['psdtotal'].tolist())
+        if "psdfrac" in result.columns:
+            df_psdfrac = pd.DataFrame(result["psdfrac"].tolist())
+            np_prop = np.array(df_psdfrac["beta"].tolist())
+        elif "psdband" in result.columns and "psdtotal" in result.columns:
+            df_psdband = pd.DataFrame(result["psdband"].tolist())
+            np_beta = np.array(df_psdband["beta"].tolist())
+            np_total = np.array(result["psdtotal"].tolist())
             np_prop = np_beta / np_total
         else:
             raise ValueError("psdfrac or psdband+psdtotal required for beta power filtering")
@@ -790,9 +840,13 @@ class WindowAnalysisResult(AnimalFeatureParser):
         Returns:
             out: np.ndarray of bool, (M fragments, N channels). True = keep window, False = remove window
         """
-        channel_targets = self.channel_abbrevs if use_abbrevs or use_abbrevs is None else self.channel_names # Match to appropriate target
-        if use_abbrevs is None: # Match channels as abbreviations
-            bad_channels = [core.utils.parse_chname_to_abbrev(ch, assume_from_number=self.assume_from_number) for ch in bad_channels]
+        channel_targets = (
+            self.channel_abbrevs if use_abbrevs or use_abbrevs is None else self.channel_names
+        )  # Match to appropriate target
+        if use_abbrevs is None:  # Match channels as abbreviations
+            bad_channels = [
+                core.utils.parse_chname_to_abbrev(ch, assume_from_number=self.assume_from_number) for ch in bad_channels
+            ]
 
         n_samples = len(self.result)
         n_channels = len(channel_targets)
@@ -803,10 +857,12 @@ class WindowAnalysisResult(AnimalFeatureParser):
             if ch in channel_targets:
                 mask[:, channel_targets.index(ch)] = False
             else:
-                warnings.warn(f'Channel {ch} not found in {channel_targets}')
+                warnings.warn(f"Channel {ch} not found in {channel_targets}")
         return mask
-    
-    def get_filter_reject_channels_by_recording_session(self, bad_channels_dict: dict[str, list[str]] = None, use_abbrevs: bool = None):
+
+    def get_filter_reject_channels_by_recording_session(
+        self, bad_channels_dict: dict[str, list[str]] = None, use_abbrevs: bool = None
+    ):
         """Filter channels to reject for each recording session
 
         Args:
@@ -827,7 +883,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         mask = np.ones((n_samples, n_channels), dtype=bool)
 
         # Group by animalday to apply filters per recording session
-        for animalday, group in self.result.groupby('animalday'):
+        for animalday, group in self.result.groupby("animalday"):
             if animalday not in bad_channels_dict:
                 logging.warning(f"No bad channels specified for recording session {animalday}")
                 continue
@@ -835,7 +891,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
             bad_channels = bad_channels_dict[animalday]
             channel_targets = self.channel_abbrevs if use_abbrevs or use_abbrevs is None else self.channel_names
             if use_abbrevs is None:
-                bad_channels = [core.parse_chname_to_abbrev(ch, assume_from_number=self.assume_from_number) for ch in bad_channels]
+                bad_channels = [
+                    core.parse_chname_to_abbrev(ch, assume_from_number=self.assume_from_number) for ch in bad_channels
+                ]
 
             # Get indices for this recording session
             session_indices = group.index
@@ -846,16 +904,19 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     ch_idx = channel_targets.index(ch)
                     mask[session_indices, ch_idx] = False
                 else:
-                    logging.warning(f'Channel {ch} not found in {channel_targets} for session {animalday}')
+                    logging.warning(f"Channel {ch} not found in {channel_targets} for session {animalday}")
 
         return mask
 
-    def filter_all(self, df:pd.DataFrame=None,
-                   inplace=True, 
-                   bad_channels: list[str]=None, 
-                   min_valid_channels=3,
-                   filters: list[callable]=None,
-                   **kwargs):
+    def filter_all(
+        self,
+        df: pd.DataFrame = None,
+        inplace=True,
+        bad_channels: list[str] = None,
+        min_valid_channels=3,
+        filters: list[callable] = None,
+        **kwargs,
+    ):
         """Apply a list of filters to the data. Filtering should be performed before aggregation.
 
         Args:
@@ -872,21 +933,27 @@ class WindowAnalysisResult(AnimalFeatureParser):
             WindowAnalysisResult: Filtered result
         """
         if filters is None:
-            filters = [self.get_filter_logrms_range, self.get_filter_high_rms, self.get_filter_low_rms, self.get_filter_high_beta, self.get_filter_reject_channels_by_recording_session]
-        
+            filters = [
+                self.get_filter_logrms_range,
+                self.get_filter_high_rms,
+                self.get_filter_low_rms,
+                self.get_filter_high_beta,
+                self.get_filter_reject_channels_by_recording_session,
+            ]
+
         filt_bools = []
         # Apply each filter function
         for filt in filters:
             filt_bool = filt(df, **kwargs)
             filt_bools.append(filt_bool)
             logging.info(f"{filt.__name__}:\tfiltered {filt_bool.size - np.count_nonzero(filt_bool)}/{filt_bool.size}")
-        
+
         # Filter channels manually
         # REVIEW add a function that just filters out bad channels separately?
         if bad_channels is not None:
             filt_bools.append(self.get_filter_reject_channels(bad_channels))
             logging.debug(f"Reject channels: {filt_bools[-1]}")
-        
+
         # Apply all filters
         filt_bool_all = np.prod(np.stack(filt_bools, axis=-1), axis=-1).astype(bool)
         logging.debug(f"filt_bool_all.shape: {filt_bool_all.shape}")
@@ -895,53 +962,51 @@ class WindowAnalysisResult(AnimalFeatureParser):
         valid_channels_per_window = np.sum(filt_bool_all, axis=1)  # axis 1 = channel
         window_mask = valid_channels_per_window >= min_valid_channels  # True if window has enough valid channels
         filt_bool_all = filt_bool_all & window_mask[:, np.newaxis]  # Apply window mask to all channels
-        
+
         filtered_result = self._apply_filter(filt_bool_all)
         if inplace:
             del self.result
             self.result = filtered_result
-        return WindowAnalysisResult(filtered_result,
-                                  self.animal_id,
-                                  self.genotype, 
-                                  self.channel_names,
-                                  self.assume_from_number)
+        return WindowAnalysisResult(
+            filtered_result, self.animal_id, self.genotype, self.channel_names, self.assume_from_number
+        )
 
-    def _apply_filter(self, filter_tfs:np.ndarray):
+    def _apply_filter(self, filter_tfs: np.ndarray):
         result = self.result.copy()
-        filter_tfs = np.array(filter_tfs, dtype=bool) # (M fragments, N channels)
+        filter_tfs = np.array(filter_tfs, dtype=bool)  # (M fragments, N channels)
         for feat in constants.FEATURES:
             if feat not in result.columns:
                 logging.info(f"Skipping {feat} because it is not in result")
                 continue
             logging.info(f"Filtering {feat}")
-            match feat: # NOTE refactor this to use constants
-                case 'rms' | 'ampvar' | 'psdtotal' | 'nspike' | 'logrms' | 'logampvar' | 'logpsdtotal' | 'lognspike':
+            match feat:  # NOTE refactor this to use constants
+                case "rms" | "ampvar" | "psdtotal" | "nspike" | "logrms" | "logampvar" | "logpsdtotal" | "lognspike":
                     vals = np.array(result[feat].tolist())
                     vals[~filter_tfs] = np.nan
                     result[feat] = vals.tolist()
-                case 'psd':
+                case "psd":
                     # FIXME The sampling rates have changed between computation passes so WARs have different shapes.
                     # Add a check for same sampling frequency, other war-relevant properties etc.
                     coords = np.array([x[0] for x in result[feat].tolist()])
                     vals = np.array([x[1] for x in result[feat].tolist()])
                     mask = np.broadcast_to(filter_tfs[:, np.newaxis, :], vals.shape)
                     vals[~mask] = np.nan
-                    outs = [(c, vals[i, :, :]) for i,c in enumerate(coords)]
+                    outs = [(c, vals[i, :, :]) for i, c in enumerate(coords)]
                     result[feat] = outs
-                case 'psdband' | 'psdfrac' | 'logpsdband' | 'logpsdfrac':
+                case "psdband" | "psdfrac" | "logpsdband" | "logpsdfrac":
                     vals = pd.DataFrame(result[feat].tolist())
                     for colname in vals.columns:
                         v = np.array(vals[colname].tolist())
                         v[~filter_tfs] = np.nan
                         vals[colname] = v.tolist()
-                    result[feat] = vals.to_dict('records')
-                case 'psdslope':
+                    result[feat] = vals.to_dict("records")
+                case "psdslope":
                     vals = np.array(result[feat].tolist())
                     mask = np.broadcast_to(filter_tfs[:, :, np.newaxis], vals.shape)
                     vals[~mask] = np.nan
                     # vals = [list(map(tuple, x)) for x in vals.tolist()]
                     result[feat] = vals.tolist()
-                case 'cohere':
+                case "cohere":
                     vals = pd.DataFrame(result[feat].tolist())
                     shape = np.array(vals.iloc[:, 0].tolist()).shape
                     mask = np.broadcast_to(filter_tfs[:, :, np.newaxis], shape)
@@ -950,18 +1015,20 @@ class WindowAnalysisResult(AnimalFeatureParser):
                         v[~mask] = np.nan
                         v[~mask.transpose(0, 2, 1)] = np.nan
                         vals[colname] = v.tolist()
-                    result[feat] = vals.to_dict('records')
-                case 'pcorr':
+                    result[feat] = vals.to_dict("records")
+                case "pcorr":
                     vals = np.array(result[feat].tolist())
                     mask = np.broadcast_to(filter_tfs[:, :, np.newaxis], vals.shape)
                     vals[~mask] = np.nan
                     vals[~mask.transpose(0, 2, 1)] = np.nan
                     result[feat] = vals.tolist()
                 case _:
-                    raise ValueError(f'Unknown feature to filter {feat}')
+                    raise ValueError(f"Unknown feature to filter {feat}")
         return result
-    
-    def save_pickle_and_json(self, folder: str | Path, make_folder=True, slugify_filebase=True, save_abbrevs_as_chnames=False):
+
+    def save_pickle_and_json(
+        self, folder: str | Path, make_folder=True, slugify_filebase=True, save_abbrevs_as_chnames=False
+    ):
         """Archive window analysis result into the folder specified, as a pickle and json file.
 
         Args:
@@ -980,18 +1047,17 @@ class WindowAnalysisResult(AnimalFeatureParser):
             filebase = folder / f"{self.animal_id}-{self.genotype}"
         filebase = str(filebase)
 
-        self.result.to_pickle(filebase + '.pkl')
+        self.result.to_pickle(filebase + ".pkl")
         json_dict = {
-            'animal_id': self.animal_id,
-            'genotype': self.genotype,
-            'channel_names': self.channel_abbrevs if save_abbrevs_as_chnames else self.channel_names,
-            'assume_from_number': False if save_abbrevs_as_chnames else self.assume_from_number,
-            'bad_channels_dict': self.bad_channels_dict
+            "animal_id": self.animal_id,
+            "genotype": self.genotype,
+            "channel_names": self.channel_abbrevs if save_abbrevs_as_chnames else self.channel_names,
+            "assume_from_number": False if save_abbrevs_as_chnames else self.assume_from_number,
+            "bad_channels_dict": self.bad_channels_dict,
         }
 
         with open(filebase + ".json", "w") as f:
             json.dump(json_dict, f, indent=2)
-
 
     @classmethod
     def load_pickle_and_json(cls, folder_path=None):
@@ -1013,24 +1079,23 @@ class WindowAnalysisResult(AnimalFeatureParser):
             folder_path = Path(folder_path)
             if not folder_path.exists():
                 raise ValueError(f"Folder path {folder_path} does not exist")
-            
-            pkl_files = list(folder_path.glob('*.pkl'))
-            json_files = list(folder_path.glob('*.json'))
-            
+
+            pkl_files = list(folder_path.glob("*.pkl"))
+            json_files = list(folder_path.glob("*.json"))
+
             if len(pkl_files) != 1 or len(json_files) != 1:
                 raise ValueError(f"Expected exactly one pickle and one json file in {folder_path}")
-                
+
             df_pickle_path = pkl_files[0]
             json_path = json_files[0]
 
-        with open(df_pickle_path, 'rb') as f:
+        with open(df_pickle_path, "rb") as f:
             data = pd.read_pickle(f)
-        with open(json_path, 'r') as f:
+        with open(json_path, "r") as f:
             metadata = json.load(f)
         return cls(data, **metadata)
-    
 
-    def aggregate_time_windows(self, groupby=['animalday', 'isday']):
+    def aggregate_time_windows(self, groupby=["animalday", "isday"]):
         """Aggregate time windows into a single data point per groupby by averaging features. This reduces the number of rows in the result.
 
         Args:
@@ -1041,23 +1106,23 @@ class WindowAnalysisResult(AnimalFeatureParser):
             ValueError: Columns in groupby not found in result
             ValueError: Columns in groupby are not constant in groups
         """
-        if not all(col in ['animalday', 'isday'] for col in groupby):
+        if not all(col in ["animalday", "isday"] for col in groupby):
             raise ValueError(f"groupby must be from ['animalday', 'isday']. Got {groupby}")
         if not all(col in self.result.columns for col in groupby):
             raise ValueError(f"Columns {groupby} not found in result. Columns: {self.result.columns.tolist()}")
-        
+
         features = [f for f in constants.FEATURES if f in self.result.columns]
         logging.debug(f"Aggregating {features}")
         result_grouped = self.result.groupby(groupby)
 
         agg_dict = {}
-        
-        if 'animalday' not in groupby:
-            agg_dict['animalday'] = lambda df: None
-        if 'isday' not in groupby:
-            agg_dict['isday'] = lambda df: None
 
-        constant_cols = ['animal', 'day', 'genotype']
+        if "animalday" not in groupby:
+            agg_dict["animalday"] = lambda df: None
+        if "isday" not in groupby:
+            agg_dict["isday"] = lambda df: None
+
+        constant_cols = ["animal", "day", "genotype"]
         for col in constant_cols:
             if col in self.result.columns:
                 is_constant = result_grouped[col].nunique() == 1
@@ -1066,24 +1131,23 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     raise ValueError(f"Column {col} is not constant in groups: {non_constant_groups}")
                 agg_dict[col] = lambda df, col=col: df[col].iloc[0]
 
-        if 'duration' in self.result.columns:
-            agg_dict['duration'] = lambda df: np.sum(df['duration'])
+        if "duration" in self.result.columns:
+            agg_dict["duration"] = lambda df: np.sum(df["duration"])
 
-        if 'endfile' in self.result.columns:
-            agg_dict['endfile'] = lambda df: df['endfile'].iloc[-1]
+        if "endfile" in self.result.columns:
+            agg_dict["endfile"] = lambda df: df["endfile"].iloc[-1]
 
-        if 'timestamp' in self.result.columns:
-            agg_dict['timestamp'] = lambda df: df['timestamp'].iloc[0]
+        if "timestamp" in self.result.columns:
+            agg_dict["timestamp"] = lambda df: df["timestamp"].iloc[0]
 
         for feat in features:
-            agg_dict[feat] = lambda df, feat=feat: self._average_feature(df, feat, 'duration')
+            agg_dict[feat] = lambda df, feat=feat: self._average_feature(df, feat, "duration")
 
-        aggregated_df = result_grouped.apply(lambda df: pd.Series({
-            col: agg_dict[col](df)
-            for col in self.result.columns if col not in groupby
-        }))
-        
-        self.result = aggregated_df.reset_index(drop=False) # Keep animalday/isday as a column
+        aggregated_df = result_grouped.apply(
+            lambda df: pd.Series({col: agg_dict[col](df) for col in self.result.columns if col not in groupby})
+        )
+
+        self.result = aggregated_df.reset_index(drop=False)  # Keep animalday/isday as a column
         self.__update_instance_vars()
 
     def add_unique_hash(self, nbytes: int | None = None):
@@ -1097,54 +1161,58 @@ class WindowAnalysisResult(AnimalFeatureParser):
         hash_suffix = secrets.token_hex(nbytes)
         new_animal_id = f"{self.animal_id}_{hash_suffix}"
 
-        if 'animal' in self.result.columns:
-            self.result['animal'] = new_animal_id
-        if 'animalday' in self.result.columns:
-            self.result['animalday'] = self.result['animalday'].str.replace(self.animal_id, new_animal_id)
+        if "animal" in self.result.columns:
+            self.result["animal"] = new_animal_id
+        if "animalday" in self.result.columns:
+            self.result["animalday"] = self.result["animalday"].str.replace(self.animal_id, new_animal_id)
         self.animal_id = new_animal_id
 
         self.__update_instance_vars()
 
-    
+
 def bin_spike_times(spike_times: list[float], fragment_durations: list[float]) -> list[int]:
     """Bin spike times into counts based on fragment durations.
-    
+
     Args:
         spike_times (list[float]): List of spike timestamps in seconds
         fragment_durations (list[float]): List of fragment durations in seconds
-    
+
     Returns:
         list[int]: List of spike counts per fragment
     """
     # Convert fragment durations to bin edges
     bin_edges = np.cumsum([0] + fragment_durations)
-    
+
     # Use numpy's histogram function to count spikes in each bin
     counts, _ = np.histogram(spike_times, bins=bin_edges)
-    
+
     return counts.tolist()
 
+
 def _bin_spike_df(df: pd.DataFrame, spikes_channel: list[list[float]]) -> np.ndarray:
-        """
-        Bins spike times into a matrix of shape (n_windows, n_channels), based on duration of each window in df
-        """
-        durations = df['duration'].tolist()
-        out = np.empty((len(durations), len(spikes_channel)))
-        for i, spike_times in enumerate(spikes_channel):
-            out[:, i] = bin_spike_times(spike_times, durations)
-        return out
+    """
+    Bins spike times into a matrix of shape (n_windows, n_channels), based on duration of each window in df
+    """
+    durations = df["duration"].tolist()
+    out = np.empty((len(durations), len(spikes_channel)))
+    for i, spike_times in enumerate(spikes_channel):
+        out[:, i] = bin_spike_times(spike_times, durations)
+    return out
 
 
 class SpikeAnalysisResult(AnimalFeatureParser):
-    def __init__(self, result_sas: list[si.SortingAnalyzer], 
-                 result_mne: mne.io.RawArray=None,
-                 animal_id:str=None, 
-                 genotype:str=None, 
-                 animal_day:str=None,
-                 bin_folder_name:str=None,
-                 metadata:core.DDFBinaryMetadata=None,
-                 channel_names:list[str]=None, 
-                 assume_from_number=False) -> None:
+    def __init__(
+        self,
+        result_sas: list[si.SortingAnalyzer],
+        result_mne: mne.io.RawArray = None,
+        animal_id: str = None,
+        genotype: str = None,
+        animal_day: str = None,
+        bin_folder_name: str = None,
+        metadata: core.DDFBinaryMetadata = None,
+        channel_names: list[str] = None,
+        assume_from_number=False,
+    ) -> None:
         """
         Args:
             result (list[si.SortingAnalyzer]): Result comes from AnimalOrganizer.compute_spike_analysis(). Each SortingAnalyzer is a single channel.
@@ -1164,12 +1232,14 @@ class SpikeAnalysisResult(AnimalFeatureParser):
         self.metadata = metadata
         self.channel_names = channel_names
         self.assume_from_number = assume_from_number
-        self.channel_abbrevs = [core.parse_chname_to_abbrev(x, assume_from_number=assume_from_number) for x in self.channel_names]
+        self.channel_abbrevs = [
+            core.parse_chname_to_abbrev(x, assume_from_number=assume_from_number) for x in self.channel_names
+        ]
 
         logging.info(f"Channel names: \t{self.channel_names}")
         logging.info(f"Channel abbreviations: \t{self.channel_abbrevs}")
 
-    def convert_to_mne(self, chunk_len:float=60, save_raw=True) -> mne.io.RawArray:
+    def convert_to_mne(self, chunk_len: float = 60, save_raw=True) -> mne.io.RawArray:
         if self.result_mne is None:
             result_mne = SpikeAnalysisResult.convert_sas_to_mne(self.result_sas, chunk_len)
             if save_raw:
@@ -1177,14 +1247,16 @@ class SpikeAnalysisResult(AnimalFeatureParser):
             else:
                 return result_mne
         return self.result_mne
-            
 
-    def save_fif_and_json(self, folder: str | Path,
-                          convert_to_mne=True,
-                          make_folder=True, 
-                          slugify_filebase=True,
-                          save_abbrevs_as_chnames=False,
-                          overwrite=False):
+    def save_fif_and_json(
+        self,
+        folder: str | Path,
+        convert_to_mne=True,
+        make_folder=True,
+        slugify_filebase=True,
+        save_abbrevs_as_chnames=False,
+        overwrite=False,
+    ):
         """Archive spike analysis result into the folder specified, as a fif and json file.
 
         Args:
@@ -1205,7 +1277,7 @@ class SpikeAnalysisResult(AnimalFeatureParser):
                 raise ValueError("No MNE RawArray found, and convert_to_mne is False. Run convert_to_mne() first.")
         else:
             result_mne = self.result_mne
-        
+
         folder = Path(folder)
         if make_folder:
             folder.mkdir(parents=True, exist_ok=True)
@@ -1215,58 +1287,56 @@ class SpikeAnalysisResult(AnimalFeatureParser):
         else:
             filebase = folder / f"{self.animal_id}-{self.genotype}-{self.animal_day}"
         filebase = str(filebase)
-            
+
         if not overwrite:
-            if filebase + '.json' in folder.glob('*.json'):
+            if filebase + ".json" in folder.glob("*.json"):
                 raise FileExistsError(f"File {filebase}.json already exists")
-            if filebase + '.fif' in folder.glob('*.fif'):
+            if filebase + ".fif" in folder.glob("*.fif"):
                 raise FileExistsError(f"File {filebase}.fif already exists")
         else:
-            for f in folder.glob('*'):
+            for f in folder.glob("*"):
                 f.unlink()
-        result_mne.save(filebase + '-raw.fif', overwrite=overwrite)
+        result_mne.save(filebase + "-raw.fif", overwrite=overwrite)
         del result_mne
 
         json_dict = {
-            'animal_id': self.animal_id,
-            'genotype': self.genotype,
-            'animal_day': self.animal_day,
-            'bin_folder_name': self.bin_folder_name,
-            'metadata': self.metadata.metadata_path,
-            'channel_names': self.channel_abbrevs if save_abbrevs_as_chnames else self.channel_names,
-            'assume_from_number': False if save_abbrevs_as_chnames else self.assume_from_number
+            "animal_id": self.animal_id,
+            "genotype": self.genotype,
+            "animal_day": self.animal_day,
+            "bin_folder_name": self.bin_folder_name,
+            "metadata": self.metadata.metadata_path,
+            "channel_names": self.channel_abbrevs if save_abbrevs_as_chnames else self.channel_names,
+            "assume_from_number": False if save_abbrevs_as_chnames else self.assume_from_number,
         }
         with open(filebase + ".json", "w") as f:
             json.dump(json_dict, f, indent=2)
-
 
     @classmethod
     def load_fif_and_json(cls, folder: str | Path):
         folder = Path(folder)
         if not folder.exists():
             raise ValueError(f"Folder {folder} does not exist")
-        
-        fif_files = list(folder.glob('*.fif')) # there may be more than 1 fif file
-        json_files = list(folder.glob('*.json'))
 
-        if len(json_files) != 1: 
+        fif_files = list(folder.glob("*.fif"))  # there may be more than 1 fif file
+        json_files = list(folder.glob("*.json"))
+
+        if len(json_files) != 1:
             raise ValueError(f"Expected exactly one json file in {folder}")
-        
+
         fif_path = fif_files[0]
         json_path = json_files[0]
 
-        with open(json_path, 'r') as f:
+        with open(json_path, "r") as f:
             data = json.load(f)
-        #data['metadata'] = core.DDFBinaryMetadata(data['metadata'])
-        data['result_mne'] = mne.io.read_raw_fif(fif_path)
-        data['result_sas'] = None
+        # data['metadata'] = core.DDFBinaryMetadata(data['metadata'])
+        data["result_mne"] = mne.io.read_raw_fif(fif_path)
+        data["result_sas"] = None
         return cls(**data)
 
-
     @staticmethod
-    def convert_sas_to_mne(sas: list[si.SortingAnalyzer], chunk_len:float=60) -> mne.io.RawArray:
+    def convert_sas_to_mne(sas: list[si.SortingAnalyzer], chunk_len: float = 60) -> mne.io.RawArray:
         """Convert a list of SortingAnalyzers to a MNE RawArray.
-        
+
         Args:
             sas (list[si.SortingAnalyzer]): The list of SortingAnalyzers to convert
             chunk_len (float, optional): The length of the chunks to use for the conversion. Defaults to 60.
@@ -1281,18 +1351,18 @@ class SpikeAnalysisResult(AnimalFeatureParser):
         sfreqs = [sa.recording.get_sampling_frequency() for sa in sas]
         if not all(sf == sfreqs[0] for sf in sfreqs):
             raise ValueError(f"All SortingAnalyzers must have the same sampling frequency. Got frequencies: {sfreqs}")
-        
+
         # Preallocate data array
         total_frames = int(sas[0].recording.get_duration() * sfreqs[0])
         n_channels = len(sas)
         data = np.empty((n_channels, total_frames))
         logging.debug(f"Data shape: {data.shape}")
-        
+
         # Fill data array one channel at a time
         for i, sa in enumerate(sas):
-            logging.debug(f"Converting channel {i+1} of {n_channels}")
+            logging.debug(f"Converting channel {i + 1} of {n_channels}")
             data[i, :] = SpikeAnalysisResult.convert_sa_to_np(sa, chunk_len)
-            
+
         channel_names = [str(sa.recording.get_channel_ids().item()) for sa in sas]
         logging.debug(f"Channel names: {channel_names}")
         sfreq = sfreqs[0]
@@ -1307,22 +1377,23 @@ class SpikeAnalysisResult(AnimalFeatureParser):
                 spike_times = spike_train / sa.sorting.get_sampling_frequency()
                 mask = spike_times < sa.recording.get_duration()
                 spike_times = spike_times[mask]
-                
+
                 # Create annotation for each spike
                 onset.extend(spike_times)
-                description.extend([sa.recording.get_channel_ids().item()] * len(spike_times)) # collapse all units into 1 spike train
+                description.extend(
+                    [sa.recording.get_channel_ids().item()] * len(spike_times)
+                )  # collapse all units into 1 spike train
         annotations = mne.Annotations(onset, duration=0, description=description)
 
-        info = mne.create_info(ch_names=channel_names, sfreq=sfreq, ch_types='eeg')
+        info = mne.create_info(ch_names=channel_names, sfreq=sfreq, ch_types="eeg")
         raw = mne.io.RawArray(data=data, info=info)
         raw = raw.set_annotations(annotations)
         return raw
 
-
     @staticmethod
-    def convert_sa_to_np(sa: si.SortingAnalyzer, chunk_len:float=60) -> np.ndarray:
+    def convert_sa_to_np(sa: si.SortingAnalyzer, chunk_len: float = 60) -> np.ndarray:
         """Convert a SortingAnalyzer to an MNE RawArray.
-        
+
         Args:
             sa (si.SortingAnalyzer): The SortingAnalyzer to convert. Must have only 1 channel.
             chunk_len (float, optional): The length of the chunks to use for the conversion. Defaults to 60.
@@ -1331,26 +1402,28 @@ class SpikeAnalysisResult(AnimalFeatureParser):
         """
         # Check that SortingAnalyzer only has 1 channel
         if len(sa.recording.get_channel_ids()) != 1:
-            raise ValueError(f"Expected SortingAnalyzer to have 1 channel, but got {len(sa.recording.get_channel_ids())} channels")
-        
+            raise ValueError(
+                f"Expected SortingAnalyzer to have 1 channel, but got {len(sa.recording.get_channel_ids())} channels"
+            )
+
         rec = sa.recording
         logging.debug(f"Recording info: {rec}")
-        
+
         # Calculate total number of frames and chunks
         total_frames = int(rec.get_duration() * rec.get_sampling_frequency())
         frames_per_chunk = round(chunk_len * rec.get_sampling_frequency())
         n_chunks = total_frames // frames_per_chunk
-        
+
         traces = np.empty(total_frames)
 
         for j in range(n_chunks):
             start_frame = j * frames_per_chunk
-            if j == n_chunks-1:
+            if j == n_chunks - 1:
                 end_frame = total_frames
             else:
                 end_frame = (j + 1) * frames_per_chunk
-            traces[start_frame:end_frame] = rec.get_traces(start_frame=start_frame,
-                                                          end_frame=end_frame,
-                                                          return_scaled=True).flatten()
-        traces *= 1e-6 # convert from uV to V
+            traces[start_frame:end_frame] = rec.get_traces(
+                start_frame=start_frame, end_frame=end_frame, return_scaled=True
+            ).flatten()
+        traces *= 1e-6  # convert from uV to V
         return traces
