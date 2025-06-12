@@ -20,9 +20,10 @@ class LongRecordingAnalyzer:
         self.n_fragments = longrecording.get_num_fragments(fragment_len_s)
         self.channel_names = longrecording.channel_names
         self.n_channels = longrecording.meta.n_channels
-        # self.V_units = longrecording.meta.V_units
         self.mult_to_uV = longrecording.meta.mult_to_uV
-        self.f_s = int(longrecording.meta.f_s)
+        self.f_s = int(
+            longrecording.LongRecording.get_sampling_frequency()
+        )  # FIXME this does not update correctly when longrecording is resampled
         self.notch_freq = notch_freq
 
     def get_fragment_rec(self, index) -> si.BaseRecording:

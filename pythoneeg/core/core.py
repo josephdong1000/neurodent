@@ -62,7 +62,9 @@ class DDFBinaryMetadata:
             raise ValueError(f"Metadata file is empty: {metadata_path}")
 
         self.n_channels = len(self.metadata_df.index)
-        self.f_s = self.__getsinglecolval("SampleRate")
+        self.f_s = self.__getsinglecolval(
+            "SampleRate"
+        )  # NOTE when recordings are resampled, this should be updated. Or this should be completely removed from the pipeline, because of conflicting information
         self.V_units = self.__getsinglecolval("Units")
         self.mult_to_uV = convert_units_to_multiplier(self.V_units)
         self.precision = self.__getsinglecolval("Precision")
@@ -82,7 +84,7 @@ class DDFBinaryMetadata:
         self.metadata_path = None
         self.metadata_df = None
         self.n_channels = n_channels
-        self.f_s = f_s
+        self.f_s = f_s  # NOTE see above note about f_s
         self.V_units = None
         self.mult_to_uV = None
         self.precision = None
