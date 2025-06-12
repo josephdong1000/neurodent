@@ -5,6 +5,7 @@ import time
 import tempfile
 import logging
 import json
+from tqdm import tqdm
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -63,8 +64,8 @@ data_folders_to_animal_ids = data['data_folders_to_animal_ids']
 # !SECTION
 
 # SECTION 3: Run pipeline
-for data_folder, animal_ids in data_folders_to_animal_ids.items():
-    for animal_id in animal_ids:
+for data_folder, animal_ids in tqdm(data_folders_to_animal_ids.items(), desc="Processing data folders"):
+    for animal_id in tqdm(animal_ids, desc=f"Processing animals in {data_folder}", leave=False):
 
         with Client(cluster_window) as client:
             client.run(lambda: os.system(f"pip install -e {base_folder}"))
