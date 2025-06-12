@@ -293,25 +293,6 @@ class LongRecordingOrganizer:
         self._median_datetime = statistics.median_low(pd.Series(dt_ends).dropna())
         self._idx_median_datetime = dt_ends.index(self._median_datetime)
 
-    # def __truncate_lists(self, colbins, rowbins, metas):
-    #     if len(colbins) > self.n_truncate:
-    #         out_colbins = colbins[:self.n_truncate]
-    #     else:
-    #         out_colbins = colbins
-
-    #     out_rowbins = []
-    #     out_metas = []
-    #     for i, e in enumerate(rowbins):
-    #         tempcolname = Path(e).name.replace("RowMajor.npy.gz", "ColMajor.bin")
-    #         if str(self.colbin_folder_path / tempcolname) in out_colbins:
-    #             out_rowbins.append(e)
-    #     for i, e in enumerate(metas):
-    #         tempcolname = Path(e).name.replace("Meta.csv", "ColMajor.bin")
-    #         if str(self.colbin_folder_path / tempcolname) in out_colbins:
-    #             out_metas.append(e)
-
-    #     return out_colbins, out_rowbins, out_metas
-
     def _truncate_file_list(
         self, files: list[Union[str, Path]], ref_list: list[Union[str, Path]] = None
     ) -> list[Union[str, Path]]:
