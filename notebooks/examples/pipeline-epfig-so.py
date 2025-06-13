@@ -61,7 +61,7 @@ exclude = ["nspike", "lognspike"]
 ep = visualization.ExperimentPlotter(wars, exclude=exclude)
 
 
-save_folder = Path("/home/dongjp/Downloads/6-9 sox5 swarm marked").resolve()
+save_folder = Path("/home/dongjp/Downloads/6-12 sox5 swarm marked").resolve()
 if not save_folder.exists():
     save_folder.mkdir(parents=True)
 for war in wars:
