@@ -987,6 +987,13 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 case "psd":
                     # FIXME The sampling rates have changed between computation passes so WARs have different shapes.
                     # Add a check for same sampling frequency, other war-relevant properties etc.
+                    # The logging lines below should be removed at some point, but I'll keep it this way for now
+                    logging.info(
+                        f"set([x[0].shape for x in result[feat].tolist()]) = {list(set([x[0].shape for x in result[feat].tolist()]))}"
+                    )
+                    logging.info(
+                        f"set([x[1].shape for x in result[feat].tolist()]) = {list(set([x[1].shape for x in result[feat].tolist()]))}"
+                    )
                     coords = np.array([x[0] for x in result[feat].tolist()])
                     vals = np.array([x[1] for x in result[feat].tolist()])
                     mask = np.broadcast_to(filter_tfs[:, np.newaxis, :], vals.shape)
