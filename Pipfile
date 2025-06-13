@@ -35,6 +35,9 @@ edfio = "*"
 build = "*"
 pythoneeg = {path = ".", editable = true}
 pyprep = "*"
+okabeito = "*"
+openpyxl = "*"
+starbars = "*"
 
 [dev-packages]
 snakeviz = "*"
