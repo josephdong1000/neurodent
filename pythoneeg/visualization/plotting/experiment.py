@@ -52,6 +52,9 @@ class ExperimentPlotter:
         if not isinstance(wars, list):
             wars = [wars]
 
+        if not wars:
+            raise ValueError("wars cannot be empty")
+
         self.results = wars
         if use_abbreviations:
             self.channel_names = [war.channel_abbrevs for war in wars]
@@ -94,7 +97,9 @@ class ExperimentPlotter:
                 dftemp = war.get_result(features=features, exclude=exclude, allow_missing=False)
                 df_wars.append(dftemp)
             except KeyError as e:
-                logging.error(f"Features missing in {war}")
+                logging.error(
+                    f"Features missing in {war}. Exclude the missing features or recompute WARs with missing features."
+                )
                 raise e
 
         self.df_wars: list[pd.DataFrame] = df_wars
