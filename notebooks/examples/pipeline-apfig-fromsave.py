@@ -15,7 +15,8 @@ logging.basicConfig(
 logger = logging.getLogger()
 
 base_folder = Path("/mnt/isilon/marsh_single_unit/PythonEEG").resolve()
-save_folder = Path("/home/dongjp/Downloads/6-11 filtered").resolve()
+load_folder = base_folder / "notebooks" / "tests" / "test-wars-sox5-3"
+save_folder = Path("/home/dongjp/Downloads/6-17 APfig").resolve()
 if not save_folder.exists():
     save_folder.mkdir(parents=True, exist_ok=True)
 
@@ -26,13 +27,15 @@ if not save_folder.exists():
 #               '081922_cohort10_group4_2mice_FMut_FHet FHET', # intermittently disconnected
 #               '090122_group4_2mice_FMut_MMut FMUT' # very disconnected
 #              ]
-animal_ids = [p.name for p in (base_folder / "notebooks" / "tests" / "test-wars-sox5-2").glob("*") if p.is_dir()]
-
+# animal_ids = [p.name for p in load_folder.glob("*") if p.is_dir()]
+animal_ids = [
+    "012022_cohort4_group5_3mice__FWT_MMUT_FMUT MMUT",
+    "031921_cohort 2 group 5 and group 6 mouse M3 cage1A",
+    "060921_Cohort 3_EM1_AM2_GF4 AM2",
+]
 
 def plot_animal(animal_id):
-    war = visualization.WindowAnalysisResult.load_pickle_and_json(
-        base_folder / "notebooks" / "tests" / "test-wars-sox5-2" / f"{animal_id}"
-    )
+    war = visualization.WindowAnalysisResult.load_pickle_and_json(load_folder / f"{animal_id}")
     war.filter_all()
 
     save_path = save_folder / animal_id
@@ -53,5 +56,5 @@ with Pool(10) as pool:
 
 
 """
-sbatch --mem 300G -c 15 -t 24:00:00 ./notebooks/examples/pipeline.sh ./notebooks/examples/pipeline-apfig-fromsave.py
+sbatch --mem 300G -c 11 -t 24:00:00 ./notebooks/examples/pipeline.sh ./notebooks/examples/pipeline-apfig-fromsave.py
 """

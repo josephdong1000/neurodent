@@ -21,20 +21,27 @@ logging.basicConfig(
 logger = logging.getLogger()
 
 base_folder = Path("/mnt/isilon/marsh_single_unit/PythonEEG")
+load_folder = base_folder / "notebooks" / "tests" / "test-wars-sox5-3"
+save_folder = base_folder / "notebooks" / "tests" / "test-wars-sox5-collapsed-3"
 # animal_ids = ['A5', 'A10', 'F22', 'G25', 'G26', 'N21', 'N22', 'N23', 'N24', 'N25']
 # animal_ids = ['A5', 'A10']
-animal_ids = [p.name for p in (base_folder / "notebooks" / "tests" / "test-wars-sox5-2").glob("*") if p.is_dir()]
-# animal_ids = [
-#     '081922_cohort10_group4_2mice_FMut_FHet FHET',
-#     '062921_Cohort 3_AM3_AM5_CM9_BM6_CM5_CF2_IF5_BF3 CF2',
+animal_ids = [p.name for p in load_folder.glob("*") if p.is_dir()]
+# bad_animal_ids = [
+#     "013122_cohort4_group7_2mice both_FHET FHET(2)",
+#     "012322_cohort4_group6_3mice_FMUT___MMUT_MWT MHET",
+#     "012322_cohort4_group6_3mice_FMUT___MMUT_MWT MMUT",
+#     "011622_cohort4_group4_3mice_MMutOLD_FMUT_FMUT_FWT OLDMMT",
+#     "011322_cohort4_group3_4mice_AllM_MT_WT_HET_WT M3",
 # ]
+bad_animal_ids = []
+animal_ids = [animal_id for animal_id in animal_ids if animal_id not in bad_animal_ids]
+if not save_folder.exists():
+    save_folder.mkdir(parents=True)
 
 
 def load_war(animal_id):
     logger.info(f"Loading {animal_id}")
-    war = visualization.WindowAnalysisResult.load_pickle_and_json(
-        Path(base_folder / "notebooks" / "tests" / "test-wars-sox5-2" / f"{animal_id}").resolve()
-    )
+    war = visualization.WindowAnalysisResult.load_pickle_and_json(Path(load_folder / f"{animal_id}").resolve())
     if war.genotype == "Unknown":  # Remove pathological recordings
         logger.info(f"Skipping {animal_id} because genotype is Unknown")
         return None
@@ -45,6 +52,7 @@ def load_war(animal_id):
     war.reorder_and_pad_channels(
         ["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis", "LHip", "RHip"], use_abbrevs=True
     )
+    war.save_pickle_and_json(save_folder / f"{animal_id} {war.animal_id}")
 
     return war
 
@@ -61,13 +69,6 @@ exclude = ["nspike", "lognspike"]
 ep = visualization.ExperimentPlotter(wars, exclude=exclude)
 
 
-save_folder = Path("/home/dongjp/Downloads/6-12 sox5 swarm marked").resolve()
-if not save_folder.exists():
-    save_folder.mkdir(parents=True)
-for war in wars:
-    war.save_pickle_and_json(save_folder / f"{war.animal_id}")
-
-
 # SECTION use seaborn.so to plot figure
 features = ["psdtotal", "psdslope", "logpsdtotal"]
 for feature in features:
@@ -78,9 +79,9 @@ for feature in features:
     (
         so.Plot(df, x="genotype", y=feature, color="isday")
         .facet(col="isday")
-        .add(so.Dot(marker="s", color="k"), so.Agg(), so.Shift(-0.2))
-        .add(so.Line(color="k", linestyle="--"), so.Agg(), so.Shift(x=-0.2))
-        .add(so.Range(color="k"), so.Est(errorbar="sd"), so.Shift(x=-0.2))
+        .add(so.Dash(color="k"), so.Agg())
+        .add(so.Line(color="k", linestyle="--"), so.Agg())
+        .add(so.Range(color="k"), so.Est(errorbar="sd"))
         .add(so.Dot(), so.Jitter(seed=42))
         .add(so.Text(halign="left"), so.Jitter(seed=42), text="animal")
         .theme(axes_style("ticks"))
