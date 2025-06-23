@@ -761,7 +761,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         out[(np_logrmsz > z_range) | (np_logrmsz < -z_range)] = False
         return out
 
-    def get_filter_high_rms(self, df: pd.DataFrame = None, max_rms=1000, **kwargs):
+    def get_filter_high_rms(self, df: pd.DataFrame = None, max_rms=500, **kwargs):
         """Filter windows based on rms.
 
         Args:
@@ -933,6 +933,8 @@ class WindowAnalysisResult(AnimalFeatureParser):
             WindowAnalysisResult: Filtered result
         """
         if filters is None:
+            # TODO refactor these into standalone functions, which take in a war as the first parameter, then pass
+            # filt_bool = filt(self, df, **kwargs) as needed
             filters = [
                 self.get_filter_logrms_range,
                 self.get_filter_high_rms,
