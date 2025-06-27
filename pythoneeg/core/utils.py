@@ -357,7 +357,16 @@ def clean_channel_name(name):
 
 
 def nanmean_series_of_np(x: pd.Series, axis: int = 0):
-    logging.debug(f"Unique shapes in x: {set(np.shape(item) for item in x)}")
+    # logging.debug(f"Unique shapes in x: {set(np.shape(item) for item in x)}")
+
+    if len(x) > 1000:
+        try:
+            if isinstance(x.iloc[0], np.ndarray):
+                xmean: np.ndarray = np.nanmean(np.stack(x.values, axis=0), axis=axis)
+                return xmean
+        except (ValueError, TypeError):
+            pass
+
     xmean: np.ndarray = np.nanmean(np.array(list(x)), axis=axis)
     return xmean
 
