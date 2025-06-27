@@ -1104,17 +1104,19 @@ class WindowAnalysisResult(AnimalFeatureParser):
             metadata = json.load(f)
         return cls(data, **metadata)
 
-    def aggregate_time_windows(self, groupby=["animalday", "isday"]):
+    def aggregate_time_windows(self, groupby: list[str] | str = ["animalday", "isday"]) -> None:
         """Aggregate time windows into a single data point per groupby by averaging features. This reduces the number of rows in the result.
 
         Args:
-            groupby (list[str], optional): Columns to group by. Defaults to ['animalday', 'isday'], which groups by animalday (recording session) and isday (day/night).
+            groupby (list[str] | str, optional): Columns to group by. Defaults to ['animalday', 'isday'], which groups by animalday (recording session) and isday (day/night).
 
         Raises:
             ValueError: groupby must be from ['animalday', 'isday']
             ValueError: Columns in groupby not found in result
             ValueError: Columns in groupby are not constant in groups
         """
+        if isinstance(groupby, str):
+            groupby = [groupby]
         if not all(col in ["animalday", "isday"] for col in groupby):
             raise ValueError(f"groupby must be from ['animalday', 'isday']. Got {groupby}")
         if not all(col in self.result.columns for col in groupby):
