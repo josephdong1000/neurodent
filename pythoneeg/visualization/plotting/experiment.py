@@ -114,7 +114,7 @@ class ExperimentPlotter:
         groupby: str | list[str],
         channels: str | list[str] = "all",
         collapse_channels: bool = False,
-        average_groupby: bool = False,
+        average_groupby: bool = True,
     ):
         """
         Process feature data for plotting.
@@ -213,6 +213,42 @@ class ExperimentPlotter:
                         vals = {"all": vals.tolist()}
                     vals = df_war[groupby].to_dict("list") | vals
 
+                # ANCHOR
+                case _ if feature in constants.HIST_FEATURES:
+                    # REVIEW revise this, splitting up frequencys and values and instead making both of them independent features
+                    # this way they can be averaged, processed, etc. without worrying about tuple things
+                    # if freq present, explode it
+                    psd_data = df_war[feature].tolist()
+
+                    freq_vals = np.array(
+                        [item[0] if isinstance(item, tuple) and len(item) == 2 else item for item in psd_data]
+                    )
+                    n_unique_freq_vals = np.unique(freq_vals, axis=0).shape[0]
+                    if n_unique_freq_vals > 1:
+                        raise ValueError(
+                            f"Multiple frequency bin values found in {feature}: {n_unique_freq_vals} values"
+                        )
+
+                    psd_vals = np.array(
+                        [item[1] if isinstance(item, tuple) and len(item) == 2 else item for item in psd_data]
+                    )
+                    psd_vals = psd_vals.transpose((0, 2, 1))
+
+                    logging.debug(f"freq_vals.shape: {freq_vals.shape}, psd_vals.shape: {psd_vals.shape}")
+
+                    # freq_vals.shape: (8, 501), psd_vals.shape: (8, 10, 501)
+                    if collapse_channels:
+                        psd_vals = np.nanmean(psd_vals, axis=1)
+                        logging.debug(f"psd_vals.shape: {psd_vals.shape}")  # (8, 501)
+                        psd_vals = {"average": psd_vals.tolist()}
+                    else:
+                        logging.debug(f"psd_vals.shape: {psd_vals.shape}")  # (8, 10, 501)
+                        psd_vals = {
+                            ch: psd_vals[:, ch_to_idx[ch], :].tolist() for ch in channels if ch in ch_names
+                        }  # (8, 10, 501)
+                    psd_vals = psd_vals | {"freq": freq_vals.tolist()}
+                    vals = df_war[groupby].to_dict("list") | psd_vals
+
                 case _:
                     raise ValueError(f"{feature} is not supported in _pull_timeseries_dataframe")
 
@@ -221,8 +257,15 @@ class ExperimentPlotter:
 
         df = pd.concat(dataframes, axis=0, ignore_index=True)
 
-        feature_cols = [col for col in df.columns if col not in groupby]
-        df = df.melt(id_vars=groupby, value_vars=feature_cols, var_name="channel", value_name=feature)
+        if feature in constants.HIST_FEATURES:
+            melt_groupby = groupby + ["freq"]
+        else:
+            melt_groupby = groupby
+        feature_cols = [col for col in df.columns if col not in melt_groupby]
+        df = df.melt(id_vars=melt_groupby, value_vars=feature_cols, var_name="channel", value_name=feature)
+
+        if feature == "psd":
+            df = df.explode(["psd", "freq"])
 
         if feature == "psdslope":
             if df[feature].isna().any():
@@ -236,6 +279,14 @@ class ExperimentPlotter:
 
         df.reset_index(drop=True, inplace=True)
 
+        # REVIEW is this averaging correctly, i.e. animals lumped then lump together.
+        # it appears to average everything at once, but animals should be averaged first?
+        # is this just a user thing?
+        # it is just a user thing, but users should know about this detail
+        # namely, individual animaldays are proccessed so fundamentally its like an underlying "animalday" is part of groupby
+        # intuitively you'd think the groupbys are applied to the aggregated full array but that's not so
+        # this shouldn't be the case but maybe merging all the DFs is a memory intensive process
+        # look into this
         if average_groupby:
             groupby_cols = df.columns.drop(feature).tolist()
             logging.debug(f"groupby_cols: {groupby_cols}")
@@ -271,6 +322,10 @@ class ExperimentPlotter:
         """
         if feature in constants.MATRIX_FEATURES and not collapse_channels:
             raise ValueError("To plot matrix features, collapse_channels must be True")
+        if feature in constants.HIST_FEATURES:
+            raise ValueError(
+                f"'{feature}' is a histogram feature and is not supported in plot_catplot. Use plot_psd instead."
+            )
 
         df = self.pull_timeseries_dataframe(feature, groupby, channels, collapse_channels, average_groupby)
 
@@ -539,6 +594,8 @@ class ExperimentPlotter:
         """
         if feature in constants.MATRIX_FEATURES and not collapse_channels:
             raise ValueError("To plot matrix features, collapse_channels must be True")
+        if feature in constants.HIST_FEATURES:
+            raise ValueError(f"'{feature}' is a histogram feature and is not supported in plot_qqplot")
 
         if isinstance(groupby, str):
             groupby = [groupby]
