@@ -94,10 +94,16 @@ LINPLOT_HEIGHT_RATIOS = {
     "nspike": 1,
 }
 
-FREQ_BANDS = {"delta": (0.1, 4), "theta": (4, 8), "alpha": (8, 13), "beta": (13, 25), "gamma": (25, 50)}
+FREQ_BANDS = {
+    "delta": (0.1, 4),
+    "theta": (4, 8),
+    "alpha": (8, 13),
+    "beta": (13, 25),
+    "gamma": (25, 40),
+}  # TODO try delta 1-4 instead
 BAND_NAMES = [k for k, _ in FREQ_BANDS.items()]
 
-FREQ_BAND_TOTAL = (0.1, 50)
+FREQ_BAND_TOTAL = (0.1, 40)
 FREQ_MINS = [v[0] for _, v in FREQ_BANDS.items()]
 FREQ_MAXS = [v[1] for _, v in FREQ_BANDS.items()]
 LINE_FREQ = 60
