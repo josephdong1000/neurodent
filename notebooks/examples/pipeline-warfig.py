@@ -1,6 +1,8 @@
 import sys
 from pathlib import Path
 import logging
+from multiprocessing import Pool, cpu_count
+from tqdm import tqdm
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -35,23 +37,29 @@ def load_war(animal_id):
         return None
     
     war.filter_all()
-    # war.reorder_and_pad_channels(['LAud', 'LVis', 'LHip', 'LBar', 'LMot', 'RMot', 'RBar', 'RHip', 'RVis', 'RAud'], use_abbrevs=True)
+    war.aggregate_time_windows()
+    war.add_unique_hash()
     war.reorder_and_pad_channels(['LMot', 'RMot', 'LBar', 'RBar', 'LAud', 'RAud', 'LVis', 'RVis', 'LHip', 'RHip'], use_abbrevs=True)
 
     return war
 
-wars = []
-for animal_id in animal_ids:
-    war = load_war(animal_id)
-    if war is not None:
-        wars.append(war)
+# Use multiprocessing to load WARs in parallel
+num_cores = 10
+with Pool(num_cores) as pool:
+    wars = []
+    for war in tqdm(pool.imap(load_war, animal_ids), total=len(animal_ids), desc="Loading WARs"):
+        if war is not None:
+            wars.append(war)
+
+
 logger.info(f'{len(wars)} wars loaded')
-ep = visualization.ExperimentPlotter(wars, exclude=['nspike', 'lognspike'])
+exclude = ['nspike', 'lognspike']
+ep = visualization.ExperimentPlotter(wars, exclude=exclude)
 
 # SECTION Define parameters
 catplot_params = {'showfliers': False}
 kinds = ['box']
-save_folder = Path('/home/dongjp/Downloads/6-4 sox5-2').resolve()
+save_folder = Path('/home/dongjp/Downloads/6-9 sox5 swarm marked').resolve()
 if not save_folder.exists():
     save_folder.mkdir(parents=True)
 # !SECTION
@@ -61,43 +69,41 @@ logger.info("Generating box plot for rms for every animal")
 g = ep.plot_catplot('rms', groupby='animal', kind='box', catplot_params={'showfliers': False, 'aspect': 4})
 g.savefig(save_folder / 'AAAA every animal box.png', dpi=300)
 
-# raise Exception('halt')
+# for feature in [x for x in constants.LINEAR_FEATURES if x not in exclude]:
+#     for kind in kinds:
+#         for groupby in ['genotype', ['genotype', 'isday']]:
+#             for collapse in [False, True]:
+#                 logger.info(f"Generating {kind} plot for {feature} with {groupby} grouping, collapse={collapse}")
+#                 g = ep.plot_catplot(feature, groupby=groupby, kind=kind, collapse_channels=collapse, catplot_params=catplot_params if kind == 'box' else None)
+#                 g.savefig(save_folder / f'{feature}-{groupby}-{kind}-{collapse}.png', dpi=300)
 
-for feature in constants.LINEAR_FEATURES:
-    for kind in kinds:
-        for groupby in ['genotype', ['genotype', 'isday']]:
-            for collapse in [False, True]:
-                logger.info(f"Generating {kind} plot for {feature} with {groupby} grouping, collapse={collapse}")
-                g = ep.plot_catplot(feature, groupby=groupby, kind=kind, collapse_channels=collapse, catplot_params=catplot_params if kind == 'box' else None)
-                g.savefig(save_folder / f'{feature}-{groupby}-{kind}-{collapse}.png', dpi=300)
-
-for kind in kinds:
-    logger.info(f"Generating {kind} plot for psdband with genotype and isday grouping")
-    g = ep.plot_catplot('psdband', groupby=['genotype', 'isday'], 
-                    x='genotype',
-                    col='isday',
-                    hue='band',
-                    kind=kind, collapse_channels=True, catplot_params=catplot_params if kind == 'box' else None)
-    g.savefig(save_folder / f'psdband-genotype-isday-{kind}-True.png', dpi=300)
+# for kind in kinds:
+#     logger.info(f"Generating {kind} plot for psdband with genotype and isday grouping")
+#     g = ep.plot_catplot('psdband', groupby=['genotype', 'isday'], 
+#                     x='genotype',
+#                     col='isday',
+#                     hue='band',
+#                     kind=kind, collapse_channels=True, catplot_params=catplot_params if kind == 'box' else None)
+#     g.savefig(save_folder / f'psdband-genotype-isday-{kind}-True.png', dpi=300)
     
-    logger.info(f"Generating {kind} plot for psdband with genotype grouping")
-    g = ep.plot_catplot('psdband', groupby=['genotype'], 
-                    x='genotype',
-                    hue='band',
-                    kind=kind, collapse_channels=True, catplot_params=catplot_params if kind == 'box' else None)
-    g.savefig(save_folder / f'psdband-genotype-{kind}-True.png', dpi=300)
+#     logger.info(f"Generating {kind} plot for psdband with genotype grouping")
+#     g = ep.plot_catplot('psdband', groupby=['genotype'], 
+#                     x='genotype',
+#                     hue='band',
+#                     kind=kind, collapse_channels=True, catplot_params=catplot_params if kind == 'box' else None)
+#     g.savefig(save_folder / f'psdband-genotype-{kind}-True.png', dpi=300)
 
-for feature in constants.MATRIX_FEATURES:
-    for kind in kinds:
-        for groupby in [['genotype', 'isday'], 'genotype']:
-            logger.info(f"Generating {kind} plot for {feature} with {groupby} grouping")
-            g = ep.plot_catplot(feature, groupby=groupby, kind=kind, collapse_channels=True, catplot_params=catplot_params if kind == 'box' else None)
-            g.savefig(save_folder / f'{feature}-{groupby}-{kind}-True.png', dpi=300)
+# for feature in [x for x in constants.MATRIX_FEATURES if x not in exclude]:
+#     for kind in kinds:
+#         for groupby in [['genotype', 'isday'], 'genotype']:
+#             logger.info(f"Generating {kind} plot for {feature} with {groupby} grouping")
+#             g = ep.plot_catplot(feature, groupby=groupby, kind=kind, collapse_channels=True, catplot_params=catplot_params if kind == 'box' else None)
+#             g.savefig(save_folder / f'{feature}-{groupby}-{kind}-True.png', dpi=300)
 # !SECTION
 
 # SECTION CATPLOTS, AVERAGE GROUPBY
 for kind in ['swarm', 'point']:
-    for feature in constants.LINEAR_FEATURES:
+    for feature in [x for x in constants.LINEAR_FEATURES if x not in exclude]:
         logger.info(f"Generating {kind} plot for {feature} with genotype grouping")
         for collapse in [False, True]:
             g = ep.plot_catplot(feature, groupby=['animal', 'genotype'], x='genotype', hue='channel', kind=kind, average_groupby=True, collapse_channels=collapse, 
@@ -109,7 +115,7 @@ for kind in ['swarm', 'point']:
                                 catplot_params={'dodge': (kind == 'swarm' or not collapse), 'errorbar': 'ci'})
             g.savefig(save_folder / f'{kind}-{feature}-genotype-isday-{"avgch" if collapse else "no avgch"}.png', dpi=300)
     
-    for feature in constants.BAND_FEATURES:
+    for feature in [x for x in constants.BAND_FEATURES if x not in exclude]:
         logger.info(f"Generating {kind} plot for {feature} with genotype grouping")
         g = ep.plot_catplot(feature, groupby=['animal', 'genotype'], 
                             x='genotype',
@@ -145,58 +151,58 @@ for kind in ['swarm', 'point']:
 # !SECTION
 
 # SECTION HEATMAP PLOTS
-logger.info("Generating heatmap for pcorr with animal grouping")
-g = ep.plot_heatmap('pcorr', groupby='animal')
-g.savefig(save_folder / 'AAAA every animal pcorr.png', dpi=300)
-logger.info("Generating heatmap for cohere with animal grouping")
-g = ep.plot_heatmap('cohere', groupby='animal')
-g.savefig(save_folder / 'AAAA every animal cohere.png', dpi=300)
+# logger.info("Generating heatmap for pcorr with animal grouping")
+# g = ep.plot_heatmap('pcorr', groupby='animal')
+# g.savefig(save_folder / 'AAAA every animal pcorr.png', dpi=300)
+# logger.info("Generating heatmap for cohere with animal grouping")
+# g = ep.plot_heatmap('cohere', groupby='animal')
+# g.savefig(save_folder / 'AAAA every animal cohere.png', dpi=300)
 
-logger.info("Generating heatmap for cohere with genotype and isday grouping")
-g = ep.plot_heatmap('cohere', groupby=['genotype', 'isday'])
-g.savefig(save_folder / 'cohere-genotype-isday-matrix-False.png', dpi=300)
-logger.info("Generating heatmap for cohere with genotype and band grouping")
-g = ep.plot_heatmap('cohere', groupby='genotype', col='band', row='genotype')
-g.savefig(save_folder / 'cohere-genotype-band-matrix-False.png', dpi=300)
+# logger.info("Generating heatmap for cohere with genotype and isday grouping")
+# g = ep.plot_heatmap('cohere', groupby=['genotype', 'isday'])
+# g.savefig(save_folder / 'cohere-genotype-isday-matrix-False.png', dpi=300)
+# logger.info("Generating heatmap for cohere with genotype and band grouping")
+# g = ep.plot_heatmap('cohere', groupby='genotype', col='band', row='genotype')
+# g.savefig(save_folder / 'cohere-genotype-band-matrix-False.png', dpi=300)
 
-logger.info("Generating heatmap for pcorr with genotype and isday grouping")
-g = ep.plot_heatmap('pcorr', groupby=['genotype', 'isday'])
-g.savefig(save_folder / 'pcorr-genotype-isday-matrix-False.png', dpi=300)
-logger.info("Generating heatmap for pcorr with genotype grouping")
-g = ep.plot_heatmap('pcorr', groupby='genotype')
-g.savefig(save_folder / 'pcorr-genotype-matrix-False.png', dpi=300)
+# logger.info("Generating heatmap for pcorr with genotype and isday grouping")
+# g = ep.plot_heatmap('pcorr', groupby=['genotype', 'isday'])
+# g.savefig(save_folder / 'pcorr-genotype-isday-matrix-False.png', dpi=300)
+# logger.info("Generating heatmap for pcorr with genotype grouping")
+# g = ep.plot_heatmap('pcorr', groupby='genotype')
+# g.savefig(save_folder / 'pcorr-genotype-matrix-False.png', dpi=300)
 # !SECTION
 
 # SECTION DIFF HEATMAP PLOTS
-for feature in constants.MATRIX_FEATURES:
-    logger.info(f"Generating diff heatmap for {feature} with WT-day baseline")
-    g = ep.plot_diffheatmap(feature, groupby=['genotype', 'isday'], baseline_key=('MWT', True))
-    g.savefig(save_folder / f'diff-{feature}-WT-day.png', dpi=300)
-    logger.info(f"Generating diff heatmap for {feature} with WT baseline")
-    g = ep.plot_diffheatmap(feature, groupby=['genotype', 'isday'], baseline_key='MWT', baseline_groupby='genotype')
-    g.savefig(save_folder / f'diff-{feature}-WT.png', dpi=300)
-    logger.info(f"Generating diff heatmap for {feature} with day baseline")
-    g = ep.plot_diffheatmap(feature, groupby=['genotype', 'isday'], baseline_key=(True,), baseline_groupby='isday')
-    g.savefig(save_folder / f'diff-{feature}-day.png', dpi=300)
+# for feature in [x for x in constants.MATRIX_FEATURES if x not in exclude]:
+#     logger.info(f"Generating diff heatmap for {feature} with WT-day baseline")
+#     g = ep.plot_diffheatmap(feature, groupby=['genotype', 'isday'], baseline_key=('MWT', True))
+#     g.savefig(save_folder / f'diff-{feature}-WT-day.png', dpi=300)
+#     logger.info(f"Generating diff heatmap for {feature} with WT baseline")
+#     g = ep.plot_diffheatmap(feature, groupby=['genotype', 'isday'], baseline_key='MWT', baseline_groupby='genotype')
+#     g.savefig(save_folder / f'diff-{feature}-WT.png', dpi=300)
+#     logger.info(f"Generating diff heatmap for {feature} with day baseline")
+#     g = ep.plot_diffheatmap(feature, groupby=['genotype', 'isday'], baseline_key=(True,), baseline_groupby='isday')
+#     g.savefig(save_folder / f'diff-{feature}-day.png', dpi=300)
 
-logger.info("Generating diff heatmap for cohere with WT baseline and day grouping")
-g = ep.plot_diffheatmap('cohere', groupby=['genotype', 'isday'], baseline_key='MWT', baseline_groupby='genotype', col='band', row='isday', remove_baseline=True)
-g.savefig(save_folder / 'diff-band-cohere-WT-day.png', dpi=300)
-logger.info("Generating diff heatmap for cohere with WT baseline")
-g = ep.plot_diffheatmap('cohere', groupby='genotype', baseline_key='MWT', baseline_groupby='genotype', col='band', row='genotype', remove_baseline=True)
-g.savefig(save_folder / 'diff-band-cohere-WT.png', dpi=300)
+# logger.info("Generating diff heatmap for cohere with WT baseline and day grouping")
+# g = ep.plot_diffheatmap('cohere', groupby=['genotype', 'isday'], baseline_key='MWT', baseline_groupby='genotype', col='band', row='isday', remove_baseline=True)
+# g.savefig(save_folder / 'diff-band-cohere-WT-day.png', dpi=300)
+# logger.info("Generating diff heatmap for cohere with WT baseline")
+# g = ep.plot_diffheatmap('cohere', groupby='genotype', baseline_key='MWT', baseline_groupby='genotype', col='band', row='genotype', remove_baseline=True)
+# g.savefig(save_folder / 'diff-band-cohere-WT.png', dpi=300)
 # !SECTION
 
 # SECTION QQ PLOTS
-# for feature in constants.LINEAR_FEATURES:
-#     logger.info(f"Generating QQ plot for {feature} with animal and channel grouping")
-#     g = ep.plot_qqplot(feature, ['animal'], row='animal', col='channel', height=3)
-#     g.savefig(save_folder / f'qq-{feature}-animal-channel.png', dpi=300)
+# for feature in [x for x in constants.LINEAR_FEATURES if x not in exclude]:
+#     # logger.info(f"Generating QQ plot for {feature} with animal and channel grouping")
+#     # g = ep.plot_qqplot(feature, ['animal'], row='animal', col='channel', height=3)
+#     # g.savefig(save_folder / f'qq-{feature}-animal-channel.png', dpi=300)
 #     logger.info(f"Generating QQ plot for {feature} with genotype and channel grouping")
 #     g = ep.plot_qqplot(feature, ['genotype'], row='genotype', col='channel', height=3)
 #     g.savefig(save_folder / f'qq-{feature}-genotype-channel.png', dpi=300)
 # !SECTION
 
 """
-sbatch --mem 700GB -c 8 -t 24:00:00 ./notebooks/examples/pipeline.sh ./notebooks/examples/pipeline-warfig.py
+sbatch --mem 200GB -c 10 -t 24:00:00 ./notebooks/examples/pipeline.sh ./notebooks/examples/pipeline-warfig.py
 """

@@ -5,6 +5,7 @@ import time
 import tempfile
 import logging
 import json
+from tqdm import tqdm
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -52,7 +53,7 @@ logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=lo
 logger = logging.getLogger()
 
 base_folder = Path('/mnt/isilon/marsh_single_unit/PythonEEG')
-with open(base_folder / 'notebooks' / 'tests' / 'sox5 combine genotypes.json', 'r') as f:
+with open(base_folder / "notebooks" / "tests" / "sox5 combine genotypes.json", "r") as f:
     data = json.load(f)
 data_parent_folder = Path(data['data_parent_folder'])
 constants.GENOTYPE_ALIASES = data['GENOTYPE_ALIASES']
@@ -63,8 +64,8 @@ data_folders_to_animal_ids = data['data_folders_to_animal_ids']
 # !SECTION
 
 # SECTION 3: Run pipeline
-for data_folder, animal_ids in data_folders_to_animal_ids.items():
-    for animal_id in animal_ids:
+for data_folder, animal_ids in tqdm(data_folders_to_animal_ids.items(), desc="Processing data folders"):
+    for animal_id in tqdm(animal_ids, desc=f"Processing animals in {data_folder}", leave=False):
 
         with Client(cluster_window) as client:
             client.run(lambda: os.system(f"pip install -e {base_folder}"))
@@ -78,7 +79,7 @@ for data_folder, animal_ids in data_folders_to_animal_ids.items():
                                                     'multiprocess_mode': 'dask',
                                                     'overwrite_rowbins': False},
             )
-            ao.compute_bad_channels()
+            ao.compute_bad_channels(lof_threshold=2)
 
             # SECTION 2: Make WAR
             war = ao.compute_windowed_analysis(['all'], multiprocess_mode='dask')
@@ -95,7 +96,9 @@ for data_folder, animal_ids in data_folders_to_animal_ids.items():
         # !SECTION
 
         # SECTION 4: Save WARs and cleanup
-        war.save_pickle_and_json(base_folder / 'notebooks' / 'tests' / 'test-wars-sox5-2' / f'{data_folder} {animal_id}')
+        war.save_pickle_and_json(
+            base_folder / "notebooks" / "tests" / "test-wars-sox5-6" / f"{data_folder} {animal_id}"
+        )
         del war
         # del sars
         # !SECTION

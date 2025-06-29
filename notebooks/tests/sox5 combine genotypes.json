@@ -97,6 +97,7 @@
         ],
         "012322_cohort4_group6_3mice_FMUT___MMUT_MWT": [
             "FMUT",
+            "FHET",
             "MHET",
             "MMUT"
         ],
@@ -107,6 +108,7 @@
         "031021_cohort 2, group 3 and 4": [
             "#8 Cage 3A",
             "#8 Cage 1A",
+            "#2 Cage 2A",
             "#3 Cage 4A"
         ],
         "031122_cohort5_group1_2mice_FHET_MWT": [

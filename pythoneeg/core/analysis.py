@@ -1,32 +1,18 @@
-# Standard library imports
-import os
-import tempfile
-import warnings
-from pathlib import Path
 from typing import Literal
 
-# Third party imports
 import numpy as np
-from scipy.interpolate import Akima1DInterpolator
-from mne import set_config
-from mne.time_frequency import (
-    csd_array_fourier
-)
-from mne_connectivity import (
-    envelope_correlation
-)
 import spikeinterface.core as si
+from mne import set_config
+from mne.time_frequency import csd_array_fourier
+from mne_connectivity import envelope_correlation
+from scipy.interpolate import Akima1DInterpolator
 
-# Local imports
-from .. import core
-from .. import constants
+from .. import constants, core
 from .analyze_frag import FragmentAnalyzer
 
 
 class LongRecordingAnalyzer:
-
     def __init__(self, longrecording: core.LongRecordingOrganizer, fragment_len_s=10, notch_freq=60) -> None:
-
         assert isinstance(longrecording, core.LongRecordingOrganizer)
 
         self.LongRecording = longrecording
@@ -34,11 +20,11 @@ class LongRecordingAnalyzer:
         self.n_fragments = longrecording.get_num_fragments(fragment_len_s)
         self.channel_names = longrecording.channel_names
         self.n_channels = longrecording.meta.n_channels
-        # self.V_units = longrecording.meta.V_units
         self.mult_to_uV = longrecording.meta.mult_to_uV
-        self.f_s = int(longrecording.meta.f_s)
+        self.f_s = int(
+            longrecording.LongRecording.get_sampling_frequency()
+        )  # FIXME this does not update correctly when longrecording is resampled
         self.notch_freq = notch_freq
-
 
     def get_fragment_rec(self, index) -> si.BaseRecording:
         """Get window at index as a spikeinterface recording object
@@ -63,7 +49,9 @@ class LongRecordingAnalyzer:
         """
         assert isinstance(recobj, si.BaseRecording) or recobj is None
         if recobj is None:
-            return self.get_fragment_rec(index).get_traces(return_scaled=True) # (num_samples, num_channels), in units uV
+            return self.get_fragment_rec(index).get_traces(
+                return_scaled=True
+            )  # (num_samples, num_channels), in units uV
         else:
             return recobj.get_traces(return_scaled=True)
 
@@ -79,7 +67,7 @@ class LongRecordingAnalyzer:
              to number of epochs, which there is only 1 in a window. Values in uV
         """
         rec = self.get_fragment_np(index, recobj=recobj)[..., np.newaxis]
-        return np.transpose(rec, (2, 1, 0)) # (1 epoch, num_channels, num_samples)
+        return np.transpose(rec, (2, 1, 0))  # (1 epoch, num_channels, num_samples)
 
     def compute_rms(self, index, **kwargs):
         """Compute average root mean square amplitude
@@ -92,10 +80,9 @@ class LongRecordingAnalyzer:
         """
         rec = self.get_fragment_np(index)
         return FragmentAnalyzer.compute_rms(rec=rec, **kwargs)
-    
+
     def compute_logrms(self, index, **kwargs):
-        """Compute the log of the root mean square amplitude
-        """
+        """Compute the log of the root mean square amplitude"""
         rec = self.get_fragment_np(index)
         return FragmentAnalyzer.compute_logrms(rec=rec, **kwargs)
 
@@ -110,10 +97,9 @@ class LongRecordingAnalyzer:
         """
         rec = self.get_fragment_np(index)
         return FragmentAnalyzer.compute_ampvar(rec=rec, **kwargs)
-    
+
     def compute_logampvar(self, index, **kwargs):
-        """Compute the log of the amplitude variance
-        """
+        """Compute the log of the amplitude variance"""
         rec = self.get_fragment_np(index)
         return FragmentAnalyzer.compute_logampvar(rec=rec, **kwargs)
 
@@ -133,12 +119,9 @@ class LongRecordingAnalyzer:
         """
         rec = self.get_fragment_np(index)
 
-        f, psd = FragmentAnalyzer.compute_psd(rec=rec, 
-                                              f_s=self.f_s, 
-                                              welch_bin_t=welch_bin_t, 
-                                              notch_filter=notch_filter, 
-                                              multitaper=multitaper,
-                                              **kwargs)
+        f, psd = FragmentAnalyzer.compute_psd(
+            rec=rec, f_s=self.f_s, welch_bin_t=welch_bin_t, notch_filter=notch_filter, multitaper=multitaper, **kwargs
+        )
 
         if index == self.n_fragments - 1 and self.n_fragments > 1:
             f_prev, _ = self.compute_psd(index - 1, welch_bin_t, notch_filter, multitaper)
@@ -146,8 +129,16 @@ class LongRecordingAnalyzer:
             f = f_prev
 
         return f, psd
-    
-    def compute_psdband(self, index, welch_bin_t=1, notch_filter=True, bands: list[tuple[float, float]]=constants.FREQ_BANDS, multitaper=False, **kwargs):
+
+    def compute_psdband(
+        self,
+        index,
+        welch_bin_t=1,
+        notch_filter=True,
+        bands: list[tuple[float, float]] = constants.FREQ_BANDS,
+        multitaper=False,
+        **kwargs,
+    ):
         """Compute power spectral density of the signal for each frequency band.
 
         Args:
@@ -160,31 +151,50 @@ class LongRecordingAnalyzer:
         Returns:
             dict: Dictionary mapping band names to PSD values for each channel
         """
-        
+
         rec = self.get_fragment_np(index)
 
-        return FragmentAnalyzer.compute_psdband(rec=rec,
-                                                f_s=self.f_s,
-                                                welch_bin_t=welch_bin_t,
-                                                notch_filter=notch_filter,
-                                                bands=bands,
-                                                multitaper=multitaper,
-                                                **kwargs)
+        return FragmentAnalyzer.compute_psdband(
+            rec=rec,
+            f_s=self.f_s,
+            welch_bin_t=welch_bin_t,
+            notch_filter=notch_filter,
+            bands=bands,
+            multitaper=multitaper,
+            **kwargs,
+        )
 
-    def compute_logpsdband(self, index, welch_bin_t=1, notch_filter=True, bands: list[tuple[float, float]]=constants.FREQ_BANDS, multitaper=False, **kwargs):
-        """Compute the log of the power spectral density of the signal for each frequency band.
-        """
+    def compute_logpsdband(
+        self,
+        index,
+        welch_bin_t=1,
+        notch_filter=True,
+        bands: list[tuple[float, float]] = constants.FREQ_BANDS,
+        multitaper=False,
+        **kwargs,
+    ):
+        """Compute the log of the power spectral density of the signal for each frequency band."""
         rec = self.get_fragment_np(index)
 
-        return FragmentAnalyzer.compute_logpsdband(rec=rec,
-                                                   f_s=self.f_s,
-                                                   welch_bin_t=welch_bin_t,
-                                                   notch_filter=notch_filter,
-                                                   bands=bands,
-                                                   multitaper=multitaper,
-                                                   **kwargs)
+        return FragmentAnalyzer.compute_logpsdband(
+            rec=rec,
+            f_s=self.f_s,
+            welch_bin_t=welch_bin_t,
+            notch_filter=notch_filter,
+            bands=bands,
+            multitaper=multitaper,
+            **kwargs,
+        )
 
-    def compute_psdtotal(self, index, welch_bin_t=1, notch_filter=True, band: tuple[float, float]=constants.FREQ_BAND_TOTAL, multitaper=False, **kwargs):
+    def compute_psdtotal(
+        self,
+        index,
+        welch_bin_t=1,
+        notch_filter=True,
+        band: tuple[float, float] = constants.FREQ_BAND_TOTAL,
+        multitaper=False,
+        **kwargs,
+    ):
         """Compute total power over PSD (power spectral density) plot within a specified frequency band
 
         Args:
@@ -199,56 +209,95 @@ class LongRecordingAnalyzer:
         """
         rec = self.get_fragment_np(index)
 
-        return FragmentAnalyzer.compute_psdtotal(rec=rec,
-                                                f_s=self.f_s,
-                                                welch_bin_t=welch_bin_t,
-                                                notch_filter=notch_filter,
-                                                band=band,
-                                                multitaper=multitaper,
-                                                **kwargs)
+        return FragmentAnalyzer.compute_psdtotal(
+            rec=rec,
+            f_s=self.f_s,
+            welch_bin_t=welch_bin_t,
+            notch_filter=notch_filter,
+            band=band,
+            multitaper=multitaper,
+            **kwargs,
+        )
 
-    def compute_logpsdtotal(self, index, welch_bin_t=1, notch_filter=True, band: tuple[float, float]=constants.FREQ_BAND_TOTAL, multitaper=False, **kwargs):
-        """Compute the log of the total power over PSD (power spectral density) plot within a specified frequency band
-        """
+    def compute_logpsdtotal(
+        self,
+        index,
+        welch_bin_t=1,
+        notch_filter=True,
+        band: tuple[float, float] = constants.FREQ_BAND_TOTAL,
+        multitaper=False,
+        **kwargs,
+    ):
+        """Compute the log of the total power over PSD (power spectral density) plot within a specified frequency band"""
         rec = self.get_fragment_np(index)
 
-        return FragmentAnalyzer.compute_logpsdtotal(rec=rec,
-                                                    f_s=self.f_s,
-                                                    welch_bin_t=welch_bin_t,
-                                                    notch_filter=notch_filter,
-                                                    band=band,
-                                                    multitaper=multitaper,
-                                                    **kwargs)
+        return FragmentAnalyzer.compute_logpsdtotal(
+            rec=rec,
+            f_s=self.f_s,
+            welch_bin_t=welch_bin_t,
+            notch_filter=notch_filter,
+            band=band,
+            multitaper=multitaper,
+            **kwargs,
+        )
 
-    def compute_psdfrac(self, index, welch_bin_t=1, notch_filter=True, bands: list[tuple[float, float]]=constants.FREQ_BANDS, total_band: tuple[float, float]=constants.FREQ_BAND_TOTAL, multitaper=False, **kwargs):
-        """Compute the power spectral density in each band as a fraction of the total power.
-        """
+    def compute_psdfrac(
+        self,
+        index,
+        welch_bin_t=1,
+        notch_filter=True,
+        bands: list[tuple[float, float]] = constants.FREQ_BANDS,
+        total_band: tuple[float, float] = constants.FREQ_BAND_TOTAL,
+        multitaper=False,
+        **kwargs,
+    ):
+        """Compute the power spectral density in each band as a fraction of the total power."""
         rec = self.get_fragment_np(index)
 
-        return FragmentAnalyzer.compute_psdfrac(rec=rec,
-                                                f_s=self.f_s,
-                                                welch_bin_t=welch_bin_t,
-                                                notch_filter=notch_filter,
-                                                bands=bands,
-                                                total_band=total_band,
-                                                multitaper=multitaper,
-                                                **kwargs)
+        return FragmentAnalyzer.compute_psdfrac(
+            rec=rec,
+            f_s=self.f_s,
+            welch_bin_t=welch_bin_t,
+            notch_filter=notch_filter,
+            bands=bands,
+            total_band=total_band,
+            multitaper=multitaper,
+            **kwargs,
+        )
 
-    def compute_logpsdfrac(self, index, welch_bin_t=1, notch_filter=True, bands: list[tuple[float, float]]=constants.FREQ_BANDS, total_band: tuple[float, float]=constants.FREQ_BAND_TOTAL, multitaper=False, **kwargs):
-        """Compute the log of the power spectral density in each band as a fraction of the total power.
-        """
+    def compute_logpsdfrac(
+        self,
+        index,
+        welch_bin_t=1,
+        notch_filter=True,
+        bands: list[tuple[float, float]] = constants.FREQ_BANDS,
+        total_band: tuple[float, float] = constants.FREQ_BAND_TOTAL,
+        multitaper=False,
+        **kwargs,
+    ):
+        """Compute the log of the power spectral density in each band as a fraction of the total power."""
         rec = self.get_fragment_np(index)
 
-        return FragmentAnalyzer.compute_logpsdfrac(rec=rec,
-                                                   f_s=self.f_s,
-                                                   welch_bin_t=welch_bin_t,
-                                                   notch_filter=notch_filter,
-                                                   bands=bands,
-                                                   total_band=total_band,
-                                                   multitaper=multitaper,
-                                                   **kwargs)
+        return FragmentAnalyzer.compute_logpsdfrac(
+            rec=rec,
+            f_s=self.f_s,
+            welch_bin_t=welch_bin_t,
+            notch_filter=notch_filter,
+            bands=bands,
+            total_band=total_band,
+            multitaper=multitaper,
+            **kwargs,
+        )
 
-    def compute_psdslope(self, index, welch_bin_t=1, notch_filter=True, band: tuple[float, float]=constants.FREQ_BAND_TOTAL, multitaper=False, **kwargs):
+    def compute_psdslope(
+        self,
+        index,
+        welch_bin_t=1,
+        notch_filter=True,
+        band: tuple[float, float] = constants.FREQ_BAND_TOTAL,
+        multitaper=False,
+        **kwargs,
+    ):
         """Compute the slope of the power spectral density of the signal.
 
         Args:
@@ -263,15 +312,16 @@ class LongRecordingAnalyzer:
         """
         rec = self.get_fragment_np(index)
 
-        return FragmentAnalyzer.compute_psdslope(rec=rec,
-                                                f_s=self.f_s,
-                                                welch_bin_t=welch_bin_t,
-                                                notch_filter=notch_filter,
-                                                band=band,
-                                                multitaper=multitaper,
-                                                **kwargs)
-    
-    
+        return FragmentAnalyzer.compute_psdslope(
+            rec=rec,
+            f_s=self.f_s,
+            welch_bin_t=welch_bin_t,
+            notch_filter=notch_filter,
+            band=band,
+            multitaper=multitaper,
+            **kwargs,
+        )
+
     def convert_idx_to_timebound(self, index: int) -> tuple[float, float]:
         """Convert fragment index to timebound (start time, end time)
 
@@ -286,21 +336,30 @@ class LongRecordingAnalyzer:
         endidx = min(frag_len_idx * (index + 1), self.LongRecording.LongRecording.get_num_frames())
         return (startidx / self.f_s, endidx / self.f_s)
 
-    def compute_cohere(self, index, freq_res: float=1, n_cycles_max: float=7, 
-                       geomspace: bool=True, 
-                       mode: Literal['cwt_morlet', 'multitaper']='cwt_morlet', 
-                       downsamp_q: int=4, epsilon: float=1e-2, **kwargs) -> np.ndarray:
+    def compute_cohere(
+        self,
+        index,
+        freq_res: float = 1,
+        n_cycles_max: float = 7,
+        geomspace: bool = True,
+        mode: Literal["cwt_morlet", "multitaper"] = "cwt_morlet",
+        downsamp_q: int = 4,
+        epsilon: float = 1e-2,
+        **kwargs,
+    ) -> np.ndarray:
         rec = self.get_fragment_np(index)
-        return FragmentAnalyzer.compute_cohere(rec=rec,
-                                                f_s=self.f_s,
-                                                freq_res=freq_res,
-                                                n_cycles_max=n_cycles_max,
-                                                geomspace=geomspace,
-                                                mode=mode,
-                                                downsamp_q=downsamp_q,
-                                                epsilon=epsilon,
-                                                **kwargs)
-    
+        return FragmentAnalyzer.compute_cohere(
+            rec=rec,
+            f_s=self.f_s,
+            freq_res=freq_res,
+            n_cycles_max=n_cycles_max,
+            geomspace=geomspace,
+            mode=mode,
+            downsamp_q=downsamp_q,
+            epsilon=epsilon,
+            **kwargs,
+        )
+
     # def compute_cacoh(self, index, freq_res=1, n_cycles_max=7.0, geomspace=True, mode:str='cwt_morlet', downsamp_q=4, epsilon=1e-2, mag_phase=True, indices=None, **kwargs):
     #     rec = self.get_fragment_mne(index)
     #     rec = decimate(rec, q=downsamp_q, axis=-1)
@@ -328,11 +387,7 @@ class LongRecordingAnalyzer:
 
     def compute_pcorr(self, index, lower_triag=True, **kwargs) -> np.ndarray:
         rec = self.get_fragment_np(index)
-        return FragmentAnalyzer.compute_pcorr(rec=rec,
-                                              f_s=self.f_s,
-                                              lower_triag=lower_triag,
-                                              **kwargs)
-
+        return FragmentAnalyzer.compute_pcorr(rec=rec, f_s=self.f_s, lower_triag=lower_triag, **kwargs)
 
     # def compute_csd(self, index, magnitude=True, n_jobs=None, **kwargs) -> np.ndarray:
     #     rec = self.get_fragment_mne(index)
@@ -370,10 +425,9 @@ class LongRecordingAnalyzer:
     # def compute_pac(self, index):
     #     ... # NOTE implement CFC measures
 
-
     def get_file_end(self, index, **kwargs):
         tstart, tend = self.convert_idx_to_timebound(index)
         for tfile in self.LongRecording.end_relative:
-           if tstart <= tfile < tend:
-               return tfile - tstart
+            if tstart <= tfile < tend:
+                return tfile - tstart
         return None
