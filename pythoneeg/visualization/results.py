@@ -434,7 +434,7 @@ def _sanitize_feature_request(features: list[str], exclude: list[str] = []):
 
 class WindowAnalysisResult(AnimalFeatureParser):
     """
-    Wrapper for output of windowed analysis. Has useful features like group-wise and global averaging, filtering, and saving
+    Wrapper for output of windowed analysis. Has useful functions like group-wise and global averaging, filtering, and saving
     """
 
     def __init__(
