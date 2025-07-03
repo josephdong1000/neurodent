@@ -371,6 +371,18 @@ def nanmean_series_of_np(x: pd.Series, axis: int = 0):
     return xmean
 
 
+def log_transform(rec: np.ndarray, **kwargs) -> np.ndarray:
+    """Log transform the signal
+
+    Args:
+        rec (np.ndarray): The signal to log transform.
+
+    Returns:
+        np.ndarray: ln(rec + 1)
+    """
+    return np.log(rec + 1)
+
+
 class Natural_Neighbor(object):
     def __init__(self):
         self.nan_edges = {}  # Grafo dos vizinhos mutuos

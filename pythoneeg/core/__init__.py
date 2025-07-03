@@ -21,10 +21,11 @@ from .utils import (
     parse_str_to_animal,
     parse_str_to_day,
     parse_chname_to_abbrev,
-    nanaverage
+    nanaverage,
+    log_transform,
 )
 from .analysis import LongRecordingAnalyzer
-from .analyze_frag import FragmentAnalyzer, _log_transform
+from .analyze_frag import FragmentAnalyzer
 from .analyze_sort import MountainSortAnalyzer
 
 __all__ = [
@@ -47,5 +48,5 @@ __all__ = [
     "LongRecordingAnalyzer",
     "MountainSortAnalyzer",
     "FragmentAnalyzer",
-    "_log_transform"
+    "log_transform",
 ]

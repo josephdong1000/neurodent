@@ -9,6 +9,7 @@ from scipy.signal import butter, decimate, filtfilt, iirnotch, sosfiltfilt, welc
 from scipy.stats import linregress, pearsonr
 
 from .. import constants
+from ..core import log_transform
 
 
 class FragmentAnalyzer:
@@ -64,7 +65,7 @@ class FragmentAnalyzer:
     def compute_logrms(rec: np.ndarray, **kwargs) -> np.ndarray:
         """Compute the log of the root mean square of the signal."""
         FragmentAnalyzer._check_rec_np(rec)
-        return _log_transform(FragmentAnalyzer.compute_rms(rec, **kwargs))
+        return log_transform(FragmentAnalyzer.compute_rms(rec, **kwargs))
 
     @staticmethod
     def compute_ampvar(rec: np.ndarray, **kwargs) -> np.ndarray:
@@ -76,7 +77,7 @@ class FragmentAnalyzer:
     def compute_logampvar(rec: np.ndarray, **kwargs) -> np.ndarray:
         """Compute the log of the amplitude variance of the signal."""
         FragmentAnalyzer._check_rec_np(rec)
-        return _log_transform(FragmentAnalyzer.compute_ampvar(rec, **kwargs))
+        return log_transform(FragmentAnalyzer.compute_ampvar(rec, **kwargs))
 
     @staticmethod
     def compute_psd(
@@ -97,6 +98,7 @@ class FragmentAnalyzer:
         if not multitaper:
             f, psd = welch(rec, fs=f_s, nperseg=round(welch_bin_t * f_s), axis=0)
         else:
+            # REVIEW psd calulation will give different bins if using multitaper
             psd, f = psd_array_multitaper(
                 rec.transpose(),
                 f_s,
@@ -140,7 +142,7 @@ class FragmentAnalyzer:
         FragmentAnalyzer._check_rec_np(rec)
 
         psd = FragmentAnalyzer.compute_psdband(rec, f_s, welch_bin_t, notch_filter, bands, multitaper, **kwargs)
-        return {k: _log_transform(v) for k, v in psd.items()}
+        return {k: log_transform(v) for k, v in psd.items()}
 
     @staticmethod
     def compute_psdtotal(
@@ -173,7 +175,7 @@ class FragmentAnalyzer:
         """Compute the log of the total power spectral density of the signal."""
         FragmentAnalyzer._check_rec_np(rec)
 
-        return _log_transform(
+        return log_transform(
             FragmentAnalyzer.compute_psdtotal(rec, f_s, welch_bin_t, notch_filter, band, multitaper, **kwargs)
         )
 
@@ -219,7 +221,7 @@ class FragmentAnalyzer:
         psd_total = FragmentAnalyzer.compute_psdtotal(
             rec, f_s, welch_bin_t, notch_filter, total_band, multitaper, **kwargs
         )
-        return {k: _log_transform(v / psd_total) for k, v in psd_band.items()}
+        return {k: log_transform(v / psd_total) for k, v in psd_band.items()}
 
     @staticmethod
     def compute_psdslope(
@@ -343,15 +345,3 @@ class FragmentAnalyzer:
             return np.tril(result.correlation, k=-1)
         else:
             return result.correlation
-
-
-def _log_transform(rec: np.ndarray, **kwargs) -> np.ndarray:
-    """Log transform the signal
-
-    Args:
-        rec (np.ndarray): The signal to log transform.
-
-    Returns:
-        np.ndarray: ln(rec + 1)
-    """
-    return np.log(rec + 1)

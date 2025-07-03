@@ -656,7 +656,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
         result = self.result.copy()
         result["nspike"] = spike_counts.tolist()
-        result["lognspike"] = list(core._log_transform(np.stack(result["nspike"].tolist(), axis=0)))
+        result["lognspike"] = list(core.log_transform(np.stack(result["nspike"].tolist(), axis=0)))
         if inplace:
             self.result = result
         return result
