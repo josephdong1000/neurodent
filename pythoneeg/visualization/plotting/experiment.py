@@ -494,6 +494,17 @@ class ExperimentPlotter:
 
         return g
 
+    def plot_heatmap_faceted(
+        self, other_dimensions: list[str] | str, groupby: str | list[str], col: str = None, row: str = None, **kwargs
+    ):
+        # Pull dataframe like usual
+        # For each unique combination of otehr_dimsnion features, groupby and get the datafrme, then pass it to the heatmap function
+        # the groupby will have to be modified when it gets passed along
+        # also col, row will have to be not in the other_dimension, otherwise this won't work
+        # figure suptitle should be related to the unique values of other_dimsnions, but can be configurable, and probably don't implement it yourself
+
+        pass
+
     def _plot_matrix(self, data, feature, color_palette="RdBu_r", norm=None, **kwargs):
         matrices = np.array(data[feature].tolist())
         avg_matrix = np.nanmean(matrices, axis=0)
