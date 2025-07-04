@@ -22,7 +22,7 @@ logger = logging.getLogger()
 
 base_folder = Path("/mnt/isilon/marsh_single_unit/PythonEEG")
 load_folder = base_folder / "notebooks" / "tests" / "test-wars-sox5-6"
-save_folder = base_folder / "notebooks" / "tests" / "test-wars-sox5-collapsed-6"
+save_folder = base_folder / "notebooks" / "tests" / "test-wars-sox5-collapsed-6-isday"
 # animal_ids = ['A5', 'A10', 'F22', 'G25', 'G26', 'N21', 'N22', 'N23', 'N24', 'N25']
 # animal_ids = ['A5', 'A10']
 animal_ids = [p.name for p in load_folder.glob("*") if p.is_dir()]
@@ -212,7 +212,7 @@ def load_war(animal_id):
     bad_channels = list(required_channels)
 
     war.filter_all(bad_channels=bad_channels)
-    war.aggregate_time_windows(groupby="animalday")  # Not grouping by isday to increase statistical power
+    war.aggregate_time_windows(groupby=["animalday", "isday"])  # Not grouping by isday to increase statistical power
     # war.add_unique_hash(4)
     war.reorder_and_pad_channels(
         ["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis", "LHip", "RHip"], use_abbrevs=True
