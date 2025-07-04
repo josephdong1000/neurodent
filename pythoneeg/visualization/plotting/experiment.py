@@ -303,6 +303,7 @@ class ExperimentPlotter:
         self,
         feature: str,
         groupby: str | list[str],
+        df: pd.DataFrame = None,
         x: str = None,
         col: str = None,
         hue: str = None,
@@ -327,7 +328,8 @@ class ExperimentPlotter:
                 f"'{feature}' is a histogram feature and is not supported in plot_catplot. Use plot_psd instead."
             )
 
-        df = self.pull_timeseries_dataframe(feature, groupby, channels, collapse_channels, average_groupby)
+        if df is None:
+            df = self.pull_timeseries_dataframe(feature, groupby, channels, collapse_channels, average_groupby)
 
         if isinstance(groupby, str):
             groupby = [groupby]
@@ -439,6 +441,7 @@ class ExperimentPlotter:
         self,
         feature: str,
         groupby: str | list[str],
+        df: pd.DataFrame = None,
         col: str = None,
         row: str = None,
         channels: str | list[str] = "all",
@@ -457,7 +460,8 @@ class ExperimentPlotter:
         if isinstance(groupby, str):
             groupby = [groupby]
 
-        df = self.pull_timeseries_dataframe(feature, groupby, channels, collapse_channels, average_groupby)
+        if df is None:
+            df = self.pull_timeseries_dataframe(feature, groupby, channels, collapse_channels, average_groupby)
 
         # Create FacetGrid
         facet_vars = {
@@ -514,6 +518,7 @@ class ExperimentPlotter:
         baseline_key: str | tuple[str, ...],
         baseline_groupby: str | list[str] = None,
         remove_baseline: bool = False,
+        df: pd.DataFrame = None,
         col: str = None,
         row: str = None,
         channels: str | list[str] = "all",
@@ -535,7 +540,8 @@ class ExperimentPlotter:
         if isinstance(baseline_key, str):
             baseline_key = (baseline_key,)
 
-        df = self.pull_timeseries_dataframe(feature, groupby, channels, collapse_channels, average_groupby)
+        if df is None:
+            df = self.pull_timeseries_dataframe(feature, groupby, channels, collapse_channels, average_groupby)
 
         facet_vars = {
             "col": groupby[0],
@@ -580,6 +586,7 @@ class ExperimentPlotter:
         self,
         feature: str,
         groupby: str | list[str],
+        df: pd.DataFrame = None,
         col: str = None,
         row: str = None,
         log: bool = False,
@@ -600,7 +607,8 @@ class ExperimentPlotter:
         if isinstance(groupby, str):
             groupby = [groupby]
 
-        df = self.pull_timeseries_dataframe(feature, groupby, channels, collapse_channels, average_groupby=False)
+        if df is None:
+            df = self.pull_timeseries_dataframe(feature, groupby, channels, collapse_channels, average_groupby=False)
 
         # Create FacetGrid
         facet_vars = {
