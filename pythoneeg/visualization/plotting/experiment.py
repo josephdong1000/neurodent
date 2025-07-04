@@ -494,16 +494,68 @@ class ExperimentPlotter:
 
         return g
 
+    def _get_default_pull_timeseries_params(self):
+        """Get default parameters for heatmap plotting methods."""
+        return {
+            "channels": "all",
+            "collapse_channels": False,
+            "average_groupby": True,
+        }
+    
     def plot_heatmap_faceted(
-        self, other_dimensions: list[str] | str, groupby: str | list[str], col: str = None, row: str = None, **kwargs
+        self,
+        feature: str,
+        groupby: str | list[str],
+        facet_vars: list[str] | str,
+        df: pd.DataFrame = None,
+        **kwargs,
     ):
-        # Pull dataframe like usual
-        # For each unique combination of otehr_dimsnion features, groupby and get the datafrme, then pass it to the heatmap function
-        # the groupby will have to be modified when it gets passed along
-        # also col, row will have to be not in the other_dimension, otherwise this won't work
-        # figure suptitle should be related to the unique values of other_dimsnions, but can be configurable, and probably don't implement it yourself
 
-        pass
+        # Pull dataframe like usual
+        # For each unique combination of facet_vars features, groupby and get the datafrme, then pass it to the heatmap function
+        # the groupby will have to be modified when it gets passed along
+        # also col, row will have to be not in the facet_vars, otherwise this won't work
+        # figure suptitle should be related to the unique values of facet_vars, but can be configurable, and probably don't implement it yourself
+
+        # Check that col and row are not in facet_vars
+        # if col is not None and col in facet_vars:
+        #     raise ValueError(f"col {col} cannot be in facet_vars")
+        # if row is not None and row in facet_vars:
+        #     raise ValueError(f"row {row} cannot be in facet_vars")
+
+        if isinstance(groupby, str):
+            groupby = [groupby]
+
+        if df is not None:
+            timeseries_kwargs = self._get_default_pull_timeseries_params()
+            df = self.pull_timeseries_dataframe(feature=feature, groupby=groupby, **timeseries_kwargs)
+
+        # Among the variables present, there are a few that need modification
+        # First modify groupby subtracting facetvars
+        if isinstance(facet_vars, str):
+            facet_vars = [facet_vars]
+
+        subfacet_groupby = groupby.copy()
+        for facet_var in facet_vars:
+            if facet_var not in groupby:
+                raise ValueError(f"Facet variable {facet_var} must be present in groupby")
+            subfacet_groupby.remove(facet_var)
+
+        # Then iterate over the dataframe facet_Vars unique groupby keys, passing them to plot_heatmap and building a list of facetgrids
+        grids = []
+        for name, group in df.groupby(facet_vars):
+            g = self.plot_heatmap(feature=feature, groupby=subfacet_groupby, df=group, **kwargs)
+            
+            # Create title from facet variable values
+            if isinstance(name, tuple):
+                title = " | ".join(f"{var}={val}" for var, val in zip(facet_vars, name))
+            else:
+                title = f"{facet_vars[0]}={name}"
+            
+            g.figure.suptitle(title, y=1.02)
+            grids.append(g)
+
+        return grids
 
     def _plot_matrix(self, data, feature, color_palette="RdBu_r", norm=None, **kwargs):
         matrices = np.array(data[feature].tolist())
