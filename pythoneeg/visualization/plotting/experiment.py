@@ -114,7 +114,7 @@ class ExperimentPlotter:
         groupby: str | list[str],
         channels: str | list[str] = "all",
         collapse_channels: bool = False,
-        average_groupby: bool = True,
+        average_groupby: bool = False,
     ):
         """
         Process feature data for plotting.
@@ -139,9 +139,12 @@ class ExperimentPlotter:
         """
         if "band" in groupby or groupby == "band":
             raise ValueError(
+                # NOTE band not existing is potentially confusing error message if you are just using pull_timesereies_dataframe, there must be a more elegant way to handle this
                 "'band' is not supported as a groupby variable. Use 'band' as a col/row/hue/x variable instead."
             )
-
+        logging.info(
+            f"feature: {feature}, groupby: {groupby}, channels: {channels}, collapse_channels: {collapse_channels}, average_groupby: {average_groupby}"
+        )
         if channels == "all":
             channels = self.all_channel_names
         elif not isinstance(channels, list):
@@ -290,7 +293,7 @@ class ExperimentPlotter:
         if average_groupby:
             groupby_cols = df.columns.drop(feature).tolist()
             logging.debug(f"groupby_cols: {groupby_cols}")
-            grouped = df.groupby(groupby_cols)
+            grouped = df.groupby(groupby_cols, sort=False)
             df = grouped[feature].apply(core.utils.nanmean_series_of_np).reset_index()
 
         # baseline_means = (df_base
@@ -444,9 +447,9 @@ class ExperimentPlotter:
         df: pd.DataFrame = None,
         col: str = None,
         row: str = None,
-        channels: str | list[str] = "all",
-        collapse_channels: bool = False,  # REVIEW what happens if collapse_channels is true? Might not need this parameter
-        average_groupby: bool = False,
+        channels: str | list[str] = "all",  # REVIEW this might not be needed, since all channels should be visualized
+        collapse_channels: bool = False,  # REVIEW Unable to plot a single cell, this parameter is not needed, if needed just use a catplot
+        average_groupby: bool = False,  # REVIEW average groupby might be a redundant parameter, since matrix plotting already averages
         cmap: str = "RdBu_r",
         height: float = 3,
         aspect: float = 1,
@@ -465,7 +468,7 @@ class ExperimentPlotter:
 
         # Create FacetGrid
         facet_vars = {
-            "col": groupby[0],
+            "col": groupby[0] if len(groupby) > 0 else None,
             "row": groupby[1] if len(groupby) > 1 else None,
             "height": height,
             "aspect": aspect,
@@ -499,7 +502,7 @@ class ExperimentPlotter:
         return {
             "channels": "all",
             "collapse_channels": False,
-            "average_groupby": True,
+            "average_groupby": False,
         }
     
     def plot_heatmap_faceted(
@@ -510,30 +513,22 @@ class ExperimentPlotter:
         df: pd.DataFrame = None,
         **kwargs,
     ):
-
-        # Pull dataframe like usual
-        # For each unique combination of facet_vars features, groupby and get the datafrme, then pass it to the heatmap function
-        # the groupby will have to be modified when it gets passed along
-        # also col, row will have to be not in the facet_vars, otherwise this won't work
-        # figure suptitle should be related to the unique values of facet_vars, but can be configurable, and probably don't implement it yourself
-
-        # Check that col and row are not in facet_vars
-        # if col is not None and col in facet_vars:
-        #     raise ValueError(f"col {col} cannot be in facet_vars")
-        # if row is not None and row in facet_vars:
-        #     raise ValueError(f"row {row} cannot be in facet_vars")
-
         if isinstance(groupby, str):
             groupby = [groupby]
 
-        if df is not None:
-            timeseries_kwargs = self._get_default_pull_timeseries_params()
-            df = self.pull_timeseries_dataframe(feature=feature, groupby=groupby, **timeseries_kwargs)
+        if df is None:
+            pull_params = self._get_default_pull_timeseries_params()
+            pull_params.update({k: v for k, v in kwargs.items() if k in pull_params.keys()})
+            df = self.pull_timeseries_dataframe(feature=feature, groupby=groupby, **pull_params)
 
         # Among the variables present, there are a few that need modification
         # First modify groupby subtracting facetvars
         if isinstance(facet_vars, str):
             facet_vars = [facet_vars]
+
+        # FIXME this is a very ad hoc modification, and is tied to fixing pulldataframe accepting band as a feature
+        if feature == "cohere":
+            groupby.append("band")
 
         subfacet_groupby = groupby.copy()
         for facet_var in facet_vars:
@@ -543,15 +538,17 @@ class ExperimentPlotter:
 
         # Then iterate over the dataframe facet_Vars unique groupby keys, passing them to plot_heatmap and building a list of facetgrids
         grids = []
-        for name, group in df.groupby(facet_vars):
+        for name, group in df.groupby(
+            facet_vars, sort=False
+        ):  # TODO not related to here, but look at everywhere else that groupby is performed and consider if you should change it to sort=False
             g = self.plot_heatmap(feature=feature, groupby=subfacet_groupby, df=group, **kwargs)
-            
+
             # Create title from facet variable values
             if isinstance(name, tuple):
                 title = " | ".join(f"{var}={val}" for var, val in zip(facet_vars, name))
             else:
                 title = f"{facet_vars[0]}={name}"
-            
+
             g.figure.suptitle(title, y=1.02)
             grids.append(g)
 
@@ -578,7 +575,7 @@ class ExperimentPlotter:
         self,
         feature: str,
         groupby: str | list[str],
-        baseline_key: str | tuple[str, ...],
+        baseline_key: str | bool | tuple[str, ...],
         baseline_groupby: str | list[str] = None,
         remove_baseline: bool = False,
         df: pd.DataFrame = None,
@@ -600,14 +597,11 @@ class ExperimentPlotter:
         if isinstance(groupby, str):
             groupby = [groupby]
 
-        if isinstance(baseline_key, str):
-            baseline_key = (baseline_key,)
-
         if df is None:
             df = self.pull_timeseries_dataframe(feature, groupby, channels, collapse_channels, average_groupby)
 
         facet_vars = {
-            "col": groupby[0],
+            "col": groupby[0] if len(groupby) > 0 else None,
             "row": groupby[1] if len(groupby) > 1 else None,
             "height": height,
             "aspect": aspect,
@@ -730,7 +724,7 @@ def df_subtract_baseline(
     df: pd.DataFrame,
     feature: str,
     groupby: str | list[str],
-    baseline_key: str | tuple[str, ...],
+    baseline_key: str | bool | tuple[str, ...],
     baseline_groupby: str | list[str] = None,
     remove_baseline: bool = False,
 ):
@@ -746,6 +740,8 @@ def df_subtract_baseline(
     if isinstance(baseline_groupby, str):
         baseline_groupby = [baseline_groupby]
     if isinstance(baseline_key, str):
+        baseline_key = (baseline_key,)
+    if isinstance(baseline_key, bool):
         baseline_key = (baseline_key,)
     remaining_groupby = [col for col in groupby if col not in baseline_groupby]
     logging.debug(f"Groupby: {groupby}")
