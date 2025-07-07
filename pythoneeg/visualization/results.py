@@ -46,6 +46,7 @@ class AnimalFeatureParser:
                 | "ampvar"
                 | "psdtotal"
                 | "pcorr"
+                | "zpcorr"
                 | "nspike"
                 | "logrms"
                 | "logampvar"
@@ -1025,7 +1026,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                         v[~mask.transpose(0, 2, 1)] = np.nan
                         vals[colname] = v.tolist()
                     result[feat] = vals.to_dict("records")
-                case "pcorr":
+                case "pcorr" | "zpcorr":
                     vals = np.array(result[feat].tolist())
                     mask = np.broadcast_to(filter_tfs[:, :, np.newaxis], vals.shape)
                     vals[~mask] = np.nan
