@@ -639,6 +639,68 @@ class ExperimentPlotter:
 
         return g
 
+    def plot_diffheatmap_faceted(
+        self,
+        feature: str,
+        groupby: str | list[str],
+        facet_vars: str | list[str],
+        baseline_key: str
+        | bool
+        | tuple[str, ...],  # NOTE these keys and groupbys only apply to the subfacets not the overall groupby
+        baseline_groupby: str | list[str] = None,
+        remove_baseline: bool = False,
+        df: pd.DataFrame = None,
+        **kwargs,
+    ):
+        if isinstance(groupby, str):
+            groupby = [groupby]
+
+        if df is None:
+            pull_params = self._get_default_pull_timeseries_params()
+            pull_params.update({k: v for k, v in kwargs.items() if k in pull_params.keys()})
+            df = self.pull_timeseries_dataframe(feature=feature, groupby=groupby, **pull_params)
+
+        # Among the variables present, there are a few that need modification
+        # First modify groupby subtracting facetvars
+        if isinstance(facet_vars, str):
+            facet_vars = [facet_vars]
+
+        # FIXME this is a very ad hoc modification, and is tied to fixing pulldataframe accepting band as a feature
+        if feature == "cohere":
+            groupby.append("band")
+
+        subfacet_groupby = groupby.copy()
+        for facet_var in facet_vars:
+            if facet_var not in groupby:
+                raise ValueError(f"Facet variable {facet_var} must be present in groupby")
+            subfacet_groupby.remove(facet_var)
+
+        # Then iterate over the dataframe facet_Vars unique groupby keys, passing them to plot_heatmap and building a list of facetgrids
+        grids = []
+        for name, group in df.groupby(
+            facet_vars, sort=False
+        ):  # TODO look at everywhere else that groupby is performed and consider changing to sort=False
+            g = self.plot_diffheatmap(
+                feature=feature,
+                groupby=subfacet_groupby,
+                baseline_key=baseline_key,
+                baseline_groupby=baseline_groupby,
+                remove_baseline=remove_baseline,
+                df=group,
+                **kwargs,
+            )
+
+            # Create title from facet variable values
+            if isinstance(name, tuple):
+                title = " | ".join(f"{var}={val}" for var, val in zip(facet_vars, name))
+            else:
+                title = f"{facet_vars[0]}={name}"
+
+            g.figure.suptitle(title, y=1.02)
+            grids.append(g)
+
+        return grids
+
     def plot_qqplot(
         self,
         feature: str,
