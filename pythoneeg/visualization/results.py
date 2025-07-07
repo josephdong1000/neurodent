@@ -46,6 +46,7 @@ class AnimalFeatureParser:
                 | "ampvar"
                 | "psdtotal"
                 | "pcorr"
+                | "zpcorr"
                 | "nspike"
                 | "logrms"
                 | "logampvar"
@@ -434,7 +435,7 @@ def _sanitize_feature_request(features: list[str], exclude: list[str] = []):
 
 class WindowAnalysisResult(AnimalFeatureParser):
     """
-    Wrapper for output of windowed analysis. Has useful features like group-wise and global averaging, filtering, and saving
+    Wrapper for output of windowed analysis. Has useful functions like group-wise and global averaging, filtering, and saving
     """
 
     def __init__(
@@ -656,7 +657,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
         result = self.result.copy()
         result["nspike"] = spike_counts.tolist()
-        result["lognspike"] = list(core._log_transform(np.stack(result["nspike"].tolist(), axis=0)))
+        result["lognspike"] = list(core.log_transform(np.stack(result["nspike"].tolist(), axis=0)))
         if inplace:
             self.result = result
         return result
@@ -1025,7 +1026,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                         v[~mask.transpose(0, 2, 1)] = np.nan
                         vals[colname] = v.tolist()
                     result[feat] = vals.to_dict("records")
-                case "pcorr":
+                case "pcorr" | "zpcorr":
                     vals = np.array(result[feat].tolist())
                     mask = np.broadcast_to(filter_tfs[:, :, np.newaxis], vals.shape)
                     vals[~mask] = np.nan

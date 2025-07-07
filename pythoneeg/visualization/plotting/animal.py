@@ -222,7 +222,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                     data_X = data_X[:, tril[0], tril[1], :]
                 data_X = data_X.reshape(data_X.shape[0], -1, data_X.shape[-1])
                 data_X = np.transpose(data_X)
-            case "pcorr":
+            case "pcorr" | "zpcorr":
                 data_X = np.stack(group[feature], axis=-1)
                 if triag:
                     tril = np.tril_indices(data_X.shape[1], k=-1)

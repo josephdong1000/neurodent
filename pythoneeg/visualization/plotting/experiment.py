@@ -184,7 +184,7 @@ class ExperimentPlotter:
                         vals = {ch: vals[:, ch_to_idx[ch]].tolist() for ch in channels if ch in ch_names}
                     vals = df_war[groupby].to_dict("list") | vals
 
-                case "pcorr":
+                case "pcorr" | "zpcorr":
                     vals = np.array(df_war[feature].tolist())
                     if collapse_channels:
                         # Get lower triangular elements (excluding diagonal)

@@ -43,3 +43,4 @@ notebooks/tests/test_all_functions_Yong.ipynb
 .DS_Store
 *.dat
 
+site/

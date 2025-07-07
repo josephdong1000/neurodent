@@ -1,0 +1,32 @@
+site_name: PythonEEG
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+
+theme:
+  name: material
+  features:
+    - toc.integrate
+    - navigation.sections
+
+nav:
+  - Home: index.md
+  - Usage:
+      - Tutorials: reference/tutorials.md
+      - Examples: reference/examples.md
+      - Contributing: reference/contributing.md
+  - API Reference:
+      - Core:
+        - Core Classes: reference/core/core.md
+        - Analysis: reference/core/analysis.md
+        - Analysis Helper Classes:
+          - Windowed Analysis: reference/core/windowed.md
+          - Spike Sorting: reference/core/sorting.md
+      - Visualization:
+        - Results: reference/visualization/results.md
+        - Plotting:
+          - Animal Level: reference/visualization/animal.md
+          - Experiment Level: reference/visualization/experiment.md
+      - Utilities: reference/utilities.md

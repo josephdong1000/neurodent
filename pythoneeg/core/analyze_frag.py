@@ -9,6 +9,7 @@ from scipy.signal import butter, decimate, filtfilt, iirnotch, sosfiltfilt, welc
 from scipy.stats import linregress, pearsonr
 
 from .. import constants
+from ..core import log_transform
 
 
 class FragmentAnalyzer:
@@ -64,7 +65,7 @@ class FragmentAnalyzer:
     def compute_logrms(rec: np.ndarray, **kwargs) -> np.ndarray:
         """Compute the log of the root mean square of the signal."""
         FragmentAnalyzer._check_rec_np(rec)
-        return _log_transform(FragmentAnalyzer.compute_rms(rec, **kwargs))
+        return log_transform(FragmentAnalyzer.compute_rms(rec, **kwargs))
 
     @staticmethod
     def compute_ampvar(rec: np.ndarray, **kwargs) -> np.ndarray:
@@ -76,7 +77,7 @@ class FragmentAnalyzer:
     def compute_logampvar(rec: np.ndarray, **kwargs) -> np.ndarray:
         """Compute the log of the amplitude variance of the signal."""
         FragmentAnalyzer._check_rec_np(rec)
-        return _log_transform(FragmentAnalyzer.compute_ampvar(rec, **kwargs))
+        return log_transform(FragmentAnalyzer.compute_ampvar(rec, **kwargs))
 
     @staticmethod
     def compute_psd(
@@ -97,6 +98,7 @@ class FragmentAnalyzer:
         if not multitaper:
             f, psd = welch(rec, fs=f_s, nperseg=round(welch_bin_t * f_s), axis=0)
         else:
+            # REVIEW psd calulation will give different bins if using multitaper
             psd, f = psd_array_multitaper(
                 rec.transpose(),
                 f_s,
@@ -140,7 +142,7 @@ class FragmentAnalyzer:
         FragmentAnalyzer._check_rec_np(rec)
 
         psd = FragmentAnalyzer.compute_psdband(rec, f_s, welch_bin_t, notch_filter, bands, multitaper, **kwargs)
-        return {k: _log_transform(v) for k, v in psd.items()}
+        return {k: log_transform(v) for k, v in psd.items()}
 
     @staticmethod
     def compute_psdtotal(
@@ -173,7 +175,7 @@ class FragmentAnalyzer:
         """Compute the log of the total power spectral density of the signal."""
         FragmentAnalyzer._check_rec_np(rec)
 
-        return _log_transform(
+        return log_transform(
             FragmentAnalyzer.compute_psdtotal(rec, f_s, welch_bin_t, notch_filter, band, multitaper, **kwargs)
         )
 
@@ -219,7 +221,7 @@ class FragmentAnalyzer:
         psd_total = FragmentAnalyzer.compute_psdtotal(
             rec, f_s, welch_bin_t, notch_filter, total_band, multitaper, **kwargs
         )
-        return {k: _log_transform(v / psd_total) for k, v in psd_band.items()}
+        return {k: log_transform(v / psd_total) for k, v in psd_band.items()}
 
     @staticmethod
     def compute_psdslope(
@@ -344,14 +346,71 @@ class FragmentAnalyzer:
         else:
             return result.correlation
 
+    @staticmethod
+    def compute_zpcorr(rec: np.ndarray, f_s: float, lower_triag: bool = True, **kwargs) -> np.ndarray:
+        """Compute the Fisher z-transformed Pearson correlation coefficient of the signal."""
+        FragmentAnalyzer._check_rec_np(rec)
 
-def _log_transform(rec: np.ndarray, **kwargs) -> np.ndarray:
-    """Log transform the signal
+        pcorr = FragmentAnalyzer.compute_pcorr(rec, f_s, lower_triag, **kwargs)
+        return np.arctanh(pcorr)
 
-    Args:
-        rec (np.ndarray): The signal to log transform.
+    # def compute_csd(self, index, magnitude=True, n_jobs=None, **kwargs) -> np.ndarray:
+    #     rec = self.get_fragment_mne(index)
+    #     csd = csd_array_fourier(rec, self.f_s,
+    #                             fmin=constants.FREQ_BAND_TOTAL[0],
+    #                             fmax=constants.FREQ_BAND_TOTAL[1],
+    #                             ch_names=self.channel_names,
+    #                             n_jobs=n_jobs,
+    #                             verbose=False)
+    #     out = {}
+    #     for k,v in constants.FREQ_BANDS.items():
+    #         try:
+    #             csd_band = csd.mean(fmin=v[0], fmax=v[1]) # Breaks if slice is too short
+    #         except (IndexError, UnboundLocalError):
+    #             timebound = self.convert_idx_to_timebound(index)
+    #             warnings.warn(f"compute_csd failed for window {index}, {round(timebound[1]-timebound[0], 5)} s. Likely too short")
+    #             data = self.compute_csd(index - 1, magnitude)[k]
+    #         else:
+    #             data = csd_band.get_data()
+    #         finally:
+    #             if magnitude:
+    #                 out[k] = np.abs(data)
+    #             else:
+    #                 out[k] = data
+    #     return out
 
-    Returns:
-        np.ndarray: ln(rec + 1)
-    """
-    return np.log(rec + 1)
+    # def compute_envcorr(self, index, **kwargs) -> np.ndarray:
+    #     rec = spre.bandpass_filter(self.get_fragment_rec(index),
+    #                                 freq_min=constants.FREQ_BAND_TOTAL[0],
+    #                                 freq_max=constants.FREQ_BAND_TOTAL[1])
+    #     rec = self.get_fragment_mne(index, rec)
+    #     envcor = envelope_correlation(rec, self.channel_names)
+    #     return envcor.get_data().reshape((self.n_channels, self.n_channels))
+
+    # def compute_pac(self, index):
+    #     ... # NOTE implement CFC measures
+
+    # def compute_cacoh(self, index, freq_res=1, n_cycles_max=7.0, geomspace=True, mode:str='cwt_morlet', downsamp_q=4, epsilon=1e-2, mag_phase=True, indices=None, **kwargs):
+    #     rec = self.get_fragment_mne(index)
+    #     rec = decimate(rec, q=downsamp_q, axis=-1)
+    #     freqs, n_cycles = self.__get_freqs_cycles(index=index, freq_res=freq_res, n_cycles_max=n_cycles_max, geomspace=geomspace, mode=mode, epsilon=epsilon)
+    #     try:
+    #         con = spectral_connectivity_time(rec,
+    #                                         freqs=freqs,
+    #                                         method='cacoh',
+    #                                         average=True,
+    #                                         mode=mode,
+    #                                         fmin=constants.FREQ_BAND_TOTAL[0],
+    #                                         fmax=constants.FREQ_BAND_TOTAL[1],
+    #                                         sfreq=self.f_s / downsamp_q,
+    #                                         n_cycles=n_cycles,
+    #                                         indices=indices, # NOTE implement L/R hemisphere coherence metrics
+    #                                         verbose=False)
+    #     except MemoryError as e:
+    #         raise MemoryError("Out of memory, use a larger freq_res parameter") from e
+
+    #     data:np.ndarray = con.get_data().squeeze()
+    #     if mag_phase:
+    #         return np.abs(data), np.angle(data, deg=True), con.freqs
+    #     else:
+    #         return data, con.freqs

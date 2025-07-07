@@ -360,70 +360,13 @@ class LongRecordingAnalyzer:
             **kwargs,
         )
 
-    # def compute_cacoh(self, index, freq_res=1, n_cycles_max=7.0, geomspace=True, mode:str='cwt_morlet', downsamp_q=4, epsilon=1e-2, mag_phase=True, indices=None, **kwargs):
-    #     rec = self.get_fragment_mne(index)
-    #     rec = decimate(rec, q=downsamp_q, axis=-1)
-    #     freqs, n_cycles = self.__get_freqs_cycles(index=index, freq_res=freq_res, n_cycles_max=n_cycles_max, geomspace=geomspace, mode=mode, epsilon=epsilon)
-    #     try:
-    #         con = spectral_connectivity_time(rec,
-    #                                         freqs=freqs,
-    #                                         method='cacoh',
-    #                                         average=True,
-    #                                         mode=mode,
-    #                                         fmin=constants.FREQ_BAND_TOTAL[0],
-    #                                         fmax=constants.FREQ_BAND_TOTAL[1],
-    #                                         sfreq=self.f_s / downsamp_q,
-    #                                         n_cycles=n_cycles,
-    #                                         indices=indices, # NOTE implement L/R hemisphere coherence metrics
-    #                                         verbose=False)
-    #     except MemoryError as e:
-    #         raise MemoryError("Out of memory, use a larger freq_res parameter") from e
-
-    #     data:np.ndarray = con.get_data().squeeze()
-    #     if mag_phase:
-    #         return np.abs(data), np.angle(data, deg=True), con.freqs
-    #     else:
-    #         return data, con.freqs
-
     def compute_pcorr(self, index, lower_triag=True, **kwargs) -> np.ndarray:
         rec = self.get_fragment_np(index)
         return FragmentAnalyzer.compute_pcorr(rec=rec, f_s=self.f_s, lower_triag=lower_triag, **kwargs)
 
-    # def compute_csd(self, index, magnitude=True, n_jobs=None, **kwargs) -> np.ndarray:
-    #     rec = self.get_fragment_mne(index)
-    #     csd = csd_array_fourier(rec, self.f_s,
-    #                             fmin=constants.FREQ_BAND_TOTAL[0],
-    #                             fmax=constants.FREQ_BAND_TOTAL[1],
-    #                             ch_names=self.channel_names,
-    #                             n_jobs=n_jobs,
-    #                             verbose=False)
-    #     out = {}
-    #     for k,v in constants.FREQ_BANDS.items():
-    #         try:
-    #             csd_band = csd.mean(fmin=v[0], fmax=v[1]) # Breaks if slice is too short
-    #         except (IndexError, UnboundLocalError):
-    #             timebound = self.convert_idx_to_timebound(index)
-    #             warnings.warn(f"compute_csd failed for window {index}, {round(timebound[1]-timebound[0], 5)} s. Likely too short")
-    #             data = self.compute_csd(index - 1, magnitude)[k]
-    #         else:
-    #             data = csd_band.get_data()
-    #         finally:
-    #             if magnitude:
-    #                 out[k] = np.abs(data)
-    #             else:
-    #                 out[k] = data
-    #     return out
-
-    # def compute_envcorr(self, index, **kwargs) -> np.ndarray:
-    #     rec = spre.bandpass_filter(self.get_fragment_rec(index),
-    #                                 freq_min=constants.FREQ_BAND_TOTAL[0],
-    #                                 freq_max=constants.FREQ_BAND_TOTAL[1])
-    #     rec = self.get_fragment_mne(index, rec)
-    #     envcor = envelope_correlation(rec, self.channel_names)
-    #     return envcor.get_data().reshape((self.n_channels, self.n_channels))
-
-    # def compute_pac(self, index):
-    #     ... # NOTE implement CFC measures
+    def compute_zpcorr(self, index, lower_triag=True, **kwargs) -> np.ndarray:
+        rec = self.get_fragment_np(index)
+        return FragmentAnalyzer.compute_zpcorr(rec=rec, f_s=self.f_s, lower_triag=lower_triag, **kwargs)
 
     def get_file_end(self, index, **kwargs):
         tstart, tend = self.convert_idx_to_timebound(index)

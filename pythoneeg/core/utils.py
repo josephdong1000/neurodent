@@ -371,17 +371,52 @@ def nanmean_series_of_np(x: pd.Series, axis: int = 0):
     return xmean
 
 
-class Natural_Neighbor(object):
-    def __init__(self):
-        self.nan_edges = {}  # Grafo dos vizinhos mutuos
-        self.nan_num = {}  # Numero de vizinhos naturais de cada instancia
-        self.repeat = {}  # Estrututa de dados que contabiliza a repeticao do metodo count
-        self.target = []  # Conjunto das classes
-        self.data = []  # Conjunto de instancias
-        self.knn = {}  # Estrutura que armazena os vizinhos de cada instanica
+def log_transform(rec: np.ndarray, **kwargs) -> np.ndarray:
+    """Log transform the signal
 
-    # Divide o dataset em atributos e classes
+    Args:
+        rec (np.ndarray): The signal to log transform.
+
+    Returns:
+        np.ndarray: ln(rec + 1)
+    """
+    return np.log(rec + 1)
+
+
+class Natural_Neighbor(object):
+    """
+    Natural Neighbor algorithm implementation for finding natural neighbors in a dataset.
+
+    This class implements the Natural Neighbor algorithm which finds mutual neighbors
+    in a dataset by iteratively expanding the neighborhood radius until convergence.
+    """
+
+    def __init__(self):
+        """
+        Initialize the Natural Neighbor algorithm.
+
+        Attributes:
+            nan_edges (dict): Graph of mutual neighbors
+            nan_num (dict): Number of natural neighbors for each instance
+            repeat (dict): Data structure that counts repetitions of the count method
+            target (list): Set of classes
+            data (list): Set of instances
+            knn (dict): Structure that stores neighbors of each instance
+        """
+        self.nan_edges = {}  # Graph of mutual neighbors
+        self.nan_num = {}  # Number of natural neighbors for each instance
+        self.repeat = {}  # Data structure that counts repetitions of the count method
+        self.target = []  # Set of classes
+        self.data = []  # Set of instances
+        self.knn = {}  # Structure that stores neighbors of each instance
+
     def load(self, filename):
+        """
+        Load dataset from a CSV file, separating attributes and classes.
+
+        Args:
+            filename (str): Path to the CSV file containing the dataset
+        """
         aux = []
         with open(filename, "r") as dataset:
             data = list(csv.reader(dataset))
@@ -393,31 +428,67 @@ class Natural_Neighbor(object):
         self.data = np.array(aux)
 
     def read(self, data: np.ndarray):
+        """
+        Load data directly from a numpy array.
+
+        Args:
+            data (np.ndarray): Input data array
+        """
         self.data = data
 
     def asserts(self):
+        """
+        Initialize data structures for the algorithm.
+
+        Sets up the necessary data structures including:
+        - nan_edges as an empty set
+        - knn, nan_num, and repeat dictionaries for each instance
+        """
         self.nan_edges = set()
         for j in range(len(self.data)):
             self.knn[j] = set()
             self.nan_num[j] = 0
             self.repeat[j] = 0
 
-    # Retorna o numero de instancias que nao possuiem vizinho natural
     def count(self):
+        """
+        Count the number of instances that have no natural neighbors.
+
+        Returns:
+            int: Number of instances with zero natural neighbors
+        """
         nan_zeros = 0
         for x in self.nan_num:
             if self.nan_num[x] == 0:
                 nan_zeros += 1
         return nan_zeros
 
-    # Retorna os indices dos vizinhos mais proximos
     def findKNN(self, inst, r, tree):
+        """
+        Find the indices of the k nearest neighbors.
+
+        Args:
+            inst: Instance to find neighbors for
+            r (int): Radius/parameter for neighbor search
+            tree: KDTree object for efficient neighbor search
+
+        Returns:
+            np.ndarray: Array of neighbor indices (excluding the instance itself)
+        """
         _, ind = tree.query([inst], r + 1)
         return np.delete(ind[0], 0)
 
-    # Retorna o NaNe
     def algorithm(self):
-        # ASSERT
+        """
+        Execute the Natural Neighbor algorithm.
+
+        The algorithm iteratively expands the neighborhood radius until convergence,
+        finding mutual neighbors between instances.
+
+        Returns:
+            int: The final radius value when convergence is reached
+        """
+        # Initialize KDTree for efficient neighbor search
         tree = KDTree(self.data)
         self.asserts()
         flag = 0
