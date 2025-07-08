@@ -297,6 +297,8 @@ class ExperimentPlotter:
         #                   .groupby(remaining_groupby)[feature]
         #                   .apply(nanmean_series_of_np))
 
+        df = core.utils.sort_dataframe_by_plot_order(df)
+
         return df
 
     def plot_catplot(
