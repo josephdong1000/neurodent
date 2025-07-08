@@ -38,7 +38,6 @@ pyprep = "*"
 okabeito = "*"
 openpyxl = "*"
 starbars = "*"
-pingouin = "*"
 
 [dev-packages]
 snakeviz = "*"
