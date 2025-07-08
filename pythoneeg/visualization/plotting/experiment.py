@@ -115,6 +115,7 @@ class ExperimentPlotter:
         channels: str | list[str] = "all",
         collapse_channels: bool = False,
         average_groupby: bool = True,
+        strict_groupby: bool = False,
     ):
         """
         Process feature data for plotting.
@@ -131,6 +132,9 @@ class ExperimentPlotter:
             Whether to average the channels to one value.
         average_groupby : bool, optional
             Whether to average the groupby variable(s).
+        strict_groupby : bool, optional
+            If True, raise an exception when groupby columns contain NaN values.
+            If False (default), only issue a warning.
 
         Returns
         -------
@@ -167,12 +171,18 @@ class ExperimentPlotter:
                 nan_cols.append(f"{col} ({nan_count}/{total_count} NaN values)")
 
         if nan_cols:
-            warning_msg = (
+            error_msg = (
                 f"Groupby columns contain NaN values: {', '.join(nan_cols)}. "
-                "This may result from previous aggregation operations (e.g., aggregate_time_windows) where these columns were not included in the groupby. "
-                "Consider: 1) Including these columns in your aggregation groupby, or 2) Using different groupby columns."
+                "This may result from previous aggregation operations (e.g., aggregate_time_windows) "
+                "where these columns were not included in the groupby. "
+                "Consider: 1) Including these columns in your aggregation groupby, "
+                "2) Filtering out NaN rows before plotting, or "
+                "3) Using different groupby columns."
             )
-            warnings.warn(warning_msg)
+            if strict_groupby:
+                raise ValueError(error_msg)
+            else:
+                warnings.warn(error_msg, UserWarning, stacklevel=2)
 
         groups = list(df.groupby(groupby).groups.keys())
         logging.debug(f"groups: {groups}")
@@ -694,6 +704,7 @@ def df_subtract_baseline(
     baseline_key: str | tuple[str, ...],
     baseline_groupby: str | list[str] = None,
     remove_baseline: bool = False,
+    strict_groupby: bool = False,
 ):
     """
     Subtract the baseline from the feature data.
@@ -729,12 +740,17 @@ def df_subtract_baseline(
             nan_cols.append(f"{col} ({nan_count}/{total_count} NaN values)")
 
     if nan_cols:
-        warning_msg = (
+        error_msg = (
             f"Groupby columns contain NaN values: {', '.join(nan_cols)}. "
             "This may result from previous aggregation operations where these columns were not included in the groupby. "
-            "Consider: 1) Including these columns in your aggregation groupby, or 2) Using different groupby columns."
+            "Consider: 1) Including these columns in your aggregation groupby, "
+            "2) Filtering out NaN rows before baseline subtraction, or "
+            "3) Using different groupby columns."
         )
-        warnings.warn(warning_msg)
+        if strict_groupby:
+            raise ValueError(error_msg)
+        else:
+            warnings.warn(error_msg, UserWarning, stacklevel=2)
 
     # Validate baseline_key length matches baseline_groupby length
     if len(baseline_key) != len(baseline_groupby):
