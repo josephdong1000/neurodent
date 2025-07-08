@@ -383,6 +383,61 @@ def log_transform(rec: np.ndarray, **kwargs) -> np.ndarray:
     return np.log(rec + 1)
 
 
+def sort_dataframe_by_plot_order(df: pd.DataFrame, df_sort_order: dict = constants.DF_SORT_ORDER) -> pd.DataFrame:
+    """
+    Sort DataFrame columns according to predefined orders.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame to sort
+    df_sort_order : dict
+        Dictionary mapping column names to the order of the values in the column.
+
+    Returns
+    -------
+    pd.DataFrame
+        Sorted DataFrame
+
+    Raises
+    ------
+    ValueError
+        If df_sort_order is not a valid dictionary or contains invalid categories
+    """
+    if not isinstance(df_sort_order, dict):
+        raise ValueError("df_sort_order must be a dictionary")
+
+    if df.empty:
+        return df.copy()
+
+    for col, categories in df_sort_order.items():
+        if not isinstance(categories, (list, tuple)):
+            raise ValueError(f"Categories for column '{col}' must be a list or tuple")
+
+    columns_to_sort = [col for col in df.columns if col in df_sort_order]
+    df_sorted = df.copy()
+
+    if not columns_to_sort:
+        return df_sorted
+
+    for col in columns_to_sort:
+        categories = df_sort_order[col]
+
+        # Check for values not in predefined categories
+        unique_values = set(df_sorted[col].dropna().unique())
+        missing_values = unique_values - set(categories)
+
+        if missing_values:
+            raise ValueError(f"Column '{col}' contains values not in predefined categories: {missing_values}")
+
+        # Create categorical with extended categories to preserve all values
+        df_sorted[col] = pd.Categorical(df_sorted[col], categories=categories, ordered=True)
+
+    df_sorted = df_sorted.sort_values(columns_to_sort)
+
+    return df_sorted
+
+
 class Natural_Neighbor(object):
     """
     Natural Neighbor algorithm implementation for finding natural neighbors in a dataset.
