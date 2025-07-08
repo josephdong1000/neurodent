@@ -1,4 +1,5 @@
 from pathlib import Path
+import warnings
 
 import matplotlib
 import matplotlib.axes
@@ -285,9 +286,14 @@ class AnimalPlotter(viz.AnimalFeatureParser):
     ):
         if features is None:
             features = constants.MATRIX_FEATURES
-        height_ratios = {"cohere": 5, "pcorr": 1}
+        height_ratios = {"cohere": 5, "pcorr": 1, "zpcorr": 1}
 
         df_rowgroup = self.window_result.get_grouprows_result(features, multiindex=multiindex)
+        for feature in features:
+            if feature not in df_rowgroup.columns:
+                warnings.warn(f"Feature {feature} not found in dataframe")
+                features.remove(feature)
+
         for i, df_row in df_rowgroup.groupby(level=0):
             fig, ax = plt.subplots(
                 len(features),
