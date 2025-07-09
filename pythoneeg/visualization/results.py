@@ -588,7 +588,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     result[feature] = [(coords[i], new_vals[i]) for i in range(len(coords))]
 
                 case _:
-                    raise Exception(f"Invalid feature: {feature}")
+                    raise ValueError(f"Invalid feature: {feature}")
 
         if inplace:
             self.result = result
