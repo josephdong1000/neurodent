@@ -24,6 +24,33 @@ class ExperimentPlotter:
 
     This class provides methods for creating different types of plots (boxplot, violin plot,
     scatter plot, etc.) from experimental data with consistent data processing and styling.
+
+    Plot Ordering
+    ------------
+    The class automatically sorts data according to predefined plot orders for columns like
+    'channel', 'genotype', 'sex', 'isday', and 'band'. Users can customize this ordering
+    during initialization:
+
+    plotter = ExperimentPlotter(wars, plot_order={'channel': ['LMot', 'RMot', ...]})
+
+    The default plot orders are defined in constants.DF_SORT_ORDER.
+
+    Validation and Warnings
+    ----------------------
+    The class automatically validates plot order against the processed DataFrame during plotting
+    and raises warnings for any mismatches. Use validate_plot_order() to explicitly validate:
+
+    plotter.validate_plot_order(df)
+
+    Examples
+    --------
+    # Customize plot ordering during initialization
+    custom_order = {
+        'channel': ['LMot', 'RMot', 'LBar', 'RBar'],  # Only include specific channels
+        'genotype': ['WT', 'KO'],  # Standard order
+        'sex': ['Female', 'Male']  # Custom order
+    }
+    plotter = ExperimentPlotter(wars, plot_order=custom_order)
     """
 
     def __init__(
@@ -32,6 +59,7 @@ class ExperimentPlotter:
         features: list[str] = None,
         exclude: list[str] = None,
         use_abbreviations: bool = True,
+        plot_order: dict = None,
     ):
         """
         Initialize plotter with WindowAnalysisResult object(s).
@@ -46,6 +74,9 @@ class ExperimentPlotter:
             List of features to exclude from extraction
         use_abbreviations : bool, optional
             Whether to use abbreviations for channel names
+        plot_order : dict, optional
+            Dictionary mapping column names to the order of values for plotting.
+            If None, uses constants.DF_SORT_ORDER.
         """
         features = features if features else ["all"]
 
@@ -92,7 +123,6 @@ class ExperimentPlotter:
         # Process all data into DataFrames
         df_wars = []
         for war in wars:
-            # Get all data
             try:
                 dftemp = war.get_result(features=features, exclude=exclude, allow_missing=False)
                 df_wars.append(dftemp)
@@ -107,6 +137,55 @@ class ExperimentPlotter:
             df_wars, axis=0, ignore_index=True
         )  # TODO this raises a warning about df wars having columns that are none I think
         self.stats = None
+
+        self._plot_order = plot_order if plot_order is not None else constants.DF_SORT_ORDER.copy()
+
+    def validate_plot_order(self, df: pd.DataFrame, raise_errors: bool = False) -> dict:
+        """
+        Validate that the current plot_order contains all necessary categories for the data.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            DataFrame to validate against (should be the DataFrame that will be sorted).
+        raise_errors : bool, optional
+            Whether to raise errors for validation issues. Default is False.
+
+        Returns
+        -------
+        dict
+            Dictionary with validation results for each column
+        """
+        validation_results = {}
+
+        # Only validate columns that exist in the DataFrame
+        columns_to_validate = [col for col in self._plot_order.keys() if col in df.columns]
+
+        for col in columns_to_validate:
+            categories = self._plot_order[col]
+            unique_values = set(df[col].dropna().unique())
+            missing_in_order = unique_values - set(categories)
+
+            validation_results[col] = {
+                "status": "valid" if not missing_in_order else "issues",
+                "unique_values": list(unique_values),
+                "defined_categories": categories,
+                "missing_in_order": list(missing_in_order),
+            }
+
+            if missing_in_order:
+                if raise_errors:
+                    raise ValueError(
+                        f'Plot order for column "{col}" is missing values found in data: {missing_in_order}'
+                    )
+                else:
+                    warnings.warn(
+                        f'Plot order for column "{col}" is missing values found in data: {missing_in_order}',
+                        UserWarning,
+                        stacklevel=2,
+                    )
+
+        return validation_results
 
     def pull_timeseries_dataframe(
         self,
@@ -339,7 +418,10 @@ class ExperimentPlotter:
         #                   .groupby(remaining_groupby)[feature]
         #                   .apply(nanmean_series_of_np))
 
-        df = core.utils.sort_dataframe_by_plot_order(df)
+        # Validate plot order against the DataFrame that will be sorted
+        self.validate_plot_order(df)
+
+        df = core.utils.sort_dataframe_by_plot_order(df, self._plot_order)
 
         return df
 
