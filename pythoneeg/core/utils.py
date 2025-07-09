@@ -436,6 +436,10 @@ def sort_dataframe_by_plot_order(df: pd.DataFrame, df_sort_order: dict = constan
         df_sorted[col] = pd.Categorical(df_sorted[col], categories=existing_categories, ordered=True)
 
     df_sorted = df_sorted.sort_values(columns_to_sort)
+    # REVIEW since "sex" is not inherently part of the pipeline (add ad-hoc), this could be a feature worth sorting
+    # But this might mean rewriting the data loading pipeline, file-reading, etc.
+    # Maybe a dictionary corresponding to animal/id -> sex would be good enough, instead of reading it in from filenames
+    # which would be difficult since name conventions are not standardized
 
     return df_sorted
 
