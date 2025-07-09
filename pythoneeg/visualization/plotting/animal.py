@@ -109,7 +109,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         ax[0].set_ylabel(rowname, rotation="horizontal", ha="right")
 
     def __get_groupavg_coherecorr(self, groupby="animalday", **kwargs):
-        avg_result = self.window_result.get_groupavg_result(constants.MATRIX_FEATURES, groupby=groupby)
+        avg_result = self.window_result.get_groupavg_result(constants.MATRIX_FEATURES.copy(), groupby=groupby)
         avg_coheresplit = pd.json_normalize(avg_result["cohere"]).set_index(
             avg_result.index
         )  # Split apart the cohere dictionaries
@@ -126,7 +126,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         **kwargs,
     ):
         if features is None:
-            features = constants.LINEAR_FEATURES + constants.BAND_FEATURES
+            features = constants.LINEAR_FEATURES.copy() + constants.BAND_FEATURES.copy()
         if channels is None:
             channels = np.arange(self.n_channels)
 
@@ -285,7 +285,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         **kwargs,
     ):
         if features is None:
-            features = constants.MATRIX_FEATURES
+            features = constants.MATRIX_FEATURES.copy()
         height_ratios = {"cohere": 5, "pcorr": 1, "zpcorr": 1}
 
         df_rowgroup = self.window_result.get_grouprows_result(features, multiindex=multiindex)
