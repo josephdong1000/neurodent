@@ -1,4 +1,5 @@
 from pathlib import Path
+import warnings
 
 import matplotlib
 import matplotlib.axes
@@ -222,7 +223,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                     data_X = data_X[:, tril[0], tril[1], :]
                 data_X = data_X.reshape(data_X.shape[0], -1, data_X.shape[-1])
                 data_X = np.transpose(data_X)
-            case "pcorr":
+            case "pcorr" | "zpcorr":
                 data_X = np.stack(group[feature], axis=-1)
                 if triag:
                     tril = np.tril_indices(data_X.shape[1], k=-1)
@@ -285,9 +286,14 @@ class AnimalPlotter(viz.AnimalFeatureParser):
     ):
         if features is None:
             features = constants.MATRIX_FEATURES
-        height_ratios = {"cohere": 5, "pcorr": 1}
+        height_ratios = {"cohere": 5, "pcorr": 1, "zpcorr": 1}
 
         df_rowgroup = self.window_result.get_grouprows_result(features, multiindex=multiindex)
+        for feature in features:
+            if feature not in df_rowgroup.columns:
+                warnings.warn(f"Feature {feature} not found in dataframe")
+                features.remove(feature)
+
         for i, df_row in df_rowgroup.groupby(level=0):
             fig, ax = plt.subplots(
                 len(features),

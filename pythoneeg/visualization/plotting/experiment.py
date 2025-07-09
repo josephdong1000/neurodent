@@ -98,7 +98,7 @@ class ExperimentPlotter:
                 df_wars.append(dftemp)
             except KeyError as e:
                 logging.error(
-                    f"Features missing in {war}. Exclude the missing features or recompute WARs with missing features."
+                    f"Features missing in {war}. Exclude the missing features during ExperimentPlotter init, or recompute WARs with missing features."
                 )
                 raise e
 
@@ -115,6 +115,7 @@ class ExperimentPlotter:
         channels: str | list[str] = "all",
         collapse_channels: bool = False,
         average_groupby: bool = False,
+        strict_groupby: bool = False,
     ):
         """
         Process feature data for plotting.
@@ -131,6 +132,9 @@ class ExperimentPlotter:
             Whether to average the channels to one value.
         average_groupby : bool, optional
             Whether to average the groupby variable(s).
+        strict_groupby : bool, optional
+            If True, raise an exception when groupby columns contain NaN values.
+            If False (default), only issue a warning.
 
         Returns
         -------
@@ -153,8 +157,46 @@ class ExperimentPlotter:
 
         if isinstance(groupby, str):
             groupby = [groupby]
+
+        # Validate groupby columns exist and check for NaN values
+        missing_cols = [col for col in groupby if col not in df.columns]
+        if missing_cols:
+            raise ValueError(
+                f"Groupby columns not found in data: {missing_cols}. Available columns: {df.columns.tolist()}"
+            )
+
+        # Check for NaN values in groupby columns
+        nan_cols = []
+        for col in groupby:
+            if df[col].isna().any():
+                nan_count = df[col].isna().sum()
+                total_count = len(df)
+                nan_cols.append(f"{col} ({nan_count}/{total_count} NaN values)")
+
+        if nan_cols:
+            error_msg = (
+                f"Groupby columns contain NaN values: {', '.join(nan_cols)}. "
+                "This may result from previous aggregation operations (e.g., aggregate_time_windows) "
+                "where these columns were not included in the groupby. "
+                "Consider: 1) Including these columns in your aggregation groupby, "
+                "2) Filtering out NaN rows before plotting, or "
+                "3) Using different groupby columns."
+            )
+            if strict_groupby:
+                raise ValueError(error_msg)
+            else:
+                warnings.warn(error_msg, UserWarning, stacklevel=2)
+
         groups = list(df.groupby(groupby).groups.keys())
         logging.debug(f"groups: {groups}")
+
+        # Check if grouping resulted in any groups
+        if not groups:  # FIXME this isn't triggering for empty groupby
+            raise ValueError(
+                f"No valid groups found when grouping by {groupby}. "
+                "This may be due to all values being NaN in one or more groupby columns. "
+                "Check your data and groupby parameters."
+            )
 
         # first iterate through animals, since that determines channel idx
         # then pull out feature into matrix, assign channels, and add to dataframe
@@ -187,7 +229,7 @@ class ExperimentPlotter:
                         vals = {ch: vals[:, ch_to_idx[ch]].tolist() for ch in channels if ch in ch_names}
                     vals = df_war[groupby].to_dict("list") | vals
 
-                case "pcorr":
+                case "pcorr" | "zpcorr":
                     vals = np.array(df_war[feature].tolist())
                     if collapse_channels:
                         # Get lower triangular elements (excluding diagonal)
@@ -293,7 +335,7 @@ class ExperimentPlotter:
         if average_groupby:
             groupby_cols = df.columns.drop(feature).tolist()
             logging.debug(f"groupby_cols: {groupby_cols}")
-            grouped = df.groupby(groupby_cols, sort=False)
+            grouped = df.groupby(groupby_cols, sort=False, dropna=False)
             df = grouped[feature].apply(core.utils.nanmean_series_of_np).reset_index()
 
         # baseline_means = (df_base
@@ -789,6 +831,7 @@ def df_subtract_baseline(
     baseline_key: str | bool | tuple[str, ...],
     baseline_groupby: str | list[str] = None,
     remove_baseline: bool = False,
+    strict_groupby: bool = False,
 ):
     """
     Subtract the baseline from the feature data.
@@ -811,6 +854,33 @@ def df_subtract_baseline(
     logging.debug(f"Baseline key: {baseline_key}")
     logging.debug(f"Remaining groupby: {remaining_groupby}")
 
+    # Validate columns exist
+    all_groupby_cols = list(set(groupby + baseline_groupby))
+    missing_cols = [col for col in all_groupby_cols if col not in df.columns]
+    if missing_cols:
+        raise ValueError(f"Groupby columns not found in data: {missing_cols}. Available columns: {df.columns.tolist()}")
+
+    # Check for NaN values in groupby columns
+    nan_cols = []
+    for col in all_groupby_cols:
+        if df[col].isna().any():
+            nan_count = df[col].isna().sum()
+            total_count = len(df)
+            nan_cols.append(f"{col} ({nan_count}/{total_count} NaN values)")
+
+    if nan_cols:
+        error_msg = (
+            f"Groupby columns contain NaN values: {', '.join(nan_cols)}. "
+            "This may result from previous aggregation operations where these columns were not included in the groupby. "
+            "Consider: 1) Including these columns in your aggregation groupby, "
+            "2) Filtering out NaN rows before baseline subtraction, or "
+            "3) Using different groupby columns."
+        )
+        if strict_groupby:
+            raise ValueError(error_msg)
+        else:
+            warnings.warn(error_msg, UserWarning, stacklevel=2)
+
     # Validate baseline_key length matches baseline_groupby length
     if len(baseline_key) != len(baseline_groupby):
         raise ValueError(
@@ -818,10 +888,14 @@ def df_subtract_baseline(
         )
 
     try:
-        df_base = df.groupby(baseline_groupby, as_index=False).get_group(baseline_key)
+        df_base = df.groupby(baseline_groupby, as_index=False).get_group(
+            baseline_key
+        )  # REVIEW maybe these should use dropna=True
     except KeyError:
+        available_keys = list(df.groupby(baseline_groupby).groups.keys())
         raise ValueError(
-            f"Baseline key {baseline_key} not found in groupby keys: {list(df.groupby(baseline_groupby).groups.keys())}"
+            f"Baseline key {baseline_key} not found in groupby keys: {available_keys}. "
+            "Check your baseline_key and baseline_groupby parameters."
         )
 
     if remaining_groupby:
