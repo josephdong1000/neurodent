@@ -428,10 +428,12 @@ def sort_dataframe_by_plot_order(df: pd.DataFrame, df_sort_order: dict = constan
         missing_values = unique_values - set(categories)
 
         if missing_values:
-            raise ValueError(f"Column '{col}' contains values not in predefined categories: {missing_values}")
+            raise ValueError(f"Column '{col}' contains values not in sort order dictionary: {missing_values}")
 
-        # Create categorical with extended categories to preserve all values
-        df_sorted[col] = pd.Categorical(df_sorted[col], categories=categories, ordered=True)
+        # Filter categories to only include those that exist in the DataFrame
+        existing_categories = [cat for cat in categories if cat in unique_values]
+
+        df_sorted[col] = pd.Categorical(df_sorted[col], categories=existing_categories, ordered=True)
 
     df_sorted = df_sorted.sort_values(columns_to_sort)
 
