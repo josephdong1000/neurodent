@@ -42,7 +42,7 @@ DEFAULT_ID_TO_NAME = {
     22: "RAud",
 }
 DF_SORT_ORDER = {
-    "channel": ["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis", "LHip", "RHip"],
+    "channel": ["average", "all", "LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis", "LHip", "RHip"],
     "genotype": ["WT", "KO"],
     "sex": ["Male", "Female"],
     "isday": [True, False],
