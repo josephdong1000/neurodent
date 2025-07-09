@@ -619,6 +619,7 @@ class ExperimentPlotter:
         groupby: str | list[str],
         baseline_key: str | bool | tuple[str, ...],
         baseline_groupby: str | list[str] = None,
+        operation: Literal["subtract", "divide"] = "subtract",
         remove_baseline: bool = False,
         df: pd.DataFrame = None,
         col: str = None,
@@ -664,7 +665,15 @@ class ExperimentPlotter:
 
         # Subtract baseline from feature
         groupby = [x for x in [facet_vars["col"], facet_vars["row"]] if x is not None]
-        df = df_subtract_baseline(df, feature, groupby, baseline_key, baseline_groupby, remove_baseline)
+        df = df_normalize_baseline(
+            df=df,
+            feature=feature,
+            groupby=groupby,
+            baseline_key=baseline_key,
+            baseline_groupby=baseline_groupby,
+            operation=operation,
+            remove_baseline=remove_baseline,
+        )
 
         # Create FacetGrid
         g = sns.FacetGrid(df, **facet_vars)
@@ -690,6 +699,7 @@ class ExperimentPlotter:
         | bool
         | tuple[str, ...],  # NOTE these keys and groupbys only apply to the subfacets not the overall groupby
         baseline_groupby: str | list[str] = None,
+        operation: Literal["subtract", "divide"] = "subtract",
         remove_baseline: bool = False,
         df: pd.DataFrame = None,
         **kwargs,
@@ -727,6 +737,7 @@ class ExperimentPlotter:
                 groupby=subfacet_groupby,
                 baseline_key=baseline_key,
                 baseline_groupby=baseline_groupby,
+                operation=operation,
                 remove_baseline=remove_baseline,
                 df=group,
                 **kwargs,
@@ -824,14 +835,15 @@ class ExperimentPlotter:
         return df.groupby(groupby)[feature].apply(lambda x: stats.normaltest(x, nan_policy="omit"))
 
 
-def df_subtract_baseline(
+def df_normalize_baseline(
     df: pd.DataFrame,
     feature: str,
     groupby: str | list[str],
     baseline_key: str | bool | tuple[str, ...],
     baseline_groupby: str | list[str] = None,
+    operation: Literal["subtract", "divide"] = "subtract",
     remove_baseline: bool = False,
-    strict_groupby: bool = False,
+    strict_groupby: bool = False,  # TODO implement strict_groupby in plot_diffheatmap
 ):
     """
     Subtract the baseline from the feature data.
@@ -912,6 +924,13 @@ def df_subtract_baseline(
         df_merge = df_merge.loc[~(df_merge[baseline_groupby] == baseline_key).all(axis=1)]
         if df_merge.empty:
             raise ValueError(f"No rows found for {groupby} != {baseline_key}")
-    df_merge[feature] = df_merge[feature].subtract(df_merge[f"{feature}_baseline"], fill_value=0)
+
+    # Normalize the feature
+    if operation == "subtract":
+        df_merge[feature] = df_merge[feature].subtract(df_merge[f"{feature}_baseline"], fill_value=0)
+    elif operation == "divide":
+        df_merge[feature] = df_merge[feature].divide(df_merge[f"{feature}_baseline"], fill_value=0)
+    else:
+        raise ValueError(f"Invalid operation: {operation}")
 
     return df_merge
