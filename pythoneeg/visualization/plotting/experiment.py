@@ -628,11 +628,23 @@ class ExperimentPlotter:
         collapse_channels: bool = False,
         average_groupby: bool = False,
         cmap: str = "RdBu_r",
+        norm: colors.Normalize | None = None,
         height: float = 3,
         aspect: float = 1,
     ):
         """
         Create a 2D feature plot of differences between groups. Baseline is subtracted from other groups.
+
+        Parameters:
+        -----------
+        cmap : str, default="RdBu_r"
+            Colormap name or matplotlib colormap object
+        norm : matplotlib.colors.Normalize, optional
+            Normalization object. If None, will use CenteredNorm with auto-detected range.
+            Common options:
+            - colors.CenteredNorm(vcenter=0)  # Auto-detect range around 0
+            - colors.Normalize(vmin=-1, vmax=1)  # Fixed range
+            - colors.LogNorm()  # Logarithmic scale
         """
         if feature not in constants.MATRIX_FEATURES:
             raise ValueError(f"{feature} is not supported for 2D feature plots")
@@ -675,13 +687,14 @@ class ExperimentPlotter:
             remove_baseline=remove_baseline,
         )
 
+        if norm is None:
+            norm = colors.CenteredNorm(vcenter=0, halfrange=0.5)
+
         # Create FacetGrid
         g = sns.FacetGrid(df, **facet_vars)
 
         # Map the plotting function
-        g.map_dataframe(
-            self._plot_matrix, feature=feature, color_palette=cmap, norm=colors.CenteredNorm(vcenter=0, halfrange=0.5)
-        )
+        g.map_dataframe(self._plot_matrix, feature=feature, color_palette=cmap, norm=norm)
 
         # NOTE implement statistical testing with big N and small N
 
@@ -702,6 +715,8 @@ class ExperimentPlotter:
         operation: Literal["subtract", "divide"] = "subtract",
         remove_baseline: bool = False,
         df: pd.DataFrame = None,
+        cmap: str = "RdBu_r",
+        norm: colors.Normalize | None = None,
         **kwargs,
     ):
         if isinstance(groupby, str):
@@ -740,6 +755,8 @@ class ExperimentPlotter:
                 operation=operation,
                 remove_baseline=remove_baseline,
                 df=group,
+                cmap=cmap,
+                norm=norm,
                 **kwargs,
             )
 
