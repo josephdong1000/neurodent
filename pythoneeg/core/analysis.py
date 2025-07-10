@@ -360,13 +360,17 @@ class LongRecordingAnalyzer:
             **kwargs,
         )
 
+    def compute_zcohere(self, index, **kwargs) -> np.ndarray:
+        rec = self.get_fragment_np(index)
+        return FragmentAnalyzer.compute_zcohere(rec=rec, f_s=self.f_s, **kwargs)
+
     def compute_pcorr(self, index, lower_triag=True, **kwargs) -> np.ndarray:
         rec = self.get_fragment_np(index)
         return FragmentAnalyzer.compute_pcorr(rec=rec, f_s=self.f_s, lower_triag=lower_triag, **kwargs)
 
-    def compute_zpcorr(self, index, lower_triag=True, **kwargs) -> np.ndarray:
+    def compute_zpcorr(self, index, **kwargs) -> np.ndarray:
         rec = self.get_fragment_np(index)
-        return FragmentAnalyzer.compute_zpcorr(rec=rec, f_s=self.f_s, lower_triag=lower_triag, **kwargs)
+        return FragmentAnalyzer.compute_zpcorr(rec=rec, f_s=self.f_s, **kwargs)
 
     def get_file_end(self, index, **kwargs):
         tstart, tend = self.convert_idx_to_timebound(index)

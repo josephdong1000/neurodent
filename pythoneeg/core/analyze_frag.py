@@ -347,11 +347,11 @@ class FragmentAnalyzer:
             return result.correlation
 
     @staticmethod
-    def compute_zpcorr(rec: np.ndarray, f_s: float, lower_triag: bool = True, **kwargs) -> np.ndarray:
+    def compute_zpcorr(rec: np.ndarray, f_s: float, **kwargs) -> np.ndarray:
         """Compute the Fisher z-transformed Pearson correlation coefficient of the signal."""
         FragmentAnalyzer._check_rec_np(rec)
 
-        pcorr = FragmentAnalyzer.compute_pcorr(rec, f_s, lower_triag, **kwargs)
+        pcorr = FragmentAnalyzer.compute_pcorr(rec, f_s, **kwargs)
         return np.arctanh(pcorr)
 
     @staticmethod
