@@ -354,6 +354,14 @@ class FragmentAnalyzer:
         pcorr = FragmentAnalyzer.compute_pcorr(rec, f_s, lower_triag, **kwargs)
         return np.arctanh(pcorr)
 
+    @staticmethod
+    def compute_zcohere(rec: np.ndarray, f_s: float, **kwargs) -> dict[str, np.ndarray]:
+        """Compute the Fisher z-transformed coherence of the signal."""
+        FragmentAnalyzer._check_rec_np(rec)
+
+        cohere = FragmentAnalyzer.compute_cohere(rec, f_s, **kwargs)
+        return {k: np.arctanh(v) for k, v in cohere.items()}
+
     # def compute_csd(self, index, magnitude=True, n_jobs=None, **kwargs) -> np.ndarray:
     #     rec = self.get_fragment_mne(index)
     #     csd = csd_array_fourier(rec, self.f_s,
