@@ -57,7 +57,7 @@ class AnimalFeatureParser:
                 col_agg = np.array(column.tolist())
                 avg = core.nanaverage(col_agg, axis=0, weights=weights)
 
-            case "cohere" | "psdband" | "psdfrac" | "logpsdband" | "logpsdfrac":
+            case "cohere" | "zcohere" | "psdband" | "psdfrac" | "logpsdband" | "logpsdfrac":
                 keys = colitem.keys()
                 avg = {}
                 for k in keys:
@@ -548,7 +548,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                         result[feature] = [list(x) for x in new_vals]
 
                 case _ if feature in constants.MATRIX_FEATURES:
-                    if feature == "cohere":
+                    if feature == "cohere" or feature == "zcohere":
                         df_bands = pd.DataFrame(result[feature].tolist())
                         vals = np.array(df_bands.values.tolist())
                         keys = df_bands.keys()
@@ -571,7 +571,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     new_vals += new_vals.transpose((*range(new_vals.ndim - 2), -1, -2))
                     new_vals[..., triu_mask[0], triu_mask[1]] = 0
 
-                    if feature == "cohere":
+                    if feature == "cohere" or feature == "zcohere":
                         result[feature] = [dict(zip(keys, vals)) for vals in new_vals]
                     else:
                         result[feature] = [list(x) for x in new_vals]
@@ -1016,7 +1016,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     vals[~mask] = np.nan
                     # vals = [list(map(tuple, x)) for x in vals.tolist()]
                     result[feat] = vals.tolist()
-                case "cohere":
+                case "cohere" | "zcohere":
                     vals = pd.DataFrame(result[feat].tolist())
                     shape = np.array(vals.iloc[:, 0].tolist()).shape
                     mask = np.broadcast_to(filter_tfs[:, :, np.newaxis], shape)

@@ -322,7 +322,7 @@ class ExperimentPlotter:
                         vals = {"all": vals.tolist()}
                     vals = df_war[groupby].to_dict("list") | vals
 
-                case "cohere":
+                case "cohere" | "zcohere":
                     df_bands = pd.DataFrame(df_war[feature].tolist())
                     vals = np.array(df_bands.values.tolist())
                     logging.debug(f"vals.shape: {vals.shape}")
@@ -396,7 +396,7 @@ class ExperimentPlotter:
                 logging.warning(f"{feature} contains NaNs")
                 df = df[df[feature].notna()]
             df[feature] = df[feature].apply(lambda x: x[0])  # get slope from [slope, intercept]
-        elif feature in constants.BAND_FEATURES + ["cohere"]:
+        elif feature in constants.BAND_FEATURES + ["cohere", "zcohere"]:
             df[feature] = df[feature].apply(lambda x: list(zip(x, constants.BAND_NAMES)))
             df = df.explode(feature)
             df[[feature, "band"]] = pd.DataFrame(df[feature].tolist(), index=df.index)
@@ -659,7 +659,7 @@ class ExperimentPlotter:
             facet_vars = [facet_vars]
 
         # FIXME this is a very ad hoc modification, and is tied to fixing pulldataframe accepting band as a feature
-        if feature == "cohere":
+        if feature in ["cohere", "zcohere"]:
             groupby.append("band")
 
         subfacet_groupby = groupby.copy()
@@ -823,7 +823,7 @@ class ExperimentPlotter:
             facet_vars = [facet_vars]
 
         # FIXME this is a very ad hoc modification, and is tied to fixing pulldataframe accepting band as a feature
-        if feature == "cohere":
+        if feature in ["cohere", "zcohere"]:
             groupby.append("band")
 
         subfacet_groupby = groupby.copy()
