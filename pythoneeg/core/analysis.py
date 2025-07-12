@@ -341,7 +341,7 @@ class LongRecordingAnalyzer:
         index,
         freq_res: float = 1,
         n_cycles_max: float = 7,
-        geomspace: bool = True,
+        geomspace: bool = False,
         mode: Literal["cwt_morlet", "multitaper"] = "cwt_morlet",
         downsamp_q: int = 4,
         epsilon: float = 1e-2,
