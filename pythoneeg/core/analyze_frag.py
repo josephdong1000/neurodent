@@ -265,7 +265,7 @@ class FragmentAnalyzer:
         """
         FragmentAnalyzer._check_rec_mne(rec)
 
-        if geomspace:
+        if geomspace: # REVIEW by default geomspace is True, but a linear scale is simpler for DOF calculation -> zcohere correction
             freqs = np.geomspace(
                 constants.FREQ_BAND_TOTAL[0],
                 constants.FREQ_BAND_TOTAL[1],
