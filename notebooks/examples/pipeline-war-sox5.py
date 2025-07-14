@@ -57,9 +57,10 @@ with open(base_folder / "notebooks" / "tests" / "sox5 combine genotypes.json", "
     data = json.load(f)
 data_parent_folder = Path(data['data_parent_folder'])
 constants.GENOTYPE_ALIASES = data['GENOTYPE_ALIASES']
+# data_folders_to_animal_ids = data["data_folders_to_animal_ids"]
 # Get only the second half of the dictionary items
 items = list(data["data_folders_to_animal_ids"].items())
-data_folders_to_animal_ids = dict(items[len(items) // 2 :])
+data_folders_to_animal_ids = dict(items[len(items) // 2 :])  # 1/2
 
 # constants.SORTING_PARAMS['freq_min'] = 60
 # constants.SORTING_PARAMS['freq_max'] = 400
