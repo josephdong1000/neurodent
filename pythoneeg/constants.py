@@ -41,9 +41,10 @@ DEFAULT_ID_TO_NAME = {
     21: "RVis",
     22: "RAud",
 }
-PLOT_ORDER = {
-    "channel": ["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis", "LHip", "RHip"],
+DF_SORT_ORDER = {
+    "channel": ["average", "all", "LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis", "LHip", "RHip"],
     "genotype": ["WT", "KO"],
+    "sex": ["Male", "Female"],
     "isday": [True, False],
     "band": ["delta", "theta", "alpha", "beta", "gamma"],
 }
@@ -79,7 +80,7 @@ LINEAR_FEATURES = [
     "lognspike",
 ]
 BAND_FEATURES = ["psdband", "psdfrac"] + ["logpsdband", "logpsdfrac"]
-MATRIX_FEATURES = ["cohere", "pcorr"]
+MATRIX_FEATURES = ["cohere", "pcorr", "zpcorr"]
 HIST_FEATURES = ["psd"]
 FEATURES = LINEAR_FEATURES + BAND_FEATURES + MATRIX_FEATURES + HIST_FEATURES
 WAR_FEATURES = [f for f in FEATURES if "nspike" not in f]

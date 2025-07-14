@@ -46,6 +46,7 @@ class AnimalFeatureParser:
                 | "ampvar"
                 | "psdtotal"
                 | "pcorr"
+                | "zpcorr"
                 | "nspike"
                 | "logrms"
                 | "logampvar"
@@ -415,6 +416,8 @@ def _sanitize_feature_request(features: list[str], exclude: list[str] = []):
     Returns:
         list[str]: Sanitized list of features.
     """
+    if isinstance(features, str):
+        features = [features]
     if features == ["all"]:
         feat = copy.deepcopy(constants.FEATURES)
     elif not features:
@@ -587,7 +590,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     result[feature] = [(coords[i], new_vals[i]) for i in range(len(coords))]
 
                 case _:
-                    raise Exception(f"Invalid feature: {feature}")
+                    raise ValueError(f"Invalid feature: {feature}")
 
         if inplace:
             self.result = result
@@ -1025,7 +1028,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                         v[~mask.transpose(0, 2, 1)] = np.nan
                         vals[colname] = v.tolist()
                     result[feat] = vals.to_dict("records")
-                case "pcorr":
+                case "pcorr" | "zpcorr":
                     vals = np.array(result[feat].tolist())
                     mask = np.broadcast_to(filter_tfs[:, :, np.newaxis], vals.shape)
                     vals[~mask] = np.nan

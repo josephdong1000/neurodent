@@ -1,4 +1,5 @@
 from pathlib import Path
+import warnings
 
 import matplotlib
 import matplotlib.axes
@@ -108,7 +109,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         ax[0].set_ylabel(rowname, rotation="horizontal", ha="right")
 
     def __get_groupavg_coherecorr(self, groupby="animalday", **kwargs):
-        avg_result = self.window_result.get_groupavg_result(constants.MATRIX_FEATURES, groupby=groupby)
+        avg_result = self.window_result.get_groupavg_result(constants.MATRIX_FEATURES.copy(), groupby=groupby)
         avg_coheresplit = pd.json_normalize(avg_result["cohere"]).set_index(
             avg_result.index
         )  # Split apart the cohere dictionaries
@@ -125,7 +126,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         **kwargs,
     ):
         if features is None:
-            features = constants.LINEAR_FEATURES + constants.BAND_FEATURES
+            features = constants.LINEAR_FEATURES.copy() + constants.BAND_FEATURES.copy()
         if channels is None:
             channels = np.arange(self.n_channels)
 
@@ -222,7 +223,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                     data_X = data_X[:, tril[0], tril[1], :]
                 data_X = data_X.reshape(data_X.shape[0], -1, data_X.shape[-1])
                 data_X = np.transpose(data_X)
-            case "pcorr":
+            case "pcorr" | "zpcorr":
                 data_X = np.stack(group[feature], axis=-1)
                 if triag:
                     tril = np.tril_indices(data_X.shape[1], k=-1)
@@ -284,10 +285,15 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         **kwargs,
     ):
         if features is None:
-            features = constants.MATRIX_FEATURES
-        height_ratios = {"cohere": 5, "pcorr": 1}
+            features = constants.MATRIX_FEATURES.copy()
+        height_ratios = {"cohere": 5, "pcorr": 1, "zpcorr": 1}
 
         df_rowgroup = self.window_result.get_grouprows_result(features, multiindex=multiindex)
+        for feature in features:
+            if feature not in df_rowgroup.columns:
+                warnings.warn(f"Feature {feature} not found in dataframe")
+                features.remove(feature)
+
         for i, df_row in df_rowgroup.groupby(level=0):
             fig, ax = plt.subplots(
                 len(features),

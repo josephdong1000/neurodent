@@ -383,17 +383,101 @@ def log_transform(rec: np.ndarray, **kwargs) -> np.ndarray:
     return np.log(rec + 1)
 
 
-class Natural_Neighbor(object):
-    def __init__(self):
-        self.nan_edges = {}  # Grafo dos vizinhos mutuos
-        self.nan_num = {}  # Numero de vizinhos naturais de cada instancia
-        self.repeat = {}  # Estrututa de dados que contabiliza a repeticao do metodo count
-        self.target = []  # Conjunto das classes
-        self.data = []  # Conjunto de instancias
-        self.knn = {}  # Estrutura que armazena os vizinhos de cada instanica
+def sort_dataframe_by_plot_order(df: pd.DataFrame, df_sort_order: dict = constants.DF_SORT_ORDER) -> pd.DataFrame:
+    """
+    Sort DataFrame columns according to predefined orders.
 
-    # Divide o dataset em atributos e classes
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame to sort
+    df_sort_order : dict
+        Dictionary mapping column names to the order of the values in the column.
+
+    Returns
+    -------
+    pd.DataFrame
+        Sorted DataFrame
+
+    Raises
+    ------
+    ValueError
+        If df_sort_order is not a valid dictionary or contains invalid categories
+    """
+    if not isinstance(df_sort_order, dict):
+        raise ValueError("df_sort_order must be a dictionary")
+
+    if df.empty:
+        return df.copy()
+
+    for col, categories in df_sort_order.items():
+        if not isinstance(categories, (list, tuple)):
+            raise ValueError(f"Categories for column '{col}' must be a list or tuple")
+
+    columns_to_sort = [col for col in df.columns if col in df_sort_order]
+    df_sorted = df.copy()
+
+    if not columns_to_sort:
+        return df_sorted
+
+    for col in columns_to_sort:
+        categories = df_sort_order[col]
+
+        # Check for values not in predefined categories
+        unique_values = set(df_sorted[col].dropna().unique())
+        missing_values = unique_values - set(categories)
+
+        if missing_values:
+            raise ValueError(f"Column '{col}' contains values not in sort order dictionary: {missing_values}")
+
+        # Filter categories to only include those that exist in the DataFrame
+        existing_categories = [cat for cat in categories if cat in unique_values]
+
+        df_sorted[col] = pd.Categorical(df_sorted[col], categories=existing_categories, ordered=True)
+
+    df_sorted = df_sorted.sort_values(columns_to_sort)
+    # REVIEW since "sex" is not inherently part of the pipeline (add ad-hoc), this could be a feature worth sorting
+    # But this might mean rewriting the data loading pipeline, file-reading, etc.
+    # Maybe a dictionary corresponding to animal/id -> sex would be good enough, instead of reading it in from filenames
+    # which would be difficult since name conventions are not standardized
+
+    return df_sorted
+
+
+class Natural_Neighbor(object):
+    """
+    Natural Neighbor algorithm implementation for finding natural neighbors in a dataset.
+
+    This class implements the Natural Neighbor algorithm which finds mutual neighbors
+    in a dataset by iteratively expanding the neighborhood radius until convergence.
+    """
+
+    def __init__(self):
+        """
+        Initialize the Natural Neighbor algorithm.
+
+        Attributes:
+            nan_edges (dict): Graph of mutual neighbors
+            nan_num (dict): Number of natural neighbors for each instance
+            repeat (dict): Data structure that counts repetitions of the count method
+            target (list): Set of classes
+            data (list): Set of instances
+            knn (dict): Structure that stores neighbors of each instance
+        """
+        self.nan_edges = {}  # Graph of mutual neighbors
+        self.nan_num = {}  # Number of natural neighbors for each instance
+        self.repeat = {}  # Data structure that counts repetitions of the count method
+        self.target = []  # Set of classes
+        self.data = []  # Set of instances
+        self.knn = {}  # Structure that stores neighbors of each instance
+
     def load(self, filename):
+        """
+        Load dataset from a CSV file, separating attributes and classes.
+
+        Args:
+            filename (str): Path to the CSV file containing the dataset
+        """
         aux = []
         with open(filename, "r") as dataset:
             data = list(csv.reader(dataset))
@@ -405,31 +489,67 @@ class Natural_Neighbor(object):
         self.data = np.array(aux)
 
     def read(self, data: np.ndarray):
+        """
+        Load data directly from a numpy array.
+
+        Args:
+            data (np.ndarray): Input data array
+        """
         self.data = data
 
     def asserts(self):
+        """
+        Initialize data structures for the algorithm.
+
+        Sets up the necessary data structures including:
+        - nan_edges as an empty set
+        - knn, nan_num, and repeat dictionaries for each instance
+        """
         self.nan_edges = set()
         for j in range(len(self.data)):
             self.knn[j] = set()
             self.nan_num[j] = 0
             self.repeat[j] = 0
 
-    # Retorna o numero de instancias que nao possuiem vizinho natural
     def count(self):
+        """
+        Count the number of instances that have no natural neighbors.
+
+        Returns:
+            int: Number of instances with zero natural neighbors
+        """
         nan_zeros = 0
         for x in self.nan_num:
             if self.nan_num[x] == 0:
                 nan_zeros += 1
         return nan_zeros
 
-    # Retorna os indices dos vizinhos mais proximos
     def findKNN(self, inst, r, tree):
+        """
+        Find the indices of the k nearest neighbors.
+
+        Args:
+            inst: Instance to find neighbors for
+            r (int): Radius/parameter for neighbor search
+            tree: KDTree object for efficient neighbor search
+
+        Returns:
+            np.ndarray: Array of neighbor indices (excluding the instance itself)
+        """
         _, ind = tree.query([inst], r + 1)
         return np.delete(ind[0], 0)
 
-    # Retorna o NaNe
     def algorithm(self):
-        # ASSERT
+        """
+        Execute the Natural Neighbor algorithm.
+
+        The algorithm iteratively expands the neighborhood radius until convergence,
+        finding mutual neighbors between instances.
+
+        Returns:
+            int: The final radius value when convergence is reached
+        """
+        # Initialize KDTree for efficient neighbor search
         tree = KDTree(self.data)
         self.asserts()
         flag = 0
