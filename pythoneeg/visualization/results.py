@@ -416,6 +416,8 @@ def _sanitize_feature_request(features: list[str], exclude: list[str] = []):
     Returns:
         list[str]: Sanitized list of features.
     """
+    if isinstance(features, str):
+        features = [features]
     if features == ["all"]:
         feat = copy.deepcopy(constants.FEATURES)
     elif not features:
