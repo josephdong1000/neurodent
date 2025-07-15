@@ -256,11 +256,10 @@ class AnimalOrganizer(AnimalFeatureParser):
                         )
                     del np_fragments  # cleanup memory
 
-                    # This is not parallelized
                     logging.debug("Processing metadata serially")
                     metadatas = [self._process_fragment_metadata(idx, lan, window_s) for idx in range(n_fragments_war)]
+                    meta_df = pd.DataFrame(metadatas)
 
-                    # Process fragments in parallel using Dask
                     logging.debug("Processing features in parallel")
                     with h5py.File(tmppath, "r", libver="latest") as f:
                         np_fragments_reconstruct = da.from_array(
@@ -285,7 +284,7 @@ class AnimalOrganizer(AnimalFeatureParser):
 
                     # Combine metadata and feature values
                     logging.debug("Combining metadata and feature values")
-                    meta_df = pd.DataFrame(metadatas)
+
                     feat_df = pd.DataFrame(feature_values)
                     lan_df = pd.concat([meta_df, feat_df], axis=1)
 
@@ -296,7 +295,10 @@ class AnimalOrganizer(AnimalFeatureParser):
                         lan_df.append(self._process_fragment_serial(idx, features, lan, window_s, kwargs))
 
             lan_df = pd.DataFrame(lan_df)
-            lan_df.sort_values("timestamp", inplace=True)
+
+            logging.debug("Validating timestamps")
+            core.validate_timestamps(lan_df["timestamp"].tolist())
+            # lan_df.sort_values("timestamp", inplace=True) # REVIEW unsure if this was doing anything before the timestamp refactor
 
             self.long_analyzers.append(lan)
             dataframes.append(lan_df)

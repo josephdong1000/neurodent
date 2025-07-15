@@ -368,7 +368,7 @@ class LongRecordingAnalyzer:
 
     def get_file_end(self, index, **kwargs):
         tstart, tend = self.convert_idx_to_timebound(index)
-        for tfile in self.LongRecording.end_relative:
+        for tfile in self.LongRecording.cumulative_file_durations:
             if tstart <= tfile < tend:
                 return tfile - tstart
         return None
