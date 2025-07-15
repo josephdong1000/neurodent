@@ -23,6 +23,8 @@ from .utils import (
     parse_chname_to_abbrev,
     nanaverage,
     log_transform,
+    TimestampMapper,
+    validate_timestamps,
 )
 from .analysis import LongRecordingAnalyzer
 from .analyze_frag import FragmentAnalyzer
@@ -49,4 +51,6 @@ __all__ = [
     "MountainSortAnalyzer",
     "FragmentAnalyzer",
     "log_transform",
+    "validate_timestamps",
+    "TimestampMapper",
 ]
