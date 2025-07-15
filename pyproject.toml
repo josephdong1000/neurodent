@@ -49,9 +49,72 @@ keywords = ["EEG", "rodent", "mouse", "neuroscience", "data analysis"]
 dev = [
     "snakeviz",
     "pyqt5",
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-mock>=3.10.0",
+    "pytest-xdist>=3.0.0",
+    "pytest-benchmark>=4.0.0",
+    "pytest-html>=3.1.0",
+    "pytest-json-report>=1.5.0",
+    "factory-boy>=3.2.0",
+    "faker>=18.0.0",
 ]
 
 [tool.setuptools.packages.find]
 include = ["pythoneeg*"]
 exclude = ["notebooks", "docs", "tmp"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "--cov=pythoneeg",
+    "--cov-report=term-missing",
+    "--cov-report=html:htmlcov",
+    "--cov-report=xml:coverage.xml",
+    "--cov-fail-under=80",
+    "--durations=10",
+    "--tb=short",
+    "--maxfail=10",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+    "eeg_data: marks tests that require EEG data files",
+    "spikeinterface: marks tests that require spikeinterface",
+    "mne: marks tests that require MNE",
+    "visualization: marks tests for visualization modules",
+    "core: marks tests for core functionality",
+]
+
+[tool.coverage.run]
+source = ["pythoneeg"]
+omit = [
+    "*/tests/*",
+    "*/test_*",
+    "*/__pycache__/*",
+    "*/migrations/*",
+    "*/venv/*",
+    "*/env/*",
+    "*/site-packages/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]
 
