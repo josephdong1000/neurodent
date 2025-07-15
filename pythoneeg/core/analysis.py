@@ -372,3 +372,11 @@ class LongRecordingAnalyzer:
             if tstart <= tfile < tend:
                 return tfile - tstart
         return None
+
+    def compute_nspike(self, index, **kwargs):
+        """Returns None. Compute and load in spikes with SpikeAnalysisResult"""
+        return None
+    
+    def compute_lognspike(self, index, **kwargs):
+        """Returns None. Compute and load in spikes with SpikeAnalysisResult"""
+        return None
