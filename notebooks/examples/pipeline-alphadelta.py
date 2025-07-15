@@ -18,7 +18,6 @@ from dask_jobqueue import SLURMCluster
 import matplotlib as mpl
 import seaborn as sns
 import seaborn.objects as so
-import pingouin as pg
 from okabeito import black, blue, green, lightblue, orange, purple, red, yellow
 from seaborn import axes_style
 from pythoneeg import constants, core, visualization
@@ -44,10 +43,11 @@ def load_war(animal_id):
         logger.info(f"Skipping {animal_id} because genotype is Unknown")
         return None
 
-    war.filter_all(bad_channels=["LHip", "RHip"])
+    # war.filter_all(bad_channels=["LHip", "RHip"])
     war.reorder_and_pad_channels(
-        ["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis", "LHip", "RHip"], use_abbrevs=True
+        ["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"], use_abbrevs=True
     )
+    war.filter_all()
     war.add_unique_hash()
     df = war.get_result(features=["psdband"])
     del war
@@ -65,19 +65,27 @@ df_bands = pd.DataFrame(df["psdband"].tolist())
 alpha_array = np.stack(df_bands["alpha"].values)
 delta_array = np.stack(df_bands["delta"].values)
 df["alphadelta"] = core.log_transform(alpha_array / delta_array).tolist()
+df["delta"] = core.log_transform(delta_array).tolist()
+df["alpha"] = core.log_transform(alpha_array).tolist()
 
-alphadelta_arrays = np.stack(df["alphadelta"].values)  # Shape: (time_points, channels)
-alphadelta_avg = np.nanmean(alphadelta_arrays, axis=1)  # Average across channels
-df["alphadelta_avg"] = alphadelta_avg
+# Average each feature across channels
+for feature in ["alphadelta", "delta", "alpha"]:
+    feature_arrays = np.stack(df[feature].values)  # Shape: (time_points, channels)
+    feature_avg = np.nanmean(feature_arrays, axis=1)  # Average across channels
+    df[f"{feature}"] = feature_avg
 logging.info(df.columns)
 
-df = df[["timestamp", "animal", "genotype", "alphadelta_avg"]]
+df = df[["timestamp", "animal", "genotype", "alphadelta", "delta", "alpha"]]
 df["hour"] = df["timestamp"].dt.hour.copy()
 df["minute"] = df["timestamp"].dt.minute.copy()
-df["total_minutes"] = 60 * round((df["hour"] * 60 + df["minute"]) / 60)
+df["total_minutes"] = 60 * (round((df["hour"] * 60 + df["minute"]) / 60) % 24)
 logging.info(df.columns)
 
-df = df.groupby(["animal", "genotype", "total_minutes"]).agg({"alphadelta_avg": "mean"}).reset_index()
+df = (
+    df.groupby(["animal", "genotype", "total_minutes"])
+    .agg({"alphadelta": "mean", "delta": "mean", "alpha": "mean"})
+    .reset_index()
+)
 # df = df.set_index("total_minutes")
 # df = df.copy()
 
@@ -85,7 +93,7 @@ logging.debug(df)
 logging.debug(df.shape)
 logger.setLevel(logging.WARNING)
 
-df.to_pickle(save_folder / "alphadelta_avg.pkl")
+df.to_pickle(save_folder / "alphadelta_avg_delta_alpha.pkl")
 
 
 """
