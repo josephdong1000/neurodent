@@ -6,7 +6,8 @@ import os
 import platform
 import re
 import sys
-from datetime import datetime
+import warnings
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Literal
 
@@ -574,3 +575,79 @@ class Natural_Neighbor(object):
             else:
                 r += 1
         return r
+
+class TimestampMapper:
+    """
+    Map each fragment to its source file's timestamp.
+    """
+
+    def __init__(self, file_end_datetimes: list[datetime], file_durations: list[float]):
+        """
+        Initialize the TimestampMapper.
+
+        Args:
+            file_end_datetimes (list[datetime]): The end datetimes of each file.
+            file_durations (list[float]): The durations of each file.
+        """
+        self.file_end_datetimes = file_end_datetimes
+        self.file_durations = file_durations
+
+        self.file_start_datetimes = [
+            file_end_datetime - timedelta(seconds=file_duration)
+            for file_end_datetime, file_duration in zip(self.file_end_datetimes, self.file_durations)
+        ]
+        self.cumulative_durations = np.cumsum(self.file_durations)
+
+    def get_fragment_timestamp(self, fragment_idx, fragment_len_s) -> datetime:
+        # Find which file this fragment belongs to
+        fragment_start_time = fragment_idx * fragment_len_s
+        file_idx = np.searchsorted(self.cumulative_durations, fragment_start_time)
+        file_idx = min(file_idx, len(self.cumulative_durations) - 1)
+
+        offset_in_file = fragment_start_time - self.cumulative_durations[file_idx]  # Negative
+
+        # Return actual timestamp + offset
+        return self.file_end_datetimes[file_idx] + timedelta(seconds=offset_in_file)
+
+
+def validate_timestamps(timestamps: list[datetime], gap_threshold_seconds: float = 60) -> list[datetime]:
+    """
+    Validate that timestamps are in chronological order and check for large gaps.
+
+    Args:
+        timestamps (list[datetime]): List of timestamps to validate
+        gap_threshold_seconds (float, optional): Threshold in seconds for warning about large gaps. Defaults to 60.
+
+    Returns:
+        list[datetime]: The validated timestamps in chronological order
+
+    Raises:
+        ValueError: If timestamps are not in chronological order
+        ValueError: If no valid timestamps are provided
+    """
+    if not timestamps:
+        raise ValueError("No timestamps provided for validation")
+
+    valid_timestamps = [ts for ts in timestamps if ts is not None]
+    if len(valid_timestamps) < len(timestamps):
+        warnings.warn(f"Found {len(timestamps) - len(valid_timestamps)} None timestamps that were filtered out")
+
+    if not valid_timestamps:
+        raise ValueError("No valid timestamps found (all were None)")
+
+    # Check chronological order
+    sorted_timestamps = sorted(valid_timestamps)
+    if valid_timestamps != sorted_timestamps:
+        raise ValueError("Timestamps are not in chronological order")
+
+    # Check for large gaps between consecutive timestamps
+    for i in range(1, len(valid_timestamps)):
+        gap = valid_timestamps[i] - valid_timestamps[i - 1]
+        gap_seconds = gap.total_seconds()
+
+        if gap_seconds > gap_threshold_seconds:
+            warnings.warn(
+                f"Large gap detected between timestamps: {gap} exceeds threshold of {gap_threshold_seconds} seconds"
+            )
+
+    return valid_timestamps
