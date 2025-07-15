@@ -51,6 +51,6 @@ __all__ = [
     "MountainSortAnalyzer",
     "FragmentAnalyzer",
     "log_transform",
-    "validate_timestamps",
     "TimestampMapper",
+    "validate_timestamps",
 ]
