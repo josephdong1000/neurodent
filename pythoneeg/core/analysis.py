@@ -67,6 +67,13 @@ class LongRecordingAnalyzer:
         rec = self.get_fragment_np(index, recobj=recobj)[..., np.newaxis]
         return np.transpose(rec, (2, 1, 0))  # (1 epoch, num_channels, num_samples)
 
+    def get_file_end(self, index, **kwargs):
+        tstart, tend = self.convert_idx_to_timebound(index)
+        for tfile in self.LongRecording.cumulative_file_durations:
+            if tstart <= tfile < tend:
+                return tfile - tstart
+        return None
+
     def compute_rms(self, index, **kwargs):
         """Compute average root mean square amplitude
 
@@ -366,17 +373,10 @@ class LongRecordingAnalyzer:
         rec = self.get_fragment_np(index)
         return FragmentAnalyzer.compute_zpcorr(rec=rec, f_s=self.f_s, lower_triag=lower_triag, **kwargs)
 
-    def get_file_end(self, index, **kwargs):
-        tstart, tend = self.convert_idx_to_timebound(index)
-        for tfile in self.LongRecording.cumulative_file_durations:
-            if tstart <= tfile < tend:
-                return tfile - tstart
-        return None
-
     def compute_nspike(self, index, **kwargs):
-        """Returns None. Compute and load in spikes with SpikeAnalysisResult"""
-        return None
-    
+        rec = self.get_fragment_np(index)
+        return FragmentAnalyzer.compute_nspike(rec=rec, f_s=self.f_s, **kwargs)
+
     def compute_lognspike(self, index, **kwargs):
-        """Returns None. Compute and load in spikes with SpikeAnalysisResult"""
-        return None
+        rec = self.get_fragment_np(index)
+        return FragmentAnalyzer.compute_lognspike(rec=rec, f_s=self.f_s, **kwargs)

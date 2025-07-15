@@ -354,6 +354,16 @@ class FragmentAnalyzer:
         pcorr = FragmentAnalyzer.compute_pcorr(rec, f_s, lower_triag, **kwargs)
         return np.arctanh(pcorr)
 
+    @staticmethod
+    def compute_nspike(rec: np.ndarray, **kwargs):
+        """Returns None. Compute and load in spikes with SpikeAnalysisResult"""
+        return None
+    
+    @staticmethod
+    def compute_lognspike(rec: np.ndarray, **kwargs):
+        """Returns None. Compute and load in spikes with SpikeAnalysisResult"""
+        return None
+
     # def compute_csd(self, index, magnitude=True, n_jobs=None, **kwargs) -> np.ndarray:
     #     rec = self.get_fragment_mne(index)
     #     csd = csd_array_fourier(rec, self.f_s,
