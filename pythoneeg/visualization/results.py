@@ -265,7 +265,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                     with h5py.File(tmppath, "r", libver="latest") as f:
                         np_fragments_reconstruct = da.from_array(
                             f["fragments"], chunks="100 MB"
-                        )  # NOTE allow the user to specify chunk size
+                        )  # NOTE maybe allow the user to specify chunk size
                         feature_values = [
                             delayed(FragmentAnalyzer._process_fragment_features_dask)(
                                 np_fragments_reconstruct[idx], lan.f_s, features, kwargs

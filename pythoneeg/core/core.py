@@ -64,7 +64,7 @@ class DDFBinaryMetadata:
         self.n_channels = len(self.metadata_df.index)
         self.f_s = self.__getsinglecolval(
             "SampleRate"
-        )  # NOTE when recordings are resampled, this should be updated. Or this should be completely removed from the pipeline, because of conflicting information
+        )  # NOTE this may not be the same as LongRecording (Recording object) f_s, which the name should reflect
         self.V_units = self.__getsinglecolval("Units")
         self.mult_to_uV = convert_units_to_multiplier(self.V_units)
         self.precision = self.__getsinglecolval("Precision")
