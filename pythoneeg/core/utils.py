@@ -622,7 +622,6 @@ def validate_timestamps(timestamps: list[datetime], gap_threshold_seconds: float
         list[datetime]: The validated timestamps in chronological order
 
     Raises:
-        ValueError: If timestamps are not in chronological order
         ValueError: If no valid timestamps are provided
     """
     if not timestamps:
@@ -638,7 +637,7 @@ def validate_timestamps(timestamps: list[datetime], gap_threshold_seconds: float
     # Check chronological order
     sorted_timestamps = sorted(valid_timestamps)
     if valid_timestamps != sorted_timestamps:
-        raise ValueError("Timestamps are not in chronological order")
+        warnings.warn("Timestamps are not in chronological order. This may cause issues with the data.")
 
     # Check for large gaps between consecutive timestamps
     for i in range(1, len(valid_timestamps)):

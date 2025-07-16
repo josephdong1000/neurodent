@@ -298,13 +298,13 @@ class AnimalOrganizer(AnimalFeatureParser):
 
             logging.debug("Validating timestamps")
             core.validate_timestamps(lan_df["timestamp"].tolist())
-            # lan_df.sort_values("timestamp", inplace=True) # REVIEW unsure if this was doing anything before the timestamp refactor
+            lan_df = lan_df.sort_values("timestamp").reset_index(drop=True)
 
             self.long_analyzers.append(lan)
             dataframes.append(lan_df)
 
         self.features_df = pd.concat(dataframes)
-        self.features_df = self.features_df.reset_index(drop=True)
+        self.features_df = self.features_df
 
         self.window_analysis_result = WindowAnalysisResult(
             self.features_df,
