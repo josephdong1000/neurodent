@@ -44,5 +44,6 @@ notebooks/tests/test_all_functions_Yong.ipynb
 *.dat
 .coverage
 .coverage.*
+coverage.xml
 
 site/
