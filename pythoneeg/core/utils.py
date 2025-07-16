@@ -35,10 +35,30 @@ def convert_units_to_multiplier(current_units, target_units="µV"):
 
 
 def is_day(dt: datetime, sunrise=6, sunset=18):
+    """
+    Check if a datetime object is during the day.
+    
+    Args:
+        dt (datetime): Datetime object to check
+        sunrise (int, optional): Sunrise hour (0-23). Defaults to 6.
+        sunset (int, optional): Sunset hour (0-23). Defaults to 18.
+        
+    Returns:
+        bool: True if the datetime is during the day, False otherwise
+        
+    Raises:
+        TypeError: If dt is not a datetime object
+    """
+    if not isinstance(dt, datetime):
+        raise TypeError(f"Expected datetime object, got {type(dt).__name__}")
     return sunrise <= dt.hour < sunset
 
 
 def convert_colpath_to_rowpath(rowdir_path, col_path, gzip=True, aspath=True):
+    # TODO it would make more sense to not have a rowdir_path aparameter, since this is outside the scope of the function
+    if not 'ColMajor' in col_path:
+        raise ValueError(f"Expected 'ColMajor' in col_path: {col_path}")
+
     out = Path(rowdir_path) / f"{Path(col_path).stem.replace('ColMajor', 'RowMajor')}"
     if gzip:
         out = str(out) + ".npy.gz"
@@ -48,10 +68,35 @@ def convert_colpath_to_rowpath(rowdir_path, col_path, gzip=True, aspath=True):
 
 
 def filepath_to_index(filepath) -> int:
+    """
+    Extract the index number from a filepath.
+
+    This function extracts the last number found in a filepath after removing common suffixes
+    and file extensions. For example, from "/path/to/data_ColMajor_001.bin" it returns 1.
+
+    Args:
+        filepath (str | Path): Path to the file to extract index from.
+
+    Returns:
+        int: The extracted index number.
+
+    Examples:
+        >>> filepath_to_index("/path/to/data_ColMajor_001.bin")
+        1
+        >>> filepath_to_index("/path/to/data_2023_015_ColMajor.bin") 
+        15
+        >>> filepath_to_index("/path/to/data_Meta_010.json")
+        10
+    """
     fpath = str(filepath)
     for suffix in ["_RowMajor", "_ColMajor", "_Meta"]:
         fpath = fpath.replace(suffix, "")
-    fpath = fpath.removesuffix("".join(Path(fpath).suffixes))
+    
+    # Remove only the actual file extension, not dots within the filename
+    path_obj = Path(fpath)
+    if path_obj.suffix:
+        fpath = str(path_obj.with_suffix(''))
+    
     fname = Path(fpath).name
     fname = re.split(r"\D+", fname)
     fname = list(filter(None, fname))
@@ -59,6 +104,22 @@ def filepath_to_index(filepath) -> int:
 
 
 def parse_truncate(truncate: int | bool) -> int:
+    """
+    Parse the truncate parameter to determine how many characters to truncate.
+
+    If truncate is a boolean, returns 10 if True and 0 if False.
+    If truncate is an integer, returns that integer value directly.
+
+    Args:
+        truncate (int | bool): If bool, True=10 chars and False=0 chars.
+                              If int, specifies exact number of chars.
+
+    Returns:
+        int: Number of characters to truncate (0 means no truncation)
+
+    Raises:
+        ValueError: If truncate is not a boolean or integer
+    """
     if isinstance(truncate, bool):
         return 10 if truncate else 0
     elif isinstance(truncate, int):
