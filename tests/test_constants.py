@@ -3,6 +3,7 @@ Unit tests for pythoneeg.constants module.
 """
 import pytest
 from datetime import datetime
+import numpy as np
 
 from pythoneeg import constants
 
@@ -67,7 +68,7 @@ class TestConstants:
     def test_global_constants(self):
         """Test global constants."""
         assert constants.GLOBAL_SAMPLING_RATE == 1000
-        assert constants.GLOBAL_DTYPE == "float32"
+        assert constants.GLOBAL_DTYPE == np.float32
         
     def test_feature_constants(self):
         """Test feature-related constants."""
