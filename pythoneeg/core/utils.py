@@ -154,8 +154,21 @@ def parse_path_to_animalday(
             list[str]: list of possible animal IDs to match against
         day_sep (str, optional): Separator for day in filename. Defaults to None.
         mode (Literal['nest', 'concat', 'base', 'noday'], optional): Mode to parse the filename. Defaults to 'concat'.
+            'nest': Extracts genotype/animal from parent directory name and date from filename
+                   e.g. "/WT_A10/recording_2023-04-01.*" 
+            'concat': Extracts all info from filename, expects genotype_animal_date format
+                     e.g. "/WT_A10_2023-04-01.*"
+            'base': Same as concat
+            'noday': Extracts only genotype and animal ID, uses default date
+                    e.g. "/WT_A10_recording.*"
+
     Returns:
         dict[str, str]: Dictionary with keys "animal", "genotype", "day", and "animalday" (concatenated).
+            Example: {"animal": "A10", "genotype": "WT", "day": "Apr-01-2023", "animalday": "A10 WT Apr-01-2023"}
+
+    Raises:
+        ValueError: If mode is invalid or required components cannot be extracted
+        TypeError: If filepath is not str or Path
     """
     filepath = Path(filepath)
     match mode:
