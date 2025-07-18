@@ -255,9 +255,9 @@ class FragmentAnalyzer:
         rec: np.ndarray,
         f_s: float,
         freq_res: float,
-        n_cycles_max: float,
         geomspace: bool,
         mode: Literal["cwt_morlet", "multitaper"],
+        cwt_n_cycles_max: float,
         epsilon: float,
     ) -> tuple[np.ndarray, np.ndarray]:
         """Get the frequencies and number of cycles for the signal.
@@ -265,7 +265,7 @@ class FragmentAnalyzer:
         """
         FragmentAnalyzer._check_rec_mne(rec)
 
-        if geomspace:
+        if geomspace: # REVIEW by default geomspace is True, but a linear scale is simpler for DOF calculation -> zcohere correction
             freqs = np.geomspace(
                 constants.FREQ_BAND_TOTAL[0],
                 constants.FREQ_BAND_TOTAL[1],
@@ -275,14 +275,15 @@ class FragmentAnalyzer:
             freqs = np.arange(constants.FREQ_BAND_TOTAL[0], constants.FREQ_BAND_TOTAL[1], freq_res)
 
         frag_len_s = rec.shape[2] / f_s
-        match mode:
-            case "cwt_morlet":
-                maximum_cyc = (frag_len_s * f_s + 1) * np.pi / 5 * freqs / f_s
-            case "multitaper":
-                maximum_cyc = frag_len_s * freqs
+        if mode == "cwt_morlet":
+            maximum_cyc = (frag_len_s * f_s + 1) * np.pi / 5 * freqs / f_s
+            maximum_cyc = maximum_cyc - epsilon  # Shave off a bit to avoid indexing errors
+            n_cycles = np.minimum(np.full(maximum_cyc.shape, cwt_n_cycles_max), maximum_cyc)
+        elif mode == "multitaper":
+            maximum_cyc = frag_len_s * freqs  # Maximize number of cycles for maximum frequency resolution
+            maximum_cyc = maximum_cyc - epsilon
+            n_cycles = maximum_cyc
 
-        maximum_cyc = maximum_cyc - epsilon  # Shave off a bit to avoid indexing errors
-        n_cycles = np.minimum(np.full(maximum_cyc.shape, n_cycles_max), maximum_cyc)
         return freqs, n_cycles
 
     @staticmethod
@@ -290,9 +291,10 @@ class FragmentAnalyzer:
         rec: np.ndarray,
         f_s: float,
         freq_res: float = 1,
-        n_cycles_max: float = 7,
-        geomspace: bool = True,
-        mode: Literal["cwt_morlet", "multitaper"] = "cwt_morlet",
+        mode: Literal["cwt_morlet", "multitaper"] = "multitaper",
+        geomspace: bool = False,
+        cwt_n_cycles_max: float = 7.0,
+        mt_bandwidth: float = 4.0,
         downsamp_q: int = 4,
         epsilon: float = 1e-2,
         **kwargs,
@@ -304,7 +306,15 @@ class FragmentAnalyzer:
         rec_mne = decimate(rec_mne, q=downsamp_q, axis=2)  # Along the time axis
         f_s = int(f_s / downsamp_q)
 
-        f, n_cycles = FragmentAnalyzer._get_freqs_cycles(rec_mne, f_s, freq_res, n_cycles_max, geomspace, mode, epsilon)
+        f, n_cycles = FragmentAnalyzer._get_freqs_cycles(
+            rec=rec_mne,
+            f_s=f_s,
+            freq_res=freq_res,
+            geomspace=geomspace,
+            mode=mode,
+            cwt_n_cycles_max=cwt_n_cycles_max,
+            epsilon=epsilon,
+        )
 
         try:
             con = spectral_connectivity_time(
@@ -318,6 +328,7 @@ class FragmentAnalyzer:
                 fmax=constants.FREQ_MAXS,
                 sfreq=f_s,
                 n_cycles=n_cycles,
+                mt_bandwidth=mt_bandwidth,
                 verbose=False,
             )
         except MemoryError as e:
@@ -330,6 +341,14 @@ class FragmentAnalyzer:
         for i in range(data.shape[1]):
             out[constants.BAND_NAMES[i]] = data[:, i].reshape((rec.shape[1], rec.shape[1]))
         return out
+
+    @staticmethod
+    def compute_zcohere(rec: np.ndarray, f_s: float, **kwargs) -> dict[str, np.ndarray]:
+        """Compute the Fisher z-transformed coherence of the signal."""
+        FragmentAnalyzer._check_rec_np(rec)
+
+        cohere = FragmentAnalyzer.compute_cohere(rec, f_s, **kwargs)
+        return {k: np.arctanh(v) for k, v in cohere.items()}
 
     @staticmethod
     def compute_pcorr(rec: np.ndarray, f_s: float, lower_triag: bool = True, **kwargs) -> np.ndarray:
@@ -347,11 +366,11 @@ class FragmentAnalyzer:
             return result.correlation
 
     @staticmethod
-    def compute_zpcorr(rec: np.ndarray, f_s: float, lower_triag: bool = True, **kwargs) -> np.ndarray:
+    def compute_zpcorr(rec: np.ndarray, f_s: float, **kwargs) -> np.ndarray:
         """Compute the Fisher z-transformed Pearson correlation coefficient of the signal."""
         FragmentAnalyzer._check_rec_np(rec)
 
-        pcorr = FragmentAnalyzer.compute_pcorr(rec, f_s, lower_triag, **kwargs)
+        pcorr = FragmentAnalyzer.compute_pcorr(rec, f_s, **kwargs)
         return np.arctanh(pcorr)
 
     @staticmethod

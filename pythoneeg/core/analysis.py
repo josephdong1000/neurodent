@@ -345,9 +345,10 @@ class LongRecordingAnalyzer:
         self,
         index,
         freq_res: float = 1,
-        n_cycles_max: float = 7,
-        geomspace: bool = True,
-        mode: Literal["cwt_morlet", "multitaper"] = "cwt_morlet",
+        mode: Literal["cwt_morlet", "multitaper"] = "multitaper",
+        geomspace: bool = False,
+        cwt_n_cycles_max: float = 7.0,
+        mt_bandwidth: float = 4.0,
         downsamp_q: int = 4,
         epsilon: float = 1e-2,
         **kwargs,
@@ -357,21 +358,26 @@ class LongRecordingAnalyzer:
             rec=rec,
             f_s=self.f_s,
             freq_res=freq_res,
-            n_cycles_max=n_cycles_max,
-            geomspace=geomspace,
             mode=mode,
+            geomspace=geomspace,
+            cwt_n_cycles_max=cwt_n_cycles_max,
+            mt_bandwidth=mt_bandwidth,
             downsamp_q=downsamp_q,
             epsilon=epsilon,
             **kwargs,
         )
 
+    def compute_zcohere(self, index, **kwargs) -> np.ndarray:
+        rec = self.get_fragment_np(index)
+        return FragmentAnalyzer.compute_zcohere(rec=rec, f_s=self.f_s, **kwargs)
+
     def compute_pcorr(self, index, lower_triag=True, **kwargs) -> np.ndarray:
         rec = self.get_fragment_np(index)
         return FragmentAnalyzer.compute_pcorr(rec=rec, f_s=self.f_s, lower_triag=lower_triag, **kwargs)
 
-    def compute_zpcorr(self, index, lower_triag=True, **kwargs) -> np.ndarray:
+    def compute_zpcorr(self, index, **kwargs) -> np.ndarray:
         rec = self.get_fragment_np(index)
-        return FragmentAnalyzer.compute_zpcorr(rec=rec, f_s=self.f_s, lower_triag=lower_triag, **kwargs)
+        return FragmentAnalyzer.compute_zpcorr(rec=rec, f_s=self.f_s, **kwargs)
 
     def compute_nspike(self, index, **kwargs):
         rec = self.get_fragment_np(index)
