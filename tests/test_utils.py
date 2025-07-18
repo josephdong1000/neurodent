@@ -459,7 +459,6 @@ class TestParsePathToAnimalday:
 
 
 class TestParseStrToGenotype:
-    # ANCHOR
     """Test parse_str_to_genotype function."""
     
     def test_wt_parsing(self):
@@ -476,6 +475,60 @@ class TestParseStrToGenotype:
         """Test no match handling."""
         with pytest.raises(ValueError):
             utils.parse_str_to_genotype("INVALID_A10_data")
+            
+    @patch('pythoneeg.constants.GENOTYPE_ALIASES', {
+        "HET": ["HET", "heterozygous", "het"],
+        "HOM": ["HOM", "homozygous", "hom"],
+        "CONTROL": ["CONTROL", "control", "CTRL"]
+    })
+    def test_custom_genotype_aliases(self):
+        """Test parsing with custom genotype aliases."""
+        assert utils.parse_str_to_genotype("HET_A10_data") == "HET"
+        assert utils.parse_str_to_genotype("heterozygous_A10_data") == "HET"
+        assert utils.parse_str_to_genotype("het_A10_data") == "HET"
+        
+        assert utils.parse_str_to_genotype("HOM_A10_data") == "HOM"
+        assert utils.parse_str_to_genotype("homozygous_A10_data") == "HOM"
+        assert utils.parse_str_to_genotype("hom_A10_data") == "HOM"
+        
+        assert utils.parse_str_to_genotype("CONTROL_A10_data") == "CONTROL"
+        assert utils.parse_str_to_genotype("control_A10_data") == "CONTROL"
+        assert utils.parse_str_to_genotype("CTRL_A10_data") == "CONTROL"
+        
+    @patch('pythoneeg.constants.GENOTYPE_ALIASES', {
+        "MUT": ["MUT", "mutant", "mutation"],
+        "WT": ["WT", "wildtype", "wild_type"]
+    })
+    def test_mutant_wildtype_aliases(self):
+        """Test parsing with mutant/wildtype aliases."""
+        assert utils.parse_str_to_genotype("MUT_A10_data") == "MUT"
+        assert utils.parse_str_to_genotype("mutant_A10_data") == "MUT"
+        assert utils.parse_str_to_genotype("mutation_A10_data") == "MUT"
+        
+        assert utils.parse_str_to_genotype("WT_A10_data") == "WT"
+        assert utils.parse_str_to_genotype("wildtype_A10_data") == "WT"
+        assert utils.parse_str_to_genotype("wild_type_A10_data") == "WT"
+        
+    @patch('pythoneeg.constants.GENOTYPE_ALIASES', {
+        "TRANSGENIC": ["TRANSGENIC", "transgenic", "transgene"],
+        "NON_TRANSGENIC": ["NON_TRANSGENIC", "non_transgenic", "non_transgene"]
+    })
+    def test_transgenic_aliases(self):
+        """Test parsing with transgenic aliases."""
+        assert utils.parse_str_to_genotype("TRANSGENIC_A10_data") == "TRANSGENIC"
+        assert utils.parse_str_to_genotype("transgenic_A10_data") == "TRANSGENIC"
+        assert utils.parse_str_to_genotype("transgene_A10_data") == "TRANSGENIC"
+        assert utils.parse_str_to_genotype("nontestcasetransgenetestcase_A10_data") == "TRANSGENIC"
+        
+        assert utils.parse_str_to_genotype("NON_TRANSGENIC_A10_data") == "NON_TRANSGENIC"
+        assert utils.parse_str_to_genotype("non_transgenic_A10_data") == "NON_TRANSGENIC"
+        assert utils.parse_str_to_genotype("non_transgene_A10_data") == "NON_TRANSGENIC"
+        
+    @patch('pythoneeg.constants.GENOTYPE_ALIASES', {})
+    def test_empty_aliases(self):
+        """Test parsing with empty genotype aliases."""
+        with pytest.raises(ValueError, match="does not have any matching values"):
+            utils.parse_str_to_genotype("WT_A10_data")
 
 
 class TestParseStrToAnimal:
@@ -511,6 +564,198 @@ class TestParseStrToAnimal:
         string = "WT_A10_Jan01_2023"
         with pytest.raises(ValueError, match="Invalid animal_param type"):
             utils.parse_str_to_animal(string, animal_param=123)
+            
+    # Tests for documentation examples
+    def test_documentation_tuple_examples(self):
+        """Test tuple format examples from documentation."""
+        # Example 1: WT_A10_2023-01-01_data.bin with (1, "_")
+        result1 = utils.parse_str_to_animal("WT_A10_2023-01-01_data.bin", (1, "_"))
+        assert result1 == "A10"
+        
+        # Example 2: WT_A10_recording.bin with (1, "_")
+        result2 = utils.parse_str_to_animal("WT_A10_recording.bin", (1, "_"))
+        assert result2 == "A10"
+        
+        # Example 3: A10_WT_recording.bin with (0, "_")
+        result3 = utils.parse_str_to_animal("A10_WT_recording.bin", (0, "_"))
+        assert result3 == "A10"
+        
+    def test_documentation_regex_examples(self):
+        """Test regex pattern examples from documentation."""
+        # Example 1: Pattern r"A\d+" matches "A" followed by any number of digits
+        # e.g. "A10" in "WT_A10_2023-01-01_data.bin"
+        result1 = utils.parse_str_to_animal("WT_A10_2023-01-01_data.bin", r"A\d+")
+        assert result1 == "A10"
+        
+        # Example 2: Pattern r"B\d+" matches "B" followed by any number of digits
+        # e.g. "B15" in "mouse_B15_recording.bin"
+        result2 = utils.parse_str_to_animal("mouse_B15_recording.bin", r"B\d+")
+        assert result2 == "B15"
+        
+        # Example 3: Pattern r"\d+" matches one or more consecutive digits
+        # e.g. "123" in "subject_123_data.bin"
+        result3 = utils.parse_str_to_animal("subject_123_data.bin", r"\d+")
+        assert result3 == "123"
+        
+        result4 = utils.parse_str_to_animal("subject_123_2025-01-01_data.bin", r"\d+")
+        assert result4 == "123"
+
+    def test_documentation_list_examples(self):
+        """Test list format examples from documentation."""
+        # Example 1: WT_A10_2023-01-01_data.bin with ["A10", "A11", "A12"]
+        result1 = utils.parse_str_to_animal("WT_A10_2023-01-01_data.bin", ["A10", "A11", "A12"])
+        assert result1 == "A10"
+        
+        # Example 2: KO_B15_recording.bin with ["A10", "B15", "C20"]
+        result2 = utils.parse_str_to_animal("KO_B15_recording.bin", ["A10", "B15", "C20"])
+        assert result2 == "B15"
+        
+        # Example 3: WT_A10_data.bin with ["B15", "C20"] - should raise error
+        with pytest.raises(ValueError, match="No matching ID found in WT_A10_data.bin from possible IDs: \\['B15', 'C20'\\]"):
+            utils.parse_str_to_animal("WT_A10_data.bin", ["B15", "C20"])
+            
+    def test_edge_cases(self):
+        """Test edge cases and variations."""
+        # Test with different separators
+        result1 = utils.parse_str_to_animal("WT-A10-Jan01-2023", (1, "-"))
+        assert result1 == "A10"
+        
+        # Test with multiple matches in regex (should return first match)
+        result2 = utils.parse_str_to_animal("A10_B15_C20_data.bin", r"[A-Z]\d+")
+        assert result2 == "A10"
+        
+        # Test with empty string in list (should not match)
+        with pytest.raises(ValueError, match="No matching ID found"):
+            utils.parse_str_to_animal("WT_A10_data.bin", ["", "B15"])
+            
+    def test_regex_no_match(self):
+        """Test regex pattern with no match."""
+        with pytest.raises(ValueError, match=r"No match found for pattern B\\d\+ in string WT_A10_data.bin"):
+            utils.parse_str_to_animal("WT_A10_data.bin", r"B\d+")
+            
+    def test_multiple_matches_list_mode(self):
+        """Test list mode when multiple IDs could match the string."""
+        # Test case 1: String contains multiple possible IDs
+        string = "WT_A10_B15_data.bin"
+        result = utils.parse_str_to_animal(string, ["A10", "B15", "C20"])
+        # Should return the first match found in the list order
+        assert result == "A10"
+        
+        # Test case 2: String contains multiple possible IDs in different order
+        string = "WT_B15_A10_data.bin"
+        result = utils.parse_str_to_animal(string, ["A10", "B15", "C20"])
+        # Should still return the first match found in the list order
+        assert result == "A10"
+        
+        # Test case 3: String contains multiple possible IDs, test with different list order
+        string = "WT_A10_B15_data.bin"
+        result = utils.parse_str_to_animal(string, ["B15", "A10", "C20"])
+        # Should return the first match found in the new list order
+        assert result == "B15"
+        
+    def test_partial_matches_list_mode(self):
+        """Test list mode with partial matches (substrings)."""
+        # Test case 1: One ID is a substring of another
+        string = "WT_A10_data.bin"
+        result = utils.parse_str_to_animal(string, ["A1", "A10", "A100"])
+        # Should return the first match found in the list order
+        assert result == "A1"
+        
+        # Test case 2: One ID is a substring of another, different order
+        string = "WT_A10_data.bin"
+        result = utils.parse_str_to_animal(string, ["A10", "A1", "A100"])
+        # Should return the first match found in the list order
+        assert result == "A10"
+        
+    def test_case_sensitivity_list_mode(self):
+        """Test list mode with case sensitivity."""
+        # Test case 1: Case sensitive matching
+        string = "WT_a10_data.bin"
+        result = utils.parse_str_to_animal(string, ["a10", "A10", "b15"])
+        # Should return the first case-sensitive match
+        assert result == "a10"
+        
+        # Test case 2: No case-sensitive match
+        string = "WT_a10_data.bin"
+        with pytest.raises(ValueError, match="No matching ID found"):
+            utils.parse_str_to_animal(string, ["A10", "B15"])
+            
+    def test_empty_and_whitespace_list_mode(self):
+        """Test list mode with empty strings and whitespace."""
+        # Test case 1: Empty strings in list (should be ignored)
+        string = "WT_A10_data.bin"
+        result = utils.parse_str_to_animal(string, ["", "A10", "   ", "B15"])
+        # Should return the first non-empty match
+        assert result == "A10"
+        
+        # Test case 2: Whitespace-only strings in list (should be ignored)
+        string = "WT_A10_data.bin"
+        result = utils.parse_str_to_animal(string, ["   ", "A10", "\t", "B15"])
+        # Should return the first non-whitespace match
+        assert result == "A10"
+        
+        # Test case 3: All empty/whitespace strings
+        string = "WT_A10_data.bin"
+        with pytest.raises(ValueError, match="No matching ID found"):
+            utils.parse_str_to_animal(string, ["", "   ", "\t", "\n"])
+            
+    def test_whitespace_in_string_list_mode(self):
+        """Test list mode when the input string contains whitespace."""
+        # Test case 1: String with leading/trailing whitespace
+        string = "  WT_A10_data.bin  "
+        result = utils.parse_str_to_animal(string, ["A10", "B15"])
+        # Should still match "A10" even with whitespace
+        assert result == "A10"
+        
+        # Test case 2: String with internal whitespace
+        string = "WT A10 data.bin"
+        result = utils.parse_str_to_animal(string, ["A10", "B15"])
+        # Should still match "A10" even with internal whitespace
+        assert result == "A10"
+        
+        # Test case 3: String with tabs and newlines
+        string = "WT\tA10\ndata.bin"
+        result = utils.parse_str_to_animal(string, ["A10", "B15"])
+        # Should still match "A10" even with tabs and newlines
+        assert result == "A10"
+        
+        # Test case 4: String with mixed whitespace characters
+        string = "  WT  A10  data.bin  "
+        result = utils.parse_str_to_animal(string, ["A10", "B15"])
+        # Should still match "A10" even with mixed whitespace
+        assert result == "A10"
+        
+    def test_whitespace_in_list_items(self):
+        """Test list mode when the list items contain whitespace."""
+        # Test case 1: List items with leading/trailing whitespace - exact match required
+        string = "WT  A10  data.bin"
+        result = utils.parse_str_to_animal(string, ["  A10  ", "B15"])
+        # Should match "  A10  " because it's an exact substring match
+        assert result == "  A10  "
+        
+        # Test case 2: List items with internal whitespace - exact match required
+        string = "WT A 10 data.bin"
+        result = utils.parse_str_to_animal(string, ["A 10", "B15"])
+        # Should match "A 10" because it's an exact substring match
+        assert result == "A 10"
+        
+        # Test case 3: List items with tabs and newlines - exact match required
+        string = "WT\tA10\ndata.bin"
+        result = utils.parse_str_to_animal(string, ["\tA10\n", "B15"])
+        # Should match "\tA10\n" because it's an exact substring match
+        assert result == "\tA10\n"
+        
+        # Test case 4: No match when whitespace doesn't align exactly
+        string = "WT_A10_data.bin"
+        # Should not match " A10 " because the string doesn't have leading/trailing spaces
+        with pytest.raises(ValueError, match="No matching ID found"):
+            utils.parse_str_to_animal(string, [" A10 ", "B15"])
+        
+        # Test case 5: Whitespace in string but not in list item
+        string = "WT  A10  data.bin"
+        result = utils.parse_str_to_animal(string, ["A10", "B15"])
+        # Should match "A10" because it's a substring of "  A10  "
+        assert result == "A10"
 
 
 class TestParseStrToDay:
