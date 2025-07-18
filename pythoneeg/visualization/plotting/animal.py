@@ -215,7 +215,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
             case "psdslope":
                 data_X = np.array(group[feature].to_list())
                 data_X[:, :, 0] = -data_X[:, :, 0]
-            case "cohere":
+            case "cohere" | "zcohere":
                 data_X = np.array([list(d.values()) for d in group[feature]])
                 data_X = np.stack(data_X, axis=-1)
                 if triag:
@@ -286,7 +286,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
     ):
         if features is None:
             features = constants.MATRIX_FEATURES.copy()
-        height_ratios = {"cohere": 5, "pcorr": 1, "zpcorr": 1}
+        height_ratios = {"cohere": 5, "zcohere": 5, "pcorr": 1, "zpcorr": 1}
 
         df_rowgroup = self.window_result.get_grouprows_result(features, multiindex=multiindex)
         for feature in features:

@@ -212,7 +212,7 @@ def load_war(animal_id):
     bad_channels = list(required_channels)
 
     war.filter_all(bad_channels=bad_channels)
-    war.aggregate_time_windows(groupby=["animalday", "isday"])
+    war.aggregate_time_windows(groupby=["animalday", "isday"])  # Not grouping by isday to increase statistical power
     # war.add_unique_hash(4)
     war.reorder_and_pad_channels(
         ["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis", "LHip", "RHip"], use_abbrevs=True

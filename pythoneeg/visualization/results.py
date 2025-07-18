@@ -57,7 +57,7 @@ class AnimalFeatureParser:
                 col_agg = np.array(column.tolist())
                 avg = core.nanaverage(col_agg, axis=0, weights=weights)
 
-            case "cohere" | "psdband" | "psdfrac" | "logpsdband" | "logpsdfrac":
+            case "cohere" | "zcohere" | "psdband" | "psdfrac" | "logpsdband" | "logpsdfrac":
                 keys = colitem.keys()
                 avg = {}
                 for k in keys:
@@ -256,16 +256,15 @@ class AnimalOrganizer(AnimalFeatureParser):
                         )
                     del np_fragments  # cleanup memory
 
-                    # This is not parallelized
                     logging.debug("Processing metadata serially")
                     metadatas = [self._process_fragment_metadata(idx, lan, window_s) for idx in range(n_fragments_war)]
+                    meta_df = pd.DataFrame(metadatas)
 
-                    # Process fragments in parallel using Dask
                     logging.debug("Processing features in parallel")
                     with h5py.File(tmppath, "r", libver="latest") as f:
                         np_fragments_reconstruct = da.from_array(
                             f["fragments"], chunks="100 MB"
-                        )  # NOTE allow the user to specify chunk size
+                        )  # NOTE maybe allow the user to specify chunk size
                         feature_values = [
                             delayed(FragmentAnalyzer._process_fragment_features_dask)(
                                 np_fragments_reconstruct[idx], lan.f_s, features, kwargs
@@ -285,7 +284,7 @@ class AnimalOrganizer(AnimalFeatureParser):
 
                     # Combine metadata and feature values
                     logging.debug("Combining metadata and feature values")
-                    meta_df = pd.DataFrame(metadatas)
+
                     feat_df = pd.DataFrame(feature_values)
                     lan_df = pd.concat([meta_df, feat_df], axis=1)
 
@@ -296,13 +295,16 @@ class AnimalOrganizer(AnimalFeatureParser):
                         lan_df.append(self._process_fragment_serial(idx, features, lan, window_s, kwargs))
 
             lan_df = pd.DataFrame(lan_df)
-            lan_df.sort_values("timestamp", inplace=True)
+
+            logging.debug("Validating timestamps")
+            core.validate_timestamps(lan_df["timestamp"].tolist())
+            lan_df = lan_df.sort_values("timestamp").reset_index(drop=True)
 
             self.long_analyzers.append(lan)
             dataframes.append(lan_df)
 
         self.features_df = pd.concat(dataframes)
-        self.features_df = self.features_df.reset_index(drop=True)
+        self.features_df = self.features_df
 
         self.window_analysis_result = WindowAnalysisResult(
             self.features_df,
@@ -550,7 +552,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                         result[feature] = [list(x) for x in new_vals]
 
                 case _ if feature in constants.MATRIX_FEATURES:
-                    if feature == "cohere":
+                    if feature == "cohere" or feature == "zcohere":
                         df_bands = pd.DataFrame(result[feature].tolist())
                         vals = np.array(df_bands.values.tolist())
                         keys = df_bands.keys()
@@ -573,7 +575,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     new_vals += new_vals.transpose((*range(new_vals.ndim - 2), -1, -2))
                     new_vals[..., triu_mask[0], triu_mask[1]] = 0
 
-                    if feature == "cohere":
+                    if feature == "cohere" or feature == "zcohere":
                         result[feature] = [dict(zip(keys, vals)) for vals in new_vals]
                     else:
                         result[feature] = [list(x) for x in new_vals]
@@ -1018,7 +1020,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     vals[~mask] = np.nan
                     # vals = [list(map(tuple, x)) for x in vals.tolist()]
                     result[feat] = vals.tolist()
-                case "cohere":
+                case "cohere" | "zcohere":
                     vals = pd.DataFrame(result[feat].tolist())
                     shape = np.array(vals.iloc[:, 0].tolist()).shape
                     mask = np.broadcast_to(filter_tfs[:, :, np.newaxis], shape)

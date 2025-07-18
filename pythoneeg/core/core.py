@@ -23,6 +23,7 @@ from sklearn.neighbors import LocalOutlierFactor
 from .. import constants
 from .utils import (
     Natural_Neighbor,
+    TimestampMapper,
     convert_colpath_to_rowpath,
     convert_units_to_multiplier,
     filepath_to_index,
@@ -64,7 +65,7 @@ class DDFBinaryMetadata:
         self.n_channels = len(self.metadata_df.index)
         self.f_s = self.__getsinglecolval(
             "SampleRate"
-        )  # NOTE when recordings are resampled, this should be updated. Or this should be completely removed from the pipeline, because of conflicting information
+        )  # NOTE this may not be the same as LongRecording (Recording object) f_s, which the name should reflect
         self.V_units = self.__getsinglecolval("Units")
         self.mult_to_uV = convert_units_to_multiplier(self.V_units)
         self.precision = self.__getsinglecolval("Precision")
@@ -228,8 +229,9 @@ class LongRecordingOrganizer:
         self.channel_names = None
         self.LongRecording = None
         self.temppaths = []
-        self.start_datetime = None
-        self.end_relative = []
+        # self.start_datetime = None
+        self.file_durations = []
+        self.cumulative_file_durations = []
         self.bad_channel_names = []
 
         # Load data if mode is specified
@@ -290,12 +292,10 @@ class LongRecordingOrganizer:
 
         self.channel_names = self.meta.channel_names
 
-        dt_ends = [x.dt_end for x in self.__metadata_objects]
-        if all(x is None for x in dt_ends):
+        file_end_datetimes = [x.dt_end for x in self.__metadata_objects]
+        if all(x is None for x in file_end_datetimes):
             raise ValueError("No dates found in any metadata object!")
-
-        self._median_datetime = statistics.median_low(pd.Series(dt_ends).dropna())
-        self._idx_median_datetime = dt_ends.index(self._median_datetime)
+        self.file_end_datetimes = file_end_datetimes
 
     def _truncate_file_list(
         self, files: list[Union[str, Path]], ref_list: list[Union[str, Path]] = None
@@ -467,20 +467,22 @@ class LongRecordingOrganizer:
             )
 
         recs = []
-        self.end_relative = []
-        t_to_median = 0
         t_cumulative = 0
         self.temppaths = []
 
         match multiprocess_mode:
             case "dask":
-                # Create delayed objects for parallel processing
+                # Compute all conversions in parallel
                 delayed_results = []
                 for i, e in enumerate(self.rowbins):
-                    delayed_results.append(dask.delayed(convert_ddfrowbin_to_si)(e, self.meta))
+                    delayed_results.append((i, dask.delayed(convert_ddfrowbin_to_si)(e, self.meta)))
+                computed_results = dask.compute(*delayed_results)
 
-                # Compute all conversions in parallel
-                results = dask.compute(*delayed_results)
+                # Reconstruct results in the correct order
+                results = [None] * len(self.rowbins)
+                for i, result in computed_results:
+                    results[i] = result
+                logging.info(f"self.rowbins: {[Path(x).name for x in self.rowbins]}")
 
             case "serial":
                 results = [convert_ddfrowbin_to_si(e, self.meta) for e in self.rowbins]
@@ -492,10 +494,11 @@ class LongRecordingOrganizer:
             recs.append(rec)
             self.temppaths.append(temppath)
 
-            if i <= self._idx_median_datetime:
-                t_to_median += rec.get_duration()
-            t_cumulative += rec.get_duration()
-            self.end_relative.append(t_cumulative)
+            duration = rec.get_duration()
+            self.file_durations.append(duration)
+
+            t_cumulative += duration  # NOTE  use numpy cumsum later
+            self.cumulative_file_durations.append(t_cumulative)
 
         if not recs:
             raise ValueError("No recordings generated. Check that all row-major files are present and readable.")
@@ -503,7 +506,7 @@ class LongRecordingOrganizer:
             logging.warning(f"Only {len(recs)} recordings generated. Some row-major files may be missing.")
 
         self.LongRecording: si.BaseRecording = si.concatenate_recordings(recs).rename_channels(self.channel_names)
-        self.start_datetime = self._median_datetime - timedelta(seconds=t_to_median)
+
 
     def convert_file_with_si_to_recording(
         self,
@@ -654,10 +657,33 @@ class LongRecordingOrganizer:
         return self.__idx_to_time(endidx) - self.__idx_to_time(startidx)
 
     def get_datetime_fragment(self, fragment_len_s, fragment_idx):
-        idx, _ = self.__fragidx_to_startendind(fragment_len_s, fragment_idx)
-        return self.start_datetime + timedelta(seconds=self.__idx_to_time(idx))
+        """
+        Get the datetime for a specific fragment using the timestamp mapper.
+
+        Args:
+            fragment_len_s (float): Length of each fragment in seconds
+            fragment_idx (int): Index of the fragment to get datetime for
+
+        Returns:
+            datetime: The datetime corresponding to the start of the fragment
+
+        Raises:
+            ValueError: If timestamp mapper is not initialized (only available in 'bin' mode)
+        """
+        return TimestampMapper(self.file_end_datetimes, self.file_durations).get_fragment_timestamp(
+            fragment_idx, fragment_len_s
+        )
 
     def __fragidx_to_startendind(self, fragment_len_s, fragment_idx):
+        """Convert fragment index to start and end sample indices.
+
+        Args:
+            fragment_len_s (float): Length of each fragment in seconds
+            fragment_idx (int): Index of the fragment to get indices for
+
+        Returns:
+            tuple[int, int]: Start and end sample indices for the fragment. The end index is capped at the recording length.
+        """
         frag_len_idx = self.__time_to_idx(fragment_len_s)
         startidx = frag_len_idx * fragment_idx
         endidx = min(frag_len_idx * (fragment_idx + 1), self.LongRecording.get_num_frames())

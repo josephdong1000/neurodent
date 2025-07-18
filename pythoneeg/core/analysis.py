@@ -21,9 +21,7 @@ class LongRecordingAnalyzer:
         self.channel_names = longrecording.channel_names
         self.n_channels = longrecording.meta.n_channels
         self.mult_to_uV = longrecording.meta.mult_to_uV
-        self.f_s = int(
-            longrecording.LongRecording.get_sampling_frequency()
-        )  # FIXME this does not update correctly when longrecording is resampled
+        self.f_s = int(longrecording.LongRecording.get_sampling_frequency())
         self.notch_freq = notch_freq
 
     def get_fragment_rec(self, index) -> si.BaseRecording:
@@ -68,6 +66,13 @@ class LongRecordingAnalyzer:
         """
         rec = self.get_fragment_np(index, recobj=recobj)[..., np.newaxis]
         return np.transpose(rec, (2, 1, 0))  # (1 epoch, num_channels, num_samples)
+
+    def get_file_end(self, index, **kwargs):
+        tstart, tend = self.convert_idx_to_timebound(index)
+        for tfile in self.LongRecording.cumulative_file_durations:
+            if tstart <= tfile < tend:
+                return tfile - tstart
+        return None
 
     def compute_rms(self, index, **kwargs):
         """Compute average root mean square amplitude
@@ -340,9 +345,10 @@ class LongRecordingAnalyzer:
         self,
         index,
         freq_res: float = 1,
-        n_cycles_max: float = 7,
-        geomspace: bool = True,
-        mode: Literal["cwt_morlet", "multitaper"] = "cwt_morlet",
+        mode: Literal["cwt_morlet", "multitaper"] = "multitaper",
+        geomspace: bool = False,
+        cwt_n_cycles_max: float = 7.0,
+        mt_bandwidth: float = 4.0,
         downsamp_q: int = 4,
         epsilon: float = 1e-2,
         **kwargs,
@@ -352,25 +358,31 @@ class LongRecordingAnalyzer:
             rec=rec,
             f_s=self.f_s,
             freq_res=freq_res,
-            n_cycles_max=n_cycles_max,
-            geomspace=geomspace,
             mode=mode,
+            geomspace=geomspace,
+            cwt_n_cycles_max=cwt_n_cycles_max,
+            mt_bandwidth=mt_bandwidth,
             downsamp_q=downsamp_q,
             epsilon=epsilon,
             **kwargs,
         )
 
+    def compute_zcohere(self, index, **kwargs) -> np.ndarray:
+        rec = self.get_fragment_np(index)
+        return FragmentAnalyzer.compute_zcohere(rec=rec, f_s=self.f_s, **kwargs)
+
     def compute_pcorr(self, index, lower_triag=True, **kwargs) -> np.ndarray:
         rec = self.get_fragment_np(index)
         return FragmentAnalyzer.compute_pcorr(rec=rec, f_s=self.f_s, lower_triag=lower_triag, **kwargs)
 
-    def compute_zpcorr(self, index, lower_triag=True, **kwargs) -> np.ndarray:
+    def compute_zpcorr(self, index, **kwargs) -> np.ndarray:
         rec = self.get_fragment_np(index)
-        return FragmentAnalyzer.compute_zpcorr(rec=rec, f_s=self.f_s, lower_triag=lower_triag, **kwargs)
+        return FragmentAnalyzer.compute_zpcorr(rec=rec, f_s=self.f_s, **kwargs)
 
-    def get_file_end(self, index, **kwargs):
-        tstart, tend = self.convert_idx_to_timebound(index)
-        for tfile in self.LongRecording.end_relative:
-            if tstart <= tfile < tend:
-                return tfile - tstart
-        return None
+    def compute_nspike(self, index, **kwargs):
+        rec = self.get_fragment_np(index)
+        return FragmentAnalyzer.compute_nspike(rec=rec, f_s=self.f_s, **kwargs)
+
+    def compute_lognspike(self, index, **kwargs):
+        rec = self.get_fragment_np(index)
+        return FragmentAnalyzer.compute_lognspike(rec=rec, f_s=self.f_s, **kwargs)

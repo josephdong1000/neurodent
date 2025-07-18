@@ -80,7 +80,7 @@ LINEAR_FEATURES = [
     "lognspike",
 ]
 BAND_FEATURES = ["psdband", "psdfrac"] + ["logpsdband", "logpsdfrac"]
-MATRIX_FEATURES = ["cohere", "pcorr", "zpcorr"]
+MATRIX_FEATURES = ["cohere", "zcohere", "pcorr", "zpcorr"]
 HIST_FEATURES = ["psd"]
 FEATURES = LINEAR_FEATURES + BAND_FEATURES + MATRIX_FEATURES + HIST_FEATURES
 WAR_FEATURES = [f for f in FEATURES if "nspike" not in f]

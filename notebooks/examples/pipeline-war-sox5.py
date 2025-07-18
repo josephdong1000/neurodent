@@ -57,7 +57,10 @@ with open(base_folder / "notebooks" / "tests" / "sox5 combine genotypes.json", "
     data = json.load(f)
 data_parent_folder = Path(data['data_parent_folder'])
 constants.GENOTYPE_ALIASES = data['GENOTYPE_ALIASES']
-data_folders_to_animal_ids = data['data_folders_to_animal_ids']
+# data_folders_to_animal_ids = data["data_folders_to_animal_ids"]
+# Get only the second half of the dictionary items
+items = list(data["data_folders_to_animal_ids"].items())
+data_folders_to_animal_ids = dict(items[len(items) // 2 :])  # 1/2
 
 # constants.SORTING_PARAMS['freq_min'] = 60
 # constants.SORTING_PARAMS['freq_max'] = 400
@@ -82,6 +85,7 @@ for data_folder, animal_ids in tqdm(data_folders_to_animal_ids.items(), desc="Pr
             ao.compute_bad_channels(lof_threshold=2)
 
             # SECTION 2: Make WAR
+            # war = ao.compute_windowed_analysis(['all'], multiprocess_mode='dask')
             war = ao.compute_windowed_analysis(['all'], multiprocess_mode='dask')
             # !SECTION
 
@@ -97,7 +101,7 @@ for data_folder, animal_ids in tqdm(data_folders_to_animal_ids.items(), desc="Pr
 
         # SECTION 4: Save WARs and cleanup
         war.save_pickle_and_json(
-            base_folder / "notebooks" / "tests" / "test-wars-sox5-6" / f"{data_folder} {animal_id}"
+            base_folder / "notebooks" / "tests" / "test-wars-sox5-7" / f"{data_folder} {animal_id}"
         )
         del war
         # del sars
