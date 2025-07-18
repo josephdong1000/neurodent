@@ -47,9 +47,10 @@ def load_war(animal_id):
     war.reorder_and_pad_channels(
         ["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"], use_abbrevs=True
     )
+    # war.filter_all(filters=[war.get_filter_reject_channels_by_recording_session])
     war.filter_all()
     war.add_unique_hash()
-    df = war.get_result(features=["psdband"])
+    df = war.get_result(features=["logpsdband", "logrms"])
     del war
     return df
 
@@ -61,21 +62,22 @@ with Pool(10) as pool:
             dfs.append(df)
     df = pd.concat(dfs)
 
-df_bands = pd.DataFrame(df["psdband"].tolist())
+df_bands = pd.DataFrame(df["logpsdband"].tolist())
 alpha_array = np.stack(df_bands["alpha"].values)
 delta_array = np.stack(df_bands["delta"].values)
-df["alphadelta"] = core.log_transform(alpha_array / delta_array).tolist()
-df["delta"] = core.log_transform(delta_array).tolist()
-df["alpha"] = core.log_transform(alpha_array).tolist()
+df["alphadelta"] = (alpha_array / delta_array).tolist()
+df["delta"] = (delta_array).tolist()
+df["alpha"] = (alpha_array).tolist()
+
 
 # Average each feature across channels
-for feature in ["alphadelta", "delta", "alpha"]:
+for feature in ["alphadelta", "delta", "alpha", "rms"]:
     feature_arrays = np.stack(df[feature].values)  # Shape: (time_points, channels)
     feature_avg = np.nanmean(feature_arrays, axis=1)  # Average across channels
     df[f"{feature}"] = feature_avg
 logging.info(df.columns)
 
-df = df[["timestamp", "animal", "genotype", "alphadelta", "delta", "alpha"]]
+df = df[["timestamp", "animal", "genotype", "alphadelta", "delta", "alpha", "rms"]]
 df["hour"] = df["timestamp"].dt.hour.copy()
 df["minute"] = df["timestamp"].dt.minute.copy()
 df["total_minutes"] = 60 * (round((df["hour"] * 60 + df["minute"]) / 60) % 24)
@@ -83,7 +85,7 @@ logging.info(df.columns)
 
 df = (
     df.groupby(["animal", "genotype", "total_minutes"])
-    .agg({"alphadelta": "mean", "delta": "mean", "alpha": "mean"})
+    .agg({"alphadelta": "mean", "delta": "mean", "alpha": "mean", "rms": "mean"})
     .reset_index()
 )
 # df = df.set_index("total_minutes")
@@ -93,7 +95,9 @@ logging.debug(df)
 logging.debug(df.shape)
 logger.setLevel(logging.WARNING)
 
-df.to_pickle(save_folder / "alphadelta_avg_delta_alpha.pkl")
+df.to_pickle(save_folder / "alphadelta_avg_delta_alpha_rms.pkl")
+# df.to_pickle(save_folder / "alphadelta_avg_delta_alpha_minimally_filtered.pkl")
+# df.to_pickle(save_folder / "alphadelta_avg_delta_alpha_nolog.pkl")
 
 
 """
