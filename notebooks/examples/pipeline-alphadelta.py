@@ -35,6 +35,15 @@ save_folder = base_folder / "notebooks" / "examples"
 
 animal_ids = [p.name for p in load_folder.glob("*") if p.is_dir()]
 
+bad_animal_ids = [
+    "013122_cohort4_group7_2mice both_FHET FHET(2)",
+    "012322_cohort4_group6_3mice_FMUT___MMUT_MWT MHET",
+    "012322_cohort4_group6_3mice_FMUT___MMUT_MWT MMUT",
+    "011622_cohort4_group4_3mice_MMutOLD_FMUT_FMUT_FWT OLDMMT",
+    "011322_cohort4_group3_4mice_AllM_MT_WT_HET_WT M3",
+    "012322_cohort4_group6_3mice_FMUT___MMUT_MWT FHET"
+]
+animal_ids = [p for p in animal_ids if p not in bad_animal_ids]
 
 def load_war(animal_id):
     logger.info(f"Loading {animal_id}")
@@ -49,8 +58,9 @@ def load_war(animal_id):
     )
     # war.filter_all(filters=[war.get_filter_reject_channels_by_recording_session])
     war.filter_all()
-    war.add_unique_hash()
+    # war.add_unique_hash()
     df = war.get_result(features=["logpsdband", "logrms"])
+    df["animal"] = animal_id
     del war
     return df
 
@@ -71,13 +81,13 @@ df["alpha"] = (alpha_array).tolist()
 
 
 # Average each feature across channels
-for feature in ["alphadelta", "delta", "alpha", "rms"]:
+for feature in ["alphadelta", "delta", "alpha", "logrms"]:
     feature_arrays = np.stack(df[feature].values)  # Shape: (time_points, channels)
     feature_avg = np.nanmean(feature_arrays, axis=1)  # Average across channels
     df[f"{feature}"] = feature_avg
 logging.info(df.columns)
 
-df = df[["timestamp", "animal", "genotype", "alphadelta", "delta", "alpha", "rms"]]
+df = df[["timestamp", "animal", "genotype", "alphadelta", "delta", "alpha", "logrms"]]
 df["hour"] = df["timestamp"].dt.hour.copy()
 df["minute"] = df["timestamp"].dt.minute.copy()
 df["total_minutes"] = 60 * (round((df["hour"] * 60 + df["minute"]) / 60) % 24)
@@ -85,7 +95,7 @@ logging.info(df.columns)
 
 df = (
     df.groupby(["animal", "genotype", "total_minutes"])
-    .agg({"alphadelta": "mean", "delta": "mean", "alpha": "mean", "rms": "mean"})
+    .agg({"alphadelta": "mean", "delta": "mean", "alpha": "mean", "logrms": "mean"})
     .reset_index()
 )
 # df = df.set_index("total_minutes")
