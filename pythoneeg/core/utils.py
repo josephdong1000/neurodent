@@ -143,6 +143,7 @@ def parse_path_to_animalday(
     animal_param: tuple[int, str] | str | list[str] = (0, None),
     day_sep: str | None = None,
     mode: Literal["nest", "concat", "base", "noday"] = "concat",
+    **day_parse_kwargs,
 ):
     """
     Parses the filename of a binfolder to get the animalday identifier (animal id, genotype, and day).
@@ -162,6 +163,8 @@ def parse_path_to_animalday(
             'base': Same as concat
             'noday': Extracts only genotype and animal ID, uses default date
                     e.g. "/WT_A10_recording.*"
+        **day_parse_kwargs: Additional keyword arguments to pass to parse_str_to_day function.
+                           Common options include parse_params dict for dateutil.parser.parse.
 
     Returns:
         dict[str, str]: Dictionary with keys "animal", "genotype", "day", and "animalday" (concatenated).
@@ -176,11 +179,11 @@ def parse_path_to_animalday(
         case "nest":
             geno = parse_str_to_genotype(filepath.parent.name)
             animid = parse_str_to_animal(filepath.parent.name, animal_param=animal_param)
-            day = parse_str_to_day(filepath.name, sep=day_sep).strftime("%b-%d-%Y")
+            day = parse_str_to_day(filepath.name, sep=day_sep, **day_parse_kwargs).strftime("%b-%d-%Y")
         case "concat" | "base":
             geno = parse_str_to_genotype(filepath.name)
             animid = parse_str_to_animal(filepath.name, animal_param=animal_param)
-            day = parse_str_to_day(filepath.name, sep=day_sep).strftime("%b-%d-%Y")
+            day = parse_str_to_day(filepath.name, sep=day_sep, **day_parse_kwargs).strftime("%b-%d-%Y")
         case "noday":
             geno = parse_str_to_genotype(filepath.name)
             animid = parse_str_to_animal(filepath.name, animal_param=animal_param)
@@ -262,7 +265,7 @@ def parse_str_to_animal(string: str, animal_param: tuple[int, str] | str | list[
         raise ValueError(f"Invalid animal_param type: {type(animal_param)}")
 
 
-def parse_str_to_day(string: str, sep: str = None, parse_params: dict = {"fuzzy": True}) -> datetime:
+def parse_str_to_day(string: str, sep: str = None, parse_params: dict = None, parse_mode: Literal["full", "split", "window", "all"] = "split") -> datetime:
     """
     Parses the filename of a binfolder to get the day.
 
@@ -270,26 +273,70 @@ def parse_str_to_day(string: str, sep: str = None, parse_params: dict = {"fuzzy"
         string (str): String to parse.
         sep (str, optional): Separator to split string by. If None, split by whitespace. Defaults to None.
         parse_params (dict, optional): Parameters to pass to dateutil.parser.parse. Defaults to {'fuzzy':True}.
-
+        parse_mode (Literal["full", "split", "window", "all"], optional): Mode for parsing the string. Defaults to "split".
+            "full": Try parsing the entire cleaned string only
+            "split": Try parsing individual tokens only
+            "window": Try parsing sliding windows of tokens (2-4 tokens) only
+            "all": Use all three approaches in sequence
     Returns:
         datetime: Datetime object corresponding to the day of the binfolder.
 
     Raises:
         ValueError: If no valid date token is found in the string.
+        
+    Note:
+        The function is designed to be conservative to avoid false positives.
+        Some complex date formats may parse with the default year (2000) instead
+        of the actual year in the string, which is acceptable behavior for
+        maintaining safety against false positives.
     """
+    if parse_params is None:
+        parse_params = {"fuzzy": True}
+    
+    # Validate parse_mode
+    valid_modes = ["full", "split", "window", "all"]
+    if parse_mode not in valid_modes:
+        raise ValueError(f"Invalid parse_mode: {parse_mode}. Must be one of {valid_modes}")
+    
     clean_str = _clean_str_for_date(string)
     # logging.debug(f'raw str: {string}, clean_str: {clean_str}')
 
-    tokens = clean_str.split(sep)
-    for token in tokens:
+    # Try parsing based on the specified mode
+    if parse_mode in ["full", "all"]:
+        # Pass 1: Try parsing the entire cleaned string
         try:
-            # logging.debug(f'token: {token}')
-            date = dateutil.parser.parse(token, default=constants.DEFAULT_DAY, **parse_params)
-            if date.year <= 1980:
-                continue
-            return date
+            date = dateutil.parser.parse(clean_str, default=constants.DEFAULT_DAY, **parse_params)
+            if date.year > 1980:
+                return date
         except ParserError:
-            continue
+            pass
+    
+    if parse_mode in ["split", "all"]:
+        # Pass 2: Try individual tokens
+        tokens = clean_str.split(sep)
+        for token in tokens:
+            try:
+                # logging.debug(f'token: {token}')
+                date = dateutil.parser.parse(token, default=constants.DEFAULT_DAY, **parse_params)
+                if date.year <= 1980:
+                    continue
+                return date
+            except ParserError:
+                continue
+    
+    if parse_mode in ["window", "all"]:
+        # Pass 3: Try sliding window of tokens
+        tokens = clean_str.split(sep)
+        for window_size in range(2, min(5, len(tokens) + 1)):
+            for i in range(len(tokens) - window_size + 1):
+                grouped = " ".join(tokens[i:i+window_size])
+                try:
+                    date = dateutil.parser.parse(grouped, default=constants.DEFAULT_DAY, **parse_params)
+                    if date.year <= 1980:
+                        continue
+                    return date
+                except ParserError:
+                    continue
 
     raise ValueError(f"No valid date token found in string: {string}")
 
