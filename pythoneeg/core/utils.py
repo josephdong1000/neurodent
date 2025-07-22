@@ -198,17 +198,31 @@ def parse_path_to_animalday(
     }
 
 
-def parse_str_to_genotype(string: str) -> str:
+def parse_str_to_genotype(string: str, strict_matching: bool = False) -> str:
     """
     Parses the filename of a binfolder to get the genotype.
 
     Args:
         string (str): String to parse.
+        strict_matching (bool, optional): If True, ensures the input matches exactly one genotype.
+            If False, allows overlapping matches and uses longest. Defaults to False for 
+            backward compatibility.
 
     Returns:
         str: Genotype.
+        
+    Raises:
+        ValueError: When string cannot be parsed or contains ambiguous matches in strict mode.
+        
+    Examples:
+        >>> parse_str_to_genotype("WT_A10_data")
+        'WT'
+        >>> parse_str_to_genotype("WT_KO_comparison", strict_matching=True)  # Would raise error
+        ValueError: Ambiguous match...
+        >>> parse_str_to_genotype("WT_KO_comparison", strict_matching=False)  # Uses longest match
+        'WT'  # or 'KO' depending on which alias is longer
     """
-    return __get_key_from_match_values(string, constants.GENOTYPE_ALIASES)
+    return __get_key_from_match_values(string, constants.GENOTYPE_ALIASES, strict_matching)
 
 
 def parse_str_to_animal(string: str, animal_param: tuple[int, str] | str | list[str] = (0, None)) -> str:
@@ -233,9 +247,9 @@ def parse_str_to_animal(string: str, animal_param: tuple[int, str] | str | list[
         'A10'
         
         # Regex pattern format
-        >>> parse_str_to_animal("WT_A10_2023-01-01_data.bin", r"A\d+")
+        >>> parse_str_to_animal("WT_A10_2023-01-01_data.bin", r"A\\d+")
         'A10'
-        >>> parse_str_to_animal("subject_123_data.bin", r"\d+")
+        >>> parse_str_to_animal("subject_123_data.bin", r"\\d+")
         '123'
         
         # List format: possible IDs to match
@@ -365,43 +379,95 @@ def _clean_str_for_date(string: str):
     return cleaned
 
 
-def parse_chname_to_abbrev(channel_name: str, assume_from_number=False) -> str:
+def parse_chname_to_abbrev(channel_name: str, assume_from_number=False, strict_matching=True) -> str:
     """
     Parses the channel name to get the abbreviation.
 
     Args:
         channel_name (str): Name of the channel.
-        assume_from_number (bool, optional): If True, assume the abbreviation based on the last number in the channel name. Defaults to False.
+        assume_from_number (bool, optional): If True, assume the abbreviation based on the last number 
+            in the channel name when normal parsing fails. Defaults to False.
+        strict_matching (bool, optional): If True, ensures the input matches exactly one L/R alias and 
+            one channel alias. If False, allows multiple matches and uses longest. Defaults to True.
 
     Returns:
         str: Abbreviation of the channel name.
+        
+    Raises:
+        ValueError: When channel_name cannot be parsed or contains ambiguous matches in strict mode.
+        KeyError: When assume_from_number=True but the detected number is not a valid channel ID.
+        
+    Examples:
+        >>> parse_chname_to_abbrev("left Aud")
+        'LAud'
+        >>> parse_chname_to_abbrev("Right VIS")
+        'RVis'
+        >>> parse_chname_to_abbrev("channel_9", assume_from_number=True)
+        'LAud'
+        >>> parse_chname_to_abbrev("LRAud", strict_matching=False)  # Would work in non-strict mode
+        'LAud'  # Uses longest L/R match
     """
     if channel_name in constants.DEFAULT_ID_TO_NAME.values():
         logging.debug(f"{channel_name} is already an abbreviation")
         return channel_name
+    
     try:
-        lr = __get_key_from_match_values(channel_name, constants.LR_ALIASES)
-        chname = __get_key_from_match_values(channel_name, constants.CHNAME_ALIASES)
+        lr = __get_key_from_match_values(channel_name, constants.LR_ALIASES, strict_matching)
+        chname = __get_key_from_match_values(channel_name, constants.CHNAME_ALIASES, strict_matching)
     except ValueError as e:
         if assume_from_number:
             logging.warning(f"{channel_name} does not match name aliases. Assuming alias from number in channel name.")
             nums = re.findall(r"\d+", channel_name)
+            
+            if not nums:
+                raise ValueError(f"Expected to find a number in channel name '{channel_name}' when assume_from_number=True, but no numbers were found.")
+            
             num = int(nums[-1])
+            if num not in constants.DEFAULT_ID_TO_NAME:
+                available_ids = sorted(constants.DEFAULT_ID_TO_NAME.keys())
+                raise KeyError(f"Channel number {num} found in '{channel_name}' is not a valid channel ID. Available channel IDs: {available_ids}")
+            
             return constants.DEFAULT_ID_TO_NAME[num]
         else:
             raise e
+    
     return lr + chname
 
 
-def __get_key_from_match_values(input_string: str, alias_dict: dict):
+def __get_key_from_match_values(input_string: str, alias_dict: dict, strict_matching: bool = True):
+    """
+    Find the best matching key from alias dictionary.
+    
+    Args:
+        input_string (str): String to search in
+        alias_dict (dict): Dictionary of {key: [aliases]} to match against
+        strict_matching (bool): If True, ensures only one alias matches across all keys
+        
+    Returns:
+        str: The key with the best matching alias
+        
+    Raises:
+        ValueError: When no matches found or multiple matches in strict mode
+    """
     matches = [
         (key, candidate, len(candidate))
         for key, aliases in alias_dict.items()
         for candidate in aliases
         if candidate in input_string
     ]
+    
     if not matches:
-        raise ValueError(f"{input_string} does not have any matching values. Available values: {alias_dict}")
+        alias_examples = {key: aliases[:2] for key, aliases in alias_dict.items()}  # Show first 2 aliases per key
+        raise ValueError(f"{input_string} does not have any matching values. Available aliases (examples): {alias_examples}")
+    
+    if strict_matching:
+        # Check if multiple different keys match
+        matching_keys = set(match[0] for match in matches)
+        if len(matching_keys) > 1:
+            matched_aliases = {key: [alias for k, alias, _ in matches if k == key] for key in matching_keys}
+            raise ValueError(f"Ambiguous match in '{input_string}'. Multiple alias types matched: {matched_aliases}. Use strict_matching=False to allow ambiguous matches.")
+    
+    # Return the key with the longest matching alias
     best_match_key, _, _ = max(matches, key=lambda x: x[2])
     return best_match_key
 
