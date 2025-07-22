@@ -17,16 +17,16 @@ DEFAULT_ID_TO_LR = {
 
 GENOTYPE_ALIASES = {"WT": ["WT", "wildtype"], "KO": ["KO", "knockout"]}
 CHNAME_ALIASES = {
-    "Aud": ["Aud", "aud"],
-    "Vis": ["Vis", "vis"],
-    "Hip": ["Hip", "hip"],
-    "Bar": ["Bar", "bar"],
-    "Mot": ["Mot", "mot"],
+    "Aud": ["Aud", "aud", "AUD"],
+    "Vis": ["Vis", "vis", "VIS"],
+    "Hip": ["Hip", "hip", "HIP"],
+    "Bar": ["Bar", "bar", "BAR"],
+    "Mot": ["Mot", "mot", "MOT"],
     # 'S' : ['Som', 'som']
 }
 LR_ALIASES = {
-    "L": ["left", "Left", "L ", " L"],
-    "R": ["right", "Right", "R ", " R"],
+    "L": ["left", "Left", "LEFT", "L ", " L"],
+    "R": ["right", "Right", "RIGHT", "R ", " R"],
 }
 
 DEFAULT_ID_TO_NAME = {
