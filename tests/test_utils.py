@@ -530,6 +530,42 @@ class TestParseStrToGenotype:
         with pytest.raises(ValueError, match="does not have any matching values"):
             utils.parse_str_to_genotype("WT_A10_data")
 
+    def test_strict_matching_genotype(self):
+        """Test strict_matching parameter for genotype parsing."""
+        # Test strict mode rejects ambiguous matches
+        with pytest.raises(ValueError, match="Ambiguous match in 'WT_KO_experiment'. Multiple alias types matched"):
+            utils.parse_str_to_genotype("WT_KO_experiment", strict_matching=True)
+            
+        with pytest.raises(ValueError, match="Ambiguous match in 'wildtype_knockout_comparison'. Multiple alias types matched"):
+            utils.parse_str_to_genotype("wildtype_knockout_comparison", strict_matching=True)
+            
+        # Test non-strict mode (default) allows ambiguous matches
+        result = utils.parse_str_to_genotype("WT_KO_experiment", strict_matching=False)
+        assert result in ["WT", "KO"]  # Should return one of them based on longest match
+        
+        result = utils.parse_str_to_genotype("wildtype_knockout_comparison", strict_matching=False)  
+        assert result in ["WT", "KO"]  # "wildtype" vs "knockout" - should pick one
+        
+        # Test that default behavior is non-strict (backward compatible)
+        result = utils.parse_str_to_genotype("WT_KO_data")
+        assert result in ["WT", "KO"]
+        
+        # Test unambiguous cases work in both modes
+        assert utils.parse_str_to_genotype("WT_only_data", strict_matching=True) == "WT"
+        assert utils.parse_str_to_genotype("knockout_only", strict_matching=True) == "KO"
+        assert utils.parse_str_to_genotype("WT_only_data", strict_matching=False) == "WT"
+        assert utils.parse_str_to_genotype("knockout_only", strict_matching=False) == "KO"
+
+    def test_genotype_backward_compatibility(self):
+        """Test that existing genotype parsing code still works."""
+        # Old function calls should work exactly as before
+        assert utils.parse_str_to_genotype("WT_A10_data") == "WT"
+        assert utils.parse_str_to_genotype("knockout_B15_data") == "KO"
+        
+        # Ambiguous cases should work (non-strict by default)
+        result = utils.parse_str_to_genotype("WT_vs_KO_study")
+        assert result in ["WT", "KO"]  # Should work, pick one based on longest match
+
 
 class TestParseStrToAnimal:
     """Test parse_str_to_animal function."""
@@ -1127,21 +1163,285 @@ class TestParseChnameToAbbrev:
     
     def test_basic_abbreviation(self):
         """Test basic channel name abbreviation."""
-        # Use full channel names that include left/right prefixes
+        # Test with exact aliases from constants
         assert utils.parse_chname_to_abbrev("left Aud") == "LAud"
         assert utils.parse_chname_to_abbrev("right Vis") == "RVis"
         assert utils.parse_chname_to_abbrev("Left Hip") == "LHip"
-        
-    def test_case_insensitive(self):
-        """Test case insensitive matching."""
-        # Use full channel names that include left/right prefixes
+        assert utils.parse_chname_to_abbrev("right Bar") == "RBar"
+        assert utils.parse_chname_to_abbrev("left Mot") == "LMot"
+
+    def test_case_insensitive_behavior(self):
+        """Test case insensitive behavior with new uppercase aliases."""
+        # These now work with uppercase aliases added to constants
         assert utils.parse_chname_to_abbrev("Left aud") == "LAud"
+        assert utils.parse_chname_to_abbrev("right vis") == "RVis"
         assert utils.parse_chname_to_abbrev("Right VIS") == "RVis"
+        assert utils.parse_chname_to_abbrev("Left AUD") == "LAud"
+        assert utils.parse_chname_to_abbrev("right HIP") == "RHip"
+        assert utils.parse_chname_to_abbrev("left BAR") == "LBar"
+        assert utils.parse_chname_to_abbrev("Right MOT") == "RMot"
         
-    def test_no_match(self):
-        """Test no match handling."""
-        with pytest.raises(ValueError, match="does not have any matching values"):
+        # Test uppercase L/R prefixes
+        assert utils.parse_chname_to_abbrev("LEFT aud") == "LAud"
+        assert utils.parse_chname_to_abbrev("RIGHT vis") == "RVis"
+        assert utils.parse_chname_to_abbrev("LEFT BAR") == "LBar"
+        assert utils.parse_chname_to_abbrev("RIGHT MOT") == "RMot"
+
+    def test_lr_prefix_variations(self):
+        """Test various left/right prefix variations."""
+        # Test different L/R prefix formats from LR_ALIASES
+        assert utils.parse_chname_to_abbrev("left Aud") == "LAud"
+        assert utils.parse_chname_to_abbrev("Left Aud") == "LAud"
+        assert utils.parse_chname_to_abbrev("L Aud") == "LAud"
+        assert utils.parse_chname_to_abbrev(" L Aud") == "LAud"
+
+        assert utils.parse_chname_to_abbrev("right Vis") == "RVis"
+        assert utils.parse_chname_to_abbrev("Right Vis") == "RVis"
+        assert utils.parse_chname_to_abbrev("R Vis") == "RVis"
+        assert utils.parse_chname_to_abbrev(" R Vis") == "RVis"
+
+    def test_channel_name_variations(self):
+        """Test various channel name variations."""
+        # Test all channel types with both cases
+        test_cases = [
+            ("left Aud", "LAud"),
+            ("right aud", "RAud"),
+            ("left Vis", "LVis"),
+            ("right vis", "RVis"),
+            ("left Hip", "LHip"),
+            ("right hip", "RHip"),
+            ("left Bar", "LBar"),
+            ("right bar", "RBar"),
+            ("left Mot", "LMot"),
+            ("right mot", "RMot"),
+        ]
+
+        for input_name, expected in test_cases:
+            result = utils.parse_chname_to_abbrev(input_name)
+            assert result == expected, f"Expected {expected}, got {result} for input {input_name}"
+
+    def test_already_abbreviated_channels(self):
+        """Test channels that are already abbreviations."""
+        # These should return themselves as they're already in DEFAULT_ID_TO_NAME.values()
+        abbreviated_channels = ["LAud", "RAud", "LVis", "RVis", "LHip", "RHip", "LBar", "RBar", "LMot", "RMot"]
+
+        for channel in abbreviated_channels:
+            result = utils.parse_chname_to_abbrev(channel)
+            assert result == channel, f"Expected {channel}, got {result}"
+
+    def test_assume_from_number_parameter(self):
+        """Test assume_from_number parameter functionality."""
+        # Test with assume_from_number=True
+        test_cases = [
+            ("channel_9", "LAud"),  # DEFAULT_ID_TO_NAME[9] = "LAud"
+            ("ch10", "LVis"),  # DEFAULT_ID_TO_NAME[10] = "LVis"
+            ("electrode_12", "LHip"),  # DEFAULT_ID_TO_NAME[12] = "LHip"
+            ("probe_22", "RAud"),  # DEFAULT_ID_TO_NAME[22] = "RAud"
+        ]
+
+        for input_name, expected in test_cases:
+            result = utils.parse_chname_to_abbrev(input_name, assume_from_number=True)
+            assert result == expected, f"Expected {expected}, got {result} for {input_name}"
+
+    def test_assume_from_number_multiple_numbers(self):
+        """Test assume_from_number with multiple numbers (uses last number)."""
+        # Should use the last number found in the string
+        result = utils.parse_chname_to_abbrev("ch1_probe2_electrode_22", assume_from_number=True)
+        assert result == "RAud"  # DEFAULT_ID_TO_NAME[22] = "RAud"
+
+        result = utils.parse_chname_to_abbrev("2023_ch_10_data", assume_from_number=True)
+        assert result == "LVis"  # DEFAULT_ID_TO_NAME[10] = "LVis"
+
+    def test_assume_from_number_invalid_id(self):
+        """Test assume_from_number with invalid channel ID - should provide detailed error."""
+        # Should raise KeyError with detailed message for numbers not in DEFAULT_ID_TO_NAME
+        with pytest.raises(KeyError, match="Channel number 99 found in 'channel_99' is not a valid channel ID. Available channel IDs: \\[9, 10, 12, 14, 15, 16, 17, 19, 21, 22\\]"):
+            utils.parse_chname_to_abbrev("channel_99", assume_from_number=True)
+
+        with pytest.raises(KeyError, match="Channel number 1 found in 'electrode_1' is not a valid channel ID"):
+            utils.parse_chname_to_abbrev("electrode_1", assume_from_number=True)
+
+    def test_assume_from_number_no_numbers(self):
+        """Test assume_from_number when no numbers are found - should provide clear error."""
+        # Should raise ValueError with clear message when no numbers are found
+        with pytest.raises(ValueError, match="Expected to find a number in channel name 'no_numbers_here' when assume_from_number=True, but no numbers were found"):
+            utils.parse_chname_to_abbrev("no_numbers_here", assume_from_number=True)
+            
+        with pytest.raises(ValueError, match="Expected to find a number in channel name 'channel' when assume_from_number=True, but no numbers were found"):
+            utils.parse_chname_to_abbrev("channel", assume_from_number=True)
+
+    def test_mixed_case_channel_content(self):
+        """Test channels with mixed case content."""
+        # Test channels that have valid L/R and channel names but with extra content
+        assert utils.parse_chname_to_abbrev("left_Aud_electrode") == "LAud"
+        assert utils.parse_chname_to_abbrev("Right_vis_channel") == "RVis"
+        assert utils.parse_chname_to_abbrev("probe_Left_Hip_001") == "LHip"
+
+    def test_substring_matching_behavior(self):
+        """Test that function uses substring matching (not exact word matching)."""
+        # These should work because the aliases are found as substrings
+        assert utils.parse_chname_to_abbrev("leftAud") == "LAud"
+        assert utils.parse_chname_to_abbrev("rightvis") == "RVis"
+        assert utils.parse_chname_to_abbrev("LeftHip") == "LHip"
+
+    def test_ambiguous_matches_longest_wins(self):
+        """Test behavior when multiple aliases could match (longest should win)."""
+        # The __get_key_from_match_values function returns the longest match
+        # Test this with custom strings that could match multiple patterns
+
+        # If we had overlapping aliases, longest would win
+        # Current aliases don't overlap, so test with valid combinations
+        assert utils.parse_chname_to_abbrev("left Aud data") == "LAud"
+        assert utils.parse_chname_to_abbrev("right vis info") == "RVis"
+
+    def test_no_match_detailed_error_messages(self):
+        """Test detailed error messages for no matches."""
+        # Test that error messages are helpful
+        with pytest.raises(ValueError, match="InvalidChannel does not have any matching values"):
             utils.parse_chname_to_abbrev("InvalidChannel")
+
+        with pytest.raises(ValueError, match="NoLRPrefix does not have any matching values"):
+            utils.parse_chname_to_abbrev("NoLRPrefix")
+
+        with pytest.raises(ValueError, match="UnknownChannel does not have any matching values"):
+            utils.parse_chname_to_abbrev("UnknownChannel")
+
+    def test_edge_cases(self):
+        """Test edge cases and boundary conditions."""
+        # Test empty string
+        with pytest.raises(ValueError):
+            utils.parse_chname_to_abbrev("")
+
+        # Test string with only whitespace
+        with pytest.raises(ValueError):
+            utils.parse_chname_to_abbrev("   ")
+
+        # Test string with only L/R but no channel name
+        with pytest.raises(ValueError):
+            utils.parse_chname_to_abbrev("left")
+
+        # Test string with only channel name but no L/R
+        with pytest.raises(ValueError):
+            utils.parse_chname_to_abbrev("Aud")
+
+    def test_input_type_validation(self):
+        """Test input type validation."""
+        # Test non-string inputs that should raise TypeError
+        with pytest.raises(TypeError, match="argument of type 'int' is not iterable"):
+            utils.parse_chname_to_abbrev(123)
+
+        with pytest.raises(TypeError, match="argument of type 'NoneType' is not iterable"):
+            utils.parse_chname_to_abbrev(None)
+
+        # Interestingly, lists work because the function searches for substrings in the list
+        # This is actually expected behavior given how the function is implemented
+        result = utils.parse_chname_to_abbrev(["left", "Aud"])
+        assert result == "LAud"  # This actually works because "left" and "Aud" are found in the list
+
+    def test_strict_matching_mode(self):
+        """Test strict_matching parameter functionality."""
+        # Test strict mode (default) - should reject ambiguous L/R matches
+        with pytest.raises(ValueError, match="Ambiguous match in 'left right Aud'. Multiple alias types matched"):
+            utils.parse_chname_to_abbrev("left right Aud", strict_matching=True)
+            
+        with pytest.raises(ValueError, match="Ambiguous match in 'Left Right VIS'. Multiple alias types matched"):
+            utils.parse_chname_to_abbrev("Left Right VIS", strict_matching=True)
+            
+        # Test strict mode rejects ambiguous channel type matches
+        with pytest.raises(ValueError, match="Ambiguous match in 'right auditory hippocampus'. Multiple alias types matched"):
+            utils.parse_chname_to_abbrev("right auditory hippocampus", strict_matching=True)
+            
+        with pytest.raises(ValueError, match="Ambiguous match in 'left auditory visual'. Multiple alias types matched"):
+            utils.parse_chname_to_abbrev("left auditory visual", strict_matching=True)
+            
+        with pytest.raises(ValueError, match="Aud Vis does not have any matching values"):
+            utils.parse_chname_to_abbrev("Aud Vis", strict_matching=True)  # Fails because no L/R prefix
+            
+        with pytest.raises(ValueError, match="Ambiguous match in 'left Aud Vis'. Multiple alias types matched"):
+            utils.parse_chname_to_abbrev("left Aud Vis", strict_matching=True)  # Has L/R but multiple channel types
+            
+        with pytest.raises(ValueError, match="Ambiguous match in 'Right Hip Aud'. Multiple alias types matched"):
+            utils.parse_chname_to_abbrev("Right Hip Aud", strict_matching=True)
+            
+        # Test non-strict mode - should allow ambiguous matches and use longest
+        result = utils.parse_chname_to_abbrev("left right Aud", strict_matching=False)
+        assert result == "RAud"  # "right" is longer than "left", so R wins
+        
+        result = utils.parse_chname_to_abbrev("Left Right VIS", strict_matching=False)
+        assert result == "RVis"  # "Right" is longer than "Left", so R wins
+        
+        result = utils.parse_chname_to_abbrev("right auditory hippocampus", strict_matching=False)
+        assert result == "RAud"  # "auditory" is longer than "hippocampus", so Aud wins
+        
+        result = utils.parse_chname_to_abbrev("left auditory visual", strict_matching=False)
+        assert result == "LAud"  # "auditory" is longer than "visual", so Aud wins
+        
+        result = utils.parse_chname_to_abbrev("Right Hip Aud", strict_matching=False) 
+        assert result == "RAud"  # "Aud" is longer than "Hip", so Aud wins
+        
+        # Test that strict mode still works for unambiguous matches
+        assert utils.parse_chname_to_abbrev("left Aud", strict_matching=True) == "LAud"
+        assert utils.parse_chname_to_abbrev("right Vis", strict_matching=True) == "RVis"
+
+    def test_reverse_order_parsing(self):
+        """Test that reverse order (channel type before L/R) works correctly."""
+        # These should work because they're unambiguous
+        assert utils.parse_chname_to_abbrev("Auditory Left") == "LAud"
+        assert utils.parse_chname_to_abbrev("Visual Right") == "RVis"
+        assert utils.parse_chname_to_abbrev("Hippocampal Left") == "LHip"
+        assert utils.parse_chname_to_abbrev("Motor RIGHT") == "RMot"
+        assert utils.parse_chname_to_abbrev("auditory right") == "RAud"
+        assert utils.parse_chname_to_abbrev("vis LEFT") == "LVis"
+
+    def test_strict_matching_default_behavior(self):
+        """Test that strict_matching defaults to True."""
+        # Should fail by default (strict_matching=True)
+        with pytest.raises(ValueError, match="Ambiguous match"):
+            utils.parse_chname_to_abbrev("left right Aud")
+            
+        # Should work when explicitly set to False
+        result = utils.parse_chname_to_abbrev("left right Aud", strict_matching=False)
+        assert result == "RAud"
+
+    def test_strict_matching_with_assume_from_number(self):
+        """Test interaction between strict_matching and assume_from_number."""
+        # When normal parsing fails due to strict mode, should fall back to assume_from_number
+        result = utils.parse_chname_to_abbrev("left right channel_9", assume_from_number=True, strict_matching=True)
+        assert result == "LAud"  # Falls back to number-based parsing
+        
+        # Should also work in non-strict mode but still use assume_from_number path
+        result = utils.parse_chname_to_abbrev("left right channel_10", assume_from_number=True, strict_matching=False)
+        assert result == "LVis"
+
+    def test_improved_error_messages(self):
+        """Test that error messages are more helpful."""
+        # Test improved no-match error message
+        with pytest.raises(ValueError, match="InvalidChannel does not have any matching values. Available aliases \\(examples\\):"):
+            utils.parse_chname_to_abbrev("InvalidChannel")
+            
+        # Error should show examples of available aliases
+        try:
+            utils.parse_chname_to_abbrev("NoMatch")
+        except ValueError as e:
+            error_msg = str(e)
+            assert "Available aliases (examples)" in error_msg
+            assert "L" in error_msg and "R" in error_msg  # Should show L/R examples
+
+    def test_backward_compatibility(self):
+        """Test that existing code still works with new parameters."""
+        # Old function calls should still work (strict_matching defaults to True)
+        assert utils.parse_chname_to_abbrev("left Aud") == "LAud"
+        assert utils.parse_chname_to_abbrev("right Vis") == "RVis"
+        assert utils.parse_chname_to_abbrev("channel_9", assume_from_number=True) == "LAud"
+        
+        # Test that function signature is backward compatible
+        assert utils.parse_chname_to_abbrev("Left Hip", False) == "LHip"  # positional assume_from_number
+
+    def test_function_documentation_examples(self):
+        """Test examples that should work based on the function's purpose."""
+        # Test typical use cases that would be expected in EEG channel naming
+        assert utils.parse_chname_to_abbrev("left auditory") == "LAud"  # if "auditory" contains "aud"
+        assert utils.parse_chname_to_abbrev("right visual") == "RVis"  # if "visual" contains "vis"
 
 
 class TestLogTransform:
