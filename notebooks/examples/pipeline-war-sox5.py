@@ -62,6 +62,15 @@ constants.GENOTYPE_ALIASES = data['GENOTYPE_ALIASES']
 items = list(data["data_folders_to_animal_ids"].items())
 data_folders_to_animal_ids = dict(items[len(items) // 2 :])  # 1/2
 
+# ANCHOR testing higher rms low cutoff for artifact filtering
+data_folders_to_animal_ids = {
+    "060921_Cohort 3_EM1_AM2_GF4": [
+        "AM2",
+    ],
+    "010822_cohort4_group2_2mice_MWT_MHET": ["M10"],
+}
+
+
 # constants.SORTING_PARAMS['freq_min'] = 60
 # constants.SORTING_PARAMS['freq_max'] = 400
 # !SECTION

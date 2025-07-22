@@ -9,7 +9,6 @@ from tqdm import tqdm
 
 import matplotlib.colors as colors
 import matplotlib.pyplot as plt
-import mne
 import numpy as np
 import pandas as pd
 from dask.distributed import Client, LocalCluster
@@ -30,7 +29,7 @@ logging.basicConfig(
 logger = logging.getLogger()
 
 base_folder = Path("/mnt/isilon/marsh_single_unit/PythonEEG")
-load_folder = base_folder / "notebooks" / "tests" / "test-wars-sox5-6"
+load_folder = base_folder / "notebooks" / "tests" / "test-wars-sox5-7"
 save_folder = base_folder / "notebooks" / "examples"
 
 animal_ids = [p.name for p in load_folder.glob("*") if p.is_dir()]
@@ -47,7 +46,7 @@ animal_ids = [p for p in animal_ids if p not in bad_animal_ids]
 
 def load_war(animal_id):
     logger.info(f"Loading {animal_id}")
-    war = visualization.WindowAnalysisResult.load_pickle_and_json(Path(load_folder / f"{animal_id}").resolve())
+    war = visualization.WindowAnalysisResult.load_pickle_and_json(Path(load_folder / f"{animal_id}"))
     if war.genotype == "Unknown":
         logger.info(f"Skipping {animal_id} because genotype is Unknown")
         return None
@@ -103,7 +102,6 @@ df = (
 
 logging.debug(df)
 logging.debug(df.shape)
-logger.setLevel(logging.WARNING)
 
 df.to_pickle(save_folder / "alphadelta_avg_delta_alpha_rms.pkl")
 # df.to_pickle(save_folder / "alphadelta_avg_delta_alpha_minimally_filtered.pkl")

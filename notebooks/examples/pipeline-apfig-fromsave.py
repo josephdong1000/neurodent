@@ -14,40 +14,50 @@ logging.basicConfig(
 )
 logger = logging.getLogger()
 
-base_folder = Path("/mnt/isilon/marsh_single_unit/PythonEEG").resolve()
-load_folder = base_folder / "notebooks" / "tests" / "test-wars-sox5-3"
-save_folder = Path("/home/dongjp/Downloads/6-17 APfig").resolve()
+base_folder = Path("/mnt/isilon/marsh_single_unit/PythonEEG")
+load_folder = base_folder / "notebooks" / "tests" / "test-wars-sox5-7"
+save_folder = Path("/home/dongjp/Downloads/7-21 APfigs")
 if not save_folder.exists():
     save_folder.mkdir(parents=True, exist_ok=True)
 
-# animal_ids = ['A5', 'A10', 'F22', 'G25', 'G26', 'N21', 'N22', 'N23', 'N24', 'N25']
-# animal_ids = ['061322_Group10 M8, M10 M8', # normal
-#               '062921_Cohort 3_AM3_AM5_CM9_BM6_CM5_CF2_IF5_BF3 BM6', # sparsely disconnected
-#               '071321_Cohort 3_AM4_CF1_DF3_FF6 AM4', # normal
-#               '081922_cohort10_group4_2mice_FMut_FHet FHET', # intermittently disconnected
-#               '090122_group4_2mice_FMut_MMut FMUT' # very disconnected
-#              ]
-# animal_ids = [p.name for p in load_folder.glob("*") if p.is_dir()]
-animal_ids = [
-    "012022_cohort4_group5_3mice__FWT_MMUT_FMUT MMUT",
-    "031921_cohort 2 group 5 and group 6 mouse M3 cage1A",
-    "060921_Cohort 3_EM1_AM2_GF4 AM2",
+animal_ids = [p.name for p in load_folder.glob("*") if p.is_dir()]
+bad_animal_ids = [
+    "013122_cohort4_group7_2mice both_FHET FHET(2)",
+    "012322_cohort4_group6_3mice_FMUT___MMUT_MWT MHET",
+    "012322_cohort4_group6_3mice_FMUT___MMUT_MWT MMUT",
+    "011622_cohort4_group4_3mice_MMutOLD_FMUT_FMUT_FWT OLDMMT",
+    "011322_cohort4_group3_4mice_AllM_MT_WT_HET_WT M3",
+    "012322_cohort4_group6_3mice_FMUT___MMUT_MWT FHET",
 ]
+animal_ids = [p for p in animal_ids if p not in bad_animal_ids]
 
 def plot_animal(animal_id):
+    logger.info(f"Plotting {animal_id}")
     war = visualization.WindowAnalysisResult.load_pickle_and_json(load_folder / f"{animal_id}")
-    war.filter_all()
+    if war.genotype == "Unknown":
+        logger.info(f"Skipping {animal_id} because genotype is Unknown")
+        return None
 
     save_path = save_folder / animal_id
     if not save_path.exists():
         save_path.mkdir(parents=True)
-    ap = visualization.AnimalPlotter(war, save_fig=True, save_path=save_path / animal_id)
 
+    # Plot before filtering
+    ap = visualization.AnimalPlotter(war, save_fig=True, save_path=save_path / f"{animal_id}")
     ap.plot_coherecorr_spectral(figsize=(20, 5), score_type="z")
     ap.plot_psd_histogram(figsize=(10, 4), avg_channels=True, plot_type="loglog")
     ap.plot_psd_spectrogram(figsize=(20, 4), mode="none")
 
-    del war
+    # Filter
+    war.reorder_and_pad_channels(["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"], use_abbrevs=True)
+    war.filter_all()
+
+    # Plot after filtering
+    ap = visualization.AnimalPlotter(war, save_fig=True, save_path=save_path / f"{animal_id} zzz_filtered")
+
+    ap.plot_coherecorr_spectral(figsize=(20, 5), score_type="z")
+    ap.plot_psd_histogram(figsize=(10, 4), avg_channels=True, plot_type="loglog")
+    ap.plot_psd_spectrogram(figsize=(20, 4), mode="none")
     return animal_id
 
 
