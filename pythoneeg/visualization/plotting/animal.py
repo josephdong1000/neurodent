@@ -285,7 +285,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         **kwargs,
     ):
         if features is None:
-            features = constants.MATRIX_FEATURES.copy()
+            features = ["zcohere", "zpcorr"]
         height_ratios = {"cohere": 5, "zcohere": 5, "pcorr": 1, "zpcorr": 1}
 
         df_rowgroup = self.window_result.get_grouprows_result(features, multiindex=multiindex)
@@ -355,16 +355,15 @@ class AnimalPlotter(viz.AnimalFeatureParser):
             )
 
         if show_featurename:
-            match feature:
-                case "cohere":
-                    ticks = n_ch * np.linspace(1 / 2, n_bands + 1 / 2, n_bands, endpoint=False)
-                    ax.set_yticks(ticks=ticks, labels=constants.BAND_NAMES)
-                    for ypos in np.linspace(0, n_bands * n_ch, n_bands, endpoint=False):
-                        ax.axhline(ypos, lw=1, ls="--", color="black")
-                case "pcorr":
-                    ax.set_yticks(ticks=[1 / 2 * n_ch], labels=[feature])
-                case _:
-                    raise ValueError(f"Unknown feature name {feature}")
+            if feature in ["cohere", "zcohere"]:
+                ticks = n_ch * np.linspace(1 / 2, n_bands + 1 / 2, n_bands, endpoint=False)
+                ax.set_yticks(ticks=ticks, labels=constants.BAND_NAMES)
+                for ypos in np.linspace(0, n_bands * n_ch, n_bands, endpoint=False):
+                    ax.axhline(ypos, lw=1, ls="--", color="black")
+            elif feature in ["pcorr", "zpcorr"]:
+                ax.set_yticks(ticks=[1 / 2 * n_ch], labels=[feature])
+            else:
+                raise ValueError(f"Unknown feature name {feature}")
 
         if show_endfile:
             self._plot_filediv_lines(group=group, ax=ax, duration_name=duration_name, endfile_name=endfile_name)
