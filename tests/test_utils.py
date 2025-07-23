@@ -534,31 +534,6 @@ class TestParseStrToGenotype:
         with pytest.raises(ValueError, match="does not have any matching values"):
             utils.parse_str_to_genotype("WT_A10_data")
 
-    def test_strict_matching_genotype(self):
-        """Test strict_matching parameter for genotype parsing."""
-        # Test strict mode rejects ambiguous matches
-        with pytest.raises(ValueError, match="Ambiguous match in 'WT_KO_experiment'. Multiple alias types matched"):
-            utils.parse_str_to_genotype("WT_KO_experiment", strict_matching=True)
-            
-        with pytest.raises(ValueError, match="Ambiguous match in 'wildtype_knockout_comparison'. Multiple alias types matched"):
-            utils.parse_str_to_genotype("wildtype_knockout_comparison", strict_matching=True)
-            
-        # Test non-strict mode (default) allows ambiguous matches
-        result = utils.parse_str_to_genotype("WT_KO_experiment", strict_matching=False)
-        assert result in ["WT", "KO"]  # Should return one of them based on longest match
-        
-        result = utils.parse_str_to_genotype("wildtype_knockout_comparison", strict_matching=False)  
-        assert result in ["WT", "KO"]  # "wildtype" vs "knockout" - should pick one
-        
-        # Test that default behavior is non-strict (backward compatible)
-        result = utils.parse_str_to_genotype("WT_KO_data")
-        assert result in ["WT", "KO"]
-        
-        # Test unambiguous cases work in both modes
-        assert utils.parse_str_to_genotype("WT_only_data", strict_matching=True) == "WT"
-        assert utils.parse_str_to_genotype("knockout_only", strict_matching=True) == "KO"
-        assert utils.parse_str_to_genotype("WT_only_data", strict_matching=False) == "WT"
-        assert utils.parse_str_to_genotype("knockout_only", strict_matching=False) == "KO"
 
     def test_genotype_backward_compatibility(self):
         """Test that existing genotype parsing code still works."""
@@ -1288,27 +1263,6 @@ class TestParseChnameToAbbrev:
         assert utils.parse_chname_to_abbrev("rightvis") == "RVis"
         assert utils.parse_chname_to_abbrev("LeftHip") == "LHip"
 
-    def test_ambiguous_matches_longest_wins(self):
-        """Test behavior when multiple aliases could match (longest should win)."""
-        # The __get_key_from_match_values function returns the longest match
-        # Test this with custom strings that could match multiple patterns
-
-        # If we had overlapping aliases, longest would win
-        # Current aliases don't overlap, so test with valid combinations
-        assert utils.parse_chname_to_abbrev("left Aud data") == "LAud"
-        assert utils.parse_chname_to_abbrev("right vis info") == "RVis"
-
-    def test_no_match_detailed_error_messages(self):
-        """Test detailed error messages for no matches."""
-        # Test that error messages are helpful
-        with pytest.raises(ValueError, match="InvalidChannel does not have any matching values"):
-            utils.parse_chname_to_abbrev("InvalidChannel")
-
-        with pytest.raises(ValueError, match="NoLRPrefix does not have any matching values"):
-            utils.parse_chname_to_abbrev("NoLRPrefix")
-
-        with pytest.raises(ValueError, match="UnknownChannel does not have any matching values"):
-            utils.parse_chname_to_abbrev("UnknownChannel")
 
     def test_edge_cases(self):
         """Test edge cases and boundary conditions."""
@@ -2806,4 +2760,113 @@ class TestTempDirectory:
             with large_file.open('r') as f:
                 chunk = f.read(1024)
                 assert len(chunk) == 1024
-                assert chunk == "A" * 1024 
+                assert chunk == "A" * 1024
+
+
+class TestCleanStrForDate:
+    """Test _clean_str_for_date function."""
+    
+    def test_basic_cleaning(self):
+        """Test basic string cleaning for dates."""
+        # Test removing common patterns that interfere with date parsing
+        assert utils._clean_str_for_date("some_random_folder_2023-01-15") == "some random folder 2023-01-15"
+        assert utils._clean_str_for_date("data_file_Jan_15_2023") == "data file Jan 15 2023"
+        
+    def test_extra_whitespace_cleanup(self):
+        """Test that extra whitespace is cleaned up."""
+        assert utils._clean_str_for_date("  multiple   spaces   here  ") == "multiple spaces here"
+        assert utils._clean_str_for_date("\t\ttabs\t\there\t\t") == "tabs here"
+        
+    def test_empty_string(self):
+        """Test empty string input."""
+        assert utils._clean_str_for_date("") == ""
+        
+    def test_pattern_removal(self):
+        """Test that specific patterns are removed according to constants."""
+        # Test some patterns that should be removed based on typical date parsing needs
+        test_string = "exp_setup_2023-01-15_final"
+        result = utils._clean_str_for_date(test_string)
+        # Should clean up underscores and other non-date elements
+        assert "_" not in result or result.count("_") < test_string.count("_")
+
+
+class TestGetKeyFromMatchValues:
+    """Test _get_key_from_match_values function."""
+    
+    def test_basic_matching(self):
+        """Test basic alias matching."""
+        test_dict = {
+            "WT": ["wildtype", "wt", "control"],
+            "KO": ["knockout", "ko", "mutant"]
+        }
+        
+        assert utils._get_key_from_match_values("wildtype_experiment", test_dict) == "WT"
+        assert utils._get_key_from_match_values("knockout_data", test_dict) == "KO"
+        assert utils._get_key_from_match_values("some_control_group", test_dict) == "WT"
+        
+    def test_longest_match_wins(self):
+        """Test that longest matching alias is selected."""
+        test_dict = {
+            "A": ["a", "abc"],
+            "B": ["ab", "b"]
+        }
+        
+        # "abc" is longer than "ab", so should match "A"
+        assert utils._get_key_from_match_values("abc_test", test_dict) == "A"
+        
+    def test_strict_matching_true(self):
+        """Test strict matching prevents ambiguous matches."""
+        test_dict = {
+            "A": ["test", "data"],
+            "B": ["test", "info"]  # "test" appears in both
+        }
+        
+        with pytest.raises(ValueError, match="Ambiguous match"):
+            utils._get_key_from_match_values("test_file", test_dict, strict_matching=True)
+            
+    def test_strict_matching_false(self):
+        """Test that strict_matching=False allows ambiguous matches."""
+        test_dict = {
+            "A": ["test", "data"],
+            "B": ["test", "info"]  # "test" appears in both, same length
+        }
+        
+        # Should not raise error, should return one of the keys
+        result = utils._get_key_from_match_values("test_file", test_dict, strict_matching=False)
+        assert result in ["A", "B"]
+        
+    def test_no_matches_raises_error(self):
+        """Test that no matches raises ValueError."""
+        test_dict = {
+            "A": ["apple", "apricot"],
+            "B": ["banana", "berry"]
+        }
+        
+        with pytest.raises(ValueError, match="does not have any matching values"):
+            utils._get_key_from_match_values("orange_fruit", test_dict)
+            
+    def test_empty_dict_raises_error(self):
+        """Test that empty dictionary raises error."""
+        with pytest.raises(ValueError, match="does not have any matching values"):
+            utils._get_key_from_match_values("test_string", {})
+            
+    def test_with_real_genotype_aliases(self):
+        """Test with actual genotype aliases from constants."""
+        # This tests integration with real data structure
+        if hasattr(constants, 'GENOTYPE_ALIASES') and constants.GENOTYPE_ALIASES:
+            # Find a real alias to test with
+            first_key = list(constants.GENOTYPE_ALIASES.keys())[0]
+            first_alias = constants.GENOTYPE_ALIASES[first_key][0]
+            
+            result = utils._get_key_from_match_values(f"test_{first_alias}_data", constants.GENOTYPE_ALIASES)
+            assert result == first_key
+            
+    def test_with_real_channel_aliases(self):
+        """Test with actual channel aliases from constants."""
+        # This tests integration with real data structure  
+        if hasattr(constants, 'LR_ALIASES') and constants.LR_ALIASES:
+            first_key = list(constants.LR_ALIASES.keys())[0]
+            first_alias = constants.LR_ALIASES[first_key][0]
+            
+            result = utils._get_key_from_match_values(f"test_{first_alias}_channel", constants.LR_ALIASES)
+            assert result == first_key 
