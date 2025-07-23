@@ -216,7 +216,7 @@ def parse_str_to_genotype(string: str, strict_matching: bool = False) -> str:
         >>> parse_str_to_genotype("WT_KO_comparison", strict_matching=False)  # Uses longest match
         'WT'  # or 'KO' depending on which alias is longer
     """
-    return __get_key_from_match_values(string, constants.GENOTYPE_ALIASES, strict_matching)
+    return _get_key_from_match_values(string, constants.GENOTYPE_ALIASES, strict_matching)
 
 
 def parse_str_to_animal(string: str, animal_param: tuple[int, str] | str | list[str] = (0, None)) -> str:
@@ -406,8 +406,8 @@ def parse_chname_to_abbrev(channel_name: str, assume_from_number=False, strict_m
         return channel_name
     
     try:
-        lr = __get_key_from_match_values(channel_name, constants.LR_ALIASES, strict_matching)
-        chname = __get_key_from_match_values(channel_name, constants.CHNAME_ALIASES, strict_matching)
+        lr = _get_key_from_match_values(channel_name, constants.LR_ALIASES, strict_matching)
+        chname = _get_key_from_match_values(channel_name, constants.CHNAME_ALIASES, strict_matching)
     except ValueError as e:
         if assume_from_number:
             logging.warning(f"{channel_name} does not match name aliases. Assuming alias from number in channel name.")
@@ -428,7 +428,7 @@ def parse_chname_to_abbrev(channel_name: str, assume_from_number=False, strict_m
     return lr + chname
 
 
-def __get_key_from_match_values(input_string: str, alias_dict: dict, strict_matching: bool = True):
+def _get_key_from_match_values(input_string: str, alias_dict: dict, strict_matching: bool = True):
     """
     Find the best matching key from alias dictionary.
     
