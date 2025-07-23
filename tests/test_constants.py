@@ -29,7 +29,7 @@ class TestConstants:
         expected_channels = ["Aud", "Vis", "Hip", "Bar", "Mot"]
         for ch in expected_channels:
             assert ch in constants.CHNAME_ALIASES
-            assert len(constants.CHNAME_ALIASES[ch]) == 2
+            assert len(constants.CHNAME_ALIASES[ch]) == 3  # Each has lowercase, uppercase, and ALL_CAPS variants
             
     def test_lr_aliases(self):
         """Test LR_ALIASES mapping."""
