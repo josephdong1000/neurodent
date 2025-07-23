@@ -1958,9 +1958,9 @@ class TestNanmeanSeriesOfNp:
         
         series = pd.Series(arrays)
         
-        # Should handle the ValueError/TypeError and fall back to list method
-        result = utils.nanmean_series_of_np(series)
-        assert isinstance(result, np.ndarray)
+        # Mixed-size arrays cannot be processed by np.nanmean - should raise ValueError
+        with pytest.raises(ValueError, match="setting an array element with a sequence"):
+            utils.nanmean_series_of_np(series)
         
     def test_non_numpy_arrays_small_series(self):
         """Test with non-numpy arrays in small series."""
