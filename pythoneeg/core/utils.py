@@ -9,7 +9,7 @@ import sys
 import warnings
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Optional
 
 import dateutil.parser
 import numpy as np
@@ -492,18 +492,18 @@ def get_temp_directory() -> Path:
     return Path(os.environ["TMPDIR"])
 
 
-def _get_groupby_keys(df: pd.DataFrame, groupby: str | list[str]):
-    """
-    Get the unique values of the groupby variable.
-    """
-    return list(df.groupby(groupby).groups.keys())
+# def _get_groupby_keys(df: pd.DataFrame, groupby: str | list[str]):
+#     """
+#     Get the unique values of the groupby variable.
+#     """
+#     return list(df.groupby(groupby).groups.keys())
 
 
-def _get_pairwise_combinations(x: list):
-    """
-    Get all pairwise combinations of a list.
-    """
-    return list(itertools.combinations(x, 2))
+# def _get_pairwise_combinations(x: list):
+#     """
+#     Get all pairwise combinations of a list.
+#     """
+#     return list(itertools.combinations(x, 2))
 
 
 class _CustomNamedTemporaryFile:
@@ -548,25 +548,6 @@ class _HiddenPrints:
             sys.stdout = self._original_stdout
 
 
-def clean_channel_name(name):
-    # Get the parts after the last '/'
-    if "/" in name:
-        name = name.split("/")[-1]
-
-    # Split by spaces
-    parts = name.split()
-
-    # For channels with Ctx at the end (L Aud Ctx, R Vis Ctx)
-    if parts[-1] == "Ctx" and len(parts) >= 3:
-        return f"{parts[-3]}_{parts[-2]}_{parts[-1]}"
-
-    # For other channels (L Hipp, R Barrel, etc.)
-    if len(parts) >= 2:
-        return f"{parts[-2]}_{parts[-1]}"
-
-    # Fallback for anything else
-    return name
-
 
 def nanmean_series_of_np(x: pd.Series, axis: int = 0):
     # logging.debug(f"Unique shapes in x: {set(np.shape(item) for item in x)}")
@@ -595,7 +576,7 @@ def log_transform(rec: np.ndarray, **kwargs) -> np.ndarray:
     return np.log(rec + 1)
 
 
-def sort_dataframe_by_plot_order(df: pd.DataFrame, df_sort_order: dict = constants.DF_SORT_ORDER) -> pd.DataFrame:
+def sort_dataframe_by_plot_order(df: pd.DataFrame, df_sort_order: Optional[dict] = None) -> pd.DataFrame:
     """
     Sort DataFrame columns according to predefined orders.
 
@@ -616,7 +597,9 @@ def sort_dataframe_by_plot_order(df: pd.DataFrame, df_sort_order: dict = constan
     ValueError
         If df_sort_order is not a valid dictionary or contains invalid categories
     """
-    if not isinstance(df_sort_order, dict):
+    if df_sort_order is None:
+        df_sort_order = constants.DF_SORT_ORDER.copy()
+    elif not isinstance(df_sort_order, dict):
         raise ValueError("df_sort_order must be a dictionary")
 
     if df.empty:
