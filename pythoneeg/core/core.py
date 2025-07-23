@@ -106,6 +106,8 @@ class DDFBinaryMetadata:
 
 
 def convert_ddfcolbin_to_ddfrowbin(rowdir_path, colbin_path, metadata, save_gzip=True):
+    # TODO consider renaming this function to something more descriptive, like convert_colbin_to_rowbin
+    # Also don't use the rowdir_path parameter, since this is outside the scope of the function. See utils.convert_colpath_to_rowpath
     assert isinstance(metadata, DDFBinaryMetadata), "Metadata needs to be of type DDFBinaryMetadata"
 
     tempbin = np.fromfile(colbin_path, dtype=metadata.precision)

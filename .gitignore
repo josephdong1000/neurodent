@@ -42,5 +42,8 @@ notebooks/tests/test_all_functions_Yong.ipynb
 *.gz
 .DS_Store
 *.dat
+.coverage
+.coverage.*
+coverage.xml
 
 site/

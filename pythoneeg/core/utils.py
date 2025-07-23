@@ -36,10 +36,30 @@ def convert_units_to_multiplier(current_units, target_units="µV"):
 
 
 def is_day(dt: datetime, sunrise=6, sunset=18):
+    """
+    Check if a datetime object is during the day.
+    
+    Args:
+        dt (datetime): Datetime object to check
+        sunrise (int, optional): Sunrise hour (0-23). Defaults to 6.
+        sunset (int, optional): Sunset hour (0-23). Defaults to 18.
+        
+    Returns:
+        bool: True if the datetime is during the day, False otherwise
+        
+    Raises:
+        TypeError: If dt is not a datetime object
+    """
+    if not isinstance(dt, datetime):
+        raise TypeError(f"Expected datetime object, got {type(dt).__name__}")
     return sunrise <= dt.hour < sunset
 
 
 def convert_colpath_to_rowpath(rowdir_path, col_path, gzip=True, aspath=True):
+    # TODO it would make more sense to not have a rowdir_path aparameter, since this is outside the scope of the function
+    if not 'ColMajor' in col_path:
+        raise ValueError(f"Expected 'ColMajor' in col_path: {col_path}")
+
     out = Path(rowdir_path) / f"{Path(col_path).stem.replace('ColMajor', 'RowMajor')}"
     if gzip:
         out = str(out) + ".npy.gz"
@@ -49,10 +69,35 @@ def convert_colpath_to_rowpath(rowdir_path, col_path, gzip=True, aspath=True):
 
 
 def filepath_to_index(filepath) -> int:
+    """
+    Extract the index number from a filepath.
+
+    This function extracts the last number found in a filepath after removing common suffixes
+    and file extensions. For example, from "/path/to/data_ColMajor_001.bin" it returns 1.
+
+    Args:
+        filepath (str | Path): Path to the file to extract index from.
+
+    Returns:
+        int: The extracted index number.
+
+    Examples:
+        >>> filepath_to_index("/path/to/data_ColMajor_001.bin")
+        1
+        >>> filepath_to_index("/path/to/data_2023_015_ColMajor.bin") 
+        15
+        >>> filepath_to_index("/path/to/data_Meta_010.json")
+        10
+    """
     fpath = str(filepath)
     for suffix in ["_RowMajor", "_ColMajor", "_Meta"]:
         fpath = fpath.replace(suffix, "")
-    fpath = fpath.removesuffix("".join(Path(fpath).suffixes))
+    
+    # Remove only the actual file extension, not dots within the filename
+    path_obj = Path(fpath)
+    if path_obj.suffix:
+        fpath = str(path_obj.with_suffix(''))
+    
     fname = Path(fpath).name
     fname = re.split(r"\D+", fname)
     fname = list(filter(None, fname))
@@ -60,6 +105,22 @@ def filepath_to_index(filepath) -> int:
 
 
 def parse_truncate(truncate: int | bool) -> int:
+    """
+    Parse the truncate parameter to determine how many characters to truncate.
+
+    If truncate is a boolean, returns 10 if True and 0 if False.
+    If truncate is an integer, returns that integer value directly.
+
+    Args:
+        truncate (int | bool): If bool, True=10 chars and False=0 chars.
+                              If int, specifies exact number of chars.
+
+    Returns:
+        int: Number of characters to truncate (0 means no truncation)
+
+    Raises:
+        ValueError: If truncate is not a boolean or integer
+    """
     if isinstance(truncate, bool):
         return 10 if truncate else 0
     elif isinstance(truncate, int):
@@ -82,6 +143,7 @@ def parse_path_to_animalday(
     animal_param: tuple[int, str] | str | list[str] = (0, None),
     day_sep: str | None = None,
     mode: Literal["nest", "concat", "base", "noday"] = "concat",
+    **day_parse_kwargs,
 ):
     """
     Parses the filename of a binfolder to get the animalday identifier (animal id, genotype, and day).
@@ -94,19 +156,34 @@ def parse_path_to_animalday(
             list[str]: list of possible animal IDs to match against
         day_sep (str, optional): Separator for day in filename. Defaults to None.
         mode (Literal['nest', 'concat', 'base', 'noday'], optional): Mode to parse the filename. Defaults to 'concat'.
+            'nest': Extracts genotype/animal from parent directory name and date from filename
+                   e.g. "/WT_A10/recording_2023-04-01.*" 
+            'concat': Extracts all info from filename, expects genotype_animal_date format
+                     e.g. "/WT_A10_2023-04-01.*"
+            'base': Same as concat
+            'noday': Extracts only genotype and animal ID, uses default date
+                    e.g. "/WT_A10_recording.*"
+        **day_parse_kwargs: Additional keyword arguments to pass to parse_str_to_day function.
+                           Common options include parse_params dict for dateutil.parser.parse.
+
     Returns:
         dict[str, str]: Dictionary with keys "animal", "genotype", "day", and "animalday" (concatenated).
+            Example: {"animal": "A10", "genotype": "WT", "day": "Apr-01-2023", "animalday": "A10 WT Apr-01-2023"}
+
+    Raises:
+        ValueError: If mode is invalid or required components cannot be extracted
+        TypeError: If filepath is not str or Path
     """
     filepath = Path(filepath)
     match mode:
         case "nest":
             geno = parse_str_to_genotype(filepath.parent.name)
             animid = parse_str_to_animal(filepath.parent.name, animal_param=animal_param)
-            day = parse_str_to_day(filepath.name, sep=day_sep).strftime("%b-%d-%Y")
+            day = parse_str_to_day(filepath.name, sep=day_sep, **day_parse_kwargs).strftime("%b-%d-%Y")
         case "concat" | "base":
             geno = parse_str_to_genotype(filepath.name)
             animid = parse_str_to_animal(filepath.name, animal_param=animal_param)
-            day = parse_str_to_day(filepath.name, sep=day_sep).strftime("%b-%d-%Y")
+            day = parse_str_to_day(filepath.name, sep=day_sep, **day_parse_kwargs).strftime("%b-%d-%Y")
         case "noday":
             geno = parse_str_to_genotype(filepath.name)
             animid = parse_str_to_animal(filepath.name, animal_param=animal_param)
@@ -121,17 +198,31 @@ def parse_path_to_animalday(
     }
 
 
-def parse_str_to_genotype(string: str) -> str:
+def parse_str_to_genotype(string: str, strict_matching: bool = False) -> str:
     """
     Parses the filename of a binfolder to get the genotype.
 
     Args:
         string (str): String to parse.
+        strict_matching (bool, optional): If True, ensures the input matches exactly one genotype.
+            If False, allows overlapping matches and uses longest. Defaults to False for 
+            backward compatibility.
 
     Returns:
         str: Genotype.
+        
+    Raises:
+        ValueError: When string cannot be parsed or contains ambiguous matches in strict mode.
+        
+    Examples:
+        >>> parse_str_to_genotype("WT_A10_data")
+        'WT'
+        >>> parse_str_to_genotype("WT_KO_comparison", strict_matching=True)  # Would raise error
+        ValueError: Ambiguous match...
+        >>> parse_str_to_genotype("WT_KO_comparison", strict_matching=False)  # Uses longest match
+        'WT'  # or 'KO' depending on which alias is longer
     """
-    return __get_key_from_match_values(string, constants.GENOTYPE_ALIASES)
+    return __get_key_from_match_values(string, constants.GENOTYPE_ALIASES, strict_matching)
 
 
 def parse_str_to_animal(string: str, animal_param: tuple[int, str] | str | list[str] = (0, None)) -> str:
@@ -141,35 +232,54 @@ def parse_str_to_animal(string: str, animal_param: tuple[int, str] | str | list[
     Args:
         string (str): String to parse.
         animal_param: Parameter specifying how to parse the animal ID:
-            tuple[int, str]: (index, separator) for simple split and index
-            str: regex pattern to extract ID
-            list[str]: list of possible animal IDs to match against
+            tuple[int, str]: (index, separator) for simple split and index. Not recommended for inconsistent naming conventions.
+            str: regex pattern to extract ID. Most general use case. If multiple matches are found, returns the first match.
+            list[str]: list of possible animal IDs to match against. Returns first match in list order, case-sensitive, ignoring empty strings.
 
     Returns:
         str: Animal id.
+        
+    Examples:
+        # Tuple format: (index, separator)
+        >>> parse_str_to_animal("WT_A10_2023-01-01_data.bin", (1, "_"))
+        'A10'
+        >>> parse_str_to_animal("A10_WT_recording.bin", (0, "_"))
+        'A10'
+        
+        # Regex pattern format
+        >>> parse_str_to_animal("WT_A10_2023-01-01_data.bin", r"A\\d+")
+        'A10'
+        >>> parse_str_to_animal("subject_123_data.bin", r"\\d+")
+        '123'
+        
+        # List format: possible IDs to match
+        >>> parse_str_to_animal("WT_A10_2023-01-01_data.bin", ["A10", "A11", "A12"])
+        'A10'
+        >>> parse_str_to_animal("WT_A10_data.bin", ["B15", "C20"])  # No match
+        ValueError: No matching ID found in WT_A10_data.bin from possible IDs: ['B15', 'C20']
     """
-    match animal_param:
-        case (index, sep):
-            # 1. split, and get by index. Simple to use, but sometimes inconsistent
-            animid = string.split(sep)
-            return animid[index]
-        case str() as pattern:
-            # 2. use regex to pull info. Most general, but hard to use for some users
-            match = re.search(pattern, string)
-            if match:
-                return match.group()
-            raise ValueError(f"No match found for pattern {pattern} in string {string}")
-        case list() as possible_ids:
-            # 3. match to list. Simple to understand, but tedious to use
-            for id in possible_ids:
-                if id in string:
-                    return id
-            raise ValueError(f"No matching ID found in {string} from possible IDs: {possible_ids}")
-        case _:
-            raise ValueError(f"Invalid animal_param type: {type(animal_param)}")
+    if isinstance(animal_param, tuple):
+        index, sep = animal_param
+        animid = string.split(sep)
+        return animid[index]
+    elif isinstance(animal_param, str):
+        pattern = animal_param
+        match = re.search(pattern, string)
+        if match:
+            return match.group()
+        raise ValueError(f"No match found for pattern {pattern} in string {string}")
+    elif isinstance(animal_param, list):
+        possible_ids = animal_param
+        for id in possible_ids:
+            # Skip empty or whitespace-only strings
+            if id and id.strip() and id in string:
+                return id
+        raise ValueError(f"No matching ID found in {string} from possible IDs: {possible_ids}")
+    else:
+        raise ValueError(f"Invalid animal_param type: {type(animal_param)}")
 
 
-def parse_str_to_day(string: str, sep: str = None, parse_params: dict = {"fuzzy": True}) -> datetime:
+def parse_str_to_day(string: str, sep: str = None, parse_params: dict = None, parse_mode: Literal["full", "split", "window", "all"] = "split") -> datetime:
     """
     Parses the filename of a binfolder to get the day.
 
@@ -177,26 +287,70 @@ def parse_str_to_day(string: str, sep: str = None, parse_params: dict = {"fuzzy"
         string (str): String to parse.
         sep (str, optional): Separator to split string by. If None, split by whitespace. Defaults to None.
         parse_params (dict, optional): Parameters to pass to dateutil.parser.parse. Defaults to {'fuzzy':True}.
-
+        parse_mode (Literal["full", "split", "window", "all"], optional): Mode for parsing the string. Defaults to "split".
+            "full": Try parsing the entire cleaned string only
+            "split": Try parsing individual tokens only
+            "window": Try parsing sliding windows of tokens (2-4 tokens) only
+            "all": Use all three approaches in sequence
     Returns:
         datetime: Datetime object corresponding to the day of the binfolder.
 
     Raises:
         ValueError: If no valid date token is found in the string.
+        
+    Note:
+        The function is designed to be conservative to avoid false positives.
+        Some complex date formats may parse with the default year (2000) instead
+        of the actual year in the string, which is acceptable behavior for
+        maintaining safety against false positives.
     """
+    if parse_params is None:
+        parse_params = {"fuzzy": True}
+    
+    # Validate parse_mode
+    valid_modes = ["full", "split", "window", "all"]
+    if parse_mode not in valid_modes:
+        raise ValueError(f"Invalid parse_mode: {parse_mode}. Must be one of {valid_modes}")
+    
     clean_str = _clean_str_for_date(string)
     # logging.debug(f'raw str: {string}, clean_str: {clean_str}')
 
-    tokens = clean_str.split(sep)
-    for token in tokens:
+    # Try parsing based on the specified mode
+    if parse_mode in ["full", "all"]:
+        # Pass 1: Try parsing the entire cleaned string
         try:
-            # logging.debug(f'token: {token}')
-            date = dateutil.parser.parse(token, default=constants.DEFAULT_DAY, **parse_params)
-            if date.year <= 1980:
-                continue
-            return date
+            date = dateutil.parser.parse(clean_str, default=constants.DEFAULT_DAY, **parse_params)
+            if date.year > 1980:
+                return date
         except ParserError:
-            continue
+            pass
+    
+    if parse_mode in ["split", "all"]:
+        # Pass 2: Try individual tokens
+        tokens = clean_str.split(sep)
+        for token in tokens:
+            try:
+                # logging.debug(f'token: {token}')
+                date = dateutil.parser.parse(token, default=constants.DEFAULT_DAY, **parse_params)
+                if date.year <= 1980:
+                    continue
+                return date
+            except ParserError:
+                continue
+    
+    if parse_mode in ["window", "all"]:
+        # Pass 3: Try sliding window of tokens
+        tokens = clean_str.split(sep)
+        for window_size in range(2, min(5, len(tokens) + 1)):
+            for i in range(len(tokens) - window_size + 1):
+                grouped = " ".join(tokens[i:i+window_size])
+                try:
+                    date = dateutil.parser.parse(grouped, default=constants.DEFAULT_DAY, **parse_params)
+                    if date.year <= 1980:
+                        continue
+                    return date
+                except ParserError:
+                    continue
 
     raise ValueError(f"No valid date token found in string: {string}")
 
@@ -225,40 +379,97 @@ def _clean_str_for_date(string: str):
     return cleaned
 
 
-def parse_chname_to_abbrev(channel_name: str, assume_from_number=False) -> str:
+def parse_chname_to_abbrev(channel_name: str, assume_from_number=False, strict_matching=True) -> str:
     """
     Parses the channel name to get the abbreviation.
 
     Args:
         channel_name (str): Name of the channel.
-        assume_from_number (bool, optional): If True, assume the abbreviation based on the last number in the channel name. Defaults to False.
+        assume_from_number (bool, optional): If True, assume the abbreviation based on the last number 
+            in the channel name when normal parsing fails. Defaults to False.
+        strict_matching (bool, optional): If True, ensures the input matches exactly one L/R alias and 
+            one channel alias. If False, allows multiple matches and uses longest. Defaults to True.
 
     Returns:
         str: Abbreviation of the channel name.
+        
+    Raises:
+        ValueError: When channel_name cannot be parsed or contains ambiguous matches in strict mode.
+        KeyError: When assume_from_number=True but the detected number is not a valid channel ID.
+        
+    Examples:
+        >>> parse_chname_to_abbrev("left Aud")
+        'LAud'
+        >>> parse_chname_to_abbrev("Right VIS")
+        'RVis'
+        >>> parse_chname_to_abbrev("channel_9", assume_from_number=True)
+        'LAud'
+        >>> parse_chname_to_abbrev("LRAud", strict_matching=False)  # Would work in non-strict mode
+        'LAud'  # Uses longest L/R match
     """
-    # REVIEW maybe DEFAULT_ID_TO_NAME is not the right place to get default abbreviations
     if channel_name in constants.DEFAULT_ID_TO_NAME.values():
         logging.debug(f"{channel_name} is already an abbreviation")
         return channel_name
+    
     try:
-        lr = __get_key_from_match_values(channel_name, constants.LR_ALIASES)
-        chname = __get_key_from_match_values(channel_name, constants.CHNAME_ALIASES)
+        lr = __get_key_from_match_values(channel_name, constants.LR_ALIASES, strict_matching)
+        chname = __get_key_from_match_values(channel_name, constants.CHNAME_ALIASES, strict_matching)
     except ValueError as e:
         if assume_from_number:
             logging.warning(f"{channel_name} does not match name aliases. Assuming alias from number in channel name.")
             nums = re.findall(r"\d+", channel_name)
+            
+            if not nums:
+                raise ValueError(f"Expected to find a number in channel name '{channel_name}' when assume_from_number=True, but no numbers were found.")
+            
             num = int(nums[-1])
+            if num not in constants.DEFAULT_ID_TO_NAME:
+                available_ids = sorted(constants.DEFAULT_ID_TO_NAME.keys())
+                raise KeyError(f"Channel number {num} found in '{channel_name}' is not a valid channel ID. Available channel IDs: {available_ids}")
+            
             return constants.DEFAULT_ID_TO_NAME[num]
         else:
             raise e
+    
     return lr + chname
 
 
-def __get_key_from_match_values(searchonvals: str, dictionary: dict):
-    for k, v in dictionary.items():
-        if any([x in searchonvals for x in v]):
-            return k
-    raise ValueError(f"{searchonvals} does not have any matching values. Available values: {dictionary}")
+def __get_key_from_match_values(input_string: str, alias_dict: dict, strict_matching: bool = True):
+    """
+    Find the best matching key from alias dictionary.
+    
+    Args:
+        input_string (str): String to search in
+        alias_dict (dict): Dictionary of {key: [aliases]} to match against
+        strict_matching (bool): If True, ensures only one alias matches across all keys
+        
+    Returns:
+        str: The key with the best matching alias
+        
+    Raises:
+        ValueError: When no matches found or multiple matches in strict mode
+    """
+    matches = [
+        (key, candidate, len(candidate))
+        for key, aliases in alias_dict.items()
+        for candidate in aliases
+        if candidate in input_string
+    ]
+    
+    if not matches:
+        alias_examples = {key: aliases[:2] for key, aliases in alias_dict.items()}  # Show first 2 aliases per key
+        raise ValueError(f"{input_string} does not have any matching values. Available aliases (examples): {alias_examples}")
+    
+    if strict_matching:
+        # Check if multiple different keys match
+        matching_keys = set(match[0] for match in matches)
+        if len(matching_keys) > 1:
+            matched_aliases = {key: [alias for k, alias, _ in matches if k == key] for key in matching_keys}
+            raise ValueError(f"Ambiguous match in '{input_string}'. Multiple alias types matched: {matched_aliases}. Use strict_matching=False to allow ambiguous matches.")
+    
+    # Return the key with the longest matching alias
+    best_match_key, _, _ = max(matches, key=lambda x: x[2])
+    return best_match_key
 
 
 def set_temp_directory(path):
