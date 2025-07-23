@@ -616,6 +616,361 @@ class TestLongRecordingOrganizer:
         
         with pytest.raises(ValueError, match="Invalid mode: invalid"):
             organizer.detect_and_load_data(mode="invalid")
+            
+    def test_get_datetime_fragment(self, temp_dir):
+        """Test get_datetime_fragment method."""
+        organizer = LongRecordingOrganizer(temp_dir, mode=None)
+        
+        # Mock the required attributes
+        end_time1 = datetime(2023, 1, 1, 12, 0, 0)
+        end_time2 = datetime(2023, 1, 1, 13, 0, 0) 
+        organizer.file_end_datetimes = [end_time1, end_time2]
+        organizer.file_durations = [3600.0, 3600.0]  # 1 hour each
+        
+        # Test getting datetime for fragment 0
+        fragment_datetime = organizer.get_datetime_fragment(fragment_len_s=600.0, fragment_idx=0)
+        
+        # Should be start of first file
+        expected = datetime(2023, 1, 1, 11, 0, 0)  # 1 hour before end_time1
+        assert fragment_datetime == expected
+        
+    def test_convert_to_mne(self, temp_dir):
+        """Test convert_to_mne method."""
+        organizer = LongRecordingOrganizer(temp_dir, mode=None)
+        
+        # Mock LongRecording with test data
+        n_channels = 3
+        n_samples = 1000
+        test_data = np.random.randn(n_samples, n_channels).astype(np.float32)
+        
+        mock_recording = Mock()
+        mock_recording.get_traces.return_value = test_data
+        mock_recording.get_sampling_frequency.return_value = 1000.0
+        organizer.LongRecording = mock_recording
+        organizer.channel_names = ['ch1', 'ch2', 'ch3']
+        
+        with patch('mne.create_info') as mock_create_info, \
+             patch('mne.io.RawArray') as mock_raw_array:
+            
+            mock_info = Mock()
+            mock_create_info.return_value = mock_info
+            mock_raw = Mock()
+            mock_raw_array.return_value = mock_raw
+            
+            result = organizer.convert_to_mne()
+            
+            # Verify create_info was called correctly
+            mock_create_info.assert_called_once_with(
+                ch_names=['ch1', 'ch2', 'ch3'],
+                sfreq=1000.0,
+                ch_types='eeg'
+            )
+            
+            # Verify RawArray was called with transposed data
+            mock_raw_array.assert_called_once()
+            call_args = mock_raw_array.call_args
+            assert call_args[1]['info'] == mock_info
+            # Data should be transposed from (n_samples, n_channels) to (n_channels, n_samples)
+            passed_data = call_args[1]['data']
+            assert passed_data.shape == (n_channels, n_samples)
+            
+            assert result == mock_raw
+            
+    def test_compute_bad_channels(self, temp_dir):
+        """Test compute_bad_channels method."""
+        organizer = LongRecordingOrganizer(temp_dir, mode=None)
+        
+        # Mock LongRecording
+        n_channels = 4
+        n_samples = 1000
+        # Create test data where channel 2 is an outlier
+        normal_data = np.random.randn(n_samples, 3) * 10  # channels 0,1,3
+        outlier_data = np.random.randn(n_samples, 1) * 100  # channel 2 (much larger amplitude)
+        test_data = np.hstack([normal_data, outlier_data])
+        # Rearrange to put outlier in position 2
+        test_data = test_data[:, [0, 1, 3, 2]]
+        
+        mock_recording = Mock()
+        mock_recording.get_traces.return_value = test_data
+        mock_recording.__str__.return_value = "MockRecording"
+        organizer.LongRecording = mock_recording
+        organizer.channel_names = ['ch1', 'ch2', 'ch3', 'ch4']
+        
+        with patch('pythoneeg.core.core.Natural_Neighbor') as mock_nn_class, \
+             patch('pythoneeg.core.core.LocalOutlierFactor') as mock_lof_class:
+            
+            # Mock Natural_Neighbor
+            mock_nn = Mock()
+            mock_nn.algorithm.return_value = 3
+            mock_nn_class.return_value = mock_nn
+            
+            # Mock LocalOutlierFactor
+            mock_lof = Mock()
+            mock_lof.negative_outlier_factor_ = np.array([-1.0, -1.0, -1.0, -2.0])  # ch4 is outlier
+            mock_lof_class.return_value = mock_lof
+            
+            # Test with default threshold
+            organizer.compute_bad_channels(lof_threshold=1.5)
+            
+            # Verify Natural_Neighbor was used
+            mock_nn.read.assert_called_once()
+            mock_nn.algorithm.assert_called_once()
+            
+            # Verify LocalOutlierFactor was configured correctly  
+            mock_lof_class.assert_called_once_with(n_neighbors=3, metric="minkowski", p=2)
+            mock_lof.fit.assert_called_once()
+            
+            # Channel 4 should be identified as bad (score 2.0 > threshold 1.5)
+            assert organizer.bad_channel_names == ['ch4']
+            
+    def test_compute_bad_channels_limit_memory(self, temp_dir):
+        """Test compute_bad_channels with limit_memory=True."""
+        organizer = LongRecordingOrganizer(temp_dir, mode=None)
+        
+        # Create larger test data
+        n_channels = 2
+        n_samples = 10000
+        test_data = np.random.randn(n_samples, n_channels).astype(np.float64)
+        
+        mock_recording = Mock()
+        mock_recording.get_traces.return_value = test_data
+        mock_recording.__str__.return_value = "MockRecording"
+        organizer.LongRecording = mock_recording
+        organizer.channel_names = ['ch1', 'ch2']
+        
+        with patch('pythoneeg.core.core.Natural_Neighbor') as mock_nn_class, \
+             patch('pythoneeg.core.core.LocalOutlierFactor') as mock_lof_class, \
+             patch('pythoneeg.core.core.decimate') as mock_decimate:
+            
+            mock_nn = Mock()
+            mock_nn.algorithm.return_value = 2
+            mock_nn_class.return_value = mock_nn
+            
+            mock_lof = Mock()
+            mock_lof.negative_outlier_factor_ = np.array([-1.0, -1.0])
+            mock_lof_class.return_value = mock_lof
+            
+            # Mock decimate to return smaller data
+            decimated_data = test_data[::10]  # Simulate decimation
+            mock_decimate.return_value = decimated_data
+            
+            organizer.compute_bad_channels(limit_memory=True)
+            
+            # Verify decimate was called
+            mock_decimate.assert_called_once()
+            # Verify data was converted to float16 before decimation
+            call_args = mock_decimate.call_args[0]
+            assert call_args[0].dtype == np.float16
+            
+    @patch('pythoneeg.core.core.DDFBinaryMetadata')
+    def test_prepare_colbins_rowbins_metas(self, mock_metadata_class, temp_dir):
+        """Test prepare_colbins_rowbins_metas method."""
+        # Create test files
+        (temp_dir / "file1_ColMajor.bin").write_bytes(b"test_data")
+        (temp_dir / "file1_RowMajor.npy.gz").write_bytes(b"test_data")  
+        (temp_dir / "file1_Meta.csv").write_text("ProbeInfo,SampleRate\nch1,1000")
+        
+        # Mock metadata objects
+        mock_meta1 = Mock()
+        mock_meta1.dt_end = datetime(2023, 1, 1, 12, 0, 0)
+        mock_meta1.channel_names = ['ch1']
+        mock_meta1.metadata_df = pd.DataFrame({'ProbeInfo': ['ch1']})
+        
+        mock_metadata_class.side_effect = [mock_meta1, mock_meta1]  # One for self.meta, one for __metadata_objects
+        
+        organizer = LongRecordingOrganizer(temp_dir, mode=None)
+        
+        with patch.object(organizer, '_validate_metadata_consistency') as mock_validate:
+            organizer.prepare_colbins_rowbins_metas()
+            
+            # Verify files were found
+            assert len(organizer.colbins) >= 1
+            assert len(organizer.metas) >= 1
+            
+            # Verify metadata was set
+            assert organizer.meta is not None
+            assert organizer.channel_names == ['ch1']
+            assert len(organizer.file_end_datetimes) >= 1
+            
+            # Verify validation was called
+            mock_validate.assert_called_once()
+            
+    def test_prepare_colbins_rowbins_metas_no_dates(self, temp_dir):
+        """Test prepare_colbins_rowbins_metas when no dates are found."""
+        (temp_dir / "file1_ColMajor.bin").write_bytes(b"test_data")
+        (temp_dir / "file1_Meta.csv").write_text("ProbeInfo,SampleRate\nch1,1000")
+        
+        organizer = LongRecordingOrganizer(temp_dir, mode=None)
+        
+        with patch('pythoneeg.core.core.DDFBinaryMetadata') as mock_metadata_class:
+            mock_meta = Mock()
+            mock_meta.dt_end = None  # No date
+            mock_meta.channel_names = ['ch1']
+            mock_meta.metadata_df = pd.DataFrame({'ProbeInfo': ['ch1']})
+            mock_metadata_class.return_value = mock_meta
+            
+            with pytest.raises(ValueError, match="No dates found in any metadata object!"):
+                organizer.prepare_colbins_rowbins_metas()
+                
+    def test_convert_file_with_si_to_recording_folder_mode(self, temp_dir):
+        """Test convert_file_with_si_to_recording with folder input."""
+        organizer = LongRecordingOrganizer(temp_dir, mode=None)
+        
+        # Mock extract function and recording
+        mock_extract = Mock()
+        mock_recording = Mock()
+        mock_recording.get_num_channels.return_value = 4
+        mock_recording.get_sampling_frequency.return_value = 1000.0
+        mock_recording.get_channel_ids.return_value = np.array(['ch1', 'ch2', 'ch3', 'ch4'])
+        mock_extract.return_value = mock_recording
+        
+        organizer.convert_file_with_si_to_recording(
+            extract_func=mock_extract,
+            input_type="folder"
+        )
+        
+        # Verify extract function was called with folder
+        mock_extract.assert_called_once_with(Path(temp_dir))
+        assert organizer.LongRecording == mock_recording
+        assert organizer.meta.n_channels == 4
+        assert organizer.meta.f_s == 1000.0
+        
+    def test_convert_file_with_si_to_recording_file_mode(self, temp_dir):
+        """Test convert_file_with_si_to_recording with single file input."""
+        # Create test file
+        test_file = temp_dir / "test.edf"
+        test_file.touch()
+        
+        organizer = LongRecordingOrganizer(temp_dir, mode=None)
+        
+        mock_extract = Mock()
+        mock_recording = Mock()
+        mock_recording.get_num_channels.return_value = 2
+        mock_recording.get_sampling_frequency.return_value = 500.0
+        mock_recording.get_channel_ids.return_value = np.array(['ch1', 'ch2'])
+        mock_extract.return_value = mock_recording
+        
+        organizer.convert_file_with_si_to_recording(
+            extract_func=mock_extract,
+            input_type="file",
+            file_pattern="*.edf"
+        )
+        
+        # Should call extract with the found file
+        mock_extract.assert_called_once_with(str(test_file))
+        assert organizer.LongRecording == mock_recording
+        
+    def test_convert_file_with_si_to_recording_files_mode(self, temp_dir):
+        """Test convert_file_with_si_to_recording with multiple files."""
+        # Create test files
+        file1 = temp_dir / "file1.edf"
+        file2 = temp_dir / "file2.edf"
+        file1.touch()
+        file2.touch()
+        
+        organizer = LongRecordingOrganizer(temp_dir, mode=None)
+        
+        # Mock extract function to return different recordings
+        mock_extract = Mock()
+        mock_rec1 = Mock()
+        mock_rec2 = Mock()
+        mock_extract.side_effect = [mock_rec1, mock_rec2]
+        
+        # Mock concatenate_recordings
+        mock_concat_rec = Mock()
+        mock_concat_rec.get_num_channels.return_value = 2
+        mock_concat_rec.get_sampling_frequency.return_value = 1000.0
+        mock_concat_rec.get_channel_ids.return_value = np.array(['ch1', 'ch2'])
+        
+        with patch('spikeinterface.core.concatenate_recordings', return_value=mock_concat_rec):
+            organizer.convert_file_with_si_to_recording(
+                extract_func=mock_extract,
+                input_type="files",
+                file_pattern="*.edf"
+            )
+        
+        # Should call extract twice and concatenate
+        assert mock_extract.call_count == 2
+        assert organizer.LongRecording == mock_concat_rec
+        
+    def test_convert_file_with_mne_to_recording_edf_intermediate(self, temp_dir):
+        """Test convert_file_with_mne_to_recording with EDF intermediate."""
+        test_file = temp_dir / "test.bdf"
+        test_file.touch()
+        
+        organizer = LongRecordingOrganizer(temp_dir, mode=None)
+        
+        # Mock MNE raw object
+        mock_raw = Mock()
+        mock_raw.info = {'sfreq': 2000.0, 'nchan': 2}
+        mock_raw.resample.return_value = mock_raw
+        
+        mock_extract = Mock(return_value=mock_raw)
+        
+        # Mock SpikeInterface recording
+        mock_si_rec = Mock()
+        mock_si_rec.get_num_channels.return_value = 2
+        mock_si_rec.get_sampling_frequency.return_value = 1000.0
+        mock_si_rec.get_channel_ids.return_value = np.array(['ch1', 'ch2'])
+        
+        with patch('mne.export.export_raw') as mock_export, \
+             patch('spikeinterface.extractors.read_edf', return_value=mock_si_rec):
+            
+            organizer.convert_file_with_mne_to_recording(
+                extract_func=mock_extract,
+                input_type="file",
+                file_pattern="*.bdf",
+                intermediate="edf"
+            )
+        
+        # Verify raw was resampled and exported
+        mock_raw.resample.assert_called_once_with(constants.GLOBAL_SAMPLING_RATE)
+        mock_export.assert_called_once()
+        assert organizer.LongRecording == mock_si_rec
+        
+    def test_convert_file_with_mne_to_recording_bin_intermediate(self, temp_dir):
+        """Test convert_file_with_mne_to_recording with binary intermediate."""
+        test_file = temp_dir / "test.bdf"
+        test_file.touch()
+        
+        organizer = LongRecordingOrganizer(temp_dir, mode=None)
+        
+        # Mock MNE raw object with test data
+        n_channels = 3
+        n_samples = 1000
+        test_data = np.random.randn(n_channels, n_samples).astype(np.float32)
+        
+        mock_raw = Mock()
+        mock_raw.info = {'sfreq': 1000.0, 'nchan': n_channels}
+        mock_raw.resample.return_value = mock_raw
+        mock_raw.get_data.return_value = test_data
+        
+        mock_extract = Mock(return_value=mock_raw)
+        
+        # Mock SpikeInterface recording
+        mock_si_rec = Mock()
+        mock_si_rec.get_num_channels.return_value = n_channels
+        mock_si_rec.get_sampling_frequency.return_value = 1000.0
+        mock_si_rec.get_channel_ids.return_value = np.array(['ch1', 'ch2', 'ch3'])
+        
+        with patch('spikeinterface.extractors.read_binary', return_value=mock_si_rec):
+            organizer.convert_file_with_mne_to_recording(
+                extract_func=mock_extract,
+                input_type="file", 
+                file_pattern="*.bdf",
+                intermediate="bin"
+            )
+        
+        # Verify binary file was created and read
+        bin_file = temp_dir / f"{temp_dir.name}_mne-to-rec.bin"
+        assert bin_file.exists()
+        
+        # Verify data was written correctly (transposed from MNE format)
+        written_data = np.fromfile(bin_file, dtype=np.float32).reshape(n_samples, n_channels)
+        expected_data = test_data.T  # MNE data is (n_channels, n_samples), we expect (n_samples, n_channels)
+        np.testing.assert_array_almost_equal(written_data, expected_data)
+        
+        assert organizer.LongRecording == mock_si_rec
 
 
 @pytest.fixture
