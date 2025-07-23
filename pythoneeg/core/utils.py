@@ -20,12 +20,6 @@ from sklearn.neighbors import KDTree
 from .. import constants
 
 
-def convert_path(inputPath):
-    # Convert path string to match the os
-    system = platform.system()
-    home = str(Path.home())
-
-
 def convert_units_to_multiplier(current_units, target_units="µV"):
     units_to_mult = {"µV": 1e-6, "mV": 1e-3, "V": 1, "nV": 1e-9}
 
@@ -504,33 +498,6 @@ def get_temp_directory() -> Path:
 #     Get all pairwise combinations of a list.
 #     """
 #     return list(itertools.combinations(x, 2))
-
-
-class _CustomNamedTemporaryFile:
-    """
-    This custom implementation is needed because of the following limitation of tempfile.NamedTemporaryFile:
-
-    > Whether the name can be used to open the file a second time, while the named temporary file is still open,
-    > varies across platforms (it can be so used on Unix; it cannot on Windows NT or later).
-    """
-
-    def __init__(self, mode="wb", delete=True):
-        self._mode = mode
-        self._delete = delete
-
-    def __enter__(self):
-        # Generate a random temporary file name
-        file_name = os.path.join(get_temp_directory(), os.urandom(24).hex())
-        # Ensure the file is created
-        open(file_name, "x").close()
-        # Open the file in the given mode
-        self._tempFile = open(file_name, self._mode)
-        return self._tempFile
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self._tempFile.close()
-        if self._delete:
-            os.remove(self._tempFile.name)
 
 
 class _HiddenPrints:
