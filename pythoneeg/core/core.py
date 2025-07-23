@@ -539,6 +539,7 @@ class LongRecordingOrganizer:
 
         self.LongRecording = rec
         self.meta = DDFBinaryMetadata(
+            None,
             n_channels=self.LongRecording.get_num_channels(),
             f_s=self.LongRecording.get_sampling_frequency(),
             dt_end=constants.DEFAULT_DAY,  # NOTE parse timestamp from SI file date/metadata?
@@ -623,6 +624,7 @@ class LongRecordingOrganizer:
 
         self.LongRecording = rec
         self.meta = DDFBinaryMetadata(
+            None,
             n_channels=self.LongRecording.get_num_channels(),
             f_s=self.LongRecording.get_sampling_frequency(),
             dt_end=constants.DEFAULT_DAY,  # NOTE parse timestamp from MNE file date/metadata?
