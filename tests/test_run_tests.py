@@ -367,7 +367,6 @@ class TestMainFunction:
         assert exc_info.value.code == 1
 
 
-@pytest.mark.integration
 class TestRunTestsIntegration:
     """Integration tests for run_tests.py functionality."""
     
@@ -391,5 +390,4 @@ class TestRunTestsIntegration:
         assert "--all-checks" in result.stdout
 
 
-# Mark all tests in this file as unit tests
-pytestmark = pytest.mark.unit
+# All tests in this file are unit tests
