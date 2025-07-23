@@ -1,0 +1,625 @@
+"""
+Unit tests for pythoneeg.core.core module.
+"""
+import gzip
+import os
+import tempfile
+from datetime import datetime
+from pathlib import Path
+from unittest.mock import Mock, patch, MagicMock
+import warnings
+
+import numpy as np
+import pandas as pd
+import pytest
+import spikeinterface.core as si
+
+from pythoneeg.core.core import (
+    DDFBinaryMetadata,
+    LongRecordingOrganizer,
+    convert_ddfcolbin_to_ddfrowbin,
+    convert_ddfrowbin_to_si,
+)
+from pythoneeg import constants
+
+
+class TestDDFBinaryMetadata:
+    """Test DDFBinaryMetadata class functionality."""
+    
+    def test_init_from_path_valid_metadata(self, temp_dir):
+        """Test initialization from valid metadata CSV file."""
+        # Create test metadata CSV
+        metadata_data = {
+            'ProbeInfo': ['LAud', 'RAud', 'LVis', 'RVis'],
+            'SampleRate': [1000, 1000, 1000, 1000],
+            'Units': ['µV', 'µV', 'µV', 'µV'],
+            'Precision': ['float32', 'float32', 'float32', 'float32'],
+            'LastEdit': ['2023-01-01T12:00:00', '2023-01-01T12:00:00', 
+                        '2023-01-01T12:00:00', '2023-01-01T12:00:00']
+        }
+        df = pd.DataFrame(metadata_data)
+        csv_path = temp_dir / "test_metadata.csv"
+        df.to_csv(csv_path, index=False)
+        
+        # Test initialization
+        metadata = DDFBinaryMetadata(csv_path)
+        
+        assert metadata.n_channels == 4
+        assert metadata.f_s == 1000
+        assert metadata.V_units == 'µV'
+        assert metadata.mult_to_uV == 1.0
+        assert metadata.precision == 'float32'
+        assert isinstance(metadata.dt_end, datetime)
+        assert metadata.channel_names == ['LAud', 'RAud', 'LVis', 'RVis']
+        
+    def test_init_from_path_empty_metadata(self, temp_dir):
+        """Test initialization from empty metadata file raises error."""
+        empty_csv = temp_dir / "empty.csv"
+        # Create truly empty CSV (no header, no data)
+        with open(empty_csv, 'w') as f:
+            f.write('')
+        
+        # pandas raises EmptyDataError for truly empty files
+        with pytest.raises(pd.errors.EmptyDataError):
+            DDFBinaryMetadata(empty_csv)
+            
+    def test_init_from_path_no_lastedit_column(self, temp_dir):
+        """Test initialization with missing LastEdit column."""
+        metadata_data = {
+            'ProbeInfo': ['LAud', 'RAud'],
+            'SampleRate': [1000, 1000],
+            'Units': ['µV', 'µV'],
+            'Precision': ['float32', 'float32']
+        }
+        df = pd.DataFrame(metadata_data)
+        csv_path = temp_dir / "no_lastedit.csv"
+        df.to_csv(csv_path, index=False)
+        
+        # This should work and set dt_end to None (the __getsinglecolval handles missing columns)
+        metadata = DDFBinaryMetadata(csv_path)
+        assert metadata.dt_end is None
+        assert metadata.n_channels == 2
+            
+    def test_init_from_params_valid(self):
+        """Test initialization from direct parameters."""
+        dt_end = datetime(2023, 1, 1, 12, 0, 0)
+        channel_names = ['LAud', 'RAud', 'LVis', 'RVis']
+        
+        metadata = DDFBinaryMetadata(
+            None,
+            n_channels=4,
+            f_s=1000.0,
+            dt_end=dt_end,
+            channel_names=channel_names
+        )
+        
+        assert metadata.n_channels == 4
+        assert metadata.f_s == 1000.0
+        assert metadata.dt_end == dt_end
+        assert metadata.channel_names == channel_names
+        assert metadata.metadata_path is None
+        assert metadata.metadata_df is None
+        assert metadata.V_units is None
+        assert metadata.mult_to_uV is None
+        assert metadata.precision is None
+        
+    def test_init_from_params_missing_required(self):
+        """Test initialization from params with missing required values raises ValueError."""
+        with pytest.raises(ValueError, match="All parameters must be provided"):
+            DDFBinaryMetadata(None, n_channels=4, f_s=1000.0)  # Missing dt_end and channel_names
+            
+    def test_init_from_params_invalid_channel_names(self):
+        """Test initialization with non-list channel_names raises ValueError."""
+        with pytest.raises(ValueError, match="channel_names must be a list"):
+            DDFBinaryMetadata(
+                None,
+                n_channels=4,
+                f_s=1000.0,
+                dt_end=datetime.now(),
+                channel_names="not_a_list"
+            )
+            
+    def test_getsinglecolval_consistent_values(self, temp_dir):
+        """Test __getsinglecolval with consistent column values."""
+        metadata_data = {
+            'ProbeInfo': ['LAud', 'RAud', 'LVis'],
+            'SampleRate': [1000, 1000, 1000],
+            'Units': ['µV', 'µV', 'µV'],
+            'Precision': ['float32', 'float32', 'float32']
+        }
+        df = pd.DataFrame(metadata_data)
+        csv_path = temp_dir / "consistent.csv"
+        df.to_csv(csv_path, index=False)
+        
+        metadata = DDFBinaryMetadata(csv_path)
+        assert metadata.f_s == 1000
+        assert metadata.V_units == 'µV'
+        
+    def test_getsinglecolval_inconsistent_values_warning(self, temp_dir):
+        """Test __getsinglecolval with inconsistent values shows warning."""
+        metadata_data = {
+            'ProbeInfo': ['LAud', 'RAud', 'LVis'],
+            'SampleRate': [1000, 2000, 1000],  # Inconsistent values
+            'Units': ['µV', 'µV', 'µV'],
+            'Precision': ['float32', 'float32', 'float32']
+        }
+        df = pd.DataFrame(metadata_data)
+        csv_path = temp_dir / "inconsistent.csv"
+        df.to_csv(csv_path, index=False)
+        
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            metadata = DDFBinaryMetadata(csv_path)
+            # Check if warning was raised (may be multiple warnings)
+            warning_messages = [str(warning.message) for warning in w]
+            assert any("Not all SampleRates are equal" in msg for msg in warning_messages)
+            assert metadata.f_s == 1000  # Should return first value
+            
+    def test_getsinglecolval_empty_column(self, temp_dir):
+        """Test __getsinglecolval with empty column returns None."""
+        metadata_data = {
+            'ProbeInfo': ['LAud'],
+            'SampleRate': [1000],
+            'Units': ['µV'],  # Valid value
+            'Precision': ['float32']
+        }
+        df = pd.DataFrame(metadata_data)
+        csv_path = temp_dir / "single_row.csv"
+        df.to_csv(csv_path, index=False)
+        
+        metadata = DDFBinaryMetadata(csv_path)
+        assert metadata.n_channels == 1
+        assert metadata.V_units == 'µV'
+
+
+class TestConvertDdfcolbinToDdfrowbin:
+    """Test convert_ddfcolbin_to_ddfrowbin function."""
+    
+    def test_convert_valid_colbin(self, temp_dir):
+        """Test converting valid column-major binary file."""
+        # Create test column-major binary data
+        n_channels = 4
+        n_samples = 1000
+        test_data = np.random.randn(n_samples, n_channels).astype(np.float32)
+        
+        # Save as column-major (Fortran order)
+        colbin_path = temp_dir / "test_ColMajor_001.bin"
+        test_data.flatten(order='F').tofile(colbin_path)
+        
+        # Create metadata
+        metadata = DDFBinaryMetadata(
+            None,
+            n_channels=n_channels,
+            f_s=1000.0,
+            dt_end=datetime.now(),
+            channel_names=['ch1', 'ch2', 'ch3', 'ch4']
+        )
+        metadata.precision = np.float32
+        
+        # Convert
+        rowbin_path = convert_ddfcolbin_to_ddfrowbin(str(temp_dir), str(colbin_path), metadata, save_gzip=True)
+        
+        # Verify output file exists
+        assert Path(rowbin_path).exists()
+        assert str(rowbin_path).endswith('.npy.gz')
+        
+        # Verify data integrity
+        with gzip.GzipFile(rowbin_path, 'r') as f:
+            converted_data = np.load(f)
+        
+        assert converted_data.shape == (n_samples, n_channels)
+        np.testing.assert_array_almost_equal(converted_data, test_data)
+        
+    def test_convert_invalid_metadata_type(self, temp_dir):
+        """Test convert with invalid metadata type raises AssertionError."""
+        colbin_path = temp_dir / "test.bin"
+        colbin_path.touch()
+        
+        with pytest.raises(AssertionError, match="Metadata needs to be of type DDFBinaryMetadata"):
+            convert_ddfcolbin_to_ddfrowbin(temp_dir, colbin_path, "not_metadata", save_gzip=True)
+            
+    def test_convert_save_uncompressed(self, temp_dir):
+        """Test converting with save_gzip=False creates .bin file."""
+        # Create test data
+        n_channels = 2
+        n_samples = 100
+        test_data = np.random.randn(n_samples, n_channels).astype(np.float32)
+        
+        colbin_path = temp_dir / "test_ColMajor_001.bin"
+        test_data.flatten(order='F').tofile(colbin_path)
+        
+        metadata = DDFBinaryMetadata(
+            None,
+            n_channels=n_channels,
+            f_s=1000.0,
+            dt_end=datetime.now(),
+            channel_names=['ch1', 'ch2']
+        )
+        metadata.precision = np.float32
+        
+        # Convert without compression
+        rowbin_path = convert_ddfcolbin_to_ddfrowbin(str(temp_dir), str(colbin_path), metadata, save_gzip=False)
+        
+        assert Path(rowbin_path).exists()
+        assert str(rowbin_path).endswith('.bin')
+        
+        # Verify data
+        converted_data = np.fromfile(rowbin_path, dtype=np.float32).reshape(n_samples, n_channels)
+        np.testing.assert_array_almost_equal(converted_data, test_data)
+
+
+class TestConvertDdfrowbinToSi:
+    """Test convert_ddfrowbin_to_si function."""
+    
+    def test_convert_gzipped_rowbin(self, temp_dir):
+        """Test converting gzipped row-major binary to SpikeInterface recording."""
+        # Create test row-major data
+        n_channels = 4
+        n_samples = 1000
+        test_data = np.random.randn(n_samples, n_channels).astype(np.float32)
+        
+        # Save as gzipped numpy array
+        rowbin_path = temp_dir / "test_RowMajor_001.npy.gz"
+        with gzip.GzipFile(rowbin_path, 'w') as f:
+            np.save(f, test_data)
+        
+        # Create metadata
+        metadata = DDFBinaryMetadata(
+            None,
+            n_channels=n_channels,
+            f_s=1000.0,
+            dt_end=datetime.now(),
+            channel_names=['ch1', 'ch2', 'ch3', 'ch4']
+        )
+        metadata.precision = np.float32
+        metadata.mult_to_uV = 1.0
+        
+        # Convert
+        rec, temppath = convert_ddfrowbin_to_si(rowbin_path, metadata)
+        
+        # Verify recording properties
+        assert isinstance(rec, si.BaseRecording)
+        assert rec.get_num_channels() == n_channels
+        assert rec.get_num_frames() == n_samples
+        assert rec.get_sampling_frequency() == constants.GLOBAL_SAMPLING_RATE
+        assert rec.get_dtype() == constants.GLOBAL_DTYPE
+        
+        # Verify temporary file was created and cleanup
+        assert temppath is not None
+        if os.path.exists(temppath):
+            os.remove(temppath)
+            
+    def test_convert_uncompressed_rowbin(self, temp_dir):
+        """Test converting uncompressed row-major binary."""
+        # Create test data
+        n_channels = 2
+        n_samples = 500
+        test_data = np.random.randn(n_samples, n_channels).astype(np.float32)
+        
+        # Save as binary file
+        rowbin_path = temp_dir / "test_RowMajor_001.bin"
+        test_data.tofile(rowbin_path)
+        
+        metadata = DDFBinaryMetadata(
+            None,
+            n_channels=n_channels,
+            f_s=1000.0,
+            dt_end=datetime.now(),
+            channel_names=['ch1', 'ch2']
+        )
+        metadata.precision = np.float32
+        metadata.mult_to_uV = 1.0
+        
+        # Convert
+        rec, temppath = convert_ddfrowbin_to_si(rowbin_path, metadata)
+        
+        assert isinstance(rec, si.BaseRecording)
+        assert rec.get_num_channels() == n_channels
+        assert rec.get_num_frames() == n_samples
+        assert temppath is None  # No temp file for uncompressed
+        
+    def test_convert_invalid_metadata_type(self, temp_dir):
+        """Test convert with invalid metadata type raises AssertionError."""
+        rowbin_path = temp_dir / "test.npy.gz"
+        
+        with pytest.raises(AssertionError, match="Metadata needs to be of type DDFBinaryMetadata"):
+            convert_ddfrowbin_to_si(rowbin_path, "not_metadata")
+            
+    def test_convert_corrupted_gzip_file(self, temp_dir):
+        """Test handling of corrupted gzip file."""
+        # Create corrupted gzip file
+        rowbin_path = temp_dir / "corrupted.npy.gz"
+        with open(rowbin_path, 'wb') as f:
+            f.write(b'corrupted data')
+        
+        metadata = DDFBinaryMetadata(
+            None,
+            n_channels=2,
+            f_s=1000.0,
+            dt_end=datetime.now(),
+            channel_names=['ch1', 'ch2']
+        )
+        metadata.precision = np.float32
+        metadata.mult_to_uV = 1.0
+        
+        with pytest.raises((EOFError, OSError)):
+            convert_ddfrowbin_to_si(rowbin_path, metadata)
+            
+    @patch('pythoneeg.core.core.spre.resample')
+    def test_convert_different_sampling_rate_resamples(self, mock_resample, temp_dir):
+        """Test that different sampling rates trigger resampling."""
+        # Create test data
+        n_channels = 2
+        n_samples = 100
+        test_data = np.random.randn(n_samples, n_channels).astype(np.float32)
+        
+        rowbin_path = temp_dir / "test.bin"
+        test_data.tofile(rowbin_path)
+        
+        metadata = DDFBinaryMetadata(
+            None,
+            n_channels=n_channels,
+            f_s=2000.0,  # Different from GLOBAL_SAMPLING_RATE
+            dt_end=datetime.now(),
+            channel_names=['ch1', 'ch2']
+        )
+        metadata.precision = np.float32
+        metadata.mult_to_uV = 1.0
+        
+        # Mock the recording and resampling
+        mock_rec = Mock()
+        mock_rec.sampling_frequency = 2000.0
+        mock_resampled_rec = Mock()
+        mock_resample.return_value = mock_resampled_rec
+        
+        with patch('spikeinterface.extractors.read_binary', return_value=mock_rec):
+            with patch('spikeinterface.preprocessing.astype', return_value=mock_resampled_rec):
+                rec, temppath = convert_ddfrowbin_to_si(rowbin_path, metadata)
+        
+        # Verify resampling was called
+        mock_resample.assert_called_once_with(mock_rec, constants.GLOBAL_SAMPLING_RATE)
+
+
+class TestLongRecordingOrganizer:
+    """Test LongRecordingOrganizer class functionality."""
+    
+    def test_init_with_mode_none(self, temp_dir):
+        """Test initialization with mode=None doesn't load data."""
+        organizer = LongRecordingOrganizer(temp_dir, mode=None)
+        
+        assert organizer.base_folder_path == Path(temp_dir)
+        assert organizer.meta is None
+        assert organizer.channel_names is None
+        assert organizer.LongRecording is None
+        assert organizer.truncate is False
+        assert organizer.n_truncate == 0
+        
+    def test_init_with_truncate_bool(self, temp_dir):
+        """Test initialization with truncate=True."""
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")  # Ignore truncation warning
+            organizer = LongRecordingOrganizer(temp_dir, mode=None, truncate=True)
+        
+        assert organizer.truncate is True
+        assert organizer.n_truncate == 10  # Default truncate value
+        
+    def test_init_with_truncate_int(self, temp_dir):
+        """Test initialization with truncate as integer."""
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            organizer = LongRecordingOrganizer(temp_dir, mode=None, truncate=5)
+        
+        assert organizer.truncate is True
+        assert organizer.n_truncate == 5
+        
+    def test_truncate_file_list_no_truncation(self, temp_dir):
+        """Test _truncate_file_list with no truncation needed."""
+        organizer = LongRecordingOrganizer(temp_dir, mode=None, truncate=False)
+        files = ['file1.bin', 'file2.bin', 'file3.bin']
+        
+        result = organizer._truncate_file_list(files)
+        assert result == files
+        
+    def test_truncate_file_list_with_truncation(self, temp_dir):
+        """Test _truncate_file_list with truncation."""
+        organizer = LongRecordingOrganizer(temp_dir, mode=None, truncate=2)
+        files = ['file3.bin', 'file1.bin', 'file2.bin']  # Unsorted
+        
+        result = organizer._truncate_file_list(files)
+        assert len(result) == 2
+        assert result == ['file1.bin', 'file2.bin']  # Should be sorted
+        
+    def test_truncate_file_list_with_ref_list(self, temp_dir):
+        """Test _truncate_file_list with reference list."""
+        organizer = LongRecordingOrganizer(temp_dir, mode=None, truncate=False)
+        # Files have _RowMajor suffix, ref_list has _ColMajor suffix, but both have same base stems
+        files = ['file1_RowMajor.npy.gz', 'file2_RowMajor.npy.gz', 'file3_RowMajor.npy.gz']
+        ref_list = ['file1_ColMajor.bin', 'file3_ColMajor.bin']  # Only file1 and file3
+        
+        result = organizer._truncate_file_list(files, ref_list=ref_list)
+        assert len(result) == 2
+        # Should return files whose stems match ref_list stems (file1 and file3)
+        result_names = [Path(f).name for f in result]
+        assert 'file1_RowMajor.npy.gz' in result_names
+        assert 'file3_RowMajor.npy.gz' in result_names
+        assert 'file2_RowMajor.npy.gz' not in result_names
+        
+    def test_validate_metadata_consistency_success(self, temp_dir):
+        """Test _validate_metadata_consistency with consistent metadata."""
+        organizer = LongRecordingOrganizer(temp_dir, mode=None)
+        
+        # Create consistent metadata objects
+        metadata1 = DDFBinaryMetadata(
+            None, n_channels=4, f_s=1000.0, dt_end=datetime.now(),
+            channel_names=['ch1', 'ch2', 'ch3', 'ch4']
+        )
+        metadata1.precision = 'float32'
+        metadata1.V_units = 'µV'
+        
+        metadata2 = DDFBinaryMetadata(
+            None, n_channels=4, f_s=1000.0, dt_end=datetime.now(),
+            channel_names=['ch1', 'ch2', 'ch3', 'ch4']
+        )
+        metadata2.precision = 'float32'
+        metadata2.V_units = 'µV'
+        
+        # Should not raise exception
+        organizer._validate_metadata_consistency([metadata1, metadata2])
+        
+    def test_validate_metadata_consistency_failure(self, temp_dir):
+        """Test _validate_metadata_consistency with inconsistent metadata."""
+        organizer = LongRecordingOrganizer(temp_dir, mode=None)
+        
+        # Create inconsistent metadata objects
+        metadata1 = DDFBinaryMetadata(
+            None, n_channels=4, f_s=1000.0, dt_end=datetime.now(),
+            channel_names=['ch1', 'ch2', 'ch3', 'ch4']
+        )
+        metadata1.precision = 'float32'
+        metadata1.V_units = 'µV'
+        
+        metadata2 = DDFBinaryMetadata(
+            None, n_channels=8, f_s=1000.0, dt_end=datetime.now(),  # Different n_channels
+            channel_names=['ch1', 'ch2', 'ch3', 'ch4', 'ch5', 'ch6', 'ch7', 'ch8']
+        )
+        metadata2.precision = 'float32'
+        metadata2.V_units = 'µV'
+        
+        with pytest.raises(ValueError, match="Metadata files inconsistent at attribute n_channels"):
+            organizer._validate_metadata_consistency([metadata1, metadata2])
+            
+    def test_time_conversion_methods(self, temp_dir):
+        """Test __time_to_idx and __idx_to_time methods."""
+        organizer = LongRecordingOrganizer(temp_dir, mode=None)
+        
+        # Mock LongRecording
+        mock_recording = Mock()
+        mock_recording.time_to_sample_index.return_value = 1000
+        mock_recording.sample_index_to_time.return_value = 1.0
+        organizer.LongRecording = mock_recording
+        
+        # Test time to index conversion
+        idx = organizer._LongRecordingOrganizer__time_to_idx(1.0)
+        assert idx == 1000
+        mock_recording.time_to_sample_index.assert_called_once_with(1.0)
+        
+        # Test index to time conversion
+        time_s = organizer._LongRecordingOrganizer__idx_to_time(1000)
+        assert time_s == 1.0
+        mock_recording.sample_index_to_time.assert_called_once_with(1000)
+        
+    def test_get_num_fragments(self, temp_dir):
+        """Test get_num_fragments calculation."""
+        organizer = LongRecordingOrganizer(temp_dir, mode=None)
+        
+        # Mock LongRecording
+        mock_recording = Mock()
+        mock_recording.time_to_sample_index.return_value = 1000  # 1 second = 1000 samples
+        mock_recording.get_num_frames.return_value = 5500  # 5.5 seconds total
+        organizer.LongRecording = mock_recording
+        
+        # Should return ceil(5500 / 1000) = 6 fragments
+        num_fragments = organizer.get_num_fragments(fragment_len_s=1.0)
+        assert num_fragments == 6
+        
+    def test_fragidx_to_startendind(self, temp_dir):
+        """Test __fragidx_to_startendind method."""
+        organizer = LongRecordingOrganizer(temp_dir, mode=None)
+        
+        # Mock LongRecording
+        mock_recording = Mock()
+        mock_recording.time_to_sample_index.return_value = 1000  # 1 second = 1000 samples
+        mock_recording.get_num_frames.return_value = 3500  # Total frames
+        organizer.LongRecording = mock_recording
+        
+        # Test fragment 0
+        start, end = organizer._LongRecordingOrganizer__fragidx_to_startendind(1.0, 0)
+        assert start == 0
+        assert end == 1000
+        
+        # Test fragment 1
+        start, end = organizer._LongRecordingOrganizer__fragidx_to_startendind(1.0, 1)
+        assert start == 1000
+        assert end == 2000
+        
+        # Test last fragment (should be capped at total frames)
+        start, end = organizer._LongRecordingOrganizer__fragidx_to_startendind(1.0, 3)
+        assert start == 3000
+        assert end == 3500  # Capped at total frames
+        
+    def test_get_fragment(self, temp_dir):
+        """Test get_fragment method."""
+        organizer = LongRecordingOrganizer(temp_dir, mode=None)
+        
+        # Mock LongRecording
+        mock_recording = Mock()
+        mock_recording.time_to_sample_index.return_value = 1000
+        mock_recording.get_num_frames.return_value = 5000
+        mock_fragment = Mock()
+        mock_recording.frame_slice.return_value = mock_fragment
+        organizer.LongRecording = mock_recording
+        
+        fragment = organizer.get_fragment(fragment_len_s=1.0, fragment_idx=2)
+        
+        # Should call frame_slice with correct indices
+        mock_recording.frame_slice.assert_called_once_with(2000, 3000)
+        assert fragment == mock_fragment
+        
+    def test_get_dur_fragment(self, temp_dir):
+        """Test get_dur_fragment method."""
+        organizer = LongRecordingOrganizer(temp_dir, mode=None)
+        
+        # Mock LongRecording
+        mock_recording = Mock()
+        mock_recording.time_to_sample_index.return_value = 1000
+        mock_recording.get_num_frames.return_value = 5000
+        mock_recording.sample_index_to_time.side_effect = lambda x: x / 1000.0
+        organizer.LongRecording = mock_recording
+        
+        duration = organizer.get_dur_fragment(fragment_len_s=1.0, fragment_idx=1)
+        
+        # Fragment 1: indices 1000-2000, times 1.0-2.0, duration = 1.0
+        assert duration == 1.0
+        
+    def test_cleanup_rec(self, temp_dir):
+        """Test cleanup_rec method."""
+        organizer = LongRecordingOrganizer(temp_dir, mode=None)
+        
+        # Create temporary files
+        temp_file1 = temp_dir / "temp1.bin"
+        temp_file2 = temp_dir / "temp2.bin"
+        temp_file1.touch()
+        temp_file2.touch()
+        
+        organizer.LongRecording = Mock()
+        organizer.temppaths = [temp_file1, temp_file2]
+        
+        # Test cleanup
+        organizer.cleanup_rec()
+        
+        # Files should be deleted
+        assert not temp_file1.exists()
+        assert not temp_file2.exists()
+        
+    def test_cleanup_rec_no_recording(self, temp_dir):
+        """Test cleanup_rec when LongRecording doesn't exist."""
+        organizer = LongRecordingOrganizer(temp_dir, mode=None)
+        organizer.temppaths = []
+        
+        # Should not raise exception - the method handles AttributeError internally
+        # It uses logging.warning, not warnings.warn
+        organizer.cleanup_rec()
+            
+    def test_detect_and_load_data_invalid_mode(self, temp_dir):
+        """Test detect_and_load_data with invalid mode raises ValueError."""
+        organizer = LongRecordingOrganizer(temp_dir, mode=None)
+        
+        with pytest.raises(ValueError, match="Invalid mode: invalid"):
+            organizer.detect_and_load_data(mode="invalid")
+
+
+@pytest.fixture
+def temp_dir():
+    """Create a temporary directory for testing."""
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        yield Path(tmp_dir)
