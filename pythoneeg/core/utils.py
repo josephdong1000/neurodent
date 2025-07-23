@@ -359,17 +359,10 @@ def _clean_str_for_date(string: str):
     Returns:
         str: Cleaned string with non-date tokens removed
     """
-
-    # Create one pattern that matches any of the above
     patterns = constants.DATEPARSER_PATTERNS_TO_REMOVE
     combined_pattern = "|".join(patterns)
-
-    # Remove all matching patterns, replace with space
     cleaned = re.sub(combined_pattern, " ", string, flags=re.IGNORECASE)
-
-    # Clean up extra whitespace
     cleaned = " ".join(cleaned.split())
-
     return cleaned
 
 
