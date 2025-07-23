@@ -138,7 +138,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                 1,
                 figsize=figsize,
                 sharex=True,
-                gridspec_kw={"height_ratios": [constants.LINPLOT_HEIGHT_RATIOS[x] for x in features]},
+                gridspec_kw={"height_ratios": [constants.FEATURE_PLOT_HEIGHT_RATIOS[x] for x in features]},
             )
             plt.subplots_adjust(hspace=0)
 
@@ -286,7 +286,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
     ):
         if features is None:
             features = ["zcohere", "zpcorr"]
-        height_ratios = {"cohere": 5, "zcohere": 5, "pcorr": 1, "zpcorr": 1}
+        # Use consolidated height ratios from constants (matrix features for spectral heatmaps)
 
         df_rowgroup = self.window_result.get_grouprows_result(features, multiindex=multiindex)
         for feature in features:
@@ -300,7 +300,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                 1,
                 figsize=figsize,
                 sharex=True,
-                gridspec_kw={"height_ratios": [height_ratios[x] for x in features]},
+                gridspec_kw={"height_ratios": [constants.FEATURE_PLOT_HEIGHT_RATIOS[x] for x in features]},
             )
             plt.subplots_adjust(hspace=0)
             for j, feat in enumerate(features):

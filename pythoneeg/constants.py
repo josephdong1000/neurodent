@@ -85,7 +85,8 @@ HIST_FEATURES = ["psd"]
 FEATURES = LINEAR_FEATURES + BAND_FEATURES + MATRIX_FEATURES + HIST_FEATURES
 WAR_FEATURES = [f for f in FEATURES if "nspike" not in f]
 
-LINPLOT_HEIGHT_RATIOS = {
+FEATURE_PLOT_HEIGHT_RATIOS = {
+    # Linear features (across channels or channels x bands)
     "rms": 1,  # NOTE add in log features?
     "ampvar": 1,
     "psdtotal": 1,
@@ -93,6 +94,11 @@ LINPLOT_HEIGHT_RATIOS = {
     "psdband": 5,
     "psdfrac": 5,
     "nspike": 1,
+    # Matrix features (heatmaps of flattened matrices for spectral analysis)
+    "cohere": 5,
+    "zcohere": 5,
+    "pcorr": 1,
+    "zpcorr": 1,
 }
 
 FREQ_BANDS = {

@@ -85,13 +85,22 @@ class TestConstants:
         assert "cohere" in constants.MATRIX_FEATURES
         assert "psd" in constants.HIST_FEATURES
         
-    def test_linplot_height_ratios(self):
-        """Test LINPLOT_HEIGHT_RATIOS."""
-        assert isinstance(constants.LINPLOT_HEIGHT_RATIOS, dict)
-        for feature, ratio in constants.LINPLOT_HEIGHT_RATIOS.items():
+    def test_feature_plot_height_ratios(self):
+        """Test FEATURE_PLOT_HEIGHT_RATIOS for both linear and matrix features."""
+        assert isinstance(constants.FEATURE_PLOT_HEIGHT_RATIOS, dict)
+        
+        # Test structure and data types
+        for feature, ratio in constants.FEATURE_PLOT_HEIGHT_RATIOS.items():
             assert isinstance(feature, str)
             assert isinstance(ratio, (int, float))
             assert ratio > 0
+            
+        # Test that both linear and matrix features are included
+        linear_features = ["rms", "ampvar", "psdtotal", "psdslope", "psdband", "psdfrac", "nspike"]
+        matrix_features = ["cohere", "zcohere", "pcorr", "zpcorr"]
+        
+        for feature in linear_features + matrix_features:
+            assert feature in constants.FEATURE_PLOT_HEIGHT_RATIOS, f"Missing feature: {feature}"
             
     def test_freq_bands(self):
         """Test FREQ_BANDS structure."""
