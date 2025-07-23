@@ -20,7 +20,33 @@ from sklearn.neighbors import KDTree
 from .. import constants
 
 
-def convert_units_to_multiplier(current_units, target_units="µV"):
+def convert_units_to_multiplier(current_units: str, target_units: str = "µV") -> float:
+    """
+    Convert between different voltage units and return the multiplication factor.
+
+    This function calculates the conversion factor needed to transform values
+    from one voltage unit to another (e.g., from mV to µV).
+
+    Args:
+        current_units (str): The current unit of the values. Must be one of: 'µV', 'mV', 'V', 'nV'.
+        target_units (str, optional): The target unit to convert to. Defaults to 'µV'.
+            Must be one of: 'µV', 'mV', 'V', 'nV'.
+
+    Returns:
+        float: The multiplication factor to convert from current_units to target_units.
+            To convert values, multiply your data by this factor.
+
+    Raises:
+        AssertionError: If current_units or target_units are not supported.
+
+    Examples:
+        >>> convert_units_to_multiplier("mV", "µV")
+        1000.0
+        >>> convert_units_to_multiplier("V", "mV")
+        1000.0
+        >>> convert_units_to_multiplier("µV", "V")
+        1e-06
+    """
     units_to_mult = {"µV": 1e-6, "mV": 1e-3, "V": 1, "nV": 1e-9}
 
     assert current_units in units_to_mult.keys(), f"No valid current unit called '{current_units}' found"
@@ -49,7 +75,33 @@ def is_day(dt: datetime, sunrise=6, sunset=18):
     return sunrise <= dt.hour < sunset
 
 
-def convert_colpath_to_rowpath(rowdir_path, col_path, gzip=True, aspath=True):
+def convert_colpath_to_rowpath(rowdir_path: str | Path, col_path: str | Path, gzip: bool = True, aspath: bool = True) -> str | Path:
+    """
+    Convert a ColMajor file path to its corresponding RowMajor file path.
+
+    This function transforms file paths from column-major format to row-major format,
+    which is used when converting between different data storage layouts in PyEEG.
+
+    Args:
+        rowdir_path (str | Path): Directory path where the RowMajor file should be located.
+        col_path (str | Path): Path to the ColMajor file to be converted. Must contain 'ColMajor' in the path.
+        gzip (bool, optional): If True, append '.npy.gz' extension. If False, append '.bin'. Defaults to True.
+        aspath (bool, optional): If True, return as Path object. If False, return as string. Defaults to True.
+
+    Returns:
+        str | Path: The converted RowMajor file path, either as string or Path object based on aspath parameter.
+
+    Raises:
+        ValueError: If 'ColMajor' is not found in col_path.
+
+    Examples:
+        >>> convert_colpath_to_rowpath("/data/row/", "/data/col/file_ColMajor_001.bin")
+        PosixPath('/data/row/file_RowMajor_001.npy.gz')
+        >>> convert_colpath_to_rowpath("/data/row/", "/data/col/file_ColMajor_001.bin", gzip=False)
+        PosixPath('/data/row/file_RowMajor_001.bin')
+        >>> convert_colpath_to_rowpath("/data/row/", "/data/col/file_ColMajor_001.bin", aspath=False)
+        '/data/row/file_RowMajor_001.npy.gz'
+    """
     # TODO it would make more sense to not have a rowdir_path aparameter, since this is outside the scope of the function
     if not 'ColMajor' in col_path:
         raise ValueError(f"Expected 'ColMajor' in col_path: {col_path}")
@@ -123,9 +175,33 @@ def parse_truncate(truncate: int | bool) -> int:
         raise ValueError(f"Invalid truncate value: {truncate}")
 
 
-def nanaverage(A, weights, axis=-1):
+def nanaverage(A: np.ndarray, weights: np.ndarray, axis: int = -1) -> np.ndarray:
     """
-    Average of an array, ignoring NaNs.
+    Compute weighted average of an array, ignoring NaN values.
+
+    This function computes a weighted average along the specified axis while
+    properly handling NaN values by masking them out of the calculation.
+
+    Args:
+        A (np.ndarray): Input array containing the values to average.
+        weights (np.ndarray): Array of weights corresponding to the values in A.
+            Must be broadcastable with A along the specified axis.
+        axis (int, optional): Axis along which to compute the average. Defaults to -1 (last axis).
+
+    Returns:
+        np.ndarray: Weighted average with NaN values properly handled. If all values
+            along an axis are NaN, the result will be NaN for that position.
+
+    Examples:
+        >>> import numpy as np
+        >>> A = np.array([[1.0, 2.0, np.nan], [4.0, np.nan, 6.0]])
+        >>> weights = np.array([1, 2, 1])
+        >>> nanaverage(A, weights, axis=1)
+        array([1.66666667, 5.        ])
+
+    Note:
+        Be careful with zero or negative weights as they may produce unexpected results.
+        The function uses numpy's masked array functionality for robust NaN handling.
     """
     masked = np.ma.masked_array(A, np.isnan(A))
     avg = np.ma.average(masked, axis=axis, weights=weights)
@@ -459,11 +535,23 @@ def _get_key_from_match_values(input_string: str, alias_dict: dict, strict_match
     return best_match_key
 
 
-def set_temp_directory(path):
-    """Set the temporary directory for PyEEG operations.
+def set_temp_directory(path: str | Path) -> None:
+    """
+    Set the temporary directory for PyEEG operations.
+
+    This function configures the temporary directory used by PyEEG for intermediate
+    files and operations. The directory will be created if it doesn't exist.
 
     Args:
-        path (str or Path): Path to the temporary directory. Will be created if it doesn't exist.
+        path (str | Path): Path to the temporary directory. Will be created if it doesn't exist.
+
+    Examples:
+        >>> set_temp_directory("/tmp/pyeeg_temp")
+        >>> set_temp_directory(Path.home() / "pyeeg_workspace" / "temp")
+
+    Note:
+        This function modifies the TMPDIR environment variable, which affects
+        the behavior of other temporary file operations in the process.
     """
     path = Path(path)
     if not path.exists():
@@ -474,7 +562,18 @@ def set_temp_directory(path):
 
 def get_temp_directory() -> Path:
     """
-    Returns the temporary directory.
+    Get the current temporary directory used by PyEEG.
+
+    Returns:
+        Path: Path object representing the current temporary directory.
+
+    Examples:
+        >>> temp_dir = get_temp_directory()
+        >>> print(f"Current temp directory: {temp_dir}")
+        Current temp directory: /tmp/pyeeg_temp
+
+    Raises:
+        KeyError: If TMPDIR environment variable is not set.
     """
     return Path(os.environ["TMPDIR"])
 
@@ -494,7 +593,30 @@ def get_temp_directory() -> Path:
 
 
 class _HiddenPrints:
-    def __init__(self, silence=True) -> None:
+    """
+    Context manager to suppress print output during code execution.
+
+    This class provides a way to temporarily suppress print statements and other
+    stdout output, which is useful when calling functions that produce unwanted
+    console output.
+
+    Args:
+        silence (bool, optional): Whether to actually suppress output. Defaults to True.
+            If False, acts as a no-op context manager.
+
+    Examples:
+        >>> with _HiddenPrints():
+        ...     print("This won't be displayed")
+        ...     some_noisy_function()
+        >>> print("This will be displayed")
+        This will be displayed
+
+        >>> with _HiddenPrints(silence=False):
+        ...     print("This will be displayed")
+        This will be displayed
+    """
+
+    def __init__(self, silence: bool = True) -> None:
         self.silence = silence
 
     def __enter__(self):
@@ -509,7 +631,40 @@ class _HiddenPrints:
 
 
 
-def nanmean_series_of_np(x: pd.Series, axis: int = 0):
+def nanmean_series_of_np(x: pd.Series, axis: int = 0) -> np.ndarray:
+    """
+    Efficiently compute NaN-aware mean of a pandas Series containing numpy arrays.
+
+    This function is optimized for computing the mean across a Series where each element
+    is a numpy array. It uses different strategies based on the size of the Series
+    for optimal performance.
+
+    Args:
+        x (pd.Series): Series containing numpy arrays as elements.
+        axis (int, optional): Axis along which to compute the mean. Defaults to 0.
+            - axis=0: Mean across the Series elements (most common)
+            - axis=1: Mean within each array element
+
+    Returns:
+        np.ndarray: Array containing the computed means with NaN values properly handled.
+
+    Examples:
+        >>> import pandas as pd
+        >>> import numpy as np
+        >>> # Create a Series of numpy arrays
+        >>> arrays = [np.array([1.0, 2.0, np.nan]), 
+        ...           np.array([4.0, np.nan, 6.0]),
+        ...           np.array([7.0, 8.0, 9.0])]
+        >>> series = pd.Series(arrays)
+        >>> nanmean_series_of_np(series)
+        array([4. , 5. , 7.5])
+
+    Performance Notes:
+        - For Series with more than 1000 elements containing numpy arrays,
+          uses `np.stack()` for better performance
+        - Falls back to list conversion for smaller Series or mixed types
+        - Handles shape mismatches gracefully by falling back to the slower method
+    """
     # logging.debug(f"Unique shapes in x: {set(np.shape(item) for item in x)}")
 
     if len(x) > 1000:
@@ -733,6 +888,28 @@ class Natural_Neighbor(object):
 class TimestampMapper:
     """
     Map each fragment to its source file's timestamp.
+
+    This class provides functionality to map data fragments back to their original
+    file timestamps when data has been concatenated from multiple files with
+    different recording times.
+
+    Attributes:
+        file_end_datetimes (list[datetime]): The end datetimes of each source file.
+        file_durations (list[float]): The durations of each source file in seconds.
+        file_start_datetimes (list[datetime]): Computed start datetimes of each file.
+        cumulative_durations (np.ndarray): Cumulative sum of file durations.
+
+    Examples:
+        >>> from datetime import datetime, timedelta
+        >>> # Set up files with known end times and durations
+        >>> end_times = [datetime(2023, 1, 1, 12, 0), datetime(2023, 1, 1, 13, 0)]
+        >>> durations = [3600.0, 1800.0]  # 1 hour, 30 minutes
+        >>> mapper = TimestampMapper(end_times, durations)
+        >>> 
+        >>> # Get timestamp for fragment at index 2 with 60s fragments
+        >>> timestamp = mapper.get_fragment_timestamp(2, 60.0)
+        >>> print(timestamp)
+        2023-01-01 11:02:00
     """
 
     def __init__(self, file_end_datetimes: list[datetime], file_durations: list[float]):
@@ -741,8 +918,14 @@ class TimestampMapper:
 
         Args:
             file_end_datetimes (list[datetime]): The end datetimes of each file.
-            file_durations (list[float]): The durations of each file.
+            file_durations (list[float]): The durations of each file in seconds.
+
+        Raises:
+            ValueError: If the lengths of file_end_datetimes and file_durations don't match.
         """
+        if len(file_end_datetimes) != len(file_durations):
+            raise ValueError("file_end_datetimes and file_durations must have the same length")
+            
         self.file_end_datetimes = file_end_datetimes
         self.file_durations = file_durations
 
@@ -752,7 +935,22 @@ class TimestampMapper:
         ]
         self.cumulative_durations = np.cumsum(self.file_durations)
 
-    def get_fragment_timestamp(self, fragment_idx, fragment_len_s) -> datetime:
+    def get_fragment_timestamp(self, fragment_idx: int, fragment_len_s: float) -> datetime:
+        """
+        Get the timestamp for a specific fragment based on its index and length.
+
+        Args:
+            fragment_idx (int): The index of the fragment (0-based).
+            fragment_len_s (float): The length of each fragment in seconds.
+
+        Returns:
+            datetime: The timestamp corresponding to the start of the specified fragment.
+
+        Examples:
+            >>> # Get timestamp for the 5th fragment (index 4) with 30-second fragments
+            >>> timestamp = mapper.get_fragment_timestamp(4, 30.0)
+            >>> # This returns the timestamp 2 minutes into the first file
+        """
         # Find which file this fragment belongs to
         fragment_start_time = fragment_idx * fragment_len_s
         file_idx = np.searchsorted(self.cumulative_durations, fragment_start_time)
