@@ -1011,6 +1011,173 @@ class WindowAnalysisResult(AnimalFeatureParser):
             filtered_result, self.animal_id, self.genotype, self.channel_names, self.assume_from_number
         )
 
+    def _create_filtered_copy(self, filter_mask: np.ndarray) -> "WindowAnalysisResult":
+        """Create a new WindowAnalysisResult with the filter applied.
+        
+        Args:
+            filter_mask (np.ndarray): Boolean mask of shape (n_windows, n_channels)
+            
+        Returns:
+            WindowAnalysisResult: New instance with filter applied
+        """
+        filtered_result = self._apply_filter(filter_mask)
+        return WindowAnalysisResult(
+            filtered_result, 
+            self.animal_id, 
+            self.genotype, 
+            self.channel_names, 
+            self.assume_from_number,
+            self.bad_channels_dict
+        )
+
+    def filter_logrms_range(self, z_range: float = 3, **kwargs) -> "WindowAnalysisResult":
+        """Filter based on log(rms) z-score range.
+        
+        Args:
+            z_range (float): Z-score range threshold. Defaults to 3.
+            
+        Returns:
+            WindowAnalysisResult: New filtered instance
+        """
+        mask = self.get_filter_logrms_range(z_range=z_range, **kwargs)
+        return self._create_filtered_copy(mask)
+    
+    def filter_high_rms(self, max_rms: float = 500, **kwargs) -> "WindowAnalysisResult":
+        """Filter out windows with RMS above threshold.
+        
+        Args:
+            max_rms (float): Maximum RMS threshold. Defaults to 500.
+            
+        Returns:
+            WindowAnalysisResult: New filtered instance
+        """
+        mask = self.get_filter_high_rms(max_rms=max_rms, **kwargs)
+        return self._create_filtered_copy(mask)
+    
+    def filter_low_rms(self, min_rms: float = 50, **kwargs) -> "WindowAnalysisResult":
+        """Filter out windows with RMS below threshold.
+        
+        Args:
+            min_rms (float): Minimum RMS threshold. Defaults to 50.
+            
+        Returns:
+            WindowAnalysisResult: New filtered instance
+        """
+        mask = self.get_filter_low_rms(min_rms=min_rms, **kwargs)
+        return self._create_filtered_copy(mask)
+    
+    def filter_high_beta(self, max_beta_prop: float = 0.4, **kwargs) -> "WindowAnalysisResult":
+        """Filter out windows with high beta power.
+        
+        Args:
+            max_beta_prop (float): Maximum beta power proportion. Defaults to 0.4.
+            
+        Returns:
+            WindowAnalysisResult: New filtered instance
+        """
+        mask = self.get_filter_high_beta(max_beta_prop=max_beta_prop, **kwargs)
+        return self._create_filtered_copy(mask)
+    
+    def filter_reject_channels(self, bad_channels: list[str], use_abbrevs: bool = None, **kwargs) -> "WindowAnalysisResult":
+        """Filter out specified bad channels.
+        
+        Args:
+            bad_channels (list[str]): List of channel names to reject
+            use_abbrevs (bool, optional): Whether to use abbreviations. Defaults to None.
+            
+        Returns:
+            WindowAnalysisResult: New filtered instance
+        """
+        mask = self.get_filter_reject_channels(bad_channels, use_abbrevs=use_abbrevs, **kwargs)
+        return self._create_filtered_copy(mask)
+    
+    def filter_reject_channels_by_session(self, bad_channels_dict: dict[str, list[str]] = None, use_abbrevs: bool = None, **kwargs) -> "WindowAnalysisResult":
+        """Filter out bad channels by recording session.
+        
+        Args:
+            bad_channels_dict (dict[str, list[str]], optional): Dict of bad channels per session
+            use_abbrevs (bool, optional): Whether to use abbreviations. Defaults to None.
+            
+        Returns:
+            WindowAnalysisResult: New filtered instance
+        """
+        mask = self.get_filter_reject_channels_by_recording_session(bad_channels_dict, use_abbrevs=use_abbrevs, **kwargs)
+        return self._create_filtered_copy(mask)
+    
+    def apply_filters(self, filter_config: dict = None, min_valid_channels: int = 3, morphological_smoothing_seconds: float = None, **kwargs) -> "WindowAnalysisResult":
+        """Apply multiple filters using configuration.
+        
+        Args:
+            filter_config (dict, optional): Dictionary of filter names and parameters.
+                Available filters: 'logrms_range', 'high_rms', 'low_rms', 'high_beta', 
+                'reject_channels', 'reject_channels_by_session'
+            min_valid_channels (int): Minimum valid channels per window. Defaults to 3.
+            morphological_smoothing_seconds (float, optional): Temporal smoothing window
+            
+        Returns:
+            WindowAnalysisResult: New filtered instance
+            
+        Examples:
+            >>> config = {
+            ...     'logrms_range': {'z_range': 3},
+            ...     'high_rms': {'max_rms': 500},
+            ...     'reject_channels': {'bad_channels': ['LMot', 'RMot']}
+            ... }
+            >>> filtered_war = war.apply_filters(config)
+        """
+        if filter_config is None:
+            filter_config = {
+                'logrms_range': {'z_range': 3},
+                'high_rms': {'max_rms': 500},
+                'low_rms': {'min_rms': 50},
+                'high_beta': {'max_beta_prop': 0.4},
+                'reject_channels_by_session': {}
+            }
+        
+        filter_methods = {
+            'logrms_range': self.get_filter_logrms_range,
+            'high_rms': self.get_filter_high_rms,
+            'low_rms': self.get_filter_low_rms,
+            'high_beta': self.get_filter_high_beta,
+            'reject_channels': self.get_filter_reject_channels,
+            'reject_channels_by_session': self.get_filter_reject_channels_by_recording_session
+        }
+        
+        filt_bools = []
+        for filter_name, filter_params in filter_config.items():
+            if filter_name not in filter_methods:
+                raise ValueError(f"Unknown filter: {filter_name}. Available: {list(filter_methods.keys())}")
+            
+            filter_func = filter_methods[filter_name]
+            filt_bool = filter_func(**filter_params, **kwargs)
+            filt_bools.append(filt_bool)
+            logging.info(f"{filter_name}: filtered {filt_bool.size - np.count_nonzero(filt_bool)}/{filt_bool.size}")
+        
+        # Combine all filter masks
+        filt_bool_all = np.prod(np.stack(filt_bools, axis=-1), axis=-1).astype(bool)
+        
+        # Apply morphological smoothing if requested
+        if morphological_smoothing_seconds is not None:
+            if "duration" not in self.result.columns:
+                raise ValueError("Cannot calculate window duration - 'duration' column missing")
+            window_duration = self.result["duration"].median()
+            structure_size = max(1, int(morphological_smoothing_seconds / window_duration))
+            
+            if structure_size > 1:
+                logging.info(f"Applying morphological smoothing with {structure_size} windows")
+                for ch_idx in range(filt_bool_all.shape[1]):
+                    channel_mask = filt_bool_all[:, ch_idx]
+                    channel_mask = binary_opening(channel_mask, structure=np.ones(structure_size))
+                    channel_mask = binary_closing(channel_mask, structure=np.ones(structure_size))
+                    filt_bool_all[:, ch_idx] = channel_mask
+        
+        # Filter windows based on minimum valid channels
+        valid_channels_per_window = np.sum(filt_bool_all, axis=1)
+        window_mask = valid_channels_per_window >= min_valid_channels
+        filt_bool_all = filt_bool_all & window_mask[:, np.newaxis]
+        
+        return self._create_filtered_copy(filt_bool_all)
+
     def _apply_filter(self, filter_tfs: np.ndarray):
         result = self.result.copy()
         filter_tfs = np.array(filter_tfs, dtype=bool)  # (M fragments, N channels)
