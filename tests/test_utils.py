@@ -1850,7 +1850,9 @@ class TestNanmeanSeriesOfNp:
         ]
         series = pd.Series(arrays)
         
-        result = utils.nanmean_series_of_np(series)
+        # Expected warning when computing mean of all NaN values
+        with pytest.warns(RuntimeWarning, match="Mean of empty slice"):
+            result = utils.nanmean_series_of_np(series)
         
         # Should return array of NaNs
         assert np.all(np.isnan(result))
@@ -1886,8 +1888,9 @@ class TestNanmeanSeriesOfNp:
         """Test nanmean operation with empty series."""
         series = pd.Series([], dtype=object)
         
-        # Empty series returns NaN, doesn't raise ValueError
-        result = utils.nanmean_series_of_np(series)
+        # Empty series causes warning and returns NaN
+        with pytest.warns(RuntimeWarning, match="Mean of empty slice"):
+            result = utils.nanmean_series_of_np(series)
         assert np.isnan(result)
             
     def test_mixed_array_sizes_small_series(self):
@@ -2151,12 +2154,9 @@ class TestTimestampMapper:
         end_times = [datetime(2023, 1, 1, 12, 0, 0)]
         durations = [60.0, 120.0]  # Different length
         
-        # Should work but only use matching pairs
-        mapper = utils.TimestampMapper(end_times, durations)
-        
-        # Should work with available data
-        result = mapper.get_fragment_timestamp(0, 30.0)
-        assert isinstance(result, datetime)
+        # Should raise ValueError for mismatched lengths
+        with pytest.raises(ValueError, match="file_end_datetimes and file_durations must have the same length"):
+            utils.TimestampMapper(end_times, durations)
         
     def test_zero_duration_file(self):
         """Test with zero duration file."""
@@ -2269,8 +2269,14 @@ class TestValidateTimestamps:
             None
         ]
         
-        with pytest.warns(UserWarning, match="Found 2 None timestamps"):
+        # Should warn about None timestamps AND about large gap (2 minutes > 60 seconds)
+        with pytest.warns(UserWarning) as warning_list:
             result = utils.validate_timestamps(timestamps)
+            
+        # Check that we got both warnings
+        warning_messages = [str(w.message) for w in warning_list]
+        assert any("Found 2 None timestamps" in msg for msg in warning_messages)
+        assert any("Large gap detected" in msg for msg in warning_messages)
             
         expected = [
             datetime(2023, 1, 1, 12, 0, 0),
@@ -2320,6 +2326,46 @@ class TestValidateTimestamps:
         with warnings.catch_warnings():
             warnings.simplefilter("error")  # Turn warnings into errors
             result = utils.validate_timestamps(timestamps, gap_threshold_seconds=60)
+            assert result == timestamps
+            
+    def test_gap_threshold_behavior(self):
+        """Test gap threshold behavior with varying thresholds and gaps."""
+        # Timestamps with different gaps
+        timestamps = [
+            datetime(2023, 1, 1, 12, 0, 0),   # Start
+            datetime(2023, 1, 1, 12, 0, 30),  # 30 seconds gap
+            datetime(2023, 1, 1, 12, 1, 30),  # 60 seconds gap  
+            datetime(2023, 1, 1, 12, 3, 30),  # 120 seconds gap
+        ]
+        
+        # Test with 20 second threshold - should warn about all gaps
+        with pytest.warns(UserWarning) as warning_list:
+            result = utils.validate_timestamps(timestamps, gap_threshold_seconds=20)
+        
+        warning_messages = [str(w.message) for w in warning_list]
+        # Should get 3 warnings (for 30s, 60s, and 120s gaps)
+        assert len([msg for msg in warning_messages if "Large gap detected" in msg]) == 3
+        
+        # Test with 50 second threshold - should warn about 60s and 120s gaps only
+        with pytest.warns(UserWarning) as warning_list:
+            result = utils.validate_timestamps(timestamps, gap_threshold_seconds=50)
+        
+        warning_messages = [str(w.message) for w in warning_list]
+        # Should get 2 warnings (for 60s and 120s gaps)
+        assert len([msg for msg in warning_messages if "Large gap detected" in msg]) == 2
+        
+        # Test with 90 second threshold - should warn about 120s gap only
+        with pytest.warns(UserWarning) as warning_list:
+            result = utils.validate_timestamps(timestamps, gap_threshold_seconds=90)
+        
+        warning_messages = [str(w.message) for w in warning_list]
+        # Should get 1 warning (for 120s gap)
+        assert len([msg for msg in warning_messages if "Large gap detected" in msg]) == 1
+        
+        # Test with 150 second threshold - should not warn about any gaps
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")  # Turn warnings into errors
+            result = utils.validate_timestamps(timestamps, gap_threshold_seconds=150)
             assert result == timestamps
             
     def test_single_timestamp(self):
@@ -2847,19 +2893,25 @@ class TestNanaverageEdgeCases:
         A = np.array([1.0, 2.0, 3.0])
         weights = np.array([0.0, 0.0, 0.0])
         
-        # This will cause division by zero and return nan
-        with pytest.raises(AttributeError):
-            # The function has a bug where it assumes avg is always masked
-            utils.nanaverage(A, weights)
+        # This will cause division by zero warnings but should return nan gracefully
+        with pytest.warns(RuntimeWarning, match="invalid value encountered in scalar divide"):
+            result = utils.nanaverage(A, weights)
+            
+        assert np.isnan(result)
+        assert isinstance(result, np.ndarray)
     
     def test_negative_weights(self):
         """Test nanaverage with negative weights."""
         A = np.array([1.0, 2.0, 3.0])
         weights = np.array([-1.0, 2.0, -1.0])
         
-        # This will also fail due to the same bug
-        with pytest.raises(AttributeError):
-            utils.nanaverage(A, weights)
+        # This should work but may produce warnings about negative weights
+        with pytest.warns(RuntimeWarning, match="invalid value encountered in scalar divide"):
+            result = utils.nanaverage(A, weights)
+            
+        # Should return nan due to invalid calculation with negative weights
+        assert np.isnan(result)
+        assert isinstance(result, np.ndarray)
 
 
 class TestCleanStrForDate:
