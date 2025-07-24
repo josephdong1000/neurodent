@@ -36,7 +36,30 @@ def load_war(animal_id):
         logger.info(f'Skipping {animal_id} because genotype is Unknown')
         return None
     
-    war.filter_all()
+    # NEW: Use improved filtering API (more configurable and readable)
+    # Option 1: Fluent interface (method chaining)
+    war = (war
+        .filter_logrms_range(z_range=3)
+        .filter_high_rms(max_rms=500)
+        .filter_low_rms(min_rms=50)
+        .filter_high_beta(max_beta_prop=0.4)
+        .filter_reject_channels_by_session()
+    )
+    
+    # Option 2: Configuration-driven (uncomment to use instead)
+    # filter_config = {
+    #     'logrms_range': {'z_range': 3},
+    #     'high_rms': {'max_rms': 500},
+    #     'low_rms': {'min_rms': 50},
+    #     'high_beta': {'max_beta_prop': 0.4},
+    #     'reject_channels_by_session': {},
+    #     'morphological_smoothing': {'smoothing_seconds': 8.0}
+    # }
+    # war = war.apply_filters(filter_config, min_valid_channels=3)
+    
+    # OLD: Still works for backward compatibility
+    # war.filter_all()
+    
     war.aggregate_time_windows()
     war.add_unique_hash()
     war.reorder_and_pad_channels(['LMot', 'RMot', 'LBar', 'RBar', 'LAud', 'RAud', 'LVis', 'RVis', 'LHip', 'RHip'], use_abbrevs=True)
