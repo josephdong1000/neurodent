@@ -9,7 +9,7 @@ import sys
 import warnings
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Optional, Union
 
 import dateutil.parser
 import numpy as np
@@ -20,13 +20,33 @@ from sklearn.neighbors import KDTree
 from .. import constants
 
 
-def convert_path(inputPath):
-    # Convert path string to match the os
-    system = platform.system()
-    home = str(Path.home())
+def convert_units_to_multiplier(current_units: str, target_units: str = "µV") -> float:
+    """
+    Convert between different voltage units and return the multiplication factor.
 
+    This function calculates the conversion factor needed to transform values
+    from one voltage unit to another (e.g., from mV to µV).
 
-def convert_units_to_multiplier(current_units, target_units="µV"):
+    Args:
+        current_units (str): The current unit of the values. Must be one of: 'µV', 'mV', 'V', 'nV'.
+        target_units (str, optional): The target unit to convert to. Defaults to 'µV'.
+            Must be one of: 'µV', 'mV', 'V', 'nV'.
+
+    Returns:
+        float: The multiplication factor to convert from current_units to target_units.
+            To convert values, multiply your data by this factor.
+
+    Raises:
+        AssertionError: If current_units or target_units are not supported.
+
+    Examples:
+        >>> convert_units_to_multiplier("mV", "µV")
+        1000.0
+        >>> convert_units_to_multiplier("V", "mV")
+        1000.0
+        >>> convert_units_to_multiplier("µV", "V")
+        1e-06
+    """
     units_to_mult = {"µV": 1e-6, "mV": 1e-3, "V": 1, "nV": 1e-9}
 
     assert current_units in units_to_mult.keys(), f"No valid current unit called '{current_units}' found"
@@ -38,15 +58,15 @@ def convert_units_to_multiplier(current_units, target_units="µV"):
 def is_day(dt: datetime, sunrise=6, sunset=18):
     """
     Check if a datetime object is during the day.
-    
+
     Args:
         dt (datetime): Datetime object to check
         sunrise (int, optional): Sunrise hour (0-23). Defaults to 6.
         sunset (int, optional): Sunset hour (0-23). Defaults to 18.
-        
+
     Returns:
         bool: True if the datetime is during the day, False otherwise
-        
+
     Raises:
         TypeError: If dt is not a datetime object
     """
@@ -55,12 +75,40 @@ def is_day(dt: datetime, sunrise=6, sunset=18):
     return sunrise <= dt.hour < sunset
 
 
-def convert_colpath_to_rowpath(rowdir_path, col_path, gzip=True, aspath=True):
+def convert_colpath_to_rowpath(
+    rowdir_path: str | Path, col_path: str | Path, gzip: bool = True, aspath: bool = True
+) -> str | Path:
+    """
+    Convert a ColMajor file path to its corresponding RowMajor file path.
+
+    This function transforms file paths from column-major format to row-major format,
+    which is used when converting between different data storage layouts in PyEEG.
+
+    Args:
+        rowdir_path (str | Path): Directory path where the RowMajor file should be located.
+        col_path (str | Path): Path to the ColMajor file to be converted. Must contain 'ColMajor' in the path.
+        gzip (bool, optional): If True, append '.npy.gz' extension. If False, append '.bin'. Defaults to True.
+        aspath (bool, optional): If True, return as Path object. If False, return as string. Defaults to True.
+
+    Returns:
+        str | Path: The converted RowMajor file path, either as string or Path object based on aspath parameter.
+
+    Raises:
+        ValueError: If 'ColMajor' is not found in col_path.
+
+    Examples:
+        >>> convert_colpath_to_rowpath("/data/row/", "/data/col/file_ColMajor_001.bin")
+        PosixPath('/data/row/file_RowMajor_001.npy.gz')
+        >>> convert_colpath_to_rowpath("/data/row/", "/data/col/file_ColMajor_001.bin", gzip=False)
+        PosixPath('/data/row/file_RowMajor_001.bin')
+        >>> convert_colpath_to_rowpath("/data/row/", "/data/col/file_ColMajor_001.bin", aspath=False)
+        '/data/row/file_RowMajor_001.npy.gz'
+    """
     # TODO it would make more sense to not have a rowdir_path aparameter, since this is outside the scope of the function
-    if not 'ColMajor' in col_path:
+    if "ColMajor" not in col_path:
         raise ValueError(f"Expected 'ColMajor' in col_path: {col_path}")
 
-    out = Path(rowdir_path) / f"{Path(col_path).stem.replace('ColMajor', 'RowMajor')}"
+    out = Path(rowdir_path) / f"{get_file_stem(Path(col_path).name).replace('ColMajor', 'RowMajor')}"
     if gzip:
         out = str(out) + ".npy.gz"
     else:
@@ -84,7 +132,7 @@ def filepath_to_index(filepath) -> int:
     Examples:
         >>> filepath_to_index("/path/to/data_ColMajor_001.bin")
         1
-        >>> filepath_to_index("/path/to/data_2023_015_ColMajor.bin") 
+        >>> filepath_to_index("/path/to/data_2023_015_ColMajor.bin")
         15
         >>> filepath_to_index("/path/to/data_Meta_010.json")
         10
@@ -92,12 +140,12 @@ def filepath_to_index(filepath) -> int:
     fpath = str(filepath)
     for suffix in ["_RowMajor", "_ColMajor", "_Meta"]:
         fpath = fpath.replace(suffix, "")
-    
+
     # Remove only the actual file extension, not dots within the filename
     path_obj = Path(fpath)
     if path_obj.suffix:
-        fpath = str(path_obj.with_suffix(''))
-    
+        fpath = str(path_obj.with_suffix(""))
+
     fname = Path(fpath).name
     fname = re.split(r"\D+", fname)
     fname = list(filter(None, fname))
@@ -129,13 +177,44 @@ def parse_truncate(truncate: int | bool) -> int:
         raise ValueError(f"Invalid truncate value: {truncate}")
 
 
-def nanaverage(A, weights, axis=-1):
+def nanaverage(A: np.ndarray, weights: np.ndarray, axis: int = -1) -> np.ndarray:
     """
-    Average of an array, ignoring NaNs.
+    Compute weighted average of an array, ignoring NaN values.
+
+    This function computes a weighted average along the specified axis while
+    properly handling NaN values by masking them out of the calculation.
+
+    Args:
+        A (np.ndarray): Input array containing the values to average.
+        weights (np.ndarray): Array of weights corresponding to the values in A.
+            Must be broadcastable with A along the specified axis.
+        axis (int, optional): Axis along which to compute the average. Defaults to -1 (last axis).
+
+    Returns:
+        np.ndarray: Weighted average with NaN values properly handled. If all values
+            along an axis are NaN, the result will be NaN for that position.
+
+    Examples:
+        >>> import numpy as np
+        >>> A = np.array([[1.0, 2.0, np.nan], [4.0, np.nan, 6.0]])
+        >>> weights = np.array([1, 2, 1])
+        >>> nanaverage(A, weights, axis=1)
+        array([1.66666667, 5.        ])
+
+    Note:
+        Be careful with zero or negative weights as they may produce unexpected results.
+        The function uses numpy's masked array functionality for robust NaN handling.
     """
     masked = np.ma.masked_array(A, np.isnan(A))
     avg = np.ma.average(masked, axis=axis, weights=weights)
-    return avg.filled(np.nan)
+    
+    # Handle case where np.ma.average returns a scalar instead of masked array
+    if np.ma.is_masked(avg):
+        return avg.filled(np.nan)
+    else:
+        # avg is a scalar or regular array, convert to array and handle NaN
+        result = np.asarray(avg)
+        return np.where(np.isfinite(result), result, np.nan)
 
 
 def parse_path_to_animalday(
@@ -157,7 +236,7 @@ def parse_path_to_animalday(
         day_sep (str, optional): Separator for day in filename. Defaults to None.
         mode (Literal['nest', 'concat', 'base', 'noday'], optional): Mode to parse the filename. Defaults to 'concat'.
             'nest': Extracts genotype/animal from parent directory name and date from filename
-                   e.g. "/WT_A10/recording_2023-04-01.*" 
+                   e.g. "/WT_A10/recording_2023-04-01.*"
             'concat': Extracts all info from filename, expects genotype_animal_date format
                      e.g. "/WT_A10_2023-04-01.*"
             'base': Same as concat
@@ -205,15 +284,15 @@ def parse_str_to_genotype(string: str, strict_matching: bool = False) -> str:
     Args:
         string (str): String to parse.
         strict_matching (bool, optional): If True, ensures the input matches exactly one genotype.
-            If False, allows overlapping matches and uses longest. Defaults to False for 
+            If False, allows overlapping matches and uses longest. Defaults to False for
             backward compatibility.
 
     Returns:
         str: Genotype.
-        
+
     Raises:
         ValueError: When string cannot be parsed or contains ambiguous matches in strict mode.
-        
+
     Examples:
         >>> parse_str_to_genotype("WT_A10_data")
         'WT'
@@ -222,7 +301,7 @@ def parse_str_to_genotype(string: str, strict_matching: bool = False) -> str:
         >>> parse_str_to_genotype("WT_KO_comparison", strict_matching=False)  # Uses longest match
         'WT'  # or 'KO' depending on which alias is longer
     """
-    return __get_key_from_match_values(string, constants.GENOTYPE_ALIASES, strict_matching)
+    return _get_key_from_match_values(string, constants.GENOTYPE_ALIASES, strict_matching)
 
 
 def parse_str_to_animal(string: str, animal_param: tuple[int, str] | str | list[str] = (0, None)) -> str:
@@ -238,20 +317,20 @@ def parse_str_to_animal(string: str, animal_param: tuple[int, str] | str | list[
 
     Returns:
         str: Animal id.
-        
+
     Examples:
         # Tuple format: (index, separator)
         >>> parse_str_to_animal("WT_A10_2023-01-01_data.bin", (1, "_"))
         'A10'
         >>> parse_str_to_animal("A10_WT_recording.bin", (0, "_"))
         'A10'
-        
+
         # Regex pattern format
         >>> parse_str_to_animal("WT_A10_2023-01-01_data.bin", r"A\\d+")
         'A10'
         >>> parse_str_to_animal("subject_123_data.bin", r"\\d+")
         '123'
-        
+
         # List format: possible IDs to match
         >>> parse_str_to_animal("WT_A10_2023-01-01_data.bin", ["A10", "A11", "A12"])
         'A10'
@@ -279,7 +358,12 @@ def parse_str_to_animal(string: str, animal_param: tuple[int, str] | str | list[
         raise ValueError(f"Invalid animal_param type: {type(animal_param)}")
 
 
-def parse_str_to_day(string: str, sep: str = None, parse_params: dict = None, parse_mode: Literal["full", "split", "window", "all"] = "split") -> datetime:
+def parse_str_to_day(
+    string: str,
+    sep: str = None,
+    parse_params: dict = None,
+    parse_mode: Literal["full", "split", "window", "all"] = "split",
+) -> datetime:
     """
     Parses the filename of a binfolder to get the day.
 
@@ -297,7 +381,7 @@ def parse_str_to_day(string: str, sep: str = None, parse_params: dict = None, pa
 
     Raises:
         ValueError: If no valid date token is found in the string.
-        
+
     Note:
         The function is designed to be conservative to avoid false positives.
         Some complex date formats may parse with the default year (2000) instead
@@ -306,12 +390,12 @@ def parse_str_to_day(string: str, sep: str = None, parse_params: dict = None, pa
     """
     if parse_params is None:
         parse_params = {"fuzzy": True}
-    
+
     # Validate parse_mode
     valid_modes = ["full", "split", "window", "all"]
     if parse_mode not in valid_modes:
         raise ValueError(f"Invalid parse_mode: {parse_mode}. Must be one of {valid_modes}")
-    
+
     clean_str = _clean_str_for_date(string)
     # logging.debug(f'raw str: {string}, clean_str: {clean_str}')
 
@@ -324,7 +408,7 @@ def parse_str_to_day(string: str, sep: str = None, parse_params: dict = None, pa
                 return date
         except ParserError:
             pass
-    
+
     if parse_mode in ["split", "all"]:
         # Pass 2: Try individual tokens
         tokens = clean_str.split(sep)
@@ -337,13 +421,13 @@ def parse_str_to_day(string: str, sep: str = None, parse_params: dict = None, pa
                 return date
             except ParserError:
                 continue
-    
+
     if parse_mode in ["window", "all"]:
         # Pass 3: Try sliding window of tokens
         tokens = clean_str.split(sep)
         for window_size in range(2, min(5, len(tokens) + 1)):
             for i in range(len(tokens) - window_size + 1):
-                grouped = " ".join(tokens[i:i+window_size])
+                grouped = " ".join(tokens[i : i + window_size])
                 try:
                     date = dateutil.parser.parse(grouped, default=constants.DEFAULT_DAY, **parse_params)
                     if date.year <= 1980:
@@ -365,17 +449,10 @@ def _clean_str_for_date(string: str):
     Returns:
         str: Cleaned string with non-date tokens removed
     """
-
-    # Create one pattern that matches any of the above
     patterns = constants.DATEPARSER_PATTERNS_TO_REMOVE
     combined_pattern = "|".join(patterns)
-
-    # Remove all matching patterns, replace with space
     cleaned = re.sub(combined_pattern, " ", string, flags=re.IGNORECASE)
-
-    # Clean up extra whitespace
     cleaned = " ".join(cleaned.split())
-
     return cleaned
 
 
@@ -385,18 +462,18 @@ def parse_chname_to_abbrev(channel_name: str, assume_from_number=False, strict_m
 
     Args:
         channel_name (str): Name of the channel.
-        assume_from_number (bool, optional): If True, assume the abbreviation based on the last number 
+        assume_from_number (bool, optional): If True, assume the abbreviation based on the last number
             in the channel name when normal parsing fails. Defaults to False.
-        strict_matching (bool, optional): If True, ensures the input matches exactly one L/R alias and 
+        strict_matching (bool, optional): If True, ensures the input matches exactly one L/R alias and
             one channel alias. If False, allows multiple matches and uses longest. Defaults to True.
 
     Returns:
         str: Abbreviation of the channel name.
-        
+
     Raises:
         ValueError: When channel_name cannot be parsed or contains ambiguous matches in strict mode.
         KeyError: When assume_from_number=True but the detected number is not a valid channel ID.
-        
+
     Examples:
         >>> parse_chname_to_abbrev("left Aud")
         'LAud'
@@ -410,42 +487,46 @@ def parse_chname_to_abbrev(channel_name: str, assume_from_number=False, strict_m
     if channel_name in constants.DEFAULT_ID_TO_NAME.values():
         logging.debug(f"{channel_name} is already an abbreviation")
         return channel_name
-    
+
     try:
-        lr = __get_key_from_match_values(channel_name, constants.LR_ALIASES, strict_matching)
-        chname = __get_key_from_match_values(channel_name, constants.CHNAME_ALIASES, strict_matching)
+        lr = _get_key_from_match_values(channel_name, constants.LR_ALIASES, strict_matching)
+        chname = _get_key_from_match_values(channel_name, constants.CHNAME_ALIASES, strict_matching)
     except ValueError as e:
         if assume_from_number:
             logging.warning(f"{channel_name} does not match name aliases. Assuming alias from number in channel name.")
             nums = re.findall(r"\d+", channel_name)
-            
+
             if not nums:
-                raise ValueError(f"Expected to find a number in channel name '{channel_name}' when assume_from_number=True, but no numbers were found.")
-            
+                raise ValueError(
+                    f"Expected to find a number in channel name '{channel_name}' when assume_from_number=True, but no numbers were found."
+                )
+
             num = int(nums[-1])
             if num not in constants.DEFAULT_ID_TO_NAME:
                 available_ids = sorted(constants.DEFAULT_ID_TO_NAME.keys())
-                raise KeyError(f"Channel number {num} found in '{channel_name}' is not a valid channel ID. Available channel IDs: {available_ids}")
-            
+                raise KeyError(
+                    f"Channel number {num} found in '{channel_name}' is not a valid channel ID. Available channel IDs: {available_ids}"
+                )
+
             return constants.DEFAULT_ID_TO_NAME[num]
         else:
             raise e
-    
+
     return lr + chname
 
 
-def __get_key_from_match_values(input_string: str, alias_dict: dict, strict_matching: bool = True):
+def _get_key_from_match_values(input_string: str, alias_dict: dict, strict_matching: bool = True):
     """
     Find the best matching key from alias dictionary.
-    
+
     Args:
         input_string (str): String to search in
         alias_dict (dict): Dictionary of {key: [aliases]} to match against
         strict_matching (bool): If True, ensures only one alias matches across all keys
-        
+
     Returns:
         str: The key with the best matching alias
-        
+
     Raises:
         ValueError: When no matches found or multiple matches in strict mode
     """
@@ -455,28 +536,44 @@ def __get_key_from_match_values(input_string: str, alias_dict: dict, strict_matc
         for candidate in aliases
         if candidate in input_string
     ]
-    
+
     if not matches:
         alias_examples = {key: aliases[:2] for key, aliases in alias_dict.items()}  # Show first 2 aliases per key
-        raise ValueError(f"{input_string} does not have any matching values. Available aliases (examples): {alias_examples}")
-    
+        raise ValueError(
+            f"{input_string} does not have any matching values. Available aliases (examples): {alias_examples}"
+        )
+
     if strict_matching:
         # Check if multiple different keys match
         matching_keys = set(match[0] for match in matches)
         if len(matching_keys) > 1:
             matched_aliases = {key: [alias for k, alias, _ in matches if k == key] for key in matching_keys}
-            raise ValueError(f"Ambiguous match in '{input_string}'. Multiple alias types matched: {matched_aliases}. Use strict_matching=False to allow ambiguous matches.")
-    
+            raise ValueError(
+                f"Ambiguous match in '{input_string}'. Multiple alias types matched: {matched_aliases}. Use strict_matching=False to allow ambiguous matches."
+            )
+
     # Return the key with the longest matching alias
     best_match_key, _, _ = max(matches, key=lambda x: x[2])
     return best_match_key
 
 
-def set_temp_directory(path):
-    """Set the temporary directory for PyEEG operations.
+def set_temp_directory(path: str | Path) -> None:
+    """
+    Set the temporary directory for PyEEG operations.
+
+    This function configures the temporary directory used by PyEEG for intermediate
+    files and operations. The directory will be created if it doesn't exist.
 
     Args:
-        path (str or Path): Path to the temporary directory. Will be created if it doesn't exist.
+        path (str | Path): Path to the temporary directory. Will be created if it doesn't exist.
+
+    Examples:
+        >>> set_temp_directory("/tmp/pyeeg_temp")
+        >>> set_temp_directory(Path.home() / "pyeeg_workspace" / "temp")
+
+    Note:
+        This function modifies the TMPDIR environment variable, which affects
+        the behavior of other temporary file operations in the process.
     """
     path = Path(path)
     if not path.exists():
@@ -487,54 +584,69 @@ def set_temp_directory(path):
 
 def get_temp_directory() -> Path:
     """
-    Returns the temporary directory.
+    Get the current temporary directory used by PyEEG.
+
+    Returns:
+        Path: Path object representing the current temporary directory.
+
+    Examples:
+        >>> temp_dir = get_temp_directory()
+        >>> print(f"Current temp directory: {temp_dir}")
+        Current temp directory: /tmp/pyeeg_temp
+
+    Raises:
+        KeyError: If TMPDIR environment variable is not set.
     """
     return Path(os.environ["TMPDIR"])
 
 
-def _get_groupby_keys(df: pd.DataFrame, groupby: str | list[str]):
-    """
-    Get the unique values of the groupby variable.
-    """
-    return list(df.groupby(groupby).groups.keys())
+def get_file_stem(filepath: Union[str, Path]) -> str:
+    """Get the true stem for files, handling double extensions like .npy.gz."""
+    filepath = Path(filepath)
+    name = filepath.name
+
+    return name.split(".")[0]
 
 
-def _get_pairwise_combinations(x: list):
-    """
-    Get all pairwise combinations of a list.
-    """
-    return list(itertools.combinations(x, 2))
+# def _get_groupby_keys(df: pd.DataFrame, groupby: str | list[str]):
+#     """
+#     Get the unique values of the groupby variable.
+#     """
+#     return list(df.groupby(groupby).groups.keys())
 
 
-class _CustomNamedTemporaryFile:
-    """
-    This custom implementation is needed because of the following limitation of tempfile.NamedTemporaryFile:
-
-    > Whether the name can be used to open the file a second time, while the named temporary file is still open,
-    > varies across platforms (it can be so used on Unix; it cannot on Windows NT or later).
-    """
-
-    def __init__(self, mode="wb", delete=True):
-        self._mode = mode
-        self._delete = delete
-
-    def __enter__(self):
-        # Generate a random temporary file name
-        file_name = os.path.join(get_temp_directory(), os.urandom(24).hex())
-        # Ensure the file is created
-        open(file_name, "x").close()
-        # Open the file in the given mode
-        self._tempFile = open(file_name, self._mode)
-        return self._tempFile
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self._tempFile.close()
-        if self._delete:
-            os.remove(self._tempFile.name)
+# def _get_pairwise_combinations(x: list):
+#     """
+#     Get all pairwise combinations of a list.
+#     """
+#     return list(itertools.combinations(x, 2))
 
 
 class _HiddenPrints:
-    def __init__(self, silence=True) -> None:
+    """
+    Context manager to suppress print output during code execution.
+
+    This class provides a way to temporarily suppress print statements and other
+    stdout output, which is useful when calling functions that produce unwanted
+    console output.
+
+    Args:
+        silence (bool, optional): Whether to actually suppress output. Defaults to True.
+            If False, acts as a no-op context manager.
+
+    Examples:
+        >>> with _HiddenPrints():
+        ...     print("This won't be displayed")
+        ...     some_noisy_function()
+        >>> print("This will be displayed")
+        This will be displayed
+
+        >>> with _HiddenPrints(silence=False):
+        ...     print("This will be displayed")
+        This will be displayed
+    """
+
+    def __init__(self, silence: bool = True) -> None:
         self.silence = silence
 
     def __enter__(self):
@@ -548,27 +660,40 @@ class _HiddenPrints:
             sys.stdout = self._original_stdout
 
 
-def clean_channel_name(name):
-    # Get the parts after the last '/'
-    if "/" in name:
-        name = name.split("/")[-1]
+def nanmean_series_of_np(x: pd.Series, axis: int = 0) -> np.ndarray:
+    """
+    Efficiently compute NaN-aware mean of a pandas Series containing numpy arrays.
 
-    # Split by spaces
-    parts = name.split()
+    This function is optimized for computing the mean across a Series where each element
+    is a numpy array. It uses different strategies based on the size of the Series
+    for optimal performance.
 
-    # For channels with Ctx at the end (L Aud Ctx, R Vis Ctx)
-    if parts[-1] == "Ctx" and len(parts) >= 3:
-        return f"{parts[-3]}_{parts[-2]}_{parts[-1]}"
+    Args:
+        x (pd.Series): Series containing numpy arrays as elements.
+        axis (int, optional): Axis along which to compute the mean. Defaults to 0.
+            - axis=0: Mean across the Series elements (most common)
+            - axis=1: Mean within each array element
 
-    # For other channels (L Hipp, R Barrel, etc.)
-    if len(parts) >= 2:
-        return f"{parts[-2]}_{parts[-1]}"
+    Returns:
+        np.ndarray: Array containing the computed means with NaN values properly handled.
 
-    # Fallback for anything else
-    return name
+    Examples:
+        >>> import pandas as pd
+        >>> import numpy as np
+        >>> # Create a Series of numpy arrays
+        >>> arrays = [np.array([1.0, 2.0, np.nan]),
+        ...           np.array([4.0, np.nan, 6.0]),
+        ...           np.array([7.0, 8.0, 9.0])]
+        >>> series = pd.Series(arrays)
+        >>> nanmean_series_of_np(series)
+        array([4. , 5. , 7.5])
 
-
-def nanmean_series_of_np(x: pd.Series, axis: int = 0):
+    Performance Notes:
+        - For Series with more than 1000 elements containing numpy arrays,
+          uses `np.stack()` for better performance
+        - Falls back to list conversion for smaller Series or mixed types
+        - Handles shape mismatches gracefully by falling back to the slower method
+    """
     # logging.debug(f"Unique shapes in x: {set(np.shape(item) for item in x)}")
 
     if len(x) > 1000:
@@ -595,7 +720,7 @@ def log_transform(rec: np.ndarray, **kwargs) -> np.ndarray:
     return np.log(rec + 1)
 
 
-def sort_dataframe_by_plot_order(df: pd.DataFrame, df_sort_order: dict = constants.DF_SORT_ORDER) -> pd.DataFrame:
+def sort_dataframe_by_plot_order(df: pd.DataFrame, df_sort_order: Optional[dict] = None) -> pd.DataFrame:
     """
     Sort DataFrame columns according to predefined orders.
 
@@ -616,7 +741,9 @@ def sort_dataframe_by_plot_order(df: pd.DataFrame, df_sort_order: dict = constan
     ValueError
         If df_sort_order is not a valid dictionary or contains invalid categories
     """
-    if not isinstance(df_sort_order, dict):
+    if df_sort_order is None:
+        df_sort_order = constants.DF_SORT_ORDER.copy()
+    elif not isinstance(df_sort_order, dict):
         raise ValueError("df_sort_order must be a dictionary")
 
     if df.empty:
@@ -787,9 +914,32 @@ class Natural_Neighbor(object):
                 r += 1
         return r
 
+
 class TimestampMapper:
     """
     Map each fragment to its source file's timestamp.
+
+    This class provides functionality to map data fragments back to their original
+    file timestamps when data has been concatenated from multiple files with
+    different recording times.
+
+    Attributes:
+        file_end_datetimes (list[datetime]): The end datetimes of each source file.
+        file_durations (list[float]): The durations of each source file in seconds.
+        file_start_datetimes (list[datetime]): Computed start datetimes of each file.
+        cumulative_durations (np.ndarray): Cumulative sum of file durations.
+
+    Examples:
+        >>> from datetime import datetime, timedelta
+        >>> # Set up files with known end times and durations
+        >>> end_times = [datetime(2023, 1, 1, 12, 0), datetime(2023, 1, 1, 13, 0)]
+        >>> durations = [3600.0, 1800.0]  # 1 hour, 30 minutes
+        >>> mapper = TimestampMapper(end_times, durations)
+        >>>
+        >>> # Get timestamp for fragment at index 2 with 60s fragments
+        >>> timestamp = mapper.get_fragment_timestamp(2, 60.0)
+        >>> print(timestamp)
+        2023-01-01 11:02:00
     """
 
     def __init__(self, file_end_datetimes: list[datetime], file_durations: list[float]):
@@ -798,8 +948,14 @@ class TimestampMapper:
 
         Args:
             file_end_datetimes (list[datetime]): The end datetimes of each file.
-            file_durations (list[float]): The durations of each file.
+            file_durations (list[float]): The durations of each file in seconds.
+
+        Raises:
+            ValueError: If the lengths of file_end_datetimes and file_durations don't match.
         """
+        if len(file_end_datetimes) != len(file_durations):
+            raise ValueError("file_end_datetimes and file_durations must have the same length")
+
         self.file_end_datetimes = file_end_datetimes
         self.file_durations = file_durations
 
@@ -809,7 +965,22 @@ class TimestampMapper:
         ]
         self.cumulative_durations = np.cumsum(self.file_durations)
 
-    def get_fragment_timestamp(self, fragment_idx, fragment_len_s) -> datetime:
+    def get_fragment_timestamp(self, fragment_idx: int, fragment_len_s: float) -> datetime:
+        """
+        Get the timestamp for a specific fragment based on its index and length.
+
+        Args:
+            fragment_idx (int): The index of the fragment (0-based).
+            fragment_len_s (float): The length of each fragment in seconds.
+
+        Returns:
+            datetime: The timestamp corresponding to the start of the specified fragment.
+
+        Examples:
+            >>> # Get timestamp for the 5th fragment (index 4) with 30-second fragments
+            >>> timestamp = mapper.get_fragment_timestamp(4, 30.0)
+            >>> # This returns the timestamp 2 minutes into the first file
+        """
         # Find which file this fragment belongs to
         fragment_start_time = fragment_idx * fragment_len_s
         file_idx = np.searchsorted(self.cumulative_durations, fragment_start_time)

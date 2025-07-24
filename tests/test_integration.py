@@ -13,7 +13,6 @@ from pythoneeg import constants
 from pythoneeg.core.core import LongRecordingOrganizer
 
 
-@pytest.mark.integration
 class TestAnalysisPipeline:
     """Test complete analysis pipeline integration."""
     
@@ -95,7 +94,6 @@ class TestAnalysisPipeline:
         assert "day" in metadata
 
 
-@pytest.mark.integration
 class TestVisualizationIntegration:
     """Test visualization module integration."""
     
@@ -143,7 +141,6 @@ class TestVisualizationIntegration:
     #     assert "ci_upper" in ci_data.columns
 
 
-@pytest.mark.integration
 class TestCoreModuleIntegration:
     """Test core module integration."""
     
@@ -205,7 +202,6 @@ class TestCoreModuleIntegration:
         assert "common_ref" in constants.SORTING_PARAMS
 
 
-@pytest.mark.integration
 class TestErrorHandlingIntegration:
     """Test error handling across modules."""
     
@@ -245,11 +241,9 @@ class TestErrorHandlingIntegration:
     #         visualizer.validate_dataframe()
 
 
-@pytest.mark.integration
 class TestPerformanceIntegration:
     """Test performance characteristics across modules."""
     
-    @pytest.mark.slow
     def test_large_data_processing_performance(self):
         """Test performance with large datasets."""
         # Create large test dataset

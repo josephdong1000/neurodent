@@ -81,6 +81,8 @@ addopts = [
     "--tb=short",
     "--maxfail=10",
 ]
+# Development profile (use with: pytest --no-cov -m "not slow")
+# Or use pytest-dev.ini for even simpler development testing
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "integration: marks tests as integration tests",

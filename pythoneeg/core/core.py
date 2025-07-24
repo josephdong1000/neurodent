@@ -29,6 +29,7 @@ from .utils import (
     filepath_to_index,
     get_temp_directory,
     parse_truncate,
+    get_file_stem
 )
 
 
@@ -113,7 +114,6 @@ def convert_ddfcolbin_to_ddfrowbin(rowdir_path, colbin_path, metadata, save_gzip
     tempbin = np.fromfile(colbin_path, dtype=metadata.precision)
     tempbin = np.reshape(tempbin, (-1, metadata.n_channels), order="F")
 
-    # rowbin_path = Path(colbin_path).parent / f'{Path(colbin_path).stem.replace("ColMajor", "RowMajor")}'
     rowbin_path = convert_colpath_to_rowpath(rowdir_path, colbin_path, gzip=save_gzip)
 
     if save_gzip:
@@ -316,8 +316,8 @@ class LongRecordingOrganizer:
             return truncated
         else:
             # Get a subset of files that match with ref_list
-            ref_list = [Path(f).stem for f in ref_list]
-            files = [f for f in files if Path(f).stem in ref_list]
+            ref_list_stems = [get_file_stem(f) for f in ref_list]
+            files = [f for f in files if get_file_stem(f) in ref_list_stems]
             return files
 
     def __update_colbins_rowbins_metas(self):
@@ -539,6 +539,7 @@ class LongRecordingOrganizer:
 
         self.LongRecording = rec
         self.meta = DDFBinaryMetadata(
+            None,
             n_channels=self.LongRecording.get_num_channels(),
             f_s=self.LongRecording.get_sampling_frequency(),
             dt_end=constants.DEFAULT_DAY,  # NOTE parse timestamp from SI file date/metadata?
@@ -623,6 +624,7 @@ class LongRecordingOrganizer:
 
         self.LongRecording = rec
         self.meta = DDFBinaryMetadata(
+            None,
             n_channels=self.LongRecording.get_num_channels(),
             f_s=self.LongRecording.get_sampling_frequency(),
             dt_end=constants.DEFAULT_DAY,  # NOTE parse timestamp from MNE file date/metadata?
