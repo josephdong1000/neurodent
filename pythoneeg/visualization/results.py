@@ -22,8 +22,10 @@ import spikeinterface as si
 from dask import delayed
 from django.utils.text import slugify
 from scipy.stats import zscore
+from scipy.ndimage import binary_opening, binary_closing
 from sklearn.neighbors import LocalOutlierFactor
 from tqdm import tqdm
+
 
 from .. import constants, core
 from ..core import FragmentAnalyzer, get_temp_directory
@@ -920,6 +922,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         bad_channels: list[str] = None,
         min_valid_channels=3,
         filters: list[callable] = None,
+        morphological_smoothing_seconds: float = None,
         **kwargs,
     ):
         """Apply a list of filters to the data. Filtering should be performed before aggregation.
@@ -932,6 +935,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
             filters (list[callable], optional): List of filter functions to apply. Each function should return a boolean mask.
                 If None, uses default filters: [get_filter_logrms_range, get_filter_high_rms, get_filter_low_rms, get_filter_high_beta].
                 Defaults to None.
+            morphological_smoothing_seconds (float, optional): If provided, apply morphological opening/closing to smooth the filter mask.
+                This removes isolated false positives/negatives along the time axis for each channel independently.
+                The value specifies the time window in seconds for the morphological operations. Defaults to None.
             **kwargs: Additional keyword arguments to pass to filter functions.
 
         Returns:
@@ -950,20 +956,47 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
         filt_bools = []
         # Apply each filter function
-        for filt in filters:
-            filt_bool = filt(df, **kwargs)
+        for filter_function in filters:
+            filt_bool = filter_function(df, **kwargs)
             filt_bools.append(filt_bool)
-            logging.info(f"{filt.__name__}:\tfiltered {filt_bool.size - np.count_nonzero(filt_bool)}/{filt_bool.size}")
+            logging.info(
+                f"{filter_function.__name__}:\tfiltered {filt_bool.size - np.count_nonzero(filt_bool)}/{filt_bool.size}"
+            )
 
         # Filter channels manually
-        # REVIEW add a function that just filters out bad channels separately?
+        # REVIEW somehow add this to the main list of filters, but I'm not sure how to do this.
         if bad_channels is not None:
             filt_bools.append(self.get_filter_reject_channels(bad_channels))
             logging.debug(f"Reject channels: {filt_bools[-1]}")
 
         # Apply all filters
         filt_bool_all = np.prod(np.stack(filt_bools, axis=-1), axis=-1).astype(bool)
-        logging.debug(f"filt_bool_all.shape: {filt_bool_all.shape}")
+        logging.debug(f"filt_bool_all.shape: {filt_bool_all.shape}")  # (windows, channels)
+
+        # Apply morphological smoothing if requested
+        if morphological_smoothing_seconds is not None:
+            if "duration" not in self.result.columns:
+                raise ValueError("Cannot calculate window duration - 'duration' column missing from result dataframe")
+            window_duration = self.result["duration"].median()
+
+            # Calculate number of windows for the smoothing
+            structure_size = max(1, int(morphological_smoothing_seconds / window_duration))
+
+            if structure_size > 1:
+                logging.info(
+                    f"Applying morphological smoothing with {structure_size} windows ({morphological_smoothing_seconds}s / {window_duration}s per window)"
+                )
+                # Apply channel-wise temporal smoothing (each channel processed independently)
+                # This avoids spatial assumptions while smoothing temporal artifacts
+                for ch_idx in range(filt_bool_all.shape[1]):
+                    channel_mask = filt_bool_all[:, ch_idx]
+                    # Opening removes small isolated artifacts
+                    channel_mask = binary_opening(channel_mask, structure=np.ones(structure_size))
+                    # Closing fills small gaps in valid data
+                    channel_mask = binary_closing(channel_mask, structure=np.ones(structure_size))
+                    filt_bool_all[:, ch_idx] = channel_mask
+            else:
+                logging.info("Skipping morphological smoothing - structure size would be 1 (no effect)")
 
         # Filter windows based on number of valid channels
         valid_channels_per_window = np.sum(filt_bool_all, axis=1)  # axis 1 = channel
