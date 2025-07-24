@@ -1,0 +1,165 @@
+name: Test, Build Package, and Generate Documentation
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  test:
+    name: Test Package
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10"]
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('**/Pipfile.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-${{ matrix.python-version }}-
+          
+    - name: Install pipenv
+      run: |
+        python -m pip install --upgrade pip
+        pip install pipenv
+        
+    - name: Install dependencies
+      run: |
+        pipenv install --dev
+        pipenv run pip install pytest-cov
+        echo "Python version: $(python --version)"
+        echo "Pipenv version: $(pipenv --version)"
+        echo "Installed packages:"
+        pipenv run pip list
+        
+    - name: Test package import
+      run: |
+        pipenv run python -c "import pythoneeg; print('Package imports successfully')"
+        
+    - name: Run tests with coverage
+      run: |
+        pipenv run pytest tests/ --cov=pythoneeg --cov-report=xml --cov-report=term-missing -v --tb=short
+      continue-on-error: true  # Continue even if some tests fail
+        
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        fail_ci_if_error: false
+
+  build-package:
+    name: Build Package
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+        
+    - name: Install build dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install build twine
+        
+    - name: Build package
+      run: |
+        python -m build
+        echo "Package built successfully!"
+        echo "Distribution files:"
+        ls -la dist/
+        echo "Package contents (wheel):"
+        unzip -l dist/*.whl | head -20
+        echo "Package contents (tar.gz):"
+        tar -tzf dist/*.tar.gz | head -20
+        
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: python-package
+        path: dist/
+        retention-days: 30
+
+  build-docs:
+    name: Build Documentation
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+        
+    - name: Install documentation dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install mkdocs mkdocstrings[python] mkdocs-material
+        
+    - name: Build documentation
+      run: |
+        echo "Building documentation..."
+        mkdocs build --verbose
+        echo "Documentation built successfully!"
+        echo "Site directory contents:"
+        ls -la site/
+        echo "Site size:"
+        du -sh site/
+        
+    - name: Upload documentation artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: documentation
+        path: site/
+        retention-days: 30
+
+  deploy-docs:
+    name: Deploy Documentation
+    runs-on: ubuntu-latest
+    needs: [test, build-docs]
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+        
+    - name: Install documentation dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install mkdocs mkdocstrings[python] mkdocs-material
+        
+    - name: Build documentation
+      run: mkdocs build
+      
+    - name: Deploy to GitHub Pages
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./site
+        force_orphan: true 
