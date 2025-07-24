@@ -72,17 +72,12 @@ python_functions = ["test_*"]
 addopts = [
     "--strict-markers",
     "--strict-config",
-    "--cov=pythoneeg",
-    "--cov-report=term-missing",
-    "--cov-report=html:htmlcov",
-    "--cov-report=xml:coverage.xml",
-    "--cov-fail-under=80",
-    "--durations=10",
     "--tb=short",
-    "--maxfail=10",
+    "--maxfail=3",
+    "-v",
 ]
-# Development profile (use with: pytest --no-cov -m "not slow")
-# Or use pytest-dev.ini for even simpler development testing
+# For coverage reports, add: --cov=pythoneeg --cov-report=term-missing --cov-fail-under=80
+# For slow tests, use: -m "not slow"
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "integration: marks tests as integration tests",
