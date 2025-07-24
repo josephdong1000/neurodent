@@ -123,7 +123,6 @@ ep.plot_feature("rms", groupby="genotype")
 - Canonical coherence
   - [channels-channels]
 - Peri-spike EEG
-- GUI
 
 ## Tasks
 
