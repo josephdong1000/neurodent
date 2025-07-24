@@ -158,5 +158,4 @@ jobs:
       run: mkdocs build
       
     - name: Deploy to GitHub Pages
-      run: |
-        pipenv run mkdocs gh-deploy --force 
+      run: mkdocs gh-deploy --force 
