@@ -914,6 +914,50 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     logging.warning(f"Channel {ch} not found in {channel_targets} for session {animalday}")
 
         return mask
+    
+    def get_filter_morphological_smoothing(self, filter_mask: np.ndarray, smoothing_seconds: float, **kwargs) -> np.ndarray:
+        """Apply morphological smoothing to a filter mask.
+        
+        Args:
+            filter_mask (np.ndarray): Input boolean mask of shape (n_windows, n_channels)
+            smoothing_seconds (float): Time window in seconds for morphological operations
+            
+        Returns:
+            np.ndarray: Smoothed boolean mask
+        """
+        if "duration" not in self.result.columns:
+            raise ValueError("Cannot calculate window duration - 'duration' column missing")
+        
+        window_duration = self.result["duration"].median()
+        structure_size = max(1, int(smoothing_seconds / window_duration))
+        
+        if structure_size <= 1:
+            return filter_mask
+        
+        smoothed_mask = filter_mask.copy()
+        for ch_idx in range(filter_mask.shape[1]):
+            channel_mask = filter_mask[:, ch_idx]
+            # Opening removes small isolated artifacts
+            channel_mask = binary_opening(channel_mask, structure=np.ones(structure_size))
+            # Closing fills small gaps in valid data
+            channel_mask = binary_closing(channel_mask, structure=np.ones(structure_size))
+            smoothed_mask[:, ch_idx] = channel_mask
+        
+        return smoothed_mask
+    
+    def filter_morphological_smoothing(self, smoothing_seconds: float) -> "WindowAnalysisResult":
+        """Apply morphological smoothing to all data.
+        
+        Args:
+            smoothing_seconds (float): Time window in seconds for morphological operations
+            
+        Returns:
+            WindowAnalysisResult: New filtered instance
+        """
+        # Start with all-True mask and smooth it
+        base_mask = np.ones((len(self.result), len(self.channel_names)), dtype=bool)
+        smoothed_mask = self.get_filter_morphological_smoothing(base_mask, smoothing_seconds)
+        return self._create_filtered_copy(smoothed_mask)
 
     def filter_all(
         self,
@@ -1030,7 +1074,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             self.bad_channels_dict
         )
 
-    def filter_logrms_range(self, z_range: float = 3, **kwargs) -> "WindowAnalysisResult":
+    def filter_logrms_range(self, z_range: float = 3) -> "WindowAnalysisResult":
         """Filter based on log(rms) z-score range.
         
         Args:
@@ -1039,10 +1083,10 @@ class WindowAnalysisResult(AnimalFeatureParser):
         Returns:
             WindowAnalysisResult: New filtered instance
         """
-        mask = self.get_filter_logrms_range(z_range=z_range, **kwargs)
+        mask = self.get_filter_logrms_range(z_range=z_range)
         return self._create_filtered_copy(mask)
     
-    def filter_high_rms(self, max_rms: float = 500, **kwargs) -> "WindowAnalysisResult":
+    def filter_high_rms(self, max_rms: float = 500) -> "WindowAnalysisResult":
         """Filter out windows with RMS above threshold.
         
         Args:
@@ -1051,10 +1095,10 @@ class WindowAnalysisResult(AnimalFeatureParser):
         Returns:
             WindowAnalysisResult: New filtered instance
         """
-        mask = self.get_filter_high_rms(max_rms=max_rms, **kwargs)
+        mask = self.get_filter_high_rms(max_rms=max_rms)
         return self._create_filtered_copy(mask)
     
-    def filter_low_rms(self, min_rms: float = 50, **kwargs) -> "WindowAnalysisResult":
+    def filter_low_rms(self, min_rms: float = 50) -> "WindowAnalysisResult":
         """Filter out windows with RMS below threshold.
         
         Args:
@@ -1063,10 +1107,10 @@ class WindowAnalysisResult(AnimalFeatureParser):
         Returns:
             WindowAnalysisResult: New filtered instance
         """
-        mask = self.get_filter_low_rms(min_rms=min_rms, **kwargs)
+        mask = self.get_filter_low_rms(min_rms=min_rms)
         return self._create_filtered_copy(mask)
     
-    def filter_high_beta(self, max_beta_prop: float = 0.4, **kwargs) -> "WindowAnalysisResult":
+    def filter_high_beta(self, max_beta_prop: float = 0.4) -> "WindowAnalysisResult":
         """Filter out windows with high beta power.
         
         Args:
@@ -1075,10 +1119,10 @@ class WindowAnalysisResult(AnimalFeatureParser):
         Returns:
             WindowAnalysisResult: New filtered instance
         """
-        mask = self.get_filter_high_beta(max_beta_prop=max_beta_prop, **kwargs)
+        mask = self.get_filter_high_beta(max_beta_prop=max_beta_prop)
         return self._create_filtered_copy(mask)
     
-    def filter_reject_channels(self, bad_channels: list[str], use_abbrevs: bool = None, **kwargs) -> "WindowAnalysisResult":
+    def filter_reject_channels(self, bad_channels: list[str], use_abbrevs: bool = None) -> "WindowAnalysisResult":
         """Filter out specified bad channels.
         
         Args:
@@ -1088,10 +1132,10 @@ class WindowAnalysisResult(AnimalFeatureParser):
         Returns:
             WindowAnalysisResult: New filtered instance
         """
-        mask = self.get_filter_reject_channels(bad_channels, use_abbrevs=use_abbrevs, **kwargs)
+        mask = self.get_filter_reject_channels(bad_channels, use_abbrevs=use_abbrevs)
         return self._create_filtered_copy(mask)
     
-    def filter_reject_channels_by_session(self, bad_channels_dict: dict[str, list[str]] = None, use_abbrevs: bool = None, **kwargs) -> "WindowAnalysisResult":
+    def filter_reject_channels_by_session(self, bad_channels_dict: dict[str, list[str]] = None, use_abbrevs: bool = None) -> "WindowAnalysisResult":
         """Filter out bad channels by recording session.
         
         Args:
@@ -1101,18 +1145,18 @@ class WindowAnalysisResult(AnimalFeatureParser):
         Returns:
             WindowAnalysisResult: New filtered instance
         """
-        mask = self.get_filter_reject_channels_by_recording_session(bad_channels_dict, use_abbrevs=use_abbrevs, **kwargs)
+        mask = self.get_filter_reject_channels_by_recording_session(bad_channels_dict, use_abbrevs=use_abbrevs)
         return self._create_filtered_copy(mask)
     
-    def apply_filters(self, filter_config: dict = None, min_valid_channels: int = 3, morphological_smoothing_seconds: float = None, **kwargs) -> "WindowAnalysisResult":
+    def apply_filters(self, filter_config: dict = None, min_valid_channels: int = 3, morphological_smoothing_seconds: float = None) -> "WindowAnalysisResult":
         """Apply multiple filters using configuration.
         
         Args:
             filter_config (dict, optional): Dictionary of filter names and parameters.
                 Available filters: 'logrms_range', 'high_rms', 'low_rms', 'high_beta', 
-                'reject_channels', 'reject_channels_by_session'
+                'reject_channels', 'reject_channels_by_session', 'morphological_smoothing'
             min_valid_channels (int): Minimum valid channels per window. Defaults to 3.
-            morphological_smoothing_seconds (float, optional): Temporal smoothing window
+            morphological_smoothing_seconds (float, optional): Temporal smoothing window (deprecated, use config instead)
             
         Returns:
             WindowAnalysisResult: New filtered instance
@@ -1121,7 +1165,8 @@ class WindowAnalysisResult(AnimalFeatureParser):
             >>> config = {
             ...     'logrms_range': {'z_range': 3},
             ...     'high_rms': {'max_rms': 500},
-            ...     'reject_channels': {'bad_channels': ['LMot', 'RMot']}
+            ...     'reject_channels': {'bad_channels': ['LMot', 'RMot']},
+            ...     'morphological_smoothing': {'smoothing_seconds': 8.0}
             ... }
             >>> filtered_war = war.apply_filters(config)
         """
@@ -1144,32 +1189,36 @@ class WindowAnalysisResult(AnimalFeatureParser):
         }
         
         filt_bools = []
+        morphological_params = None
+        
         for filter_name, filter_params in filter_config.items():
+            if filter_name == 'morphological_smoothing':
+                morphological_params = filter_params
+                continue
+                
             if filter_name not in filter_methods:
-                raise ValueError(f"Unknown filter: {filter_name}. Available: {list(filter_methods.keys())}")
+                raise ValueError(f"Unknown filter: {filter_name}. Available: {list(filter_methods.keys()) + ['morphological_smoothing']}")
             
             filter_func = filter_methods[filter_name]
-            filt_bool = filter_func(**filter_params, **kwargs)
+            filt_bool = filter_func(**filter_params)
             filt_bools.append(filt_bool)
             logging.info(f"{filter_name}: filtered {filt_bool.size - np.count_nonzero(filt_bool)}/{filt_bool.size}")
         
         # Combine all filter masks
-        filt_bool_all = np.prod(np.stack(filt_bools, axis=-1), axis=-1).astype(bool)
+        if filt_bools:
+            filt_bool_all = np.prod(np.stack(filt_bools, axis=-1), axis=-1).astype(bool)
+        else:
+            filt_bool_all = np.ones((len(self.result), len(self.channel_names)), dtype=bool)
         
-        # Apply morphological smoothing if requested
-        if morphological_smoothing_seconds is not None:
-            if "duration" not in self.result.columns:
-                raise ValueError("Cannot calculate window duration - 'duration' column missing")
-            window_duration = self.result["duration"].median()
-            structure_size = max(1, int(morphological_smoothing_seconds / window_duration))
-            
-            if structure_size > 1:
-                logging.info(f"Applying morphological smoothing with {structure_size} windows")
-                for ch_idx in range(filt_bool_all.shape[1]):
-                    channel_mask = filt_bool_all[:, ch_idx]
-                    channel_mask = binary_opening(channel_mask, structure=np.ones(structure_size))
-                    channel_mask = binary_closing(channel_mask, structure=np.ones(structure_size))
-                    filt_bool_all[:, ch_idx] = channel_mask
+        # Apply morphological smoothing if requested (either from config or parameter)
+        if morphological_params or morphological_smoothing_seconds is not None:
+            if morphological_params:
+                smoothing_seconds = morphological_params['smoothing_seconds']
+            else:
+                smoothing_seconds = morphological_smoothing_seconds
+                
+            filt_bool_all = self.get_filter_morphological_smoothing(filt_bool_all, smoothing_seconds)
+            logging.info(f"Applied morphological smoothing: {smoothing_seconds}s")
         
         # Filter windows based on minimum valid channels
         valid_channels_per_window = np.sum(filt_bool_all, axis=1)
