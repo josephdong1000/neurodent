@@ -55,9 +55,8 @@ def load_war(animal_id):
     war.reorder_and_pad_channels(
         ["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"], use_abbrevs=True
     )
-    # war.filter_all(filters=[war.get_filter_reject_channels_by_recording_session])
-    war.filter_all()
-    # war.add_unique_hash()
+    war.filter_all(morphological_smoothing_seconds=60)
+
     df = war.get_result(features=["logpsdband", "logrms"])
     df["animal"] = animal_id
     del war

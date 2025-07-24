@@ -50,7 +50,7 @@ def plot_animal(animal_id):
 
     # Filter
     war.reorder_and_pad_channels(["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"], use_abbrevs=True)
-    war.filter_all()
+    war.filter_all(morphological_smoothing_seconds=60)
 
     # Plot after filtering
     ap = visualization.AnimalPlotter(war, save_fig=True, save_path=save_path / f"{animal_id} zzz_filtered")

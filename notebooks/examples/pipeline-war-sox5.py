@@ -63,12 +63,12 @@ items = list(data["data_folders_to_animal_ids"].items())
 data_folders_to_animal_ids = dict(items[len(items) // 2 :])  # 1/2
 
 # ANCHOR testing higher rms low cutoff for artifact filtering
-data_folders_to_animal_ids = {
-    "060921_Cohort 3_EM1_AM2_GF4": [
-        "AM2",
-    ],
-    "010822_cohort4_group2_2mice_MWT_MHET": ["M10"],
-}
+# data_folders_to_animal_ids = {
+#     "060921_Cohort 3_EM1_AM2_GF4": [
+#         "AM2",
+#     ],
+#     "010822_cohort4_group2_2mice_MWT_MHET": ["M10"],
+# }
 
 
 # constants.SORTING_PARAMS['freq_min'] = 60
@@ -95,7 +95,9 @@ for data_folder, animal_ids in tqdm(data_folders_to_animal_ids.items(), desc="Pr
 
             # SECTION 2: Make WAR
             # war = ao.compute_windowed_analysis(['all'], multiprocess_mode='dask')
-            war = ao.compute_windowed_analysis(['all'], multiprocess_mode='dask')
+            war = ao.compute_windowed_analysis(
+                ["all"], exclude=["pcorr", "cohere", "nspike", "lognspike"], multiprocess_mode="dask"
+            )
             # !SECTION
 
         # SECTION 3: Make SARs, save SARs and load into WAR
