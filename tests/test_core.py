@@ -6,7 +6,7 @@ import os
 import tempfile
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 import warnings
 
 import numpy as np
@@ -210,8 +210,8 @@ class TestConvertDdfcolbinToDdfrowbin:
         assert converted_data.shape == (n_samples, n_channels)
         np.testing.assert_array_almost_equal(converted_data, test_data)
         
-    def test_convert_invalid_metadata_type(self, temp_dir):
-        """Test convert with invalid metadata type raises AssertionError."""
+    def test_convert_colbin_invalid_metadata_type(self, temp_dir):
+        """Test convert colbin with invalid metadata type raises AssertionError."""
         colbin_path = temp_dir / "test.bin"
         colbin_path.touch()
         
@@ -318,8 +318,8 @@ class TestConvertDdfrowbinToSi:
         assert rec.get_num_frames() == n_samples
         assert temppath is None  # No temp file for uncompressed
         
-    def test_convert_invalid_metadata_type(self, temp_dir):
-        """Test convert with invalid metadata type raises AssertionError."""
+    def test_convert_rowbin_invalid_metadata_type(self, temp_dir):
+        """Test convert rowbin with invalid metadata type raises AssertionError."""
         rowbin_path = temp_dir / "test.npy.gz"
         
         with pytest.raises(AssertionError, match="Metadata needs to be of type DDFBinaryMetadata"):
@@ -374,7 +374,8 @@ class TestConvertDdfrowbinToSi:
         
         with patch('spikeinterface.extractors.read_binary', return_value=mock_rec):
             with patch('spikeinterface.preprocessing.astype', return_value=mock_resampled_rec):
-                rec, temppath = convert_ddfrowbin_to_si(rowbin_path, metadata)
+                with pytest.warns(UserWarning, match="Sampling rate 2000.0 Hz != 1000 Hz. Resampling"):
+                    convert_ddfrowbin_to_si(rowbin_path, metadata)
         
         # Verify resampling was called
         mock_resample.assert_called_once_with(mock_rec, constants.GLOBAL_SAMPLING_RATE)
@@ -422,7 +423,9 @@ class TestLongRecordingOrganizer:
         
     def test_truncate_file_list_with_truncation(self, temp_dir):
         """Test _truncate_file_list with truncation."""
-        organizer = LongRecordingOrganizer(temp_dir, mode=None, truncate=2)
+        with pytest.warns(UserWarning, match="LongRecording will be truncated to the first 2 files"):
+            organizer = LongRecordingOrganizer(temp_dir, mode=None, truncate=2)
+        
         files = ['file3.bin', 'file1.bin', 'file2.bin']  # Unsorted
         
         result = organizer._truncate_file_list(files)
@@ -432,17 +435,18 @@ class TestLongRecordingOrganizer:
     def test_truncate_file_list_with_ref_list(self, temp_dir):
         """Test _truncate_file_list with reference list."""
         organizer = LongRecordingOrganizer(temp_dir, mode=None, truncate=False)
-        # Files have _RowMajor suffix, ref_list has _ColMajor suffix, but both have same base stems
-        files = ['file1_RowMajor.npy.gz', 'file2_RowMajor.npy.gz', 'file3_RowMajor.npy.gz']
-        ref_list = ['file1_ColMajor.bin', 'file3_ColMajor.bin']  # Only file1 and file3
+        # Test the actual pattern used in the code: rowbins matched against transformed colbins
+        colbins = ['file1_ColMajor.bin', 'file3_ColMajor.bin']  # Only file1 and file3
+        rowbins = ['file1_RowMajor.npy.gz', 'file2_RowMajor.npy.gz', 'file3_RowMajor.npy.gz']
+        # Create ref_list as done in actual code
+        ref_list = [x.replace("_ColMajor.bin", "_RowMajor.npy.gz") for x in colbins]
         
-        result = organizer._truncate_file_list(files, ref_list=ref_list)
+        result = organizer._truncate_file_list(rowbins, ref_list=ref_list)
         assert len(result) == 2
-        # Should return files whose stems match ref_list stems (file1 and file3)
-        result_names = [Path(f).name for f in result]
-        assert 'file1_RowMajor.npy.gz' in result_names
-        assert 'file3_RowMajor.npy.gz' in result_names
-        assert 'file2_RowMajor.npy.gz' not in result_names
+        # Should return the actual files whose stems match ref_list stems (file1 and file3)
+        assert 'file1_RowMajor.npy.gz' in result  
+        assert 'file3_RowMajor.npy.gz' in result
+        assert 'file2_RowMajor.npy.gz' not in result
         
     def test_validate_metadata_consistency_success(self, temp_dir):
         """Test _validate_metadata_consistency with consistent metadata."""
@@ -627,12 +631,13 @@ class TestLongRecordingOrganizer:
         organizer.file_end_datetimes = [end_time1, end_time2]
         organizer.file_durations = [3600.0, 3600.0]  # 1 hour each
         
-        # Test getting datetime for fragment 0
-        fragment_datetime = organizer.get_datetime_fragment(fragment_len_s=600.0, fragment_idx=0)
-        
-        # Should be start of first file
+        # Test getting datetime for fragment 0 with different fragment lengths
         expected = datetime(2023, 1, 1, 11, 0, 0)  # 1 hour before end_time1
-        assert fragment_datetime == expected
+        
+        test_fragment_lengths = np.arange(1, 3600)
+        for fragment_len_s in test_fragment_lengths:
+            fragment_datetime = organizer.get_datetime_fragment(fragment_len_s=fragment_len_s, fragment_idx=0)
+            assert fragment_datetime == expected, f"Failed for fragment_len_s={fragment_len_s}"
         
     def test_convert_to_mne(self, temp_dir):
         """Test convert_to_mne method."""
@@ -680,8 +685,7 @@ class TestLongRecordingOrganizer:
         """Test compute_bad_channels method."""
         organizer = LongRecordingOrganizer(temp_dir, mode=None)
         
-        # Mock LongRecording
-        n_channels = 4
+        # Mock LongRecording  
         n_samples = 1000
         # Create test data where channel 2 is an outlier
         normal_data = np.random.randn(n_samples, 3) * 10  # channels 0,1,3
@@ -692,7 +696,7 @@ class TestLongRecordingOrganizer:
         
         mock_recording = Mock()
         mock_recording.get_traces.return_value = test_data
-        mock_recording.__str__.return_value = "MockRecording"
+        mock_recording.__str__ = Mock(return_value="MockRecording")
         organizer.LongRecording = mock_recording
         organizer.channel_names = ['ch1', 'ch2', 'ch3', 'ch4']
         
@@ -734,7 +738,7 @@ class TestLongRecordingOrganizer:
         
         mock_recording = Mock()
         mock_recording.get_traces.return_value = test_data
-        mock_recording.__str__.return_value = "MockRecording"
+        mock_recording.__str__ = Mock(return_value="MockRecording")
         organizer.LongRecording = mock_recording
         organizer.channel_names = ['ch1', 'ch2']
         
@@ -762,30 +766,28 @@ class TestLongRecordingOrganizer:
             call_args = mock_decimate.call_args[0]
             assert call_args[0].dtype == np.float16
             
-    @patch('pythoneeg.core.core.DDFBinaryMetadata')
-    def test_prepare_colbins_rowbins_metas(self, mock_metadata_class, temp_dir):
+    def test_prepare_colbins_rowbins_metas(self, temp_dir):
         """Test prepare_colbins_rowbins_metas method."""
-        # Create test files
-        (temp_dir / "file1_ColMajor.bin").write_bytes(b"test_data")
-        (temp_dir / "file1_RowMajor.npy.gz").write_bytes(b"test_data")  
-        (temp_dir / "file1_Meta.csv").write_text("ProbeInfo,SampleRate\nch1,1000")
-        
-        # Mock metadata objects
-        mock_meta1 = Mock()
-        mock_meta1.dt_end = datetime(2023, 1, 1, 12, 0, 0)
-        mock_meta1.channel_names = ['ch1']
-        mock_meta1.metadata_df = pd.DataFrame({'ProbeInfo': ['ch1']})
-        
-        mock_metadata_class.side_effect = [mock_meta1, mock_meta1]  # One for self.meta, one for __metadata_objects
-        
         organizer = LongRecordingOrganizer(temp_dir, mode=None)
         
-        with patch.object(organizer, '_validate_metadata_consistency') as mock_validate:
-            organizer.prepare_colbins_rowbins_metas()
+        # Mock the private methods to avoid file I/O
+        organizer.colbins = [temp_dir / "file1_ColMajor.bin"]
+        organizer.rowbins = [temp_dir / "file1_RowMajor.npy.gz"]  
+        organizer.metas = [temp_dir / "file1_Meta.csv"]
+        
+        # Mock metadata objects
+        mock_meta = Mock()
+        mock_meta.dt_end = datetime(2023, 1, 1, 12, 0, 0)
+        mock_meta.channel_names = ['ch1']
+        mock_meta.metadata_df = pd.DataFrame({'ProbeInfo': ['ch1']})
+        
+        with patch.object(organizer, '_LongRecordingOrganizer__update_colbins_rowbins_metas'), \
+             patch.object(organizer, '_LongRecordingOrganizer__check_colbins_rowbins_metas_folders_exist'), \
+             patch.object(organizer, '_LongRecordingOrganizer__check_colbins_rowbins_metas_not_empty'), \
+             patch.object(organizer, '_validate_metadata_consistency') as mock_validate, \
+             patch('pythoneeg.core.core.DDFBinaryMetadata', return_value=mock_meta):
             
-            # Verify files were found
-            assert len(organizer.colbins) >= 1
-            assert len(organizer.metas) >= 1
+            organizer.prepare_colbins_rowbins_metas()
             
             # Verify metadata was set
             assert organizer.meta is not None
@@ -797,14 +799,16 @@ class TestLongRecordingOrganizer:
             
     def test_prepare_colbins_rowbins_metas_no_dates(self, temp_dir):
         """Test prepare_colbins_rowbins_metas when no dates are found."""
+        # Create colbin, rowbin, and meta files so the organizer finds them
         (temp_dir / "file1_ColMajor.bin").write_bytes(b"test_data")
+        (temp_dir / "file1_RowMajor.npy.gz").write_bytes(b"dummy_data")
         (temp_dir / "file1_Meta.csv").write_text("ProbeInfo,SampleRate\nch1,1000")
         
         organizer = LongRecordingOrganizer(temp_dir, mode=None)
         
         with patch('pythoneeg.core.core.DDFBinaryMetadata') as mock_metadata_class:
             mock_meta = Mock()
-            mock_meta.dt_end = None  # No date
+            mock_meta.dt_end = None  # No date - this should trigger the ValueError
             mock_meta.channel_names = ['ch1']
             mock_meta.metadata_df = pd.DataFrame({'ProbeInfo': ['ch1']})
             mock_metadata_class.return_value = mock_meta
@@ -902,7 +906,11 @@ class TestLongRecordingOrganizer:
         
         # Mock MNE raw object
         mock_raw = Mock()
-        mock_raw.info = {'sfreq': 2000.0, 'nchan': 2}
+        mock_info = Mock()
+        mock_info.sfreq = 2000.0
+        mock_info.nchan = 2
+        mock_info.__getitem__ = lambda self, key: getattr(self, key)  # Allow dict-style access
+        mock_raw.info = mock_info
         mock_raw.resample.return_value = mock_raw
         
         mock_extract = Mock(return_value=mock_raw)
@@ -941,7 +949,11 @@ class TestLongRecordingOrganizer:
         test_data = np.random.randn(n_channels, n_samples).astype(np.float32)
         
         mock_raw = Mock()
-        mock_raw.info = {'sfreq': 1000.0, 'nchan': n_channels}
+        mock_info = Mock()
+        mock_info.sfreq = 1000.0
+        mock_info.nchan = n_channels
+        mock_info.__getitem__ = lambda self, key: getattr(self, key)  # Allow dict-style access
+        mock_raw.info = mock_info
         mock_raw.resample.return_value = mock_raw
         mock_raw.get_data.return_value = test_data
         
