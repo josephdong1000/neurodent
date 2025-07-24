@@ -74,7 +74,6 @@ addopts = [
     "--strict-config",
     "--tb=short",
     "--maxfail=3",
-    "-v",
 ]
 # For coverage reports, add: --cov=pythoneeg --cov-report=term-missing --cov-fail-under=80
 # For slow tests, use: -m "not slow"
