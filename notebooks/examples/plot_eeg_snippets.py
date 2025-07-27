@@ -11,8 +11,10 @@ from typing import Dict, List, Tuple
 import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
+import spikeinterface.preprocessing as spre
 
 from pythoneeg import constants, visualization
+from pythoneeg.core.utils import parse_chname_to_abbrev
 
 # Configure logging
 logging.basicConfig(
@@ -104,11 +106,12 @@ def load_and_sample_animal_data(animal_info: Tuple[str, str, str, Path]) -> Dict
                 mode="nest",
                 assume_from_number=True,
                 skip_days=["bad"],
-                truncate=3,
+                # truncate=3,
                 lro_kwargs={
                     "mode": "bin",
                     "multiprocess_mode": "serial",  # Use serial for individual animals
                     "overwrite_rowbins": False,
+                    "truncate": 5,
                 },
             )
         except Exception as e:
@@ -130,6 +133,7 @@ def load_and_sample_animal_data(animal_info: Tuple[str, str, str, Path]) -> Dict
                 total_duration = 0
                 valid_recs = []
                 rec = lro.LongRecording
+                rec = spre.notch_filter(rec, freq=60, q=100)
                 try:
                     duration = rec.get_duration()
                     if duration > 0:
@@ -192,7 +196,7 @@ def extract_snippets_from_lro_safe(valid_recs: List, animal_id: str, genotype: s
 
             # Get the data with error handling
             try:
-                data = rec.get_traces(start_frame=start_sample, end_frame=end_sample)
+                data = rec.get_traces(start_frame=start_sample, end_frame=end_sample, return_scaled=True)
                 if data is None or data.size == 0:
                     logger.warning(f"Empty data for {animal_id} LRO {lro_idx} rec {rec_idx}")
                     continue
@@ -248,17 +252,18 @@ def plot_snippets(all_snippets: List[Dict], save_folder: Path):
                 genotype_snippets[genotype] = []
             genotype_snippets[genotype].extend(result["snippets"])
 
-    # Plot each genotype
+    # Plot each genotype with both color schemes
     for genotype, snippets in genotype_snippets.items():
         if not snippets:
             continue
 
         logger.info(f"Plotting {len(snippets)} snippets for {genotype}")
-        plot_genotype_snippets(genotype, snippets, save_folder)
+        plot_genotype_snippets(genotype, snippets, save_folder, color_scheme="color")
+        plot_genotype_snippets(genotype, snippets, save_folder, color_scheme="black")
 
 
-def plot_genotype_snippets(genotype: str, snippets: List[Dict], save_folder: Path):
-    """Plot 5×3 subplot layout: 5 animals (rows) × 3 samples (columns)."""
+def plot_genotype_snippets(genotype: str, snippets: List[Dict], save_folder: Path, color_scheme: str = "color"):
+    """Plot 5×3 subplot layout: 5 animals (rows) × 3 samples (columns) with improved formatting."""
 
     if not snippets:
         return
@@ -273,7 +278,7 @@ def plot_genotype_snippets(genotype: str, snippets: List[Dict], save_folder: Pat
 
     # Take up to 5 animals and ensure each has 3 snippets
     animals = list(animal_snippets.keys())[:5]
-    
+
     # Prepare data for 5×3 grid
     plot_data = []
     for animal_id in animals:
@@ -282,116 +287,204 @@ def plot_genotype_snippets(genotype: str, snippets: List[Dict], save_folder: Pat
         while len(animal_data) < 3:
             animal_data.append(None)
         plot_data.append(animal_data)
-    
+
     # Pad with empty rows if less than 5 animals
     while len(plot_data) < 5:
         plot_data.append([None, None, None])
 
-    # Create 5×3 subplot grid
-    fig, axes = plt.subplots(5, 3, figsize=(15, 20), sharex=True)
-    fig.suptitle(f"EEG Snippets - {genotype}", fontsize=20, fontweight="bold", y=0.98)
+    # Calculate global y-limits for consistent scaling
+    all_data = []
+    for row_data in plot_data:
+        for snippet in row_data:
+            if snippet is not None:
+                all_data.append(snippet["data"])
 
-    # Colors for different channels
-    colors = plt.cm.tab10(np.linspace(0, 1, len(CHANNEL_ORDER)))
+    # if all_data:
+    #     # Find global min/max for consistent scaling
+    #     global_min = np.min([np.min(data) for data in all_data])
+    #     global_max = np.max([np.max(data) for data in all_data])
+    #     data_range = global_max - global_min
+    #     # Add 10% padding
+    #     global_min -= 0.1 * data_range
+    #     global_max += 0.1 * data_range
+    # else:
+    #     global_min, global_max = 0, 1
+    global_max = 100
+    global_min = -global_max
+
+    # Create 5×3 subplot grid with 1:1 aspect ratio - no sharing for independent control
+    fig_width = 15
+    fig_height = 20  # Make it square for 1:1 aspect ratio
+    fig, axes = plt.subplots(5, 3, figsize=(fig_width, fig_height), sharex=False, sharey=False)
+
+    # Adjust spacing to prevent text overlap
+    # plt.subplots_adjust(left=0.12, right=0.95, top=0.92, bottom=0.08, hspace=0.4, wspace=0.3)
+    plt.subplots_adjust(hspace=0.4, wspace=0.3)
+
+    fig.suptitle(
+        f"EEG Snippets - {genotype} ({'Color' if color_scheme == 'color' else 'Black'})",
+        fontsize=16,
+        fontweight="bold",
+        y=0.96,
+    )
+
+    # Color scheme selection
+    if color_scheme == "color":
+        colors = plt.cm.tab10(np.linspace(0, 1, len(CHANNEL_ORDER)))
+    else:
+        colors = ["black"] * len(CHANNEL_ORDER)
+
+    # Channel spacing for stacked display
+    # channel_spacing = (global_max - global_min) / (len(CHANNEL_ORDER) + 1)
+    channel_spacing = global_max - global_min
 
     for row in range(5):
         for col in range(3):
             ax = axes[row, col]
             snippet = plot_data[row][col] if row < len(plot_data) else None
-            
+
             if snippet is None:
                 # Empty subplot
-                ax.text(0.5, 0.5, "No Data", ha="center", va="center", 
-                       transform=ax.transAxes, fontsize=14, color="gray")
-                ax.set_xlim([0, SNIPPET_DURATION])
-                ax.set_ylim([0, 1])
+                ax.text(
+                    0.5, 0.5, "No Data", ha="center", va="center", transform=ax.transAxes, fontsize=12, color="gray"
+                )
+                # Set consistent limits and labels for empty subplots
+                ax.set_xlim([0, SNIPPET_DURATION])  # Extra space for scalebar
+                ax.set_ylim([global_min, global_max])
+                # ax.set_xticks([0, 1, 2, 3, 4, 5])
+                # ax.set_xticklabels([0, 1, 2, 3, 4, 5], fontsize=7)
+                # ax.set_yticks([])  # No y-ticks for empty subplots
             else:
                 # Plot all channels on this subplot
                 data = snippet["data"]
                 time_axis = snippet["time_axis"]
                 channel_names = snippet["channel_names"]
                 animal_id = snippet["animal_id"]
-                
-                # Reorder channels to match standard order
-                channel_indices = []
-                plot_channel_names = []
-                
-                for desired_channel in CHANNEL_ORDER:
-                    # Find matching channel
-                    found_idx = None
-                    for idx, ch_name in enumerate(channel_names):
-                        ch_name_clean = str(ch_name).strip()
-                        desired_clean = str(desired_channel).strip()
-                        
-                        if (desired_clean == ch_name_clean or
-                            desired_clean in ch_name_clean or
-                            ch_name_clean in desired_clean or
-                            desired_clean.replace("L", "").replace("R", "") in ch_name_clean or
-                            ch_name_clean.replace("L", "").replace("R", "") in desired_clean):
-                            found_idx = idx
-                            break
-                    
-                    if found_idx is not None:
-                        channel_indices.append(found_idx)
-                        plot_channel_names.append(channel_names[found_idx])
-                    else:
-                        channel_indices.append(None)
-                        plot_channel_names.append(desired_channel)
-                
-                # Calculate channel spacing for y-axis
-                channel_spacing = 200  # microvolts between channels
-                y_offset = 0
+
+                # Get abbreviated channel names in original order
+                channel_indices = list(range(len(channel_names)))
+                plot_channel_abbrevs = []
+
+                for ch_name in channel_names:
+                    try:
+                        abbrev = parse_chname_to_abbrev(ch_name, assume_from_number=True, strict_matching=False)
+                        plot_channel_abbrevs.append(abbrev)
+                    except Exception:
+                        plot_channel_abbrevs.append(str(ch_name)[:4])  # Fallback: first 4 chars
+
+                # Calculate y-offsets for stacked channels - start with spacing from bottom
+                y_offset = global_min + channel_spacing
                 y_labels = []
                 y_positions = []
-                
-                for ch_idx, (data_ch_idx, ch_name) in enumerate(zip(channel_indices, plot_channel_names)):
-                    if data_ch_idx is not None:
-                        # Plot the channel data with offset
-                        channel_data = data[:, data_ch_idx] + y_offset
-                        ax.plot(time_axis, channel_data, color=colors[ch_idx], 
-                               linewidth=1.0, label=ch_name)
-                        y_labels.append(ch_name)
-                        y_positions.append(y_offset)
-                    else:
-                        # Missing channel - just add to labels
-                        y_labels.append(f"{ch_name} (missing)")
-                        y_positions.append(y_offset)
-                    
+
+                for ch_idx, (data_ch_idx, ch_abbrev) in enumerate(zip(channel_indices, plot_channel_abbrevs)):
+                    # Plot the channel data with offset
+                    channel_data = data[:, data_ch_idx]
+                    # Normalize to channel spacing and add offset - reduced amplitude
+                    normalized_data = channel_data - np.mean(channel_data)
+                    channel_data_plot = normalized_data + y_offset
+
+                    color_idx = ch_idx % len(colors)  # Cycle through colors if more channels than colors
+                    ax.plot(time_axis, channel_data_plot, color=colors[color_idx], linewidth=0.8, alpha=0.8)
+                    y_labels.append(ch_abbrev)
+                    y_positions.append(y_offset)
+
                     y_offset += channel_spacing
-                
-                # Set y-axis labels at channel positions
+
+                # Set consistent axis parameters for all data subplots
+                ax.set_xlim([0, SNIPPET_DURATION])  # Extra space for scalebar
+                ax.set_ylim([global_min, y_offset])
+                # ax.set_xticks([0, 1, 2, 3, 4, 5])
+                # ax.set_xticklabels([0, 1, 2, 3, 4, 5], fontsize=7)
                 ax.set_yticks(y_positions)
-                ax.set_yticklabels(y_labels, fontsize=8)
-                ax.set_ylim([-channel_spacing, y_offset])
-                
+                ax.set_yticklabels(y_labels, fontsize=7)
+
                 # Style the plot
-                ax.grid(True, alpha=0.3)
-                ax.tick_params(labelsize=8)
-            
+                ax.grid(True, alpha=0.2)
+                ax.tick_params(labelsize=7)
+
+                # Force 1:1 aspect ratio
+                ax.set_aspect("auto", adjustable="box")
+
             # Set labels and titles
             if row == 0:
-                ax.set_title(f"Sample {col + 1}", fontsize=12, fontweight="bold")
-            
-            if row < len(animals) and col == 0:
-                # Add animal ID on the left
-                ax.text(-0.15, 0.5, animals[row], rotation=90, ha="center", va="center",
-                       transform=ax.transAxes, fontsize=10, fontweight="bold")
-            
-            if row == 4:  # Bottom row
-                ax.set_xlabel("Time (s)", fontsize=10)
-            
-            if col == 0:  # Left column
-                ax.set_ylabel("Channels", fontsize=10)
+                ax.set_title(f"Sample {col + 1}", fontsize=10, fontweight="bold", pad=10)
 
-    plt.tight_layout()
-    
+            # Set xlabel on all subplots
+            ax.set_xlabel("Time (s)", fontsize=8)
+
+            # Add animal ID on the left with better positioning
+            if row < len(animals) and col == 0:
+                ax.text(
+                    -0.25,
+                    0.5,
+                    animals[row][:15],
+                    rotation=90,
+                    ha="center",
+                    va="center",
+                    transform=ax.transAxes,
+                    fontsize=8,
+                    fontweight="bold",
+                )
+
+    # Add scale bar to all subplots that have data - positioned outside plot area
+    for row in range(5):
+        for col in range(3):
+            if plot_data[row][col] is not None:
+                ax_scale = axes[row, col]
+
+                # Position scalebar in bottom-right corner, outside the data area
+                # ANCHOR position the scale bar
+                scale_x_start = SNIPPET_DURATION + 0.2  # Just outside the right edge
+                scale_y_start = global_min - 3 * channel_spacing  # Near bottom
+                scale_width = 1.0  # 1 second
+                scale_height = channel_spacing  # Voltage scale
+
+                # Horizontal line for time
+                line_h = ax_scale.plot(
+                    [scale_x_start, scale_x_start + scale_width], [scale_y_start, scale_y_start], "k-", linewidth=2
+                )
+                line_h[0].set_clip_on(False)  # Disable clipping so line shows outside plot
+
+                text_h = ax_scale.text(
+                    scale_x_start + scale_width / 2,
+                    scale_y_start - channel_spacing * 0.1,
+                    "1 s",
+                    ha="center",
+                    va="top",
+                    fontsize=7,
+                    fontweight="bold",
+                )
+                text_h.set_clip_on(False)  # Disable clipping so text shows outside plot
+
+                # Vertical line for voltage
+                line_v = ax_scale.plot(
+                    [scale_x_start, scale_x_start], [scale_y_start, scale_y_start + scale_height], "k-", linewidth=2
+                )
+                line_v[0].set_clip_on(False)  # Disable clipping so line shows outside plot
+
+                text_v = ax_scale.text(
+                    scale_x_start - 0.05,
+                    scale_y_start + scale_height / 2,
+                    f"{int(scale_height)} μV",
+                    ha="right",
+                    va="center",
+                    fontsize=7,
+                    fontweight="bold",
+                    rotation=90,
+                )
+                text_v.set_clip_on(False)  # Disable clipping so text shows outside plot
+
+                # X-axis limits already set to accommodate scalebar
+
     # Save the plot
-    filename = f"eeg_snippets_{genotype}_5x3.png"
+    color_suffix = "_color" if color_scheme == "color" else "_black"
+    filename = f"eeg_snippets_{genotype}_5x3{color_suffix}.tiff"
     filepath = save_folder / filename
-    plt.savefig(filepath, dpi=300, bbox_inches="tight")
+    plt.savefig(filepath, dpi=300, bbox_inches="tight", facecolor="white", format="tiff")
     plt.close()
-    
-    logger.info(f"Saved {genotype} 5×3 plot to {filepath}")
+
+    logger.info(f"Saved {genotype} 5×3 {color_scheme} plot to {filepath}")
 
 
 def main():
@@ -424,7 +517,7 @@ def main():
     # Process animals in parallel
     start_time = time.time()
 
-    with Pool(processes=min(8, len(animals_to_process))) as pool:
+    with Pool(processes=min(10, len(animals_to_process))) as pool:
         results = list(
             tqdm(
                 pool.imap(load_and_sample_animal_data, animals_to_process),
@@ -473,5 +566,5 @@ if __name__ == "__main__":
 """
 To run this script on SLURM:
 
-sbatch --mem 100GB -c 8 -t 12:00:00 /mnt/isilon/marsh_single_unit/PythonEEG/notebooks/examples/pipeline.sh /mnt/isilon/marsh_single_unit/PythonEEG/notebooks/examples/plot_eeg_snippets.py
+sbatch --mem 200GB -c 11 -t 12:00:00 /mnt/isilon/marsh_single_unit/PythonEEG/notebooks/examples/pipeline.sh /mnt/isilon/marsh_single_unit/PythonEEG/notebooks/examples/plot_eeg_snippets.py
 """
