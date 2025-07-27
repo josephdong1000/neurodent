@@ -29,6 +29,7 @@ dist/
 *.pyc
 slurm-*.out
 **/pipeline-wars/*
+**/eeg_snippets*
 *.ps1
 *.prof
 
