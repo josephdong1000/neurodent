@@ -139,6 +139,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                 figsize=figsize,
                 sharex=True,
                 gridspec_kw={"height_ratios": [constants.FEATURE_PLOT_HEIGHT_RATIOS[x] for x in features]},
+                squeeze=False,
             )
             plt.subplots_adjust(hspace=0)
 
@@ -301,13 +302,14 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                 figsize=figsize,
                 sharex=True,
                 gridspec_kw={"height_ratios": [constants.FEATURE_PLOT_HEIGHT_RATIOS[x] for x in features]},
+                squeeze=False,
             )
             plt.subplots_adjust(hspace=0)
             for j, feat in enumerate(features):
                 self._plot_coherecorr_spectralgroup(
                     group=df_row,
                     feature=feat,
-                    ax=ax[j],
+                    ax=ax[j, 0],
                     score_type=score_type,
                     triag=triag,
                     show_endfile=show_endfile,
@@ -315,7 +317,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                     endfile_name=endfile_name,
                     **kwargs,
                 )
-            ax[-1].set_xlabel("Time (s)")
+            ax[-1, 0].set_xlabel("Time (s)")
             fig.suptitle(i)
             self._handle_figure(fig, title=f"coherecorr_spectral_{i}")
 
