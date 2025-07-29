@@ -29,6 +29,9 @@ class TestLongRecordingAnalyzer:
         mock.LongRecording = MagicMock()
         mock.LongRecording.get_sampling_frequency.return_value = constants.GLOBAL_SAMPLING_RATE
         mock.LongRecording.get_num_frames.return_value = 10000
+        # Add cumulative_file_durations attribute to the LongRecordingOrganizer level
+        # Make the first file end at 5 seconds so it falls within the first fragment [0, 10)
+        mock.cumulative_file_durations = [5.0, 15.0, 25.0]
         # Add end_relative attribute with a non-empty list
         mock.end_relative = [1]
         return mock

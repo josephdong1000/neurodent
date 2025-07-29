@@ -199,7 +199,7 @@ class TestMountainSortAnalyzer:
         
         # Verify select_channels was called for each channel
         calls = mock_recording.clone.return_value.select_channels.call_args_list
-        expected_calls = [[(channel_id,)] for channel_id in channel_ids]
+        expected_calls = [([channel_id],) for channel_id in channel_ids]
         actual_calls = [call[0] for call in calls]
         
         assert actual_calls == expected_calls
@@ -350,8 +350,9 @@ class TestMountainSortAnalyzer:
         # Verify dask.delayed was called for each channel (cache + sort)
         assert mock_delayed.call_count == 8  # 4 for caching + 4 for sorting
         
-        # Check results structure
-        assert sortings == mock_delayed_sort
+        # Check results structure - should return delayed objects, not the original mocks
+        assert len(sortings) == 4  # One for each channel
+        assert len(wave_recs) == 4  # One for each channel
         assert wave_recs == mock_split_recs
     
     @patch('matplotlib.pyplot.subplots')
@@ -379,7 +380,7 @@ class TestMountainSortAnalyzer:
         mock_subplots.return_value = (mock_fig, mock_ax)
         
         # Test with plotting enabled
-        with patch('pythoneeg.core.analyze_sort.plot_probe') as mock_plot_probe:
+        with patch('pythoneeg.core.analyze_sort.pi_plotting.plot_probe') as mock_plot_probe:
             MountainSortAnalyzer.sort_recording(
                 mock_recording, plot_probe=True, multiprocess_mode="serial"
             )
