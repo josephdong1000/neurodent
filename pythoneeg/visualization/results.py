@@ -35,7 +35,7 @@ class AnimalFeatureParser:
     # REVIEW make this a utility function and refactor across codebase?
     def _average_feature(self, df: pd.DataFrame, colname: str, weightsname: str | None = "duration"):
         column = df[colname]
-        if weightsname is None:
+        if weightsname is None or weightsname not in df.columns:
             weights = np.ones(column.size)
         else:
             weights = df[weightsname]
@@ -482,6 +482,35 @@ class WindowAnalysisResult(AnimalFeatureParser):
         if "index" in self.result.columns:
             warnings.warn("Dropping column 'index'")
             self.result = self.result.drop(columns=["index"])
+
+        # Check if timestamps are sorted and sort if needed
+        if "timestamp" in self.result.columns:
+            if not self.result["timestamp"].is_monotonic_increasing:
+                warnings.warn("Timestamps are not sorted. Sorting result DataFrame by timestamp.")
+                self.result = self.result.sort_values("timestamp")
+
+        # Check for unusually short intervals between timestamps
+        if "timestamp" in self.result.columns and "duration" in self.result.columns:
+            median_duration = self.result["duration"].median()
+            timestamp_diffs = self.result["timestamp"].diff()
+            short_intervals = timestamp_diffs < pd.Timedelta(seconds=median_duration)
+            
+            # Skip first row since diff() produces NaT
+            short_intervals = short_intervals[1:]
+            
+            if short_intervals.any():
+                n_short = short_intervals.sum()
+                pct_short = (n_short / len(short_intervals)) * 100
+                
+                warning_msg = (
+                    f"Found {n_short} intervals ({pct_short:.1f}%) between timestamps "
+                    f"that are shorter than the median duration of {median_duration:.1f}s"
+                )
+                
+                if pct_short > 1.0:  # More than 1% of intervals are short
+                    raise ValueError(warning_msg)
+                else:
+                    warnings.warn(warning_msg)
 
         if "animal" in self.result.columns:
             unique_animals = self.result["animal"].unique()
