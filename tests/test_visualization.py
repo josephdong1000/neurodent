@@ -6,14 +6,12 @@ Legacy ResultsVisualizer and standalone plotting function tests have been remove
 import numpy as np
 import pandas as pd
 import pytest
+import warnings
 from unittest.mock import Mock, patch, MagicMock
-from pathlib import Path
-import matplotlib.pyplot as plt
 
 from pythoneeg.visualization import (
     WindowAnalysisResult,
     AnimalFeatureParser,
-    AnimalOrganizer,
     SpikeAnalysisResult,
     AnimalPlotter,
     ExperimentPlotter
@@ -111,6 +109,425 @@ class TestWindowAnalysisResult:
         result = war.get_groupavg_result(['rms'], groupby='animalday')
         assert isinstance(result, pd.DataFrame)
         assert 'rms' in result.columns
+
+    def test_unsorted_timestamps_warning(self):
+        """Test that unsorted timestamps generate a warning and get sorted."""
+        # Create DataFrame with unsorted timestamps
+        data = {
+            'animal': ['A1', 'A1', 'A1'],
+            'animalday': ['A1_20230101', 'A1_20230101', 'A1_20230101'],
+            'genotype': ['WT', 'WT', 'WT'],
+            'timestamp': pd.to_datetime([
+                '2023-01-01 10:08:00',  # Out of order
+                '2023-01-01 10:00:00',  # Should be first
+                '2023-01-01 10:04:00'   # Should be middle
+            ]),
+            'duration': [240.0, 240.0, 240.0],
+            'rms': [[100.0, 110.0], [200.0, 210.0], [150.0, 160.0]]
+        }
+        df = pd.DataFrame(data)
+        
+        # Should generate warning and sort timestamps
+        with pytest.warns(UserWarning, match="Timestamps are not sorted"):
+            war = WindowAnalysisResult(
+                result=df,
+                animal_id="A1",
+                genotype="WT",
+                channel_names=["LMot", "RMot"]
+            )
+        
+        # Verify timestamps are now sorted
+        assert war.result["timestamp"].is_monotonic_increasing
+        expected_order = [
+            pd.Timestamp('2023-01-01 10:00:00'),
+            pd.Timestamp('2023-01-01 10:04:00'), 
+            pd.Timestamp('2023-01-01 10:08:00')
+        ]
+        pd.testing.assert_series_equal(
+            war.result["timestamp"].reset_index(drop=True),
+            pd.Series(expected_order, name="timestamp")
+        )
+
+    def test_sorted_timestamps_no_warning(self):
+        """Test that already sorted timestamps don't generate warnings."""
+        # Create DataFrame with properly sorted timestamps
+        data = {
+            'animal': ['A1', 'A1', 'A1'],
+            'animalday': ['A1_20230101', 'A1_20230101', 'A1_20230101'],
+            'genotype': ['WT', 'WT', 'WT'],
+            'timestamp': pd.to_datetime([
+                '2023-01-01 10:00:00',
+                '2023-01-01 10:04:00',
+                '2023-01-01 10:08:00'
+            ]),
+            'duration': [240.0, 240.0, 240.0],
+            'rms': [[100.0, 110.0], [200.0, 210.0], [150.0, 160.0]]
+        }
+        df = pd.DataFrame(data)
+        
+        # Should not generate any warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")  # Turn warnings into errors
+            war = WindowAnalysisResult(
+                result=df,
+                animal_id="A1",
+                genotype="WT",
+                channel_names=["LMot", "RMot"]
+            )
+        
+        # Verify timestamps remain sorted
+        assert war.result["timestamp"].is_monotonic_increasing
+
+    def test_short_intervals_warning(self):
+        """Test warning for short intervals between timestamps (< 1% threshold)."""
+        # Create DataFrame with one short interval out of many (< 1% threshold)
+        # Need enough timestamps so that 1 short interval is < 1%
+        timestamps = pd.date_range('2023-01-01 10:00:00', periods=150, freq='4min')
+        timestamps_list = timestamps.tolist()
+        # Make one interval short (30 seconds instead of 4 minutes)
+        timestamps_list[50] = timestamps_list[49] + pd.Timedelta(seconds=30)
+        # Adjust remaining timestamps to maintain sequence
+        for i in range(51, len(timestamps_list)):
+            timestamps_list[i] = timestamps_list[50] + pd.Timedelta(minutes=4) * (i - 50)
+        
+        data = {
+            'animal': ['A1'] * 150,
+            'animalday': ['A1_20230101'] * 150,
+            'genotype': ['WT'] * 150,
+            'timestamp': timestamps_list,
+            'duration': [240.0] * 150,  # 4 minute median duration
+            'rms': [[100.0, 110.0]] * 150
+        }
+        df = pd.DataFrame(data)
+        
+        # Should generate warning but not raise error (1/149 = 0.67% < 1% threshold)
+        with pytest.warns(UserWarning, match=r"Found \d+ intervals.*shorter than the median duration"):
+            war = WindowAnalysisResult(
+                result=df,
+                animal_id="A1",
+                genotype="WT",
+                channel_names=["LMot", "RMot"]
+            )
+
+    def test_short_intervals_error(self):
+        """Test error for too many short intervals between timestamps (> 1% threshold)."""
+        # Create DataFrame where >1% of intervals are short
+        data = {
+            'animal': ['A1'] * 4,
+            'animalday': ['A1_20230101'] * 4,
+            'genotype': ['WT'] * 4,
+            'timestamp': pd.to_datetime([
+                '2023-01-01 10:00:00',
+                '2023-01-01 10:00:30',  # 30s gap
+                '2023-01-01 10:01:00',  # 30s gap  
+                '2023-01-01 10:04:00'   # Normal gap
+            ]),
+            'duration': [240.0] * 4,  # 4 minute median duration
+            'rms': [[100.0, 110.0]] * 4
+        }
+        df = pd.DataFrame(data)
+        
+        # Should raise ValueError (>1% of intervals are short: 2/3 = 66.7%)
+        with pytest.raises(ValueError, match=r"Found \d+ intervals.*shorter than the median duration"):
+            WindowAnalysisResult(
+                result=df,
+                animal_id="A1",
+                genotype="WT", 
+                channel_names=["LMot", "RMot"]
+            )
+
+    def test_no_short_intervals_check_without_duration(self):
+        """Test that short interval check is skipped when duration column is missing."""
+        # Create DataFrame without duration column
+        data = {
+            'animal': ['A1', 'A1', 'A1'],
+            'animalday': ['A1_20230101', 'A1_20230101', 'A1_20230101'],
+            'genotype': ['WT', 'WT', 'WT'],
+            'timestamp': pd.to_datetime([
+                '2023-01-01 10:00:00',
+                '2023-01-01 10:00:30',  # Short interval
+                '2023-01-01 10:04:00'
+            ]),
+            'rms': [[100.0, 110.0], [200.0, 210.0], [150.0, 160.0]]
+        }
+        df = pd.DataFrame(data)
+        
+        # Should not raise error or warning about short intervals
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")  # Turn warnings into errors
+            war = WindowAnalysisResult(
+                result=df,
+                animal_id="A1",
+                genotype="WT",
+                channel_names=["LMot", "RMot"]
+            )
+
+    def test_no_timestamp_validation_without_timestamps(self):
+        """Test that timestamp validation is skipped when timestamp column is missing."""
+        # Create DataFrame without timestamp column
+        data = {
+            'animal': ['A1', 'A1', 'A1'],
+            'animalday': ['A1_20230101', 'A1_20230101', 'A1_20230101'],
+            'genotype': ['WT', 'WT', 'WT'],
+            'duration': [240.0, 240.0, 240.0],
+            'rms': [[100.0, 110.0], [200.0, 210.0], [150.0, 160.0]]
+        }
+        df = pd.DataFrame(data)
+        
+        # Should not raise any errors or warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")  # Turn warnings into errors
+            war = WindowAnalysisResult(
+                result=df,
+                animal_id="A1",
+                genotype="WT",
+                channel_names=["LMot", "RMot"]
+            )
+
+    def test_equal_timestamps_handled_correctly(self):
+        """Test that equal timestamps (0 second intervals) are handled correctly."""
+        # Create DataFrame with duplicate timestamps
+        data = {
+            'animal': ['A1'] * 4,
+            'animalday': ['A1_20230101'] * 4,
+            'genotype': ['WT'] * 4,
+            'timestamp': pd.to_datetime([
+                '2023-01-01 10:00:00',
+                '2023-01-01 10:00:00',  # Duplicate timestamp
+                '2023-01-01 10:04:00',
+                '2023-01-01 10:08:00'
+            ]),
+            'duration': [240.0] * 4,
+            'rms': [[100.0, 110.0]] * 4
+        }
+        df = pd.DataFrame(data)
+        
+        # Should handle duplicate timestamps (0 second interval is < median duration)
+        # This should trigger the short interval warning/error logic
+        with pytest.raises(ValueError, match=r"Found \d+ intervals.*shorter than the median duration"):
+            WindowAnalysisResult(
+                result=df,
+                animal_id="A1",
+                genotype="WT",
+                channel_names=["LMot", "RMot"]
+            )
+
+    def test_edge_case_single_timestamp(self):
+        """Test edge case with only one timestamp (no intervals to check)."""
+        data = {
+            'animal': ['A1'],
+            'animalday': ['A1_20230101'],
+            'genotype': ['WT'],
+            'timestamp': pd.to_datetime(['2023-01-01 10:00:00']),
+            'duration': [240.0],
+            'rms': [[100.0, 110.0]]
+        }
+        df = pd.DataFrame(data)
+        
+        # Should not raise any errors (no intervals to check)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")  # Turn warnings into errors  
+            war = WindowAnalysisResult(
+                result=df,
+                animal_id="A1",
+                genotype="WT",
+                channel_names=["LMot", "RMot"]
+            )
+
+    def test_mixed_duration_intervals(self):
+        """Test with mixed durations and corresponding interval validation."""
+        # Create realistic scenario with uniform durations and appropriate intervals
+        data = {
+            'animal': ['A1'] * 6,
+            'animalday': ['A1_20230101'] * 6,
+            'genotype': ['WT'] * 6,
+            'timestamp': pd.to_datetime([
+                '2023-01-01 10:00:00',
+                '2023-01-01 10:04:00',  # 4min interval  
+                '2023-01-01 10:08:00',  # 4min interval
+                '2023-01-01 10:12:00',  # 4min interval
+                '2023-01-01 10:16:00',  # 4min interval
+                '2023-01-01 10:20:00'   # 4min interval
+            ]),
+            'duration': [240.0, 240.0, 240.0, 240.0, 240.0, 240.0],  # Uniform durations match intervals
+            'rms': [[100.0, 110.0]] * 6
+        }
+        df = pd.DataFrame(data)
+        
+        # All intervals should be reasonable relative to durations - no warnings expected
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")  # Turn warnings into errors
+            war = WindowAnalysisResult(
+                result=df,
+                animal_id="A1",
+                genotype="WT",
+                channel_names=["LMot", "RMot"]
+            )
+
+    def test_boundary_condition_exactly_one_percent(self):
+        """Test boundary condition where exactly 1% of intervals are short."""
+        # Create 101 timestamps where exactly 1 interval is short (1/100 = 1.0%)
+        # We need 101 timestamps to get 100 intervals
+        timestamps = pd.date_range('2023-01-01 10:00:00', periods=101, freq='4min')
+        timestamps_list = timestamps.tolist()
+        # Make the second interval short (30 seconds instead of 4 minutes)
+        timestamps_list[1] = timestamps_list[0] + pd.Timedelta(seconds=30)
+        # Adjust remaining timestamps to maintain sequence
+        for i in range(2, len(timestamps_list)):
+            timestamps_list[i] = timestamps_list[i-1] + pd.Timedelta(minutes=4)
+        
+        data = {
+            'animal': ['A1'] * 101,
+            'animalday': ['A1_20230101'] * 101,
+            'genotype': ['WT'] * 101,
+            'timestamp': timestamps_list,
+            'duration': [240.0] * 101,  # 4 minute durations
+            'rms': [[100.0, 110.0]] * 101
+        }
+        df = pd.DataFrame(data)
+        
+        # Exactly 1% should trigger warning but not error (1/100 = 1.0%)
+        with pytest.warns(UserWarning, match=r"Found \d+ intervals.*shorter than the median duration"):
+            war = WindowAnalysisResult(
+                result=df,
+                animal_id="A1",
+                genotype="WT",
+                channel_names=["LMot", "RMot"]
+            )
+
+    def test_fragment_durations_stored_and_used(self):
+        """Test that fragment durations are stored and used in weighted averaging."""
+        # Create DataFrame with varying fragment durations
+        data = {
+            'animal': ['A1'] * 4,
+            'animalday': ['A1_20230101'] * 2 + ['A1_20230102'] * 2,
+            'genotype': ['WT'] * 4,
+            'timestamp': pd.to_datetime([
+                '2023-01-01 10:00:00', '2023-01-01 10:04:00',
+                '2023-01-02 10:00:00', '2023-01-02 10:04:10'
+            ]),
+            'duration': [240.0, 240.0, 240.0, 250.0],  # Variable durations
+            'rms': [[100.0, 110.0], [200.0, 210.0], [120.0, 130.0], [180.0, 190.0]]
+        }
+        df = pd.DataFrame(data)
+        
+        war = WindowAnalysisResult(
+            result=df,
+            animal_id="A1",
+            genotype="WT",
+            channel_names=["LMot", "RMot"]
+        )
+        
+        # Verify duration column exists
+        assert 'duration' in war.result.columns
+        
+        # Test weighted averaging uses durations
+        avg_result = war.get_groupavg_result(['rms'], groupby='animalday')
+        assert len(avg_result) == 2
+        
+        # Day 1: uniform weights (240, 240) - simple average
+        day1_expected = np.average([[100.0, 110.0], [200.0, 210.0]], axis=0, weights=[240.0, 240.0])
+        np.testing.assert_array_almost_equal(avg_result.loc['A1_20230101', 'rms'], day1_expected)
+        
+        # Day 2: different weights (240, 250) - weighted average
+        day2_expected = np.average([[120.0, 130.0], [180.0, 190.0]], axis=0, weights=[240.0, 250.0])
+        np.testing.assert_array_almost_equal(avg_result.loc['A1_20230102', 'rms'], day2_expected)
+
+    def test_duration_aggregation_sums_correctly(self):
+        """Test that time window aggregation properly sums fragment durations."""
+        data = {
+            'animal': ['A1'] * 4,
+            'animalday': ['A1_20230101'] * 2 + ['A1_20230102'] * 2,
+            'genotype': ['WT'] * 4,
+            'timestamp': pd.to_datetime([
+                '2023-01-01 10:00:00', '2023-01-01 10:04:00',
+                '2023-01-02 10:00:00', '2023-01-02 10:04:10'
+            ]),
+            'isday': [True] * 4,
+            'duration': [240.0, 240.0, 240.0, 240.0],  # Uniform durations to avoid timestamp validation issues
+            'rms': [[100.0, 110.0], [200.0, 210.0], [120.0, 130.0], [180.0, 190.0]]
+        }
+        df = pd.DataFrame(data)
+        
+        war = WindowAnalysisResult(
+            result=df,
+            animal_id="A1",
+            genotype="WT",
+            channel_names=["LMot", "RMot"]
+        )
+        
+        # Aggregate by animalday
+        war.aggregate_time_windows(groupby=['animalday'])
+        
+        # Check durations were summed correctly
+        result = war.result
+        assert len(result) == 2
+        
+        day1_duration = result[result['animalday'] == 'A1_20230101']['duration'].iloc[0]
+        day2_duration = result[result['animalday'] == 'A1_20230102']['duration'].iloc[0]
+        
+        assert day1_duration == 480.0  # 240 + 240
+        assert day2_duration == 480.0  # 240 + 240
+
+    def test_duration_preserved_in_save_load(self):
+        """Test that fragment durations are preserved through save/load cycles."""
+        import tempfile
+        from pathlib import Path
+        
+        data = {
+            'animal': ['A1'] * 3,
+            'animalday': ['A1_20230101'] * 3,
+            'genotype': ['WT'] * 3,
+            'timestamp': pd.to_datetime([
+                '2023-01-01 10:00:00', '2023-01-01 10:04:00', '2023-01-01 10:08:00'
+            ]),
+            'duration': [240.0, 245.0, 235.0],
+            'rms': [[100.0, 110.0], [200.0, 210.0], [150.0, 160.0]]
+        }
+        df = pd.DataFrame(data)
+        
+        war = WindowAnalysisResult(
+            result=df,
+            animal_id="A1",
+            genotype="WT",
+            channel_names=["LMot", "RMot"]
+        )
+        
+        with tempfile.TemporaryDirectory() as tmpdir:
+            save_path = Path(tmpdir)
+            
+            # Save and load
+            war.save_pickle_and_json(save_path)
+            loaded_war = WindowAnalysisResult.load_pickle_and_json(save_path)
+            
+            # Verify durations preserved
+            assert 'duration' in loaded_war.result.columns
+            original_durations = war.result['duration'].tolist()
+            loaded_durations = loaded_war.result['duration'].tolist()
+            assert original_durations == loaded_durations
+
+    def test_missing_duration_column_fallback(self):
+        """Test graceful handling when duration column is missing."""
+        # Create DataFrame without duration column
+        data = {
+            'animal': ['A1', 'A1'],
+            'animalday': ['A1_day1', 'A1_day1'],
+            'genotype': ['WT', 'WT'],
+            'timestamp': pd.to_datetime(['2023-01-01 10:00:00', '2023-01-01 10:04:00']),
+            'rms': [[100.0, 110.0], [200.0, 210.0]]
+        }
+        df = pd.DataFrame(data)
+        
+        war = WindowAnalysisResult(
+            result=df,
+            animal_id="A1",
+            genotype="WT",
+            channel_names=["LMot", "RMot"]
+        )
+        
+        # Should handle missing duration gracefully (falls back to uniform weights)
+        result = war.get_groupavg_result(['rms'], groupby='animalday')
+        assert not np.isnan(result.loc['A1_day1', 'rms']).any()
 
 
 class TestAnimalPlotter:
