@@ -1,5 +1,6 @@
 from pathlib import Path
 import warnings
+import logging
 
 import matplotlib
 import matplotlib.axes
@@ -147,13 +148,13 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                 self._plot_linear_temporalgroup(
                     group=df_row,
                     feature=feat,
-                    ax=ax[j],
+                    ax=ax[j, 0],
                     score_type=score_type,
                     channels=channels,
                     show_endfile=show_endfile,
                     **kwargs,
                 )
-            ax[-1].set_xlabel("Time (s)")
+            ax[-1, 0].set_xlabel("Time (s)")
             fig.suptitle(i)
             self._handle_figure(fig, title=f"linear_temporal_{i}")
 
@@ -469,6 +470,157 @@ class AnimalPlotter(viz.AnimalFeatureParser):
             ax.set_ylabel("Frequency (Hz)")
             ax.set_title(i)
             self._handle_figure(fig, title=f"psd_spectrogram_{i}")
+
+    def plot_artifact_diagnosis(
+        self,
+        features: list[str] | str = None,
+        figsize=None,
+        cmap="viridis",
+        score_type=None,
+        **kwargs,
+    ):
+        """
+        Create artifact diagnosis heatmap showing patterns over time.
+
+        Creates a heatmap where:
+        - X-axis: Time of day (timestamp mod 24h)
+        - Y-axis: Days
+        - Color: Feature values (flattened across channels)
+
+        Parameters
+        ----------
+        features : list[str], optional
+            List of features to plot. If None, uses non-band linear features.
+        figsize : tuple, optional
+            Figure size (width, height)
+        cmap : str, optional
+            Colormap for the heatmap
+        score_type : str, optional
+            Standardization method for feature values
+        **kwargs
+            Additional arguments passed to matplotlib
+        """
+        if features is None:
+            # Use non-band linear features for artifact detection
+            features = [f for f in constants.LINEAR_FEATURES]
+        if isinstance(features, str):
+            features = [features]
+
+        # Get data grouped by animalday
+        df_rowgroup = self.window_result.get_grouprows_result(
+            features, multiindex=["animal", "genotype"], include=["duration", "endfile", "timestamp"]
+        )
+
+        for feature in features:
+            if feature not in df_rowgroup.columns:
+                warnings.warn(f"Feature {feature} not found in dataframe")
+                features.remove(feature)
+
+        if not features:
+            raise ValueError("No valid features found for artifact diagnosis")
+
+        # Process each feature
+        for feature in features:
+            self._plot_artifact_diagnosis_feature(
+                df_rowgroup=df_rowgroup, feature=feature, figsize=figsize, cmap=cmap, score_type=score_type, **kwargs
+            )
+
+    def _plot_artifact_diagnosis_feature(
+        self,
+        df_rowgroup: pd.DataFrame,
+        feature: str,
+        n_bins=24 * 60,
+        figsize=None,
+        cmap="viridis",
+        score_type="z",
+        **kwargs,
+    ):
+        """
+        Create artifact diagnosis heatmap for a single feature.
+        """
+        # Group by animalday to process each recording session
+        for animalday, df_day in df_rowgroup.groupby(level=0):
+            # Extract timestamps and convert to time of day (modulo 24h)
+            timestamps = df_day["timestamp"]
+            time_of_day = timestamps.dt.hour + timestamps.dt.minute / 60.0 + timestamps.dt.second / 3600.0
+
+            # Get feature data and flatten across channels
+            feature_data = self.__get_linear_feature(group=df_day, feature=feature, score_type=score_type)
+            logging.info(f"Feature data shape: {feature_data.shape}")
+
+            # Flatten across channels (take mean across channels)
+            if feature_data.ndim > 2:
+                feature_data = np.nanmean(feature_data, axis=1).squeeze()
+            else:
+                feature_data = feature_data.squeeze()
+
+            logging.info(f"Feature data shape: {feature_data.shape}")
+
+            # Create time bins for the heatmap (24 hours)
+            time_bins = np.linspace(0, 24, n_bins + 1)  # 25 edges for 24 bins
+            bin_centers = (time_bins[:-1] + time_bins[1:]) / 2
+
+            # Create day bins (unique days)
+            days = timestamps.dt.date.unique()
+            days = sorted(days)
+
+            # Initialize heatmap matrix
+            heatmap_matrix = np.full((len(days), n_bins), np.nan)
+
+            # Fill the heatmap matrix
+            for i, day in enumerate(days):
+                day_mask = timestamps.dt.date == day
+                day_times = time_of_day[day_mask]
+                day_values = feature_data[day_mask]
+
+                # Bin the data by time of day
+                for j, (bin_start, bin_end) in enumerate(zip(time_bins[:-1], time_bins[1:])):
+                    time_mask = (day_times >= bin_start) & (day_times < bin_end)
+                    if np.any(time_mask):
+                        heatmap_matrix[i, j] = np.nanmean(day_values[time_mask])
+
+            # Create the plot
+            fig, ax = plt.subplots(1, 1, figsize=figsize or (10, 3))
+
+            # Create the heatmap
+            im = ax.imshow(
+                heatmap_matrix,
+                aspect="auto",
+                cmap=cmap,
+                extent=[0, 24, 0, len(days)],
+                origin="lower",
+                interpolation="none",
+                **kwargs,
+            )
+
+            # Add colorbar
+            cbar = fig.colorbar(im, ax=ax)
+            cbar.set_label(f"{feature} ({score_type})")
+
+            # Set labels and title
+            ax.set_xlabel("Time of Day (hours)")
+            ax.set_ylabel("Day")
+            ax.set_title(f"Artifact Diagnosis - {feature} - {animalday}")
+
+            # Set x-axis ticks (every 6 hours)
+            ax.set_xticks([0, 6, 12, 18, 24])
+            ax.set_xticklabels(["00:00", "06:00", "12:00", "18:00", "24:00"])
+
+            # Set y-axis ticks (every day)
+            if len(days) <= 10:
+                ax.set_yticks(range(len(days)))
+                ax.set_yticklabels([day.strftime("%Y-%m-%d") for day in days])
+            else:
+                # Show every nth day if too many days
+                n = max(1, len(days) // 10)
+                ax.set_yticks(np.arange(0, len(days), n) + 0.5)
+                ax.set_yticklabels([days[i].strftime("%Y-%m-%d") for i in range(0, len(days), n)])
+
+            # Add grid
+            ax.grid(True, alpha=0.3)
+
+            # Handle figure saving/display
+            self._handle_figure(fig, title=f"artifact_diagnosis_{feature}_{animalday}")
 
     def _handle_figure(self, fig, title=None):
         if self.save_fig:
