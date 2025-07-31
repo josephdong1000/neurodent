@@ -546,7 +546,6 @@ class AnimalPlotter(viz.AnimalFeatureParser):
 
             # Get feature data and flatten across channels
             feature_data = self.__get_linear_feature(group=df_day, feature=feature, score_type=score_type)
-            logging.info(f"Feature data shape: {feature_data.shape}")
 
             # Flatten across channels (take mean across channels)
             if feature_data.ndim > 2:
@@ -554,15 +553,13 @@ class AnimalPlotter(viz.AnimalFeatureParser):
             else:
                 feature_data = feature_data.squeeze()
 
-            logging.info(f"Feature data shape: {feature_data.shape}")
-
             # Create time bins for the heatmap (24 hours)
             time_bins = np.linspace(0, 24, n_bins + 1)  # 25 edges for 24 bins
             bin_centers = (time_bins[:-1] + time_bins[1:]) / 2
 
             # Create day bins (unique days)
             days = timestamps.dt.date.unique()
-            days = sorted(days)
+            days = sorted(days, reverse=True)
 
             # Initialize heatmap matrix
             heatmap_matrix = np.full((len(days), n_bins), np.nan)
@@ -593,6 +590,11 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                 **kwargs,
             )
 
+            # Add red boundary lines between longrecording objects (different animaldays)
+            # Since we're already grouping by animalday, we need to check if there are multiple longrecordings
+            # This would be indicated by breaks in timestamps or endfile markers
+            self._add_longrecording_boundaries(ax, df_day, time_of_day, days)
+
             # Add colorbar
             cbar = fig.colorbar(im, ax=ax)
             cbar.set_label(f"{feature} ({score_type})")
@@ -606,9 +608,9 @@ class AnimalPlotter(viz.AnimalFeatureParser):
             ax.set_xticks([0, 6, 12, 18, 24])
             ax.set_xticklabels(["00:00", "06:00", "12:00", "18:00", "24:00"])
 
-            # Set y-axis ticks (every day)
+            # Set y-axis ticks (every day) - centered in each row
             if len(days) <= 10:
-                ax.set_yticks(range(len(days)))
+                ax.set_yticks(np.arange(len(days)) + 0.5)
                 ax.set_yticklabels([day.strftime("%Y-%m-%d") for day in days])
             else:
                 # Show every nth day if too many days
@@ -621,6 +623,48 @@ class AnimalPlotter(viz.AnimalFeatureParser):
 
             # Handle figure saving/display
             self._handle_figure(fig, title=f"artifact_diagnosis_{feature}_{animalday}")
+
+    def _add_longrecording_boundaries(self, ax, df_day, time_of_day, days):
+        """
+        Add red vertical lines to indicate boundaries between longrecording objects.
+
+        Args:
+            ax: matplotlib axes object
+            df_day: dataframe for the current animalday
+            time_of_day: array of time of day values (0-24 hours)
+            days: sorted list of unique days
+        """
+        # Check if we have endfile column to identify longrecording boundaries
+        if "endfile" not in df_day.columns:
+            return
+
+        # Find longrecording boundaries based on endfile markers
+        df_day = df_day.reset_index()
+        endfile_indices = df_day.index[df_day["endfile"].notna()].tolist()
+
+        if not endfile_indices:
+            return
+
+        # For each endfile marker, draw a red line at the corresponding timestamp
+        for idx in endfile_indices:
+            if idx in df_day.index:
+                timestamp = df_day.loc[idx, "timestamp"]
+                day = timestamp.date()
+
+                # Find which day row this corresponds to
+                if day in days:
+                    day_idx = days.index(day)
+                    time_hour = timestamp.hour + timestamp.minute / 60.0 + timestamp.second / 3600.0
+
+                    # Draw vertical line at this time point for this day
+                    ax.axvline(
+                        x=time_hour,
+                        ymin=(day_idx) / len(days),
+                        ymax=(day_idx + 1) / len(days),
+                        color="red",
+                        linewidth=1,
+                        alpha=0.8,
+                    )
 
     def _handle_figure(self, fig, title=None):
         if self.save_fig:
