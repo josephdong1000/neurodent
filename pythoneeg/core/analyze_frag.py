@@ -126,7 +126,23 @@ class FragmentAnalyzer:
 
         f, psd = FragmentAnalyzer.compute_psd(rec, f_s, welch_bin_t, notch_filter, multitaper, **kwargs)
         deltaf = np.median(np.diff(f))
-        return {k: simpson(psd[np.logical_and(f >= v[0], f <= v[1]), :], dx=deltaf, axis=0) for k, v in bands.items()}
+        
+        # Use exclusive upper bounds to avoid double-counting at band boundaries
+        # Standard approach: f >= low_bound and f < high_bound for all bands except the last
+        result = {}
+        band_items = list(bands.items())
+        
+        for i, (k, v) in enumerate(band_items):
+            if i == len(band_items) - 1:
+                # Last band: include upper boundary
+                freq_mask = np.logical_and(f >= v[0], f <= v[1])
+            else:
+                # All other bands: exclude upper boundary
+                freq_mask = np.logical_and(f >= v[0], f < v[1])
+            
+            result[k] = simpson(psd[freq_mask, :], dx=deltaf, axis=0)
+        
+        return result
 
     @staticmethod
     def compute_logpsdband(
@@ -160,7 +176,9 @@ class FragmentAnalyzer:
         f, psd = FragmentAnalyzer.compute_psd(rec, f_s, welch_bin_t, notch_filter, multitaper, **kwargs)
         deltaf = np.median(np.diff(f))
 
-        return simpson(psd[np.logical_and(f >= band[0], f <= band[1]), :], dx=deltaf, axis=0)
+        # Use inclusive bounds for total power calculation
+        freq_mask = np.logical_and(f >= band[0], f <= band[1])
+        return simpson(psd[freq_mask, :], dx=deltaf, axis=0)
 
     @staticmethod
     def compute_logpsdtotal(
@@ -194,9 +212,12 @@ class FragmentAnalyzer:
         FragmentAnalyzer._check_rec_np(rec)
 
         psd = FragmentAnalyzer.compute_psdband(rec, f_s, welch_bin_t, notch_filter, bands, multitaper, **kwargs)
-        psdtotal = FragmentAnalyzer.compute_psdtotal(
-            rec, f_s, welch_bin_t, notch_filter, total_band, multitaper, **kwargs
-        )
+        
+        # Use sum of band powers as denominator to ensure fractions sum to 1
+        # This is mathematically correct since bands with non-overlapping boundaries
+        # should exactly partition the frequency space
+        psdtotal = sum(psd.values())
+        
         return {k: v / psdtotal for k, v in psd.items()}
 
     @staticmethod

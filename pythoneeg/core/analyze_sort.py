@@ -10,6 +10,7 @@ import dask.distributed
 import matplotlib.pyplot as plt
 import numpy as np
 import probeinterface as pi
+import probeinterface.plotting as pi_plotting
 import spikeinterface.core as si
 import spikeinterface.preprocessing as spre
 from mountainsort5 import Scheme2SortingParameters, sorting_scheme2
@@ -43,7 +44,7 @@ class MountainSortAnalyzer:
 
         if plot_probe:
             _, ax2 = plt.subplots(1, 1)
-            plot_probe(probe, ax=ax2, with_device_index=True, with_contact_id=True)
+            pi_plotting.plot_probe(probe, ax=ax2, with_device_index=True, with_contact_id=True)
             plt.show()
 
         # Get recordings for sorting and waveforms
