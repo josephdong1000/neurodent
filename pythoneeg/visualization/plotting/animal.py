@@ -471,16 +471,17 @@ class AnimalPlotter(viz.AnimalFeatureParser):
             ax.set_title(i)
             self._handle_figure(fig, title=f"psd_spectrogram_{i}")
 
-    def plot_artifact_diagnosis(
+    def plot_temporal_heatmap(
         self,
         features: list[str] | str = None,
         figsize=None,
         cmap="viridis",
         score_type=None,
+        norm=None,
         **kwargs,
     ):
         """
-        Create artifact diagnosis heatmap showing patterns over time.
+        Create temporal heatmap showing feature patterns over time.
 
         Creates a heatmap where:
         - X-axis: Time of day (timestamp mod 24h)
@@ -497,11 +498,17 @@ class AnimalPlotter(viz.AnimalFeatureParser):
             Colormap for the heatmap
         score_type : str, optional
             Standardization method for feature values
+        norm : matplotlib.colors.Normalize, optional
+            Normalization object for the colormap. If None, uses default normalization.
+            Common options:
+            - matplotlib.colors.Normalize(vmin=0, vmax=1)  # Fixed range
+            - matplotlib.colors.CenteredNorm(vcenter=0)  # Auto-detect range around 0
+            - matplotlib.colors.LogNorm()  # Logarithmic scale
         **kwargs
             Additional arguments passed to matplotlib
         """
         if features is None:
-            # Use non-band linear features for artifact detection
+            # Use non-band linear features for temporal analysis
             features = [f for f in constants.LINEAR_FEATURES]
         if isinstance(features, str):
             features = [features]
@@ -517,15 +524,21 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                 features.remove(feature)
 
         if not features:
-            raise ValueError("No valid features found for artifact diagnosis")
+            raise ValueError("No valid features found for temporal heatmap")
 
         # Process each feature
         for feature in features:
-            self._plot_artifact_diagnosis_feature(
-                df_rowgroup=df_rowgroup, feature=feature, figsize=figsize, cmap=cmap, score_type=score_type, **kwargs
+            self._plot_temporal_heatmap_feature(
+                df_rowgroup=df_rowgroup,
+                feature=feature,
+                figsize=figsize,
+                cmap=cmap,
+                score_type=score_type,
+                norm=norm,
+                **kwargs,
             )
 
-    def _plot_artifact_diagnosis_feature(
+    def _plot_temporal_heatmap_feature(
         self,
         df_rowgroup: pd.DataFrame,
         feature: str,
@@ -533,10 +546,11 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         figsize=None,
         cmap="viridis",
         score_type="z",
+        norm=None,
         **kwargs,
     ):
         """
-        Create artifact diagnosis heatmap for a single feature.
+        Create temporal heatmap for a single feature.
         """
         # Group by animalday to process each recording session
         for animalday, df_day in df_rowgroup.groupby(level=0):
@@ -584,6 +598,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                 heatmap_matrix,
                 aspect="auto",
                 cmap=cmap,
+                norm=norm,
                 extent=[0, 24, 0, len(days)],
                 origin="lower",
                 interpolation="none",
@@ -602,7 +617,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
             # Set labels and title
             ax.set_xlabel("Time of Day (hours)")
             ax.set_ylabel("Day")
-            ax.set_title(f"Artifact Diagnosis - {feature} - {animalday}")
+            ax.set_title(f"Temporal Heatmap - {feature} - {animalday}")
 
             # Set x-axis ticks (every 6 hours)
             ax.set_xticks([0, 6, 12, 18, 24])
@@ -622,7 +637,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
             ax.grid(True, alpha=0.3)
 
             # Handle figure saving/display
-            self._handle_figure(fig, title=f"artifact_diagnosis_{feature}_{animalday}")
+            self._handle_figure(fig, title=f"temporal_heatmap_{feature}_{animalday}")
 
     def _add_longrecording_boundaries(self, ax, df_day, time_of_day, days):
         """
