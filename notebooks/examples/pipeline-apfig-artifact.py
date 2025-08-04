@@ -3,6 +3,7 @@ import sys
 from multiprocessing import Pool
 from pathlib import Path
 
+import matplotlib
 from tqdm import tqdm
 
 from pythoneeg import constants, core, visualization
@@ -16,7 +17,7 @@ logger = logging.getLogger()
 
 base_folder = Path("/mnt/isilon/marsh_single_unit/PythonEEG")
 load_folder = base_folder / "notebooks" / "tests" / "test-wars-sox5-7"
-save_folder = Path("/home/dongjp/Downloads/7-30 artifact figs")
+save_folder = Path("/home/dongjp/Downloads/7-30 artifact figs 4 zscore")
 if not save_folder.exists():
     save_folder.mkdir(parents=True, exist_ok=True)
 
@@ -44,8 +45,43 @@ def plot_animal(animal_id):
     save_path = save_folder
 
     ap = visualization.AnimalPlotter(war, save_fig=True, save_path=save_path / f"{animal_id}")
-    ap.plot_artifact_diagnosis(features="rms", figsize=(10, 5))
-    ap.plot_artifact_diagnosis(features="zcohere", figsize=(10, 5))
+    # ap.plot_temporal_heatmap(features="rms", figsize=(10, 3), norm=matplotlib.colors.Normalize(vmin=50, vmax=300))
+    ap.plot_temporal_heatmap(
+        features="rms",
+        figsize=(10, 3),
+        cmap="seismic",
+        score_type="z",
+        norm=matplotlib.colors.CenteredNorm(halfrange=2),
+    )
+
+    # ap.plot_temporal_heatmap(
+    #     features="psdtotal", figsize=(10, 3), norm=matplotlib.colors.Normalize(vmin=50**2, vmax=500**2)
+    # )
+    # ap.plot_temporal_heatmap(features="zcohere", figsize=(10, 5), norm=matplotlib.colors.Normalize(vmin=0, vmax=1.5))
+    # ap.plot_temporal_heatmap(
+    #     features="zpcorr", figsize=(10, 3), norm=matplotlib.colors.Normalize(vmin=-1.5, vmax=1.5), cmap="RdBu_r"
+    # )
+    ap.plot_temporal_heatmap(
+        features="zpcorr", figsize=(10, 3), cmap="RdBu_r", score_type="z", norm=matplotlib.colors.CenteredNorm()
+    )
+
+    # Filter using default features
+    war = war.filter_all()
+    ap = visualization.AnimalPlotter(war, save_fig=True, save_path=save_path / f"{animal_id}_filtered")
+    # ap.plot_temporal_heatmap(features="rms", figsize=(10, 3), norm=matplotlib.colors.Normalize(vmin=50, vmax=300))
+    # ap.plot_temporal_heatmap(
+    #     features="zpcorr", figsize=(10, 3), norm=matplotlib.colors.Normalize(vmin=-1.5, vmax=1.5), cmap="RdBu_r"
+    # )
+    ap.plot_temporal_heatmap(
+        features="rms",
+        figsize=(10, 3),
+        cmap="seismic",
+        score_type="z",
+        norm=matplotlib.colors.CenteredNorm(halfrange=2),
+    )
+    ap.plot_temporal_heatmap(
+        features="zpcorr", figsize=(10, 3), cmap="RdBu_r", score_type="z", norm=matplotlib.colors.CenteredNorm()
+    )
 
     return animal_id
 
