@@ -625,13 +625,6 @@ def cache_fragments_to_zarr(
 
     Raises:
         ImportError: If zarr is not available
-
-    Examples:
-        >>> import numpy as np
-        >>> fragments = np.random.rand(100, 1000, 8)  # 100 fragments, 1000 samples, 8 channels
-        >>> zarr_path, zarr_array = cache_fragments_to_zarr(fragments, 100)
-        >>> # Access fragments via zarr_array[idx] instead of fragments[idx]
-        >>> first_fragment = zarr_array[0]
     """
     try:
         import zarr
