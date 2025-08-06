@@ -13,8 +13,6 @@ from typing import Literal
 
 import dask
 import dask.array as da
-import dask.dataframe as dd
-import h5py
 import mne
 import numpy as np
 import pandas as pd
@@ -232,9 +230,6 @@ class AnimalOrganizer(AnimalFeatureParser):
             miniters = int(lan.n_fragments / 100)
             match multiprocess_mode:
                 case "dask":
-                    # Save fragments to tempfile
-                    tmppath = os.path.join(get_temp_directory(), f"temp_{os.urandom(24).hex()}.h5")
-
                     # The last fragment is not included because it makes the dask array ragged
                     logging.debug("Converting LongRecording to numpy array")
 
@@ -245,48 +240,40 @@ class AnimalOrganizer(AnimalFeatureParser):
                     for idx in range(n_fragments_war):
                         np_fragments[idx] = lan.get_fragment_np(idx)
 
-                    logging.debug(f"Caching numpy array with h5py in {tmppath}")
-                    with h5py.File(tmppath, "w", libver="latest") as f:
-                        f.create_dataset(
-                            "fragments",
-                            data=np_fragments,
-                            chunks=True,  # Let h5py auto-chunk, or specify tuple like (1, -1, -1)
-                            maxshape=None,  # Allow dataset to be resizable
-                            #    compression="gzip",  # Use GZIP compression
-                            #    compression_opts=4,  # Compression level 0-9 (higher = more compression but slower)
-                            #    rdcc_nbytes=10 * 1024 * 1024  # 10MB chunk cache
-                        )
-                    del np_fragments  # cleanup memory
+                    # Cache fragments to zarr
+                    tmppath, _ = core.cache_fragments_to_zarr(np_fragments, n_fragments_war)
+                    del np_fragments
 
                     logging.debug("Processing metadata serially")
                     metadatas = [self._process_fragment_metadata(idx, lan, window_s) for idx in range(n_fragments_war)]
                     meta_df = pd.DataFrame(metadatas)
 
                     logging.debug("Processing features in parallel")
-                    with h5py.File(tmppath, "r", libver="latest") as f:
-                        np_fragments_reconstruct = da.from_array(
-                            f["fragments"], chunks="100 MB"
-                        )  # NOTE maybe allow the user to specify chunk size
-                        feature_values = [
-                            delayed(FragmentAnalyzer._process_fragment_features_dask)(
-                                np_fragments_reconstruct[idx], lan.f_s, features, kwargs
-                            )
-                            for idx in range(n_fragments_war)
-                        ]
-                        # del np_fragments_reconstruct # cleanup memory
-                        feature_values = dask.compute(*feature_values)
-                        f.close()  # ensure file is closed
+                    np_fragments_reconstruct = da.from_zarr(tmppath, chunks=("auto", -1, -1))
+                    logging.debug(f"Dask array shape: {np_fragments_reconstruct.shape}")
+                    logging.debug(f"Dask array chunks: {np_fragments_reconstruct.chunks}")
 
-                    # Clean up temp file after processing
-                    logging.debug("Cleaning up temp file")
+                    # Create delayed tasks for each fragment using efficient dependency resolution
+                    feature_values = [
+                        delayed(FragmentAnalyzer.process_fragment_with_dependencies)(
+                            np_fragments_reconstruct[idx], lan.f_s, features, kwargs
+                        )
+                        for idx in range(n_fragments_war)
+                    ]
+
+                    # Compute features in parallel
+                    feature_values = dask.compute(*feature_values)
+
+                    # Clean up temp directory after processing
+                    logging.debug("Cleaning up temp directory")
                     try:
-                        os.remove(tmppath)
+                        import shutil
+
+                        shutil.rmtree(tmppath)
                     except (OSError, FileNotFoundError) as e:
-                        logging.warning(f"Failed to remove temporary file {tmppath}: {e}")
+                        logging.warning(f"Failed to remove temporary directory {tmppath}: {e}")
 
-                    # Combine metadata and feature values
                     logging.debug("Combining metadata and feature values")
-
                     feat_df = pd.DataFrame(feature_values)
                     lan_df = pd.concat([meta_df, feat_df], axis=1)
 
@@ -494,19 +481,19 @@ class WindowAnalysisResult(AnimalFeatureParser):
             median_duration = self.result["duration"].median()
             timestamp_diffs = self.result["timestamp"].diff()
             short_intervals = timestamp_diffs < pd.Timedelta(seconds=median_duration)
-            
+
             # Skip first row since diff() produces NaT
             short_intervals = short_intervals[1:]
-            
+
             if short_intervals.any():
                 n_short = short_intervals.sum()
                 pct_short = (n_short / len(short_intervals)) * 100
-                
+
                 warning_msg = (
                     f"Found {n_short} intervals ({pct_short:.1f}%) between timestamps "
                     f"that are shorter than the median duration of {median_duration:.1f}s"
                 )
-                
+
                 if pct_short > 1.0:  # More than 1% of intervals are short
                     raise ValueError(warning_msg)
                 else:
