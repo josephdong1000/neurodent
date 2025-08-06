@@ -29,18 +29,40 @@ logging.basicConfig(
 logger = logging.getLogger()
 
 base_folder = Path("/mnt/isilon/marsh_single_unit/PythonEEG")
-load_folder = base_folder / "notebooks" / "tests" / "test-wars-sox5-7"
+load_folder = base_folder / "notebooks" / "tests" / "test-wars-sox5-8"
 save_folder = base_folder / "notebooks" / "examples"
 
 animal_ids = [p.name for p in load_folder.glob("*") if p.is_dir()]
 
+# bad_animal_ids = [
+#     "013122_cohort4_group7_2mice both_FHET FHET(2)",
+#     "012322_cohort4_group6_3mice_FMUT___MMUT_MWT MHET",
+#     "012322_cohort4_group6_3mice_FMUT___MMUT_MWT MMUT",
+#     "011622_cohort4_group4_3mice_MMutOLD_FMUT_FMUT_FWT OLDMMT",
+#     "011322_cohort4_group3_4mice_AllM_MT_WT_HET_WT M3",
+#     "012322_cohort4_group6_3mice_FMUT___MMUT_MWT FHET"
+# ]
 bad_animal_ids = [
-    "013122_cohort4_group7_2mice both_FHET FHET(2)",
-    "012322_cohort4_group6_3mice_FMUT___MMUT_MWT MHET",
-    "012322_cohort4_group6_3mice_FMUT___MMUT_MWT MMUT",
-    "011622_cohort4_group4_3mice_MMutOLD_FMUT_FMUT_FWT OLDMMT",
+    "011322_cohort4_group3_4mice_AllM_MT_WT_HET_WT M2",
     "011322_cohort4_group3_4mice_AllM_MT_WT_HET_WT M3",
-    "012322_cohort4_group6_3mice_FMUT___MMUT_MWT FHET"
+    "011322_cohort4_group3_4mice_AllM_MT_WT_HET_WT M8",
+    "011622_cohort4_group4_3mice_MMutOLD_FMUT_FMUT_FWT FMUT(2)",
+    "011622_cohort4_group4_3mice_MMutOLD_FMUT_FMUT_FWT OLDMMT",
+    "012022_cohort4_group5_3mice__FWT_MMUT_FMUT FMUT",
+    "012022_cohort4_group5_3mice__FWT_MMUT_FMUT FWT",
+    "012022_cohort4_group5_3mice__FWT_MMUT_FMUT MMUT",
+    "012322_cohort4_group6_3mice_FMUT___MMUT_MWT FHET",
+    "031021_cohort 2, group 3 and 4 #8 Cage 3A",
+    "031122_cohort5_group1_2mice_FHET_MWT F4",
+    "031921_cohort 2 group 5 and group 6 mouse M3 cage1A",
+    "060921_Cohort 3_EM1_AM2_GF4 GF4",
+    "061022_group 9 M1, M2, M3 group9_M1_Cage1",
+    "061322_Group10 M8, M10 M8",
+    "061722_group10 M3, F8 F8",
+    "061722_group10 M3, F8 M3",
+    "062921_Cohort 3_AM3_AM5_CM9_BM6_CM5_CF2_IF5_BF3 BM6",
+    "121821_cohort4_Group1_2mice M2",
+    "121821_cohort4_Group1_2mice M4",
 ]
 animal_ids = [p for p in animal_ids if p not in bad_animal_ids]
 
@@ -55,7 +77,8 @@ def load_war(animal_id):
     war.reorder_and_pad_channels(
         ["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"], use_abbrevs=True
     )
-    war.filter_all(morphological_smoothing_seconds=60 * 5)
+    # war.filter_all(morphological_smoothing_seconds=60 * 5)
+    war.filter_all(morphological_smoothing_seconds=None)
 
     df = war.get_result(features=["logpsdband", "logrms"])
     df["animal"] = animal_id

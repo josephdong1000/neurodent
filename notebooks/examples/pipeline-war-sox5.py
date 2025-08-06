@@ -57,19 +57,12 @@ with open(base_folder / "notebooks" / "tests" / "sox5 combine genotypes.json", "
     data = json.load(f)
 data_parent_folder = Path(data['data_parent_folder'])
 constants.GENOTYPE_ALIASES = data['GENOTYPE_ALIASES']
+
 # data_folders_to_animal_ids = data["data_folders_to_animal_ids"]
 # Get only the second half of the dictionary items
 items = list(data["data_folders_to_animal_ids"].items())
 data_folders_to_animal_ids = dict(items[len(items) // 2 :])  # 1/2
-
-# ANCHOR testing higher rms low cutoff for artifact filtering
-# data_folders_to_animal_ids = {
-#     "060921_Cohort 3_EM1_AM2_GF4": [
-#         "AM2",
-#     ],
-#     "010822_cohort4_group2_2mice_MWT_MHET": ["M10"],
-# }
-
+# data_folders_to_animal_ids = data["data_folders_to_animal_ids"]
 
 # constants.SORTING_PARAMS['freq_min'] = 60
 # constants.SORTING_PARAMS['freq_max'] = 400
@@ -95,9 +88,7 @@ for data_folder, animal_ids in tqdm(data_folders_to_animal_ids.items(), desc="Pr
 
             # SECTION 2: Make WAR
             # war = ao.compute_windowed_analysis(['all'], multiprocess_mode='dask')
-            war = ao.compute_windowed_analysis(
-                ["all"], exclude=["pcorr", "cohere", "nspike", "lognspike"], multiprocess_mode="dask"
-            )
+            war = ao.compute_windowed_analysis(["all"], exclude=["nspike", "lognspike"], multiprocess_mode="dask")
             # !SECTION
 
         # SECTION 3: Make SARs, save SARs and load into WAR
@@ -112,7 +103,7 @@ for data_folder, animal_ids in tqdm(data_folders_to_animal_ids.items(), desc="Pr
 
         # SECTION 4: Save WARs and cleanup
         war.save_pickle_and_json(
-            base_folder / "notebooks" / "tests" / "test-wars-sox5-7" / f"{data_folder} {animal_id}"
+            base_folder / "notebooks" / "tests" / "test-wars-sox5-8" / f"{data_folder} {animal_id}"
         )
         del war
         # del sars
