@@ -61,7 +61,8 @@ constants.GENOTYPE_ALIASES = data['GENOTYPE_ALIASES']
 # data_folders_to_animal_ids = data["data_folders_to_animal_ids"]
 # Get only the second half of the dictionary items
 items = list(data["data_folders_to_animal_ids"].items())
-data_folders_to_animal_ids = dict(items[len(items) // 2 :])  # 1/2
+# data_folders_to_animal_ids = dict(items[int(len(items) * 1 / 2) :])  # last 1/2
+data_folders_to_animal_ids = dict(items[int(len(items) * 2 / 3) :])  # last 1/3
 # data_folders_to_animal_ids = data["data_folders_to_animal_ids"]
 
 # constants.SORTING_PARAMS['freq_min'] = 60
