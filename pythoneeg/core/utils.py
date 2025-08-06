@@ -16,6 +16,7 @@ import numpy as np
 import pandas as pd
 from dateutil.parser import ParserError
 from sklearn.neighbors import KDTree
+import zarr
 
 from .. import constants
 
@@ -598,6 +599,70 @@ def get_temp_directory() -> Path:
         KeyError: If TMPDIR environment variable is not set.
     """
     return Path(os.environ["TMPDIR"])
+
+
+def cache_fragments_to_zarr(
+    np_fragments: np.ndarray, n_fragments: int, tmpdir: Optional[str] = None
+) -> tuple[str, "zarr.Array"]:
+    """
+    Cache numpy fragments array to zarr format for efficient memory management.
+
+    This function converts a numpy array of recording fragments to a zarr array stored
+    in a temporary location. This allows better memory management and garbage collection
+    by avoiding keeping large numpy arrays in memory for extended periods.
+
+    Args:
+        np_fragments (np.ndarray): Numpy array of shape (n_fragments, n_samples, n_channels)
+            containing the recording fragments to cache.
+        n_fragments (int): Number of fragments to cache (allows for subset caching).
+        tmpdir (str, optional): Directory path for temporary zarr storage. If None,
+            uses get_temp_directory(). Defaults to None.
+
+    Returns:
+        tuple[str, zarr.Array]: A tuple containing:
+            - str: Path to the temporary zarr file
+            - zarr.Array: The zarr array object for accessing cached data
+
+    Raises:
+        ImportError: If zarr is not available
+
+    Examples:
+        >>> import numpy as np
+        >>> fragments = np.random.rand(100, 1000, 8)  # 100 fragments, 1000 samples, 8 channels
+        >>> zarr_path, zarr_array = cache_fragments_to_zarr(fragments, 100)
+        >>> # Access fragments via zarr_array[idx] instead of fragments[idx]
+        >>> first_fragment = zarr_array[0]
+    """
+    try:
+        import zarr
+    except ImportError:
+        raise ImportError("zarr package is required for fragment caching")
+
+    if tmpdir is None:
+        tmpdir = get_temp_directory()
+
+    # Generate unique temporary path
+    tmppath = os.path.join(tmpdir, f"temp_{os.urandom(24).hex()}.zarr")
+
+    logging.debug(f"Caching numpy array with zarr in {tmppath}")
+
+    # Create Zarr array with optimal settings for fragment-wise access
+    chunk_size = min(100, n_fragments)  # Cap at 100 fragments per chunk
+    zarr_array = zarr.open(
+        tmppath,
+        mode="w",
+        shape=np_fragments.shape,
+        chunks=(
+            chunk_size,
+            -1,  # No chunking along timestamp dimension
+            -1,  # No chunking along channel dimension
+        ),
+        dtype=np_fragments.dtype,
+        compressor=zarr.Blosc(cname="lz4", clevel=3, shuffle=zarr.Blosc.SHUFFLE),  # Fast compression
+    )
+    zarr_array[:n_fragments] = np_fragments[:n_fragments]
+
+    return tmppath, zarr_array
 
 
 def get_file_stem(filepath: Union[str, Path]) -> str:
