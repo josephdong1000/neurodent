@@ -717,7 +717,10 @@ def log_transform(rec: np.ndarray, **kwargs) -> np.ndarray:
     Returns:
         np.ndarray: ln(rec + 1)
     """
-    return np.log(rec + 1)
+    if rec is not None:
+        return np.log(rec + 1)
+    else:
+        return None
 
 
 def sort_dataframe_by_plot_order(df: pd.DataFrame, df_sort_order: Optional[dict] = None) -> pd.DataFrame:
