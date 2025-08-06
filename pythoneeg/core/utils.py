@@ -655,6 +655,15 @@ def cache_fragments_to_zarr(
     )
     zarr_array[:n_fragments] = np_fragments[:n_fragments]
 
+    # Log debug properties of the zarr array
+    total_memory_bytes = zarr_array.nbytes
+    total_memory_mb = total_memory_bytes / (1024 * 1024)
+    total_memory_gb = total_memory_mb / 1024
+
+    logging.debug(f"  - Total memory footprint: {total_memory_mb:.2f} MB, {total_memory_gb:.3f} GB")
+    logging.debug(f"  - Zarr array shape: {zarr_array.shape}")
+    logging.debug(f"  - Zarr array chunks: {zarr_array.chunks}")
+
     return tmppath, zarr_array
 
 
