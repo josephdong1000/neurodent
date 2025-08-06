@@ -216,7 +216,8 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                 data_X = np.transpose(data_X)
             case "psdslope":
                 data_X = np.array(group[feature].to_list())
-                data_X[:, :, 0] = -data_X[:, :, 0]
+                data_X = data_X[:, :, 0]
+                # data_X[:, :, 0] = -data_X[:, :, 0]
             case "cohere" | "zcohere":
                 data_X = np.array([list(d.values()) for d in group[feature]])
                 data_X = np.stack(data_X, axis=-1)
@@ -515,7 +516,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
 
         # Get data grouped by animalday
         df_rowgroup = self.window_result.get_grouprows_result(
-            features, multiindex=["animal", "genotype"], include=["duration", "endfile", "timestamp"]
+            features, multiindex=["animal", "genotype"], include=["duration", "endfile", "timestamp", "animalday"]
         )
 
         for feature in features:
@@ -641,7 +642,8 @@ class AnimalPlotter(viz.AnimalFeatureParser):
 
     def _add_longrecording_boundaries(self, ax, df_day, time_of_day, days):
         """
-        Add red vertical lines to indicate boundaries between longrecording objects.
+        Add red vertical lines to indicate boundaries between longrecording objects
+        and plot animalday values on top.
 
         Args:
             ax: matplotlib axes object
@@ -661,6 +663,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
             return
 
         # For each endfile marker, draw a red line at the corresponding timestamp
+        # REVIEW this logic might be faulty because of how timestamps are reported
         for idx in endfile_indices:
             if idx in df_day.index:
                 timestamp = df_day.loc[idx, "timestamp"]
@@ -678,8 +681,37 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                         ymax=(day_idx + 1) / len(days),
                         color="red",
                         linewidth=1,
+                        linestyle="--",
                         alpha=0.8,
                     )
+
+        # Add dotted white lines where animalday value changes
+        if "animalday" in df_day.columns:
+            df_day_sorted = df_day.sort_values("timestamp")
+            prev_animalday = None
+
+            for idx, row in df_day_sorted.iterrows():
+                timestamp = row["timestamp"]
+                animalday = row["animalday"]
+                day = timestamp.date()
+
+                if day in days and pd.notna(animalday):
+                    # Check if animalday changed from previous row
+                    if prev_animalday is not None and animalday != prev_animalday:
+                        day_idx = days.index(day)
+                        time_hour = timestamp.hour + timestamp.minute / 60.0 + timestamp.second / 3600.0
+
+                        # Draw dotted white vertical line at animalday boundary
+                        ax.axvline(
+                            x=time_hour,
+                            ymin=(day_idx) / len(days),
+                            ymax=(day_idx + 1) / len(days),
+                            color="white",
+                            linewidth=2,
+                            alpha=0.8,
+                        )
+
+                    prev_animalday = animalday
 
     def _handle_figure(self, fig, title=None):
         if self.save_fig:
