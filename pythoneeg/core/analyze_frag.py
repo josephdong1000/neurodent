@@ -1,5 +1,5 @@
 import logging
-from typing import Literal
+from typing import Literal, Dict, List, Any
 
 import numpy as np
 from mne.time_frequency import psd_array_multitaper
@@ -17,8 +17,34 @@ class FragmentAnalyzer:
     All functions receive a (N x M) numpy array, where N is the number of samples, and M is the number of channels.
     """
 
+    # Unified feature dependency mapping - all dependencies as lists for consistency
+    FEATURE_DEPENDENCIES = {
+        # Log transforms
+        "logrms": ["rms"],
+        "logampvar": ["ampvar"],
+        "lognspike": ["nspike"],
+        "logpsdband": ["psdband"],
+        "logpsdtotal": ["psdtotal"],
+        "logpsdfrac": ["psdfrac"],
+        # Z-transforms
+        "zpcorr": ["pcorr"],
+        "zcohere": ["cohere"],
+        # PSD-dependent features
+        "psdband": ["psd"],
+        "psdtotal": ["psd"],
+        "psdslope": ["psd"],
+        # Multi-dependency features
+        "psdfrac": ["psdband", "psdtotal"],
+    }
+
     @staticmethod
     def _process_fragment_features_dask(rec: np.ndarray, f_s: int, features: list[str], kwargs: dict):
+        """
+        Legacy fragment processing method without dependency optimization.
+
+        Note: Consider using process_fragment_with_dependencies() instead for better performance
+        when computing interdependent features like PSD-based features.
+        """
         row = {}
         for feat in features:
             func = getattr(FragmentAnalyzer, f"compute_{feat}")
@@ -62,10 +88,13 @@ class FragmentAnalyzer:
         return out
 
     @staticmethod
-    def compute_logrms(rec: np.ndarray, **kwargs) -> np.ndarray:
+    def compute_logrms(rec: np.ndarray, precomputed_rms: np.ndarray = None, **kwargs) -> np.ndarray:
         """Compute the log of the root mean square of the signal."""
         FragmentAnalyzer._check_rec_np(rec)
-        return log_transform(FragmentAnalyzer.compute_rms(rec, **kwargs))
+        if precomputed_rms is not None:
+            return log_transform(precomputed_rms)
+        else:
+            return log_transform(FragmentAnalyzer.compute_rms(rec, **kwargs))
 
     @staticmethod
     def compute_ampvar(rec: np.ndarray, **kwargs) -> np.ndarray:
@@ -74,10 +103,13 @@ class FragmentAnalyzer:
         return np.std(rec, axis=0) ** 2
 
     @staticmethod
-    def compute_logampvar(rec: np.ndarray, **kwargs) -> np.ndarray:
+    def compute_logampvar(rec: np.ndarray, precomputed_ampvar: np.ndarray = None, **kwargs) -> np.ndarray:
         """Compute the log of the amplitude variance of the signal."""
         FragmentAnalyzer._check_rec_np(rec)
-        return log_transform(FragmentAnalyzer.compute_ampvar(rec, **kwargs))
+        if precomputed_ampvar is not None:
+            return log_transform(precomputed_ampvar)
+        else:
+            return log_transform(FragmentAnalyzer.compute_ampvar(rec, **kwargs))
 
     @staticmethod
     def compute_psd(
@@ -119,12 +151,16 @@ class FragmentAnalyzer:
         notch_filter: bool = True,
         bands: list[tuple[float, float]] = constants.FREQ_BANDS,
         multitaper: bool = False,
+        precomputed_psd: tuple = None,
         **kwargs,
     ) -> dict[str, np.ndarray]:
         """Compute the power spectral density of the signal for each frequency band."""
         FragmentAnalyzer._check_rec_np(rec)
 
-        f, psd = FragmentAnalyzer.compute_psd(rec, f_s, welch_bin_t, notch_filter, multitaper, **kwargs)
+        if precomputed_psd is not None:
+            f, psd = precomputed_psd
+        else:
+            f, psd = FragmentAnalyzer.compute_psd(rec, f_s, welch_bin_t, notch_filter, multitaper, **kwargs)
         deltaf = np.median(np.diff(f))
         return {k: simpson(psd[np.logical_and(f >= v[0], f <= v[1]), :], dx=deltaf, axis=0) for k, v in bands.items()}
 
@@ -136,12 +172,19 @@ class FragmentAnalyzer:
         notch_filter: bool = True,
         bands: list[tuple[float, float]] = constants.FREQ_BANDS,
         multitaper: bool = False,
+        precomputed_psd: tuple = None,
+        precomputed_psdband: dict = None,
         **kwargs,
     ) -> dict[str, np.ndarray]:
         """Compute the log of the power spectral density of the signal for each frequency band."""
         FragmentAnalyzer._check_rec_np(rec)
 
-        psd = FragmentAnalyzer.compute_psdband(rec, f_s, welch_bin_t, notch_filter, bands, multitaper, **kwargs)
+        if precomputed_psdband is not None:
+            psd = precomputed_psdband
+        else:
+            psd = FragmentAnalyzer.compute_psdband(
+                rec, f_s, welch_bin_t, notch_filter, bands, multitaper, precomputed_psd=precomputed_psd, **kwargs
+            )
         return {k: log_transform(v) for k, v in psd.items()}
 
     @staticmethod
@@ -152,12 +195,16 @@ class FragmentAnalyzer:
         notch_filter: bool = True,
         band: tuple[float, float] = constants.FREQ_BAND_TOTAL,
         multitaper: bool = False,
+        precomputed_psd: tuple = None,
         **kwargs,
     ) -> np.ndarray:
         """Compute the total power spectral density of the signal."""
         FragmentAnalyzer._check_rec_np(rec)
 
-        f, psd = FragmentAnalyzer.compute_psd(rec, f_s, welch_bin_t, notch_filter, multitaper, **kwargs)
+        if precomputed_psd is not None:
+            f, psd = precomputed_psd
+        else:
+            f, psd = FragmentAnalyzer.compute_psd(rec, f_s, welch_bin_t, notch_filter, multitaper, **kwargs)
         deltaf = np.median(np.diff(f))
 
         return simpson(psd[np.logical_and(f >= band[0], f <= band[1]), :], dx=deltaf, axis=0)
@@ -170,14 +217,21 @@ class FragmentAnalyzer:
         notch_filter: bool = True,
         band: tuple[float, float] = constants.FREQ_BAND_TOTAL,
         multitaper: bool = False,
+        precomputed_psd: tuple = None,
+        precomputed_psdtotal: np.ndarray = None,
         **kwargs,
     ) -> np.ndarray:
         """Compute the log of the total power spectral density of the signal."""
         FragmentAnalyzer._check_rec_np(rec)
 
-        return log_transform(
-            FragmentAnalyzer.compute_psdtotal(rec, f_s, welch_bin_t, notch_filter, band, multitaper, **kwargs)
-        )
+        if precomputed_psdtotal is not None:
+            return log_transform(precomputed_psdtotal)
+        else:
+            return log_transform(
+                FragmentAnalyzer.compute_psdtotal(
+                    rec, f_s, welch_bin_t, notch_filter, band, multitaper, precomputed_psd=precomputed_psd, **kwargs
+                )
+            )
 
     @staticmethod
     def compute_psdfrac(
@@ -188,16 +242,28 @@ class FragmentAnalyzer:
         bands: list[tuple[float, float]] = constants.FREQ_BANDS,
         total_band: tuple[float, float] = constants.FREQ_BAND_TOTAL,
         multitaper: bool = False,
+        precomputed_psd: tuple = None,
+        precomputed_psdband: dict = None,
+        precomputed_psdtotal: np.ndarray = None,
         **kwargs,
-    ) -> np.ndarray:
+    ) -> dict[str, np.ndarray]:
         """Compute the power spectral density of bands as a fraction of the total power."""
         FragmentAnalyzer._check_rec_np(rec)
 
-        psd = FragmentAnalyzer.compute_psdband(rec, f_s, welch_bin_t, notch_filter, bands, multitaper, **kwargs)
-        psdtotal = FragmentAnalyzer.compute_psdtotal(
-            rec, f_s, welch_bin_t, notch_filter, total_band, multitaper, **kwargs
-        )
-        return {k: v / psdtotal for k, v in psd.items()}
+        if precomputed_psdband is not None:
+            psdband = precomputed_psdband
+        else:
+            psdband = FragmentAnalyzer.compute_psdband(
+                rec, f_s, welch_bin_t, notch_filter, bands, multitaper, precomputed_psd=precomputed_psd, **kwargs
+            )
+
+        if precomputed_psdtotal is not None:
+            psdtotal = precomputed_psdtotal
+        else:
+            psdtotal = FragmentAnalyzer.compute_psdtotal(
+                rec, f_s, welch_bin_t, notch_filter, total_band, multitaper, precomputed_psd=precomputed_psd, **kwargs
+            )
+        return {k: v / psdtotal for k, v in psdband.items()}
 
     @staticmethod
     def compute_logpsdfrac(
@@ -208,20 +274,39 @@ class FragmentAnalyzer:
         bands: list[tuple[float, float]] = constants.FREQ_BANDS,
         total_band: tuple[float, float] = constants.FREQ_BAND_TOTAL,
         multitaper: bool = False,
+        precomputed_psd: tuple = None,
+        precomputed_psdband: dict = None,
+        precomputed_psdtotal: np.ndarray = None,
+        precomputed_psdfrac: dict = None,
         **kwargs,
     ) -> dict[str, np.ndarray]:
         """Compute the log of the power spectral density of bands as a fraction of the log total power."""
         FragmentAnalyzer._check_rec_np(rec)
 
-        # logpsd = FragmentAnalyzer.compute_logpsdband(rec, f_s, welch_bin_t, notch_filter, bands, multitaper, **kwargs)
-        # logpsdtotal = FragmentAnalyzer.compute_logpsdtotal(rec, f_s, welch_bin_t, notch_filter, total_band, multitaper, **kwargs)
-        # return {k: v / logpsdtotal for k, v in logpsd.items()}
+        if precomputed_psdfrac is not None:
+            return {k: log_transform(v) for k, v in precomputed_psdfrac.items()}
+        else:
+            if precomputed_psdband is not None:
+                psdband = precomputed_psdband
+            else:
+                psdband = FragmentAnalyzer.compute_psdband(
+                    rec, f_s, welch_bin_t, notch_filter, bands, multitaper, precomputed_psd=precomputed_psd, **kwargs
+                )
 
-        psd_band = FragmentAnalyzer.compute_psdband(rec, f_s, welch_bin_t, notch_filter, bands, multitaper, **kwargs)
-        psd_total = FragmentAnalyzer.compute_psdtotal(
-            rec, f_s, welch_bin_t, notch_filter, total_band, multitaper, **kwargs
-        )
-        return {k: log_transform(v / psd_total) for k, v in psd_band.items()}
+            if precomputed_psdtotal is not None:
+                psd_total = precomputed_psdtotal
+            else:
+                psd_total = FragmentAnalyzer.compute_psdtotal(
+                    rec,
+                    f_s,
+                    welch_bin_t,
+                    notch_filter,
+                    total_band,
+                    multitaper,
+                    precomputed_psd=precomputed_psd,
+                    **kwargs,
+                )
+            return {k: log_transform(v / psd_total) for k, v in psdband.items()}
 
     @staticmethod
     def compute_psdslope(
@@ -231,12 +316,16 @@ class FragmentAnalyzer:
         notch_filter: bool = True,
         band: tuple[float, float] = constants.FREQ_BAND_TOTAL,
         multitaper: bool = False,
+        precomputed_psd: tuple = None,
         **kwargs,
     ) -> np.ndarray:
         """Compute the slope of the power spectral density of the signal on a log-log scale."""
         FragmentAnalyzer._check_rec_np(rec)
 
-        f, psd = FragmentAnalyzer.compute_psd(rec, f_s, welch_bin_t, notch_filter, multitaper, **kwargs)
+        if precomputed_psd is not None:
+            f, psd = precomputed_psd
+        else:
+            f, psd = FragmentAnalyzer.compute_psd(rec, f_s, welch_bin_t, notch_filter, multitaper, **kwargs)
 
         freqs = f[np.logical_and(f >= band[0], f <= band[1])]
         psd_band = psd[np.logical_and(f >= band[0], f <= band[1]), :]
@@ -265,7 +354,7 @@ class FragmentAnalyzer:
         """
         FragmentAnalyzer._check_rec_mne(rec)
 
-        if geomspace: # REVIEW by default geomspace is True, but a linear scale is simpler for DOF calculation -> zcohere correction
+        if geomspace:  # REVIEW by default geomspace is True, but a linear scale is simpler for DOF calculation -> zcohere correction
             freqs = np.geomspace(
                 constants.FREQ_BAND_TOTAL[0],
                 constants.FREQ_BAND_TOTAL[1],
@@ -343,12 +432,17 @@ class FragmentAnalyzer:
         return out
 
     @staticmethod
-    def compute_zcohere(rec: np.ndarray, f_s: float, **kwargs) -> dict[str, np.ndarray]:
+    def compute_zcohere(
+        rec: np.ndarray, f_s: float, precomputed_cohere: dict = None, **kwargs
+    ) -> dict[str, np.ndarray]:
         """Compute the Fisher z-transformed coherence of the signal."""
         FragmentAnalyzer._check_rec_np(rec)
 
-        cohere = FragmentAnalyzer.compute_cohere(rec, f_s, **kwargs)
-        return {k: np.arctanh(v) for k, v in cohere.items()}
+        if precomputed_cohere is not None:
+            return {k: np.arctanh(v) for k, v in precomputed_cohere.items()}
+        else:
+            cohere = FragmentAnalyzer.compute_cohere(rec, f_s, **kwargs)
+            return {k: np.arctanh(v) for k, v in cohere.items()}
 
     @staticmethod
     def compute_pcorr(rec: np.ndarray, f_s: float, lower_triag: bool = True, **kwargs) -> np.ndarray:
@@ -366,22 +460,29 @@ class FragmentAnalyzer:
             return result.correlation
 
     @staticmethod
-    def compute_zpcorr(rec: np.ndarray, f_s: float, **kwargs) -> np.ndarray:
+    def compute_zpcorr(rec: np.ndarray, f_s: float, precomputed_pcorr: np.ndarray = None, **kwargs) -> np.ndarray:
         """Compute the Fisher z-transformed Pearson correlation coefficient of the signal."""
         FragmentAnalyzer._check_rec_np(rec)
 
-        pcorr = FragmentAnalyzer.compute_pcorr(rec, f_s, **kwargs)
-        return np.arctanh(pcorr)
+        if precomputed_pcorr is not None:
+            return np.arctanh(precomputed_pcorr)
+        else:
+            pcorr = FragmentAnalyzer.compute_pcorr(rec, f_s, **kwargs)
+            return np.arctanh(pcorr)
 
     @staticmethod
     def compute_nspike(rec: np.ndarray, **kwargs):
         """Returns None. Compute and load in spikes with SpikeAnalysisResult"""
         return None
-    
+
     @staticmethod
-    def compute_lognspike(rec: np.ndarray, **kwargs):
+    def compute_lognspike(rec: np.ndarray, precomputed_nspike: np.ndarray = None, **kwargs):
         """Returns None. Compute and load in spikes with SpikeAnalysisResult"""
-        return None
+        if precomputed_nspike is not None:
+            return log_transform(precomputed_nspike)
+        else:
+            n_spike = FragmentAnalyzer.compute_nspike(rec, **kwargs)
+            return log_transform(n_spike)
 
     # def compute_csd(self, index, magnitude=True, n_jobs=None, **kwargs) -> np.ndarray:
     #     rec = self.get_fragment_mne(index)
@@ -443,3 +544,86 @@ class FragmentAnalyzer:
     #         return np.abs(data), np.angle(data, deg=True), con.freqs
     #     else:
     #         return data, con.freqs
+
+    @staticmethod
+    def process_fragment_with_dependencies(
+        fragment_data: np.ndarray, f_s: int, features: List[str], kwargs: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Process a single fragment with efficient dependency resolution.
+
+        This is the enhanced replacement for _process_fragment_features_dask that
+        automatically resolves feature dependencies and reuses intermediate calculations
+        to avoid redundant computations (e.g., computing PSD once for multiple dependent features).
+
+        Args:
+            fragment_data: Single fragment data with shape (n_samples, n_channels)
+            f_s: Sampling frequency
+            features: List of features to compute
+            kwargs: Additional parameters for feature computation
+
+        Returns:
+            Dictionary of computed features for this fragment
+        """
+        computed_cache = {}
+        results = {}
+
+        # Compute all requested features using dependency resolution
+        for feature in features:
+            if feature not in results:
+                results[feature] = FragmentAnalyzer._resolve_feature_dependencies(
+                    feature, fragment_data, f_s, kwargs, computed_cache
+                )
+
+        return results
+
+    @staticmethod
+    def _resolve_feature_dependencies(
+        feature: str, fragment_data: np.ndarray, f_s: int, kwargs: Dict[str, Any], computed_cache: Dict[str, Any]
+    ) -> Any:
+        """
+        Resolve feature dependencies recursively, caching intermediate results.
+
+        This handles the dependency tree resolution automatically. For example:
+        - logpsdfrac -> psdfrac -> [psdband, psdtotal] -> psd
+        - All intermediate results are cached and reused within the fragment
+
+        Args:
+            feature: Name of feature to compute
+            fragment_data: EEG fragment data (n_samples, n_channels)
+            f_s: Sampling frequency
+            kwargs: Computation parameters
+            computed_cache: Cache to store intermediate results for this fragment
+
+        Returns:
+            Computed feature value
+        """
+        # Return cached result if already computed
+        if feature in computed_cache:
+            return computed_cache[feature]
+
+        # Check if feature has dependencies
+        if feature in FragmentAnalyzer.FEATURE_DEPENDENCIES:
+            dependencies = FragmentAnalyzer.FEATURE_DEPENDENCIES[feature]
+
+            # Recursively compute all dependencies first
+            precomputed_kwargs = kwargs.copy()
+            for dependency in dependencies:
+                if dependency not in computed_cache:
+                    computed_cache[dependency] = FragmentAnalyzer._resolve_feature_dependencies(
+                        dependency, fragment_data, f_s, kwargs, computed_cache
+                    )
+                precomputed_key = f"precomputed_{dependency}"
+                precomputed_kwargs[precomputed_key] = computed_cache[dependency]
+
+            # Compute the feature using precomputed dependencies
+            func = getattr(FragmentAnalyzer, f"compute_{feature}")
+            result = func(rec=fragment_data, f_s=f_s, **precomputed_kwargs)
+        else:
+            # Base feature with no dependencies - compute directly
+            func = getattr(FragmentAnalyzer, f"compute_{feature}")
+            result = func(rec=fragment_data, f_s=f_s, **kwargs)
+
+        # Cache and return result
+        computed_cache[feature] = result
+        return result
