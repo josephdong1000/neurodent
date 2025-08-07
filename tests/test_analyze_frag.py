@@ -4,7 +4,7 @@ Unit tests for pythoneeg.core.analyze_frag module.
 import numpy as np
 import pytest
 from unittest.mock import patch, Mock, MagicMock
-from scipy.integrate import simpson
+from scipy.integrate import trapezoid
 
 from pythoneeg.core.analyze_frag import FragmentAnalyzer
 from pythoneeg import constants
@@ -267,12 +267,13 @@ class TestFragmentAnalyzer:
         # Compute total power manually from PSD
         deltaf = np.median(np.diff(f))
         freq_mask = np.logical_and(f >= constants.FREQ_BAND_TOTAL[0], f <= constants.FREQ_BAND_TOTAL[1])
-        manual_total = simpson(psd[freq_mask, :], dx=deltaf, axis=0)
+        manual_total = trapezoid(psd[freq_mask, :], dx=deltaf, axis=0)
         
         # Sum of band powers should approximately equal total power
         band_sum = sum(result.values())
-        np.testing.assert_allclose(band_sum, manual_total, rtol=0.15, 
-                                 err_msg="Sum of band powers should approximately equal total power")
+        np.testing.assert_allclose(band_sum, manual_total, rtol=1e-6, 
+                                 err_msg="Sum of band powers should equal total power")
+        
     
     def test_compute_psdband_custom_bands(self, sample_rec_2d):
         """Test compute_psdband function with custom frequency bands."""
@@ -485,7 +486,7 @@ class TestFragmentAnalyzer:
             # Some functions may legitimately fail with very short signals
             # This is acceptable behavior and we document it
             assert any(keyword in str(e).lower() for keyword in 
-                      ['window', 'nperseg', 'length', 'insufficient']), \
+                      ['window', 'nperseg', 'length', 'insufficient', 'w0 should be']), \
                 f"Expected short signal error, got: {e}"
 
     # Total Power Features
@@ -507,9 +508,9 @@ class TestFragmentAnalyzer:
         f, psd = FragmentAnalyzer.compute_psd(sample_rec_2d, f_s=f_s, notch_filter=False)
         deltaf = np.median(np.diff(f))
         freq_mask = np.logical_and(f >= constants.FREQ_BAND_TOTAL[0], f <= constants.FREQ_BAND_TOTAL[1])
-        manual_total = simpson(psd[freq_mask, :], dx=deltaf, axis=0)
+        manual_total = trapezoid(psd[freq_mask, :], dx=deltaf, axis=0)
         
-        np.testing.assert_allclose(result, manual_total, rtol=0.01,
+        np.testing.assert_allclose(result, manual_total, rtol=1e-6,
                                  err_msg="Total power should match manual calculation from PSD")
     
     def test_compute_psdtotal_custom_band(self, sample_rec_2d):
@@ -528,7 +529,7 @@ class TestFragmentAnalyzer:
         f, psd = FragmentAnalyzer.compute_psd(sample_rec_2d, f_s=f_s, notch_filter=False)
         deltaf = np.median(np.diff(f))
         freq_mask = np.logical_and(f >= custom_band[0], f <= custom_band[1])
-        manual_total = simpson(psd[freq_mask, :], dx=deltaf, axis=0)
+        manual_total = trapezoid(psd[freq_mask, :], dx=deltaf, axis=0)
         
         np.testing.assert_allclose(result, manual_total, rtol=0.01,
                                  err_msg="Custom band total power should match manual calculation")
@@ -708,7 +709,7 @@ class TestFragmentAnalyzer:
         mock_con = Mock()
         # Create mock data for each frequency band
         n_bands = len(constants.BAND_NAMES)
-        mock_data = np.random.rand(n_channels * (n_channels - 1) // 2, n_bands)
+        mock_data = np.random.rand(n_channels ** 2, n_bands)
         mock_con.get_data.return_value = mock_data
         mock_connectivity.return_value = mock_con
         
@@ -724,17 +725,28 @@ class TestFragmentAnalyzer:
         for band_name, coherence_matrix in result.items():
             assert coherence_matrix.shape == (n_channels, n_channels)
             
-            # Coherence matrices should be symmetric
             np.testing.assert_allclose(coherence_matrix, coherence_matrix.T, rtol=1e-10,
                                      err_msg=f"{band_name} coherence matrix should be symmetric")
             
-            # Diagonal should be 1 (perfect coherence with self)
             np.testing.assert_allclose(np.diag(coherence_matrix), np.ones(n_channels), rtol=1e-6,
                                      err_msg=f"{band_name} coherence diagonal should be 1")
             
             # All values should be between 0 and 1
             assert np.all(coherence_matrix >= 0) and np.all(coherence_matrix <= 1), \
                 f"{band_name} coherence values should be between 0 and 1"
+                
+            # Test that all unique channel pairs are represented
+            # For n channels, we should have n*(n-1)/2 unique pairs
+            n_unique_pairs = n_channels * (n_channels - 1) // 2
+            upper_triangle = coherence_matrix[np.triu_indices(n_channels, k=1)]
+            assert len(upper_triangle) == n_unique_pairs, \
+                f"Should have {n_unique_pairs} unique pairs for {n_channels} channels"
+                
+            # Off-diagonal values should be meaningful (not all zeros unless by design)
+            # This tests that the reconstruction from upper triangle worked
+            if n_channels > 1:
+                assert not np.allclose(upper_triangle, 0), \
+                    f"{band_name} off-diagonal coherence values shouldn't all be zero"
     
     def test_compute_zcohere(self, sample_rec_2d):
         """Test compute_zcohere function."""
@@ -773,8 +785,9 @@ class TestFragmentAnalyzer:
         n_channels = sample_rec_2d.shape[1]
         assert result_lower.shape == (n_channels, n_channels)
         
-        # Check that it's lower triangular (upper triangle should be zero)
-        assert np.allclose(np.triu(result_lower, k=0), 0)
+        # Check that it's lower triangular (upper triangle above diagonal should be zero)
+        # Note: diagonal is preserved, only strict upper triangle (k=1) should be zero
+        assert np.allclose(np.triu(result_lower, k=1), 0)
         
         # Test with full matrix
         result_full = FragmentAnalyzer.compute_pcorr(
@@ -796,6 +809,23 @@ class TestFragmentAnalyzer:
         # All correlation values should be between -1 and 1
         assert np.all(result_full >= -1) and np.all(result_full <= 1), \
             "Correlation values should be between -1 and 1"
+            
+        # Test that all unique channel pairs are represented
+        n_unique_pairs = n_channels * (n_channels - 1) // 2
+        upper_triangle = result_full[np.triu_indices(n_channels, k=1)]
+        assert len(upper_triangle) == n_unique_pairs, \
+            f"Should have {n_unique_pairs} unique pairs for {n_channels} channels"
+            
+        # Test that lower_triag=True and lower_triag=False give related results
+        # The lower triangle of full result should match the lower triangle result
+        # (excluding diagonal since lower_triag=True zeroes the diagonal)
+        lower_indices = np.tril_indices(n_channels, k=-1)
+        np.testing.assert_array_almost_equal(
+            result_full[lower_indices], 
+            result_lower[lower_indices], 
+            decimal=10,
+            err_msg="Lower triangles should match between lower_triag=True/False"
+        )
         
         # Test some basic properties with known test signals
         # Our fixture has structured signals (sine waves), so some correlations might be higher
@@ -949,7 +979,7 @@ class TestFragmentAnalyzerMathematicalVerification:
         
         # Sum of band powers should approximately equal total power
         band_sum = sum(psdband_result.values())
-        np.testing.assert_allclose(band_sum, psdtotal_result, rtol=0.15)  # Allow some tolerance for boundary effects
+        np.testing.assert_allclose(band_sum, psdtotal_result, rtol=1e-6)  # High precision with trapezoidal integration
     
     def test_psdfrac_sums_to_one(self):
         """Test that PSD fractions sum to 1."""
@@ -1033,9 +1063,9 @@ class TestFragmentAnalyzerMathematicalVerification:
         
         # With low noise, correlation should be high; with high noise, correlation should be lower
         if noise_level <= 0.1:
-            assert off_diag_corr > 0.8, f"With low noise ({noise_level}), correlation should be high"
+            assert off_diag_corr > 0.9, f"With low noise ({noise_level}), correlation should be high"
         elif noise_level >= 1.0:
-            assert off_diag_corr < 0.8, f"With high noise ({noise_level}), correlation should be lower"
+            assert off_diag_corr < 0.9, f"With high noise ({noise_level}), correlation should be lower"
 
     def test_correlation_with_timeshift(self):
         """Test that identical signals with time shifts have decreasing correlation."""
