@@ -128,20 +128,13 @@ class FragmentAnalyzer:
         f, psd = FragmentAnalyzer.compute_psd(rec, f_s, welch_bin_t, notch_filter, multitaper, **kwargs)
         deltaf = np.median(np.diff(f))
         
-        # Use exclusive upper bounds to avoid double-counting at band boundaries
-        # Only the last band gets inclusive upper bound to match total frequency coverage
+        # Integrate each band separately using trapezoidal integration
         result = {}
-        band_items = list(bands.items())
         
-        for i, (k, v) in enumerate(band_items):
-            if i == len(band_items) - 1:
-                # Last band: include upper boundary
-                freq_mask = np.logical_and(f >= v[0], f <= v[1])
-            else:
-                # All other bands: exclude upper boundary to avoid double-counting
-                freq_mask = np.logical_and(f >= v[0], f < v[1])
-            
-            result[k] = trapezoid(psd[freq_mask, :], dx=deltaf, axis=0)
+        for band_name, (f_low, f_high) in bands.items():
+            # Always use inclusive boundaries for both ends
+            freq_mask = np.logical_and(f >= f_low, f <= f_high)
+            result[band_name] = trapezoid(psd[freq_mask, :], dx=deltaf, axis=0)
         
         return result
 
@@ -214,7 +207,6 @@ class FragmentAnalyzer:
 
         psdband = FragmentAnalyzer.compute_psdband(rec, f_s, welch_bin_t, notch_filter, bands, multitaper, **kwargs)
         psdtotal = sum(psdband.values())
-        # psdtotal = FragmentAnalyzer.compute_psdtotal(rec, f_s, welch_bin_t, notch_filter, total_band, multitaper, **kwargs)
         
         return {k: v / psdtotal for k, v in psdband.items()}
 
@@ -231,16 +223,10 @@ class FragmentAnalyzer:
     ) -> dict[str, np.ndarray]:
         """Compute the log of the power spectral density of bands as a fraction of the log total power."""
         FragmentAnalyzer._check_rec_np(rec)
-
-        # logpsd = FragmentAnalyzer.compute_logpsdband(rec, f_s, welch_bin_t, notch_filter, bands, multitaper, **kwargs)
-        # logpsdtotal = FragmentAnalyzer.compute_logpsdtotal(rec, f_s, welch_bin_t, notch_filter, total_band, multitaper, **kwargs)
-        # return {k: v / logpsdtotal for k, v in logpsd.items()}
-
+        
         psd_band = FragmentAnalyzer.compute_psdband(rec, f_s, welch_bin_t, notch_filter, bands, multitaper, **kwargs)
         psd_total = sum(psd_band.values())
-        # psd_total = FragmentAnalyzer.compute_psdtotal(
-        #     rec, f_s, welch_bin_t, notch_filter, total_band, multitaper, **kwargs
-        # )
+        
         return {k: log_transform(v / psd_total) for k, v in psd_band.items()}
 
     @staticmethod
