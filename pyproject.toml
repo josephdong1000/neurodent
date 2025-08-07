@@ -73,7 +73,9 @@ addopts = [
     "--strict-markers",
     "--strict-config",
     "--tb=short",
-    "--maxfail=3",
+    "--maxfail=5",
+    "-n", "2",  # Limit parallel workers to prevent memory issues
+    "--dist", "loadfile",  # Better memory distribution
 ]
 # For coverage reports, add: --cov=pythoneeg --cov-report=term-missing --cov-fail-under=80
 # For slow tests, use: -m "not slow"
