@@ -1,10 +1,11 @@
 import logging
 from typing import Literal
+import warnings
 
 import numpy as np
 from mne.time_frequency import psd_array_multitaper
 from mne_connectivity import spectral_connectivity_time
-from scipy.integrate import simpson
+from scipy.integrate import trapezoid
 from scipy.signal import butter, decimate, filtfilt, iirnotch, sosfiltfilt, welch
 from scipy.stats import linregress, pearsonr
 
@@ -128,7 +129,7 @@ class FragmentAnalyzer:
         deltaf = np.median(np.diff(f))
         
         # Use exclusive upper bounds to avoid double-counting at band boundaries
-        # Standard approach: f >= low_bound and f < high_bound for all bands except the last
+        # Only the last band gets inclusive upper bound to match total frequency coverage
         result = {}
         band_items = list(bands.items())
         
@@ -137,10 +138,10 @@ class FragmentAnalyzer:
                 # Last band: include upper boundary
                 freq_mask = np.logical_and(f >= v[0], f <= v[1])
             else:
-                # All other bands: exclude upper boundary
+                # All other bands: exclude upper boundary to avoid double-counting
                 freq_mask = np.logical_and(f >= v[0], f < v[1])
             
-            result[k] = simpson(psd[freq_mask, :], dx=deltaf, axis=0)
+            result[k] = trapezoid(psd[freq_mask, :], dx=deltaf, axis=0)
         
         return result
 
@@ -178,7 +179,7 @@ class FragmentAnalyzer:
 
         # Use inclusive bounds for total power calculation
         freq_mask = np.logical_and(f >= band[0], f <= band[1])
-        return simpson(psd[freq_mask, :], dx=deltaf, axis=0)
+        return trapezoid(psd[freq_mask, :], dx=deltaf, axis=0)
 
     @staticmethod
     def compute_logpsdtotal(
@@ -211,14 +212,11 @@ class FragmentAnalyzer:
         """Compute the power spectral density of bands as a fraction of the total power."""
         FragmentAnalyzer._check_rec_np(rec)
 
-        psd = FragmentAnalyzer.compute_psdband(rec, f_s, welch_bin_t, notch_filter, bands, multitaper, **kwargs)
+        psdband = FragmentAnalyzer.compute_psdband(rec, f_s, welch_bin_t, notch_filter, bands, multitaper, **kwargs)
+        psdtotal = sum(psdband.values())
+        # psdtotal = FragmentAnalyzer.compute_psdtotal(rec, f_s, welch_bin_t, notch_filter, total_band, multitaper, **kwargs)
         
-        # Use sum of band powers as denominator to ensure fractions sum to 1
-        # This is mathematically correct since bands with non-overlapping boundaries
-        # should exactly partition the frequency space
-        psdtotal = sum(psd.values())
-        
-        return {k: v / psdtotal for k, v in psd.items()}
+        return {k: v / psdtotal for k, v in psdband.items()}
 
     @staticmethod
     def compute_logpsdfrac(
@@ -239,9 +237,10 @@ class FragmentAnalyzer:
         # return {k: v / logpsdtotal for k, v in logpsd.items()}
 
         psd_band = FragmentAnalyzer.compute_psdband(rec, f_s, welch_bin_t, notch_filter, bands, multitaper, **kwargs)
-        psd_total = FragmentAnalyzer.compute_psdtotal(
-            rec, f_s, welch_bin_t, notch_filter, total_band, multitaper, **kwargs
-        )
+        psd_total = sum(psd_band.values())
+        # psd_total = FragmentAnalyzer.compute_psdtotal(
+        #     rec, f_s, welch_bin_t, notch_filter, total_band, multitaper, **kwargs
+        # )
         return {k: log_transform(v / psd_total) for k, v in psd_band.items()}
 
     @staticmethod
@@ -326,7 +325,7 @@ class FragmentAnalyzer:
         rec_mne = FragmentAnalyzer._reshape_np_for_mne(rec)
         rec_mne = decimate(rec_mne, q=downsamp_q, axis=2)  # Along the time axis
         f_s = int(f_s / downsamp_q)
-
+        
         f, n_cycles = FragmentAnalyzer._get_freqs_cycles(
             rec=rec_mne,
             f_s=f_s,
@@ -358,9 +357,19 @@ class FragmentAnalyzer:
             ) from e
 
         data = con.get_data()
+        n_channels = rec.shape[1]
+        
+        # The data from spectral_connectivity_time has shape (n_connections, n_freq_bands)
+        # where n_connections is the number of unique channel pairs (upper triangle)
+        # and n_freq_bands is the number of frequency bands we're analyzing
+        
         out = {}
-        for i in range(data.shape[1]):
-            out[constants.BAND_NAMES[i]] = data[:, i].reshape((rec.shape[1], rec.shape[1]))
+        for i, band_name in enumerate(constants.BAND_NAMES):
+            if i >= data.shape[1]:  # Skip if we don't have data for this band
+                warnings.warn(f"No coherence data for band {band_name}")
+                continue
+                
+            out[band_name] = data[:, i].reshape((n_channels, n_channels))
         return out
 
     @staticmethod
