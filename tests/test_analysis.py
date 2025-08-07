@@ -567,6 +567,50 @@ class TestLongRecordingAnalyzer:
             assert isinstance(result, np.ndarray)
             assert result.shape == (8, 8)
             np.testing.assert_array_equal(result, expected_result)
+    
+    def test_compute_zcohere_z_epsilon_parameter(self, analyzer, mock_long_recording):
+        """Test that z_epsilon parameter is passed through correctly for z-transformed coherence."""
+        mock_recording = Mock()
+        mock_recording.get_traces.return_value = np.ones((1000, 8))
+        mock_long_recording.get_fragment.return_value = mock_recording
+        
+        with patch('pythoneeg.core.analysis.FragmentAnalyzer.compute_zcohere') as mock_compute:
+            mock_compute.return_value = {"delta": np.eye(8)}
+            
+            # Test with default z_epsilon
+            analyzer.compute_zcohere(0)
+            mock_compute.assert_called_once()
+            call_kwargs = mock_compute.call_args[1]
+            assert call_kwargs['z_epsilon'] == 1e-6
+            
+            # Test with custom z_epsilon
+            mock_compute.reset_mock()
+            analyzer.compute_zcohere(0, z_epsilon=1e-3)
+            mock_compute.assert_called_once()
+            call_kwargs = mock_compute.call_args[1]
+            assert call_kwargs['z_epsilon'] == 1e-3
+    
+    def test_compute_zpcorr_z_epsilon_parameter(self, analyzer, mock_long_recording):
+        """Test that z_epsilon parameter is passed through correctly for z-transformed Pearson correlation."""
+        mock_recording = Mock()
+        mock_recording.get_traces.return_value = np.ones((1000, 8))
+        mock_long_recording.get_fragment.return_value = mock_recording
+        
+        with patch('pythoneeg.core.analysis.FragmentAnalyzer.compute_zpcorr') as mock_compute:
+            mock_compute.return_value = np.eye(8)
+            
+            # Test with default z_epsilon
+            analyzer.compute_zpcorr(0)
+            mock_compute.assert_called_once()
+            call_kwargs = mock_compute.call_args[1]
+            assert call_kwargs['z_epsilon'] == 1e-6
+            
+            # Test with custom z_epsilon
+            mock_compute.reset_mock()
+            analyzer.compute_zpcorr(0, z_epsilon=1e-3)
+            mock_compute.assert_called_once()
+            call_kwargs = mock_compute.call_args[1]
+            assert call_kwargs['z_epsilon'] == 1e-3
             
     def test_compute_nspike(self, analyzer, mock_long_recording):
         """Test spike count computation integration - verify data flow and return format."""
