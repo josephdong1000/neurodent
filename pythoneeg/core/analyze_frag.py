@@ -346,25 +346,51 @@ class FragmentAnalyzer:
         n_channels = rec.shape[1]
         
         # The data from spectral_connectivity_time has shape (n_connections, n_freq_bands)
-        # where n_connections is the number of unique channel pairs (upper triangle)
-        # and n_freq_bands is the number of frequency bands we're analyzing
+        # where n_connections is n_channels^2 (all possible pairs including self)
+        # We need to extract only the upper triangular connections and create a symmetric matrix
         
         out = {}
         for i, band_name in enumerate(constants.BAND_NAMES):
             if i >= data.shape[1]:  # Skip if we don't have data for this band
                 warnings.warn(f"No coherence data for band {band_name}")
                 continue
-                
-            out[band_name] = data[:, i].reshape((n_channels, n_channels))
+            
+            # Extract the band data
+            band_data = data[:, i]
+            
+            # Reshape to full matrix (includes diagonal and all pairs)
+            full_matrix = band_data.reshape((n_channels, n_channels))
+            
+            # The data from spectral_connectivity_time has zeros in the upper triangle
+            # We need to fill the upper triangle with the lower triangle values
+            # and ensure the matrix is symmetric
+            symmetric_matrix = full_matrix.copy()
+            # Fill upper triangle with lower triangle values
+            symmetric_matrix = np.triu(symmetric_matrix.T, k=1) + np.tril(symmetric_matrix, k=-1)
+            
+            # Set diagonal to 1 (self-coherence should be 1)
+            np.fill_diagonal(symmetric_matrix, 1.0)
+            
+            out[band_name] = symmetric_matrix
         return out
 
     @staticmethod
-    def compute_zcohere(rec: np.ndarray, f_s: float, **kwargs) -> dict[str, np.ndarray]:
-        """Compute the Fisher z-transformed coherence of the signal."""
+    def compute_zcohere(rec: np.ndarray, f_s: float, z_epsilon: float = 1e-6, **kwargs) -> dict[str, np.ndarray]:
+        """Compute the Fisher z-transformed coherence of the signal.
+        
+        Args:
+            rec: Input signal array
+            f_s: Sampling frequency
+            z_epsilon: Small value to prevent arctanh(1) = inf. Values are clipped to [-1+z_epsilon, 1-z_epsilon]
+            **kwargs: Additional arguments passed to compute_cohere
+        """
         FragmentAnalyzer._check_rec_np(rec)
 
         cohere = FragmentAnalyzer.compute_cohere(rec, f_s, **kwargs)
-        return {k: np.arctanh(v) for k, v in cohere.items()}
+        # Handle arctanh(1) = inf by clipping values using z_epsilon parameter
+        clip_max = 1.0 - z_epsilon
+        clip_min = -1.0 + z_epsilon
+        return {k: np.arctanh(np.clip(v, clip_min, clip_max)) for k, v in cohere.items()}
 
     @staticmethod
     def compute_pcorr(rec: np.ndarray, f_s: float, lower_triag: bool = True, **kwargs) -> np.ndarray:
@@ -382,12 +408,23 @@ class FragmentAnalyzer:
             return result.correlation
 
     @staticmethod
-    def compute_zpcorr(rec: np.ndarray, f_s: float, **kwargs) -> np.ndarray:
-        """Compute the Fisher z-transformed Pearson correlation coefficient of the signal."""
+    def compute_zpcorr(rec: np.ndarray, f_s: float, z_epsilon: float = 1e-6, **kwargs) -> np.ndarray:
+        """Compute the Fisher z-transformed Pearson correlation coefficient of the signal.
+        
+        Args:
+            rec: Input signal array
+            f_s: Sampling frequency
+            z_epsilon: Small value to prevent arctanh(1) = inf. Values are clipped to [-1+z_epsilon, 1-z_epsilon]
+            **kwargs: Additional arguments passed to compute_pcorr
+        """
         FragmentAnalyzer._check_rec_np(rec)
 
-        pcorr = FragmentAnalyzer.compute_pcorr(rec, f_s, **kwargs)
-        return np.arctanh(pcorr)
+        # Get full correlation matrix for z-transform
+        pcorr = FragmentAnalyzer.compute_pcorr(rec, f_s, lower_triag=False, **kwargs)
+        # Handle arctanh(1) = inf by clipping values using z_epsilon parameter
+        clip_max = 1.0 - z_epsilon
+        clip_min = -1.0 + z_epsilon
+        return np.arctanh(np.clip(pcorr, clip_min, clip_max))
 
     @staticmethod
     def compute_nspike(rec: np.ndarray, **kwargs):
