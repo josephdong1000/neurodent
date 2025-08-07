@@ -367,17 +367,31 @@ class LongRecordingAnalyzer:
             **kwargs,
         )
 
-    def compute_zcohere(self, index, **kwargs) -> np.ndarray:
+    def compute_zcohere(self, index, z_epsilon: float = 1e-6, **kwargs) -> np.ndarray:
+        """Compute the Fisher z-transformed coherence of the signal.
+        
+        Args:
+            index (int): Index of time window
+            z_epsilon (float): Small value to prevent arctanh(1) = inf. Values are clipped to [-1+z_epsilon, 1-z_epsilon]
+            **kwargs: Additional arguments passed to compute_zcohere
+        """
         rec = self.get_fragment_np(index)
-        return FragmentAnalyzer.compute_zcohere(rec=rec, f_s=self.f_s, **kwargs)
+        return FragmentAnalyzer.compute_zcohere(rec=rec, f_s=self.f_s, z_epsilon=z_epsilon, **kwargs)
 
     def compute_pcorr(self, index, lower_triag=True, **kwargs) -> np.ndarray:
         rec = self.get_fragment_np(index)
         return FragmentAnalyzer.compute_pcorr(rec=rec, f_s=self.f_s, lower_triag=lower_triag, **kwargs)
 
-    def compute_zpcorr(self, index, **kwargs) -> np.ndarray:
+    def compute_zpcorr(self, index, z_epsilon: float = 1e-6, **kwargs) -> np.ndarray:
+        """Compute the Fisher z-transformed Pearson correlation coefficient of the signal.
+        
+        Args:
+            index (int): Index of time window
+            z_epsilon (float): Small value to prevent arctanh(1) = inf. Values are clipped to [-1+z_epsilon, 1-z_epsilon]
+            **kwargs: Additional arguments passed to compute_zpcorr
+        """
         rec = self.get_fragment_np(index)
-        return FragmentAnalyzer.compute_zpcorr(rec=rec, f_s=self.f_s, **kwargs)
+        return FragmentAnalyzer.compute_zpcorr(rec=rec, f_s=self.f_s, z_epsilon=z_epsilon, **kwargs)
 
     def compute_nspike(self, index, **kwargs):
         rec = self.get_fragment_np(index)
