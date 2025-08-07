@@ -781,6 +781,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
         result = df.copy() if df is not None else self.result.copy()
         np_rms = np.array(result["rms"].tolist())
         np_rmsnan = np_rms.copy()
+        # Convert to float to allow NaN assignment for integer arrays
+        if np_rmsnan.dtype.kind in ('i', 'u'):  # integer types
+            np_rmsnan = np_rmsnan.astype(float)
         np_rmsnan[np_rms > max_rms] = np.nan
         result["rms"] = np_rmsnan.tolist()
 
@@ -1238,6 +1241,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
             match feat:  # NOTE refactor this to use constants
                 case "rms" | "ampvar" | "psdtotal" | "nspike" | "logrms" | "logampvar" | "logpsdtotal" | "lognspike":
                     vals = np.array(result[feat].tolist())
+                    # Convert to float to allow NaN assignment for integer features
+                    if vals.dtype.kind in ('i', 'u'):  # integer types
+                        vals = vals.astype(float)
                     vals[~filter_tfs] = np.nan
                     result[feat] = vals.tolist()
                 case "psd":
