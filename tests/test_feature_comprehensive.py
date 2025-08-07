@@ -15,7 +15,6 @@ All tests are designed to ensure robustness and correctness of EEG feature compu
 import numpy as np
 import pytest
 from scipy import signal
-from scipy.stats import pearsonr
 import warnings
 
 from pythoneeg.core.analyze_frag import FragmentAnalyzer
@@ -295,7 +294,7 @@ class TestMathematicalProperties:
         
         # Calculate PSD integral
         freqs, psd = FragmentAnalyzer.compute_psd(signal_data, self.fs, notch_filter=False)
-        psd_integral = np.trapz(psd, freqs, axis=0)
+        psd_integral = np.trapezoid(psd, freqs, axis=0)
         
         # They should be approximately equal
         np.testing.assert_allclose(psd_integral, signal_energy, rtol=0.2)
@@ -348,10 +347,10 @@ class TestCrossMethodConsistency:
         """Test that both PSD methods produce valid results."""
         signal_data = self.generator.white_noise(self.n_samples, self.n_channels, 1.0)
         
-        freqs_welch, psd_welch = FragmentAnalyzer.compute_psd(
+        _, psd_welch = FragmentAnalyzer.compute_psd(
             signal_data, self.fs, multitaper=False, notch_filter=False
         )
-        freqs_mt, psd_mt = FragmentAnalyzer.compute_psd(
+        _, psd_mt = FragmentAnalyzer.compute_psd(
             signal_data, self.fs, multitaper=True, notch_filter=False
         )
         
@@ -498,7 +497,7 @@ class TestParameterCombinations:
         assert set(psdband.keys()) == expected_bands
         
         # All values should be positive and finite
-        for band_name, values in psdband.items():
+        for _, values in psdband.items():
             assert np.all(values >= 0)
             assert np.all(np.isfinite(values))
             
@@ -587,6 +586,167 @@ class TestReferenceImplementations:
         
         np.testing.assert_allclose(freqs_fa, freqs_ref, rtol=1e-10)
         np.testing.assert_allclose(psd_fa, psd_ref, rtol=1e-10)
+
+
+class TestMathematicalProperties:
+    """Test mathematical properties and consistency of all compute functions."""
+    
+    def setup_method(self):
+        """Set up test parameters."""
+        self.fs = 1000.0
+        self.n_samples = 2000
+        self.n_channels = 2
+        self.generator = SyntheticSignalGenerator()
+    
+    def test_logampvar_mathematical_properties(self):
+        """Test log amplitude variance mathematical properties."""
+        # Create test signal with known variance
+        signal_data = self.generator.white_noise(self.n_samples, self.n_channels, amplitude=2.0)
+        
+        # Compute both amplitude variance and log amplitude variance
+        ampvar = FragmentAnalyzer.compute_ampvar(signal_data)
+        logampvar = FragmentAnalyzer.compute_logampvar(signal_data)
+        
+        # Log amplitude variance should equal log transform of amplitude variance
+        from pythoneeg.core import log_transform
+        expected_logampvar = log_transform(ampvar)
+        np.testing.assert_allclose(logampvar, expected_logampvar, rtol=1e-10)
+        
+        # Test monotonicity: larger variance should give larger log variance
+        signal_large_var = self.generator.white_noise(self.n_samples, self.n_channels, amplitude=5.0)
+        logampvar_large = FragmentAnalyzer.compute_logampvar(signal_large_var)
+        
+        # Log amplitude variance of larger-amplitude signal should be larger
+        assert np.all(logampvar_large > logampvar), "Log amplitude variance should increase with signal amplitude"
+    
+    def test_logpsdband_mathematical_properties(self):
+        """Test log PSD band mathematical properties."""
+        signal_data = self.generator.multi_freq_signal(
+            self.n_samples, self.n_channels, 
+            freqs=[5, 15, 25], amplitudes=[1.0, 2.0, 0.5], 
+            fs=self.fs
+        )
+        
+        # Compute both PSD band and log PSD band
+        psdband = FragmentAnalyzer.compute_psdband(signal_data, self.fs, notch_filter=False)
+        logpsdband = FragmentAnalyzer.compute_logpsdband(signal_data, self.fs, notch_filter=False)
+        
+        # Log PSD band should equal log transform of PSD band
+        from pythoneeg.core import log_transform
+        for band_name in psdband.keys():
+            expected_logpsd = log_transform(psdband[band_name])
+            np.testing.assert_allclose(logpsdband[band_name], expected_logpsd, rtol=1e-10)
+    
+    def test_logpsdtotal_mathematical_properties(self):
+        """Test log total PSD mathematical properties."""
+        signal_data = self.generator.white_noise(self.n_samples, self.n_channels, amplitude=1.5)
+        
+        # Compute both total PSD and log total PSD
+        psdtotal = FragmentAnalyzer.compute_psdtotal(signal_data, self.fs, notch_filter=False)
+        logpsdtotal = FragmentAnalyzer.compute_logpsdtotal(signal_data, self.fs, notch_filter=False)
+        
+        # Log total PSD should equal log transform of total PSD
+        from pythoneeg.core import log_transform
+        expected_logpsdtotal = log_transform(psdtotal)
+        np.testing.assert_allclose(logpsdtotal, expected_logpsdtotal, rtol=1e-10)
+    
+    def test_logpsdfrac_mathematical_properties(self):
+        """Test log PSD fraction mathematical properties."""
+        signal_data = self.generator.multi_freq_signal(
+            self.n_samples, self.n_channels,
+            freqs=[3, 10, 20, 30], amplitudes=[1.0, 1.5, 1.2, 0.8],
+            fs=self.fs
+        )
+        
+        # Compute PSD fractions and log PSD fractions
+        psdfrac = FragmentAnalyzer.compute_psdfrac(signal_data, self.fs, notch_filter=False)
+        logpsdfrac = FragmentAnalyzer.compute_logpsdfrac(signal_data, self.fs, notch_filter=False)
+        
+        # Log PSD fraction should be consistent with log transform
+        # Note: logpsdfrac uses log(psd_band / psd_total), not log(psdfrac)
+        psdband = FragmentAnalyzer.compute_psdband(signal_data, self.fs, notch_filter=False)
+        psdtotal = FragmentAnalyzer.compute_psdtotal(signal_data, self.fs, notch_filter=False)
+        
+        from pythoneeg.core import log_transform
+        for band_name in psdfrac.keys():
+            expected_logpsdfrac = log_transform(psdband[band_name] / psdtotal)
+            np.testing.assert_allclose(logpsdfrac[band_name], expected_logpsdfrac, rtol=1e-10)
+    
+    def test_psdslope_mathematical_properties(self):
+        """Test PSD slope computation mathematical properties."""
+        # Create pink noise (1/f) signal - should have negative slope
+        signal_data = self.generator.white_noise(self.n_samples * 2, self.n_channels, amplitude=1.0)
+        
+        # Apply 1/f filter to create pink noise
+        from scipy.signal import butter, filtfilt
+        # Simple approximation of pink noise by filtering white noise
+        b, a = butter(1, 0.1, btype='high', fs=self.fs)
+        pink_signal = filtfilt(b, a, signal_data, axis=0).astype(np.float32)
+        
+        # Compute PSD slope
+        psdslope = FragmentAnalyzer.compute_psdslope(pink_signal, self.fs, notch_filter=False)
+        
+        # Check that we get slope and intercept for each channel
+        assert psdslope.shape == (self.n_channels, 2), "PSD slope should return [slope, intercept] for each channel"
+        
+        # Slopes should be negative for 1/f-like signals (in most cases)
+        slopes = psdslope[:, 0]
+        # Don't require all slopes to be negative due to filtering artifacts, but most should be
+        negative_slopes = np.sum(slopes < 0)
+        assert negative_slopes >= self.n_channels // 2, "Most slopes should be negative for 1/f-like signal"
+    
+    def test_zcohere_mathematical_properties(self):
+        """Test z-transformed coherence mathematical properties."""
+        # Create two signals with known coherence
+        n_samples_long = self.n_samples * 4  # Longer signal for better coherence estimation
+        base_signal = self.generator.sine_wave(n_samples_long, 1, freq=10.0, fs=self.fs)
+        
+        # Create partially correlated signals
+        noise1 = self.generator.white_noise(n_samples_long, 1, amplitude=0.5)
+        noise2 = self.generator.white_noise(n_samples_long, 1, amplitude=0.5)
+        
+        signal_ch1 = base_signal + noise1
+        signal_ch2 = base_signal + noise2  # Shared component + independent noise
+        
+        test_signal = np.hstack([signal_ch1, signal_ch2])
+        
+        try:
+            # Compute coherence and z-transformed coherence
+            cohere = FragmentAnalyzer.compute_cohere(test_signal, self.fs, freq_res=2, downsamp_q=2)
+            zcohere = FragmentAnalyzer.compute_zcohere(test_signal, self.fs, freq_res=2, downsamp_q=2)
+            
+            # Z-transformed coherence should equal arctanh(coherence)
+            for band_name in cohere.keys():
+                # The actual implementation uses np.arctanh directly, which can give inf
+                # for coherence values of 1.0. We need to test what the function actually does
+                expected_zcohere = np.arctanh(cohere[band_name])
+                # Compare only finite values, as inf values are expected for perfect coherence
+                finite_mask = np.isfinite(expected_zcohere) & np.isfinite(zcohere[band_name])
+                if np.any(finite_mask):
+                    np.testing.assert_allclose(
+                        zcohere[band_name][finite_mask], 
+                        expected_zcohere[finite_mask], 
+                        rtol=1e-6
+                    )
+                # Check that inf values occur in the same places
+                inf_mask_actual = np.isinf(zcohere[band_name])
+                inf_mask_expected = np.isinf(expected_zcohere)
+                np.testing.assert_array_equal(inf_mask_actual, inf_mask_expected)
+                
+        except MemoryError:
+            # Skip test if insufficient memory
+            pytest.skip("Insufficient memory for coherence computation")
+        
+    def test_nspike_and_lognspike_return_none(self):
+        """Test that spike counting functions return None (not implemented)."""
+        signal_data = self.generator.white_noise(self.n_samples, self.n_channels, amplitude=1.0)
+        
+        # Both functions should return None
+        nspike_result = FragmentAnalyzer.compute_nspike(signal_data, f_s=self.fs)
+        lognspike_result = FragmentAnalyzer.compute_lognspike(signal_data, f_s=self.fs)
+        
+        assert nspike_result is None, "compute_nspike should return None"
+        assert lognspike_result is None, "compute_lognspike should return None"
 
 
 if __name__ == "__main__":

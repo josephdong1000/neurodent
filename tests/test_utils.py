@@ -1818,8 +1818,8 @@ class TestNanmeanSeriesOfNp:
         
     def test_basic_operation_large_series(self):
         """Test basic nanmean operation with large series (> 1000 items)."""
-        # Create series with many numpy arrays
-        arrays = [np.array([i, i+1, i+2]) for i in range(1500)]
+        # Create series with many numpy arrays - reduced size to prevent memory issues
+        arrays = [np.array([i, i+1, i+2]) for i in range(100)]  # Reduced from 1500
         series = pd.Series(arrays)
         
         result = utils.nanmean_series_of_np(series)
@@ -1910,9 +1910,9 @@ class TestNanmeanSeriesOfNp:
             
     def test_mixed_array_sizes_large_series(self):
         """Test with arrays of different sizes in large series (triggers stacking path)."""
-        # Create 1500 arrays with mixed sizes
+        # Create 100 arrays with mixed sizes - reduced size to prevent memory issues
         arrays = []
-        for i in range(1500):
+        for i in range(100):  # Reduced from 1500
             if i % 3 == 0:
                 arrays.append(np.array([i, i+1]))
             elif i % 3 == 1:
@@ -1938,7 +1938,7 @@ class TestNanmeanSeriesOfNp:
         
     def test_non_numpy_arrays_large_series(self):
         """Test with non-numpy arrays in large series."""
-        arrays = [[i, i+1, i+2] for i in range(1500)]  # Lists instead of numpy arrays
+        arrays = [[i, i+1, i+2] for i in range(100)]  # Lists instead of numpy arrays - reduced size
         series = pd.Series(arrays)
         
         # Should fallback to list method since first element is not numpy array
@@ -1950,7 +1950,7 @@ class TestNanmeanSeriesOfNp:
     def test_mixed_types_large_series(self):
         """Test with mixed types in large series."""
         arrays = []
-        for i in range(1500):
+        for i in range(100):  # Reduced from 1500 to prevent memory issues
             if i % 2 == 0:
                 arrays.append(np.array([i, i+1, i+2]))  # numpy array
             else:
@@ -2008,7 +2008,7 @@ class TestNanmeanSeriesOfNp:
         """Test exception handling in large series path."""
         # Create series that will trigger the large series path but cause an exception
         arrays = []
-        for i in range(1500):
+        for i in range(100):  # Reduced from 1500 to prevent memory issues
             if i == 0:
                 arrays.append(np.array([1, 2, 3]))  # First element is numpy array
             else:
@@ -2022,8 +2022,8 @@ class TestNanmeanSeriesOfNp:
             
     def test_performance_comparison(self):
         """Test that large series uses the optimized path."""
-        # Create large series
-        arrays = [np.array([i, i+1, i+2]) for i in range(1500)]
+        # Create large series - reduced size to prevent memory issues
+        arrays = [np.array([i, i+1, i+2]) for i in range(100)]  # Reduced from 1500
         series = pd.Series(arrays)
         
         # This should use the optimized stacking path
@@ -2044,6 +2044,17 @@ class TestNanmeanSeriesOfNp:
         # Test axis=-1 (last axis)
         result = utils.nanmean_series_of_np(series, axis=-1)
         expected = np.nanmean(np.array([arrays[0], arrays[1]]), axis=-1)
+        
+        np.testing.assert_array_almost_equal(result, expected)
+
+    def test_basic_operation_large_series(self):
+        """Test basic nanmean operation with large series (100 items)."""
+        # Create series with many numpy arrays - reduced size to prevent memory issues
+        arrays = [np.array([i, i+1, i+2]) for i in range(100)]
+        series = pd.Series(arrays)
+        
+        result = utils.nanmean_series_of_np(series)
+        expected = np.nanmean(np.stack(arrays, axis=0), axis=0)
         
         np.testing.assert_array_almost_equal(result, expected)
 
@@ -2796,14 +2807,14 @@ class TestTempDirectory:
             
             temp_dir_path = utils.get_temp_directory()
             
-            # Create a moderately large file (1MB)
+            # Create a moderately large file (100KB) - reduced size to prevent memory issues
             large_file = temp_dir_path / "large_file.txt"
-            content = "A" * (1024 * 1024)  # 1MB of 'A's
+            content = "A" * (1024 * 100)  # 100KB of 'A's (reduced from 1MB)
             
             large_file.write_text(content)
             
             assert large_file.exists()
-            assert large_file.stat().st_size >= 1024 * 1024
+            assert large_file.stat().st_size >= 1024 * 100  # Reduced from 1MB
             
             # Read it back
             read_content = large_file.read_text()

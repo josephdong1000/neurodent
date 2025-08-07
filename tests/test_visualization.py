@@ -157,7 +157,6 @@ class TestWindowAnalysisResult:
         assert 'psdtotal' in result.columns
         assert 'animal' in result.columns  # Metadata columns should be included
     
-    @pytest.mark.xfail(reason="core.nanaverage bug: returns scalar, .filled() fails on scalar")
     def test_get_groupavg_result(self, war):
         """Test getting group average results."""
         # Use groupby on 'animalday' to avoid single-group scalar reduction
@@ -467,6 +466,7 @@ class TestWindowAnalysisResultFiltering:
         """Test morphological smoothing without duration column."""
         df = pd.DataFrame({
             'animal': ['A1'] * 5,
+            'animalday': ['A1_20230101'] * 5,
             'rms': [[100, 200]] * 5
         })
         
@@ -506,7 +506,11 @@ class TestWindowAnalysisResultFiltering:
             filtered = filtering_war.apply_filters(config)
             
             mock_high_rms.assert_called_once_with(max_rms=500)
-            mock_smooth.assert_called_once_with(mask, 8.0)
+            # Check that mock_smooth was called once with the right arguments
+            mock_smooth.assert_called_once()
+            args, kwargs = mock_smooth.call_args
+            np.testing.assert_array_equal(args[0], mask)
+            assert args[1] == 8.0
             assert isinstance(filtered, WindowAnalysisResult)
 
 
@@ -818,9 +822,11 @@ class TestSpikeAnalysisResult:
         # Mock sampling frequencies to be the same
         sa1.recording.get_sampling_frequency.return_value = 1000.0
         sa2.recording.get_sampling_frequency.return_value = 1000.0
-        # Mock channel count
+        # Mock channel count and IDs
         sa1.recording.get_num_channels.return_value = 1
         sa2.recording.get_num_channels.return_value = 1
+        sa1.recording.get_channel_ids.return_value = np.array(['0'])
+        sa2.recording.get_channel_ids.return_value = np.array(['1'])
         # Mock spike times
         sa1.get_spike_times.return_value = [0.1, 0.2, 0.3]
         sa2.get_spike_times.return_value = [0.1, 0.2, 0.3]
@@ -849,12 +855,15 @@ class TestSpikeAnalysisResult:
     def test_convert_to_mne(self, mock_raw, sar):
         """Test conversion to MNE format."""
         mock_raw_instance = Mock()
+        mock_set_annotations = Mock()
+        mock_raw_instance.set_annotations.return_value = mock_set_annotations
         mock_raw.return_value = mock_raw_instance
         
         result = sar.convert_to_mne(chunk_len=60)
         
-        assert result == mock_raw_instance
+        assert result == mock_set_annotations
         mock_raw.assert_called()
+        mock_raw_instance.set_annotations.assert_called_once()
 
 
 class TestDataProcessingForVisualization:
