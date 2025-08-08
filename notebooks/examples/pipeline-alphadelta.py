@@ -63,6 +63,7 @@ bad_animal_ids = [
     "062921_Cohort 3_AM3_AM5_CM9_BM6_CM5_CF2_IF5_BF3 BM6",
     "121821_cohort4_Group1_2mice M2",
     "121821_cohort4_Group1_2mice M4",
+    "060921_Cohort 3_EM1_AM2_GF4 AM2",
 ]
 animal_ids = [p for p in animal_ids if p not in bad_animal_ids]
 
