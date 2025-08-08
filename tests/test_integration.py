@@ -275,7 +275,10 @@ class TestPerformanceIntegration:
         # Test log transformation performance
         import time
         start_time = time.time()
-        log_data = utils.log_transform(large_data)
+        # Random data may contain negative values, generating expected log warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            log_data = utils.log_transform(large_data)
         end_time = time.time()
         
         # Should complete within reasonable time
