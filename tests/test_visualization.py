@@ -288,6 +288,38 @@ class TestWindowAnalysisResult:
                 channel_names=["LMot", "RMot"]
             )
 
+    def test_suppress_short_intervals_error(self):
+        """Test that suppress_short_interval_error parameter suppresses the ValueError."""
+        # Create DataFrame where >1% of intervals are short (same as test_short_intervals_error)
+        data = {
+            'animal': ['A1'] * 4,
+            'animalday': ['A1_20230101'] * 4,
+            'genotype': ['WT'] * 4,
+            'timestamp': pd.to_datetime([
+                '2023-01-01 10:00:00',
+                '2023-01-01 10:00:30',  # 30s gap
+                '2023-01-01 10:01:00',  # 30s gap  
+                '2023-01-01 10:04:00'   # Normal gap
+            ]),
+            'duration': [240.0] * 4,  # 4 minute median duration
+            'rms': [[100.0, 110.0]] * 4
+        }
+        df = pd.DataFrame(data)
+        
+        # Should NOT raise ValueError when suppress_short_interval_error=True
+        war = WindowAnalysisResult(
+            result=df,
+            animal_id="A1",
+            genotype="WT", 
+            channel_names=["LMot", "RMot"],
+            suppress_short_interval_error=True
+        )
+        
+        # Verify the parameter is stored correctly
+        assert war.suppress_short_interval_error
+        assert war.animal_id == "A1"
+        assert war.genotype == "WT"
+
     def test_no_short_intervals_check_without_duration(self):
         """Test that short interval check is skipped when duration column is missing."""
         # Create DataFrame without duration column

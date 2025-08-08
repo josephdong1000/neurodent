@@ -200,6 +200,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         exclude: list[str] = ["nspike", "lognspike"],
         window_s=4,
         multiprocess_mode: Literal["dask", "serial"] = "serial",
+        suppress_short_interval_error=False,
         **kwargs,
     ):
         """Computes windowed analysis of animal recordings. The data is divided into windows (time bins), then features are extracted from each window. The result is
@@ -209,6 +210,7 @@ class AnimalOrganizer(AnimalFeatureParser):
             features (list[str]): List of features to compute. See individual compute_...() functions for output format
             exclude (list[str], optional): List of features to ignore. Will override the features parameter. Defaults to [].
             window_s (int, optional): Length of each window in seconds. Note that some features break with very short window times. Defaults to 4.
+            suppress_short_interval_error (bool, optional): If True, suppress ValueError for short intervals between timestamps in resulting WindowAnalysisResult. Useful for aggregated WARs. Defaults to False.
 
         Raises:
             AttributeError: If a feature's compute_...() function was not implemented, this error will be raised.
@@ -302,6 +304,7 @@ class AnimalOrganizer(AnimalFeatureParser):
             self.channel_names,
             self.assume_from_number,
             self.bad_channels_dict,
+            suppress_short_interval_error,
         )
 
         return self.window_analysis_result
@@ -439,6 +442,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         channel_names: list[str] = None,
         assume_from_number=False,
         bad_channels_dict: dict[str, list[str]] = {},
+        suppress_short_interval_error=False,
     ) -> None:
         """
         Args:
@@ -448,6 +452,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             channel_names (list[str], optional): List of channel names. Defaults to None.
             assume_channels (bool, optional): If true, assumes channel names according to AnimalFeatureParser.DEFAULT_CHNUM_TO_NAME. Defaults to False.
             bad_channels_dict (dict[str, list[str]], optional): Dictionary of channels to reject for each recording session. Defaults to {}.
+            suppress_short_interval_error (bool, optional): If True, suppress ValueError for short intervals between timestamps. Useful for aggregated WARs with large window sizes. Defaults to False.
         """
         self.result = result
         self.animal_id = animal_id
@@ -455,6 +460,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         self.channel_names = channel_names
         self.assume_from_number = assume_from_number
         self.bad_channels_dict = bad_channels_dict
+        self.suppress_short_interval_error = suppress_short_interval_error
 
         self.__update_instance_vars()
 
@@ -494,9 +500,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     f"that are shorter than the median duration of {median_duration:.1f}s"
                 )
 
-                if pct_short > 1.0:  # More than 1% of intervals are short
+                if pct_short > 1.0 and not self.suppress_short_interval_error:  # More than 1% of intervals are short
                     raise ValueError(warning_msg)
-                else:
+                elif not self.suppress_short_interval_error:
                     warnings.warn(warning_msg)
 
         if "animal" in self.result.columns:
@@ -1071,7 +1077,13 @@ class WindowAnalysisResult(AnimalFeatureParser):
             del self.result
             self.result = filtered_result
         return WindowAnalysisResult(
-            filtered_result, self.animal_id, self.genotype, self.channel_names, self.assume_from_number
+            filtered_result,
+            self.animal_id,
+            self.genotype,
+            self.channel_names,
+            self.assume_from_number,
+            self.bad_channels_dict,
+            self.suppress_short_interval_error,
         )
 
     def _create_filtered_copy(self, filter_mask: np.ndarray) -> "WindowAnalysisResult":
@@ -1085,12 +1097,13 @@ class WindowAnalysisResult(AnimalFeatureParser):
         """
         filtered_result = self._apply_filter(filter_mask)
         return WindowAnalysisResult(
-            filtered_result, 
-            self.animal_id, 
-            self.genotype, 
-            self.channel_names, 
+            filtered_result,
+            self.animal_id,
+            self.genotype,
+            self.channel_names,
             self.assume_from_number,
-            self.bad_channels_dict
+            self.bad_channels_dict,
+            self.suppress_short_interval_error,
         )
 
     def filter_logrms_range(self, z_range: float = 3) -> "WindowAnalysisResult":
@@ -1435,6 +1448,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
         )
 
         self.result = aggregated_df.reset_index(drop=False)  # Keep animalday/isday as a column
+
+        self.suppress_short_interval_error = True
+        logging.info("Setting suppress_short_interval_error to True")
         self.__update_instance_vars()
 
     def add_unique_hash(self, nbytes: int | None = None):
