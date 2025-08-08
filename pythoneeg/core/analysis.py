@@ -378,7 +378,15 @@ class LongRecordingAnalyzer:
         rec = self.get_fragment_np(index)
         return FragmentAnalyzer.compute_zcohere(rec=rec, f_s=self.f_s, z_epsilon=z_epsilon, **kwargs)
 
-    def compute_pcorr(self, index, lower_triag=True, **kwargs) -> np.ndarray:
+    def compute_imcoh(self, index, **kwargs) -> np.ndarray:
+        rec = self.get_fragment_np(index)
+        return FragmentAnalyzer.compute_imcoh(rec=rec, f_s=self.f_s, **kwargs)
+    
+    def compute_zimcoh(self, index, z_epsilon: float = 1e-6, **kwargs) -> np.ndarray:
+        rec = self.get_fragment_np(index)
+        return FragmentAnalyzer.compute_zimcoh(rec=rec, f_s=self.f_s, z_epsilon=z_epsilon, **kwargs)
+
+    def compute_pcorr(self, index, lower_triag=False, **kwargs) -> np.ndarray:
         rec = self.get_fragment_np(index)
         return FragmentAnalyzer.compute_pcorr(rec=rec, f_s=self.f_s, lower_triag=lower_triag, **kwargs)
 

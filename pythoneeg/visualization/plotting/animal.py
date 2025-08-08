@@ -215,7 +215,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
             case "psdslope":
                 data_X = np.array(group[feature].to_list())
                 data_X[:, :, 0] = -data_X[:, :, 0]
-            case "cohere" | "zcohere":
+            case "cohere" | "zcohere" | "imcoh" | "zimcoh":
                 data_X = np.array([list(d.values()) for d in group[feature]])
                 data_X = np.stack(data_X, axis=-1)
                 if triag:
@@ -355,7 +355,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
             )
 
         if show_featurename:
-            if feature in ["cohere", "zcohere"]:
+            if feature in ["cohere", "zcohere", "imcoh", "zimcoh"]:
                 ticks = n_ch * np.linspace(1 / 2, n_bands + 1 / 2, n_bands, endpoint=False)
                 ax.set_yticks(ticks=ticks, labels=constants.BAND_NAMES)
                 for ypos in np.linspace(0, n_bands * n_ch, n_bands, endpoint=False):
