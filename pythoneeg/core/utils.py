@@ -767,7 +767,9 @@ def sort_dataframe_by_plot_order(df: pd.DataFrame, df_sort_order: Optional[dict]
         missing_values = unique_values - set(categories)
 
         if missing_values:
-            raise ValueError(f"Column '{col}' contains values not in sort order dictionary: {missing_values}")
+            raise ValueError(
+                f"Column '{col}' contains values not in sort order dictionary: {missing_values}. Add them to plot_order in ExperimentPlotter init."
+            )
 
         # Filter categories to only include those that exist in the DataFrame
         existing_categories = [cat for cat in categories if cat in unique_values]

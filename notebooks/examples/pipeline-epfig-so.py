@@ -21,8 +21,8 @@ logging.basicConfig(
 logger = logging.getLogger()
 
 base_folder = Path("/mnt/isilon/marsh_single_unit/PythonEEG")
-load_folder = base_folder / "notebooks" / "tests" / "test-wars-sox5-6"
-save_folder = base_folder / "notebooks" / "tests" / "test-wars-sox5-collapsed-6-isday"
+load_folder = base_folder / "notebooks" / "tests" / "test-wars-sox5-7"
+save_folder = base_folder / "notebooks" / "tests" / "test-wars-sox5-collapsed-7-isday"
 # animal_ids = ['A5', 'A10', 'F22', 'G25', 'G26', 'N21', 'N22', 'N23', 'N24', 'N25']
 # animal_ids = ['A5', 'A10']
 animal_ids = [p.name for p in load_folder.glob("*") if p.is_dir()]
@@ -211,12 +211,13 @@ def load_war(animal_id):
     #     bad_channels = list(required_channels)
     bad_channels = list(required_channels)
 
-    war.filter_all(bad_channels=bad_channels)
+    war.filter_all(bad_channels=bad_channels, morphological_smoothing_seconds=60 * 5)
     war.aggregate_time_windows(groupby=["animalday", "isday"])  # Not grouping by isday to increase statistical power
     # war.add_unique_hash(4)
-    war.reorder_and_pad_channels(
-        ["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis", "LHip", "RHip"], use_abbrevs=True
-    )
+    # war.reorder_and_pad_channels(
+    #     ["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis", "LHip", "RHip"], use_abbrevs=True
+    # )
+    war.reorder_and_pad_channels(["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"], use_abbrevs=True)
     war.save_pickle_and_json(save_folder / f"{animal_id}")
 
     return war
@@ -230,8 +231,7 @@ with Pool(14) as pool:
             wars.append(war)
 
 logger.info(f"{len(wars)} wars loaded")
-exclude = ["nspike", "lognspike"]
-ep = visualization.ExperimentPlotter(wars, exclude=exclude)
+ep = visualization.ExperimentPlotter(wars, exclude=["nspike", "lognspike", "pcorr", "cohere"])
 
 
 # SECTION use seaborn.so to plot figure

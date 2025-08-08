@@ -791,7 +791,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         out[np_rms > max_rms] = False
         return out
 
-    def get_filter_low_rms(self, df: pd.DataFrame = None, min_rms=50, **kwargs):
+    def get_filter_low_rms(self, df: pd.DataFrame = None, min_rms=30, **kwargs):
         """Filter windows based on rms.
 
         Args:
