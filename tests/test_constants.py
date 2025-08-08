@@ -83,6 +83,11 @@ class TestConstants:
         assert "rms" in constants.LINEAR_FEATURES
         assert "psdband" in constants.BAND_FEATURES
         assert "cohere" in constants.MATRIX_FEATURES
+        assert "zcohere" in constants.MATRIX_FEATURES
+        assert "imcoh" in constants.MATRIX_FEATURES
+        assert "zimcoh" in constants.MATRIX_FEATURES
+        assert "pcorr" in constants.MATRIX_FEATURES
+        assert "zpcorr" in constants.MATRIX_FEATURES
         assert "psd" in constants.HIST_FEATURES
         
     def test_feature_plot_height_ratios(self):
@@ -127,6 +132,24 @@ class TestConstants:
         assert len(constants.FREQ_MINS) == len(constants.FREQ_MAXS)
         
         assert constants.LINE_FREQ == 60
+        
+    def test_freq_bands_contiguity(self):
+        """Test that frequency bands are contiguous without gaps or overlaps."""
+        band_items = list(constants.FREQ_BANDS.items())
+        
+        # Test contiguity between adjacent bands
+        for i in range(len(band_items) - 1):
+            current_name, (current_low, current_high) = band_items[i]
+            next_name, (next_low, next_high) = band_items[i+1]
+            
+            # Bands should be perfectly contiguous (current_high == next_low)
+            assert current_high == next_low, \
+                f"Gap/overlap between {current_name} (ends at {current_high}) and {next_name} (starts at {next_low})"
+        
+        # Test that combined range matches FREQ_BAND_TOTAL
+        combined_range = (band_items[0][1][0], band_items[-1][1][1])
+        assert combined_range == constants.FREQ_BAND_TOTAL, \
+            f"Combined band range {combined_range} does not match FREQ_BAND_TOTAL {constants.FREQ_BAND_TOTAL}"
         
     def test_sorting_params(self):
         """Test SORTING_PARAMS."""

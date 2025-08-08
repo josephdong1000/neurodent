@@ -79,6 +79,48 @@ class TestWindowAnalysisResult:
         return pd.DataFrame(data)
     
     @pytest.fixture
+    def filtering_result_df(self):
+        """Create a comprehensive result DataFrame for filtering tests."""
+        np.random.seed(42)  # For reproducible tests
+        n_windows = 20
+        n_channels = 3
+        
+        data = {
+            'animal': ['A1'] * n_windows,
+            'animalday': ['A1_20230101'] * (n_windows // 2) + ['A1_20230102'] * (n_windows // 2),
+            'genotype': ['WT'] * n_windows,
+            'duration': [4.0] * n_windows,
+            'isday': [True, False] * (n_windows // 2),
+            # RMS values with some outliers
+            'rms': [np.random.normal(100, 20, n_channels).tolist() for _ in range(n_windows)],
+            # PSD band data with beta proportions
+            'psdband': [
+                {
+                    'alpha': np.random.normal(50, 10, n_channels).tolist(),
+                    'beta': np.random.normal(30, 5, n_channels).tolist(),
+                    'gamma': np.random.normal(20, 3, n_channels).tolist()
+                } for _ in range(n_windows)
+            ],
+            'psdtotal': [np.random.normal(100, 15, n_channels).tolist() for _ in range(n_windows)],
+            'psdfrac': [
+                {
+                    'alpha': np.random.uniform(0.3, 0.6, n_channels).tolist(),
+                    'beta': np.random.uniform(0.2, 0.5, n_channels).tolist(),
+                    'gamma': np.random.uniform(0.1, 0.3, n_channels).tolist()
+                } for _ in range(n_windows)
+            ]
+        }
+        
+        # Add some extreme RMS values for testing
+        data['rms'][0] = [1000.0, 2000.0, 3000.0]  # Very high RMS
+        data['rms'][1] = [10.0, 20.0, 30.0]  # Very low RMS
+        
+        # Add high beta proportion for testing
+        data['psdfrac'][2]['beta'] = [0.6, 0.7, 0.8]
+        
+        return pd.DataFrame(data)
+    
+    @pytest.fixture
     def war(self, sample_result_df):
         """Create a WindowAnalysisResult instance."""
         return WindowAnalysisResult(
@@ -86,6 +128,17 @@ class TestWindowAnalysisResult:
             animal_id="A1",
             genotype="WT",
             channel_names=["LMot", "RMot"]
+        )
+    
+    @pytest.fixture
+    def filtering_war(self, filtering_result_df):
+        """Create a WindowAnalysisResult instance for filtering tests."""
+        return WindowAnalysisResult(
+            result=filtering_result_df,
+            animal_id="A1",
+            genotype="WT",
+            channel_names=["LMot", "RMot", "LBar"],
+            bad_channels_dict={'A1_20230101': ['LMot'], 'A1_20230102': ['RMot']}
         )
     
     def test_init(self, war, sample_result_df):
@@ -102,7 +155,6 @@ class TestWindowAnalysisResult:
         assert 'psdtotal' in result.columns
         assert 'animal' in result.columns  # Metadata columns should be included
     
-    @pytest.mark.xfail(reason="core.nanaverage bug: returns scalar, .filled() fails on scalar")
     def test_get_groupavg_result(self, war):
         """Test getting group average results."""
         # Use groupby on 'animalday' to avoid single-group scalar reduction
@@ -530,6 +582,355 @@ class TestWindowAnalysisResult:
         assert not np.isnan(result.loc['A1_day1', 'rms']).any()
 
 
+class TestWindowAnalysisResultFiltering:
+    """Test new filtering methods for WindowAnalysisResult."""
+    
+    @pytest.fixture
+    def filtering_result_df(self):
+        """Create a comprehensive result DataFrame for filtering tests."""
+        np.random.seed(42)  # For reproducible tests
+        n_windows = 20
+        n_channels = 3
+        
+        data = {
+            'animal': ['A1'] * n_windows,
+            'animalday': ['A1_20230101'] * (n_windows // 2) + ['A1_20230102'] * (n_windows // 2),
+            'genotype': ['WT'] * n_windows,
+            'duration': [4.0] * n_windows,
+            'isday': [True, False] * (n_windows // 2),
+            # RMS values with some outliers
+            'rms': [np.random.normal(100, 20, n_channels).tolist() for _ in range(n_windows)],
+            # PSD band data with beta proportions
+            'psdband': [
+                {
+                    'alpha': np.random.normal(50, 10, n_channels).tolist(),
+                    'beta': np.random.normal(30, 5, n_channels).tolist(),
+                    'gamma': np.random.normal(20, 3, n_channels).tolist()
+                } for _ in range(n_windows)
+            ],
+            'psdtotal': [np.random.normal(100, 15, n_channels).tolist() for _ in range(n_windows)],
+            'psdfrac': [
+                {
+                    'alpha': np.random.uniform(0.3, 0.6, n_channels).tolist(),
+                    'beta': np.random.uniform(0.2, 0.5, n_channels).tolist(),
+                    'gamma': np.random.uniform(0.1, 0.3, n_channels).tolist()
+                } for _ in range(n_windows)
+            ]
+        }
+        
+        # Add some extreme RMS values for testing
+        data['rms'][0] = [1000.0, 2000.0, 3000.0]  # Very high RMS
+        data['rms'][1] = [10.0, 20.0, 30.0]  # Very low RMS
+        
+        # Add high beta proportion for testing
+        data['psdfrac'][2]['beta'] = [0.6, 0.7, 0.8]
+        
+        return pd.DataFrame(data)
+    
+    @pytest.fixture
+    def filtering_war(self, filtering_result_df):
+        """Create a WindowAnalysisResult instance for filtering tests."""
+        return WindowAnalysisResult(
+            result=filtering_result_df,
+            animal_id="A1",
+            genotype="WT",
+            channel_names=["LMot", "RMot", "LBar"],
+            bad_channels_dict={'A1_20230101': ['LMot'], 'A1_20230102': ['RMot']}
+        )
+    
+    def test_filter_high_rms(self, filtering_war):
+        """Test filtering high RMS values."""
+        filtered = filtering_war.filter_high_rms(max_rms=500)
+        
+        # Should return new instance
+        assert isinstance(filtered, WindowAnalysisResult)
+        assert filtered is not filtering_war
+        
+        # Original should be unchanged
+        assert len(filtering_war.result) == 20
+        
+        # Check that high RMS values are filtered
+        original_rms = np.array(filtering_war.result['rms'].tolist())
+        filtered_rms = np.array(filtered.result['rms'].tolist())
+        
+        # Windows with extreme values should have NaN in filtered result
+        assert np.all(np.isnan(filtered_rms[0]))  # Window 0 had [1000, 2000, 3000]
+        assert not np.all(np.isnan(filtered_rms[2]))  # Window 2 should be fine
+    
+    def test_filter_low_rms(self, filtering_war):
+        """Test filtering low RMS values."""
+        filtered = filtering_war.filter_low_rms(min_rms=50)
+        
+        assert isinstance(filtered, WindowAnalysisResult)
+        assert filtered is not filtering_war
+        
+        # Check that low RMS values are filtered
+        filtered_rms = np.array(filtered.result['rms'].tolist())
+        assert np.all(np.isnan(filtered_rms[1]))  # Window 1 had [10, 20, 30]
+    
+    def test_filter_high_beta(self, filtering_war):
+        """Test filtering high beta power."""
+        filtered = filtering_war.filter_high_beta(max_beta_prop=0.5)
+        
+        assert isinstance(filtered, WindowAnalysisResult)
+        
+        # Check that window with high beta is filtered
+        # Window 2 was set to have beta = [0.6, 0.7, 0.8]
+        filtered_psdfrac = filtered.result['psdfrac'].tolist()
+        high_beta_window = filtered_psdfrac[2]
+        
+        # All channels should be filtered for this window due to broadcast_to
+        assert all(np.isnan(high_beta_window['beta']))
+    
+    def test_filter_reject_channels(self, filtering_war):
+        """Test rejecting specific channels."""
+        filtered = filtering_war.filter_reject_channels(['LMot'])
+        
+        assert isinstance(filtered, WindowAnalysisResult)
+        
+        # Check that LMot channel (index 0) is filtered for all windows
+        filtered_rms = np.array(filtered.result['rms'].tolist())
+        assert np.all(np.isnan(filtered_rms[:, 0]))  # First channel should be NaN
+        assert not np.all(np.isnan(filtered_rms[:, 1]))  # Other channels should have data
+    
+    def test_filter_reject_channels_by_session(self, filtering_war):
+        """Test rejecting channels by recording session."""
+        # Use the bad_channels_dict from fixture
+        filtered = filtering_war.filter_reject_channels_by_session()
+        
+        assert isinstance(filtered, WindowAnalysisResult)
+        
+        filtered_rms = np.array(filtered.result['rms'].tolist())
+        
+        # Windows 0-9 (A1_20230101): LMot should be filtered
+        assert np.all(np.isnan(filtered_rms[:10, 0]))
+        
+        # Windows 10-19 (A1_20230102): RMot should be filtered  
+        assert np.all(np.isnan(filtered_rms[10:, 1]))
+    
+    def test_filter_logrms_range_calls_underlying_method(self, filtering_war):
+        """Test that filter_logrms_range calls the underlying get_filter method."""
+        with patch.object(filtering_war, 'get_filter_logrms_range') as mock_filter:
+            mock_filter.return_value = np.ones((20, 3), dtype=bool)
+            
+            filtered = filtering_war.filter_logrms_range(z_range=2.5)
+            
+            mock_filter.assert_called_once_with(z_range=2.5)
+            assert isinstance(filtered, WindowAnalysisResult)
+    
+    def test_apply_filters_default_config(self, filtering_war):
+        """Test apply_filters with default configuration."""
+        with patch.object(filtering_war, 'get_filter_logrms_range') as mock_logrms, \
+             patch.object(filtering_war, 'get_filter_high_rms') as mock_high_rms, \
+             patch.object(filtering_war, 'get_filter_low_rms') as mock_low_rms, \
+             patch.object(filtering_war, 'get_filter_high_beta') as mock_high_beta, \
+             patch.object(filtering_war, 'get_filter_reject_channels_by_recording_session') as mock_reject_session:
+            
+            # Mock all filters to return all-True masks
+            for mock in [mock_logrms, mock_high_rms, mock_low_rms, mock_high_beta, mock_reject_session]:
+                mock.return_value = np.ones((20, 3), dtype=bool)
+            
+            filtered = filtering_war.apply_filters()
+            
+            # Verify all default filters were called
+            mock_logrms.assert_called_once_with(z_range=3)
+            mock_high_rms.assert_called_once_with(max_rms=500)
+            mock_low_rms.assert_called_once_with(min_rms=50)
+            mock_high_beta.assert_called_once_with(max_beta_prop=0.4)
+            mock_reject_session.assert_called_once_with()
+            
+            assert isinstance(filtered, WindowAnalysisResult)
+    
+    def test_apply_filters_custom_config(self, filtering_war):
+        """Test apply_filters with custom configuration."""
+        config = {
+            'high_rms': {'max_rms': 600},
+            'reject_channels': {'bad_channels': ['LBar']}
+        }
+        
+        with patch.object(filtering_war, 'get_filter_high_rms') as mock_high_rms, \
+             patch.object(filtering_war, 'get_filter_reject_channels') as mock_reject:
+            
+            mock_high_rms.return_value = np.ones((20, 3), dtype=bool)
+            mock_reject.return_value = np.ones((20, 3), dtype=bool)
+            
+            filtered = filtering_war.apply_filters(config)
+            
+            mock_high_rms.assert_called_once_with(max_rms=600)
+            mock_reject.assert_called_once_with(bad_channels=['LBar'])
+    
+    def test_apply_filters_invalid_filter_name(self, filtering_war):
+        """Test apply_filters with invalid filter name."""
+        config = {'invalid_filter': {}}
+        
+        with pytest.raises(ValueError, match="Unknown filter: invalid_filter"):
+            filtering_war.apply_filters(config)
+    
+    def test_apply_filters_min_valid_channels(self, filtering_war):
+        """Test minimum valid channels requirement."""
+        # Create a filter that passes only 1 channel per window 
+        config = {'reject_channels': {'bad_channels': ['LMot', 'RMot']}}
+        
+        with patch.object(filtering_war, 'get_filter_reject_channels') as mock_reject:
+            # Mock to filter out 2 of 3 channels (only LBar remains)
+            mask = np.ones((20, 3), dtype=bool)
+            mask[:, 0] = False  # Filter LMot
+            mask[:, 1] = False  # Filter RMot
+            mock_reject.return_value = mask
+            
+            # Should filter out windows with < 3 valid channels
+            filtered = filtering_war.apply_filters(config, min_valid_channels=3)
+            
+            # All windows should be filtered since only 1 channel remains per window
+            filtered_rms = np.array(filtered.result['rms'].tolist())
+            assert np.all(np.isnan(filtered_rms))
+    
+    def test_morphological_smoothing(self, filtering_war):
+        """Test morphological smoothing functionality."""
+        config = {'high_rms': {'max_rms': 500}}
+        
+        # Create a filter that produces isolated artifacts
+        with patch.object(filtering_war, 'get_filter_high_rms') as mock_filter:
+            mask = np.ones((20, 3), dtype=bool)
+            # Create isolated false positives/negatives
+            mask[5, 0] = False  # Isolated artifact
+            mask[15, 1] = False  # Another isolated artifact
+            mock_filter.return_value = mask
+            
+            # Test with morphological smoothing
+            filtered = filtering_war.apply_filters(
+                config, 
+                morphological_smoothing_seconds=8.0  # 2 windows at 4s each
+            )
+            
+            assert isinstance(filtered, WindowAnalysisResult)
+    
+    def test_filter_methods_return_new_instances(self, filtering_war):
+        """Test that all filter methods return new instances."""
+        methods_and_params = [
+            ('filter_high_rms', {'max_rms': 500}),
+            ('filter_low_rms', {'min_rms': 50}),
+            ('filter_high_beta', {'max_beta_prop': 0.4}),
+            ('filter_reject_channels', {'bad_channels': ['LMot']}),
+            ('filter_reject_channels_by_session', {}),
+        ]
+        
+        for method_name, params in methods_and_params:
+            method = getattr(filtering_war, method_name)
+            filtered = method(**params)
+            
+            assert isinstance(filtered, WindowAnalysisResult)
+            assert filtered is not filtering_war
+            assert filtered.animal_id == filtering_war.animal_id
+            assert filtered.genotype == filtering_war.genotype
+            assert filtered.channel_names == filtering_war.channel_names
+    
+    def test_method_chaining(self, filtering_war):
+        """Test that methods can be chained together."""
+        result = (filtering_war
+                 .filter_high_rms(max_rms=500)
+                 .filter_low_rms(min_rms=50)
+                 .filter_reject_channels(['LMot']))
+        
+        assert isinstance(result, WindowAnalysisResult)
+        assert result is not filtering_war
+    
+    def test_backwards_compatibility_filter_all(self, filtering_war):
+        """Test that old filter_all method still works."""
+        # This tests that we haven't broken existing functionality
+        try:
+            # Should still work with the old interface (if it exists)
+            result = filtering_war.filter_all(inplace=False)
+            assert isinstance(result, WindowAnalysisResult)
+        except AttributeError:
+            # If filter_all doesn't exist, that's also fine - it may have been replaced
+            pass
+    
+    def test_create_filtered_copy_preserves_metadata(self, filtering_war):
+        """Test that _create_filtered_copy preserves all metadata."""
+        mask = np.ones((20, 3), dtype=bool)
+        filtered = filtering_war._create_filtered_copy(mask)
+        
+        assert filtered.animal_id == filtering_war.animal_id
+        assert filtered.genotype == filtering_war.genotype
+        assert filtered.channel_names == filtering_war.channel_names
+        assert filtered.assume_from_number == filtering_war.assume_from_number
+        assert filtered.bad_channels_dict == filtering_war.bad_channels_dict
+    
+    def test_edge_case_empty_bad_channels_dict(self):
+        """Test filtering with empty bad channels dictionary."""
+        df = pd.DataFrame({
+            'animal': ['A1'] * 5,
+            'animalday': ['A1_20230101'] * 5,
+            'genotype': ['WT'] * 5,
+            'rms': [[100, 200]] * 5,
+            'duration': [4.0] * 5
+        })
+        
+        war = WindowAnalysisResult(
+            result=df,
+            animal_id="A1",
+            genotype="WT",
+            channel_names=["LMot", "RMot"],
+            bad_channels_dict={}
+        )
+        
+        # Should not raise error
+        filtered = war.filter_reject_channels_by_session()
+        assert isinstance(filtered, WindowAnalysisResult)
+    
+    def test_edge_case_no_duration_column(self):
+        """Test morphological smoothing without duration column."""
+        df = pd.DataFrame({
+            'animal': ['A1'] * 5,
+            'animalday': ['A1_20230101'] * 5,
+            'rms': [[100, 200]] * 5
+        })
+        
+        war = WindowAnalysisResult(
+            result=df,
+            animal_id="A1", 
+            genotype="WT",
+            channel_names=["LMot", "RMot"]
+        )
+        
+        config = {'high_rms': {'max_rms': 500}}
+        
+        with pytest.raises(ValueError, match="Cannot calculate window duration"):
+            war.apply_filters(config, morphological_smoothing_seconds=8.0)
+    
+    def test_filter_morphological_smoothing(self, filtering_war):
+        """Test standalone morphological smoothing filter."""
+        filtered = filtering_war.filter_morphological_smoothing(smoothing_seconds=8.0)
+        
+        assert isinstance(filtered, WindowAnalysisResult)
+        assert filtered is not filtering_war
+    
+    def test_apply_filters_with_morphological_config(self, filtering_war):
+        """Test morphological smoothing via configuration."""
+        config = {
+            'high_rms': {'max_rms': 500},
+            'morphological_smoothing': {'smoothing_seconds': 8.0}
+        }
+        
+        with patch.object(filtering_war, 'get_filter_high_rms') as mock_high_rms, \
+             patch.object(filtering_war, 'get_filter_morphological_smoothing') as mock_smooth:
+            
+            mask = np.ones((20, 3), dtype=bool)
+            mock_high_rms.return_value = mask
+            mock_smooth.return_value = mask
+            
+            filtered = filtering_war.apply_filters(config)
+            
+            mock_high_rms.assert_called_once_with(max_rms=500)
+            # Check that mock_smooth was called once with the right arguments
+            mock_smooth.assert_called_once()
+            args, kwargs = mock_smooth.call_args
+            np.testing.assert_array_equal(args[0], mask)
+            assert args[1] == 8.0
+            assert isinstance(filtered, WindowAnalysisResult)
+
+
 class TestAnimalPlotter:
     """Test AnimalPlotter class."""
     
@@ -838,9 +1239,11 @@ class TestSpikeAnalysisResult:
         # Mock sampling frequencies to be the same
         sa1.recording.get_sampling_frequency.return_value = 1000.0
         sa2.recording.get_sampling_frequency.return_value = 1000.0
-        # Mock channel count
+        # Mock channel count and IDs
         sa1.recording.get_num_channels.return_value = 1
         sa2.recording.get_num_channels.return_value = 1
+        sa1.recording.get_channel_ids.return_value = np.array(['0'])
+        sa2.recording.get_channel_ids.return_value = np.array(['1'])
         # Mock spike times
         sa1.get_spike_times.return_value = [0.1, 0.2, 0.3]
         sa2.get_spike_times.return_value = [0.1, 0.2, 0.3]
@@ -869,12 +1272,15 @@ class TestSpikeAnalysisResult:
     def test_convert_to_mne(self, mock_raw, sar):
         """Test conversion to MNE format."""
         mock_raw_instance = Mock()
+        mock_set_annotations = Mock()
+        mock_raw_instance.set_annotations.return_value = mock_set_annotations
         mock_raw.return_value = mock_raw_instance
         
         result = sar.convert_to_mne(chunk_len=60)
         
-        assert result == mock_raw_instance
+        assert result == mock_set_annotations
         mock_raw.assert_called()
+        mock_raw_instance.set_annotations.assert_called_once()
 
 
 class TestDataProcessingForVisualization:

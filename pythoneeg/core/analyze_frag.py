@@ -1,10 +1,11 @@
 import logging
 from typing import Literal, Dict, List, Any
+import warnings
 
 import numpy as np
 from mne.time_frequency import psd_array_multitaper
-from mne_connectivity import spectral_connectivity_time
-from scipy.integrate import simpson
+from mne_connectivity import spectral_connectivity_time, spectral_connectivity_epochs
+from scipy.integrate import trapezoid
 from scipy.signal import butter, decimate, filtfilt, iirnotch, sosfiltfilt, welch
 from scipy.stats import linregress, pearsonr
 
@@ -74,7 +75,7 @@ class FragmentAnalyzer:
 
     @staticmethod
     def _reshape_np_for_mne(rec: np.ndarray, **kwargs) -> np.ndarray:
-        """Reshape numpy array of (N x M) to (1 x M x N) array for MNE. N = number of samples, M = number of channels."""
+        """Reshape numpy array of (N x M) to (1 x M x N) array for MNE. 1 epoch, M = number of channels, N = number of samples."""
         FragmentAnalyzer._check_rec_np(rec)
         rec = rec[..., np.newaxis]
         return np.transpose(rec, (2, 1, 0))
@@ -162,7 +163,16 @@ class FragmentAnalyzer:
         else:
             f, psd = FragmentAnalyzer.compute_psd(rec, f_s, welch_bin_t, notch_filter, multitaper, **kwargs)
         deltaf = np.median(np.diff(f))
-        return {k: simpson(psd[np.logical_and(f >= v[0], f <= v[1]), :], dx=deltaf, axis=0) for k, v in bands.items()}
+
+        # Integrate each band separately using trapezoidal integration
+        result = {}
+
+        for band_name, (f_low, f_high) in bands.items():
+            # Always use inclusive boundaries for both ends
+            freq_mask = np.logical_and(f >= f_low, f <= f_high)
+            result[band_name] = trapezoid(psd[freq_mask, :], dx=deltaf, axis=0)
+
+        return result
 
     @staticmethod
     def compute_logpsdband(
@@ -207,7 +217,9 @@ class FragmentAnalyzer:
             f, psd = FragmentAnalyzer.compute_psd(rec, f_s, welch_bin_t, notch_filter, multitaper, **kwargs)
         deltaf = np.median(np.diff(f))
 
-        return simpson(psd[np.logical_and(f >= band[0], f <= band[1]), :], dx=deltaf, axis=0)
+        # Use inclusive bounds for total power calculation
+        freq_mask = np.logical_and(f >= band[0], f <= band[1])
+        return trapezoid(psd[freq_mask, :], dx=deltaf, axis=0)
 
     @staticmethod
     def compute_logpsdtotal(
@@ -250,19 +262,11 @@ class FragmentAnalyzer:
         """Compute the power spectral density of bands as a fraction of the total power."""
         FragmentAnalyzer._check_rec_np(rec)
 
-        if precomputed_psdband is not None:
-            psdband = precomputed_psdband
-        else:
-            psdband = FragmentAnalyzer.compute_psdband(
-                rec, f_s, welch_bin_t, notch_filter, bands, multitaper, precomputed_psd=precomputed_psd, **kwargs
-            )
+        psdband = FragmentAnalyzer.compute_psdband(
+            rec, f_s, welch_bin_t, notch_filter, bands, multitaper, precomputed_psd=precomputed_psd**kwargs
+        )
+        psdtotal = sum(psdband.values())
 
-        if precomputed_psdtotal is not None:
-            psdtotal = precomputed_psdtotal
-        else:
-            psdtotal = FragmentAnalyzer.compute_psdtotal(
-                rec, f_s, welch_bin_t, notch_filter, total_band, multitaper, precomputed_psd=precomputed_psd, **kwargs
-            )
         return {k: v / psdtotal for k, v in psdband.items()}
 
     @staticmethod
@@ -283,30 +287,12 @@ class FragmentAnalyzer:
         """Compute the log of the power spectral density of bands as a fraction of the log total power."""
         FragmentAnalyzer._check_rec_np(rec)
 
-        if precomputed_psdfrac is not None:
-            return {k: log_transform(v) for k, v in precomputed_psdfrac.items()}
-        else:
-            if precomputed_psdband is not None:
-                psdband = precomputed_psdband
-            else:
-                psdband = FragmentAnalyzer.compute_psdband(
-                    rec, f_s, welch_bin_t, notch_filter, bands, multitaper, precomputed_psd=precomputed_psd, **kwargs
-                )
+        psd_band = FragmentAnalyzer.compute_psdband(
+            rec, f_s, welch_bin_t, notch_filter, bands, multitaper, precomputed_psd=precomputed_psd**kwargs
+        )
+        psd_total = sum(psd_band.values())
 
-            if precomputed_psdtotal is not None:
-                psd_total = precomputed_psdtotal
-            else:
-                psd_total = FragmentAnalyzer.compute_psdtotal(
-                    rec,
-                    f_s,
-                    welch_bin_t,
-                    notch_filter,
-                    total_band,
-                    multitaper,
-                    precomputed_psd=precomputed_psd,
-                    **kwargs,
-                )
-            return {k: log_transform(v / psd_total) for k, v in psdband.items()}
+        return {k: log_transform(v / psd_total) for k, v in psd_band.items()}
 
     @staticmethod
     def compute_psdslope(
@@ -376,7 +362,7 @@ class FragmentAnalyzer:
         return freqs, n_cycles
 
     @staticmethod
-    def compute_cohere(
+    def compute_coherency(
         rec: np.ndarray,
         f_s: float,
         freq_res: float = 1,
@@ -406,17 +392,18 @@ class FragmentAnalyzer:
         )
 
         try:
-            con = spectral_connectivity_time(
+            con = spectral_connectivity_epochs(
                 rec_mne,
-                freqs=f,
-                method="coh",
-                average=True,
+                # freqs=f,
+                method="cohy",
+                # average=True,
                 faverage=True,
                 mode=mode,
                 fmin=constants.FREQ_MINS,
                 fmax=constants.FREQ_MAXS,
                 sfreq=f_s,
-                n_cycles=n_cycles,
+                cwt_freqs=f,
+                cwt_n_cycles=n_cycles,
                 mt_bandwidth=mt_bandwidth,
                 verbose=False,
             )
@@ -426,26 +413,134 @@ class FragmentAnalyzer:
             ) from e
 
         data = con.get_data()
+        n_channels = rec.shape[1]
+
         out = {}
-        for i in range(data.shape[1]):
-            out[constants.BAND_NAMES[i]] = data[:, i].reshape((rec.shape[1], rec.shape[1]))
+        # Make data symmetric
+        for i, band_name in enumerate(constants.BAND_NAMES):
+            if i >= data.shape[1]:  # Skip if we don't have data for this band
+                warnings.warn(f"No coherence data for band {band_name}")
+                continue
+
+            band_data = data[:, i]
+
+            full_matrix = band_data.reshape((n_channels, n_channels))
+
+            symmetric_matrix = full_matrix.copy()
+            symmetric_matrix = np.triu(symmetric_matrix.T, k=1) + np.tril(symmetric_matrix, k=-1)
+
+            np.fill_diagonal(symmetric_matrix, 1.0)
+
+            out[band_name] = symmetric_matrix
         return out
 
     @staticmethod
+    def compute_cohere(
+        rec: np.ndarray,
+        f_s: float,
+        **kwargs,
+    ) -> np.ndarray:
+        """Compute the coherence of the signal."""
+        FragmentAnalyzer._check_rec_np(rec)
+        cohere = FragmentAnalyzer.compute_coherency(rec, f_s, **kwargs)
+        return {k: np.abs(v) for k, v in cohere.items()}
+
+        # rec_mne = FragmentAnalyzer._reshape_np_for_mne(rec)
+        # rec_mne = decimate(rec_mne, q=downsamp_q, axis=2)  # Along the time axis
+        # f_s = int(f_s / downsamp_q)
+
+        # f, n_cycles = FragmentAnalyzer._get_freqs_cycles(
+        #     rec=rec_mne,
+        #     f_s=f_s,
+        #     freq_res=freq_res,
+        #     geomspace=geomspace,
+        #     mode=mode,
+        #     cwt_n_cycles_max=cwt_n_cycles_max,
+        #     epsilon=epsilon,
+        # )
+
+        # try:
+        #     con = spectral_connectivity_epochs(
+        #         rec_mne,
+        #         freqs=f,
+        #         method="coh",
+        #         average=True,
+        #         faverage=True,
+        #         mode=mode,
+        #         fmin=constants.FREQ_MINS,
+        #         fmax=constants.FREQ_MAXS,
+        #         sfreq=f_s,
+        #         n_cycles=n_cycles,
+        #         mt_bandwidth=mt_bandwidth,
+        #         verbose=False,
+        #     )
+        # except MemoryError as e:
+        #     raise MemoryError(
+        #         "Out of memory. Use a larger freq_res parameter, a smaller n_cycles_max parameter, or a larger downsamp_q parameter"
+        #     ) from e
+
+        # data = con.get_data()
+        # n_channels = rec.shape[1]
+
+        # out = {}
+        # # Make data symmetric
+        # for i, band_name in enumerate(constants.BAND_NAMES):
+        #     if i >= data.shape[1]:  # Skip if we don't have data for this band
+        #         warnings.warn(f"No coherence data for band {band_name}")
+        #         continue
+
+        #     band_data = data[:, i]
+
+        #     full_matrix = band_data.reshape((n_channels, n_channels))
+
+        #     symmetric_matrix = full_matrix.copy()
+        #     symmetric_matrix = np.triu(symmetric_matrix.T, k=1) + np.tril(symmetric_matrix, k=-1)
+
+        #     np.fill_diagonal(symmetric_matrix, 1.0)
+
+        #     out[band_name] = symmetric_matrix
+        # return out
+
+    @staticmethod
     def compute_zcohere(
-        rec: np.ndarray, f_s: float, precomputed_cohere: dict = None, **kwargs
+        rec: np.ndarray, f_s: float, z_epsilon: float = 1e-6, precomputed_cohere=None, **kwargs
     ) -> dict[str, np.ndarray]:
-        """Compute the Fisher z-transformed coherence of the signal."""
+        """Compute the Fisher z-transformed coherence of the signal.
+
+        Args:
+            rec: Input signal array
+            f_s: Sampling frequency
+            z_epsilon: Small value to prevent arctanh(1) = inf. Values are clipped to [-1+z_epsilon, 1-z_epsilon]
+            **kwargs: Additional arguments passed to compute_cohere
+        """
         FragmentAnalyzer._check_rec_np(rec)
 
         if precomputed_cohere is not None:
-            return {k: np.arctanh(v) for k, v in precomputed_cohere.items()}
+            cohere = precomputed_cohere.copy()
         else:
             cohere = FragmentAnalyzer.compute_cohere(rec, f_s, **kwargs)
-            return {k: np.arctanh(v) for k, v in cohere.items()}
+        clip_max = 1.0 - z_epsilon
+        clip_min = -1.0 + z_epsilon
+        return {k: np.arctanh(np.clip(v, clip_min, clip_max)) for k, v in cohere.items()}
 
     @staticmethod
-    def compute_pcorr(rec: np.ndarray, f_s: float, lower_triag: bool = True, **kwargs) -> np.ndarray:
+    def compute_imcoh(rec: np.ndarray, f_s: float, **kwargs) -> dict[str, np.ndarray]:
+        """Compute the imaginary coherence of the signal."""
+        FragmentAnalyzer._check_rec_np(rec)
+        cohere = FragmentAnalyzer.compute_coherency(rec, f_s, **kwargs)
+        return {k: np.imag(v) for k, v in cohere.items()}
+
+    @staticmethod
+    def compute_zimcoh(rec: np.ndarray, f_s: float, z_epsilon: float = 1e-6, **kwargs) -> dict[str, np.ndarray]:
+        """Compute the Fisher z-transformed imaginary coherence of the signal."""
+        FragmentAnalyzer._check_rec_np(rec)
+        imcoh = FragmentAnalyzer.compute_imcoh(rec, f_s, **kwargs)
+        clip_max = 1.0 - z_epsilon
+        clip_min = -1.0 + z_epsilon
+        return {k: np.arctanh(np.clip(v, clip_min, clip_max)) for k, v in imcoh.items()}
+
+    @staticmethod
+    def compute_pcorr(rec: np.ndarray, f_s: float, lower_triag: bool = False, **kwargs) -> np.ndarray:
         """Compute the Pearson correlation coefficient of the signal."""
         FragmentAnalyzer._check_rec_np(rec)
 
@@ -460,15 +555,27 @@ class FragmentAnalyzer:
             return result.correlation
 
     @staticmethod
-    def compute_zpcorr(rec: np.ndarray, f_s: float, precomputed_pcorr: np.ndarray = None, **kwargs) -> np.ndarray:
-        """Compute the Fisher z-transformed Pearson correlation coefficient of the signal."""
+    def compute_zpcorr(
+        rec: np.ndarray, f_s: float, z_epsilon: float = 1e-6, precomputed_pcorr: np.ndarray = None, **kwargs
+    ) -> np.ndarray:
+        """Compute the Fisher z-transformed Pearson correlation coefficient of the signal.
+
+        Args:
+            rec: Input signal array
+            f_s: Sampling frequency
+            z_epsilon: Small value to prevent arctanh(1) = inf. Values are clipped to [-1+z_epsilon, 1-z_epsilon]
+            **kwargs: Additional arguments passed to compute_pcorr
+        """
         FragmentAnalyzer._check_rec_np(rec)
 
         if precomputed_pcorr is not None:
-            return np.arctanh(precomputed_pcorr)
+            pcorr = precomputed_pcorr.copy()
         else:
-            pcorr = FragmentAnalyzer.compute_pcorr(rec, f_s, **kwargs)
-            return np.arctanh(pcorr)
+            # Get full correlation matrix for z-transform
+            pcorr = FragmentAnalyzer.compute_pcorr(rec, f_s, lower_triag=False, **kwargs)
+        clip_max = 1.0 - z_epsilon
+        clip_min = -1.0 + z_epsilon
+        return np.arctanh(np.clip(pcorr, clip_min, clip_max))
 
     @staticmethod
     def compute_nspike(rec: np.ndarray, **kwargs):
