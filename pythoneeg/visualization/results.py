@@ -57,14 +57,14 @@ class AnimalFeatureParser:
                 | "psdslope"
             ):
                 col_agg = np.array(column.tolist())
-                avg = core.nanaverage(col_agg, axis=0, weights=weights)
+                avg = core.nanaverage(col_agg, axis=0, weights=weights) # STUB fix this to handle symmetric matrices for pcorr etc.
 
             case "cohere" | "zcohere" | "imcoh" | "zimcoh" | "psdband" | "psdfrac" | "logpsdband" | "logpsdfrac":
                 keys = colitem.keys()
                 avg = {}
                 for k in keys:
                     v = np.array([d[k] for d in column])
-                    avg[k] = core.nanaverage(v, axis=0, weights=weights)
+                    avg[k] = core.nanaverage(v, axis=0, weights=weights) # STUB fix this to handle symmetric matrices for cohere, imcoh, etc.
 
             case "psd":
                 coords = colitem[0]
