@@ -83,6 +83,11 @@ class TestConstants:
         assert "rms" in constants.LINEAR_FEATURES
         assert "psdband" in constants.BAND_FEATURES
         assert "cohere" in constants.MATRIX_FEATURES
+        assert "zcohere" in constants.MATRIX_FEATURES
+        assert "imcoh" in constants.MATRIX_FEATURES
+        assert "zimcoh" in constants.MATRIX_FEATURES
+        assert "pcorr" in constants.MATRIX_FEATURES
+        assert "zpcorr" in constants.MATRIX_FEATURES
         assert "psd" in constants.HIST_FEATURES
         
     def test_feature_plot_height_ratios(self):
