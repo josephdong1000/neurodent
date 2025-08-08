@@ -4,6 +4,7 @@ Integration tests for PythonEEG package.
 import numpy as np
 import pandas as pd
 import pytest
+import warnings
 from pathlib import Path
 from unittest.mock import patch, Mock, MagicMock
 
@@ -192,7 +193,9 @@ class TestCoreModuleIntegration:
         assert np.isclose(multiplier, 1000.0)
         
         # Test log transformation
-        log_data = utils.log_transform(test_data)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            log_data = utils.log_transform(test_data)
         assert log_data.shape == test_data.shape
         
         # Test data processing utilities
