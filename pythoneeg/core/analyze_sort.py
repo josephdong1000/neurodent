@@ -5,14 +5,21 @@ import warnings
 from pathlib import Path
 from typing import Literal
 
-import dask
-import dask.distributed
+try:
+    import dask
+    import dask.distributed
+except Exception:  # pragma: no cover - optional at import time
+    dask = None
 import matplotlib.pyplot as plt
 import numpy as np
 import probeinterface as pi
 import probeinterface.plotting as pi_plotting
-import spikeinterface.core as si
-import spikeinterface.preprocessing as spre
+try:
+    import spikeinterface.core as si
+    import spikeinterface.preprocessing as spre
+except Exception:  # pragma: no cover
+    si = None
+    spre = None
 from mountainsort5 import Scheme2SortingParameters, sorting_scheme2
 from mountainsort5.util import create_cached_recording
 
@@ -23,8 +30,8 @@ from .utils import _HiddenPrints, get_temp_directory
 class MountainSortAnalyzer:
     @staticmethod
     def sort_recording(
-        recording: si.BaseRecording, plot_probe=False, multiprocess_mode: Literal["dask", "serial"] = "serial"
-    ) -> tuple[list[si.BaseSorting], list[si.BaseRecording]]:
+        recording: "si.BaseRecording", plot_probe=False, multiprocess_mode: Literal["dask", "serial"] = "serial"
+    ) -> tuple[list["si.BaseSorting"], list["si.BaseRecording"]]:
         """Sort a recording using MountainSort.
 
         Args:
@@ -38,6 +45,8 @@ class MountainSortAnalyzer:
         logging.debug(f"Sorting recording info: {recording}")
         logging.debug(f"Sorting recording channel names: {recording.get_channel_ids()}")
 
+        if si is None or spre is None:
+            raise ImportError("spikeinterface is required for sorting")
         rec = recording.clone()
         probe = MountainSortAnalyzer._get_dummy_probe(rec)
         rec = rec.set_probe(probe)
@@ -58,6 +67,8 @@ class MountainSortAnalyzer:
         # Run sorting
         match multiprocess_mode:
             case "dask":
+                if dask is None:
+                    raise ImportError("dask is required for multiprocess_mode='dask'")
                 cached_recs = [dask.delayed(MountainSortAnalyzer._cache_recording)(sort_rec) for sort_rec in sort_recs]
                 sortings = [dask.delayed(MountainSortAnalyzer._run_sorting)(cached_rec) for cached_rec in cached_recs]
             case "serial":

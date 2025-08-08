@@ -1,16 +1,23 @@
-import logging
 from typing import Literal, Dict, List, Any
 import warnings
 
 import numpy as np
-from mne.time_frequency import psd_array_multitaper
-from mne_connectivity import spectral_connectivity_time, spectral_connectivity_epochs
+
+try:
+    from mne.time_frequency import psd_array_multitaper
+except Exception:  # pragma: no cover - optional at import time
+    psd_array_multitaper = None
+try:  # keep optional to allow running light tests that do not exercise connectivity
+    from mne_connectivity import spectral_connectivity_time, spectral_connectivity_epochs
+except Exception:  # pragma: no cover - optional at import time
+    spectral_connectivity_time = None
+    spectral_connectivity_epochs = None
 from scipy.integrate import trapezoid
 from scipy.signal import butter, decimate, filtfilt, iirnotch, sosfiltfilt, welch
 from scipy.stats import linregress, pearsonr
 
 from .. import constants
-from ..core import log_transform
+# Do not import utils at module import time to avoid heavy optional deps; import where used
 
 
 class FragmentAnalyzer:
@@ -92,6 +99,9 @@ class FragmentAnalyzer:
     def compute_logrms(rec: np.ndarray, precomputed_rms: np.ndarray = None, **kwargs) -> np.ndarray:
         """Compute the log of the root mean square of the signal."""
         FragmentAnalyzer._check_rec_np(rec)
+        # Local import to avoid importing heavy dependencies from utils at module import time
+        from .utils import log_transform
+
         if precomputed_rms is not None:
             return log_transform(precomputed_rms)
         else:
@@ -107,6 +117,9 @@ class FragmentAnalyzer:
     def compute_logampvar(rec: np.ndarray, precomputed_ampvar: np.ndarray = None, **kwargs) -> np.ndarray:
         """Compute the log of the amplitude variance of the signal."""
         FragmentAnalyzer._check_rec_np(rec)
+        # Local import to avoid importing heavy dependencies from utils at module import time
+        from .utils import log_transform
+
         if precomputed_ampvar is not None:
             return log_transform(precomputed_ampvar)
         else:
@@ -131,6 +144,8 @@ class FragmentAnalyzer:
         if not multitaper:
             f, psd = welch(rec, fs=f_s, nperseg=round(welch_bin_t * f_s), axis=0)
         else:
+            if psd_array_multitaper is None:
+                raise ImportError("mne is required for multitaper PSD; install mne or set multitaper=False")
             # REVIEW psd calulation will give different bins if using multitaper
             psd, f = psd_array_multitaper(
                 rec.transpose(),
@@ -189,6 +204,9 @@ class FragmentAnalyzer:
         """Compute the log of the power spectral density of the signal for each frequency band."""
         FragmentAnalyzer._check_rec_np(rec)
 
+        # Local import to avoid importing heavy dependencies from utils at module import time
+        from .utils import log_transform
+
         if precomputed_psdband is not None:
             psd = precomputed_psdband
         else:
@@ -235,6 +253,9 @@ class FragmentAnalyzer:
     ) -> np.ndarray:
         """Compute the log of the total power spectral density of the signal."""
         FragmentAnalyzer._check_rec_np(rec)
+
+        # Local import to avoid importing heavy dependencies from utils at module import time
+        from .utils import log_transform
 
         if precomputed_psdtotal is not None:
             return log_transform(precomputed_psdtotal)
@@ -291,6 +312,8 @@ class FragmentAnalyzer:
             rec, f_s, welch_bin_t, notch_filter, bands, multitaper, precomputed_psd=precomputed_psd, **kwargs
         )
         psd_total = sum(psd_band.values())
+        # Local import to avoid importing heavy dependencies from utils at module import time
+        from .utils import log_transform
 
         return {k: log_transform(v / psd_total) for k, v in psd_band.items()}
 
@@ -391,6 +414,8 @@ class FragmentAnalyzer:
             epsilon=epsilon,
         )
 
+        if spectral_connectivity_epochs is None:
+            raise ImportError("mne_connectivity is required for connectivity computations")
         try:
             con = spectral_connectivity_epochs(
                 rec_mne,
@@ -585,6 +610,9 @@ class FragmentAnalyzer:
     @staticmethod
     def compute_lognspike(rec: np.ndarray, precomputed_nspike: np.ndarray = None, **kwargs):
         """Returns None. Compute and load in spikes with SpikeAnalysisResult"""
+        # Local import to avoid importing heavy dependencies from utils at module import time
+        from .utils import log_transform
+
         if precomputed_nspike is not None:
             return log_transform(precomputed_nspike)
         else:

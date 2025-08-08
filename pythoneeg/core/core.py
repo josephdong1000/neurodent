@@ -9,7 +9,10 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Callable, Literal, Union
 
-import dask
+try:
+    import dask
+except Exception:  # pragma: no cover - optional at import time for tests that don't use dask
+    dask = None
 import mne
 import numpy as np
 import pandas as pd

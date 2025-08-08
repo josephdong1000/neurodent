@@ -1,10 +1,20 @@
 from typing import Literal
 
 import numpy as np
-import spikeinterface.core as si
-from mne import set_config
-from mne.time_frequency import csd_array_fourier
-from mne_connectivity import envelope_correlation
+try:
+    import spikeinterface.core as si
+except Exception:  # pragma: no cover - optional at import time for tests not using spikeinterface
+    si = None
+try:
+    from mne import set_config
+    from mne.time_frequency import csd_array_fourier
+except Exception:  # pragma: no cover
+    set_config = None
+    csd_array_fourier = None
+try:
+    from mne_connectivity import envelope_correlation
+except Exception:  # pragma: no cover
+    envelope_correlation = None
 from scipy.interpolate import Akima1DInterpolator
 
 from .. import constants, core
@@ -24,7 +34,7 @@ class LongRecordingAnalyzer:
         self.f_s = int(longrecording.LongRecording.get_sampling_frequency())
         self.notch_freq = notch_freq
 
-    def get_fragment_rec(self, index) -> si.BaseRecording:
+    def get_fragment_rec(self, index) -> "si.BaseRecording":
         """Get window at index as a spikeinterface recording object
 
         Args:
@@ -33,6 +43,8 @@ class LongRecordingAnalyzer:
         Returns:
             si.BaseRecording: spikeinterface recording object
         """
+        if si is None:
+            raise ImportError("spikeinterface is required for get_fragment_rec")
         return self.LongRecording.get_fragment(self.fragment_len_s, index)
 
     def get_fragment_np(self, index, recobj=None) -> np.ndarray:
@@ -45,7 +57,8 @@ class LongRecordingAnalyzer:
         Returns:
             np.ndarray: Numpy array with dimensions (N, M), N = number of samples, M = number of channels. Values in uV
         """
-        assert isinstance(recobj, si.BaseRecording) or recobj is None
+        if si is not None:
+            assert isinstance(recobj, si.BaseRecording) or recobj is None
         if recobj is None:
             return self.get_fragment_rec(index).get_traces(
                 return_scaled=True

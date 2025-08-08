@@ -9,9 +9,6 @@ from scipy.integrate import trapezoid
 
 from pythoneeg.core.analyze_frag import FragmentAnalyzer
 from pythoneeg import constants
-from pythoneeg.core import analysis
-from pythoneeg.core import LongRecordingOrganizer
-
 
 class TestFragmentAnalyzer:
     """Test FragmentAnalyzer static methods."""

@@ -12,7 +12,10 @@ import warnings
 import numpy as np
 import pandas as pd
 import pytest
-import spikeinterface.core as si
+try:
+    import spikeinterface.core as si
+except Exception:
+    si = None
 
 from pythoneeg.core.core import (
     DDFBinaryMetadata,
