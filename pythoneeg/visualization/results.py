@@ -1352,6 +1352,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             "channel_names": self.channel_abbrevs if save_abbrevs_as_chnames else self.channel_names,
             "assume_from_number": False if save_abbrevs_as_chnames else self.assume_from_number,
             "bad_channels_dict": self.bad_channels_dict,
+            "suppress_short_interval_error": self.suppress_short_interval_error,
         }
 
         with open(filebase + ".json", "w") as f:
