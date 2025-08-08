@@ -63,9 +63,10 @@ def __getattr__(name: str) -> Any:  # PEP 562 lazy imports
 
         return FragmentAnalyzer
 
-    if name in {"get_temp_directory", "nanaverage", "log_transform", "parse_chname_to_abbrev"}:
+    if name in {"get_temp_directory", "set_temp_directory", "nanaverage", "log_transform", "parse_chname_to_abbrev"}:
         from .utils import (
             get_temp_directory,
+            set_temp_directory,
             nanaverage,
             log_transform,
             parse_chname_to_abbrev,
@@ -73,6 +74,7 @@ def __getattr__(name: str) -> Any:  # PEP 562 lazy imports
 
         return {
             "get_temp_directory": get_temp_directory,
+            "set_temp_directory": set_temp_directory,
             "nanaverage": nanaverage,
             "log_transform": log_transform,
             "parse_chname_to_abbrev": parse_chname_to_abbrev,
