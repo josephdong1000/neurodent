@@ -21,8 +21,8 @@ logging.basicConfig(
 logger = logging.getLogger()
 
 base_folder = Path("/mnt/isilon/marsh_single_unit/PythonEEG")
-load_folder = base_folder / "notebooks" / "tests" / "test-wars-sox5-7"
-save_folder = base_folder / "notebooks" / "tests" / "test-wars-sox5-collapsed-7-isday"
+load_folder = base_folder / "notebooks" / "tests" / "test-wars-sox5-8"
+save_folder = base_folder / "notebooks" / "tests" / "test-wars-sox5-collapsed-8-isday"
 # animal_ids = ['A5', 'A10', 'F22', 'G25', 'G26', 'N21', 'N22', 'N23', 'N24', 'N25']
 # animal_ids = ['A5', 'A10']
 animal_ids = [p.name for p in load_folder.glob("*") if p.is_dir()]
