@@ -263,7 +263,7 @@ class FragmentAnalyzer:
         FragmentAnalyzer._check_rec_np(rec)
 
         psdband = FragmentAnalyzer.compute_psdband(
-            rec, f_s, welch_bin_t, notch_filter, bands, multitaper, precomputed_psd=precomputed_psd**kwargs
+            rec, f_s, welch_bin_t, notch_filter, bands, multitaper, precomputed_psd=precomputed_psd, **kwargs
         )
         psdtotal = sum(psdband.values())
 
@@ -288,7 +288,7 @@ class FragmentAnalyzer:
         FragmentAnalyzer._check_rec_np(rec)
 
         psd_band = FragmentAnalyzer.compute_psdband(
-            rec, f_s, welch_bin_t, notch_filter, bands, multitaper, precomputed_psd=precomputed_psd**kwargs
+            rec, f_s, welch_bin_t, notch_filter, bands, multitaper, precomputed_psd=precomputed_psd, **kwargs
         )
         psd_total = sum(psd_band.values())
 
