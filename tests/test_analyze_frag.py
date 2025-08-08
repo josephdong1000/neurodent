@@ -687,13 +687,11 @@ class TestFragmentAnalyzer:
         actual_freq_res = np.median(np.diff(freqs))
         assert abs(actual_freq_res - expected_freq_res) / expected_freq_res < 0.5, \
             f"Frequency resolution {actual_freq_res:.3f} should be close to {expected_freq_res}"
-        
-        # Test that n_cycles increases with frequency (typical CWT behavior)
+
+        # Test that n_cycles is monotonically increasing with frequency
         freq_sorted_indices = np.argsort(freqs)
         cycles_sorted = n_cycles[freq_sorted_indices]
-        # Allow for some noise but expect general increasing trend
-        assert np.corrcoef(freqs[freq_sorted_indices], cycles_sorted)[0, 1] > 0.5, \
-            "Number of cycles should generally increase with frequency"
+        assert np.all(np.diff(cycles_sorted) >= 0), "Number of cycles should monotonically increase with frequency"
     
     def test_get_freqs_cycles_multitaper(self, sample_rec_3d):
         """Test _get_freqs_cycles with multitaper mode."""
