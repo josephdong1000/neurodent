@@ -43,6 +43,7 @@ Python scientific computing package for extracting features from mouse EEG recor
 - Research the best practices for codebase design decisions
 - Make minimal changes unless instructed otherwise
 - Avoid overdocumenting code that is self-explanatory, particularly inline comments
+- Typehints are great -- use them
 
 **Error handling:** 
 - Return `np.nan` for math failures, insufficient data, undefined results
