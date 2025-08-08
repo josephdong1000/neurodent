@@ -3,6 +3,7 @@ Unit tests for pythoneeg.core.analyze_frag module.
 """
 import numpy as np
 import pytest
+import warnings
 from unittest.mock import patch, Mock, MagicMock
 from scipy.integrate import trapezoid
 
@@ -20,9 +21,9 @@ class TestFragmentAnalyzer:
     def sample_rec_2d(self):
         """Create a 2D sample recording array (N_samples x N_channels)."""
         np.random.seed(42)  # For reproducible tests
-        n_samples, n_channels = 1000, 4
+        n_samples, n_channels = 6000, 4  # 6 seconds at 1000 Hz for reliable spectral estimates
         # Create a realistic EEG-like signal with different frequencies per channel
-        t = np.linspace(0, 1, n_samples)
+        t = np.linspace(0, 6, n_samples)  # 6 seconds for >=5 cycles at 1 Hz
         data = np.zeros((n_samples, n_channels))
         
         # Channel 0: 10 Hz sine wave + noise
@@ -39,15 +40,33 @@ class TestFragmentAnalyzer:
         return data.astype(np.float32)
     
     @pytest.fixture
+    def sample_rec_2d_short(self):
+        """Create a short 2D sample recording array for non-spectral tests."""
+        np.random.seed(42)  # For reproducible tests
+        n_samples, n_channels = 1000, 4  # 1 second - sufficient for amplitude/variance tests
+        t = np.linspace(0, 1, n_samples)
+        data = np.zeros((n_samples, n_channels))
+        
+        # Same signal patterns as longer version
+        data[:, 0] = 100 * np.sin(2 * np.pi * 10 * t) + 10 * np.random.randn(n_samples)
+        data[:, 1] = 80 * np.sin(2 * np.pi * 20 * t) + 15 * np.random.randn(n_samples)
+        data[:, 2] = (50 * np.sin(2 * np.pi * 5 * t) + 
+                     30 * np.sin(2 * np.pi * 15 * t) + 
+                     20 * np.random.randn(n_samples))
+        data[:, 3] = 60 * np.sin(2 * np.pi * 30 * t) + 25 * np.random.randn(n_samples)
+        
+        return data.astype(np.float32)
+    
+    @pytest.fixture
     def sample_rec_3d(self, sample_rec_2d):
         """Create a 3D sample recording array for MNE (1 x N_channels x N_samples)."""
         return sample_rec_2d.T[np.newaxis, :, :]  # (1, n_channels, n_samples)
     
     # Input Validation Tests
-    def test_check_rec_np_valid(self, sample_rec_2d):
+    def test_check_rec_np_valid(self, sample_rec_2d_short):
         """Test _check_rec_np with valid 2D array."""
         # Should not raise any exception
-        FragmentAnalyzer._check_rec_np(sample_rec_2d)
+        FragmentAnalyzer._check_rec_np(sample_rec_2d_short)
     
     def test_check_rec_np_invalid_type(self):
         """Test _check_rec_np with invalid input type."""
@@ -85,71 +104,71 @@ class TestFragmentAnalyzer:
             FragmentAnalyzer._check_rec_mne(np.random.randn(2, 4, 10))
     
     # Data Transformation Tests
-    def test_reshape_np_for_mne(self, sample_rec_2d):
+    def test_reshape_np_for_mne(self, sample_rec_2d_short):
         """Test _reshape_np_for_mne conversion."""
-        n_samples, n_channels = sample_rec_2d.shape
-        result = FragmentAnalyzer._reshape_np_for_mne(sample_rec_2d)
+        n_samples, n_channels = sample_rec_2d_short.shape
+        result = FragmentAnalyzer._reshape_np_for_mne(sample_rec_2d_short)
         
         # Check output shape: (1, n_channels, n_samples)
         assert result.shape == (1, n_channels, n_samples)
         
         # Check data integrity (first sample, all channels)
         np.testing.assert_array_almost_equal(
-            result[0, :, 0], sample_rec_2d[0, :], decimal=5
+            result[0, :, 0], sample_rec_2d_short[0, :], decimal=5
         )
     
     # Basic Amplitude Features
-    def test_compute_rms(self, sample_rec_2d):
+    def test_compute_rms(self, sample_rec_2d_short):
         """Test compute_rms function."""
-        result = FragmentAnalyzer.compute_rms(sample_rec_2d)
+        result = FragmentAnalyzer.compute_rms(sample_rec_2d_short)
         
         # Check output shape: should be (n_channels,)
-        assert result.shape == (sample_rec_2d.shape[1],)
+        assert result.shape == (sample_rec_2d_short.shape[1],)
         
         # Check that all RMS values are positive
         assert np.all(result > 0)
         
         # Manually compute RMS for first channel and compare
-        expected_rms_ch0 = np.sqrt(np.mean(sample_rec_2d[:, 0] ** 2))
+        expected_rms_ch0 = np.sqrt(np.mean(sample_rec_2d_short[:, 0] ** 2))
         # Use decimal=4 for float32 precision (was decimal=5)
         np.testing.assert_array_almost_equal(result[0], expected_rms_ch0, decimal=4)
     
-    def test_compute_logrms(self, sample_rec_2d):
+    def test_compute_logrms(self, sample_rec_2d_short):
         """Test compute_logrms function."""
-        result = FragmentAnalyzer.compute_logrms(sample_rec_2d)
+        result = FragmentAnalyzer.compute_logrms(sample_rec_2d_short)
         
         # Check output shape
-        assert result.shape == (sample_rec_2d.shape[1],)
+        assert result.shape == (sample_rec_2d_short.shape[1],)
         
         # Compare with manual calculation
-        rms_values = FragmentAnalyzer.compute_rms(sample_rec_2d)
+        rms_values = FragmentAnalyzer.compute_rms(sample_rec_2d_short)
         expected_logrms = np.log(rms_values + 1)
         np.testing.assert_array_almost_equal(result, expected_logrms, decimal=5)
     
-    def test_compute_ampvar(self, sample_rec_2d):
+    def test_compute_ampvar(self, sample_rec_2d_short):
         """Test compute_ampvar function."""
-        result = FragmentAnalyzer.compute_ampvar(sample_rec_2d)
+        result = FragmentAnalyzer.compute_ampvar(sample_rec_2d_short)
         
         # Check output shape
-        assert result.shape == (sample_rec_2d.shape[1],)
+        assert result.shape == (sample_rec_2d_short.shape[1],)
         
         # Check that all variance values are non-negative
         assert np.all(result >= 0)
         
         # Manually compute variance for first channel and compare
-        expected_var_ch0 = np.std(sample_rec_2d[:, 0]) ** 2
+        expected_var_ch0 = np.std(sample_rec_2d_short[:, 0]) ** 2
         # Use decimal=3 for float32 precision (was decimal=5)
         np.testing.assert_array_almost_equal(result[0], expected_var_ch0, decimal=3)
     
-    def test_compute_logampvar(self, sample_rec_2d):
+    def test_compute_logampvar(self, sample_rec_2d_short):
         """Test compute_logampvar function."""
-        result = FragmentAnalyzer.compute_logampvar(sample_rec_2d)
+        result = FragmentAnalyzer.compute_logampvar(sample_rec_2d_short)
         
         # Check output shape
-        assert result.shape == (sample_rec_2d.shape[1],)
+        assert result.shape == (sample_rec_2d_short.shape[1],)
         
         # Compare with manual calculation
-        ampvar_values = FragmentAnalyzer.compute_ampvar(sample_rec_2d)
+        ampvar_values = FragmentAnalyzer.compute_ampvar(sample_rec_2d_short)
         expected_logampvar = np.log(ampvar_values + 1)
         np.testing.assert_array_almost_equal(result, expected_logampvar, decimal=5)
     
@@ -399,44 +418,51 @@ class TestFragmentAnalyzer:
         ampvar = FragmentAnalyzer.compute_ampvar(single_channel_data)
         assert ampvar.shape == (1,)
         
-        f, psd = FragmentAnalyzer.compute_psd(single_channel_data, f_s=1000, notch_filter=False)
-        assert psd.shape[1] == 1
+        # PSD with short single-channel signals may generate scipy warnings about nperseg
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)  # Ignore scipy nperseg warnings
+            f, psd = FragmentAnalyzer.compute_psd(single_channel_data, f_s=1000, notch_filter=False)
+            assert psd.shape[1] == 1
 
         # Test all compute functions with single channel data
         f_s = 1000.0
         
-        # Test band power functions
-        psdband = FragmentAnalyzer.compute_psdband(single_channel_data, f_s=f_s)
-        assert isinstance(psdband, dict)
-        for band_power in psdband.values():
-            assert band_power.shape == (1,)
+        # All PSD-based functions may generate scipy warnings for short/single-channel signals
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)  # Ignore scipy nperseg warnings
             
-        logpsdband = FragmentAnalyzer.compute_logpsdband(single_channel_data, f_s=f_s)
-        assert isinstance(logpsdband, dict)
-        for band_power in logpsdband.values():
-            assert band_power.shape == (1,)
+            # Test band power functions
+            psdband = FragmentAnalyzer.compute_psdband(single_channel_data, f_s=f_s)
+            assert isinstance(psdband, dict)
+            for band_power in psdband.values():
+                assert band_power.shape == (1,)
+                
+            logpsdband = FragmentAnalyzer.compute_logpsdband(single_channel_data, f_s=f_s)
+            assert isinstance(logpsdband, dict)
+            for band_power in logpsdband.values():
+                assert band_power.shape == (1,)
 
-        # Test total power functions  
-        psdtotal = FragmentAnalyzer.compute_psdtotal(single_channel_data, f_s=f_s)
-        assert psdtotal.shape == (1,)
-        
-        logpsdtotal = FragmentAnalyzer.compute_logpsdtotal(single_channel_data, f_s=f_s)
-        assert logpsdtotal.shape == (1,)
-
-        # Test fractional power functions
-        psdfrac = FragmentAnalyzer.compute_psdfrac(single_channel_data, f_s=f_s)
-        assert isinstance(psdfrac, dict)
-        for band_frac in psdfrac.values():
-            assert band_frac.shape == (1,)
+            # Test total power functions  
+            psdtotal = FragmentAnalyzer.compute_psdtotal(single_channel_data, f_s=f_s)
+            assert psdtotal.shape == (1,)
             
-        logpsdfrac = FragmentAnalyzer.compute_logpsdfrac(single_channel_data, f_s=f_s)
-        assert isinstance(logpsdfrac, dict)
-        for band_frac in logpsdfrac.values():
-            assert band_frac.shape == (1,)
+            logpsdtotal = FragmentAnalyzer.compute_logpsdtotal(single_channel_data, f_s=f_s)
+            assert logpsdtotal.shape == (1,)
 
-        # Test PSD slope
-        psdslope = FragmentAnalyzer.compute_psdslope(single_channel_data, f_s=f_s)
-        assert psdslope.shape == (1, 2)  # slope and intercept
+            # Test fractional power functions
+            psdfrac = FragmentAnalyzer.compute_psdfrac(single_channel_data, f_s=f_s)
+            assert isinstance(psdfrac, dict)
+            for band_frac in psdfrac.values():
+                assert band_frac.shape == (1,)
+                
+            logpsdfrac = FragmentAnalyzer.compute_logpsdfrac(single_channel_data, f_s=f_s)
+            assert isinstance(logpsdfrac, dict)
+            for band_frac in logpsdfrac.values():
+                assert band_frac.shape == (1,)
+
+            # Test PSD slope
+            psdslope = FragmentAnalyzer.compute_psdslope(single_channel_data, f_s=f_s)
+            assert psdslope.shape == (1, 2)  # slope and intercept
 
         # Test correlation functions (single channel should give 1x1 matrix)
         pcorr = FragmentAnalyzer.compute_pcorr(single_channel_data, f_s=f_s)
@@ -459,13 +485,17 @@ class TestFragmentAnalyzer:
         ampvar = FragmentAnalyzer.compute_ampvar(short_signal)
         assert ampvar.shape == (2,)
         
-        try:
-            f, psd = FragmentAnalyzer.compute_psd(short_signal, f_s=100, notch_filter=False)
-            assert psd.shape[1] == 2
-        except ValueError as e:
-            # PSD computation might fail for very short signals due to insufficient data for windowing
-            assert "nperseg" in str(e).lower() or "window" in str(e).lower(), \
-                f"Expected windowing-related error, got: {e}"
+        # PSD with very short signals will generate expected scipy warnings about nperseg
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", UserWarning)  # Ignore scipy nperseg warnings
+            
+            try:
+                f, psd = FragmentAnalyzer.compute_psd(short_signal, f_s=100, notch_filter=False)
+                assert psd.shape[1] == 2
+            except ValueError as e:
+                # PSD computation might fail for very short signals due to insufficient data for windowing
+                assert "nperseg" in str(e).lower() or "window" in str(e).lower(), \
+                    f"Expected windowing-related error, got: {e}"
 
         # Test other functions with short signals - most should handle gracefully
         f_s = 100.0
@@ -788,6 +818,43 @@ class TestFragmentAnalyzer:
         # Check that it's lower triangular (upper triangle above diagonal should be zero)
         # Note: diagonal is preserved, only strict upper triangle (k=1) should be zero
         assert np.allclose(np.triu(result_lower, k=1), 0)
+    
+    def test_short_signal_warnings(self, sample_rec_2d_short):
+        """Test that short signals appropriately warn about insufficient cycles."""
+        # This test verifies that the warning system is working correctly
+        # Short signals (1 second) should warn about insufficient cycles for 1 Hz analysis
+        
+        with pytest.warns(RuntimeWarning, match="fmin=.*Hz corresponds to.*< 5 cycles"):
+            # This should generate a warning because 1 Hz needs 5 seconds for 5 cycles
+            FragmentAnalyzer.compute_cohere(sample_rec_2d_short, constants.GLOBAL_SAMPLING_RATE)
+    
+    def test_long_signal_no_warnings(self, sample_rec_2d):
+        """Test that appropriately long signals don't generate cycle warnings."""
+        # This test verifies that longer signals (6 seconds) don't warn about insufficient cycles
+        
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")  # Capture all warnings
+            FragmentAnalyzer.compute_cohere(sample_rec_2d, constants.GLOBAL_SAMPLING_RATE)
+            
+            # Filter out non-MNE warnings (benchmark warnings are expected in test environment)
+            mne_warnings = [warning for warning in w if "cycles" in str(warning.message)]
+            assert len(mne_warnings) == 0, f"Unexpected cycle warnings: {[str(w.message) for w in mne_warnings]}"
+
+    def test_compute_pcorr(self, sample_rec_2d):
+        """Test compute_pcorr function."""
+        f_s = constants.GLOBAL_SAMPLING_RATE
+        n_channels = sample_rec_2d.shape[1]
+        
+        # Test with lower triangle
+        result_lower = FragmentAnalyzer.compute_pcorr(
+            sample_rec_2d, f_s=f_s, lower_triag=True
+        )
+        
+        assert result_lower.shape == (n_channels, n_channels)
+        
+        # Check that it's lower triangular (upper triangle above diagonal should be zero)
+        # Note: diagonal is preserved, only strict upper triangle (k=1) should be zero
+        assert np.allclose(np.triu(result_lower, k=1), 0)
         
         # Test with full matrix
         result_full = FragmentAnalyzer.compute_pcorr(
@@ -871,7 +938,7 @@ class TestFragmentAnalyzer:
         """Test memory error handling in compute_cohere."""
         f_s = 1000.0
         
-        with patch('pythoneeg.core.analyze_frag.spectral_connectivity_time') as mock_connectivity:
+        with patch('pythoneeg.core.analyze_frag.spectral_connectivity_epochs') as mock_connectivity:
             # Make the connectivity function raise a MemoryError
             mock_connectivity.side_effect = MemoryError("Test memory error")
             
@@ -1113,7 +1180,7 @@ class TestFragmentAnalyzerMathematicalVerification:
 
     def test_coherence_mathematical_properties(self):
         """Test coherence behaves similarly to correlation for basic cases."""
-        n_samples = 4000  # Longer signal for better spectral estimation
+        n_samples = 6000  # 6 seconds at 1000 Hz for reliable spectral estimation
         fs = constants.GLOBAL_SAMPLING_RATE
         np.random.seed(202)
         
