@@ -1269,3 +1269,40 @@ class TestFragmentAnalyzerMathematicalVerification:
             expected_ratio = 2.0 + amplitude  # Higher amplitude should give higher ratio
             assert target_power > expected_ratio * max_neighbor_power, \
                 f"Peak power ({target_power:.3f}) should be >{expected_ratio:.1f}x higher than neighbors ({max_neighbor_power:.3f})"
+
+    def test_pcorr_analyzer_consistency(self):
+        """Test that FragmentAnalyzer and LongRecordingAnalyzer produce consistent pcorr results."""
+        np.random.seed(42)
+        signals = np.random.randn(1000, 4).astype(np.float32)
+        
+        # FragmentAnalyzer default behavior
+        fa_result = FragmentAnalyzer.compute_pcorr(signals, constants.GLOBAL_SAMPLING_RATE)
+        
+        # Create LongRecordingAnalyzer setup
+        from pythoneeg.core.analysis import LongRecordingAnalyzer
+        from pythoneeg.core import core
+        
+        mock_long_recording = MagicMock(spec=core.LongRecordingOrganizer)
+        mock_long_recording.get_num_fragments.return_value = 1
+        mock_long_recording.channel_names = ["ch1", "ch2", "ch3", "ch4"]
+        mock_long_recording.meta = MagicMock()
+        mock_long_recording.meta.n_channels = 4
+        mock_long_recording.meta.mult_to_uV = 1.0
+        mock_long_recording.LongRecording = MagicMock()
+        mock_long_recording.LongRecording.get_sampling_frequency.return_value = constants.GLOBAL_SAMPLING_RATE
+        mock_long_recording.LongRecording.get_num_frames.return_value = 5000
+        mock_long_recording.end_relative = [1]
+        
+        mock_recording = MagicMock()
+        mock_recording.get_traces.return_value = signals
+        mock_long_recording.get_fragment.return_value = mock_recording
+        
+        analyzer = LongRecordingAnalyzer(mock_long_recording, fragment_len_s=10, notch_freq=60)
+        lra_result = analyzer.compute_pcorr(0)
+        
+        # Both should produce symmetric matrices
+        assert np.allclose(fa_result, fa_result.T), "FragmentAnalyzer should produce symmetric matrix"
+        assert np.allclose(lra_result, lra_result.T), "LongRecordingAnalyzer should produce symmetric matrix"
+        
+        # Results should be nearly identical (allowing for minor numerical differences)
+        np.testing.assert_allclose(fa_result, lra_result, rtol=1e-10, atol=1e-12)
