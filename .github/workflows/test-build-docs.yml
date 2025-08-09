@@ -38,9 +38,7 @@ jobs:
       if: runner.os == 'macOS'
       run: |
         python -m pip install --upgrade pip setuptools wheel
-        # Build isosplit6 from source with the compiler flags above
         pip install --no-binary :all: isosplit6
-        # Install mountainsort5 (depends on isosplit6)
         pip install mountainsort5
         
     - name: Cache pip dependencies
