@@ -25,6 +25,23 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
+
+    - name: macOS: Configure compiler for isosplit6 build
+      if: runner.os == 'macOS'
+      run: |
+        echo "CC=gcc" >> $GITHUB_ENV
+        echo "CXX=g++" >> $GITHUB_ENV
+        echo "CXXFLAGS=-std=c++14 -I$(xcrun --show-sdk-path)/usr/include/c++/v1" >> $GITHUB_ENV
+        echo "LDFLAGS=-L$(xcrun --show-sdk-path)/usr/lib" >> $GITHUB_ENV
+
+    - name: macOS: Pre-install isosplit6 and mountainsort5 from source
+      if: runner.os == 'macOS'
+      run: |
+        python -m pip install --upgrade pip setuptools wheel
+        # Build isosplit6 from source with the compiler flags above
+        pip install --no-binary :all: isosplit6
+        # Install mountainsort5 (depends on isosplit6)
+        pip install mountainsort5
         
     - name: Cache pip dependencies
       uses: actions/cache@v3
