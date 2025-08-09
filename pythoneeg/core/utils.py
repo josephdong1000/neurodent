@@ -218,6 +218,7 @@ def nanaverage(A: np.ndarray, weights: np.ndarray, axis: int = -1) -> np.ndarray
         return np.where(np.isfinite(result), result, np.nan)
 
 
+
 def parse_path_to_animalday(
     filepath: str | Path,
     animal_param: tuple[int, str] | str | list[str] = (0, None),

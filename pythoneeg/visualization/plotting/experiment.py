@@ -497,7 +497,7 @@ class ExperimentPlotter:
         #     param_order_name = 'order' if param_name == 'x' else param_name + '_order'
         #     if default_params[param_name] in constants.PLOT_ORDER and not (catplot_params is not None and param_order_name in catplot_params):
         #         default_params[param_order_name] = constants.PLOT_ORDER[default_params[param_name]]
-            
+
         # Create boxplot using seaborn
         g = sns.catplot(**default_params)
 
@@ -636,7 +636,7 @@ class ExperimentPlotter:
             "collapse_channels": False,
             "average_groupby": False,
         }
-    
+
     def plot_heatmap_faceted(
         self,
         feature: str,
