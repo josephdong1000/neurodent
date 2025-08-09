@@ -26,7 +26,7 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
-    - name: macOS: Configure compiler for isosplit6 build
+    - name: macOS Configure compiler for isosplit6 build
       if: runner.os == 'macOS'
       run: |
         echo "CC=gcc" >> $GITHUB_ENV
