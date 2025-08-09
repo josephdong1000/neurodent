@@ -26,8 +26,6 @@ dependencies = [
     "spikeinterface",
     "ipykernel",
     "dask[distributed]",
-    "nodejs",
-    "npm",
     "dask-labextension",
     "bokeh",
     "dask-jobqueue",
@@ -41,12 +39,20 @@ dependencies = [
     "neo",
     "pyedflib",
     "edfio",
+    "build",
+    "pyprep",
+    "okabeito",
+    "openpyxl",
+    "starbars",
+    "appnope",
 ]
 requires-python = ">=3.10"
 keywords = ["EEG", "rodent", "mouse", "neuroscience", "data analysis"]
 
 [project.optional-dependencies]
 dev = [
+    "nodejs",
+    "npm",
     "snakeviz",
     "pyqt5",
     "pytest>=7.0.0",
