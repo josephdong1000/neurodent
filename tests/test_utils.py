@@ -88,7 +88,7 @@ class TestConvertColpathToRowpath:
         rowdir_path = "/output/dir"
         
         result = utils.convert_colpath_to_rowpath(rowdir_path, col_path)
-        expected = Path("/output/dir/data_RowMajor_001.npy.gz")
+        expected = Path(rowdir_path) / "data_RowMajor_001.npy.gz"
         assert result == expected
         
     def test_without_gzip(self):
@@ -97,7 +97,7 @@ class TestConvertColpathToRowpath:
         rowdir_path = "/output/dir"
         
         result = utils.convert_colpath_to_rowpath(rowdir_path, col_path, gzip=False)
-        expected = Path("/output/dir/data_RowMajor_001.bin")
+        expected = Path(rowdir_path) / "data_RowMajor_001.bin"
         assert result == expected
         
     def test_as_string(self):
@@ -106,7 +106,7 @@ class TestConvertColpathToRowpath:
         rowdir_path = "/output/dir"
         
         result = utils.convert_colpath_to_rowpath(rowdir_path, col_path, aspath=False)
-        expected = "/output/dir/data_RowMajor_001.npy.gz"
+        expected = str(Path(rowdir_path) / "data_RowMajor_001.npy.gz")
         assert result == expected
 
     def test_without_gzip_as_string(self):
@@ -115,7 +115,7 @@ class TestConvertColpathToRowpath:
         rowdir_path = "/output/dir"
         
         result = utils.convert_colpath_to_rowpath(rowdir_path, col_path, gzip=False, aspath=False)
-        expected = "/output/dir/data_RowMajor_001.bin"
+        expected = str(Path(rowdir_path) / "data_RowMajor_001.bin")
         assert result == expected
         
     def test_invalid_col_path(self):
