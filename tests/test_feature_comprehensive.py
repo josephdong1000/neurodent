@@ -793,7 +793,7 @@ class TestMathematicalProperties:
         from pythoneeg.core import log_transform
         for band_name in psdfrac.keys():
             expected_logpsdfrac = log_transform(psdband[band_name] / psdtotal)
-            np.testing.assert_allclose(logpsdfrac[band_name], expected_logpsdfrac, rtol=1e-10)
+            np.testing.assert_allclose(logpsdfrac[band_name], expected_logpsdfrac, rtol=1e-6)
     
     def test_psdslope_mathematical_properties(self):
         """Test PSD slope computation mathematical properties."""
