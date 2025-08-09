@@ -17,8 +17,6 @@ scipy = "*"
 spikeinterface = "*"
 ipykernel = "*"
 dask = {extras = ["distributed"], version = "*"}
-nodejs = "*"
-npm = "*"
 dask-labextension = "*"
 bokeh = "*"
 dask-jobqueue = "*"
@@ -41,6 +39,8 @@ starbars = "*"
 appnope = "*"
 
 [dev-packages]
+nodejs = "*"
+npm = "*"
 snakeviz = "*"
 pyqt5 = "*"
 mkdocs = "*"
