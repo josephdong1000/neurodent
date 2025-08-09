@@ -2,6 +2,7 @@
 Unit tests for pythoneeg.core.core module.
 """
 import gzip
+import gc
 import os
 import tempfile
 from datetime import datetime
@@ -289,6 +290,9 @@ class TestConvertDdfrowbinToSi:
         
         # Verify temporary file was created and cleanup
         assert temppath is not None
+        # Ensure the recording object is deleted before removing temp file on Windows
+        rec = None
+        gc.collect()
         if os.path.exists(temppath):
             os.remove(temppath)
             

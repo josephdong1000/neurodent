@@ -2699,9 +2699,9 @@ class TestTempDirectory:
             assert npz_file.exists()
             
             # Load and verify
-            loaded_data = np.load(npz_file)
-            np.testing.assert_array_equal(loaded_data['array1'], test_array)
-            np.testing.assert_array_equal(loaded_data['array2'], test_array * 2)
+            with np.load(npz_file) as loaded_data:
+                np.testing.assert_array_equal(loaded_data["array1"], test_array)
+                np.testing.assert_array_equal(loaded_data["array2"], test_array * 2)
     
     def test_pandas_dataframe_operations(self):
         """Test saving and loading pandas DataFrames in temp directory."""
