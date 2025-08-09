@@ -8,10 +8,11 @@ from unittest.mock import Mock, patch, MagicMock
 import numpy as np
 import pytest
 
-from pythoneeg.core.analyze_sort import MountainSortAnalyzer
+from pythoneeg.core.analyze_sort import MountainSortAnalyzer, MOUNTAINSORT_AVAILABLE
 from pythoneeg import constants
 
 
+@pytest.mark.skipif(not MOUNTAINSORT_AVAILABLE, reason="mountainsort5 not available")
 class TestMountainSortAnalyzer:
     """Test MountainSortAnalyzer static methods."""
     
@@ -463,3 +464,20 @@ class TestMountainSortAnalyzer:
                             
                             assert len(set(paths)) == 3  # All paths should be unique
                             assert all('hex' in str(path) for path in paths)
+
+
+class TestMountainSortOptionalDependency:
+    """Test behavior when mountainsort5 is not available."""
+    
+    @pytest.mark.skipif(MOUNTAINSORT_AVAILABLE, reason="mountainsort5 is available")
+    def test_mountainsort_unavailable_error(self):
+        """Test that proper error is raised when mountainsort5 is not available."""
+        mock_recording = MagicMock()
+        
+        with pytest.raises(ImportError, match="MountainSort5 is not available"):
+            MountainSortAnalyzer.sort_recording(mock_recording)
+    
+    def test_mountainsort_availability_flag(self):
+        """Test that MOUNTAINSORT_AVAILABLE flag is accessible."""
+        # This should always pass regardless of availability
+        assert isinstance(MOUNTAINSORT_AVAILABLE, bool)

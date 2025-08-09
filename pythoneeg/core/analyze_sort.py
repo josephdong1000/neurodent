@@ -20,8 +20,17 @@ try:
 except Exception:  # pragma: no cover
     si = None
     spre = None
-from mountainsort5 import Scheme2SortingParameters, sorting_scheme2
-from mountainsort5.util import create_cached_recording
+
+try:
+    from mountainsort5 import Scheme2SortingParameters, sorting_scheme2
+    from mountainsort5.util import create_cached_recording
+    MOUNTAINSORT_AVAILABLE = True
+except ImportError:  # pragma: no cover
+    # MountainSort5 is optional - spike sorting features will not be available
+    Scheme2SortingParameters = None
+    sorting_scheme2 = None
+    create_cached_recording = None
+    MOUNTAINSORT_AVAILABLE = False
 
 from .. import constants
 from .utils import _HiddenPrints, get_temp_directory
@@ -42,6 +51,12 @@ class MountainSortAnalyzer:
         Returns:
             list[si.SortingAnalyzer]: A list of independent sorting analyzers, one for each channel.
         """
+        if not MOUNTAINSORT_AVAILABLE:
+            raise ImportError(
+                "MountainSort5 is not available. Spike sorting functionality requires mountainsort5. "
+                "Install it with: pip install mountainsort5"
+            )
+
         logging.debug(f"Sorting recording info: {recording}")
         logging.debug(f"Sorting recording channel names: {recording.get_channel_ids()}")
 

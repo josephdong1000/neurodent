@@ -318,7 +318,16 @@ class AnimalOrganizer(AnimalFeatureParser):
         Returns:
             spike_analysis_results: list[SpikeAnalysisResult]. Each SpikeAnalysisResult object corresponds to a LongRecording object,
             typically a different day or recording session.
+            
+        Raises:
+            ImportError: If mountainsort5 is not available.
         """
+        # Check if mountainsort5 is available
+        from ..core.analyze_sort import MOUNTAINSORT_AVAILABLE
+        if not MOUNTAINSORT_AVAILABLE:
+            raise ImportError(
+                "Spike analysis requires mountainsort5. Install it with: pip install mountainsort5"
+            )
         sars = []
         lrec_sorts = []
         lrec_recs = []
