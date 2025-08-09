@@ -231,7 +231,7 @@ with Pool(14) as pool:
             wars.append(war)
 
 logger.info(f"{len(wars)} wars loaded")
-ep = visualization.ExperimentPlotter(wars, exclude=["nspike", "lognspike", "pcorr", "cohere"])
+ep = visualization.ExperimentPlotter(wars, exclude=["nspike", "lognspike", "imcoh", "zimcoh"])
 
 
 # SECTION use seaborn.so to plot figure
