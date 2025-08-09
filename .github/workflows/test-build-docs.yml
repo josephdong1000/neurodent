@@ -10,10 +10,11 @@ on:
 jobs:
   test:
     name: Test Package
-    runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.10.8"]
+        python-version: ["3.10.8", "3.11", "3.12", "3.13"]
+        os: ["ubuntu-latest", "macos-latest", "windows-latest"]
+    runs-on: ${{ matrix.os }}
     
     steps:
     - name: Checkout code
@@ -52,14 +53,14 @@ jobs:
         
     - name: Run tests with coverage
       run: |
-        pipenv run pytest tests/ --cov=pythoneeg --cov-report=xml --cov-report=term-missing -v --tb=short
-      continue-on-error: true  # Continue even if some tests fail
+        pipenv run pytest tests/ --cov=pythoneeg --cov-report=xml --cov-report=term-missing -v
         
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v5
       with:
         file: ./coverage.xml
         fail_ci_if_error: false
+        token: ${{ secrets.CODECOV_TOKEN }}
 
   build-package:
     name: Build Package
