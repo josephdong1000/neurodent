@@ -32,7 +32,7 @@ from .utils import (
     filepath_to_index,
     get_temp_directory,
     parse_truncate,
-    get_file_stem
+    get_file_stem,
 )
 
 
@@ -200,6 +200,8 @@ class LongRecordingOrganizer:
         extract_func: Union[Callable[..., si.BaseRecording], Callable[..., mne.io.Raw]] = None,
         input_type: Literal["folder", "file", "files"] = "folder",
         file_pattern: str = None,
+        manual_datetimes: datetime | list[datetime] = None,
+        datetimes_are_start: bool = True,
         **kwargs,
     ):
         """Construct a long recording from binary files or EDF files.
@@ -214,10 +216,16 @@ class LongRecordingOrganizer:
             extract_func (Callable, optional): Function to extract data when using 'si' or 'mne' mode. Required for those modes.
             input_type (Literal['folder', 'file', 'files'], optional): Type of input to load. Defaults to 'folder'.
             file_pattern (str, optional): Pattern to match files when using 'file' or 'files' input type. Defaults to '*'.
+            manual_datetimes (datetime | list[datetime], optional): Manual timestamps for the recording.
+                For 'bin' mode: if datetime, used as global start/end time; if list, one timestamp per file.
+                For 'si'/'mne' modes: if datetime, used as start/end of entire recording; if list, one per input file.
+            datetimes_are_start (bool, optional): If True, manual_datetimes are treated as start times.
+                If False, treated as end times. Defaults to True.
             **kwargs: Additional arguments passed to the data loading functions.
 
         Raises:
-            ValueError: If no data files are found or if the folder contains mixed file types.
+            ValueError: If no data files are found, if the folder contains mixed file types,
+                or if manual time parameters are invalid.
         """
 
         self.n_truncate = parse_truncate(truncate)
@@ -226,6 +234,13 @@ class LongRecordingOrganizer:
             warnings.warn(f"LongRecording will be truncated to the first {self.n_truncate} files")
 
         self.base_folder_path = Path(base_folder_path)
+
+        # Store manual time parameters for validation
+        self.manual_datetimes = manual_datetimes
+        self.datetimes_are_start = datetimes_are_start
+
+        # Validate manual time parameters
+        self._validate_manual_time_params()
 
         # Initialize core attributes
         self.meta = None
@@ -295,10 +310,16 @@ class LongRecordingOrganizer:
 
         self.channel_names = self.meta.channel_names
 
+        # Initialize file_end_datetimes from CSV metadata (will be overridden later if manual times provided)
         file_end_datetimes = [x.dt_end for x in self.__metadata_objects]
         if all(x is None for x in file_end_datetimes):
-            raise ValueError("No dates found in any metadata object!")
-        self.file_end_datetimes = file_end_datetimes
+            # If no CSV times available, manual times will be required later
+            self.file_end_datetimes = file_end_datetimes
+        else:
+            self.file_end_datetimes = file_end_datetimes
+            logging.info(
+                f"CSV metadata timestamps: {len([x for x in file_end_datetimes if x is not None])} of {len(file_end_datetimes)} files have timestamps"
+            )
 
     def _truncate_file_list(
         self, files: list[Union[str, Path]], ref_list: list[Union[str, Path]] = None
@@ -409,6 +430,8 @@ class LongRecordingOrganizer:
         self.prepare_colbins_rowbins_metas()
         self.convert_colbins_to_rowbins(overwrite=overwrite_rowbins, multiprocess_mode=multiprocess_mode)
         self.convert_rowbins_to_rec(multiprocess_mode=multiprocess_mode)
+        # Now that file_durations are available, finalize timestamps
+        self.finalize_file_timestamps()
 
     def convert_colbins_to_rowbins(self, overwrite=False, multiprocess_mode: Literal["dask", "serial"] = "serial"):
         """
@@ -510,7 +533,6 @@ class LongRecordingOrganizer:
 
         self.LongRecording: si.BaseRecording = si.concatenate_recordings(recs).rename_channels(self.channel_names)
 
-
     def convert_file_with_si_to_recording(
         self,
         extract_func: Callable[..., si.BaseRecording],
@@ -518,10 +540,46 @@ class LongRecordingOrganizer:
         file_pattern: str = "*",
         **kwargs,
     ):
+        """Create a SpikeInterface Recording from a folder, a single file, or multiple files.
+
+        This is a thin wrapper around ``extract_func`` that discovers inputs under
+        ``self.base_folder_path`` and builds a ``si.BaseRecording`` accordingly.
+
+        Modes:
+        - ``folder``: Passes ``self.base_folder_path`` directly to ``extract_func``.
+        - ``file``: Uses ``glob`` with ``file_pattern`` relative to ``self.base_folder_path``.
+          If multiple matches are found, the first match is used and a warning is issued.
+        - ``files``: Uses ``Path.glob`` with ``file_pattern`` under ``self.base_folder_path``,
+          optionally truncates via ``self._truncate_file_list(...)``, sorts the files, applies
+          ``extract_func`` to each file, and concatenates the resulting recordings via
+          ``si.concatenate_recordings``.
+
+        Args:
+            extract_func (Callable[..., si.BaseRecording]): Function that consumes a path
+                (folder or file path) and returns a ``si.BaseRecording``.
+            input_type (Literal['folder', 'file', 'files'], optional): How to discover inputs.
+                Defaults to ``'folder'``.
+            file_pattern (str, optional): Glob pattern used when ``input_type`` is ``'file'`` or
+                ``'files'``. Defaults to ``'*'``.
+            **kwargs: Additional keyword arguments forwarded to ``extract_func``.
+
+        Side Effects:
+            Sets ``self.LongRecording`` to the resulting recording and initializes ``self.meta``
+            based on that recording's properties.
+
+        Raises:
+            ValueError: If no files are found for the given ``file_pattern`` or ``input_type`` is invalid.
+        """
+        # Early validation and file discovery
         if input_type == "folder":
+            # For single folder, validate that timestamps are provided
+            self._validate_timestamps_for_mode("si", 1)
             datafolder = self.base_folder_path
             rec: si.BaseRecording = extract_func(datafolder, **kwargs)
+            n_processed_files = 1
         elif input_type == "file":
+            # For single file, validate that timestamps are provided
+            self._validate_timestamps_for_mode("si", 1)
             datafiles = glob.glob(str(self.base_folder_path / file_pattern))
             if len(datafiles) == 0:
                 raise ValueError(f"No files found matching pattern: {file_pattern}")
@@ -529,16 +587,23 @@ class LongRecordingOrganizer:
                 warnings.warn(f"Multiple files found matching pattern: {file_pattern}. Using first file.")
             datafile = datafiles[0]
             rec: si.BaseRecording = extract_func(datafile, **kwargs)
+            n_processed_files = 1
         elif input_type == "files":
             datafiles = [str(x) for x in self.base_folder_path.glob(file_pattern)]
             if len(datafiles) == 0:
                 raise ValueError(f"No files found matching pattern: {file_pattern}")
             datafiles = self._truncate_file_list(datafiles)
+            # Validate timestamps early before slow processing
+            self._validate_timestamps_for_mode("si", len(datafiles))
             datafiles.sort()  # FIXME sort by index, or some other logic. Files may be out of order otherwise, messing up isday calculation
             recs: list[si.BaseRecording] = [extract_func(x, **kwargs) for x in datafiles]
             rec = si.concatenate_recordings(recs)
+            n_processed_files = len(datafiles)
         else:
-            raise ValueError(f"Invalid mode: {input_type}")
+            raise ValueError(f"Invalid input_type: {input_type}")
+
+        # Store number of processed files for timestamp handling
+        self._n_processed_files = n_processed_files
 
         self.LongRecording = rec
         self.meta = DDFBinaryMetadata(
@@ -548,6 +613,21 @@ class LongRecordingOrganizer:
             dt_end=constants.DEFAULT_DAY,  # NOTE parse timestamp from SI file date/metadata?
             channel_names=self.LongRecording.get_channel_ids().tolist(),
         )
+
+        # For si mode, handle multiple files or single file
+        if not hasattr(self, "file_durations") or not self.file_durations:
+            if hasattr(self, "_n_processed_files") and self._n_processed_files > 1:
+                # Multiple files concatenated - estimate equal durations
+                total_duration = self.LongRecording.get_duration()
+                avg_duration = total_duration / self._n_processed_files
+                self.file_durations = [avg_duration] * self._n_processed_files
+            else:
+                # Single file or folder
+                self.file_durations = [self.LongRecording.get_duration()]
+            self.file_end_datetimes = []
+
+        # Apply manual timestamps if provided
+        self.finalize_file_timestamps()
 
     def convert_file_with_mne_to_recording(
         self,
@@ -560,10 +640,16 @@ class LongRecordingOrganizer:
         multiprocess_mode: Literal["dask", "serial"] = "serial",
         **kwargs,
     ):
+        # Early validation and file discovery
         if input_type == "folder":
+            # For single folder, validate that timestamps are provided
+            self._validate_timestamps_for_mode("mne", 1)
             datafolder = self.base_folder_path
             raw: mne.io.Raw = extract_func(datafolder, **kwargs)
+            n_processed_files = 1
         elif input_type == "file":
+            # For single file, validate that timestamps are provided
+            self._validate_timestamps_for_mode("mne", 1)
             datafiles = list(self.base_folder_path.glob(file_pattern))
             if len(datafiles) == 0:
                 raise ValueError(f"No files found matching pattern: {file_pattern}")
@@ -571,24 +657,30 @@ class LongRecordingOrganizer:
                 warnings.warn(f"Multiple files found matching pattern: {file_pattern}. Using first file.")
             datafile = datafiles[0]
             raw: mne.io.Raw = extract_func(datafile, **kwargs)
+            n_processed_files = 1
         elif input_type == "files":
             datafiles = list(self.base_folder_path.glob(file_pattern))
             if len(datafiles) == 0:
                 raise ValueError(f"No files found matching pattern: {file_pattern}")
             datafiles = self._truncate_file_list(datafiles)
+            # Validate timestamps early before slow processing
+            self._validate_timestamps_for_mode("mne", len(datafiles))
             datafiles.sort()  # FIXME sort by index, or some other logic. Files may be out of order otherwise, messing up isday calculation
-            logging.debug(f"Running extract_func on {len(datafiles)} files")
+            logging.info(f"Running extract_func on {len(datafiles)} files")
             raws: list[mne.io.Raw] = [extract_func(x, **kwargs) for x in datafiles]
-            logging.debug(f"Concatenating {len(raws)} raws")
+            logging.info(f"Concatenating {len(raws)} raws")
             raw: mne.io.Raw = mne.concatenate_raws(raws)
             del raws
+            n_processed_files = len(datafiles)
         else:
-            raise ValueError(f"Invalid mode: {input_type}")
+            raise ValueError(f"Invalid input_type: {input_type}")
+
+        # Store number of processed files for timestamp handling
+        self._n_processed_files = n_processed_files
 
         logging.info(raw.info)
-        logging.debug(f"Old sampling frequency: {raw.info['sfreq']}")
+        logging.info(f"Resampling from {raw.info['sfreq']} to {constants.GLOBAL_SAMPLING_RATE}")
         raw = raw.resample(constants.GLOBAL_SAMPLING_RATE)
-        logging.debug(f"New sampling frequency: {raw.info['sfreq']}")
 
         # Cache raw to binary
         intermediate_name = (
@@ -596,30 +688,34 @@ class LongRecordingOrganizer:
         )
         if intermediate == "edf":
             fname = self.base_folder_path / f"{intermediate_name}.edf"
-            logging.debug(f"Exporting raw to {fname}")
+            logging.info(f"Exporting raw to {fname}")
             mne.export.export_raw(
                 fname, raw=raw, fmt="edf", overwrite=overwrite
             )  # NOTE this causes a lot of OOM issues
-            logging.debug("Reading edf file")
+            logging.info("Reading edf file")
             rec = se.read_edf(fname)
         elif intermediate == "bin":
             fname = self.base_folder_path / f"{intermediate_name}.bin"
-            logging.debug(f"Exporting raw to {fname}")
+            logging.info(f"Exporting raw to {fname}")
             data: np.ndarray = raw.get_data()  # (n channels, n samples)
             data = data.T  # (n samples, n channels)
-            logging.debug(f"Writing to {fname}")
+            logging.info(f"Writing to {fname}")
             data.tofile(fname)
 
+            logging.info(f"raw.info: {raw.info}")
+            logging.info(f"raw.info['sfreq']: {raw.info['sfreq']}")
+            logging.info(f"raw.info['nchan']: {raw.info['nchan']}")
+
             params = {
-                "sampling_frequency": raw.info.sfreq,
+                "sampling_frequency": raw.info["sfreq"],
                 "dtype": data.dtype,
-                "num_channels": raw.info.nchan,
+                "num_channels": raw.info["nchan"],
                 "gain_to_uV": 1,
                 "offset_to_uV": 0,
                 "time_axis": 0,
                 "is_filtered": False,
             }
-            logging.debug(f"Reading from {fname}")
+            logging.info(f"Reading from {fname}")
             rec = se.read_binary(fname, **params)
 
         else:
@@ -633,6 +729,21 @@ class LongRecordingOrganizer:
             dt_end=constants.DEFAULT_DAY,  # NOTE parse timestamp from MNE file date/metadata?
             channel_names=self.LongRecording.get_channel_ids().tolist(),
         )
+
+        # For mne mode, handle multiple files or single file
+        if not hasattr(self, "file_durations") or not self.file_durations:
+            if hasattr(self, "_n_processed_files") and self._n_processed_files > 1:
+                # Multiple files concatenated - estimate equal durations
+                total_duration = self.LongRecording.get_duration()
+                avg_duration = total_duration / self._n_processed_files
+                self.file_durations = [avg_duration] * self._n_processed_files
+            else:
+                # Single file or folder
+                self.file_durations = [self.LongRecording.get_duration()]
+            self.file_end_datetimes = []
+
+        # Apply manual timestamps if provided
+        self.finalize_file_timestamps()
 
     def cleanup_rec(self):
         try:
@@ -741,3 +852,143 @@ class LongRecordingOrganizer:
 
         self.bad_channel_names = [self.channel_names[i] for i in np.where(~is_inlier)[0]]
         logging.info(f"lrec.bad_channel_names: {self.bad_channel_names}")
+
+    def _validate_manual_time_params(self):
+        """Validate that manual time parameters are correctly specified."""
+        if self.manual_datetimes is not None:
+            if not isinstance(self.manual_datetimes, (datetime, list, tuple)):
+                raise ValueError("manual_datetimes must be a datetime object or list of datetime objects")
+
+    def _validate_timestamps_for_mode(self, mode: str, expected_n_files: int = None):
+        """Validate that manual timestamps are provided when required for specific modes.
+
+        Args:
+            mode (str): The processing mode ('si', 'mne', or 'bin')
+            expected_n_files (int, optional): Expected number of files for validation
+
+        Raises:
+            ValueError: If timestamps are required but not provided or if count mismatch
+        """
+        if mode in ["si", "mne"]:
+            if self.manual_datetimes is None:
+                raise ValueError(f"manual_datetimes must be provided for {mode} mode when no CSV metadata is available")
+
+            # If list provided and expected files known, validate length
+            if expected_n_files is not None and isinstance(self.manual_datetimes, list):
+                if len(self.manual_datetimes) != expected_n_files:
+                    raise ValueError(
+                        f"manual_datetimes length ({len(self.manual_datetimes)}) must match "
+                        f"number of input files ({expected_n_files}) for {mode} mode"
+                    )
+
+    def _compute_manual_file_datetimes(self, n_files: int, durations: list[float]) -> list[datetime]:
+        """Compute file end datetimes based on manual time specifications.
+
+        Args:
+            n_files (int): Number of files
+            durations (list[float]): Duration of each file in seconds
+
+        Returns:
+            list[datetime]: End datetime for each file
+
+        Raises:
+            ValueError: If manual_datetimes length doesn't match number of files
+        """
+        if self.manual_datetimes is None:
+            return None
+
+        if isinstance(self.manual_datetimes, list):
+            # List of times provided - one per file
+            if len(self.manual_datetimes) != n_files:
+                raise ValueError(
+                    f"manual_datetimes length ({len(self.manual_datetimes)}) must match number of files ({n_files})"
+                )
+
+            # Convert start times to end times or vice versa
+            if self.datetimes_are_start:
+                # Convert start times to end times
+                file_end_datetimes = [
+                    start_time + timedelta(seconds=duration)
+                    for start_time, duration in zip(self.manual_datetimes, durations)
+                ]
+            else:
+                # Use as end times directly
+                file_end_datetimes = list(self.manual_datetimes)
+
+            # Check contiguity (warn instead of error)
+            self._validate_file_contiguity(file_end_datetimes, durations)
+
+            return file_end_datetimes
+
+        else:
+            # Single datetime provided - global start or end time
+            if self.datetimes_are_start:
+                # Global start time - compute cumulative end times
+                current_time = self.manual_datetimes
+                file_end_datetimes = []
+                for duration in durations:
+                    current_time += timedelta(seconds=duration)
+                    file_end_datetimes.append(current_time)
+                return file_end_datetimes
+            else:
+                # Global end time - work backwards
+                total_duration = sum(durations)
+                start_time = self.manual_datetimes - timedelta(seconds=total_duration)
+                current_time = start_time
+                file_end_datetimes = []
+                for duration in durations:
+                    current_time += timedelta(seconds=duration)
+                    file_end_datetimes.append(current_time)
+                return file_end_datetimes
+
+    def _validate_file_contiguity(self, file_end_datetimes: list[datetime], durations: list[float]):
+        """Check that files are contiguous in time and warn if they're not.
+
+        Args:
+            file_end_datetimes (list[datetime]): End datetime for each file
+            durations (list[float]): Duration of each file in seconds
+        """
+        if len(file_end_datetimes) <= 1:
+            return  # Single file or no files - nothing to check
+
+        tolerance_seconds = 1.0  # Allow 1 second tolerance for rounding errors
+
+        for i in range(len(file_end_datetimes) - 1):
+            # Start time of next file should equal end time of current file
+            current_end = file_end_datetimes[i]
+            next_start = file_end_datetimes[i + 1] - timedelta(seconds=durations[i + 1])
+
+            gap_seconds = (next_start - current_end).total_seconds()
+            if gap_seconds > tolerance_seconds:
+                warnings.warn(
+                    f"Files may not be contiguous: gap of {gap_seconds:.2f}s between "
+                    f"file {i} (ends {current_end}) and file {i + 1} (starts {next_start}). "
+                    f"Tolerance is {tolerance_seconds}s."
+                )
+            elif gap_seconds < -tolerance_seconds:
+                warnings.warn(
+                    f"Files may overlap: negative gap of {gap_seconds:.2f}s between "
+                    f"file {i} (ends {current_end}) and file {i + 1} (starts {next_start}). "
+                    f"Tolerance is {tolerance_seconds}s."
+                )
+
+    def finalize_file_timestamps(self):
+        """Finalize file timestamps using manual times if provided, otherwise validate CSV times."""
+        logging.info("Finalizing file timestamps")
+        if not hasattr(self, "file_durations") or not self.file_durations:
+            return  # No file durations available yet
+
+        manual_file_datetimes = self._compute_manual_file_datetimes(len(self.file_durations), self.file_durations)
+
+        if manual_file_datetimes is not None:
+            self.file_end_datetimes = manual_file_datetimes
+            logging.info(f"Using manual timestamps: {len(manual_file_datetimes)} file end times specified")
+        else:
+            # Check if CSV times are sufficient (only for bin mode)
+            if hasattr(self, "file_end_datetimes") and self.file_end_datetimes:
+                if all(x is None for x in self.file_end_datetimes):
+                    raise ValueError("No dates found in any metadata object and no manual times specified!")
+                logging.info("Using CSV metadata timestamps")
+            else:
+                # For si/mne modes, manual timestamps are required
+                raise ValueError("manual_datetimes must be provided when no CSV metadata is available!")
