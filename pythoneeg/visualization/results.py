@@ -97,10 +97,11 @@ class AnimalOrganizer(AnimalFeatureParser):
             anim_id (str): The ID of the animal. This should correspond to only one animal.
             day_sep (str, optional): Separator for day in folder name. Set to None or empty string to get all folders. Defaults to None.
             mode (Literal["nest", "concat", "base", "noday"], optional): The mode of the AnimalOrganizer. Defaults to "concat".
-                "nest": base_folder_path / animal_id / date_format
-                "concat": base_folder_path / animal_id*date_format
-                "base": base_folder_path
-                "noday": base_folder_path / animal_id
+                File structure patterns (where * indicates search location):
+                "nest": base_folder_path / animal_id / *date_format* (looks for folders/files within animal_id subdirectories)
+                "concat": base_folder_path / *animal_id*date_format* (looks for folders/files with animal_id+date in name at base level)
+                "base": base_folder_path / * (looks for folders/files directly in base_folder_path)
+                "noday": base_folder_path / *animal_id* (same as concat but expects single unique match, no date filtering)
             assume_from_number (bool, optional): Whether to assume the animal ID is a number. Defaults to False.
             skip_days (list[str], optional): The days to skip. Defaults to [].
             truncate (bool|int, optional): Whether to truncate the data. Defaults to False.
@@ -160,7 +161,7 @@ class AnimalOrganizer(AnimalFeatureParser):
 
         self.long_analyzers: list[core.LongRecordingAnalyzer] = []
         logging.debug(f"Creating {len(self._bin_folders)} LongRecordings")
-        self.long_recordings = [core.LongRecordingOrganizer(e, **lro_kwargs) for e in self._bin_folders]
+        self.long_recordings: list[core.LongRecordingOrganizer] = [core.LongRecordingOrganizer(e, **lro_kwargs) for e in self._bin_folders]
 
         channel_names = [x.channel_names for x in self.long_recordings]
         if len(set([" ".join(x) for x in channel_names])) > 1:
