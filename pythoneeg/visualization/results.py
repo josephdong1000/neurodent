@@ -27,6 +27,7 @@ from tqdm import tqdm
 
 from .. import constants, core
 from ..core import FragmentAnalyzer, get_temp_directory
+from ..core.analyze_sort import MOUNTAINSORT_AVAILABLE
 
 
 class AnimalFeatureParser:
@@ -323,7 +324,6 @@ class AnimalOrganizer(AnimalFeatureParser):
             ImportError: If mountainsort5 is not available.
         """
         # Check if mountainsort5 is available
-        from ..core.analyze_sort import MOUNTAINSORT_AVAILABLE
         if not MOUNTAINSORT_AVAILABLE:
             raise ImportError(
                 "Spike analysis requires mountainsort5. Install it with: pip install mountainsort5"

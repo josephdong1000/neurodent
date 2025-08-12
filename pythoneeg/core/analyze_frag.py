@@ -17,7 +17,7 @@ from scipy.signal import butter, decimate, filtfilt, iirnotch, sosfiltfilt, welc
 from scipy.stats import linregress, pearsonr
 
 from .. import constants
-# Do not import utils at module import time to avoid heavy optional deps; import where used
+from .utils import log_transform
 
 
 class FragmentAnalyzer:
@@ -100,7 +100,6 @@ class FragmentAnalyzer:
         """Compute the log of the root mean square of the signal."""
         FragmentAnalyzer._check_rec_np(rec)
         # Local import to avoid importing heavy dependencies from utils at module import time
-        from .utils import log_transform
 
         if precomputed_rms is not None:
             return log_transform(precomputed_rms)
@@ -118,7 +117,6 @@ class FragmentAnalyzer:
         """Compute the log of the amplitude variance of the signal."""
         FragmentAnalyzer._check_rec_np(rec)
         # Local import to avoid importing heavy dependencies from utils at module import time
-        from .utils import log_transform
 
         if precomputed_ampvar is not None:
             return log_transform(precomputed_ampvar)
@@ -205,7 +203,6 @@ class FragmentAnalyzer:
         FragmentAnalyzer._check_rec_np(rec)
 
         # Local import to avoid importing heavy dependencies from utils at module import time
-        from .utils import log_transform
 
         if precomputed_psdband is not None:
             psd = precomputed_psdband
@@ -255,7 +252,6 @@ class FragmentAnalyzer:
         FragmentAnalyzer._check_rec_np(rec)
 
         # Local import to avoid importing heavy dependencies from utils at module import time
-        from .utils import log_transform
 
         if precomputed_psdtotal is not None:
             return log_transform(precomputed_psdtotal)
@@ -313,7 +309,6 @@ class FragmentAnalyzer:
         )
         psd_total = sum(psd_band.values())
         # Local import to avoid importing heavy dependencies from utils at module import time
-        from .utils import log_transform
 
         return {k: log_transform(v / psd_total) for k, v in psd_band.items()}
 
@@ -611,7 +606,6 @@ class FragmentAnalyzer:
     def compute_lognspike(rec: np.ndarray, precomputed_nspike: np.ndarray = None, **kwargs):
         """Returns None. Compute and load in spikes with SpikeAnalysisResult"""
         # Local import to avoid importing heavy dependencies from utils at module import time
-        from .utils import log_transform
 
         if precomputed_nspike is not None:
             return log_transform(precomputed_nspike)
