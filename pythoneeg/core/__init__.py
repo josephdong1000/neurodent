@@ -29,6 +29,8 @@ from .utils import (
     validate_timestamps,
     nanaverage,
     log_transform,
+    get_cache_status_message,
+    should_use_cache_unified,
 )
 
 # === INTERNAL/ADVANCED UTILITIES ===
@@ -50,8 +52,10 @@ __all__: list[str] = [
     "parse_chname_to_abbrev",
     "parse_path_to_animalday",
     "validate_timestamps",
-    "nanaverage",
+    "nanaverage", 
     "log_transform",
+    "get_cache_status_message",
+    "should_use_cache_unified",
     # === INTERNAL/ADVANCED ===
     "utils",  # Access via core.utils.function_name for internal functions
 ]
