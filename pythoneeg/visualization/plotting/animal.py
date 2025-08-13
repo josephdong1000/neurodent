@@ -126,8 +126,11 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         show_endfile=False,
         **kwargs,
     ):
+        # REVIEW this breaks for plotting psdslope, which contains both slope and intercept values.
+        # Perhaps split apart psdslope more cleanly into psdslope + psdintercept when computing WAR
         if features is None:
             features = constants.LINEAR_FEATURES.copy() + constants.BAND_FEATURES.copy()
+            features = [x for x in features if x and not x.startswith("log")]
         if channels is None:
             channels = np.arange(self.n_channels)
 
@@ -178,6 +181,13 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         data_t = group[duration_name]
         data_T = np.cumsum(data_t)
 
+        # Handle both 2D and 3D feature arrays
+        if data_Z.ndim == 2:
+            # 2D array (time, channels) - expand to 3D for consistent handling
+            data_Z = np.expand_dims(data_Z, axis=-1)
+        elif data_Z.ndim != 3:
+            raise ValueError(f"Expected 2D or 3D feature array, got {data_Z.ndim}D for feature '{feature}'")
+
         if channels is None:
             channels = np.arange(data_Z.shape[1])
         data_Z = data_Z[:, channels, :]
@@ -216,7 +226,8 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                 data_X = np.transpose(data_X)
             case "psdslope":
                 data_X = np.array(group[feature].to_list())
-                data_X = data_X[:, :, 0]
+                data_X = data_X[:, :, 0]  # Take first component (slope)
+                # data_X = np.expand_dims(data_X, axis=-1)  # Keep 3D format for consistency
             case "cohere" | "zcohere" | "imcoh" | "zimcoh":
                 data_X = np.array([list(d.values()) for d in group[feature]])
                 data_X = np.stack(data_X, axis=-1)
