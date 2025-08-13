@@ -992,3 +992,83 @@ class LongRecordingOrganizer:
             else:
                 # For si/mne modes, manual timestamps are required
                 raise ValueError("manual_datetimes must be provided when no CSV metadata is available!")
+    def __str__(self):
+        """Return a string representation of critical long recording features."""
+        if not hasattr(self, "LongRecording") or self.LongRecording is None:
+            return "LongRecordingOrganizer: No recording loaded yet"
+
+        n_channels = self.LongRecording.get_num_channels()
+        sampling_freq = self.LongRecording.get_sampling_frequency()
+        total_duration = self.LongRecording.get_duration()
+
+        n_files = len(self.file_durations) if hasattr(self, "file_durations") and self.file_durations else 1
+
+        timestamp_info = "No timestamps"
+        if hasattr(self, "file_end_datetimes") and self.file_end_datetimes:
+            timestamp_coverage = len([x for x in self.file_end_datetimes if x is not None])
+            timestamp_info = f"{timestamp_coverage}/{len(self.file_end_datetimes)} files have timestamps"
+
+        channel_info = "No channels"
+        if hasattr(self, "channel_names") and self.channel_names:
+            if len(self.channel_names) <= 5:
+                channel_info = f"[{', '.join(self.channel_names)}]"
+            else:
+                channel_info = f"[{', '.join(self.channel_names[:3])}, ..., {self.channel_names[-1]}] ({len(self.channel_names)} total)"
+
+        metadata_info = ""
+        if hasattr(self, "meta") and self.meta:
+            if hasattr(self.meta, "precision") and self.meta.precision:
+                metadata_info = f", {self.meta.precision} precision"
+            if hasattr(self.meta, "V_units") and self.meta.V_units:
+                metadata_info += f", {self.meta.V_units} units"
+
+        return (
+            f"LongRecording: {n_files} files, {n_channels} channels, "
+            f"{sampling_freq} Hz, {total_duration:.1f}s duration, "
+            f"channels: {channel_info}{metadata_info}, timestamps: {timestamp_info}"
+        )
+
+    def __repr__(self):
+        """Return a detailed string representation for debugging."""
+        return self.__str__()
+
+    def __str__(self):
+        """Return a string representation of critical long recording features."""
+        if not hasattr(self, "LongRecording") or self.LongRecording is None:
+            return "LongRecordingOrganizer: No recording loaded yet"
+
+        n_channels = self.LongRecording.get_num_channels()
+        sampling_freq = self.LongRecording.get_sampling_frequency()
+        total_duration = self.LongRecording.get_duration()
+
+        n_files = len(self.file_durations) if hasattr(self, "file_durations") and self.file_durations else 1
+
+        timestamp_info = "No timestamps"
+        if hasattr(self, "file_end_datetimes") and self.file_end_datetimes:
+            timestamp_coverage = len([x for x in self.file_end_datetimes if x is not None])
+            timestamp_info = f"{timestamp_coverage}/{len(self.file_end_datetimes)} files have timestamps"
+
+        channel_info = "No channels"
+        if hasattr(self, "channel_names") and self.channel_names:
+            if len(self.channel_names) <= 5:
+                channel_info = f"[{', '.join(self.channel_names)}]"
+            else:
+                channel_info = f"[{', '.join(self.channel_names[:3])}, ..., {self.channel_names[-1]}] ({len(self.channel_names)} total)"
+
+        metadata_info = ""
+        if hasattr(self, "meta") and self.meta:
+            if hasattr(self.meta, "precision") and self.meta.precision:
+                metadata_info = f", {self.meta.precision} precision"
+            if hasattr(self.meta, "V_units") and self.meta.V_units:
+                metadata_info += f", {self.meta.V_units} units"
+
+        return (
+            f"LongRecording: {n_files} files, {n_channels} channels, "
+            f"{sampling_freq} Hz, {total_duration:.1f}s duration, "
+            f"channels: {channel_info}{metadata_info}, timestamps: {timestamp_info}"
+        )
+
+    def __repr__(self):
+        """Return a detailed string representation for debugging."""
+        return self.__str__()
+
