@@ -107,8 +107,16 @@ if not save_folder.exists():
 # print(f"\n\n\tlrec: {lrec}\n\n")
 
 constants.GENOTYPE_ALIASES = {"ARX": "ARX"}
-constants.LR_ALIASES = {"L": "L", "R": "R"}
-constants.CHNAME_ALIASES = {"left Aud": "LAud", "right Aud": "RAud", "left VIS": "LVIS", "right VIS": "RVIS"}
+constants.LR_ALIASES = {
+    "L": [f"E{i}-" for i in range(1, 32, 2)],  # Odd numbered electrodes (1,3,5,...,31)
+    "R": [f"E{i}-" for i in range(2, 33, 2)],  # Even numbered electrodes (2,4,6,...,32)
+}
+constants.CHNAME_ALIASES = {
+    "Vis": ["E1-", "E2-"] + ["E9-", "E10-"] + ["E17-", "E18-"] + ["E25-", "E26-"],
+    "Hip": ["E3-", "E4-"] + ["E11-", "E12-"] + ["E19-", "E20-"] + ["E27-", "E28-"],
+    "Bar": ["E5-", "E6-"] + ["E13-", "E14-"] + ["E21-", "E22-"] + ["E29-", "E30-"],
+    "Mot": ["E7-", "E8-"] + ["E15-", "E16-"] + ["E23-", "E24-"] + ["E31-", "E32-"],
+}
 
 for animal_id in ["1017 1015"]:
     with Client(cluster_window) as client:
@@ -119,12 +127,15 @@ for animal_id in ["1017 1015"]:
             # assume_from_number=True,
             skip_days=["bad"],
             lro_kwargs={
-                "truncate": 2,  # REVIEW put back when testing
+                # "truncate": 2,  # REVIEW put back when testing
+                # REVIEW when the truncate number changes, should the user be notified and be advised to force regenerat
                 "mode": "mne",
                 "extract_func": read_raw_edf,
                 "file_pattern": "*.EDF",
                 "input_type": "files",
                 "intermediate": "bin",
+                "cache_policy": "force_regenerate",
+                # "cache_policy": "force_regenerate",
                 "manual_datetimes": datetime(2015, 2, 25, 8, 37, 45),
             },
         )
@@ -140,6 +151,8 @@ for animal_id in ["1017 1015"]:
     ap.plot_psd_histogram(figsize=(10, 4), avg_channels=True, plot_type="loglog")
     ap.plot_psd_spectrogram(figsize=(20, 4), mode="none")
 
+    ap.plot_coherecorr_matrix(figsize=(12, 4))
+    ap.plot_linear_temporal(features=["rms", "ampvar", "psdtotal", "psdband", "psdfrac"], figsize=(20, 40))
 
 # with open(base_folder / "notebooks" / "tests" / "sox5 combine genotypes.json", "r") as f:
 #     data = json.load(f)
@@ -147,34 +160,6 @@ for animal_id in ["1017 1015"]:
 # constants.GENOTYPE_ALIASES = data["GENOTYPE_ALIASES"]
 # data_folders_to_animal_ids = data["data_folders_to_animal_ids"]
 
-
-# SECTION 3: Run and plot windowed analysis
-# for data_folder, animal_ids in data_folders_to_animal_ids.items():
-#     for animal_id in animal_ids:
-#         with Client(cluster_window) as client:
-#             client.upload_file(str(base_folder / "pythoneeg.tar.gz"))
-
-#             ao = visualization.AnimalOrganizer(
-#                 data_parent_folder / data_folder,
-#                 animal_id,
-#                 mode="nest",
-#                 assume_from_number=True,
-#                 skip_days=["bad"],
-#                 lro_kwargs={"mode": "bin", "multiprocess_mode": "dask", "overwrite_rowbins": True},
-#             )
-
-#             war = ao.compute_windowed_analysis(["all"], multiprocess_mode="dask")
-
-#         save_path = save_folder / f"{data_folder} {animal_id}"
-#         if not save_path.exists():
-#             save_path.mkdir(parents=True)
-#         ap = visualization.AnimalPlotter(war, save_fig=True, save_path=save_path / animal_id)
-
-#         ap.plot_coherecorr_spectral(figsize=(20, 5), score_type="z")
-#         ap.plot_psd_histogram(figsize=(10, 4), avg_channels=True, plot_type="loglog")
-#         ap.plot_psd_spectrogram(figsize=(20, 4), mode="none")
-
-#         del war
 
 """
 sbatch --mem 100G -c 4 -t 48:00:00 /mnt/isilon/marsh_single_unit/PythonEEG/notebooks/examples/pipeline.sh /mnt/isilon/marsh_single_unit/PythonEEG/notebooks/examples/pipeline-war-ARXRosa.py
