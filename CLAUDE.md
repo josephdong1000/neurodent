@@ -73,6 +73,12 @@ Python scientific computing package for extracting features from mouse EEG recor
 - **Divide by zero in arctanh**: Expected when coherence = 1.0 exactly, handled by z_epsilon parameter
 - **SciPy nperseg warnings**: Expected when test signals shorter than default window, typically harmless
 
+**Debugging test failures:**
+- Check test design: verify correct methods called (e.g., `convert_file_with_si_to_recording()` for SI mode)
+- Handle array dimensions: check 2D vs 3D compatibility in plotting/feature extraction
+- Fix test vs. code: fix tests for wrong APIs/expectations, fix code for actual bugs
+- Debug systematically: isolate issue → categorize → fix → validate → test regression
+
 ## Key Modules
 
 - `pythoneeg/core/analysis.py` - `LongRecordingAnalyzer` main analysis orchestrator
