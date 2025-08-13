@@ -1,5 +1,6 @@
 import glob
 import gzip
+import json
 import logging
 import math
 import os
@@ -33,6 +34,8 @@ from .utils import (
     get_temp_directory,
     parse_truncate,
     get_file_stem,
+    should_use_cache_unified,
+    get_cache_status_message,
 )
 
 
@@ -107,6 +110,62 @@ class DDFBinaryMetadata:
         if vals.size == 0:
             return None
         return vals.iloc[0]
+
+    def to_dict(self) -> dict:
+        """Convert DDFBinaryMetadata to a dictionary for JSON serialization."""
+        return {
+            "metadata_path": str(self.metadata_path) if self.metadata_path else None,
+            "n_channels": self.n_channels,
+            "f_s": self.f_s,
+            "V_units": self.V_units,
+            "mult_to_uV": self.mult_to_uV,
+            "precision": self.precision,
+            "dt_end": self.dt_end.isoformat() if self.dt_end else None,
+            "channel_names": self.channel_names,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "DDFBinaryMetadata":
+        """Create DDFBinaryMetadata from a dictionary (from JSON deserialization)."""
+        dt_end = datetime.fromisoformat(data["dt_end"]) if data["dt_end"] else None
+        
+        return cls(
+            metadata_path=None,  # We're reconstructing from cached data
+            n_channels=data["n_channels"],
+            f_s=data["f_s"],
+            dt_end=dt_end,
+            channel_names=data["channel_names"],
+        )
+
+    def to_json(self, file_path: Path) -> None:
+        """Save DDFBinaryMetadata to a JSON file."""
+        with open(file_path, 'w') as f:
+            json.dump(self.to_dict(), f, indent=2)
+
+    @classmethod
+    def from_json(cls, file_path: Path) -> "DDFBinaryMetadata":
+        """Load DDFBinaryMetadata from a JSON file."""
+        with open(file_path, 'r') as f:
+            data = json.load(f)
+        
+        # Reconstruct the object, preserving additional fields that were serialized
+        instance = cls.from_dict(data)
+        
+        # Set additional fields that might not be in from_dict
+        instance.V_units = data.get("V_units")
+        instance.mult_to_uV = data.get("mult_to_uV")
+        instance.precision = data.get("precision")
+        
+        return instance
+
+    def update_sampling_rate(self, new_f_s: float) -> None:
+        """Update the sampling rate in this metadata object.
+        
+        This should be called when the associated recording is resampled.
+        """
+        old_f_s = self.f_s
+        self.f_s = new_f_s
+        logging.info(f"Updated DDFBinaryMetadata sampling rate from {old_f_s} Hz to {new_f_s} Hz")
 
 
 def convert_ddfcolbin_to_ddfrowbin(rowdir_path, colbin_path, metadata, save_gzip=True):
@@ -183,6 +242,8 @@ def convert_ddfrowbin_to_si(bin_rowmajor_path, metadata):
     if rec.sampling_frequency != constants.GLOBAL_SAMPLING_RATE:
         warnings.warn(f"Sampling rate {rec.sampling_frequency} Hz != {constants.GLOBAL_SAMPLING_RATE} Hz. Resampling")
         rec = spre.resample(rec, constants.GLOBAL_SAMPLING_RATE)
+        # Update metadata to reflect the new sampling rate
+        metadata.update_sampling_rate(constants.GLOBAL_SAMPLING_RATE)
 
     rec = spre.astype(rec, dtype=constants.GLOBAL_DTYPE)
 
@@ -195,7 +256,7 @@ class LongRecordingOrganizer:
         base_folder_path,
         mode: Literal["bin", "si", "mne", None] = "bin",
         truncate: Union[bool, int] = False,
-        overwrite_rowbins: bool = False,
+        cache_policy: Literal["auto", "always", "force_regenerate"] = "auto",
         multiprocess_mode: Literal["dask", "serial"] = "serial",
         extract_func: Union[Callable[..., si.BaseRecording], Callable[..., mne.io.Raw]] = None,
         input_type: Literal["folder", "file", "files"] = "folder",
@@ -261,7 +322,7 @@ class LongRecordingOrganizer:
         if mode is not None:
             self.detect_and_load_data(
                 mode=mode,
-                overwrite_rowbins=overwrite_rowbins,
+                cache_policy=cache_policy,
                 multiprocess_mode=multiprocess_mode,
                 extract_func=extract_func,
                 input_type=input_type,
@@ -272,7 +333,7 @@ class LongRecordingOrganizer:
     def detect_and_load_data(
         self,
         mode: Literal["bin", "si", "mne", None] = "bin",
-        overwrite_rowbins: bool = False,
+        cache_policy: Literal["auto", "always", "force_regenerate"] = "auto",
         multiprocess_mode: Literal["dask", "serial"] = "serial",
         extract_func: Union[Callable[..., si.BaseRecording], Callable[..., mne.io.Raw]] = None,
         input_type: Literal["folder", "file", "files"] = "folder",
@@ -284,12 +345,17 @@ class LongRecordingOrganizer:
         if mode == "bin":
             # Binary file pipeline
             self.convert_colbins_rowbins_to_rec(
-                overwrite_rowbins=overwrite_rowbins, multiprocess_mode=multiprocess_mode
+                cache_policy=cache_policy,
+                multiprocess_mode=multiprocess_mode,
             )
         elif mode == "si":
             # EDF file pipeline
             self.convert_file_with_si_to_recording(
-                extract_func=extract_func, input_type=input_type, file_pattern=file_pattern, **kwargs
+                extract_func=extract_func,
+                input_type=input_type,
+                file_pattern=file_pattern,
+                cache_policy=cache_policy,
+                **kwargs,
             )
         elif mode == "mne":
             # MNE file pipeline
@@ -297,6 +363,7 @@ class LongRecordingOrganizer:
                 extract_func=extract_func,
                 input_type=input_type,
                 file_pattern=file_pattern,
+                cache_policy=cache_policy,
                 n_jobs=self.n_jobs,
                 **kwargs,
             )
@@ -434,11 +501,14 @@ class LongRecordingOrganizer:
         return
 
     def convert_colbins_rowbins_to_rec(
-        self, overwrite_rowbins: bool = False, multiprocess_mode: Literal["dask", "serial"] = "serial"
+        self,
+        overwrite_rowbins: bool = False,
+        multiprocess_mode: Literal["dask", "serial"] = "serial",
+        cache_policy: Literal["auto", "always", "force_regenerate"] = "auto",
     ):
         self.prepare_colbins_rowbins_metas()
         self.convert_colbins_to_rowbins(overwrite=overwrite_rowbins, multiprocess_mode=multiprocess_mode)
-        self.convert_rowbins_to_rec(multiprocess_mode=multiprocess_mode)
+        self.convert_rowbins_to_rec(multiprocess_mode=multiprocess_mode, cache_policy=cache_policy)
         # Now that file_durations are available, finalize timestamps
         self.finalize_file_timestamps()
 
@@ -484,13 +554,21 @@ class LongRecordingOrganizer:
 
         self.__update_colbins_rowbins_metas()
 
-    def convert_rowbins_to_rec(self, multiprocess_mode: Literal["dask", "serial"] = "serial"):
+    def convert_rowbins_to_rec(
+        self,
+        multiprocess_mode: Literal["dask", "serial"] = "serial",
+        cache_policy: Literal["auto", "always", "force_regenerate"] = "auto",
+    ):
         """
         Convert row-major binary files to SpikeInterface Recording structure.
 
         Args:
             multiprocess_mode (Literal['dask', 'serial'], optional): If 'dask', use dask to convert the files in parallel.
                 If 'serial', convert the files in serial. Defaults to 'serial'.
+            cache_policy (Literal): Caching policy for intermediate files (default: "auto")
+                - "auto": Use cached files if exist and newer than sources, regenerate with logging if missing/invalid
+                - "always": Use cached files if exist, raise error if missing/invalid
+                - "force_regenerate": Always regenerate files, overwrite existing cache
         """
         if len(self.rowbins) < len(self.colbins):
             warnings.warn(
@@ -543,13 +621,14 @@ class LongRecordingOrganizer:
         self.LongRecording: si.BaseRecording = si.concatenate_recordings(recs).rename_channels(self.channel_names)
 
         # Debug logging for critical recording features
-        logging.debug(f"LongRecording created: {self}")
+        logging.info(f"LongRecording created: {self}")
 
     def convert_file_with_si_to_recording(
         self,
         extract_func: Callable[..., si.BaseRecording],
         input_type: Literal["folder", "file", "files"] = "folder",
         file_pattern: str = "*",
+        cache_policy: Literal["auto", "always", "force_regenerate"] = "auto",
         **kwargs,
     ):
         """Create a SpikeInterface Recording from a folder, a single file, or multiple files.
@@ -649,80 +728,25 @@ class LongRecordingOrganizer:
         # Debug logging for critical recording features
         logging.debug(f"LongRecording created via SI: {self}")
 
-    def convert_file_with_mne_to_recording(
-        self,
-        extract_func: Callable[..., mne.io.Raw],
-        input_type: Literal["folder", "file", "files"] = "folder",
-        file_pattern: str = "*",
-        intermediate: Literal["edf", "bin"] = "edf",
-        intermediate_name=None,
-        overwrite=True,
-        multiprocess_mode: Literal["dask", "serial"] = "serial",
-        n_jobs: int = None,
-        **kwargs,
-    ):
-        """
-        Convert MNE-compatible files to SpikeInterface recording format.
-
-        Args:
-            extract_func (Callable): Function that takes a file path and returns mne.io.Raw object
-            input_type (Literal): Type of input - "folder", "file", or "files"
-            file_pattern (str): Glob pattern for file matching (default: "*")
-            intermediate (Literal): Intermediate format - "edf" or "bin" (default: "edf")
-            intermediate_name (str, optional): Custom name for intermediate file
-            overwrite (bool): Whether to overwrite existing intermediate files (default: True)
-            multiprocess_mode (Literal): Processing mode - "dask" or "serial" (default: "serial")
-            n_jobs (int, optional): Number of jobs for MNE resampling. If None (default),
-                                uses the instance n_jobs value. Set to -1 for automatic parallel
-                                detection, or >1 for specific job count.
-            **kwargs: Additional arguments passed to extract_func
-        """
-        # Early validation and file discovery
+    def _load_and_process_mne_data(
+        self, extract_func, input_type, datafolder, datafile, datafiles, n_jobs, metadata_to_update=None, **kwargs
+    ) -> mne.io.Raw:
+        """Helper method to load and process MNE data from various input types."""
+        # Load data based on input type
         if input_type == "folder":
-            # For single folder, validate that timestamps are provided
-            self._validate_timestamps_for_mode("mne", 1)
-            datafolder = self.base_folder_path
             raw: mne.io.Raw = extract_func(datafolder, **kwargs)
-            n_processed_files = 1
         elif input_type == "file":
-            # For single file, validate that timestamps are provided
-            self._validate_timestamps_for_mode("mne", 1)
-            datafiles = list(self.base_folder_path.glob(file_pattern))
-            if len(datafiles) == 0:
-                raise ValueError(f"No files found matching pattern: {file_pattern}")
-            elif len(datafiles) > 1:
-                warnings.warn(f"Multiple files found matching pattern: {file_pattern}. Using first file.")
-            datafile = datafiles[0]
             raw: mne.io.Raw = extract_func(datafile, **kwargs)
-            n_processed_files = 1
         elif input_type == "files":
-            datafiles = list(self.base_folder_path.glob(file_pattern))
-            if len(datafiles) == 0:
-                raise ValueError(f"No files found matching pattern: {file_pattern}")
-            datafiles = self._truncate_file_list(datafiles)
-            # Validate timestamps early before slow processing
-            self._validate_timestamps_for_mode("mne", len(datafiles))
-            datafiles.sort()  # FIXME sort by index, or some other logic. Files may be out of order otherwise, messing up isday calculation
             logging.info(f"Running extract_func on {len(datafiles)} files")
             raws: list[mne.io.Raw] = [extract_func(x, **kwargs) for x in datafiles]
             logging.info(f"Concatenating {len(raws)} raws")
             raw: mne.io.Raw = mne.concatenate_raws(raws)
             del raws
-            n_processed_files = len(datafiles)
         else:
             raise ValueError(f"Invalid input_type: {input_type}")
 
-        # Store number of processed files for timestamp handling
-        self._n_processed_files = n_processed_files
-
-        logging.info(raw.info)
-        logging.info(f"Resampling from {raw.info['sfreq']} to {constants.GLOBAL_SAMPLING_RATE}")
-
-        # Optimize resampling performance
-        # Ensure data is preloaded for parallel processing
-        if not raw.preload:
-            logging.info("Preloading data")
-            raw.load_data()
+        logging.info(f"raw.info: {raw.info}")
 
         # Use user-specified n_jobs for MNE resampling, or default to 1
         effective_n_jobs = n_jobs if n_jobs is not None else self.n_jobs
@@ -730,59 +754,300 @@ class LongRecordingOrganizer:
             f"Using n_jobs={effective_n_jobs} for MNE resampling (method param: {n_jobs}, instance: {self.n_jobs})"
         )
 
-        # Use optimal resampling method with power-of-2 padding for speed
-        raw = raw.resample(constants.GLOBAL_SAMPLING_RATE, n_jobs=effective_n_jobs, npad="auto", method="fft")
+        # Ensure data is preloaded for parallel processing
+        if not raw.preload:
+            logging.info("Preloading data")
+            raw.load_data()
 
-        # Cache raw to binary
+        # Use optimal resampling method with power-of-2 padding for speed
+        original_sfreq = raw.info['sfreq']
+        if original_sfreq != constants.GLOBAL_SAMPLING_RATE:
+            logging.info(f"Resampling from {original_sfreq} to {constants.GLOBAL_SAMPLING_RATE}")
+            raw = raw.resample(constants.GLOBAL_SAMPLING_RATE, n_jobs=effective_n_jobs, npad="auto", method="fft")
+            
+            # Update metadata to reflect the new sampling rate
+            if metadata_to_update is not None:
+                metadata_to_update.update_sampling_rate(constants.GLOBAL_SAMPLING_RATE)
+        else:
+            logging.info(f"Sampling frequency already matches {constants.GLOBAL_SAMPLING_RATE} Hz, no resampling needed")
+
+        return raw
+
+    def _get_or_create_intermediate_file(
+        self,
+        fname,
+        source_paths,
+        cache_policy,
+        intermediate,
+        extract_func,
+        input_type,
+        datafolder,
+        datafile,
+        datafiles,
+        n_jobs,
+        **kwargs,
+    ):
+        """Get cached intermediate file or create it if needed.
+        
+        Returns:
+            tuple: (recording, raw_object, metadata) where:
+                - recording: SpikeInterface recording object
+                - raw_object: MNE Raw object (None if using cache)
+                - metadata: DDFBinaryMetadata object
+        """
+        # Define metadata sidecar file path
+        meta_fname = fname.with_suffix(fname.suffix + '.meta.json')
+        
+        # Check cache policy and validate cache files
+        if cache_policy == "force_regenerate":
+            use_cache = False
+            logging.info(get_cache_status_message(fname, False))
+            logging.info("Cache policy 'force_regenerate': ignoring any existing cache")
+        else:
+            # Check if both data and metadata cache files exist and are valid
+            data_cache_valid = should_use_cache_unified(fname, source_paths, cache_policy)
+            meta_cache_valid = meta_fname.exists() if data_cache_valid else False
+            
+            # Handle cache validation based on policy
+            if not data_cache_valid or not meta_cache_valid:
+                if cache_policy == "always":
+                    # 'always' policy: raise error if cache missing/invalid
+                    missing_files = []
+                    if not data_cache_valid:
+                        missing_files.append(f"intermediate file ({fname})")
+                    if not meta_cache_valid:
+                        missing_files.append(f"metadata sidecar ({meta_fname})")
+                    raise FileNotFoundError(
+                        f"Cache policy 'always' requires existing cache files, but missing: {', '.join(missing_files)}"
+                    )
+                elif cache_policy == "auto":
+                    # 'auto' policy: log and regenerate if cache missing/invalid
+                    if not data_cache_valid:
+                        logging.info(f"Intermediate file {fname} missing or outdated, regenerating")
+                    if not meta_cache_valid:
+                        logging.info(f"Metadata sidecar {meta_fname} missing, regenerating")
+                    use_cache = False
+                else:
+                    use_cache = False
+            else:
+                use_cache = True
+                
+            if use_cache:
+                logging.info(get_cache_status_message(fname, True))
+                logging.info(f"Loading cached metadata from {meta_fname}")
+                
+                # Load metadata from sidecar file
+                try:
+                    metadata = DDFBinaryMetadata.from_json(meta_fname)
+                    logging.info(f"Loaded cached metadata: {metadata.n_channels} channels, {metadata.f_s} Hz")
+                except Exception as e:
+                    if cache_policy == "always":
+                        # 'always' policy: raise error if metadata invalid
+                        raise ValueError(f"Cache policy 'always' requires valid metadata, but failed to load {meta_fname}: {e}")
+                    elif cache_policy == "auto":
+                        # 'auto' policy: log and regenerate if metadata invalid
+                        logging.info(f"Failed to load cached metadata from {meta_fname}: {e}")
+                        logging.info("Regenerating intermediate files due to invalid metadata")
+                        use_cache = False
+
+        if use_cache:
+            # Load cached data file
+            if intermediate == "edf":
+                logging.info("Reading cached edf file")
+                rec = se.read_edf(fname)
+                return rec, None, metadata  # No raw object when using cache
+                
+            elif intermediate == "bin":
+                # Use metadata to reconstruct SpikeInterface parameters
+                params = {
+                    "sampling_frequency": metadata.f_s,
+                    "num_channels": metadata.n_channels,
+                    "dtype": "float64",  # We standardize on float64 for cached binary files
+                    "gain_to_uV": 1,
+                    "offset_to_uV": 0,
+                    "time_axis": 0,
+                    "is_filtered": False,
+                }
+
+                logging.info(f"Reading from cached binary file {fname}")
+                rec = se.read_binary(fname, **params)
+                return rec, None, metadata  # No raw object when using cache
+        
+        else:
+            # Generate new intermediate files
+            logging.info(get_cache_status_message(fname, False))
+
+            # Create metadata object from raw info BEFORE resampling
+            # We need to load one file to get the original metadata
+            if input_type == "folder":
+                sample_raw = extract_func(datafolder, **kwargs)
+            elif input_type == "file":
+                sample_raw = extract_func(datafile, **kwargs)
+            elif input_type == "files":
+                sample_raw = extract_func(datafiles[0], **kwargs)
+            else:
+                raise ValueError(f"Invalid input_type: {input_type}")
+            
+            # Create metadata from the original raw object (before resampling)
+            original_info = sample_raw.info
+            metadata = DDFBinaryMetadata(
+                metadata_path=None,
+                n_channels=original_info["nchan"],
+                f_s=original_info["sfreq"],  # Original sampling rate
+                dt_end=None,  # Will be set later by finalize_file_timestamps
+                channel_names=original_info["ch_names"],
+            )
+            logging.info(f"Created metadata from raw: {metadata.n_channels} channels, {metadata.f_s} Hz")
+
+            # Load and process all the data (this may resample and update metadata)
+            raw = self._load_and_process_mne_data(
+                extract_func, input_type, datafolder, datafile, datafiles, n_jobs, 
+                metadata_to_update=metadata, **kwargs
+            )
+
+            # Create the intermediate file
+            if intermediate == "edf":
+                logging.info(f"Exporting raw to {fname}")
+                mne.export.export_raw(fname, raw=raw, fmt="edf", overwrite=True)
+
+                logging.info("Reading edf file")
+                rec = se.read_edf(fname)
+
+            elif intermediate == "bin":
+                # Get raw info for SpikeInterface parameters
+                raw_info = raw.info
+                params = {
+                    "sampling_frequency": raw_info["sfreq"],
+                    "num_channels": raw_info["nchan"],
+                    "gain_to_uV": 1,
+                    "offset_to_uV": 0,
+                    "time_axis": 0,
+                    "is_filtered": False,
+                }
+
+                logging.info(f"Exporting raw to {fname}")
+                data: np.ndarray = raw.get_data()  # (n channels, n samples)
+                data = data.T  # (n samples, n channels)
+                params["dtype"] = data.dtype
+                logging.info(f"Writing to {fname}")
+                data.tofile(fname)
+
+                logging.info(f"Reading from {fname}")
+                rec = se.read_binary(fname, **params)
+            
+            else:
+                raise ValueError(f"Invalid intermediate: {intermediate}")
+
+            # Save metadata sidecar file
+            logging.info(f"Saving metadata to {meta_fname}")
+            metadata.to_json(meta_fname)
+            
+            return rec, raw, metadata
+
+    def convert_file_with_mne_to_recording(
+        self,
+        extract_func: Callable[..., mne.io.Raw],
+        input_type: Literal["folder", "file", "files"] = "folder",
+        file_pattern: str = "*",
+        intermediate: Literal["edf", "bin"] = "edf",
+        intermediate_name=None,
+        cache_policy: Literal["auto", "always", "force_regenerate"] = "auto",
+        multiprocess_mode: Literal["dask", "serial"] = "serial",
+        n_jobs: int = None,
+        **kwargs,
+    ):
+        """
+        Convert MNE-compatible files to SpikeInterface recording format with metadata caching.
+
+        Args:
+            extract_func (Callable): Function that takes a file path and returns mne.io.Raw object
+            input_type (Literal): Type of input - "folder", "file", or "files"
+            file_pattern (str): Glob pattern for file matching (default: "*")
+            intermediate (Literal): Intermediate format - "edf" or "bin" (default: "edf")
+            intermediate_name (str, optional): Custom name for intermediate file
+            cache_policy (Literal): Caching policy for intermediate and metadata files (default: "auto")
+                - "auto": Use cached files if both data and metadata exist and cache is newer than sources, regenerate with logging if missing/invalid
+                - "always": Use cached files if both data and metadata exist, raise error if missing/invalid
+                - "force_regenerate": Always regenerate files, overwrite existing cache
+            multiprocess_mode (Literal): Processing mode - "dask" or "serial" (default: "serial")
+            n_jobs (int, optional): Number of jobs for MNE resampling. If None (default),
+                                uses the instance n_jobs value. Set to -1 for automatic parallel
+                                detection, or >1 for specific job count.
+            **kwargs: Additional arguments passed to extract_func
+            
+        Note:
+            Creates two cache files: data file (e.g., file.edf) and metadata sidecar (e.g., file.edf.meta.json).
+            Both files must exist for cache to be used. Metadata preserves channel names, original 
+            sampling rates, and other DDFBinaryMetadata fields across cache hits.
+        """
+        # Early validation and file discovery
+        if input_type == "folder":
+            self._validate_timestamps_for_mode("mne", 1)
+            datafolder = self.base_folder_path
+            datafile = None
+            datafiles = None
+            source_paths = [self.base_folder_path]
+            n_processed_files = 1
+
+        elif input_type == "file":
+            self._validate_timestamps_for_mode("mne", 1)
+            datafiles = list(self.base_folder_path.glob(file_pattern))
+            if len(datafiles) == 0:
+                raise ValueError(f"No files found matching pattern: {file_pattern}")
+            elif len(datafiles) > 1:
+                warnings.warn(f"Multiple files found matching pattern: {file_pattern}. Using first file.")
+            datafile = datafiles[0]
+            datafolder = None
+            source_paths = [datafile]
+            n_processed_files = 1
+
+        elif input_type == "files":
+            datafiles = list(self.base_folder_path.glob(file_pattern))
+            if len(datafiles) == 0:
+                raise ValueError(f"No files found matching pattern: {file_pattern}")
+            datafiles = self._truncate_file_list(datafiles)
+            self._validate_timestamps_for_mode("mne", len(datafiles))
+            datafiles.sort()
+            datafolder = None
+            datafile = None
+            source_paths = datafiles
+            n_processed_files = len(datafiles)
+
+        else:
+            raise ValueError(f"Invalid input_type: {input_type}")
+
+        # Store number of processed files for timestamp handling
+        self._n_processed_files = n_processed_files
+
+        # Determine intermediate file path
         intermediate_name = (
             f"{self.base_folder_path.name}_mne-to-rec" if intermediate_name is None else intermediate_name
         )
-        if intermediate == "edf":
-            fname = self.base_folder_path / f"{intermediate_name}.edf"
-            logging.info(f"Exporting raw to {fname}")
-            mne.export.export_raw(
-                fname, raw=raw, fmt="edf", overwrite=overwrite
-            )  # NOTE this causes a lot of OOM issues
-            logging.info("Reading edf file")
-            rec = se.read_edf(fname)
-        elif intermediate == "bin":
-            fname = self.base_folder_path / f"{intermediate_name}.bin"
-            logging.info(f"Exporting raw to {fname}")
-            data: np.ndarray = raw.get_data()  # (n channels, n samples)
-            data = data.T  # (n samples, n channels)
-            logging.info(f"Writing to {fname}")
-            data.tofile(fname)
+        fname = self.base_folder_path / f"{intermediate_name}.{intermediate}"
 
-            logging.info(f"raw.info: {raw.info}")
-            logging.info(f"raw.info['sfreq']: {raw.info['sfreq']}")
-            logging.info(f"raw.info['nchan']: {raw.info['nchan']}")
-
-            params = {
-                "sampling_frequency": raw.info["sfreq"],
-                "dtype": data.dtype,
-                "num_channels": raw.info["nchan"],
-                "gain_to_uV": 1,
-                "offset_to_uV": 0,
-                "time_axis": 0,
-                "is_filtered": False,
-            }
-            logging.info(f"Reading from {fname}")
-            rec = se.read_binary(fname, **params)
-
-        else:
-            raise ValueError(f"Invalid intermediate: {intermediate}")
+        # Get or create the intermediate file (this handles caching logic)
+        rec, raw, metadata = self._get_or_create_intermediate_file(
+            fname=fname,
+            source_paths=source_paths,
+            cache_policy=cache_policy,
+            intermediate=intermediate,
+            extract_func=extract_func,
+            input_type=input_type,
+            datafolder=datafolder,
+            datafile=datafile,
+            datafiles=datafiles,
+            n_jobs=n_jobs,
+            **kwargs,
+        )
 
         self.LongRecording = rec
-        # For MNE mode, don't use confusing DEFAULT_DAY if we have manual timestamps
-        dt_end = None if self.manual_datetimes is not None else None  # Will be set by finalize_file_timestamps
 
-        self.meta = DDFBinaryMetadata(
-            None,
-            n_channels=self.LongRecording.get_num_channels(),
-            f_s=self.LongRecording.get_sampling_frequency(),
-            dt_end=dt_end,
-            channel_names=raw.info["ch_names"],
-        )
+        # Use the metadata object that was either loaded from cache or created from raw data
+        # Update dt_end for manual timestamps (will be properly set by finalize_file_timestamps)
+        if self.manual_datetimes is not None:
+            metadata.dt_end = None  # Will be set by finalize_file_timestamps
+        
+        self.meta = metadata
         self.channel_names = self.meta.channel_names
 
         # For mne mode, handle multiple files or single file
@@ -1069,10 +1334,10 @@ class LongRecordingOrganizer:
 
         channel_info = "No channels"
         if hasattr(self, "channel_names") and self.channel_names:
-            if len(self.channel_names) <= 5:
-                channel_info = f"[{', '.join(self.channel_names)}]"
-            else:
-                channel_info = f"[{', '.join(self.channel_names[:3])}, ..., {self.channel_names[-1]}] ({len(self.channel_names)} total)"
+            # if len(self.channel_names) <= 5:
+            channel_info = f"[{', '.join(self.channel_names)}]"
+            # else:
+            #     channel_info = f"[{', '.join(self.channel_names[:3])}, ..., {self.channel_names[-1]}] ({len(self.channel_names)} total)"
 
         metadata_info = ""
         if hasattr(self, "meta") and self.meta:
