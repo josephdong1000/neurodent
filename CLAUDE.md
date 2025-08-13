@@ -45,6 +45,9 @@ Python scientific computing package for extracting features from mouse EEG recor
 - Avoid overdocumenting code that is self-explanatory, particularly inline comments
 - Typehints are great -- use them
 - **Imports**: Prefer immediate imports for IDE support; use lazy imports only for heavy dependencies (MNE/SpikeInterface classes)
+- **API Design**: When parameters create confusing interactions, unify into single clear parameter with descriptive values
+- **Code Cleanup**: Remove unused functions, consolidate redundant code, clean up imports when requested
+- **Variable Scope**: Trace all code paths to ensure variables are properly defined in scope before implementing parameter changes
 
 **Error handling:** 
 - Return `np.nan` for math failures, insufficient data, undefined results
@@ -56,6 +59,7 @@ Python scientific computing package for extracting features from mouse EEG recor
 - Mock external dependencies (SpikeInterface, MNE) in unit tests
 - Test edge cases: empty arrays, NaN values, extreme values
 - **Import changes**: Test all import patterns, circular imports, and IDE functionality
+- **Test Organization**: Consolidate scattered test files covering same functionality into comprehensive suites
 
 **Test markers:**
 ```python
