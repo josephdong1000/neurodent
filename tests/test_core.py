@@ -935,6 +935,7 @@ class TestLongRecordingOrganizer:
         mock_info = Mock()
         mock_info.sfreq = 2000.0
         mock_info.nchan = 2
+        mock_info.ch_names = ["ch1", "ch2"]  # Add channel names
         mock_info.__getitem__ = lambda self, key: getattr(self, key)  # Allow dict-style access
         mock_raw.info = mock_info
         mock_raw.resample.return_value = mock_raw
@@ -988,6 +989,7 @@ class TestLongRecordingOrganizer:
         mock_info = Mock()
         mock_info.sfreq = 1000.0
         mock_info.nchan = n_channels
+        mock_info.ch_names = ["ch1", "ch2", "ch3"]  # Add channel names
         mock_info.__getitem__ = lambda self, key: getattr(self, key)  # Allow dict-style access
         mock_raw.info = mock_info
         mock_raw.resample.return_value = mock_raw
@@ -1050,6 +1052,7 @@ class TestMNENJobsParameter:
         mock_info = Mock()
         mock_info.sfreq = 2000.0
         mock_info.nchan = 2
+        mock_info.ch_names = ["ch1", "ch2"]  # Add channel names
         mock_info.__getitem__ = lambda self, key: getattr(self, key)
         mock_raw.info = mock_info
         mock_raw.resample.return_value = mock_raw
@@ -1099,6 +1102,7 @@ class TestMNENJobsParameter:
         mock_info = Mock()
         mock_info.sfreq = 2000.0
         mock_info.nchan = 2
+        mock_info.ch_names = ["ch1", "ch2"]  # Add channel names
         mock_info.__getitem__ = lambda self, key: getattr(self, key)
         mock_raw.info = mock_info
         mock_raw.resample.return_value = mock_raw
@@ -1145,6 +1149,7 @@ class TestMNENJobsParameter:
         mock_info = Mock()
         mock_info.sfreq = 2000.0
         mock_info.nchan = 2
+        mock_info.ch_names = ["ch1", "ch2"]  # Add channel names
         mock_info.__getitem__ = lambda self, key: getattr(self, key)
         mock_raw.info = mock_info
         mock_raw.resample.return_value = mock_raw
