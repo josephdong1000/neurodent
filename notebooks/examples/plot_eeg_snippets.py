@@ -13,8 +13,7 @@ import numpy as np
 from tqdm import tqdm
 import spikeinterface.preprocessing as spre
 
-from pythoneeg import constants, visualization
-from pythoneeg.core.utils import parse_chname_to_abbrev
+from pythoneeg import constants, core, visualization
 
 # Configure logging
 logging.basicConfig(
@@ -367,7 +366,7 @@ def plot_genotype_snippets(genotype: str, snippets: List[Dict], save_folder: Pat
 
                 for ch_name in channel_names:
                     try:
-                        abbrev = parse_chname_to_abbrev(ch_name, assume_from_number=True, strict_matching=False)
+                        abbrev = core.parse_chname_to_abbrev(ch_name, assume_from_number=True, strict_matching=False)
                         plot_channel_abbrevs.append(abbrev)
                     except Exception:
                         plot_channel_abbrevs.append(str(ch_name)[:4])  # Fallback: first 4 chars
