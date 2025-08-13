@@ -208,7 +208,7 @@ def nanaverage(A: np.ndarray, weights: np.ndarray, axis: int = -1) -> np.ndarray
     """
     masked = np.ma.masked_array(A, np.isnan(A))
     avg = np.ma.average(masked, axis=axis, weights=weights)
-    
+
     # Handle case where np.ma.average returns a scalar instead of masked array
     if np.ma.is_masked(avg):
         return avg.filled(np.nan)
@@ -216,7 +216,6 @@ def nanaverage(A: np.ndarray, weights: np.ndarray, axis: int = -1) -> np.ndarray
         # avg is a scalar or regular array, convert to array and handle NaN
         result = np.asarray(avg)
         return np.where(np.isfinite(result), result, np.nan)
-
 
 
 def parse_path_to_animalday(

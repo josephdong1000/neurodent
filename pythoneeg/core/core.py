@@ -202,6 +202,7 @@ class LongRecordingOrganizer:
         file_pattern: str = None,
         manual_datetimes: datetime | list[datetime] = None,
         datetimes_are_start: bool = True,
+        n_jobs: int = 1,
         **kwargs,
     ):
         """Construct a long recording from binary files or EDF files.
@@ -221,6 +222,8 @@ class LongRecordingOrganizer:
                 For 'si'/'mne' modes: if datetime, used as start/end of entire recording; if list, one per input file.
             datetimes_are_start (bool, optional): If True, manual_datetimes are treated as start times.
                 If False, treated as end times. Defaults to True.
+            n_jobs (int, optional): Number of jobs for MNE resampling operations. Defaults to 1 for safety.
+                Set to -1 for automatic parallel detection, or >1 for specific job count.
             **kwargs: Additional arguments passed to the data loading functions.
 
         Raises:
@@ -239,6 +242,9 @@ class LongRecordingOrganizer:
         self.manual_datetimes = manual_datetimes
         self.datetimes_are_start = datetimes_are_start
 
+        # Store n_jobs parameter for MNE operations
+        self.n_jobs = n_jobs
+
         # Validate manual time parameters
         self._validate_manual_time_params()
 
@@ -247,7 +253,6 @@ class LongRecordingOrganizer:
         self.channel_names = None
         self.LongRecording = None
         self.temppaths = []
-        # self.start_datetime = None
         self.file_durations = []
         self.cumulative_file_durations = []
         self.bad_channel_names = []
@@ -289,7 +294,11 @@ class LongRecordingOrganizer:
         elif mode == "mne":
             # MNE file pipeline
             self.convert_file_with_mne_to_recording(
-                extract_func=extract_func, input_type=input_type, file_pattern=file_pattern, **kwargs
+                extract_func=extract_func,
+                input_type=input_type,
+                file_pattern=file_pattern,
+                n_jobs=self.n_jobs,
+                **kwargs,
             )
         elif mode is None:
             pass
@@ -533,6 +542,9 @@ class LongRecordingOrganizer:
 
         self.LongRecording: si.BaseRecording = si.concatenate_recordings(recs).rename_channels(self.channel_names)
 
+        # Debug logging for critical recording features
+        logging.debug(f"LongRecording created: {self}")
+
     def convert_file_with_si_to_recording(
         self,
         extract_func: Callable[..., si.BaseRecording],
@@ -606,13 +618,18 @@ class LongRecordingOrganizer:
         self._n_processed_files = n_processed_files
 
         self.LongRecording = rec
+        # For SI mode, don't use confusing DEFAULT_DAY if we have manual timestamps
+        dt_end = None if self.manual_datetimes is not None else None  # Will be set by finalize_file_timestamps
+
         self.meta = DDFBinaryMetadata(
             None,
             n_channels=self.LongRecording.get_num_channels(),
             f_s=self.LongRecording.get_sampling_frequency(),
-            dt_end=constants.DEFAULT_DAY,  # NOTE parse timestamp from SI file date/metadata?
-            channel_names=self.LongRecording.get_channel_ids().tolist(),
+            dt_end=dt_end,  # Will be properly set by finalize_file_timestamps
+            channel_names=self.LongRecording.get_channel_ids().tolist(),  # NOTE may potentially be a list of integers, which is undesirable. The ability to set names is available in the extractor function itself
+            # In the case this is integers, raise a warning and/or error, convert to string, and make a note that you may need to adjust parameters in si extractor
         )
+        self.channel_names = self.meta.channel_names
 
         # For si mode, handle multiple files or single file
         if not hasattr(self, "file_durations") or not self.file_durations:
@@ -629,6 +646,9 @@ class LongRecordingOrganizer:
         # Apply manual timestamps if provided
         self.finalize_file_timestamps()
 
+        # Debug logging for critical recording features
+        logging.debug(f"LongRecording created via SI: {self}")
+
     def convert_file_with_mne_to_recording(
         self,
         extract_func: Callable[..., mne.io.Raw],
@@ -638,8 +658,25 @@ class LongRecordingOrganizer:
         intermediate_name=None,
         overwrite=True,
         multiprocess_mode: Literal["dask", "serial"] = "serial",
+        n_jobs: int = None,
         **kwargs,
     ):
+        """
+        Convert MNE-compatible files to SpikeInterface recording format.
+
+        Args:
+            extract_func (Callable): Function that takes a file path and returns mne.io.Raw object
+            input_type (Literal): Type of input - "folder", "file", or "files"
+            file_pattern (str): Glob pattern for file matching (default: "*")
+            intermediate (Literal): Intermediate format - "edf" or "bin" (default: "edf")
+            intermediate_name (str, optional): Custom name for intermediate file
+            overwrite (bool): Whether to overwrite existing intermediate files (default: True)
+            multiprocess_mode (Literal): Processing mode - "dask" or "serial" (default: "serial")
+            n_jobs (int, optional): Number of jobs for MNE resampling. If None (default),
+                                uses the instance n_jobs value. Set to -1 for automatic parallel
+                                detection, or >1 for specific job count.
+            **kwargs: Additional arguments passed to extract_func
+        """
         # Early validation and file discovery
         if input_type == "folder":
             # For single folder, validate that timestamps are provided
@@ -680,7 +717,21 @@ class LongRecordingOrganizer:
 
         logging.info(raw.info)
         logging.info(f"Resampling from {raw.info['sfreq']} to {constants.GLOBAL_SAMPLING_RATE}")
-        raw = raw.resample(constants.GLOBAL_SAMPLING_RATE)
+
+        # Optimize resampling performance
+        # Ensure data is preloaded for parallel processing
+        if not raw.preload:
+            logging.info("Preloading data")
+            raw.load_data()
+
+        # Use user-specified n_jobs for MNE resampling, or default to 1
+        effective_n_jobs = n_jobs if n_jobs is not None else self.n_jobs
+        logging.info(
+            f"Using n_jobs={effective_n_jobs} for MNE resampling (method param: {n_jobs}, instance: {self.n_jobs})"
+        )
+
+        # Use optimal resampling method with power-of-2 padding for speed
+        raw = raw.resample(constants.GLOBAL_SAMPLING_RATE, n_jobs=effective_n_jobs, npad="auto", method="fft")
 
         # Cache raw to binary
         intermediate_name = (
@@ -722,13 +773,17 @@ class LongRecordingOrganizer:
             raise ValueError(f"Invalid intermediate: {intermediate}")
 
         self.LongRecording = rec
+        # For MNE mode, don't use confusing DEFAULT_DAY if we have manual timestamps
+        dt_end = None if self.manual_datetimes is not None else None  # Will be set by finalize_file_timestamps
+
         self.meta = DDFBinaryMetadata(
             None,
             n_channels=self.LongRecording.get_num_channels(),
             f_s=self.LongRecording.get_sampling_frequency(),
-            dt_end=constants.DEFAULT_DAY,  # NOTE parse timestamp from MNE file date/metadata?
-            channel_names=self.LongRecording.get_channel_ids().tolist(),
+            dt_end=dt_end,
+            channel_names=raw.info["ch_names"],
         )
+        self.channel_names = self.meta.channel_names
 
         # For mne mode, handle multiple files or single file
         if not hasattr(self, "file_durations") or not self.file_durations:
@@ -744,6 +799,9 @@ class LongRecordingOrganizer:
 
         # Apply manual timestamps if provided
         self.finalize_file_timestamps()
+
+        # Debug logging for critical recording features
+        logging.debug(f"LongRecording created via MNE: {self}")
 
     def cleanup_rec(self):
         try:
@@ -992,45 +1050,6 @@ class LongRecordingOrganizer:
             else:
                 # For si/mne modes, manual timestamps are required
                 raise ValueError("manual_datetimes must be provided when no CSV metadata is available!")
-    def __str__(self):
-        """Return a string representation of critical long recording features."""
-        if not hasattr(self, "LongRecording") or self.LongRecording is None:
-            return "LongRecordingOrganizer: No recording loaded yet"
-
-        n_channels = self.LongRecording.get_num_channels()
-        sampling_freq = self.LongRecording.get_sampling_frequency()
-        total_duration = self.LongRecording.get_duration()
-
-        n_files = len(self.file_durations) if hasattr(self, "file_durations") and self.file_durations else 1
-
-        timestamp_info = "No timestamps"
-        if hasattr(self, "file_end_datetimes") and self.file_end_datetimes:
-            timestamp_coverage = len([x for x in self.file_end_datetimes if x is not None])
-            timestamp_info = f"{timestamp_coverage}/{len(self.file_end_datetimes)} files have timestamps"
-
-        channel_info = "No channels"
-        if hasattr(self, "channel_names") and self.channel_names:
-            if len(self.channel_names) <= 5:
-                channel_info = f"[{', '.join(self.channel_names)}]"
-            else:
-                channel_info = f"[{', '.join(self.channel_names[:3])}, ..., {self.channel_names[-1]}] ({len(self.channel_names)} total)"
-
-        metadata_info = ""
-        if hasattr(self, "meta") and self.meta:
-            if hasattr(self.meta, "precision") and self.meta.precision:
-                metadata_info = f", {self.meta.precision} precision"
-            if hasattr(self.meta, "V_units") and self.meta.V_units:
-                metadata_info += f", {self.meta.V_units} units"
-
-        return (
-            f"LongRecording: {n_files} files, {n_channels} channels, "
-            f"{sampling_freq} Hz, {total_duration:.1f}s duration, "
-            f"channels: {channel_info}{metadata_info}, timestamps: {timestamp_info}"
-        )
-
-    def __repr__(self):
-        """Return a detailed string representation for debugging."""
-        return self.__str__()
 
     def __str__(self):
         """Return a string representation of critical long recording features."""
@@ -1071,4 +1090,3 @@ class LongRecordingOrganizer:
     def __repr__(self):
         """Return a detailed string representation for debugging."""
         return self.__str__()
-

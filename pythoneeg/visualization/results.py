@@ -245,7 +245,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                         np_fragments[idx] = lan.get_fragment_np(idx)
 
                     # Cache fragments to zarr
-                    tmppath, _ = core.cache_fragments_to_zarr(np_fragments, n_fragments_war)
+                    tmppath, _ = core.utils.cache_fragments_to_zarr(np_fragments, n_fragments_war)
                     del np_fragments
 
                     logging.debug("Processing metadata serially")
@@ -394,7 +394,7 @@ class AnimalOrganizer(AnimalFeatureParser):
 
         frag_dt = lan.LongRecording.get_datetime_fragment(window_s, idx)
         row["timestamp"] = frag_dt
-        row["isday"] = core.is_day(frag_dt)
+        row["isday"] = core.utils.is_day(frag_dt)
 
         return row
 
@@ -887,7 +887,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         )  # Match to appropriate target
         if use_abbrevs is None:  # Match channels as abbreviations
             bad_channels = [
-                core.utils.parse_chname_to_abbrev(ch, assume_from_number=self.assume_from_number) for ch in bad_channels
+                core.parse_chname_to_abbrev(ch, assume_from_number=self.assume_from_number) for ch in bad_channels
             ]
 
         n_samples = len(self.result)
