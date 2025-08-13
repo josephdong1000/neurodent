@@ -220,7 +220,7 @@ class TestManualTimestamps:
         organizer.file_durations = [3600.0, 1800.0]
         
         # Call the method we want to test
-        organizer._finalize_file_timestamps()
+        organizer.finalize_file_timestamps()
         
         # Verify the correct end times were computed
         expected = [

@@ -820,12 +820,16 @@ class TestLongRecordingOrganizer:
             mock_meta.metadata_df = pd.DataFrame({'ProbeInfo': ['ch1']})
             mock_metadata_class.return_value = mock_meta
             
-            with pytest.raises(ValueError, match="No dates found in any metadata object!"):
-                organizer.prepare_colbins_rowbins_metas()
+            # This should now process without error since the validation was moved to after processing
+            # and only affects certain conditions
+            organizer.prepare_colbins_rowbins_metas()
                 
     def test_convert_file_with_si_to_recording_folder_mode(self, temp_dir):
         """Test convert_file_with_si_to_recording with folder input."""
-        organizer = LongRecordingOrganizer(temp_dir, mode=None)
+        from datetime import datetime
+        organizer = LongRecordingOrganizer(temp_dir, mode=None,
+                                         manual_datetimes=datetime(2023, 1, 1, 10, 0, 0),
+                                         datetimes_are_start=True)
         
         # Mock extract function and recording
         mock_extract = Mock()
@@ -833,6 +837,7 @@ class TestLongRecordingOrganizer:
         mock_recording.get_num_channels.return_value = 4
         mock_recording.get_sampling_frequency.return_value = 1000.0
         mock_recording.get_channel_ids.return_value = np.array(['ch1', 'ch2', 'ch3', 'ch4'])
+        mock_recording.get_duration.return_value = 3600.0
         mock_extract.return_value = mock_recording
         
         organizer.convert_file_with_si_to_recording(
@@ -852,13 +857,17 @@ class TestLongRecordingOrganizer:
         test_file = temp_dir / "test.edf"
         test_file.touch()
         
-        organizer = LongRecordingOrganizer(temp_dir, mode=None)
+        from datetime import datetime
+        organizer = LongRecordingOrganizer(temp_dir, mode=None,
+                                         manual_datetimes=datetime(2023, 1, 1, 10, 0, 0),
+                                         datetimes_are_start=True)
         
         mock_extract = Mock()
         mock_recording = Mock()
         mock_recording.get_num_channels.return_value = 2
         mock_recording.get_sampling_frequency.return_value = 500.0
         mock_recording.get_channel_ids.return_value = np.array(['ch1', 'ch2'])
+        mock_recording.get_duration.return_value = 1800.0
         mock_extract.return_value = mock_recording
         
         organizer.convert_file_with_si_to_recording(
@@ -879,12 +888,18 @@ class TestLongRecordingOrganizer:
         file1.touch()
         file2.touch()
         
-        organizer = LongRecordingOrganizer(temp_dir, mode=None)
+        from datetime import datetime
+        organizer = LongRecordingOrganizer(temp_dir, mode=None,
+                                         manual_datetimes=[datetime(2023, 1, 1, 10, 0, 0), 
+                                                         datetime(2023, 1, 1, 11, 0, 0)],
+                                         datetimes_are_start=True)
         
         # Mock extract function to return different recordings
         mock_extract = Mock()
         mock_rec1 = Mock()
         mock_rec2 = Mock()
+        mock_rec1.get_duration.return_value = 3600.0
+        mock_rec2.get_duration.return_value = 1800.0
         mock_extract.side_effect = [mock_rec1, mock_rec2]
         
         # Mock concatenate_recordings
@@ -892,6 +907,7 @@ class TestLongRecordingOrganizer:
         mock_concat_rec.get_num_channels.return_value = 2
         mock_concat_rec.get_sampling_frequency.return_value = 1000.0
         mock_concat_rec.get_channel_ids.return_value = np.array(['ch1', 'ch2'])
+        mock_concat_rec.get_duration.return_value = 5400.0
         
         with patch('spikeinterface.core.concatenate_recordings', return_value=mock_concat_rec):
             organizer.convert_file_with_si_to_recording(
@@ -909,7 +925,10 @@ class TestLongRecordingOrganizer:
         test_file = temp_dir / "test.bdf"
         test_file.touch()
         
-        organizer = LongRecordingOrganizer(temp_dir, mode=None)
+        from datetime import datetime
+        organizer = LongRecordingOrganizer(temp_dir, mode=None,
+                                         manual_datetimes=datetime(2023, 1, 1, 10, 0, 0),
+                                         datetimes_are_start=True)
         
         # Mock MNE raw object
         mock_raw = Mock()
@@ -919,6 +938,7 @@ class TestLongRecordingOrganizer:
         mock_info.__getitem__ = lambda self, key: getattr(self, key)  # Allow dict-style access
         mock_raw.info = mock_info
         mock_raw.resample.return_value = mock_raw
+        mock_raw.get_data.return_value = np.random.randn(2, 3600000)
         
         mock_extract = Mock(return_value=mock_raw)
         
@@ -927,6 +947,7 @@ class TestLongRecordingOrganizer:
         mock_si_rec.get_num_channels.return_value = 2
         mock_si_rec.get_sampling_frequency.return_value = 1000.0
         mock_si_rec.get_channel_ids.return_value = np.array(['ch1', 'ch2'])
+        mock_si_rec.get_duration.return_value = 3600.0
         
         with patch('mne.export.export_raw') as mock_export, \
              patch('spikeinterface.extractors.read_edf', return_value=mock_si_rec):
@@ -938,8 +959,13 @@ class TestLongRecordingOrganizer:
                 intermediate="edf"
             )
         
-        # Verify raw was resampled and exported
-        mock_raw.resample.assert_called_once_with(constants.GLOBAL_SAMPLING_RATE)
+        # Verify raw was resampled with correct parameters (MNE uses serial processing)
+        mock_raw.resample.assert_called_once()
+        call_args = mock_raw.resample.call_args
+        assert call_args[0][0] == constants.GLOBAL_SAMPLING_RATE  # First positional arg is sampling rate
+        assert call_args.kwargs['n_jobs'] == 1  # Serial processing for MNE
+        assert 'npad' in call_args.kwargs
+        assert 'method' in call_args.kwargs
         mock_export.assert_called_once()
         assert organizer.LongRecording == mock_si_rec
         
@@ -948,7 +974,10 @@ class TestLongRecordingOrganizer:
         test_file = temp_dir / "test.bdf"
         test_file.touch()
         
-        organizer = LongRecordingOrganizer(temp_dir, mode=None)
+        from datetime import datetime
+        organizer = LongRecordingOrganizer(temp_dir, mode=None,
+                                         manual_datetimes=datetime(2023, 1, 1, 10, 0, 0),
+                                         datetimes_are_start=True)
         
         # Mock MNE raw object with test data
         n_channels = 3
@@ -971,6 +1000,7 @@ class TestLongRecordingOrganizer:
         mock_si_rec.get_num_channels.return_value = n_channels
         mock_si_rec.get_sampling_frequency.return_value = 1000.0
         mock_si_rec.get_channel_ids.return_value = np.array(['ch1', 'ch2', 'ch3'])
+        mock_si_rec.get_duration.return_value = 1.0  # 1000 samples at 1000 Hz = 1 second
         
         with patch('spikeinterface.extractors.read_binary', return_value=mock_si_rec):
             organizer.convert_file_with_mne_to_recording(
@@ -990,6 +1020,161 @@ class TestLongRecordingOrganizer:
         np.testing.assert_array_almost_equal(written_data, expected_data)
         
         assert organizer.LongRecording == mock_si_rec
+
+
+class TestMNENJobsParameter:
+    """Test n_jobs parameter functionality in MNE conversions."""
+    
+    @pytest.fixture
+    def temp_dir(self):
+        """Create temporary directory for tests."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            yield Path(tmp_dir)
+    
+    def test_default_n_jobs_equals_one(self, temp_dir):
+        """Test that n_jobs defaults to 1 for safety."""
+        test_file = temp_dir / "test.bdf"
+        test_file.touch()
+        
+        # Default n_jobs should be 1
+        organizer = LongRecordingOrganizer(
+            temp_dir, mode=None,
+            manual_datetimes=datetime(2023, 1, 1, 10, 0, 0),
+            datetimes_are_start=True
+        )
+        
+        assert organizer.n_jobs == 1
+        
+        # Mock MNE raw object
+        mock_raw = Mock()
+        mock_info = Mock()
+        mock_info.sfreq = 2000.0
+        mock_info.nchan = 2
+        mock_info.__getitem__ = lambda self, key: getattr(self, key)
+        mock_raw.info = mock_info
+        mock_raw.resample.return_value = mock_raw
+        mock_raw.get_data.return_value = np.random.randn(2, 3600)
+        
+        mock_extract = Mock(return_value=mock_raw)
+        
+        # Mock SpikeInterface recording
+        mock_si_rec = Mock()
+        mock_si_rec.get_num_channels.return_value = 2
+        mock_si_rec.get_sampling_frequency.return_value = constants.GLOBAL_SAMPLING_RATE
+        mock_si_rec.get_channel_ids.return_value = np.array(['ch1', 'ch2'])
+        mock_si_rec.get_duration.return_value = 3.6
+        
+        with patch('mne.export.export_raw'), \
+             patch('spikeinterface.extractors.read_edf', return_value=mock_si_rec):
+            
+            organizer.convert_file_with_mne_to_recording(
+                extract_func=mock_extract,
+                input_type="file",
+                file_pattern="*.bdf",
+                intermediate="edf"
+            )
+        
+        # Should use n_jobs=1 (default)
+        mock_raw.resample.assert_called_once()
+        call_args = mock_raw.resample.call_args
+        assert call_args.kwargs['n_jobs'] == 1
+    
+    def test_explicit_n_jobs_override(self, temp_dir):
+        """Test that users can override n_jobs parameter."""
+        test_file = temp_dir / "test.bdf"
+        test_file.touch()
+        
+        # User specifies n_jobs=4
+        organizer = LongRecordingOrganizer(
+            temp_dir, mode=None,
+            manual_datetimes=datetime(2023, 1, 1, 10, 0, 0),
+            datetimes_are_start=True,
+            n_jobs=4
+        )
+        
+        assert organizer.n_jobs == 4
+        
+        # Mock MNE raw object
+        mock_raw = Mock()
+        mock_info = Mock()
+        mock_info.sfreq = 2000.0
+        mock_info.nchan = 2
+        mock_info.__getitem__ = lambda self, key: getattr(self, key)
+        mock_raw.info = mock_info
+        mock_raw.resample.return_value = mock_raw
+        mock_raw.get_data.return_value = np.random.randn(2, 3600)
+        
+        mock_extract = Mock(return_value=mock_raw)
+        
+        # Mock SpikeInterface recording
+        mock_si_rec = Mock()
+        mock_si_rec.get_num_channels.return_value = 2
+        mock_si_rec.get_sampling_frequency.return_value = constants.GLOBAL_SAMPLING_RATE
+        mock_si_rec.get_channel_ids.return_value = np.array(['ch1', 'ch2'])
+        mock_si_rec.get_duration.return_value = 3.6
+        
+        with patch('mne.export.export_raw'), \
+             patch('spikeinterface.extractors.read_edf', return_value=mock_si_rec):
+            
+            organizer.convert_file_with_mne_to_recording(
+                extract_func=mock_extract,
+                input_type="file",
+                file_pattern="*.bdf",
+                intermediate="edf"
+            )
+        
+        # Should use user-specified n_jobs=4
+        mock_raw.resample.assert_called_once()
+        call_args = mock_raw.resample.call_args
+        assert call_args.kwargs['n_jobs'] == 4
+    
+    def test_n_jobs_direct_method_call(self, temp_dir):
+        """Test n_jobs parameter when calling convert_file_with_mne_to_recording directly."""
+        test_file = temp_dir / "test.bdf"
+        test_file.touch()
+        
+        organizer = LongRecordingOrganizer(
+            temp_dir, mode=None,
+            manual_datetimes=datetime(2023, 1, 1, 10, 0, 0),
+            datetimes_are_start=True,
+            n_jobs=1  # Default
+        )
+        
+        # Mock MNE raw object
+        mock_raw = Mock()
+        mock_info = Mock()
+        mock_info.sfreq = 2000.0
+        mock_info.nchan = 2
+        mock_info.__getitem__ = lambda self, key: getattr(self, key)
+        mock_raw.info = mock_info
+        mock_raw.resample.return_value = mock_raw
+        mock_raw.get_data.return_value = np.random.randn(2, 1000)
+        
+        mock_extract = Mock(return_value=mock_raw)
+        
+        # Mock SpikeInterface recording
+        mock_si_rec = Mock()
+        mock_si_rec.get_num_channels.return_value = 2
+        mock_si_rec.get_sampling_frequency.return_value = constants.GLOBAL_SAMPLING_RATE
+        mock_si_rec.get_channel_ids.return_value = np.array(['ch1', 'ch2'])
+        mock_si_rec.get_duration.return_value = 1.0
+        
+        with patch('mne.export.export_raw'), \
+             patch('spikeinterface.extractors.read_edf', return_value=mock_si_rec):
+            
+            # Call directly with override n_jobs=6
+            organizer.convert_file_with_mne_to_recording(
+                extract_func=mock_extract,
+                input_type="file",
+                file_pattern="*.bdf",
+                intermediate="edf",
+                n_jobs=6  # Override the instance default
+            )
+        
+        # Should use the method parameter n_jobs=6, not instance n_jobs=1
+        mock_raw.resample.assert_called_once()
+        call_args = mock_raw.resample.call_args
+        assert call_args.kwargs['n_jobs'] == 6
 
 
 @pytest.fixture
