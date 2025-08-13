@@ -675,18 +675,18 @@ def get_file_stem(filepath: Union[str, Path]) -> str:
     return name.split(".")[0]
 
 
-# def _get_groupby_keys(df: pd.DataFrame, groupby: str | list[str]):
-#     """
-#     Get the unique values of the groupby variable.
-#     """
-#     return list(df.groupby(groupby).groups.keys())
+def _get_groupby_keys(df: pd.DataFrame, groupby: str | list[str]):
+    """
+    Get the unique values of the groupby variable.
+    """
+    return list(df.groupby(groupby).groups.keys())
 
 
-# def _get_pairwise_combinations(x: list):
-#     """
-#     Get all pairwise combinations of a list.
-#     """
-#     return list(itertools.combinations(x, 2))
+def _get_pairwise_combinations(x: list):
+    """
+    Get all pairwise combinations of a list.
+    """
+    return list(itertools.combinations(x, 2))
 
 
 class _HiddenPrints:
@@ -1104,3 +1104,102 @@ def validate_timestamps(timestamps: list[datetime], gap_threshold_seconds: float
             )
 
     return valid_timestamps
+
+
+def should_use_cached_file(
+    cache_path: Union[str, Path],
+    source_paths: list[Union[str, Path]],
+    use_cached: Literal["auto", "always", "never", "error"] = "auto"
+) -> bool:
+    """
+    Determine whether to use a cached intermediate file based on caching policy and file timestamps.
+    
+    Args:
+        cache_path: Path to the cached intermediate file
+        source_paths: List of source file paths that the cache depends on
+        use_cached: Caching policy
+            - "auto": Use cached if exists and newer than all sources (default)
+            - "always": Always use cached if it exists
+            - "never": Never use cached (always regenerate)
+            - "error": Raise error if cached doesn't exist
+    
+    Returns:
+        bool: True if cached file should be used, False if it should be regenerated
+        
+    Raises:
+        FileNotFoundError: When use_cached="error" and cache doesn't exist
+        ValueError: For invalid use_cached values
+    """
+    cache_path = Path(cache_path)
+    source_paths = [Path(p) for p in source_paths]
+    
+    if use_cached == "never":
+        return False
+    elif use_cached == "error":
+        if not cache_path.exists():
+            raise FileNotFoundError(f"Cache file required but not found: {cache_path}")
+        return True
+    elif use_cached == "always":
+        return cache_path.exists()
+    elif use_cached == "auto":
+        if not cache_path.exists():
+            return False
+        
+        # Check if cache is newer than all source files
+        cache_mtime = cache_path.stat().st_mtime
+        
+        for source_path in source_paths:
+            if not source_path.exists():
+                continue  # Skip missing source files
+            if source_path.stat().st_mtime > cache_mtime:
+                logging.info(f"Cache {cache_path.name} is older than {source_path.name}, regenerating")
+                return False
+        
+        logging.info(f"Using cached intermediate file: {cache_path.name}")
+        return True
+    else:
+        raise ValueError(f"Invalid use_cached value: {use_cached}")
+
+
+def get_cache_status_message(
+    cache_path: Union[str, Path], 
+    use_cached: bool
+) -> str:
+    """Generate a descriptive message about cache usage for logging."""
+    cache_path = Path(cache_path)
+    
+    if use_cached:
+        return f"Using cached intermediate: {cache_path.name}"
+    else:
+        return f"Regenerating intermediate: {cache_path.name}"
+
+
+def should_use_cache_unified(
+    cache_path: Union[str, Path], 
+    source_paths: list[Union[str, Path]], 
+    cache_policy: Literal["auto", "always", "force_regenerate"]
+) -> bool:
+    """Unified cache decision logic for all intermediate files.
+    
+    Args:
+        cache_path: Path to the cache file
+        source_paths: List of source file paths to check timestamps against
+        cache_policy: Caching policy:
+            - "auto": Use cache if exists and newer than sources, regenerate with logging if missing/invalid
+            - "always": Use cache if exists, raise error if missing/invalid
+            - "force_regenerate": Always regenerate and overwrite existing cache
+        
+    Returns:
+        bool: True if cache should be used, False if should regenerate
+        
+    Raises:
+        ValueError: If cache_policy is invalid
+    """
+    if cache_policy == "force_regenerate":
+        return False
+    elif cache_policy == "always":
+        return Path(cache_path).exists()
+    elif cache_policy == "auto":
+        return should_use_cached_file(cache_path, source_paths, "auto")
+    else:
+        raise ValueError(f"Invalid cache_policy: {cache_policy}. Must be one of: auto, always, force_regenerate")
