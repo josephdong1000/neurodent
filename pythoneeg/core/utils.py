@@ -376,7 +376,7 @@ def parse_str_to_day(
             "full": Try parsing the entire cleaned string only
             "split": Try parsing individual tokens only
             "window": Try parsing sliding windows of tokens (2-4 tokens) only
-            "all": Use all three approaches in sequence
+            "all": Use all three approaches in the order "full", "split", "window
     Returns:
         datetime: Datetime object corresponding to the day of the binfolder.
 
