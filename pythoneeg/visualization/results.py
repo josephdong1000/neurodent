@@ -1185,11 +1185,48 @@ class WindowAnalysisResult(AnimalFeatureParser):
         """Filter out bad channels by recording session.
 
         Args:
-            bad_channels_dict (dict[str, list[str]], optional): Dict of bad channels per session
-            use_abbrevs (bool, optional): Whether to use abbreviations. Defaults to None.
+            bad_channels_dict (dict[str, list[str]], optional): Dictionary mapping recording session 
+                identifiers to lists of bad channel names to reject. Session identifiers are in the 
+                format "{animal_id} {genotype} {day}" (e.g., "A10 WT Apr-01-2023"). Channel names 
+                can be either full names (e.g., "Left Auditory") or abbreviations (e.g., "LAud"). 
+                If None, uses the bad_channels_dict from the constructor. Defaults to None.
+            use_abbrevs (bool, optional): Override automatic channel name format detection. If True, 
+                channels are assumed to be abbreviations. If False, channels are assumed to be full 
+                names. If None, automatically detects format and converts to abbreviations for matching. 
+                Defaults to None.
 
         Returns:
-            WindowAnalysisResult: New filtered instance
+            WindowAnalysisResult: New filtered instance with bad channels masked as NaN for their 
+                respective recording sessions
+
+        Examples:
+            Filter specific channels per session using abbreviations:
+            >>> bad_channels = {
+            ...     "A10 WT Apr-01-2023": ["LAud", "RMot"],  # Session 1: reject left auditory, right motor
+            ...     "A10 WT Apr-02-2023": ["LVis"]           # Session 2: reject left visual only
+            ... }
+            >>> filtered_war = war.filter_reject_channels_by_session(bad_channels, use_abbrevs=True)
+
+            Filter using full channel names:
+            >>> bad_channels = {
+            ...     "A12 KO May-15-2023": ["Left Motor", "Right Barrel"],
+            ...     "A12 KO May-16-2023": ["Left Auditory", "Left Visual", "Right Motor"]
+            ... }
+            >>> filtered_war = war.filter_reject_channels_by_session(bad_channels, use_abbrevs=False)
+
+            Auto-detect channel format (recommended):
+            >>> bad_channels = {
+            ...     "A15 WT Jun-10-2023": ["LMot", "RBar"],  # Will auto-detect as abbreviations
+            ...     "A15 WT Jun-11-2023": ["LAud"]
+            ... }
+            >>> filtered_war = war.filter_reject_channels_by_session(bad_channels)
+
+        Note:
+            - Session identifiers must exactly match the "animalday" values in the result DataFrame
+            - Available channel abbreviations: LAud, RAud, LVis, RVis, LHip, RHip, LBar, RBar, LMot, RMot
+            - Channel names are case-insensitive and support various formats (e.g., "left aud", "Left Auditory")
+            - If a session identifier is not found in bad_channels_dict, a warning is logged but processing continues
+            - If a channel name is not recognized, a warning is logged but other channels are still processed
         """
         mask = self.get_filter_reject_channels_by_recording_session(bad_channels_dict, use_abbrevs=use_abbrevs)
         return self._create_filtered_copy(mask)
