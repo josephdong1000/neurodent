@@ -203,6 +203,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         window_s=4,
         multiprocess_mode: Literal["dask", "serial"] = "serial",
         suppress_short_interval_error=False,
+        apply_notch_filter=True,
         **kwargs,
     ):
         """Computes windowed analysis of animal recordings. The data is divided into windows (time bins), then features are extracted from each window. The result is
@@ -213,6 +214,7 @@ class AnimalOrganizer(AnimalFeatureParser):
             exclude (list[str], optional): List of features to ignore. Will override the features parameter. Defaults to [].
             window_s (int, optional): Length of each window in seconds. Note that some features break with very short window times. Defaults to 4.
             suppress_short_interval_error (bool, optional): If True, suppress ValueError for short intervals between timestamps in resulting WindowAnalysisResult. Useful for aggregated WARs. Defaults to False.
+            apply_notch_filter (bool, optional): Whether to apply notch filtering to remove line noise. Uses constants.LINE_FREQ. Defaults to True.
 
         Raises:
             AttributeError: If a feature's compute_...() function was not implemented, this error will be raised.
@@ -225,7 +227,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         dataframes = []
         for lrec in self.long_recordings:  # Iterate over all long recordings
             logging.info(f"Computing windowed analysis for {lrec.base_folder_path}")
-            lan = core.LongRecordingAnalyzer(lrec, fragment_len_s=window_s)
+            lan = core.LongRecordingAnalyzer(lrec, fragment_len_s=window_s, apply_notch_filter=apply_notch_filter)
             if lan.n_fragments == 0:
                 logging.warning(f"No fragments found for {lrec.base_folder_path}. Skipping.")
                 continue
