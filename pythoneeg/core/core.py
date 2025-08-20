@@ -128,7 +128,7 @@ class DDFBinaryMetadata:
     def from_dict(cls, data: dict) -> "DDFBinaryMetadata":
         """Create DDFBinaryMetadata from a dictionary (from JSON deserialization)."""
         dt_end = datetime.fromisoformat(data["dt_end"]) if data["dt_end"] else None
-        
+
         return cls(
             metadata_path=None,  # We're reconstructing from cached data
             n_channels=data["n_channels"],
@@ -139,28 +139,28 @@ class DDFBinaryMetadata:
 
     def to_json(self, file_path: Path) -> None:
         """Save DDFBinaryMetadata to a JSON file."""
-        with open(file_path, 'w') as f:
+        with open(file_path, "w") as f:
             json.dump(self.to_dict(), f, indent=2)
 
     @classmethod
     def from_json(cls, file_path: Path) -> "DDFBinaryMetadata":
         """Load DDFBinaryMetadata from a JSON file."""
-        with open(file_path, 'r') as f:
+        with open(file_path, "r") as f:
             data = json.load(f)
-        
+
         # Reconstruct the object, preserving additional fields that were serialized
         instance = cls.from_dict(data)
-        
+
         # Set additional fields that might not be in from_dict
         instance.V_units = data.get("V_units")
         instance.mult_to_uV = data.get("mult_to_uV")
         instance.precision = data.get("precision")
-        
+
         return instance
 
     def update_sampling_rate(self, new_f_s: float) -> None:
         """Update the sampling rate in this metadata object.
-        
+
         This should be called when the associated recording is resampled.
         """
         old_f_s = self.f_s
@@ -760,16 +760,18 @@ class LongRecordingOrganizer:
             raw.load_data()
 
         # Use optimal resampling method with power-of-2 padding for speed
-        original_sfreq = raw.info['sfreq']
+        original_sfreq = raw.info["sfreq"]
         if original_sfreq != constants.GLOBAL_SAMPLING_RATE:
             logging.info(f"Resampling from {original_sfreq} to {constants.GLOBAL_SAMPLING_RATE}")
             raw = raw.resample(constants.GLOBAL_SAMPLING_RATE, n_jobs=effective_n_jobs, npad="auto", method="fft")
-            
+
             # Update metadata to reflect the new sampling rate
             if metadata_to_update is not None:
                 metadata_to_update.update_sampling_rate(constants.GLOBAL_SAMPLING_RATE)
         else:
-            logging.info(f"Sampling frequency already matches {constants.GLOBAL_SAMPLING_RATE} Hz, no resampling needed")
+            logging.info(
+                f"Sampling frequency already matches {constants.GLOBAL_SAMPLING_RATE} Hz, no resampling needed"
+            )
 
         return raw
 
@@ -788,7 +790,7 @@ class LongRecordingOrganizer:
         **kwargs,
     ):
         """Get cached intermediate file or create it if needed.
-        
+
         Returns:
             tuple: (recording, raw_object, metadata) where:
                 - recording: SpikeInterface recording object
@@ -796,8 +798,8 @@ class LongRecordingOrganizer:
                 - metadata: DDFBinaryMetadata object
         """
         # Define metadata sidecar file path
-        meta_fname = fname.with_suffix(fname.suffix + '.meta.json')
-        
+        meta_fname = fname.with_suffix(fname.suffix + ".meta.json")
+
         # Check cache policy and validate cache files
         if cache_policy == "force_regenerate":
             use_cache = False
@@ -807,7 +809,7 @@ class LongRecordingOrganizer:
             # Check if both data and metadata cache files exist and are valid
             data_cache_valid = should_use_cache_unified(fname, source_paths, cache_policy)
             meta_cache_valid = meta_fname.exists() if data_cache_valid else False
-            
+
             # Handle cache validation based on policy
             if not data_cache_valid or not meta_cache_valid:
                 if cache_policy == "always":
@@ -831,11 +833,11 @@ class LongRecordingOrganizer:
                     use_cache = False
             else:
                 use_cache = True
-                
+
             if use_cache:
                 logging.info(get_cache_status_message(fname, True))
                 logging.info(f"Loading cached metadata from {meta_fname}")
-                
+
                 # Load metadata from sidecar file
                 try:
                     metadata = DDFBinaryMetadata.from_json(meta_fname)
@@ -843,7 +845,9 @@ class LongRecordingOrganizer:
                 except Exception as e:
                     if cache_policy == "always":
                         # 'always' policy: raise error if metadata invalid
-                        raise ValueError(f"Cache policy 'always' requires valid metadata, but failed to load {meta_fname}: {e}")
+                        raise ValueError(
+                            f"Cache policy 'always' requires valid metadata, but failed to load {meta_fname}: {e}"
+                        )
                     elif cache_policy == "auto":
                         # 'auto' policy: log and regenerate if metadata invalid
                         logging.info(f"Failed to load cached metadata from {meta_fname}: {e}")
@@ -856,7 +860,7 @@ class LongRecordingOrganizer:
                 logging.info("Reading cached edf file")
                 rec = se.read_edf(fname)
                 return rec, None, metadata  # No raw object when using cache
-                
+
             elif intermediate == "bin":
                 # Use metadata to reconstruct SpikeInterface parameters
                 params = {
@@ -872,7 +876,7 @@ class LongRecordingOrganizer:
                 logging.info(f"Reading from cached binary file {fname}")
                 rec = se.read_binary(fname, **params)
                 return rec, None, metadata  # No raw object when using cache
-        
+
         else:
             # Generate new intermediate files
             logging.info(get_cache_status_message(fname, False))
@@ -887,7 +891,7 @@ class LongRecordingOrganizer:
                 sample_raw = extract_func(datafiles[0], **kwargs)
             else:
                 raise ValueError(f"Invalid input_type: {input_type}")
-            
+
             # Create metadata from the original raw object (before resampling)
             original_info = sample_raw.info
             metadata = DDFBinaryMetadata(
@@ -901,8 +905,7 @@ class LongRecordingOrganizer:
 
             # Load and process all the data (this may resample and update metadata)
             raw = self._load_and_process_mne_data(
-                extract_func, input_type, datafolder, datafile, datafiles, n_jobs, 
-                metadata_to_update=metadata, **kwargs
+                extract_func, input_type, datafolder, datafile, datafiles, n_jobs, metadata_to_update=metadata, **kwargs
             )
 
             # Create the intermediate file
@@ -934,14 +937,14 @@ class LongRecordingOrganizer:
 
                 logging.info(f"Reading from {fname}")
                 rec = se.read_binary(fname, **params)
-            
+
             else:
                 raise ValueError(f"Invalid intermediate: {intermediate}")
 
             # Save metadata sidecar file
             logging.info(f"Saving metadata to {meta_fname}")
             metadata.to_json(meta_fname)
-            
+
             return rec, raw, metadata
 
     def convert_file_with_mne_to_recording(
@@ -974,10 +977,10 @@ class LongRecordingOrganizer:
                                 uses the instance n_jobs value. Set to -1 for automatic parallel
                                 detection, or >1 for specific job count.
             **kwargs: Additional arguments passed to extract_func
-            
+
         Note:
             Creates two cache files: data file (e.g., file.edf) and metadata sidecar (e.g., file.edf.meta.json).
-            Both files must exist for cache to be used. Metadata preserves channel names, original 
+            Both files must exist for cache to be used. Metadata preserves channel names, original
             sampling rates, and other DDFBinaryMetadata fields across cache hits.
         """
         # Early validation and file discovery
@@ -1046,7 +1049,7 @@ class LongRecordingOrganizer:
         # Update dt_end for manual timestamps (will be properly set by finalize_file_timestamps)
         if self.manual_datetimes is not None:
             metadata.dt_end = None  # Will be set by finalize_file_timestamps
-        
+
         self.meta = metadata
         self.channel_names = self.meta.channel_names
 
@@ -1143,11 +1146,43 @@ class LongRecordingOrganizer:
 
         return mne.io.RawArray(data=data, info=info)
 
-    def compute_bad_channels(self, lof_threshold: float = 1.5, limit_memory: bool = True):
+    def compute_bad_channels(
+        self, lof_threshold: float = None, limit_memory: bool = True, force_recompute: bool = False
+    ):
+        """Compute bad channels using LOF analysis with unified score storage.
+
+        Args:
+            lof_threshold (float, optional): Threshold for determining bad channels from LOF scores.
+                                           If None, only computes/loads scores without setting bad_channel_names.
+            limit_memory (bool): Whether to reduce memory usage by decimation and float16.
+            force_recompute (bool): Whether to recompute LOF scores even if they exist.
+        """
+        # Check if LOF scores already exist and are current
+        if not force_recompute and hasattr(self, "lof_scores") and self.lof_scores is not None:
+            logging.info("Using existing LOF scores")
+        else:
+            # Compute new LOF scores
+            scores = self._compute_lof_scores(limit_memory=limit_memory)
+            self.lof_scores = scores
+            logging.info(f"Computed LOF scores for {len(scores)} channels")
+
+        # Apply threshold if provided
+        if lof_threshold is not None:
+            self.apply_lof_threshold(lof_threshold)
+
+    def _compute_lof_scores(self, limit_memory: bool = True) -> np.ndarray:
+        """Compute raw LOF scores for all channels.
+
+        Args:
+            limit_memory (bool): Whether to reduce memory usage.
+
+        Returns:
+            np.ndarray: LOF scores for each channel.
+        """
         nn = Natural_Neighbor()
         rec = self.LongRecording
 
-        logging.info(f"Computing bad channels for {rec.__str__()}")
+        logging.info(f"Computing LOF scores for {rec.__str__()}")
         logging.debug("Getting traces from recording object")
         rec_np = rec.get_traces(return_scaled=True)  # (n_samples, n_channels)
         if limit_memory:
@@ -1158,7 +1193,7 @@ class LongRecordingOrganizer:
         # Compute the optimal number of neighbors
         nn.read(rec_np)
         n_neighbors = nn.algorithm()
-        logging.info(f"n_neighbors for bad channel detection: {n_neighbors}")
+        logging.info(f"n_neighbors for LOF computation: {n_neighbors}")
 
         # Initialize LocalOutlierFactor
         lof = LocalOutlierFactor(n_neighbors=n_neighbors, metric="minkowski", p=2)
@@ -1169,12 +1204,33 @@ class LongRecordingOrganizer:
         lof.fit(rec_np)
         del rec_np
         scores = lof.negative_outlier_factor_ * -1
-        is_inlier = scores < lof_threshold
-        logging.debug(f"is_inlier: {is_inlier}")
-        logging.debug(f"lof scores: {scores}")
+        logging.debug(f"LOF scores: {scores}")
 
+        return scores
+
+    def apply_lof_threshold(self, lof_threshold: float):
+        """Apply threshold to existing LOF scores to determine bad channels.
+
+        Args:
+            lof_threshold (float): Threshold for determining bad channels.
+        """
+        if not hasattr(self, "lof_scores") or self.lof_scores is None:
+            raise ValueError("LOF scores not available. Run compute_bad_channels() first.")
+
+        is_inlier = self.lof_scores < lof_threshold
         self.bad_channel_names = [self.channel_names[i] for i in np.where(~is_inlier)[0]]
-        logging.info(f"lrec.bad_channel_names: {self.bad_channel_names}")
+        logging.info(f"Applied threshold {lof_threshold}: bad_channel_names = {self.bad_channel_names}")
+
+    def get_lof_scores(self) -> dict:
+        """Get LOF scores with channel names.
+
+        Returns:
+            dict: Dictionary mapping channel names to LOF scores.
+        """
+        if not hasattr(self, "lof_scores") or self.lof_scores is None:
+            raise ValueError("LOF scores not available. Run compute_bad_channels() first.")
+
+        return dict(zip(self.channel_names, self.lof_scores))
 
     def _validate_manual_time_params(self):
         """Validate that manual time parameters are correctly specified."""

@@ -21,7 +21,6 @@ from dask import delayed
 from django.utils.text import slugify
 from scipy.stats import zscore
 from scipy.ndimage import binary_opening, binary_closing
-from sklearn.neighbors import LocalOutlierFactor
 from tqdm import tqdm
 
 
@@ -189,12 +188,46 @@ class AnimalOrganizer(AnimalFeatureParser):
         for lrec in self.long_recordings:
             lrec.cleanup_rec()
 
-    def compute_bad_channels(self, lof_threshold: float = 1.5):
+    def compute_bad_channels(self, lof_threshold: float = None, force_recompute: bool = False):
+        """Compute bad channels using LOF analysis for all recordings.
+        
+        Args:
+            lof_threshold (float, optional): Threshold for determining bad channels from LOF scores.
+                                           If None, only computes/loads scores without setting bad_channel_names.
+            force_recompute (bool): Whether to recompute LOF scores even if they exist.
+        """
         for lrec in self.long_recordings:
-            lrec.compute_bad_channels(lof_threshold=lof_threshold)
+            lrec.compute_bad_channels(lof_threshold=lof_threshold, force_recompute=force_recompute)
+        
+        # Update bad channels dict if threshold was applied
+        if lof_threshold is not None:
+            self.bad_channels_dict = {
+                animalday: lrec.bad_channel_names for animalday, lrec in zip(self.animaldays, self.long_recordings)
+            }
+    
+    def apply_lof_threshold(self, lof_threshold: float):
+        """Apply threshold to existing LOF scores to determine bad channels for all recordings.
+        
+        Args:
+            lof_threshold (float): Threshold for determining bad channels.
+        """
+        for lrec in self.long_recordings:
+            lrec.apply_lof_threshold(lof_threshold)
+        
         self.bad_channels_dict = {
             animalday: lrec.bad_channel_names for animalday, lrec in zip(self.animaldays, self.long_recordings)
         }
+    
+    def get_all_lof_scores(self) -> dict:
+        """Get LOF scores for all recordings.
+        
+        Returns:
+            dict: Dictionary mapping animal days to LOF score dictionaries.
+        """
+        return {
+            animalday: lrec.get_lof_scores() for animalday, lrec in zip(self.animaldays, self.long_recordings)
+        }
+    
 
     def compute_windowed_analysis(
         self,
@@ -301,6 +334,15 @@ class AnimalOrganizer(AnimalFeatureParser):
         self.features_df = pd.concat(dataframes)
         self.features_df = self.features_df
 
+        # Collect LOF scores from long recordings
+        lof_scores_dict = {}
+        for animalday, lrec in zip(self.animaldays, self.long_recordings):
+            if hasattr(lrec, 'lof_scores') and lrec.lof_scores is not None:
+                lof_scores_dict[animalday] = {
+                    'lof_scores': lrec.lof_scores.tolist(),
+                    'channel_names': lrec.channel_names
+                }
+        
         self.window_analysis_result = WindowAnalysisResult(
             self.features_df,
             self.animal_id,
@@ -309,6 +351,7 @@ class AnimalOrganizer(AnimalFeatureParser):
             self.assume_from_number,
             self.bad_channels_dict,
             suppress_short_interval_error,
+            lof_scores_dict,
         )
 
         return self.window_analysis_result
@@ -455,6 +498,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         assume_from_number=False,
         bad_channels_dict: dict[str, list[str]] = {},
         suppress_short_interval_error=False,
+        lof_scores_dict: dict[str, dict] = {},
     ) -> None:
         """
         Args:
@@ -473,6 +517,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         self.assume_from_number = assume_from_number
         self.bad_channels_dict = bad_channels_dict
         self.suppress_short_interval_error = suppress_short_interval_error
+        self.lof_scores_dict = lof_scores_dict
 
         self.__update_instance_vars()
 
@@ -1403,6 +1448,15 @@ class WindowAnalysisResult(AnimalFeatureParser):
         filebase = str(filebase)
 
         self.result.to_pickle(filebase + ".pkl")
+        # Collect LOF scores from long recordings
+        lof_scores_dict = {}
+        for animalday, lrec in zip(self.animaldays, self.long_recordings):
+            if hasattr(lrec, 'lof_scores') and lrec.lof_scores is not None:
+                lof_scores_dict[animalday] = {
+                    'lof_scores': lrec.lof_scores.tolist(),
+                    'channel_names': lrec.channel_names
+                }
+        
         json_dict = {
             "animal_id": self.animal_id,
             "genotype": self.genotype,
@@ -1410,10 +1464,54 @@ class WindowAnalysisResult(AnimalFeatureParser):
             "assume_from_number": False if save_abbrevs_as_chnames else self.assume_from_number,
             "bad_channels_dict": self.bad_channels_dict,
             "suppress_short_interval_error": self.suppress_short_interval_error,
+            "lof_scores_dict": lof_scores_dict,
         }
 
         with open(filebase + ".json", "w") as f:
             json.dump(json_dict, f, indent=2)
+    
+    
+    def apply_lof_threshold(self, lof_threshold: float) -> dict:
+        """Apply LOF threshold directly to stored scores to get bad channels.
+        
+        Args:
+            lof_threshold (float): Threshold for determining bad channels.
+            
+        Returns:
+            dict: Dictionary mapping animal days to lists of bad channel names.
+        """
+        if not hasattr(self, 'lof_scores_dict') or not self.lof_scores_dict:
+            raise ValueError("LOF scores not available in this WAR. Compute LOF scores first.")
+        
+        bad_channels_dict = {}
+        for animalday, lof_data in self.lof_scores_dict.items():
+            if 'lof_scores' in lof_data and 'channel_names' in lof_data:
+                scores = np.array(lof_data['lof_scores'])
+                channel_names = lof_data['channel_names']
+                
+                is_inlier = scores < lof_threshold
+                bad_channels = [channel_names[i] for i in np.where(~is_inlier)[0]]
+                bad_channels_dict[animalday] = bad_channels
+        
+        return bad_channels_dict
+    
+    def get_lof_scores(self) -> dict:
+        """Get LOF scores from this WAR.
+        
+        Returns:
+            dict: Dictionary mapping animal days to LOF score dictionaries.
+        """
+        if not hasattr(self, 'lof_scores_dict') or not self.lof_scores_dict:
+            raise ValueError("LOF scores not available in this WAR.")
+        
+        result = {}
+        for animalday, lof_data in self.lof_scores_dict.items():
+            if 'lof_scores' in lof_data and 'channel_names' in lof_data:
+                scores = lof_data['lof_scores']
+                channel_names = lof_data['channel_names']
+                result[animalday] = dict(zip(channel_names, scores))
+        
+        return result
 
     @classmethod
     def load_pickle_and_json(cls, folder_path=None):
