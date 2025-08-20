@@ -3,8 +3,10 @@ from typing import Literal
 import numpy as np
 try:
     import spikeinterface.core as si
+    import spikeinterface.preprocessing as spre
 except Exception:  # pragma: no cover - optional at import time for tests not using spikeinterface
     si = None
+    spre = None
 try:
     from mne import set_config
     from mne.time_frequency import csd_array_fourier
@@ -22,7 +24,7 @@ from .analyze_frag import FragmentAnalyzer
 
 
 class LongRecordingAnalyzer:
-    def __init__(self, longrecording: core.LongRecordingOrganizer, fragment_len_s=10, notch_freq=60) -> None:
+    def __init__(self, longrecording: core.LongRecordingOrganizer, fragment_len_s=10, apply_notch_filter=True) -> None:
         assert isinstance(longrecording, core.LongRecordingOrganizer)
 
         self.LongRecording = longrecording
@@ -32,7 +34,7 @@ class LongRecordingAnalyzer:
         self.n_channels = longrecording.meta.n_channels
         self.mult_to_uV = longrecording.meta.mult_to_uV
         self.f_s = int(longrecording.LongRecording.get_sampling_frequency())
-        self.notch_freq = notch_freq
+        self.apply_notch_filter = apply_notch_filter
 
     def get_fragment_rec(self, index) -> "si.BaseRecording":
         """Get window at index as a spikeinterface recording object
@@ -41,11 +43,17 @@ class LongRecordingAnalyzer:
             index (int): Index of time window
 
         Returns:
-            si.BaseRecording: spikeinterface recording object
+            si.BaseRecording: spikeinterface recording object with optional notch filtering applied
         """
         if si is None:
             raise ImportError("spikeinterface is required for get_fragment_rec")
-        return self.LongRecording.get_fragment(self.fragment_len_s, index)
+        
+        rec = self.LongRecording.get_fragment(self.fragment_len_s, index)
+        
+        if self.apply_notch_filter and spre is not None:
+            rec = spre.notch_filter(rec, freq=constants.LINE_FREQ)
+        
+        return rec
 
     def get_fragment_np(self, index, recobj=None) -> np.ndarray:
         """Get window at index as a numpy array object
