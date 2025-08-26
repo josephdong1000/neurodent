@@ -1162,9 +1162,14 @@ class LongRecordingOrganizer:
             logging.info("Using existing LOF scores")
         else:
             # Compute new LOF scores
-            scores = self._compute_lof_scores(limit_memory=limit_memory)
-            self.lof_scores = scores
-            logging.info(f"Computed LOF scores for {len(scores)} channels")
+            try:
+                scores = self._compute_lof_scores(limit_memory=limit_memory)
+                self.lof_scores = scores
+                logging.info(f"Computed LOF scores for {len(scores)} channels")
+            except Exception as e:
+                logging.error(f"Failed to compute LOF scores for recording: {e}")
+                self.lof_scores = None
+                logging.warning("LOF scores set to None due to computation failure")
 
         # Apply threshold if provided
         if lof_threshold is not None:
@@ -1179,34 +1184,49 @@ class LongRecordingOrganizer:
         Returns:
             np.ndarray: LOF scores for each channel.
         """
-        nn = Natural_Neighbor()
-        rec = self.LongRecording
+        try:
+            nn = Natural_Neighbor()
+            rec = self.LongRecording
 
-        logging.info(f"Computing LOF scores for {rec.__str__()}")
-        logging.debug("Getting traces from recording object")
-        rec_np = rec.get_traces(return_scaled=True)  # (n_samples, n_channels)
-        if limit_memory:
-            rec_np = rec_np.astype(np.float16)
-            rec_np = decimate(rec_np, 10, axis=0)
-        rec_np = rec_np.T  # (n_channels, n_samples)
+            logging.info(f"Computing LOF scores for {rec.__str__()}")
+            logging.debug("Getting traces from recording object")
+            rec_np = rec.get_traces(return_scaled=True)  # (n_samples, n_channels)
+            
+            if rec_np is None or rec_np.size == 0:
+                logging.error("Failed to get traces from recording - data is None or empty")
+                raise ValueError("Recording traces are None or empty")
+            
+            logging.debug(f"Got traces shape: {rec_np.shape}")
+            
+            if limit_memory:
+                rec_np = rec_np.astype(np.float16)
+                rec_np = decimate(rec_np, 10, axis=0)
+            rec_np = rec_np.T  # (n_channels, n_samples)
 
-        # Compute the optimal number of neighbors
-        nn.read(rec_np)
-        n_neighbors = nn.algorithm()
-        logging.info(f"n_neighbors for LOF computation: {n_neighbors}")
+            # Compute the optimal number of neighbors
+            nn.read(rec_np)
+            n_neighbors = nn.algorithm()
+            logging.info(f"n_neighbors for LOF computation: {n_neighbors}")
 
-        # Initialize LocalOutlierFactor
-        lof = LocalOutlierFactor(n_neighbors=n_neighbors, metric="minkowski", p=2)
+            # Initialize LocalOutlierFactor
+            lof = LocalOutlierFactor(n_neighbors=n_neighbors, metric="minkowski", p=2)
 
-        # Compute the outlier scores
-        logging.debug("Computing outlier scores")
-        del nn
-        lof.fit(rec_np)
-        del rec_np
-        scores = lof.negative_outlier_factor_ * -1
-        logging.debug(f"LOF scores: {scores}")
+            # Compute the outlier scores
+            logging.debug("Computing outlier scores")
+            del nn
+            lof.fit(rec_np)
+            del rec_np
+            scores = lof.negative_outlier_factor_ * -1
+            logging.info(f"LOF computation successful: {len(scores)} channels")
+            logging.debug(f"LOF scores: {scores}")
 
-        return scores
+            return scores
+            
+        except Exception as e:
+            logging.error(f"Failed to compute LOF scores: {e}")
+            logging.error(f"Recording info: channels={getattr(self, 'channel_names', 'unknown')}, "
+                         f"duration={getattr(rec, 'duration', 'unknown') if 'rec' in locals() else 'unknown'}")
+            raise
 
     def apply_lof_threshold(self, lof_threshold: float):
         """Apply threshold to existing LOF scores to determine bad channels.
