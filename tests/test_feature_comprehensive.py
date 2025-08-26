@@ -860,16 +860,23 @@ class TestMathematicalProperties:
             # Skip test if insufficient memory
             pytest.skip("Insufficient memory for coherence computation")
         
-    def test_nspike_and_lognspike_return_none(self):
-        """Test that spike counting functions return None (not implemented)."""
+    def test_nspike_and_lognspike_return_nan_arrays(self):
+        """Test that spike counting functions return NaN arrays (placeholder implementation)."""
         signal_data = self.generator.white_noise(self.n_samples, self.n_channels, amplitude=1.0)
         
-        # Both functions should return None
+        # Both functions should return NaN arrays
         nspike_result = FragmentAnalyzer.compute_nspike(signal_data, f_s=self.fs)
         lognspike_result = FragmentAnalyzer.compute_lognspike(signal_data, f_s=self.fs)
         
-        assert nspike_result is None, "compute_nspike should return None"
-        assert lognspike_result is None, "compute_lognspike should return None"
+        # Test nspike returns NaN array
+        assert isinstance(nspike_result, np.ndarray), "compute_nspike should return ndarray"
+        assert nspike_result.shape == (self.n_channels,), "compute_nspike should return array with shape (n_channels,)"
+        assert np.all(np.isnan(nspike_result)), "compute_nspike should return all NaN values"
+        
+        # Test lognspike returns NaN array (log of NaN is still NaN)
+        assert isinstance(lognspike_result, np.ndarray), "compute_lognspike should return ndarray"
+        assert lognspike_result.shape == (self.n_channels,), "compute_lognspike should return array with shape (n_channels,)"
+        assert np.all(np.isnan(lognspike_result)), "compute_lognspike should return all NaN values"
     
     def test_z_epsilon_parameter_zcohere(self):
         """Test that the z_epsilon parameter works correctly for z-transformed coherence."""

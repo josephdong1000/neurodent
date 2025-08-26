@@ -75,6 +75,8 @@ class TestLongRecordingAnalyzer:
         mock_fragment = Mock()
         mock_long_recording.get_fragment.return_value = mock_fragment
         
+        # Disable notch filtering for this test since we're using mock objects
+        analyzer.apply_notch_filter = False
         result = analyzer.get_fragment_rec(0)
         
         mock_long_recording.get_fragment.assert_called_once_with(10, 0)
@@ -86,6 +88,8 @@ class TestLongRecordingAnalyzer:
         mock_recording.get_traces.return_value = np.random.randn(1000, 8)
         mock_long_recording.get_fragment.return_value = mock_recording
         
+        # Disable notch filtering for this test since we're using mock objects
+        analyzer.apply_notch_filter = False
         result = analyzer.get_fragment_np(0)
         
         assert isinstance(result, np.ndarray)
@@ -97,6 +101,9 @@ class TestLongRecordingAnalyzer:
         mock_recording = Mock()
         mock_recording.get_traces.return_value = np.ones((1000, 8))  # Simple constant signal
         mock_long_recording.get_fragment.return_value = mock_recording
+        
+        # Disable notch filtering for this test since we're using mock objects
+        analyzer.apply_notch_filter = False
         
         # Test integration: does it call FragmentAnalyzer with the right data?
         with patch('pythoneeg.core.analysis.FragmentAnalyzer.compute_rms') as mock_compute_rms:
@@ -120,6 +127,9 @@ class TestLongRecordingAnalyzer:
         mock_recording = Mock()
         mock_recording.get_traces.return_value = np.ones((1000, 8))
         mock_long_recording.get_fragment.return_value = mock_recording
+        
+        # Disable notch filtering for this test since we're using mock objects
+        analyzer.apply_notch_filter = False
         
         # Test integration: does it call FragmentAnalyzer with correct parameters?
         with patch('pythoneeg.core.analysis.FragmentAnalyzer.compute_psd') as mock_compute_psd:
@@ -150,6 +160,9 @@ class TestLongRecordingAnalyzer:
         mock_recording = Mock()
         mock_recording.get_traces.return_value = np.ones((1000, 8))
         mock_long_recording.get_fragment.return_value = mock_recording
+        
+        # Disable notch filtering for this test since we're using mock objects
+        analyzer.apply_notch_filter = False
         
         # Test integration: does it call FragmentAnalyzer with correct parameters?
         with patch('pythoneeg.core.analysis.FragmentAnalyzer.compute_psdband') as mock_compute_psdband:
