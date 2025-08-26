@@ -907,9 +907,9 @@ class TestWindowAnalysisResultFiltering:
             bad_channels_dict={}
         )
         
-        # Should not raise error
-        filtered = war.filter_reject_channels_by_session()
-        assert isinstance(filtered, WindowAnalysisResult)
+        # Should raise ValueError for empty bad_channels_dict
+        with pytest.raises(ValueError, match="No bad channels specified for recording session A1_20230101"):
+            war.filter_reject_channels_by_session()
     
     def test_edge_case_no_duration_column(self):
         """Test morphological smoothing without duration column."""

@@ -200,6 +200,9 @@ class TestLongRecordingAnalyzer:
         mock_recording.get_traces.return_value = np.ones((1000, 8))
         mock_long_recording.get_fragment.return_value = mock_recording
         
+        # Disable notch filtering for this test since we're using mock objects
+        analyzer.apply_notch_filter = False
+        
         # Test integration: does it call FragmentAnalyzer with correct parameters?
         with patch('pythoneeg.core.analysis.FragmentAnalyzer.compute_cohere') as mock_compute_cohere:
             expected_result = {
@@ -242,6 +245,9 @@ class TestLongRecordingAnalyzer:
         mock_recording.get_traces.return_value = np.ones((1000, 8))
         mock_long_recording.get_fragment.return_value = mock_recording
         
+        # Disable notch filtering for this test since we're using mock objects
+        analyzer.apply_notch_filter = False
+        
         # Test integration: does it call FragmentAnalyzer with correct parameters?
         with patch('pythoneeg.core.analysis.FragmentAnalyzer.compute_pcorr') as mock_compute_pcorr:
             expected_result = np.eye(8) * 0.5  # Mock correlation matrix
@@ -269,6 +275,9 @@ class TestLongRecordingAnalyzer:
         mock_recording.get_traces.return_value = np.ones((1000, 8))
         mock_long_recording.get_fragment.return_value = mock_recording
         
+        # Disable notch filtering for this test since we're using mock objects
+        analyzer.apply_notch_filter = False
+        
         result = analyzer.get_fragment_mne(0)
         
         # Verify MNE format: (1 epoch, n_channels, n_samples)
@@ -281,6 +290,9 @@ class TestLongRecordingAnalyzer:
         mock_recording = Mock()
         mock_recording.get_traces.return_value = np.ones((1000, 8))
         mock_long_recording.get_fragment.return_value = mock_recording
+        
+        # Disable notch filtering for this test since we're using mock objects
+        analyzer.apply_notch_filter = False
         
         with patch('pythoneeg.core.analysis.FragmentAnalyzer.compute_logrms') as mock_compute:
             expected_result = np.log(np.ones(8))  # log of RMS of ones
@@ -304,6 +316,9 @@ class TestLongRecordingAnalyzer:
         mock_recording.get_traces.return_value = np.ones((1000, 8))
         mock_long_recording.get_fragment.return_value = mock_recording
         
+        # Disable notch filtering for this test since we're using mock objects
+        analyzer.apply_notch_filter = False
+        
         with patch('pythoneeg.core.analysis.FragmentAnalyzer.compute_ampvar') as mock_compute:
             expected_result = np.zeros(8)  # variance of constant signal is 0
             mock_compute.return_value = expected_result
@@ -322,11 +337,11 @@ class TestLongRecordingAnalyzer:
             
     def test_compute_logampvar(self, analyzer, mock_long_recording):
         """Test log amplitude variance computation integration - verify data flow and return format."""
-        mock_recording = Mock()
-        mock_recording.get_traces.return_value = np.random.randn(1000, 8)
-        mock_long_recording.get_fragment.return_value = mock_recording
+        test_data = np.random.randn(1000, 8)
         
-        with patch('pythoneeg.core.analysis.FragmentAnalyzer.compute_logampvar') as mock_compute:
+        # Mock get_fragment_np to bypass notch filtering and return numpy data directly
+        with patch.object(analyzer, 'get_fragment_np', return_value=test_data), \
+             patch('pythoneeg.core.analysis.FragmentAnalyzer.compute_logampvar') as mock_compute:
             expected_result = np.log(np.ones(8))  
             mock_compute.return_value = expected_result
             
@@ -344,11 +359,11 @@ class TestLongRecordingAnalyzer:
             
     def test_compute_logpsdband(self, analyzer, mock_long_recording):
         """Test log PSD band computation integration - verify data flow and return format."""
-        mock_recording = Mock()
-        mock_recording.get_traces.return_value = np.ones((1000, 8))
-        mock_long_recording.get_fragment.return_value = mock_recording
+        test_data = np.ones((1000, 8))
         
-        with patch('pythoneeg.core.analysis.FragmentAnalyzer.compute_logpsdband') as mock_compute:
+        # Mock get_fragment_np to bypass notch filtering and return numpy data directly
+        with patch.object(analyzer, "get_fragment_np", return_value=test_data), \
+             patch('pythoneeg.core.analysis.FragmentAnalyzer.compute_logpsdband') as mock_compute:
             expected_result = {
                 "delta": np.log(np.ones(8)),
                 "theta": np.log(np.ones(8)),
@@ -377,11 +392,11 @@ class TestLongRecordingAnalyzer:
                 
     def test_compute_psdtotal(self, analyzer, mock_long_recording):
         """Test total PSD computation integration - verify data flow and return format."""
-        mock_recording = Mock()
-        mock_recording.get_traces.return_value = np.ones((1000, 8))
-        mock_long_recording.get_fragment.return_value = mock_recording
+        test_data = np.ones((1000, 8))
         
-        with patch('pythoneeg.core.analysis.FragmentAnalyzer.compute_psdtotal') as mock_compute:
+        # Mock get_fragment_np to bypass notch filtering and return numpy data directly
+        with patch.object(analyzer, "get_fragment_np", return_value=test_data), \
+             patch('pythoneeg.core.analysis.FragmentAnalyzer.compute_psdtotal') as mock_compute:
             expected_result = np.ones(8) * 5.0  # total power across all bands
             mock_compute.return_value = expected_result
             
@@ -403,11 +418,11 @@ class TestLongRecordingAnalyzer:
             
     def test_compute_logpsdtotal(self, analyzer, mock_long_recording):
         """Test log total PSD computation integration - verify data flow and return format."""
-        mock_recording = Mock()
-        mock_recording.get_traces.return_value = np.ones((1000, 8))
-        mock_long_recording.get_fragment.return_value = mock_recording
+        test_data = np.ones((1000, 8))
         
-        with patch('pythoneeg.core.analysis.FragmentAnalyzer.compute_logpsdtotal') as mock_compute:
+        # Mock get_fragment_np to bypass notch filtering and return numpy data directly
+        with patch.object(analyzer, "get_fragment_np", return_value=test_data), \
+             patch('pythoneeg.core.analysis.FragmentAnalyzer.compute_logpsdtotal') as mock_compute:
             expected_result = np.log(np.ones(8) * 5.0)
             mock_compute.return_value = expected_result
             
@@ -428,11 +443,11 @@ class TestLongRecordingAnalyzer:
             
     def test_compute_psdfrac(self, analyzer, mock_long_recording):
         """Test PSD fraction computation integration - verify data flow and return format."""
-        mock_recording = Mock()
-        mock_recording.get_traces.return_value = np.ones((1000, 8))
-        mock_long_recording.get_fragment.return_value = mock_recording
+        test_data = np.ones((1000, 8))
         
-        with patch('pythoneeg.core.analysis.FragmentAnalyzer.compute_psdfrac') as mock_compute:
+        # Mock get_fragment_np to bypass notch filtering and return numpy data directly
+        with patch.object(analyzer, "get_fragment_np", return_value=test_data), \
+             patch('pythoneeg.core.analysis.FragmentAnalyzer.compute_psdfrac') as mock_compute:
             expected_result = {
                 "delta": np.ones(8) * 0.2,
                 "theta": np.ones(8) * 0.2,
@@ -462,11 +477,11 @@ class TestLongRecordingAnalyzer:
             
     def test_compute_logpsdfrac(self, analyzer, mock_long_recording):
         """Test log PSD fraction computation integration - verify data flow and return format."""
-        mock_recording = Mock()
-        mock_recording.get_traces.return_value = np.ones((1000, 8))
-        mock_long_recording.get_fragment.return_value = mock_recording
+        test_data = np.ones((1000, 8))
         
-        with patch('pythoneeg.core.analysis.FragmentAnalyzer.compute_logpsdfrac') as mock_compute:
+        # Mock get_fragment_np to bypass notch filtering and return numpy data directly
+        with patch.object(analyzer, "get_fragment_np", return_value=test_data), \
+             patch('pythoneeg.core.analysis.FragmentAnalyzer.compute_logpsdfrac') as mock_compute:
             expected_result = {
                 "delta": np.log(np.ones(8) * 0.2),
                 "theta": np.log(np.ones(8) * 0.2), 
@@ -495,11 +510,11 @@ class TestLongRecordingAnalyzer:
                 
     def test_compute_psdslope(self, analyzer, mock_long_recording):
         """Test PSD slope computation integration - verify data flow and return format."""
-        mock_recording = Mock()
-        mock_recording.get_traces.return_value = np.ones((1000, 8))
-        mock_long_recording.get_fragment.return_value = mock_recording
+        test_data = np.ones((1000, 8))
         
-        with patch('pythoneeg.core.analysis.FragmentAnalyzer.compute_psdslope') as mock_compute:
+        # Mock get_fragment_np to bypass notch filtering and return numpy data directly
+        with patch.object(analyzer, "get_fragment_np", return_value=test_data), \
+             patch('pythoneeg.core.analysis.FragmentAnalyzer.compute_psdslope') as mock_compute:
             expected_result = np.ones((8, 2)) * [-1.0, 2.0]  # [slope, intercept] per channel
             mock_compute.return_value = expected_result
             
@@ -521,11 +536,11 @@ class TestLongRecordingAnalyzer:
             
     def test_compute_zcohere(self, analyzer, mock_long_recording):
         """Test z-transformed coherence computation integration - verify data flow and return format."""
-        mock_recording = Mock()
-        mock_recording.get_traces.return_value = np.ones((1000, 8))
-        mock_long_recording.get_fragment.return_value = mock_recording
+        test_data = np.ones((1000, 8))
         
-        with patch('pythoneeg.core.analysis.FragmentAnalyzer.compute_zcohere') as mock_compute:
+        # Mock get_fragment_np to bypass notch filtering and return numpy data directly
+        with patch.object(analyzer, "get_fragment_np", return_value=test_data), \
+             patch('pythoneeg.core.analysis.FragmentAnalyzer.compute_zcohere') as mock_compute:
             expected_result = {
                 "delta": np.eye(8) * 0.8,  # z-transformed coherence matrix
                 "theta": np.eye(8) * 0.9,
@@ -555,11 +570,11 @@ class TestLongRecordingAnalyzer:
                 
     def test_compute_zpcorr(self, analyzer, mock_long_recording):
         """Test z-transformed Pearson correlation computation integration - verify data flow and return format."""
-        mock_recording = Mock()
-        mock_recording.get_traces.return_value = np.ones((1000, 8))
-        mock_long_recording.get_fragment.return_value = mock_recording
+        test_data = np.ones((1000, 8))
         
-        with patch('pythoneeg.core.analysis.FragmentAnalyzer.compute_zpcorr') as mock_compute:
+        # Mock get_fragment_np to bypass notch filtering and return numpy data directly
+        with patch.object(analyzer, "get_fragment_np", return_value=test_data), \
+             patch('pythoneeg.core.analysis.FragmentAnalyzer.compute_zpcorr') as mock_compute:
             expected_result = np.eye(8) * 0.5  # z-transformed correlation matrix
             mock_compute.return_value = expected_result
             
@@ -581,11 +596,11 @@ class TestLongRecordingAnalyzer:
     
     def test_compute_zcohere_z_epsilon_parameter(self, analyzer, mock_long_recording):
         """Test that z_epsilon parameter is passed through correctly for z-transformed coherence."""
-        mock_recording = Mock()
-        mock_recording.get_traces.return_value = np.ones((1000, 8))
-        mock_long_recording.get_fragment.return_value = mock_recording
+        test_data = np.ones((1000, 8))
         
-        with patch('pythoneeg.core.analysis.FragmentAnalyzer.compute_zcohere') as mock_compute:
+        # Mock get_fragment_np to bypass notch filtering and return numpy data directly
+        with patch.object(analyzer, "get_fragment_np", return_value=test_data), \
+             patch('pythoneeg.core.analysis.FragmentAnalyzer.compute_zcohere') as mock_compute:
             mock_compute.return_value = {"delta": np.eye(8)}
             
             # Test with default z_epsilon
@@ -603,11 +618,11 @@ class TestLongRecordingAnalyzer:
     
     def test_compute_zpcorr_z_epsilon_parameter(self, analyzer, mock_long_recording):
         """Test that z_epsilon parameter is passed through correctly for z-transformed Pearson correlation."""
-        mock_recording = Mock()
-        mock_recording.get_traces.return_value = np.ones((1000, 8))
-        mock_long_recording.get_fragment.return_value = mock_recording
+        test_data = np.ones((1000, 8))
         
-        with patch('pythoneeg.core.analysis.FragmentAnalyzer.compute_zpcorr') as mock_compute:
+        # Mock get_fragment_np to bypass notch filtering and return numpy data directly
+        with patch.object(analyzer, "get_fragment_np", return_value=test_data), \
+             patch('pythoneeg.core.analysis.FragmentAnalyzer.compute_zpcorr') as mock_compute:
             mock_compute.return_value = np.eye(8)
             
             # Test with default z_epsilon
@@ -625,11 +640,11 @@ class TestLongRecordingAnalyzer:
             
     def test_compute_nspike(self, analyzer, mock_long_recording):
         """Test spike count computation integration - verify data flow and return format."""
-        mock_recording = Mock()
-        mock_recording.get_traces.return_value = np.ones((1000, 8))
-        mock_long_recording.get_fragment.return_value = mock_recording
+        test_data = np.ones((1000, 8))
         
-        with patch('pythoneeg.core.analysis.FragmentAnalyzer.compute_nspike') as mock_compute:
+        # Mock get_fragment_np to bypass notch filtering and return numpy data directly
+        with patch.object(analyzer, "get_fragment_np", return_value=test_data), \
+             patch('pythoneeg.core.analysis.FragmentAnalyzer.compute_nspike') as mock_compute:
             expected_result = None  # Returns None per implementation
             mock_compute.return_value = expected_result
             
@@ -649,11 +664,11 @@ class TestLongRecordingAnalyzer:
             
     def test_compute_lognspike(self, analyzer, mock_long_recording):
         """Test log spike count computation integration - verify data flow and return format."""
-        mock_recording = Mock()
-        mock_recording.get_traces.return_value = np.ones((1000, 8))
-        mock_long_recording.get_fragment.return_value = mock_recording
+        test_data = np.ones((1000, 8))
         
-        with patch('pythoneeg.core.analysis.FragmentAnalyzer.compute_lognspike') as mock_compute:
+        # Mock get_fragment_np to bypass notch filtering and return numpy data directly
+        with patch.object(analyzer, "get_fragment_np", return_value=test_data), \
+             patch('pythoneeg.core.analysis.FragmentAnalyzer.compute_lognspike') as mock_compute:
             expected_result = None  # Returns None per implementation
             mock_compute.return_value = expected_result
             
@@ -782,7 +797,9 @@ class TestLongRecordingAnalyzerParameterPassThrough:
     
     def test_compute_psd_parameter_passthrough(self, analyzer):
         """Test that compute_psd passes all parameters correctly to FragmentAnalyzer."""
-        with patch('pythoneeg.core.analysis.FragmentAnalyzer.compute_psd') as mock_compute:
+        test_data = np.random.randn(1000, 4)
+        with patch.object(analyzer, 'get_fragment_np', return_value=test_data), \
+             patch('pythoneeg.core.analysis.FragmentAnalyzer.compute_psd') as mock_compute:
             mock_compute.return_value = (np.linspace(0, 50, 100), np.ones((100, 4)))
             
             # Call with custom parameters
@@ -812,7 +829,9 @@ class TestLongRecordingAnalyzerParameterPassThrough:
             
     def test_compute_psdband_parameter_passthrough(self, analyzer):
         """Test that compute_psdband passes all parameters correctly to FragmentAnalyzer."""
-        with patch('pythoneeg.core.analysis.FragmentAnalyzer.compute_psdband') as mock_compute:
+        test_data = np.random.randn(1000, 4)
+        with patch.object(analyzer, 'get_fragment_np', return_value=test_data), \
+             patch('pythoneeg.core.analysis.FragmentAnalyzer.compute_psdband') as mock_compute:
             mock_result = {band: np.ones(4) for band in constants.FREQ_BANDS}
             mock_compute.return_value = mock_result
             
@@ -846,7 +865,9 @@ class TestLongRecordingAnalyzerParameterPassThrough:
             
     def test_compute_cohere_parameter_passthrough(self, analyzer):
         """Test that compute_cohere passes all parameters correctly to FragmentAnalyzer."""
-        with patch('pythoneeg.core.analysis.FragmentAnalyzer.compute_cohere') as mock_compute:
+        test_data = np.random.randn(1000, 4)
+        with patch.object(analyzer, 'get_fragment_np', return_value=test_data), \
+             patch('pythoneeg.core.analysis.FragmentAnalyzer.compute_cohere') as mock_compute:
             mock_result = {band: np.eye(4) for band in constants.FREQ_BANDS}
             mock_compute.return_value = mock_result
             
@@ -879,7 +900,9 @@ class TestLongRecordingAnalyzerParameterPassThrough:
                 
     def test_compute_pcorr_parameter_passthrough(self, analyzer):
         """Test that compute_pcorr passes all parameters correctly to FragmentAnalyzer."""
-        with patch('pythoneeg.core.analysis.FragmentAnalyzer.compute_pcorr') as mock_compute:
+        test_data = np.random.randn(1000, 4)
+        with patch.object(analyzer, 'get_fragment_np', return_value=test_data), \
+             patch('pythoneeg.core.analysis.FragmentAnalyzer.compute_pcorr') as mock_compute:
             mock_compute.return_value = np.eye(4)
             
             # Call with custom parameters
@@ -927,6 +950,8 @@ class TestLongRecordingAnalyzerParameterPassThrough:
             
     def test_all_compute_methods_pass_fragment_data_correctly(self, analyzer):
         """Test that all compute methods pass fragment data with correct shape and type."""
+        test_data = np.random.randn(1000, 4)
+        
         compute_methods = [
             'compute_rms', 'compute_logrms', 'compute_ampvar', 'compute_logampvar',
             'compute_psdband', 'compute_logpsdband', 'compute_psdtotal', 'compute_logpsdtotal',
@@ -935,41 +960,43 @@ class TestLongRecordingAnalyzerParameterPassThrough:
             'compute_nspike', 'compute_lognspike'
         ]
         
-        for method_name in compute_methods:
-            with patch(f'pythoneeg.core.analysis.FragmentAnalyzer.{method_name}') as mock_method:
-                # Set up return value based on method type
-                if method_name in ['compute_psdband', 'compute_logpsdband', 'compute_psdfrac', 'compute_logpsdfrac']:
-                    mock_method.return_value = {band: np.ones(4) for band in constants.FREQ_BANDS}
-                elif method_name == 'compute_psd':
-                    mock_method.return_value = (np.linspace(0, 50, 100), np.ones((100, 4)))
-                elif method_name in ['compute_cohere', 'compute_zcohere']:
-                    mock_method.return_value = {band: np.eye(4) for band in constants.FREQ_BANDS}
-                elif method_name == 'compute_psdslope':
-                    mock_method.return_value = np.ones((4, 2))
-                elif method_name in ['compute_nspike', 'compute_lognspike']:
-                    mock_method.return_value = None
-                else:
-                    mock_method.return_value = np.ones(4)
+        # Mock get_fragment_np globally for all method calls
+        with patch.object(analyzer, 'get_fragment_np', return_value=test_data):
+            for method_name in compute_methods:
+                with patch(f'pythoneeg.core.analysis.FragmentAnalyzer.{method_name}') as mock_method:
+                    # Set up return value based on method type
+                    if method_name in ['compute_psdband', 'compute_logpsdband', 'compute_psdfrac', 'compute_logpsdfrac']:
+                        mock_method.return_value = {band: np.ones(4) for band in constants.FREQ_BANDS}
+                    elif method_name == 'compute_psd':
+                        mock_method.return_value = (np.linspace(0, 50, 100), np.ones((100, 4)))
+                    elif method_name in ['compute_cohere', 'compute_zcohere']:
+                        mock_method.return_value = {band: np.eye(4) for band in constants.FREQ_BANDS}
+                    elif method_name == 'compute_psdslope':
+                        mock_method.return_value = np.ones((4, 2))
+                    elif method_name in ['compute_nspike', 'compute_lognspike']:
+                        mock_method.return_value = None
+                    else:
+                        mock_method.return_value = np.ones(4)
                 
-                # Call the method
-                method = getattr(analyzer, method_name)
-                method(index=0)
+                    # Call the method
+                    method = getattr(analyzer, method_name)
+                    method(index=0)
                 
-                # Verify call was made
-                mock_method.assert_called_once()
-                call_kwargs = mock_method.call_args[1]
+                    # Verify call was made
+                    mock_method.assert_called_once()
+                    call_kwargs = mock_method.call_args[1]
                 
-                # Check fragment data properties
-                assert 'rec' in call_kwargs, f"{method_name} should pass 'rec' parameter"
-                rec_data = call_kwargs['rec']
-                assert isinstance(rec_data, np.ndarray), f"{method_name} should pass numpy array"
-                assert rec_data.ndim == 2, f"{method_name} should pass 2D array"
-                assert rec_data.shape[1] == analyzer.n_channels, f"{method_name} should pass data with correct number of channels"
+                    # Check fragment data properties
+                    assert 'rec' in call_kwargs, f"{method_name} should pass 'rec' parameter"
+                    rec_data = call_kwargs['rec']
+                    assert isinstance(rec_data, np.ndarray), f"{method_name} should pass numpy array"
+                    assert rec_data.ndim == 2, f"{method_name} should pass 2D array"
+                    assert rec_data.shape[1] == analyzer.n_channels, f"{method_name} should pass data with correct number of channels"
                 
-                # Check sampling frequency is passed
-                if method_name != 'compute_ampvar' and method_name != 'compute_logampvar' and method_name != 'compute_rms' and method_name != 'compute_logrms':
-                    assert 'f_s' in call_kwargs, f"{method_name} should pass sampling frequency"
-                    assert call_kwargs['f_s'] == analyzer.f_s, f"{method_name} should pass correct sampling frequency"
+                    # Check sampling frequency is passed
+                    if method_name not in ['compute_ampvar', 'compute_logampvar', 'compute_rms', 'compute_logrms']:
+                        assert 'f_s' in call_kwargs, f"{method_name} should pass sampling frequency"
+                        assert call_kwargs['f_s'] == analyzer.f_s, f"{method_name} should pass correct sampling frequency"
 
 
 class TestLongRecordingAnalyzerNotchFiltering:

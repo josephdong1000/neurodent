@@ -117,6 +117,33 @@ def mock_spikeinterface():
     }
 
 
+@pytest.fixture(scope="session") 
+def real_spikeinterface_recording():
+    """Create a real SpikeInterface recording for proper integration testing."""
+    try:
+        import spikeinterface as si
+        import spikeinterface.preprocessing as spre
+        
+        # Create a minimal synthetic recording
+        duration = 2.0  # seconds
+        sampling_frequency = constants.GLOBAL_SAMPLING_RATE
+        n_channels = 8
+        
+        # Generate synthetic data
+        recording = si.generate_recording(
+            num_channels=n_channels,
+            sampling_frequency=sampling_frequency, 
+            durations=[duration],
+            seed=42
+        )
+        
+        return recording
+        
+    except ImportError:
+        # Fallback if SpikeInterface not available
+        return None
+
+
 @pytest.fixture(scope="session")
 def mock_mne():
     """Mock MNE objects for testing."""
