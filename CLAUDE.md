@@ -48,6 +48,7 @@ Python scientific computing package for extracting features from mouse EEG recor
 - **API Design**: When parameters create confusing interactions, unify into single clear parameter with descriptive values
 - **Code Cleanup**: Remove unused functions, consolidate redundant code, clean up imports when requested
 - **Variable Scope**: Trace all code paths to ensure variables are properly defined in scope before implementing parameter changes
+- **Parameter Design**: Before adding new parameters, check if existing constants can be used. Prefer centralized configuration (constants.py) over scattered parameters. If users need to change values, they should modify constants rather than pass parameters
 
 **Error handling:** 
 - Return `np.nan` for math failures, insufficient data, undefined results
