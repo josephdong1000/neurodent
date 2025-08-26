@@ -3,7 +3,6 @@ Unit tests for manual timestamp functionality in LongRecordingOrganizer.
 """
 import pytest
 from datetime import datetime, timedelta
-from unittest.mock import patch
 
 from pythoneeg.core.core import LongRecordingOrganizer
 
@@ -201,20 +200,12 @@ class TestManualTimestamps:
         
         assert result is None
 
-    @patch('pythoneeg.core.core.LongRecordingOrganizer.prepare_colbins_rowbins_metas')
-    @patch('pythoneeg.core.core.LongRecordingOrganizer.convert_colbins_to_rowbins')
-    @patch('pythoneeg.core.core.LongRecordingOrganizer.convert_rowbins_to_rec')
-    def test_finalize_file_timestamps_with_manual_start(self, mock_convert_rowbins_to_rec, mock_convert_colbins_to_rowbins, mock_prepare_metas):
+    def test_finalize_file_timestamps_with_manual_start(self):
         """Test that _finalize_file_timestamps uses manual start time."""
-        # Mock all the methods that would normally be called during initialization
-        mock_prepare_metas.return_value = None
-        mock_convert_colbins_to_rowbins.return_value = None
-        mock_convert_rowbins_to_rec.return_value = None
-        
-        # Mock the file durations and other necessary attributes
+        # Create a minimal organizer with mode=None to avoid file system dependencies
         organizer = LongRecordingOrganizer(
             "/fake/path", 
-            mode="bin",
+            mode=None,
             manual_datetimes=datetime(2023, 1, 1, 10, 0, 0),
             datetimes_are_start=True
         )
