@@ -196,8 +196,15 @@ class AnimalOrganizer(AnimalFeatureParser):
                                            If None, only computes/loads scores without setting bad_channel_names.
             force_recompute (bool): Whether to recompute LOF scores even if they exist.
         """
-        for lrec in self.long_recordings:
+        logging.info(
+            f"Computing bad channels for {len(self.long_recordings)} recordings with threshold={lof_threshold}"
+        )
+        for i, lrec in enumerate(self.long_recordings):
+            logging.debug(f"Computing bad channels for recording {i}: {self.animaldays[i]}")
             lrec.compute_bad_channels(lof_threshold=lof_threshold, force_recompute=force_recompute)
+            logging.debug(
+                f"Recording {i} LOF scores computed: {hasattr(lrec, 'lof_scores') and lrec.lof_scores is not None}"
+            )
         
         # Update bad channels dict if threshold was applied
         if lof_threshold is not None:
@@ -232,7 +239,7 @@ class AnimalOrganizer(AnimalFeatureParser):
     def compute_windowed_analysis(
         self,
         features: list[str],
-        exclude: list[str] = ["nspike", "lognspike"],
+        exclude: list[str] = [],
         window_s=4,
         multiprocess_mode: Literal["dask", "serial"] = "serial",
         suppress_short_interval_error=False,
@@ -337,11 +344,18 @@ class AnimalOrganizer(AnimalFeatureParser):
         # Collect LOF scores from long recordings
         lof_scores_dict = {}
         for animalday, lrec in zip(self.animaldays, self.long_recordings):
+            logging.debug(
+                f"Checking LOF scores for {animalday}: has_attr={hasattr(lrec, 'lof_scores')}, "
+                f"is_not_none={getattr(lrec, 'lof_scores', None) is not None}"
+            )
             if hasattr(lrec, 'lof_scores') and lrec.lof_scores is not None:
                 lof_scores_dict[animalday] = {
                     'lof_scores': lrec.lof_scores.tolist(),
                     'channel_names': lrec.channel_names
                 }
+                logging.info(f"Added LOF scores for {animalday}: {len(lrec.lof_scores)} channels")
+
+        logging.info(f"Total LOF scores collected: {len(lof_scores_dict)} animal days")
         
         self.window_analysis_result = WindowAnalysisResult(
             self.features_df,
@@ -974,8 +988,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
         # Group by animalday to apply filters per recording session
         for animalday, group in self.result.groupby("animalday"):
             if animalday not in bad_channels_dict:
-                logging.warning(f"No bad channels specified for recording session {animalday}")
-                continue
+                raise ValueError(
+                    f"No bad channels specified for recording session {animalday}. Check that all days are present in bad_channels_dict"
+                )
 
             bad_channels = bad_channels_dict[animalday]
             channel_targets = self.channel_abbrevs if use_abbrevs or use_abbrevs is None else self.channel_names
@@ -1448,14 +1463,6 @@ class WindowAnalysisResult(AnimalFeatureParser):
         filebase = str(filebase)
 
         self.result.to_pickle(filebase + ".pkl")
-        # Collect LOF scores from long recordings
-        lof_scores_dict = {}
-        for animalday, lrec in zip(self.animaldays, self.long_recordings):
-            if hasattr(lrec, 'lof_scores') and lrec.lof_scores is not None:
-                lof_scores_dict[animalday] = {
-                    'lof_scores': lrec.lof_scores.tolist(),
-                    'channel_names': lrec.channel_names
-                }
         
         json_dict = {
             "animal_id": self.animal_id,
@@ -1464,7 +1471,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             "assume_from_number": False if save_abbrevs_as_chnames else self.assume_from_number,
             "bad_channels_dict": self.bad_channels_dict,
             "suppress_short_interval_error": self.suppress_short_interval_error,
-            "lof_scores_dict": lof_scores_dict,
+            "lof_scores_dict": self.lof_scores_dict.copy(),
         }
 
         with open(filebase + ".json", "w") as f:
