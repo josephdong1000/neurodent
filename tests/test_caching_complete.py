@@ -15,6 +15,12 @@ import numpy as np
 
 from pythoneeg import core
 
+try:
+    import spikeinterface
+    SPIKEINTERFACE_AVAILABLE = True
+except ImportError:
+    SPIKEINTERFACE_AVAILABLE = False
+
 
 class TestUnifiedCachingSystem:
     """Comprehensive tests for the unified caching parameter system."""
@@ -243,6 +249,7 @@ class TestMNECachingOptimization:
         return extract_func
 
     @pytest.mark.unit
+    @pytest.mark.skipif(not SPIKEINTERFACE_AVAILABLE, reason="SpikeInterface not available")
     def test_mne_cache_prevents_loading_when_cache_exists(self, mock_extract_func):
         """Test that when cache exists, extract_func is not called."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -330,6 +337,7 @@ class TestMNECachingOptimization:
             assert mock_from_json.called
 
     @pytest.mark.unit
+    @pytest.mark.skipif(not SPIKEINTERFACE_AVAILABLE, reason="SpikeInterface not available")
     def test_missing_metadata_sidecar_falls_back_to_regenerate(self, mock_extract_func):
         """Test that missing metadata sidecar falls back to regenerating both files."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -387,6 +395,7 @@ class TestMNECachingOptimization:
             assert mock_export.called
 
     @pytest.mark.unit
+    @pytest.mark.skipif(not SPIKEINTERFACE_AVAILABLE, reason="SpikeInterface not available")
     def test_missing_intermediate_file_falls_back_to_regenerate(self, mock_extract_func):
         """Test that missing intermediate file falls back to regenerating both files."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -456,6 +465,7 @@ class TestMNECachingOptimization:
             assert mock_export.called
 
     @pytest.mark.unit
+    @pytest.mark.skipif(not SPIKEINTERFACE_AVAILABLE, reason="SpikeInterface not available")
     def test_invalid_cache_policy_raises_error(self, mock_extract_func):
         """Test that invalid cache policy strings raise ValueError."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -486,6 +496,7 @@ class TestMNECachingOptimization:
                 )
 
     @pytest.mark.unit  
+    @pytest.mark.skipif(not SPIKEINTERFACE_AVAILABLE, reason="SpikeInterface not available")
     def test_mne_cache_calls_loading_when_cache_missing(self, mock_extract_func):
         """Test that when cache doesn't exist, extract_func is called."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -533,6 +544,7 @@ class TestMNECachingOptimization:
             assert mock_export.called
 
     @pytest.mark.unit
+    @pytest.mark.skipif(not SPIKEINTERFACE_AVAILABLE, reason="SpikeInterface not available")
     def test_cache_policy_behaviors_comprehensive(self, mock_extract_func):
         """Test all 4 cache policy behaviors comprehensively."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -620,6 +632,7 @@ class TestMNECachingOptimization:
                         assert mock_from_json.called, f"Cache policy '{cache_policy}' should have loaded from cache"
 
     @pytest.mark.unit
+    @pytest.mark.skipif(not SPIKEINTERFACE_AVAILABLE, reason="SpikeInterface not available")
     def test_force_regenerate_behavior(self, mock_extract_func):
         """Test 'force_regenerate' cache policy behavior.
         

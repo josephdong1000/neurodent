@@ -21,6 +21,12 @@ from pythoneeg.core import analysis
 from pythoneeg import constants
 from pythoneeg.core.core import LongRecordingOrganizer
 
+try:
+    import spikeinterface
+    SPIKEINTERFACE_AVAILABLE = True
+except ImportError:
+    SPIKEINTERFACE_AVAILABLE = False
+
 
 class TestLongRecordingAnalyzer:
     """Test LongRecordingAnalyzer class."""
@@ -70,6 +76,7 @@ class TestLongRecordingAnalyzer:
         assert analyzer.f_s == constants.GLOBAL_SAMPLING_RATE
         assert analyzer.apply_notch_filter == True
         
+    @pytest.mark.skipif(not SPIKEINTERFACE_AVAILABLE, reason="SpikeInterface not available")
     def test_get_fragment_rec(self, analyzer, mock_long_recording):
         """Test getting fragment as recording object."""
         mock_fragment = Mock()
@@ -82,6 +89,7 @@ class TestLongRecordingAnalyzer:
         mock_long_recording.get_fragment.assert_called_once_with(10, 0)
         assert result == mock_fragment
         
+    @pytest.mark.skipif(not SPIKEINTERFACE_AVAILABLE, reason="SpikeInterface not available")
     def test_get_fragment_np(self, analyzer, mock_long_recording):
         """Test getting fragment as numpy array."""
         mock_recording = Mock()
