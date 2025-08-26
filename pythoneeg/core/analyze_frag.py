@@ -600,7 +600,7 @@ class FragmentAnalyzer:
     @staticmethod
     def compute_nspike(rec: np.ndarray, **kwargs):
         """Returns None. Compute and load in spikes with SpikeAnalysisResult"""
-        return None
+        return np.full(rec.shape[1], np.nan)
 
     @staticmethod
     def compute_lognspike(rec: np.ndarray, precomputed_nspike: np.ndarray = None, **kwargs):
