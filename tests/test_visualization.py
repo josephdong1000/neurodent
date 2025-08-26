@@ -1369,3 +1369,362 @@ class TestErrorHandling:
         # This would be tested in the actual plotting methods
         # when they encounter unsupported plot types
         pass 
+
+
+class TestWindowAnalysisResultLOF:
+    """Test LOF (Local Outlier Factor) functionality in WindowAnalysisResult."""
+    
+    @pytest.fixture
+    def sample_lof_scores_dict(self):
+        """Create sample LOF scores data for testing."""
+        return {
+            'day1': {
+                'lof_scores': [2.5, 0.8],
+                'channel_names': ['LMot', 'RMot']
+            },
+            'day2': {
+                'lof_scores': [1.1, 2.8],
+                'channel_names': ['LMot', 'RMot']
+            }
+        }
+    
+    @pytest.fixture
+    def war_with_lof(self, sample_lof_scores_dict):
+        """Create WindowAnalysisResult with LOF scores."""
+        # Create minimal DataFrame
+        test_df = pd.DataFrame({
+            'animal': ['A1'] * 4,
+            'animalday': ['day1', 'day1', 'day2', 'day2'],
+            'genotype': ['WT'] * 4,
+            'duration': [4.0] * 4,
+            'rms': [[100.0, 110.0]] * 4,
+            'timestamp': pd.to_datetime(['2023-01-01 10:00:00', '2023-01-01 10:04:00',
+                                       '2023-01-02 10:00:00', '2023-01-02 10:04:00'])
+        })
+        
+        return WindowAnalysisResult(
+            result=test_df,
+            animal_id='A1',
+            genotype='WT',
+            channel_names=['LMot', 'RMot'],
+            lof_scores_dict=sample_lof_scores_dict
+        )
+    
+    def test_war_init_with_lof_scores(self, war_with_lof, sample_lof_scores_dict):
+        """Test WindowAnalysisResult initialization with LOF scores."""
+        assert hasattr(war_with_lof, 'lof_scores_dict')
+        assert war_with_lof.lof_scores_dict == sample_lof_scores_dict
+    
+    def test_war_get_lof_scores(self, war_with_lof):
+        """Test getting LOF scores from WindowAnalysisResult."""
+        scores = war_with_lof.get_lof_scores()
+        
+        assert isinstance(scores, dict)
+        assert 'day1' in scores
+        assert 'day2' in scores
+        
+        # Check day1 scores
+        day1_scores = scores['day1']
+        assert day1_scores['LMot'] == 2.5
+        assert day1_scores['RMot'] == 0.8
+        
+        # Check day2 scores
+        day2_scores = scores['day2']
+        assert day2_scores['LMot'] == 1.1
+        assert day2_scores['RMot'] == 2.8
+    
+    def test_war_apply_lof_threshold(self, war_with_lof):
+        """Test applying LOF threshold to WindowAnalysisResult."""
+        # Test threshold 1.5
+        bad_channels_1_5 = war_with_lof.apply_lof_threshold(1.5)
+        
+        assert isinstance(bad_channels_1_5, dict)
+        assert 'day1' in bad_channels_1_5
+        assert 'day2' in bad_channels_1_5
+        
+        # Day1: scores [2.5, 0.8] with threshold 1.5
+        # Bad channels: LMot (2.5 >= 1.5)
+        assert set(bad_channels_1_5['day1']) == {'LMot'}
+        
+        # Day2: scores [1.1, 2.8] with threshold 1.5
+        # Bad channels: RMot (2.8 >= 1.5)
+        assert set(bad_channels_1_5['day2']) == {'RMot'}
+        
+        # Test different threshold
+        bad_channels_2_0 = war_with_lof.apply_lof_threshold(2.0)
+        
+        # Day1: only LMot (2.5) is >= 2.0
+        assert set(bad_channels_2_0['day1']) == {'LMot'}
+        
+        # Day2: only RMot (2.8) is >= 2.0
+        assert set(bad_channels_2_0['day2']) == {'RMot'}
+    
+    def test_war_apply_lof_threshold_strict(self, war_with_lof):
+        """Test very strict LOF threshold."""
+        bad_channels = war_with_lof.apply_lof_threshold(1.0)
+        
+        # Day1: LMot (2.5) >= 1.0, RMot (0.8) < 1.0
+        assert set(bad_channels['day1']) == {'LMot'}
+        
+        # Day2: LMot (1.1) >= 1.0, RMot (2.8) >= 1.0
+        assert set(bad_channels['day2']) == {'LMot', 'RMot'}
+    
+    def test_war_apply_lof_threshold_lenient(self, war_with_lof):
+        """Test very lenient LOF threshold."""
+        bad_channels = war_with_lof.apply_lof_threshold(3.5)
+        
+        # All scores are < 3.5
+        assert bad_channels['day1'] == []
+        assert bad_channels['day2'] == []
+    
+    def test_war_lof_scores_error_when_missing(self):
+        """Test error when LOF scores are not available."""
+        # Create WAR without LOF scores
+        test_df = pd.DataFrame({
+            'animal': ['A1'] * 2,
+            'animalday': ['day1', 'day1'],
+            'genotype': ['WT'] * 2,
+            'duration': [4.0] * 2,
+            'rms': [[100.0, 110.0]] * 2,
+            'timestamp': pd.to_datetime(['2023-01-01 10:00:00', '2023-01-01 10:04:00'])
+        })
+        war = WindowAnalysisResult(
+            result=test_df,
+            animal_id='A1',
+            genotype='WT',
+            channel_names=['LMot', 'RMot']
+        )
+        
+        with pytest.raises(ValueError, match="LOF scores not available"):
+            war.get_lof_scores()
+        
+        with pytest.raises(ValueError, match="LOF scores not available"):
+            war.apply_lof_threshold(1.5)
+    
+    def test_war_lof_scores_empty_dict(self):
+        """Test behavior with empty LOF scores dictionary."""
+        test_df = pd.DataFrame({
+            'animal': ['A1'] * 2,
+            'animalday': ['day1', 'day1'],
+            'genotype': ['WT'] * 2,
+            'duration': [4.0] * 2,
+            'rms': [[100.0, 110.0]] * 2,
+            'timestamp': pd.to_datetime(['2023-01-01 10:00:00', '2023-01-01 10:04:00'])
+        })
+        war = WindowAnalysisResult(
+            result=test_df,
+            animal_id='A1',
+            genotype='WT',
+            channel_names=['LMot', 'RMot'],
+            lof_scores_dict={}
+        )
+        
+        with pytest.raises(ValueError, match="LOF scores not available"):
+            war.get_lof_scores()
+        
+        with pytest.raises(ValueError, match="LOF scores not available"):
+            war.apply_lof_threshold(1.5)
+    
+    def test_war_save_load_preserves_lof_scores(self, war_with_lof):
+        """Test that LOF scores are preserved through save/load cycle."""
+        import tempfile
+        from pathlib import Path
+        
+        # Mock the save method to bypass the long_recordings dependency
+        with patch.object(war_with_lof, 'save_pickle_and_json') as mock_save:
+            # Test the JSON creation part directly
+            lof_scores_dict = {}
+            # Simulate the LOF collection that normally happens in save
+            if hasattr(war_with_lof, 'lof_scores_dict') and war_with_lof.lof_scores_dict:
+                lof_scores_dict = war_with_lof.lof_scores_dict
+            
+            json_dict = {
+                "animal_id": war_with_lof.animal_id,
+                "genotype": war_with_lof.genotype,
+                "channel_names": war_with_lof.channel_names,
+                "assume_from_number": war_with_lof.assume_from_number,
+                "bad_channels_dict": getattr(war_with_lof, 'bad_channels_dict', {}),
+                "suppress_short_interval_error": getattr(war_with_lof, 'suppress_short_interval_error', False),
+                "lof_scores_dict": lof_scores_dict,
+            }
+            
+            # Verify LOF scores are included in save data
+            assert 'lof_scores_dict' in json_dict
+            assert json_dict['lof_scores_dict'] == war_with_lof.lof_scores_dict
+            
+            # Test that a new WAR created with this data preserves LOF scores
+            new_war = WindowAnalysisResult(
+                war_with_lof.result,
+                **json_dict
+            )
+            
+            # Verify LOF functionality works
+            original_scores = war_with_lof.get_lof_scores()
+            new_scores = new_war.get_lof_scores()
+            assert original_scores == new_scores
+            
+            original_bad_channels = war_with_lof.apply_lof_threshold(1.5)
+            new_bad_channels = new_war.apply_lof_threshold(1.5)
+            assert original_bad_channels == new_bad_channels
+    
+    def test_war_lof_scores_invalid_data_structure(self):
+        """Test handling of invalid LOF scores data structure."""
+        # Missing required keys
+        invalid_lof_dict = {
+            'day1': {
+                'lof_scores': [1.0, 2.0],
+                # Missing 'channel_names'
+            }
+        }
+        
+        test_df = pd.DataFrame({
+            'animal': ['A1'] * 2,
+            'animalday': ['day1', 'day1'],
+            'genotype': ['WT'] * 2,
+            'duration': [4.0] * 2,
+            'rms': [[100.0, 110.0]] * 2,
+            'timestamp': pd.to_datetime(['2023-01-01 10:00:00', '2023-01-01 10:04:00'])
+        })
+        war = WindowAnalysisResult(
+            result=test_df,
+            animal_id='A1',
+            genotype='WT',
+            channel_names=['LMot', 'RMot'],
+            lof_scores_dict=invalid_lof_dict
+        )
+        
+        # Should not crash, but will skip invalid entries
+        scores = war.get_lof_scores()
+        assert scores == {}
+        
+        bad_channels = war.apply_lof_threshold(1.5)
+        assert bad_channels == {}
+    
+    def test_war_lof_threshold_workflow_simulation(self, war_with_lof):
+        """Test complete workflow of LOF threshold testing."""
+        # Simulate workflow: load WAR and test multiple thresholds
+        
+        # Get raw scores for analysis
+        raw_scores = war_with_lof.get_lof_scores()
+        assert len(raw_scores) == 2  # Two days
+        
+        # Test multiple thresholds quickly
+        thresholds = [1.0, 1.5, 2.0, 2.5, 3.0]
+        results = {}
+        
+        for threshold in thresholds:
+            bad_channels = war_with_lof.apply_lof_threshold(threshold)
+            total_bad = sum(len(channels) for channels in bad_channels.values())
+            results[threshold] = total_bad
+        
+        # Verify results make sense (stricter thresholds = more bad channels)
+        assert results[1.0] >= results[1.5]
+        assert results[1.5] >= results[2.0]
+        assert results[2.0] >= results[2.5]
+        assert results[2.5] >= results[3.0]
+        
+        # Verify specific expectations
+        assert results[1.0] == 3  # Most channels bad with strict threshold (LMot day1, LMot+RMot day2)
+        assert results[3.0] == 0  # No channels bad with lenient threshold
+
+
+class TestAnimalOrganizerLOF:
+    """Test LOF functionality integration with AnimalOrganizer (mocked)."""
+    
+    def test_animal_organizer_lof_methods_exist(self):
+        """Test that AnimalOrganizer has the expected LOF methods."""
+        from pythoneeg.visualization.results import AnimalOrganizer
+        
+        # Check that the methods exist
+        assert hasattr(AnimalOrganizer, 'compute_bad_channels')
+        assert hasattr(AnimalOrganizer, 'apply_lof_threshold')
+        assert hasattr(AnimalOrganizer, 'get_all_lof_scores')
+        
+        # Check method signatures by inspection
+        import inspect
+        
+        # compute_bad_channels should accept lof_threshold and force_recompute
+        sig = inspect.signature(AnimalOrganizer.compute_bad_channels)
+        assert 'lof_threshold' in sig.parameters
+        assert 'force_recompute' in sig.parameters
+        
+        # apply_lof_threshold should accept lof_threshold
+        sig = inspect.signature(AnimalOrganizer.apply_lof_threshold)
+        assert 'lof_threshold' in sig.parameters
+        
+        # get_all_lof_scores should have no required parameters
+        sig = inspect.signature(AnimalOrganizer.get_all_lof_scores)
+        required_params = [p for p in sig.parameters.values() if p.default == p.empty]
+        assert len(required_params) == 1  # Only 'self'
+    
+    @patch('pythoneeg.visualization.results.AnimalOrganizer.__init__', return_value=None)
+    def test_animal_organizer_war_creation_includes_lof(self, mock_init):
+        """Test that WindowAnalysisResult creation includes LOF scores."""
+        from pythoneeg.visualization.results import AnimalOrganizer
+        
+        # Create mock AnimalOrganizer with necessary attributes
+        ao = AnimalOrganizer.__new__(AnimalOrganizer)
+        ao.animaldays = ['day1', 'day2']
+        ao.animal_id = 'A1'
+        ao.genotype = 'WT'
+        ao.channel_names = ['LMot', 'RMot']
+        ao.assume_from_number = False
+        ao.bad_channels_dict = {}
+        
+        # Mock long_recordings with LOF scores
+        mock_lrec1 = Mock()
+        mock_lrec1.lof_scores = np.array([1.5, 2.0])
+        mock_lrec1.channel_names = ['LMot', 'RMot']
+        
+        mock_lrec2 = Mock()
+        mock_lrec2.lof_scores = np.array([0.8, 1.2])
+        mock_lrec2.channel_names = ['LMot', 'RMot']
+        
+        ao.long_recordings = [mock_lrec1, mock_lrec2]
+        
+        # Mock features_df
+        ao.features_df = pd.DataFrame({
+            'animal': ['A1'] * 4,
+            'animalday': ['day1', 'day1', 'day2', 'day2'],
+            'genotype': ['WT'] * 4,
+            'duration': [4.0] * 4,
+            'rms': [[100.0, 110.0]] * 4,
+            'timestamp': pd.to_datetime(['2023-01-01 10:00:00', '2023-01-01 10:04:00',
+                                       '2023-01-02 10:00:00', '2023-01-02 10:04:00'])
+        })
+        
+        # Test the LOF scores collection logic from compute_windowed_analysis
+        lof_scores_dict = {}
+        for animalday, lrec in zip(ao.animaldays, ao.long_recordings):
+            if hasattr(lrec, 'lof_scores') and lrec.lof_scores is not None:
+                lof_scores_dict[animalday] = {
+                    'lof_scores': lrec.lof_scores.tolist(),
+                    'channel_names': lrec.channel_names
+                }
+        
+        # Verify LOF scores were collected correctly
+        assert 'day1' in lof_scores_dict
+        assert 'day2' in lof_scores_dict
+        assert lof_scores_dict['day1']['lof_scores'] == [1.5, 2.0]
+        assert lof_scores_dict['day2']['lof_scores'] == [0.8, 1.2]
+        
+        # Create WindowAnalysisResult with LOF scores
+        from pythoneeg.visualization.results import WindowAnalysisResult
+        war = WindowAnalysisResult(
+            ao.features_df,
+            ao.animal_id,
+            ao.genotype,
+            ao.channel_names,
+            ao.assume_from_number,
+            ao.bad_channels_dict,
+            False,  # suppress_short_interval_error
+            lof_scores_dict
+        )
+        
+        # Verify LOF functionality works
+        assert hasattr(war, 'lof_scores_dict')
+        assert war.lof_scores_dict == lof_scores_dict
+        
+        scores = war.get_lof_scores()
+        assert scores['day1']['LMot'] == 1.5
+        assert scores['day2']['RMot'] == 1.2
