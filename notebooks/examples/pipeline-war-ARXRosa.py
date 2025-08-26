@@ -128,7 +128,7 @@ for animal_id in ["1017 1015"]:
             skip_days=["bad"],
             lro_kwargs={
                 # "truncate": 2,  # REVIEW put back when testing
-                # REVIEW when the truncate number changes, should the user be notified and be advised to force regenerat
+                # REVIEW when the truncate number changes, should the user be notified and be advised to force regenerate?
                 "mode": "mne",
                 "extract_func": read_raw_edf,
                 "file_pattern": "*.EDF",
@@ -162,5 +162,5 @@ for animal_id in ["1017 1015"]:
 
 
 """
-sbatch --mem 100G -c 4 -t 48:00:00 /mnt/isilon/marsh_single_unit/PythonEEG/notebooks/examples/pipeline.sh /mnt/isilon/marsh_single_unit/PythonEEG/notebooks/examples/pipeline-war-ARXRosa.py
+sbatch --mem 300G -c 4 -t 48:00:00 /mnt/isilon/marsh_single_unit/PythonEEG/notebooks/examples/pipeline.sh /mnt/isilon/marsh_single_unit/PythonEEG/notebooks/examples/pipeline-war-ARXRosa.py
 """

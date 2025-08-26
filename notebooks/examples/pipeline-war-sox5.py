@@ -1,78 +1,78 @@
 import os
 import sys
 from pathlib import Path
-import time
-import tempfile
 import logging
 import json
 from tqdm import tqdm
 
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.colors as colors
-import mne
 from dask_jobqueue import SLURMCluster
 from dask.distributed import Client
-from django.utils.text import slugify
-import joblib
 
 from pythoneeg import core
 from pythoneeg import visualization
 from pythoneeg import constants
 
-core.set_temp_directory('/scr1/users/dongjp')
+core.set_temp_directory("/scr1/users/dongjp")
 
 # SECTION 1: Set up clusters
 cluster_window = SLURMCluster(
-        cores=30,
-        memory='100GB',
-        walltime='48:00:00',
-        interface=None,
-        scheduler_options={'interface': 'eth1'}, # Look at `nmcli dev status` to find the correct interface
-        job_extra_directives=['--output=/dev/null',
-                              '--error=/dev/null']
-    )
+    cores=30,
+    memory="100GB",
+    walltime="48:00:00",
+    interface=None,
+    scheduler_options={"interface": "eth1"},  # Look at `nmcli dev status` to find the correct interface
+    job_extra_directives=["--output=/dev/null", "--error=/dev/null"],
+)
 print(f"\n\n\tcluster_window.dashboard_link: {cluster_window.dashboard_link}\n\n")
 cluster_spike = SLURMCluster(
-        cores=1,
-        memory='100GB',
-        processes=1,
-        walltime='6:00:00',
-        interface=None,
-        scheduler_options={'interface': 'eth1'}, # Look at `nmcli dev status` to find the correct interface
-        job_extra_directives=['--output=/dev/null',
-                              '--error=/dev/null']
-    )
+    cores=1,
+    memory="100GB",
+    processes=1,
+    walltime="6:00:00",
+    interface=None,
+    scheduler_options={"interface": "eth1"},  # Look at `nmcli dev status` to find the correct interface
+    job_extra_directives=["--output=/dev/null", "--error=/dev/null"],
+)
 print(f"\n\n\tcluster_spike.dashboard_link: {cluster_spike.dashboard_link}\n\n")
 cluster_window.scale(jobs=5)
 cluster_spike.adapt(maximum_jobs=15)
 # !SECTION
 
 # SECTION 2: Setup parameters
-logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.DEBUG, stream=sys.stdout, force=True)
+logging.basicConfig(
+    format="%(asctime)s - %(levelname)s - %(message)s", level=logging.DEBUG, stream=sys.stdout, force=True
+)
 logger = logging.getLogger()
 
-base_folder = Path('/mnt/isilon/marsh_single_unit/PythonEEG')
+base_folder = Path("/mnt/isilon/marsh_single_unit/PythonEEG")
 with open(base_folder / "notebooks" / "tests" / "sox5 combine genotypes.json", "r") as f:
     data = json.load(f)
-data_parent_folder = Path(data['data_parent_folder'])
-constants.GENOTYPE_ALIASES = data['GENOTYPE_ALIASES']
+bad_channels = data["bad_channels"]
+data_parent_folder = Path(data["data_parent_folder"])
+constants.GENOTYPE_ALIASES = data["GENOTYPE_ALIASES"]
 
 # data_folders_to_animal_ids = data["data_folders_to_animal_ids"]
 # Get only the second half of the dictionary items
 items = list(data["data_folders_to_animal_ids"].items())
-# data_folders_to_animal_ids = dict(items[int(len(items) * 1 / 2) :])  # last 1/2
-data_folders_to_animal_ids = dict(items[int(len(items) * 2 / 3) :])  # last 1/3
+data_folders_to_animal_ids = dict(items[int(len(items) * 1 / 2) :])  # last 1/2
+# data_folders_to_animal_ids = dict(items[int(len(items) * 2 / 3) :])  # last 1/3
 # data_folders_to_animal_ids = data["data_folders_to_animal_ids"]
 
-# constants.SORTING_PARAMS['freq_min'] = 60
-# constants.SORTING_PARAMS['freq_max'] = 400
+bad_folder_animalday = [
+    "012322_cohort4_group6_3mice_FMUT___MMUT_MWT MHET",
+    "012322_cohort4_group6_3mice_FMUT___MMUT_MWT MMUT",
+    "013122_cohort4_group7_2mice both_FHET FHET(2)",
+]
+
+
 # !SECTION
 
 # SECTION 3: Run pipeline
 for data_folder, animal_ids in tqdm(data_folders_to_animal_ids.items(), desc="Processing data folders"):
     for animal_id in tqdm(animal_ids, desc=f"Processing animals in {data_folder}", leave=False):
-
+        if f"{data_folder} {animal_id}" in bad_folder_animalday:
+            logging.warning(f"Skipping {data_folder} {animal_id} because it is in bad_folder_animalday")
+            continue
         with Client(cluster_window) as client:
             client.run(lambda: os.system(f"pip install -e {base_folder}"))
             
@@ -85,11 +85,19 @@ for data_folder, animal_ids in tqdm(data_folders_to_animal_ids.items(), desc="Pr
                                                     'multiprocess_mode': 'dask',
                                                     'overwrite_rowbins': False},
             )
-            ao.compute_bad_channels(lof_threshold=2)
+            ao.compute_bad_channels()
 
             # SECTION 2: Make WAR
-            # war = ao.compute_windowed_analysis(['all'], multiprocess_mode='dask')
-            war = ao.compute_windowed_analysis(["all"], exclude=["nspike", "lognspike"], multiprocess_mode="dask")
+            war = ao.compute_windowed_analysis(
+                ["all"], multiprocess_mode="dask"
+            )  # REVIEW this syntax should be by default compute all features
+            logging.warning(f"war.lof_scores_dict: {war.lof_scores_dict}")
+
+            if f"{data_folder} {animal_id}" in bad_channels:
+                war = war.filter_reject_channels_by_session(bad_channels[f"{data_folder} {animal_id}"])
+            else:
+                logging.info(f"No bad channels defined for {data_folder} {animal_id}, skipping filtering")
+            logging.warning(f"war.lof_scores_dict: {war.lof_scores_dict}")
             # !SECTION
 
         # SECTION 3: Make SARs, save SARs and load into WAR
@@ -104,7 +112,7 @@ for data_folder, animal_ids in tqdm(data_folders_to_animal_ids.items(), desc="Pr
 
         # SECTION 4: Save WARs and cleanup
         war.save_pickle_and_json(
-            base_folder / "notebooks" / "tests" / "test-wars-sox5-8" / f"{data_folder} {animal_id}"
+            base_folder / "notebooks" / "tests" / "test-wars-sox5-9" / f"{data_folder} {animal_id}"
         )
         del war
         # del sars
