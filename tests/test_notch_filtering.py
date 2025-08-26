@@ -12,6 +12,7 @@ import warnings
 from pythoneeg.core.analysis import LongRecordingAnalyzer
 from pythoneeg.core.analyze_frag import FragmentAnalyzer
 from pythoneeg import constants
+from pythoneeg import core
 
 try:
     import spikeinterface as si
@@ -77,8 +78,19 @@ class TestNotchFiltering:
         # Make get_fragment return our real SpikeInterface recording
         mock_long_recording.get_fragment.return_value = real_spikeinterface_recording
         
-        # Create analyzer with notch filtering enabled (default)
-        analyzer = LongRecordingAnalyzer(longrecording=mock_long_recording, fragment_len_s=2)
+        # Create a real mock that inherits from LongRecordingOrganizer to pass isinstance check
+        class MockLongRecordingOrganizer(core.LongRecordingOrganizer):
+            def __init__(self):
+                # Skip parent __init__ to avoid file system dependencies
+                pass
+        
+        # Copy all the mock attributes to our class-based mock
+        mock_organizer = MockLongRecordingOrganizer()
+        for attr in ['get_num_fragments', 'channel_names', 'meta', 'LongRecording', 
+                     'cumulative_file_durations', 'end_relative', 'get_fragment']:
+            setattr(mock_organizer, attr, getattr(mock_long_recording, attr))
+        
+        analyzer = LongRecordingAnalyzer(longrecording=mock_organizer, fragment_len_s=2)
         
         # Test that get_fragment_rec works with real SpikeInterface object
         fragment_rec = analyzer.get_fragment_rec(0)
@@ -88,6 +100,7 @@ class TestNotchFiltering:
         assert hasattr(fragment_rec, 'get_sampling_frequency')
         assert fragment_rec.get_sampling_frequency() == constants.GLOBAL_SAMPLING_RATE
     
+    @pytest.mark.skipif(not SPIKEINTERFACE_AVAILABLE, reason="SpikeInterface not available")
     def test_notch_filter_disable_flag(self):
         """Test that apply_notch_filter=False properly disables filtering."""
         from pythoneeg.core.core import LongRecordingOrganizer
@@ -108,15 +121,28 @@ class TestNotchFiltering:
         mock_recording.get_traces.return_value = np.random.randn(1000, 8)
         mock_long_recording.get_fragment.return_value = mock_recording
         
-        # Create analyzer with notch filtering disabled
-        analyzer = LongRecordingAnalyzer(longrecording=mock_long_recording, fragment_len_s=2)
+        # Create a real mock that inherits from LongRecordingOrganizer to pass isinstance check
+        class MockLongRecordingOrganizer(core.LongRecordingOrganizer):
+            def __init__(self):
+                # Skip parent __init__ to avoid file system dependencies
+                pass
+        
+        # Copy all the mock attributes to our class-based mock
+        mock_organizer = MockLongRecordingOrganizer()
+        for attr in ['get_num_fragments', 'channel_names', 'meta', 'LongRecording', 
+                     'cumulative_file_durations', 'end_relative', 'get_fragment']:
+            setattr(mock_organizer, attr, getattr(mock_long_recording, attr))
+        
+        analyzer = LongRecordingAnalyzer(longrecording=mock_organizer, fragment_len_s=2)
         analyzer.apply_notch_filter = False
         
         # This should work without calling notch_filter on the mock
-        with patch('spikeinterface.preprocessing.notch_filter') as mock_notch:
+        # Since SpikeInterface may not be available, patch the spre module in pythoneeg.core.analysis
+        with patch('pythoneeg.core.analysis.spre') as mock_spre:
+            mock_spre.notch_filter = Mock()
             fragment_rec = analyzer.get_fragment_rec(0)
             # Verify notch_filter was NOT called
-            mock_notch.assert_not_called()
+            mock_spre.notch_filter.assert_not_called()
             assert fragment_rec == mock_recording
     
     def test_fragment_analyzer_notch_filter_in_psd_computation(self):
@@ -161,6 +187,7 @@ class TestNotchFiltering:
         reduction_ratio = power_60hz_with_notch / power_60hz_without_notch
         assert reduction_ratio < 0.5, f"60Hz power reduction was only {(1-reduction_ratio)*100:.1f}%"
     
+    @pytest.mark.skipif(not SPIKEINTERFACE_AVAILABLE, reason="SpikeInterface not available")
     def test_notch_filter_parameter_in_analyzer_methods(self):
         """Test that LongRecordingAnalyzer methods respect the notch filter setting."""
         from pythoneeg.core.core import LongRecordingOrganizer
@@ -176,11 +203,23 @@ class TestNotchFiltering:
         mock_long_recording.cumulative_file_durations = [2.0]
         mock_long_recording.end_relative = [1]
         
-        analyzer = LongRecordingAnalyzer(longrecording=mock_long_recording, fragment_len_s=2)
+        # Create a real mock that inherits from LongRecordingOrganizer to pass isinstance check
+        class MockLongRecordingOrganizer(core.LongRecordingOrganizer):
+            def __init__(self):
+                # Skip parent __init__ to avoid file system dependencies
+                pass
+        
+        # Copy all the mock attributes to our class-based mock
+        mock_organizer = MockLongRecordingOrganizer()
+        for attr in ['get_num_fragments', 'channel_names', 'meta', 'LongRecording', 
+                     'cumulative_file_durations', 'end_relative']:
+            setattr(mock_organizer, attr, getattr(mock_long_recording, attr))
+        
+        analyzer = LongRecordingAnalyzer(longrecording=mock_organizer, fragment_len_s=2)
         
         # Test that the analyzer has notch filtering enabled by default
-        assert analyzer.apply_notch_filter == True
+        assert analyzer.apply_notch_filter
         
         # Test that we can disable it
         analyzer.apply_notch_filter = False
-        assert analyzer.apply_notch_filter == False
+        assert not analyzer.apply_notch_filter
