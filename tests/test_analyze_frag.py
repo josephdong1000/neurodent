@@ -919,14 +919,18 @@ class TestFragmentAnalyzer:
     def test_compute_nspike(self, sample_rec_2d):
         """Test compute_nspike function."""
         result = FragmentAnalyzer.compute_nspike(sample_rec_2d)
-        # This function should return None as documented
-        assert result is None
+        # This function returns NaN array for placeholder functionality
+        assert isinstance(result, np.ndarray)
+        assert result.shape == (sample_rec_2d.shape[1],)
+        assert np.all(np.isnan(result))
     
     def test_compute_lognspike(self, sample_rec_2d):
         """Test compute_lognspike function."""
         result = FragmentAnalyzer.compute_lognspike(sample_rec_2d)
-        # This function should return None as documented
-        assert result is None
+        # This function returns log-transformed NaN array (which is still NaN)
+        assert isinstance(result, np.ndarray)
+        assert result.shape == (sample_rec_2d.shape[1],)
+        assert np.all(np.isnan(result))
     
     # Error Handling Tests
     def test_memory_error_handling(self, sample_rec_2d):
@@ -1297,7 +1301,9 @@ class TestFragmentAnalyzerMathematicalVerification:
         mock_recording.get_traces.return_value = signals
         mock_long_recording.get_fragment.return_value = mock_recording
         
-        analyzer = LongRecordingAnalyzer(mock_long_recording, fragment_len_s=10, notch_freq=60)
+        analyzer = LongRecordingAnalyzer(mock_long_recording, fragment_len_s=10)
+        # Disable notch filtering for this test since we're using mock objects
+        analyzer.apply_notch_filter = False
         lra_result = analyzer.compute_pcorr(0)
         
         # Both should produce symmetric matrices

@@ -17,10 +17,16 @@ except Exception:  # pragma: no cover - optional at import time for tests that d
 import mne
 import numpy as np
 import pandas as pd
-import spikeinterface.core as si
-import spikeinterface.extractors as se
-import spikeinterface.preprocessing as spre
-import spikeinterface.widgets as sw
+try:
+    import spikeinterface.core as si
+    import spikeinterface.extractors as se
+    import spikeinterface.preprocessing as spre
+    import spikeinterface.widgets as sw
+except Exception:  # pragma: no cover - optional at import time for tests not using spikeinterface
+    si = None
+    se = None
+    spre = None
+    sw = None
 from scipy.signal import decimate
 from sklearn.neighbors import LocalOutlierFactor
 
@@ -201,6 +207,8 @@ def convert_ddfrowbin_to_si(bin_rowmajor_path, metadata):
             - se.BaseRecording: The SpikeInterface Recording object.
             - str or None: Path to temporary file if created, None otherwise.
     """
+    if se is None:
+        raise ImportError("SpikeInterface is required for convert_ddfrowbin_to_si")
     assert isinstance(metadata, DDFBinaryMetadata), "Metadata needs to be of type DDFBinaryMetadata"
 
     bin_rowmajor_path = Path(bin_rowmajor_path)
@@ -258,7 +266,7 @@ class LongRecordingOrganizer:
         truncate: Union[bool, int] = False,
         cache_policy: Literal["auto", "always", "force_regenerate"] = "auto",
         multiprocess_mode: Literal["dask", "serial"] = "serial",
-        extract_func: Union[Callable[..., si.BaseRecording], Callable[..., mne.io.Raw]] = None,
+        extract_func: Union[Callable[..., "si.BaseRecording"], Callable[..., mne.io.Raw]] = None,
         input_type: Literal["folder", "file", "files"] = "folder",
         file_pattern: str = None,
         manual_datetimes: datetime | list[datetime] = None,
@@ -335,7 +343,7 @@ class LongRecordingOrganizer:
         mode: Literal["bin", "si", "mne", None] = "bin",
         cache_policy: Literal["auto", "always", "force_regenerate"] = "auto",
         multiprocess_mode: Literal["dask", "serial"] = "serial",
-        extract_func: Union[Callable[..., si.BaseRecording], Callable[..., mne.io.Raw]] = None,
+        extract_func: Union[Callable[..., "si.BaseRecording"], Callable[..., mne.io.Raw]] = None,
         input_type: Literal["folder", "file", "files"] = "folder",
         file_pattern: str = None,
         **kwargs,
@@ -570,6 +578,8 @@ class LongRecordingOrganizer:
                 - "always": Use cached files if exist, raise error if missing/invalid
                 - "force_regenerate": Always regenerate files, overwrite existing cache
         """
+        if si is None:
+            raise ImportError("SpikeInterface is required for convert_rowbins_to_rec")
         if len(self.rowbins) < len(self.colbins):
             warnings.warn(
                 f"{len(self.colbins)} column-major files found, but only {len(self.rowbins)} row-major files found. Some column-major files may be missing."
@@ -618,14 +628,14 @@ class LongRecordingOrganizer:
         elif len(recs) < len(self.rowbins):
             logging.warning(f"Only {len(recs)} recordings generated. Some row-major files may be missing.")
 
-        self.LongRecording: si.BaseRecording = si.concatenate_recordings(recs).rename_channels(self.channel_names)
+        self.LongRecording: "si.BaseRecording" = si.concatenate_recordings(recs).rename_channels(self.channel_names)
 
         # Debug logging for critical recording features
         logging.info(f"LongRecording created: {self}")
 
     def convert_file_with_si_to_recording(
         self,
-        extract_func: Callable[..., si.BaseRecording],
+        extract_func: Callable[..., "si.BaseRecording"],
         input_type: Literal["folder", "file", "files"] = "folder",
         file_pattern: str = "*",
         cache_policy: Literal["auto", "always", "force_regenerate"] = "auto",
@@ -646,7 +656,7 @@ class LongRecordingOrganizer:
           ``si.concatenate_recordings``.
 
         Args:
-            extract_func (Callable[..., si.BaseRecording]): Function that consumes a path
+            extract_func (Callable[..., "si.BaseRecording"]): Function that consumes a path
                 (folder or file path) and returns a ``si.BaseRecording``.
             input_type (Literal['folder', 'file', 'files'], optional): How to discover inputs.
                 Defaults to ``'folder'``.
@@ -661,12 +671,14 @@ class LongRecordingOrganizer:
         Raises:
             ValueError: If no files are found for the given ``file_pattern`` or ``input_type`` is invalid.
         """
+        if si is None:
+            raise ImportError("SpikeInterface is required for convert_file_with_si_to_recording")
         # Early validation and file discovery
         if input_type == "folder":
             # For single folder, validate that timestamps are provided
             self._validate_timestamps_for_mode("si", 1)
             datafolder = self.base_folder_path
-            rec: si.BaseRecording = extract_func(datafolder, **kwargs)
+            rec: "si.BaseRecording" = extract_func(datafolder, **kwargs)
             n_processed_files = 1
         elif input_type == "file":
             # For single file, validate that timestamps are provided
@@ -677,7 +689,7 @@ class LongRecordingOrganizer:
             elif len(datafiles) > 1:
                 warnings.warn(f"Multiple files found matching pattern: {file_pattern}. Using first file.")
             datafile = datafiles[0]
-            rec: si.BaseRecording = extract_func(datafile, **kwargs)
+            rec: "si.BaseRecording" = extract_func(datafile, **kwargs)
             n_processed_files = 1
         elif input_type == "files":
             datafiles = [str(x) for x in self.base_folder_path.glob(file_pattern)]
@@ -687,7 +699,7 @@ class LongRecordingOrganizer:
             # Validate timestamps early before slow processing
             self._validate_timestamps_for_mode("si", len(datafiles))
             datafiles.sort()  # FIXME sort by index, or some other logic. Files may be out of order otherwise, messing up isday calculation
-            recs: list[si.BaseRecording] = [extract_func(x, **kwargs) for x in datafiles]
+            recs: list["si.BaseRecording"] = [extract_func(x, **kwargs) for x in datafiles]
             rec = si.concatenate_recordings(recs)
             n_processed_files = len(datafiles)
         else:
@@ -983,6 +995,8 @@ class LongRecordingOrganizer:
             Both files must exist for cache to be used. Metadata preserves channel names, original
             sampling rates, and other DDFBinaryMetadata fields across cache hits.
         """
+        if se is None:
+            raise ImportError("SpikeInterface is required for convert_file_with_mne_to_recording")
         # Early validation and file discovery
         if input_type == "folder":
             self._validate_timestamps_for_mode("mne", 1)
@@ -1162,9 +1176,14 @@ class LongRecordingOrganizer:
             logging.info("Using existing LOF scores")
         else:
             # Compute new LOF scores
-            scores = self._compute_lof_scores(limit_memory=limit_memory)
-            self.lof_scores = scores
-            logging.info(f"Computed LOF scores for {len(scores)} channels")
+            try:
+                scores = self._compute_lof_scores(limit_memory=limit_memory)
+                self.lof_scores = scores
+                logging.info(f"Computed LOF scores for {len(scores)} channels")
+            except Exception as e:
+                logging.error(f"Failed to compute LOF scores for recording: {e}")
+                self.lof_scores = None
+                logging.warning("LOF scores set to None due to computation failure")
 
         # Apply threshold if provided
         if lof_threshold is not None:
@@ -1179,34 +1198,49 @@ class LongRecordingOrganizer:
         Returns:
             np.ndarray: LOF scores for each channel.
         """
-        nn = Natural_Neighbor()
-        rec = self.LongRecording
+        try:
+            nn = Natural_Neighbor()
+            rec = self.LongRecording
 
-        logging.info(f"Computing LOF scores for {rec.__str__()}")
-        logging.debug("Getting traces from recording object")
-        rec_np = rec.get_traces(return_scaled=True)  # (n_samples, n_channels)
-        if limit_memory:
-            rec_np = rec_np.astype(np.float16)
-            rec_np = decimate(rec_np, 10, axis=0)
-        rec_np = rec_np.T  # (n_channels, n_samples)
+            logging.info(f"Computing LOF scores for {rec.__str__()}")
+            logging.debug("Getting traces from recording object")
+            rec_np = rec.get_traces(return_scaled=True)  # (n_samples, n_channels)
+            
+            if rec_np is None or rec_np.size == 0:
+                logging.error("Failed to get traces from recording - data is None or empty")
+                raise ValueError("Recording traces are None or empty")
+            
+            logging.debug(f"Got traces shape: {rec_np.shape}")
+            
+            if limit_memory:
+                rec_np = rec_np.astype(np.float16)
+                rec_np = decimate(rec_np, 10, axis=0)
+            rec_np = rec_np.T  # (n_channels, n_samples)
 
-        # Compute the optimal number of neighbors
-        nn.read(rec_np)
-        n_neighbors = nn.algorithm()
-        logging.info(f"n_neighbors for LOF computation: {n_neighbors}")
+            # Compute the optimal number of neighbors
+            nn.read(rec_np)
+            n_neighbors = nn.algorithm()
+            logging.info(f"n_neighbors for LOF computation: {n_neighbors}")
 
-        # Initialize LocalOutlierFactor
-        lof = LocalOutlierFactor(n_neighbors=n_neighbors, metric="minkowski", p=2)
+            # Initialize LocalOutlierFactor
+            lof = LocalOutlierFactor(n_neighbors=n_neighbors, metric="minkowski", p=2)
 
-        # Compute the outlier scores
-        logging.debug("Computing outlier scores")
-        del nn
-        lof.fit(rec_np)
-        del rec_np
-        scores = lof.negative_outlier_factor_ * -1
-        logging.debug(f"LOF scores: {scores}")
+            # Compute the outlier scores
+            logging.debug("Computing outlier scores")
+            del nn
+            lof.fit(rec_np)
+            del rec_np
+            scores = lof.negative_outlier_factor_ * -1
+            logging.info(f"LOF computation successful: {len(scores)} channels")
+            logging.debug(f"LOF scores: {scores}")
 
-        return scores
+            return scores
+            
+        except Exception as e:
+            logging.error(f"Failed to compute LOF scores: {e}")
+            logging.error(f"Recording info: channels={getattr(self, 'channel_names', 'unknown')}, "
+                         f"duration={getattr(rec, 'duration', 'unknown') if 'rec' in locals() else 'unknown'}")
+            raise
 
     def apply_lof_threshold(self, lof_threshold: float):
         """Apply threshold to existing LOF scores to determine bad channels.

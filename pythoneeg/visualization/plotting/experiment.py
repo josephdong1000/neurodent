@@ -583,11 +583,23 @@ class ExperimentPlotter:
         collapse_channels: bool = False,  # REVIEW Unable to plot a single cell, this parameter is not needed, if needed just use a catplot
         average_groupby: bool = False,  # REVIEW average groupby might be a redundant parameter, since matrix plotting already averages
         cmap: str = "RdBu_r",
+        norm: colors.Normalize | None = None,
         height: float = 3,
         aspect: float = 1,
     ):
         """
         Create a 2D feature plot.
+        
+        Parameters:
+        -----------
+        cmap : str, default="RdBu_r"
+            Colormap name or matplotlib colormap object
+        norm : matplotlib.colors.Normalize, optional
+            Normalization object. If None, will use CenteredNorm with auto-detected range.
+            Common options:
+            - colors.CenteredNorm(vcenter=0)  # Auto-detect range around 0
+            - colors.Normalize(vmin=-1, vmax=1)  # Fixed range
+            - colors.LogNorm()  # Logarithmic scale
         """
         if feature not in constants.MATRIX_FEATURES:
             raise ValueError(f"{feature} is not supported for 2D feature plots")
@@ -622,7 +634,7 @@ class ExperimentPlotter:
         g = sns.FacetGrid(df, **facet_vars)
 
         # Map the plotting function
-        g.map_dataframe(self._plot_matrix, feature=feature, color_palette=cmap)
+        g.map_dataframe(self._plot_matrix, feature=feature, color_palette=cmap, norm=norm)
 
         # Adjust layout
         plt.tight_layout()
@@ -785,9 +797,7 @@ class ExperimentPlotter:
 
         # Map the plotting function
         g.map_dataframe(self._plot_matrix, feature=feature, color_palette=cmap, norm=norm)
-
-        # NOTE implement statistical testing with big N and small N
-
+        
         # Adjust layout
         plt.tight_layout()
 

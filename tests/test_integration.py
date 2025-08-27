@@ -43,18 +43,16 @@ class TestAnalysisPipeline:
         # Create analyzer
         analyzer = analysis.LongRecordingAnalyzer(
             longrecording=mock_long_recording,
-            fragment_len_s=10,
-            notch_freq=60
+            fragment_len_s=10
         )
         
         # Test cross-module workflow: analysis → data processing → results format
         # Mock fragment data for workflow testing
-        mock_recording = MagicMock()
-        mock_recording.get_traces.return_value = np.random.randn(1000, 2)
-        mock_long_recording.get_fragment.return_value = mock_recording
+        test_data = np.random.randn(1000, 2)
         
         # Test that analysis integrates with utilities
-        with patch('pythoneeg.core.analysis.FragmentAnalyzer.compute_rms') as mock_rms:
+        with patch.object(analyzer, 'get_fragment_np', return_value=test_data), \
+             patch('pythoneeg.core.analysis.FragmentAnalyzer.compute_rms') as mock_rms:
             mock_rms.return_value = np.array([1.5, 2.0])
             
             # Compute feature
