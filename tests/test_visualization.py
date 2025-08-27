@@ -907,8 +907,38 @@ class TestWindowAnalysisResultFiltering:
             bad_channels_dict={}
         )
         
-        # Should raise ValueError for empty bad_channels_dict
-        with pytest.raises(ValueError, match="No bad channels specified for recording session A1_20230101"):
+        # Empty bad_channels_dict should mean "no bad channels" and not raise an error
+        filtered = war.filter_reject_channels_by_session()
+        
+        # Should return a new instance with no filtering applied (all data preserved)
+        assert isinstance(filtered, WindowAnalysisResult)
+        assert len(filtered.result) == len(war.result)
+        
+        # All RMS values should be preserved (no NaN introduced by filtering)
+        original_rms = np.array(war.result['rms'].tolist())
+        filtered_rms = np.array(filtered.result['rms'].tolist())
+        np.testing.assert_array_equal(filtered_rms, original_rms)
+
+    def test_edge_case_missing_session_in_bad_channels_dict(self):
+        """Test error when non-empty bad_channels_dict is missing a session."""
+        df = pd.DataFrame({
+            'animal': ['A1'] * 10,
+            'animalday': ['A1_20230101'] * 5 + ['A1_20230102'] * 5,  # Two sessions
+            'genotype': ['WT'] * 10,
+            'rms': [[100, 200]] * 10,
+            'duration': [4.0] * 10
+        })
+        
+        war = WindowAnalysisResult(
+            result=df,
+            animal_id="A1",
+            genotype="WT",
+            channel_names=["LMot", "RMot"],
+            bad_channels_dict={'A1_20230101': ['LMot']}  # Missing A1_20230102
+        )
+        
+        # Should raise ValueError for missing session when dict is non-empty
+        with pytest.raises(ValueError, match="No bad channels specified for recording session A1_20230102"):
             war.filter_reject_channels_by_session()
     
     def test_edge_case_no_duration_column(self):
