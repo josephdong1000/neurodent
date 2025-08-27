@@ -413,6 +413,8 @@ def parse_str_to_day(
     if parse_mode in ["split", "all"]:
         # Pass 2: Try individual tokens
         tokens = clean_str.split(sep)
+        if len(tokens) == 1:
+            warnings.warn("Only 1 string token found. Did you mean to use a different separator or parse_mode='all'?")
         for token in tokens:
             try:
                 # logging.debug(f'token: {token}')
@@ -426,6 +428,8 @@ def parse_str_to_day(
     if parse_mode in ["window", "all"]:
         # Pass 3: Try sliding window of tokens
         tokens = clean_str.split(sep)
+        if len(tokens) == 1:
+            warnings.warn("Only 1 string token found. Did you mean to use a different separator or parse_mode='all'?")
         for window_size in range(2, min(5, len(tokens) + 1)):
             for i in range(len(tokens) - window_size + 1):
                 grouped = " ".join(tokens[i : i + window_size])
