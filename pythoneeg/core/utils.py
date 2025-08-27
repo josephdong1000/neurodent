@@ -433,6 +433,13 @@ def parse_str_to_day(
         date_result = _try_user_regex_patterns(clean_str, date_patterns)
         if date_result is not None:
             return date_result
+        else:
+            # Warn when patterns are provided but none match, falling back to token parsing
+            warnings.warn(
+                f"No user-provided date patterns matched '{clean_str}'. "
+                f"Falling back to token-based parsing which may be ambiguous.",
+                UserWarning
+            )
 
     # Fallback to original token-based approach
     # Try parsing based on the specified mode
@@ -490,23 +497,41 @@ def _try_user_regex_patterns(clean_str: str, date_patterns: list[tuple[str, str]
     Returns:
         Optional[datetime]: Parsed datetime if a pattern matches, None otherwise
     """
-    for pattern, date_format in date_patterns:
+    successful_matches = []
+    
+    for pattern_idx, (pattern, date_format) in enumerate(date_patterns):
         try:
-            matches = re.finditer(pattern, clean_str, re.IGNORECASE)
-            for match in matches:
-                date_str = match.group()
+            regex_matches = re.finditer(pattern, clean_str, re.IGNORECASE)
+            for match in regex_matches:
+                date_str = match.group().strip()
+                # Check if date string can be parsed and meets year criteria
                 try:
-                    # Parse the date string directly with the provided format
-                    date = datetime.strptime(date_str.strip(), date_format)
-                    
+                    date = datetime.strptime(date_str, date_format)
                     if date.year > 1980:
-                        return date
+                        successful_matches.append((date_str, pattern_idx))
                 except (ValueError, TypeError):
                     continue
         except re.error as e:
             logging.warning(f"Invalid regex pattern '{pattern}': {e}")
-            continue
-                
+    
+    # Check for multiple successful matches and warn
+    if len(successful_matches) > 1:
+        match_details = [f"pattern {idx}: '{match}'" for match, idx in successful_matches]
+        warnings.warn(
+            f"Multiple date patterns matched in '{clean_str}': {', '.join(match_details)}. "
+            f"Using first match: '{successful_matches[0][0]}'", 
+            UserWarning
+        )
+    
+    # Return first successful match
+    if successful_matches:
+        first_match_str, first_pattern_idx = successful_matches[0]
+        pattern, date_format = date_patterns[first_pattern_idx]
+        try:
+            return datetime.strptime(first_match_str, date_format)
+        except (ValueError, TypeError):
+            return None
+    
     return None
 
 
