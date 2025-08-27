@@ -51,16 +51,14 @@ class TestLongRecordingAnalyzer:
         """Create a LongRecordingAnalyzer instance for testing."""
         return analysis.LongRecordingAnalyzer(
             longrecording=mock_long_recording,
-            fragment_len_s=10,
-            notch_freq=60
+            fragment_len_s=10
         )
     
     def test_init(self, mock_long_recording):
         """Test LongRecordingAnalyzer initialization."""
         analyzer = analysis.LongRecordingAnalyzer(
             longrecording=mock_long_recording,
-            fragment_len_s=10,
-            notch_freq=60
+            fragment_len_s=10
         )
         
         assert analyzer.LongRecording == mock_long_recording
@@ -70,7 +68,7 @@ class TestLongRecordingAnalyzer:
         assert analyzer.n_channels == 8
         assert analyzer.mult_to_uV == 1.0
         assert analyzer.f_s == constants.GLOBAL_SAMPLING_RATE
-        assert analyzer.notch_freq == 60
+        assert analyzer.apply_notch_filter == True
         
     def test_get_fragment_rec(self, analyzer, mock_long_recording):
         """Test getting fragment as recording object."""
@@ -766,8 +764,7 @@ class TestLongRecordingAnalyzerParameterPassThrough:
         """Create a LongRecordingAnalyzer instance for testing."""
         return analysis.LongRecordingAnalyzer(
             longrecording=mock_long_recording,
-            fragment_len_s=5,
-            notch_freq=50
+            fragment_len_s=5
         )
     
     def test_compute_psd_parameter_passthrough(self, analyzer):
@@ -960,5 +957,111 @@ class TestLongRecordingAnalyzerParameterPassThrough:
                 if method_name != 'compute_ampvar' and method_name != 'compute_logampvar' and method_name != 'compute_rms' and method_name != 'compute_logrms':
                     assert 'f_s' in call_kwargs, f"{method_name} should pass sampling frequency"
                     assert call_kwargs['f_s'] == analyzer.f_s, f"{method_name} should pass correct sampling frequency"
+
+
+class TestLongRecordingAnalyzerNotchFiltering:
+    """Test notch filtering functionality in LongRecordingAnalyzer."""
+    
+    @pytest.fixture
+    def mock_long_recording(self):
+        """Create a mock LongRecordingOrganizer for testing."""
+        mock = MagicMock(spec=LongRecordingOrganizer)
+        mock.get_num_fragments.return_value = 5
+        mock.channel_names = ["ch1", "ch2"]
+        mock.meta = MagicMock()
+        mock.meta.n_channels = 2
+        mock.meta.mult_to_uV = 1.0
+        mock.LongRecording = MagicMock()
+        mock.LongRecording.get_sampling_frequency.return_value = constants.GLOBAL_SAMPLING_RATE
+        mock.LongRecording.get_num_frames.return_value = 5000
+        mock.cumulative_file_durations = [10.0]
+        mock.end_relative = [1]
+        
+        # Mock fragment data
+        mock_recording = Mock()
+        mock_recording.get_traces.return_value = np.random.randn(1000, 2)
+        mock.get_fragment.return_value = mock_recording
+        
+        return mock
+    
+    def test_notch_filter_enabled_by_default(self, mock_long_recording):
+        """Test that notch filtering is enabled by default."""
+        analyzer = analysis.LongRecordingAnalyzer(mock_long_recording)
+        assert analyzer.apply_notch_filter == True
+        
+    def test_notch_filter_can_be_disabled(self, mock_long_recording):
+        """Test that notch filtering can be disabled."""
+        analyzer = analysis.LongRecordingAnalyzer(mock_long_recording, apply_notch_filter=False)
+        assert analyzer.apply_notch_filter == False
+    
+    @patch('pythoneeg.core.analysis.spre')
+    def test_notch_filter_applied_when_enabled(self, mock_spre, mock_long_recording):
+        """Test that notch filter is applied when enabled and spikeinterface is available."""
+        # Setup mock
+        mock_original_rec = Mock()
+        mock_filtered_rec = Mock()
+        mock_long_recording.get_fragment.return_value = mock_original_rec
+        mock_spre.notch_filter.return_value = mock_filtered_rec
+        
+        # Create analyzer with filtering enabled
+        analyzer = analysis.LongRecordingAnalyzer(mock_long_recording, apply_notch_filter=True)
+        
+        # Get fragment
+        result = analyzer.get_fragment_rec(0)
+        
+        # Verify notch filter was called
+        mock_spre.notch_filter.assert_called_once_with(mock_original_rec, freq=constants.LINE_FREQ)
+        assert result == mock_filtered_rec
+    
+    @patch('pythoneeg.core.analysis.spre')
+    def test_notch_filter_not_applied_when_disabled(self, mock_spre, mock_long_recording):
+        """Test that notch filter is not applied when disabled."""
+        # Setup mock
+        mock_original_rec = Mock()
+        mock_long_recording.get_fragment.return_value = mock_original_rec
+        
+        # Create analyzer with filtering disabled
+        analyzer = analysis.LongRecordingAnalyzer(mock_long_recording, apply_notch_filter=False)
+        
+        # Get fragment
+        result = analyzer.get_fragment_rec(0)
+        
+        # Verify notch filter was not called
+        mock_spre.notch_filter.assert_not_called()
+        assert result == mock_original_rec
+    
+    @patch('pythoneeg.core.analysis.spre', None)
+    def test_notch_filter_skipped_when_spikeinterface_preprocessing_unavailable(self, mock_long_recording):
+        """Test that notch filter is skipped when spikeinterface preprocessing is not available."""
+        # Setup mock
+        mock_original_rec = Mock()
+        mock_long_recording.get_fragment.return_value = mock_original_rec
+        
+        # Create analyzer with filtering enabled but spre unavailable
+        analyzer = analysis.LongRecordingAnalyzer(mock_long_recording, apply_notch_filter=True)
+        
+        # Get fragment
+        result = analyzer.get_fragment_rec(0)
+        
+        # Verify original recording is returned unchanged
+        assert result == mock_original_rec
+    
+    @patch('pythoneeg.core.analysis.spre')
+    def test_notch_filter_uses_line_freq_constant(self, mock_spre, mock_long_recording):
+        """Test that notch filter uses the LINE_FREQ constant."""
+        # Setup mock
+        mock_original_rec = Mock()
+        mock_filtered_rec = Mock()
+        mock_long_recording.get_fragment.return_value = mock_original_rec
+        mock_spre.notch_filter.return_value = mock_filtered_rec
+        
+        # Create analyzer
+        analyzer = analysis.LongRecordingAnalyzer(mock_long_recording, apply_notch_filter=True)
+        
+        # Get fragment
+        analyzer.get_fragment_rec(0)
+        
+        # Verify notch filter was called with correct frequency
+        mock_spre.notch_filter.assert_called_once_with(mock_original_rec, freq=constants.LINE_FREQ)
 
     

@@ -21,7 +21,6 @@ from dask import delayed
 from django.utils.text import slugify
 from scipy.stats import zscore
 from scipy.ndimage import binary_opening, binary_closing
-from sklearn.neighbors import LocalOutlierFactor
 from tqdm import tqdm
 
 
@@ -189,12 +188,46 @@ class AnimalOrganizer(AnimalFeatureParser):
         for lrec in self.long_recordings:
             lrec.cleanup_rec()
 
-    def compute_bad_channels(self, lof_threshold: float = 1.5):
+    def compute_bad_channels(self, lof_threshold: float = None, force_recompute: bool = False):
+        """Compute bad channels using LOF analysis for all recordings.
+        
+        Args:
+            lof_threshold (float, optional): Threshold for determining bad channels from LOF scores.
+                                           If None, only computes/loads scores without setting bad_channel_names.
+            force_recompute (bool): Whether to recompute LOF scores even if they exist.
+        """
         for lrec in self.long_recordings:
-            lrec.compute_bad_channels(lof_threshold=lof_threshold)
+            lrec.compute_bad_channels(lof_threshold=lof_threshold, force_recompute=force_recompute)
+        
+        # Update bad channels dict if threshold was applied
+        if lof_threshold is not None:
+            self.bad_channels_dict = {
+                animalday: lrec.bad_channel_names for animalday, lrec in zip(self.animaldays, self.long_recordings)
+            }
+    
+    def apply_lof_threshold(self, lof_threshold: float):
+        """Apply threshold to existing LOF scores to determine bad channels for all recordings.
+        
+        Args:
+            lof_threshold (float): Threshold for determining bad channels.
+        """
+        for lrec in self.long_recordings:
+            lrec.apply_lof_threshold(lof_threshold)
+        
         self.bad_channels_dict = {
             animalday: lrec.bad_channel_names for animalday, lrec in zip(self.animaldays, self.long_recordings)
         }
+    
+    def get_all_lof_scores(self) -> dict:
+        """Get LOF scores for all recordings.
+        
+        Returns:
+            dict: Dictionary mapping animal days to LOF score dictionaries.
+        """
+        return {
+            animalday: lrec.get_lof_scores() for animalday, lrec in zip(self.animaldays, self.long_recordings)
+        }
+    
 
     def compute_windowed_analysis(
         self,
@@ -203,6 +236,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         window_s=4,
         multiprocess_mode: Literal["dask", "serial"] = "serial",
         suppress_short_interval_error=False,
+        apply_notch_filter=True,
         **kwargs,
     ):
         """Computes windowed analysis of animal recordings. The data is divided into windows (time bins), then features are extracted from each window. The result is
@@ -213,6 +247,7 @@ class AnimalOrganizer(AnimalFeatureParser):
             exclude (list[str], optional): List of features to ignore. Will override the features parameter. Defaults to [].
             window_s (int, optional): Length of each window in seconds. Note that some features break with very short window times. Defaults to 4.
             suppress_short_interval_error (bool, optional): If True, suppress ValueError for short intervals between timestamps in resulting WindowAnalysisResult. Useful for aggregated WARs. Defaults to False.
+            apply_notch_filter (bool, optional): Whether to apply notch filtering to remove line noise. Uses constants.LINE_FREQ. Defaults to True.
 
         Raises:
             AttributeError: If a feature's compute_...() function was not implemented, this error will be raised.
@@ -225,7 +260,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         dataframes = []
         for lrec in self.long_recordings:  # Iterate over all long recordings
             logging.info(f"Computing windowed analysis for {lrec.base_folder_path}")
-            lan = core.LongRecordingAnalyzer(lrec, fragment_len_s=window_s)
+            lan = core.LongRecordingAnalyzer(lrec, fragment_len_s=window_s, apply_notch_filter=apply_notch_filter)
             if lan.n_fragments == 0:
                 logging.warning(f"No fragments found for {lrec.base_folder_path}. Skipping.")
                 continue
@@ -299,6 +334,15 @@ class AnimalOrganizer(AnimalFeatureParser):
         self.features_df = pd.concat(dataframes)
         self.features_df = self.features_df
 
+        # Collect LOF scores from long recordings
+        lof_scores_dict = {}
+        for animalday, lrec in zip(self.animaldays, self.long_recordings):
+            if hasattr(lrec, 'lof_scores') and lrec.lof_scores is not None:
+                lof_scores_dict[animalday] = {
+                    'lof_scores': lrec.lof_scores.tolist(),
+                    'channel_names': lrec.channel_names
+                }
+        
         self.window_analysis_result = WindowAnalysisResult(
             self.features_df,
             self.animal_id,
@@ -307,6 +351,7 @@ class AnimalOrganizer(AnimalFeatureParser):
             self.assume_from_number,
             self.bad_channels_dict,
             suppress_short_interval_error,
+            lof_scores_dict,
         )
 
         return self.window_analysis_result
@@ -453,6 +498,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         assume_from_number=False,
         bad_channels_dict: dict[str, list[str]] = {},
         suppress_short_interval_error=False,
+        lof_scores_dict: dict[str, dict] = {},
     ) -> None:
         """
         Args:
@@ -471,6 +517,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         self.assume_from_number = assume_from_number
         self.bad_channels_dict = bad_channels_dict
         self.suppress_short_interval_error = suppress_short_interval_error
+        self.lof_scores_dict = lof_scores_dict
 
         self.__update_instance_vars()
 
@@ -1185,11 +1232,48 @@ class WindowAnalysisResult(AnimalFeatureParser):
         """Filter out bad channels by recording session.
 
         Args:
-            bad_channels_dict (dict[str, list[str]], optional): Dict of bad channels per session
-            use_abbrevs (bool, optional): Whether to use abbreviations. Defaults to None.
+            bad_channels_dict (dict[str, list[str]], optional): Dictionary mapping recording session 
+                identifiers to lists of bad channel names to reject. Session identifiers are in the 
+                format "{animal_id} {genotype} {day}" (e.g., "A10 WT Apr-01-2023"). Channel names 
+                can be either full names (e.g., "Left Auditory") or abbreviations (e.g., "LAud"). 
+                If None, uses the bad_channels_dict from the constructor. Defaults to None.
+            use_abbrevs (bool, optional): Override automatic channel name format detection. If True, 
+                channels are assumed to be abbreviations. If False, channels are assumed to be full 
+                names. If None, automatically detects format and converts to abbreviations for matching. 
+                Defaults to None.
 
         Returns:
-            WindowAnalysisResult: New filtered instance
+            WindowAnalysisResult: New filtered instance with bad channels masked as NaN for their 
+                respective recording sessions
+
+        Examples:
+            Filter specific channels per session using abbreviations:
+            >>> bad_channels = {
+            ...     "A10 WT Apr-01-2023": ["LAud", "RMot"],  # Session 1: reject left auditory, right motor
+            ...     "A10 WT Apr-02-2023": ["LVis"]           # Session 2: reject left visual only
+            ... }
+            >>> filtered_war = war.filter_reject_channels_by_session(bad_channels, use_abbrevs=True)
+
+            Filter using full channel names:
+            >>> bad_channels = {
+            ...     "A12 KO May-15-2023": ["Left Motor", "Right Barrel"],
+            ...     "A12 KO May-16-2023": ["Left Auditory", "Left Visual", "Right Motor"]
+            ... }
+            >>> filtered_war = war.filter_reject_channels_by_session(bad_channels, use_abbrevs=False)
+
+            Auto-detect channel format (recommended):
+            >>> bad_channels = {
+            ...     "A15 WT Jun-10-2023": ["LMot", "RBar"],  # Will auto-detect as abbreviations
+            ...     "A15 WT Jun-11-2023": ["LAud"]
+            ... }
+            >>> filtered_war = war.filter_reject_channels_by_session(bad_channels)
+
+        Note:
+            - Session identifiers must exactly match the "animalday" values in the result DataFrame
+            - Available channel abbreviations: LAud, RAud, LVis, RVis, LHip, RHip, LBar, RBar, LMot, RMot
+            - Channel names are case-insensitive and support various formats (e.g., "left aud", "Left Auditory")
+            - If a session identifier is not found in bad_channels_dict, a warning is logged but processing continues
+            - If a channel name is not recognized, a warning is logged but other channels are still processed
         """
         mask = self.get_filter_reject_channels_by_recording_session(bad_channels_dict, use_abbrevs=use_abbrevs)
         return self._create_filtered_copy(mask)
@@ -1364,6 +1448,15 @@ class WindowAnalysisResult(AnimalFeatureParser):
         filebase = str(filebase)
 
         self.result.to_pickle(filebase + ".pkl")
+        # Collect LOF scores from long recordings
+        lof_scores_dict = {}
+        for animalday, lrec in zip(self.animaldays, self.long_recordings):
+            if hasattr(lrec, 'lof_scores') and lrec.lof_scores is not None:
+                lof_scores_dict[animalday] = {
+                    'lof_scores': lrec.lof_scores.tolist(),
+                    'channel_names': lrec.channel_names
+                }
+        
         json_dict = {
             "animal_id": self.animal_id,
             "genotype": self.genotype,
@@ -1371,10 +1464,54 @@ class WindowAnalysisResult(AnimalFeatureParser):
             "assume_from_number": False if save_abbrevs_as_chnames else self.assume_from_number,
             "bad_channels_dict": self.bad_channels_dict,
             "suppress_short_interval_error": self.suppress_short_interval_error,
+            "lof_scores_dict": lof_scores_dict,
         }
 
         with open(filebase + ".json", "w") as f:
             json.dump(json_dict, f, indent=2)
+    
+    
+    def apply_lof_threshold(self, lof_threshold: float) -> dict:
+        """Apply LOF threshold directly to stored scores to get bad channels.
+        
+        Args:
+            lof_threshold (float): Threshold for determining bad channels.
+            
+        Returns:
+            dict: Dictionary mapping animal days to lists of bad channel names.
+        """
+        if not hasattr(self, 'lof_scores_dict') or not self.lof_scores_dict:
+            raise ValueError("LOF scores not available in this WAR. Compute LOF scores first.")
+        
+        bad_channels_dict = {}
+        for animalday, lof_data in self.lof_scores_dict.items():
+            if 'lof_scores' in lof_data and 'channel_names' in lof_data:
+                scores = np.array(lof_data['lof_scores'])
+                channel_names = lof_data['channel_names']
+                
+                is_inlier = scores < lof_threshold
+                bad_channels = [channel_names[i] for i in np.where(~is_inlier)[0]]
+                bad_channels_dict[animalday] = bad_channels
+        
+        return bad_channels_dict
+    
+    def get_lof_scores(self) -> dict:
+        """Get LOF scores from this WAR.
+        
+        Returns:
+            dict: Dictionary mapping animal days to LOF score dictionaries.
+        """
+        if not hasattr(self, 'lof_scores_dict') or not self.lof_scores_dict:
+            raise ValueError("LOF scores not available in this WAR.")
+        
+        result = {}
+        for animalday, lof_data in self.lof_scores_dict.items():
+            if 'lof_scores' in lof_data and 'channel_names' in lof_data:
+                scores = lof_data['lof_scores']
+                channel_names = lof_data['channel_names']
+                result[animalday] = dict(zip(channel_names, scores))
+        
+        return result
 
     @classmethod
     def load_pickle_and_json(cls, folder_path=None):
