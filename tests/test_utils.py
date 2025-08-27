@@ -893,9 +893,14 @@ class TestParseStrToDay:
         
     def test_ambiguous_date_formats_raise_valueerror(self):
         """Test that invalid date formats raise ValueError."""
-        # Ambiguous date formats
         with pytest.raises(ValueError, match="No valid date token found"):
-            utils.parse_str_to_day("WT_A10_13-13-13_data")  # Invalid month/day
+            utils.parse_str_to_day("WT_A10_13-13-13_data")
+            
+        with pytest.raises(ValueError, match="No valid date token found"):
+            utils.parse_str_to_day("ID1524_invalid_data")
+            
+        with pytest.raises(ValueError, match="No valid date token found"):
+            utils.parse_str_to_day("WT_A10_no_date_here")
         
     def test_unicode_and_special_characters_dont_interfere(self):
         """Test that unicode and special characters don't interfere with date parsing."""
@@ -913,7 +918,6 @@ class TestParseStrToDay:
         
     def test_many_tokens_performance(self):
         """Test performance with strings containing many tokens."""
-        # String with many tokens (reduced from 1e4 to 1e3 for better performance)
         many_tokens = "WT_A10_" + "_".join([f"token{i}" for i in range(int(1e3))]) + "_2023-07-04_data"
         result = utils.parse_str_to_day(many_tokens)
         assert result.year == 2023
@@ -922,13 +926,14 @@ class TestParseStrToDay:
         
     def test_iso_us_and_european_date_formats(self):
         """Test parsing of ISO, US, and European date formats."""
-        # Test various date formats that should work
         test_cases = [
             ("WT_A10_2023-07-04_data", 2023, 7, 4),      # ISO format
             ("WT_A10_07/04/2023_data", 2023, 7, 4),      # US format
-            ("WT_A10_04/07/2023_data", 2023, 4, 7),      # European format
+            ("WT_A10_04/07/2023_data", 2023, 7, 4),      # European format
             ("WT_A10_2023-7-4_data", 2023, 7, 4),        # No leading zeros
-        ]
+        ] # REVIEW european format is not supported, every date should be expected 2023-07-04, but european has month and day flipped so uncertainty arises
+        # REVIEW is there a part of the code that allows people to pass a date parsing string and then parse out the date from string based on this formatting string?
+        # that would decrease ambiguity. maybe implement that and see how things go
         
         for string, expected_year, expected_month, expected_day in test_cases:
             result = utils.parse_str_to_day(string)
@@ -936,12 +941,13 @@ class TestParseStrToDay:
             assert result.month == expected_month, f"Failed for {string}"
             assert result.day == expected_day, f"Failed for {string}"
             
-    def test_complex_date_formats(self):
-        """Test parsing of complex date formats with the new two-pass approach."""
-        # Test cases that should work with the new sliding window approach
+    def test_complex_date_formats_parsemode_split(self):
+        """Test parsing of complex date formats with parsemode split."""
         test_cases = [
-            ("ID1524_January-20-2012_data", 2012, 1, 20),    # Complex ID with date
-            ("ID1524_Jan-20-2012_data", 2012, 1, 20),        # Abbreviated month
+            ("ID1524_January-20-2012_data", 2012, 1, 20),
+            ("ID1524_Jan-20-2012_data", 2012, 1, 20),
+            ("ID 1524 January-20-2012 data", 2012, 1, 20),    # Complex ID with date
+            ("ID 1524 Jan-20-2012 data", 2012, 1, 20),        # Abbreviated month
         ]
         
         for string, expected_year, expected_month, expected_day in test_cases:
@@ -951,10 +957,8 @@ class TestParseStrToDay:
             assert result.day == expected_day, f"Failed for {string}"
             
     def test_parsemode_all(self):
-        """Test underscore-separated dates (current limitation)."""
-        # Note: year defaults to 2000 due to underscore interference in parsing
-        # This is acceptable behavior for the current safety-focused design
-        
+        """Test underscore-separated date with parsemode 'all'"""
+        # Note: year defaults to 2000
         result = utils.parse_str_to_day("Mouse_A10_December_25_2023_data", parse_mode="all")
         assert result.month == 12
         assert result.day == 25
@@ -966,15 +970,21 @@ class TestParseStrToDay:
         result = utils.parse_str_to_day("ID1524_January_20_2012_data")
         assert result.month == 1
         assert result.day == 20
-            
-    def test_edge_cases_with_new_approach(self):
-        """Test edge cases that demonstrate the safety of the new approach."""
-        # These should still fail (safety maintained)
-        with pytest.raises(ValueError, match="No valid date token found"):
-            utils.parse_str_to_day("ID1524_invalid_data")
-            
-        with pytest.raises(ValueError, match="No valid date token found"):
-            utils.parse_str_to_day("WT_A10_no_date_here")
+
+    def test_parsemode_all_ambiguous_month_day(self):
+        """Test underscore-separated date with parsemode 'all' with ambiguous month/day"""
+        # Note: year defaults to 2000
+        result = utils.parse_str_to_day("Mouse_A10_December_11_2023_data", parse_mode="all")
+        assert result.month == 12
+        assert result.day == 11
+        
+        result = utils.parse_str_to_day("Subject_123_March_11_2024_data", parse_mode="all")
+        assert result.month == 3
+        assert result.day == 11
+
+        result = utils.parse_str_to_day("ID1524_January_11_2012_data")
+        assert result.month == 1
+        assert result.day == 11
             
     def test_number_only_ids_with_number_only_dates(self):
         """Test parsing with numeric IDs and numeric date formats."""
@@ -982,32 +992,45 @@ class TestParseStrToDay:
         test_cases = [
             ("123_2023-07-04_data", 2023, 7, 4),           # Simple numeric ID with ISO date
             ("456_07/04/2023_data", 2023, 7, 4),           # Numeric ID with US date format
-            ("789_04/07/2023_data", 2023, 4, 7),           
             ("999_2023-7-4_data", 2023, 7, 4),             # Numeric ID with no leading zeros
             ("123_2023-07-04_456_data", 2023, 7, 4),       # Multiple numeric IDs
         ]
         
         for string, expected_year, expected_month, expected_day in test_cases:
-            result = utils.parse_str_to_day(string, parse_mode='split')
+            result = utils.parse_str_to_day(string, parse_mode='split', sep='_')
+            assert result.year == expected_year, f"Failed for {string}"
+            assert result.month == expected_month, f"Failed for {string}"
+            assert result.day == expected_day, f"Failed for {string}"
+
+    def test_number_only_four_digit_ids_with_number_only_dates(self):
+        """Test parsing with 4-digit year-like numeric IDs and numeric date formats."""
+        # Test various combinations of numeric IDs with numeric dates
+        test_cases = [
+            ("1450_2023-07-04_data", 2023, 7, 4),
+            ("1920_07/04/2023_data", 2023, 7, 4),
+            ("2001_2023-07-04_data", 2023, 7, 4),           # Simple numeric ID with ISO date
+            ("2002_07/04/2023_data", 2023, 7, 4),           # Numeric ID with US date format
+            ("2003_2023-7-4_data", 2023, 7, 4),             # Numeric ID with no leading zeros
+            ("1990_2023-07-04_1991_data", 2023, 7, 4),      # Multiple numeric IDs
+        ]
+        # REVIEW this test fails since 2001 is attempted to be parsed to 2000-1-1
+        # maybe use the aformentioned parse by formatting string method or something of the like
+        
+        for string, expected_year, expected_month, expected_day in test_cases:
+            result = utils.parse_str_to_day(string, parse_mode='split', sep='_')
             assert result.year == expected_year, f"Failed for {string}"
             assert result.month == expected_month, f"Failed for {string}"
             assert result.day == expected_day, f"Failed for {string}"
             
     def test_multiple_numeric_dates_behavior(self):
         """Test behavior with multiple numeric dates (may vary based on dateutil version)."""
-        # This case can cause dateutil to get confused about time offsets
-        # The exact behavior may vary depending on the dateutil version
         string = "123_2023-07-04_789_2024-12-25_data"
-        try:
-            result = utils.parse_str_to_day(string, parse_mode='full')
-            # If it succeeds, it should return the first valid date
-            assert result.year == 2023
-            assert result.month == 7
-            assert result.day == 4
-        except ValueError as e:
-            # If it fails, it should be due to dateutil confusion
-            assert "timedelta" in str(e) or "offset" in str(e)
-            
+        result = utils.parse_str_to_day(string, parse_mode='full')
+        # Test it returns first valid date
+        assert result.year == 2023
+        assert result.month == 7
+        assert result.day == 4
+
     def test_numeric_ids_without_dates_raise_error(self):
         """Test that numeric IDs without valid dates raise ValueError."""
         with pytest.raises(ValueError, match="No valid date token found"):
@@ -1018,52 +1041,51 @@ class TestParseStrToDay:
 
     def test_parse_mode_full(self):
         """Test parse_mode='full' - only tries parsing the entire cleaned string."""
-        # Should work when date is in the full string
         result = utils.parse_str_to_day("2023-07-04", parse_mode="full")
         assert result.year == 2023
         assert result.month == 7
         assert result.day == 4
         
-        # Should work with extra text
         result = utils.parse_str_to_day("WT_A10_2023-07-04_data", parse_mode="full")
         assert result.year == 2023
         assert result.month == 7
         assert result.day == 4
         
-        # Should fail when date is only in individual tokens (no valid date in full string)
         with pytest.raises(ValueError, match="No valid date token found"):
             utils.parse_str_to_day("WT_A10_no_date_here", parse_mode="full")
 
     def test_parse_mode_split(self):
         """Test parse_mode='split' - only tries parsing individual tokens."""
-        # Should work when date is in individual tokens
-        result = utils.parse_str_to_day("WT_A10_2023-07-04_data", parse_mode="split")
+        result = utils.parse_str_to_day("WT_A10 2023-07-04 data", parse_mode="split")
         assert result.year == 2023
         assert result.month == 7
         assert result.day == 4
         
-        # Should work with custom separator - finds first valid token
-        result = utils.parse_str_to_day("WT|A10|2023|07|04|data", parse_mode="split", sep="|")
-        # "2023" is found and interpreted as January 1, 2023 (uses default month/day)
+        result = utils.parse_str_to_day("WT|A10|2023-07-04|data", parse_mode="split", sep="|")
         assert result.year == 2023
-        assert result.month == 1
-        assert result.day == 1
+        assert result.month == 7
+        assert result.day == 4
         
-        # Should fail when no individual tokens contain valid date
         with pytest.raises(ValueError, match="No valid date token found"):
             utils.parse_str_to_day("no date here", parse_mode="split")
 
     def test_parse_mode_window(self):
         """Test parse_mode='window' - only tries parsing sliding windows of tokens."""
         # Should work when date requires multiple tokens
-        result = utils.parse_str_to_day("WT_A10_January_20_2012_data", parse_mode="window")
-        assert result.month == 1
+        # REVIEW window doesn't work as intended, it is intedned to find the best match and report back that as the date
+        # but if theres just a month in one window it gets parsed as a full date, Feb -> Feb-1-2000
+        # again maybe searching by format string -> parse from there would be more appropriate
+        # alongside the split, full and all parsemodes
+
+        result = utils.parse_str_to_day("WT_A10_February_20_2012_data", parse_mode="window", sep='_')
+        assert result.year == 2012
+        assert result.month == 2
         assert result.day == 20
-        # Note: year may default to 2000 due to dateutil limitations
         
         # Should work with abbreviated month
-        result = utils.parse_str_to_day("WT_A10_Jan_20_2012_data", parse_mode="window")
-        assert result.month == 1
+        result = utils.parse_str_to_day("WT_A10_Feb_20_2012_data", parse_mode="window", sep='_')
+        assert result.year == 2012
+        assert result.month == 2
         assert result.day == 20
         
         # Should fail when no multi-token date exists
@@ -1079,15 +1101,21 @@ class TestParseStrToDay:
         assert result.day == 4
         
         # Should work with individual token parsing
-        result = utils.parse_str_to_day("WT_A10_2023_07_04_data", parse_mode="all")
-        assert result.year == 2000  # Conservative parsing uses default year
+        result = utils.parse_str_to_day("WT_A10_2023_07_04_data", parse_mode="all", sep="_")
+        assert result.year == 2023
         assert result.month == 7
         assert result.day == 4
+        # REVIEW same issues as above, try moving this test wholesale into format string searching
         
-        # Should work with window parsing
-        result = utils.parse_str_to_day("WT_A10_January_20_2012_data", parse_mode="all")
+        result = utils.parse_str_to_day("WT_A10_January_20_2012_data", parse_mode="all", sep="_")
+        assert result.year == 2023
         assert result.month == 1
         assert result.day == 20
+        # REVIEW same issues as above, try moving this test wholesale into format string searching
+    
+    # REVIEW by the way, split by default splits by whitespace, not by underscores. Almost all of these tests assume it splits by underscores, which is very wrong
+    # I documented this with a warning when split is called but only 1 token gets raised. It would be prudent to closely examine tests that raise this warning -- 
+    # perhaps the logic is wrong and should be using the format string searching method instead
 
     def test_parse_mode_default_behavior(self):
         """Test that default parse_mode is 'split'."""
@@ -1096,6 +1124,7 @@ class TestParseStrToDay:
         assert result.year == 2000  # Conservative parsing uses default year
         assert result.month == 7
         assert result.day == 4
+        # REVIEW problems outlined per above
         
         # Should fail when no valid tokens can be parsed in split mode
         with pytest.raises(ValueError, match="No valid date token found"):
@@ -1115,30 +1144,15 @@ class TestParseStrToDay:
         with pytest.raises(ValueError, match="No valid date token found"):
             utils.parse_str_to_day("WT_A10_2023-07-04_data", 
                                   parse_mode="split", 
+                                    sep='_',
                                   parse_params={"fuzzy": False})
         
         # Test with fuzzy parsing enabled
         result = utils.parse_str_to_day("WT_A10_2023-07-04_data", 
                                        parse_mode="split", 
+                                       sep='_',
                                        parse_params={"fuzzy": True})
         assert result.year == 2023
-        assert result.month == 7
-        assert result.day == 4
-
-    def test_parse_mode_performance_comparison(self):
-        """Test that different parse modes have expected performance characteristics."""
-        # Create a string that would be expensive to process with 'all' mode
-        many_tokens = "WT_A10_" + "_".join([f"token{i}" for i in range(100)]) + "_2023_07_04_data"
-        
-        # 'split' mode should be fast and find the date
-        result = utils.parse_str_to_day(many_tokens, parse_mode="split")
-        assert result.year == 2000  # Conservative parsing uses default year
-        assert result.month == 7
-        assert result.day == 4
-        
-        # 'all' mode should also work but might be slower
-        result = utils.parse_str_to_day(many_tokens, parse_mode="all")
-        assert result.year == 2000  # Conservative parsing uses default year
         assert result.month == 7
         assert result.day == 4
 
@@ -1207,7 +1221,6 @@ class TestParseChnameToAbbrev:
 
     def test_already_abbreviated_channels(self):
         """Test channels that are already abbreviations."""
-        # These should return themselves as they're already in DEFAULT_ID_TO_NAME.values()
         abbreviated_channels = ["LAud", "RAud", "LVis", "RVis", "LHip", "RHip", "LBar", "RBar", "LMot", "RMot"]
 
         for channel in abbreviated_channels:
@@ -1298,9 +1311,9 @@ class TestParseChnameToAbbrev:
             utils.parse_chname_to_abbrev(None)
 
         # Interestingly, lists work because the function searches for substrings in the list
-        # This is actually expected behavior given how the function is implemented
+        # REVIEW this is unintended behavior, parse chnaame to abbrev should only operate on strings
         result = utils.parse_chname_to_abbrev(["left", "Aud"])
-        assert result == "LAud"  # This actually works because "left" and "Aud" are found in the list
+        assert result == "LAud"
 
     def test_strict_matching_mode(self):
         """Test strict_matching parameter functionality."""
@@ -1327,6 +1340,7 @@ class TestParseChnameToAbbrev:
         with pytest.raises(ValueError, match="Ambiguous match in 'Right Hip Aud'. Multiple alias types matched"):
             utils.parse_chname_to_abbrev("Right Hip Aud", strict_matching=True)
             
+    def test_nonstrict_matching_mode(self):
         # Test non-strict mode - should allow ambiguous matches and use longest
         result = utils.parse_chname_to_abbrev("left right Aud", strict_matching=False)
         assert result == "RAud"  # "right" is longer than "left", so R wins
@@ -1672,7 +1686,7 @@ class TestSortDataframeByPlotOrder:
             "genotype": ["WT", "KO"],
             "value": [1, 2]
         })
-        
+        # ANCHOR 08/14/2025
         # Test with non-dict
         with pytest.raises(ValueError, match="df_sort_order must be a dictionary"):
             utils.sort_dataframe_by_plot_order(df, "not_a_dict")
