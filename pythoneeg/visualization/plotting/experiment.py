@@ -797,9 +797,7 @@ class ExperimentPlotter:
 
         # Map the plotting function
         g.map_dataframe(self._plot_matrix, feature=feature, color_palette=cmap, norm=norm)
-
-        # NOTE implement statistical testing with big N and small N
-
+        
         # Adjust layout
         plt.tight_layout()
 
