@@ -33,7 +33,8 @@ def load_war(animal_id):
 
     bad_channels = ["LHip", "RHip"]
 
-    war.filter_all(bad_channels=bad_channels, morphological_smoothing_seconds=60 * 5)
+    war.filter_all(bad_channels=bad_channels)
+    # war.filter_all(bad_channels=bad_channels, morphological_smoothing_seconds=60 * 5)
     war.aggregate_time_windows(groupby=["animalday", "isday"])
 
     war.reorder_and_pad_channels(["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"], use_abbrevs=True)
@@ -49,7 +50,7 @@ with Pool(14) as pool:
             wars.append(war)
 
 logger.info(f"{len(wars)} wars loaded")
-ep = visualization.ExperimentPlotter(wars, exclude=["nspike", "lognspike", "imcoh", "zimcoh"])
+ep = visualization.ExperimentPlotter(wars)
 
 
 """
