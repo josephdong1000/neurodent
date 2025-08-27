@@ -88,16 +88,12 @@ for data_folder, animal_ids in tqdm(data_folders_to_animal_ids.items(), desc="Pr
             ao.compute_bad_channels()
 
             # SECTION 2: Make WAR
-            war = ao.compute_windowed_analysis(
-                ["all"], multiprocess_mode="dask"
-            )  # REVIEW this syntax should be by default compute all features
-            logging.warning(f"war.lof_scores_dict: {war.lof_scores_dict}")
+            war = ao.compute_windowed_analysis(["all"], multiprocess_mode="dask")
 
             if f"{data_folder} {animal_id}" in bad_channels:
                 war = war.filter_reject_channels_by_session(bad_channels[f"{data_folder} {animal_id}"])
             else:
                 logging.info(f"No bad channels defined for {data_folder} {animal_id}, skipping filtering")
-            logging.warning(f"war.lof_scores_dict: {war.lof_scores_dict}")
             # !SECTION
 
         # SECTION 3: Make SARs, save SARs and load into WAR
