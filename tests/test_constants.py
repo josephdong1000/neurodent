@@ -81,7 +81,18 @@ class TestConstants:
         
         # Check that all feature lists contain expected items
         assert "rms" in constants.LINEAR_FEATURES
+        assert "ampvar" in constants.LINEAR_FEATURES
+        assert "psdtotal" in constants.LINEAR_FEATURES
+        assert "psdslope" in constants.LINEAR_FEATURES
+        assert "nspike" in constants.LINEAR_FEATURES
+        assert "logrms" in constants.LINEAR_FEATURES
+        assert "logampvar" in constants.LINEAR_FEATURES
+        assert "logpsdtotal" in constants.LINEAR_FEATURES
+        assert "lognspike" in constants.LINEAR_FEATURES
         assert "psdband" in constants.BAND_FEATURES
+        assert "psdfrac" in constants.BAND_FEATURES
+        assert "logpsdband" in constants.BAND_FEATURES
+        assert "logpsdfrac" in constants.BAND_FEATURES
         assert "cohere" in constants.MATRIX_FEATURES
         assert "zcohere" in constants.MATRIX_FEATURES
         assert "imcoh" in constants.MATRIX_FEATURES

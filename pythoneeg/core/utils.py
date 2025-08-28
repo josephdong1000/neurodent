@@ -364,6 +364,7 @@ def parse_str_to_day(
     sep: str = None,
     parse_params: dict = None,
     parse_mode: Literal["full", "split", "window", "all"] = "split",
+    date_patterns: list[tuple[str, str]] = None,
 ) -> datetime:
     """
     Parses the filename of a binfolder to get the day.
@@ -376,21 +377,49 @@ def parse_str_to_day(
             "full": Try parsing the entire cleaned string only
             "split": Try parsing individual tokens only
             "window": Try parsing sliding windows of tokens (2-4 tokens) only
-            "all": Use all three approaches in sequence
+            "all": Use all three approaches in the order "full", "split", "window
+        date_patterns (list[tuple[str, str]], optional): List of (regex_pattern, strptime_format) tuples
+            to try before falling back to token-based parsing. This allows users to specify
+            exact formats to handle ambiguous cases like MM/DD/YYYY vs DD/MM/YYYY. 
+            Only used in "split" and "all" modes. Defaults to None (no regex patterns).
+            
     Returns:
         datetime: Datetime object corresponding to the day of the binfolder.
 
     Raises:
         ValueError: If no valid date token is found in the string.
+        TypeError: If date_patterns is not a list of tuples.
+
+    Examples:
+        >>> # Handle ambiguous date formats with explicit patterns
+        >>> patterns = [(r'(19\d{2}|20\d{2})-(\d{1,2})-(\d{1,2})', '%Y-%m-%d')]
+        >>> parse_str_to_day('2001_2023-07-04_data', date_patterns=patterns)
+        datetime.datetime(2023, 7, 4, 0, 0)
+        
+        >>> # European format pattern
+        >>> patterns = [(r'(\d{1,2})/(\d{1,2})/(19\d{2}|20\d{2})', '%d/%m/%Y')]
+        >>> parse_str_to_day('04/07/2023_data', date_patterns=patterns)
+        datetime.datetime(2023, 7, 4, 0, 0)  # July 4th, not April 7th
 
     Note:
-        The function is designed to be conservative to avoid false positives.
-        Some complex date formats may parse with the default year (2000) instead
-        of the actual year in the string, which is acceptable behavior for
-        maintaining safety against false positives.
+        When date_patterns is provided, users have full control over date interpretation.
+        Without date_patterns, the function falls back to token-based parsing which may
+        be ambiguous for formats like MM/DD/YYYY vs DD/MM/YYYY.
     """
     if parse_params is None:
         parse_params = {"fuzzy": True}
+    elif not isinstance(parse_params, dict):
+        raise TypeError("parse_params must be a dictionary")
+
+    # Validate date_patterns
+    if date_patterns is not None:
+        if not isinstance(date_patterns, list):
+            raise TypeError("date_patterns must be a list of (regex_pattern, strptime_format) tuples")
+        for i, pattern_tuple in enumerate(date_patterns):
+            if not isinstance(pattern_tuple, tuple) or len(pattern_tuple) != 2:
+                raise TypeError(f"date_patterns[{i}] must be a tuple of (regex_pattern, strptime_format)")
+            if not isinstance(pattern_tuple[0], str) or not isinstance(pattern_tuple[1], str):
+                raise TypeError(f"date_patterns[{i}] must contain string elements")
 
     # Validate parse_mode
     valid_modes = ["full", "split", "window", "all"]
@@ -398,8 +427,21 @@ def parse_str_to_day(
         raise ValueError(f"Invalid parse_mode: {parse_mode}. Must be one of {valid_modes}")
 
     clean_str = _clean_str_for_date(string)
-    # logging.debug(f'raw str: {string}, clean_str: {clean_str}')
+    
+    # Only use user-provided regex patterns for "split" and "all" modes
+    if date_patterns and parse_mode in ["split", "all"]:
+        date_result = _try_user_regex_patterns(clean_str, date_patterns)
+        if date_result is not None:
+            return date_result
+        else:
+            # Warn when patterns are provided but none match, falling back to token parsing
+            warnings.warn(
+                f"No user-provided date patterns matched '{clean_str}'. "
+                f"Falling back to token-based parsing which may be ambiguous.",
+                UserWarning
+            )
 
+    # Fallback to original token-based approach
     # Try parsing based on the specified mode
     if parse_mode in ["full", "all"]:
         # Pass 1: Try parsing the entire cleaned string
@@ -413,6 +455,8 @@ def parse_str_to_day(
     if parse_mode in ["split", "all"]:
         # Pass 2: Try individual tokens
         tokens = clean_str.split(sep)
+        if len(tokens) == 1:
+            warnings.warn("Only 1 string token found. Did you mean to use a different separator or parse_mode='all'?")
         for token in tokens:
             try:
                 # logging.debug(f'token: {token}')
@@ -426,6 +470,8 @@ def parse_str_to_day(
     if parse_mode in ["window", "all"]:
         # Pass 3: Try sliding window of tokens
         tokens = clean_str.split(sep)
+        if len(tokens) == 1:
+            warnings.warn("Only 1 string token found. Did you mean to use a different separator or parse_mode='all'?")
         for window_size in range(2, min(5, len(tokens) + 1)):
             for i in range(len(tokens) - window_size + 1):
                 grouped = " ".join(tokens[i : i + window_size])
@@ -438,6 +484,55 @@ def parse_str_to_day(
                     continue
 
     raise ValueError(f"No valid date token found in string: {string}")
+
+
+def _try_user_regex_patterns(clean_str: str, date_patterns: list[tuple[str, str]]) -> Optional[datetime]:
+    """
+    Try user-provided regex patterns to find complete date patterns.
+    
+    Args:
+        clean_str (str): Cleaned string to search for date patterns
+        date_patterns (list[tuple[str, str]]): List of (regex_pattern, strptime_format) tuples
+        
+    Returns:
+        Optional[datetime]: Parsed datetime if a pattern matches, None otherwise
+    """
+    successful_matches = []
+    
+    for pattern_idx, (pattern, date_format) in enumerate(date_patterns):
+        try:
+            regex_matches = re.finditer(pattern, clean_str, re.IGNORECASE)
+            for match in regex_matches:
+                date_str = match.group().strip()
+                # Check if date string can be parsed and meets year criteria
+                try:
+                    date = datetime.strptime(date_str, date_format)
+                    if date.year > 1980:
+                        successful_matches.append((date_str, pattern_idx))
+                except (ValueError, TypeError):
+                    continue
+        except re.error as e:
+            logging.warning(f"Invalid regex pattern '{pattern}': {e}")
+    
+    # Check for multiple successful matches and warn
+    if len(successful_matches) > 1:
+        match_details = [f"pattern {idx}: '{match}'" for match, idx in successful_matches]
+        warnings.warn(
+            f"Multiple date patterns matched in '{clean_str}': {', '.join(match_details)}. "
+            f"Using first match: '{successful_matches[0][0]}'", 
+            UserWarning
+        )
+    
+    # Return first successful match
+    if successful_matches:
+        first_match_str, first_pattern_idx = successful_matches[0]
+        pattern, date_format = date_patterns[first_pattern_idx]
+        try:
+            return datetime.strptime(first_match_str, date_format)
+        except (ValueError, TypeError):
+            return None
+    
+    return None
 
 
 def _clean_str_for_date(string: str):
