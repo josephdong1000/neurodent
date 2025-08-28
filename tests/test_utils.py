@@ -263,11 +263,12 @@ class TestParsePathToAnimalday:
         # Use a filename with a valid date token that the parser can recognize
         filepath = Path("/parent/WT_A10_2023-04-01/recording_2023-04-01.bin")
         
-        result = utils.parse_path_to_animalday(
-            filepath, 
-            animal_param=(1, "_"), 
-            mode="nest"
-        )
+        with pytest.warns(UserWarning, match="Only 1 string token found"):
+            result = utils.parse_path_to_animalday(
+                filepath, 
+                animal_param=(1, "_"), 
+                mode="nest"
+            )
         
         assert result["animal"] == "A10"
         assert result["genotype"] == "WT"
@@ -355,8 +356,10 @@ class TestParsePathToAnimalday:
         """Test nest mode with invalid filename (no date)."""
         filepath = Path("/parent/WT_A10_20231/recording_invalid.bin")
         
-        with pytest.raises(ValueError, match="No valid date token found"):
-            utils.parse_path_to_animalday(filepath, animal_param=(1, "_"), mode="nest")
+        # Expected warning because filename doesn't contain separators
+        with pytest.warns(UserWarning, match="Only 1 string token found"):
+            with pytest.raises(ValueError, match="No valid date token found"):
+                utils.parse_path_to_animalday(filepath, animal_param=(1, "_"), mode="nest")
 
     def test_base_mode(self):
         """Test base mode parsing (same as concat)."""
@@ -427,11 +430,14 @@ class TestParsePathToAnimalday:
         """Test the specific examples mentioned in the documentation."""
         # Test nest mode example: /WT_A10/recording_2023-04-01.bin
         nest_filepath = Path("/parent/WT_A10/recording_2023-04-01.bin")
-        nest_result = utils.parse_path_to_animalday(
-            nest_filepath, 
-            animal_param=(1, "_"), 
-            mode="nest"
-        )
+        
+        # Expected warning because filename doesn't contain separators
+        with pytest.warns(UserWarning, match="Only 1 string token found"):
+            nest_result = utils.parse_path_to_animalday(
+                nest_filepath, 
+                animal_param=(1, "_"), 
+                mode="nest"
+            )
         assert nest_result["animal"] == "A10"
         assert nest_result["genotype"] == "WT"
         assert nest_result["day"] == "Apr-01-2023"
@@ -800,10 +806,11 @@ class TestParseStrToDay:
         assert result.day == 4
         
         # Custom separator that doesn't exist in string - should still work because of fuzzy parsing
-        result = utils.parse_str_to_day("WT_A10_2023-07-04_data", sep="|")
-        assert result.year == 2023
-        assert result.month == 7
-        assert result.day == 4
+        with pytest.warns(UserWarning, match="Only 1 string token found"):
+            result = utils.parse_str_to_day("WT_A10_2023-07-04_data", sep="|")
+            assert result.year == 2023
+            assert result.month == 7
+            assert result.day == 4
         
         # Separator that creates empty tokens
         result = utils.parse_str_to_day("WT__A10__2023-07-04__data", sep="_")
@@ -852,10 +859,11 @@ class TestParseStrToDay:
             utils.parse_str_to_day("2023-07-04", parse_params=123)
         
         # Empty dict parse_params should work (uses default behavior)
-        result = utils.parse_str_to_day("2023-07-04", parse_params={})
-        assert result.year == 2023
-        assert result.month == 7
-        assert result.day == 4
+        with pytest.warns(UserWarning, match="Only 1 string token found"):
+            result = utils.parse_str_to_day("2023-07-04", parse_params={})
+            assert result.year == 2023
+            assert result.month == 7
+            assert result.day == 4
         
     def test_dates_before_1980_are_ignored(self):
         """Test that dates before 1980 are ignored for safety."""
@@ -896,8 +904,9 @@ class TestParseStrToDay:
         with pytest.raises(ValueError, match="No valid date token found"):
             utils.parse_str_to_day("WT_A10_13-13-13_data")
             
-        with pytest.raises(ValueError, match="No valid date token found"):
-            utils.parse_str_to_day("ID1524_invalid_data")
+        with pytest.warns(UserWarning, match="Only 1 string token found"):
+            with pytest.raises(ValueError, match="No valid date token found"):
+                utils.parse_str_to_day("ID1524_invalid_data")
             
         with pytest.raises(ValueError, match="No valid date token found"):
             utils.parse_str_to_day("WT_A10_no_date_here")
@@ -984,31 +993,37 @@ class TestParseStrToDay:
             (r'(19\d{2}|20\d{2})-(\d{1,2})-(\d{1,2})', '%Y-%m-%d')   # ISO format
         ]
         # Should use first pattern (US format) when multiple match
-        result = utils.parse_str_to_day("12/06/2023_data", date_patterns=multiple_patterns)
-        assert result.year == 2023
-        assert result.month == 12  # December (US format: MM/DD/YYYY)
-        assert result.day == 6
+        with pytest.warns(UserWarning, match="Multiple.*patterns.*matched"):
+            result = utils.parse_str_to_day("12/06/2023_data", date_patterns=multiple_patterns)
+            assert result.year == 2023
+            assert result.month == 12  # December (US format: MM/DD/YYYY)
+            assert result.day == 6
         
         # Test 2: Multiple matches within single string - should return first match
         multi_date_string = "data_01/02/2020_and_03/04/2021_files"
-        result = utils.parse_str_to_day(multi_date_string, date_patterns=multiple_patterns)
-        assert result.year == 2020  # First date found
-        assert result.month == 1    # January (US format)
-        assert result.day == 2
+        with pytest.warns(UserWarning, match="Multiple.*patterns.*matched"):
+            result = utils.parse_str_to_day(multi_date_string, date_patterns=multiple_patterns)
+            assert result.year == 2020  # First date found
+            assert result.month == 1    # January (US format)
+            assert result.day == 2
         
         # Test 3: No patterns match - should fall back to token parsing
         no_match_patterns = [(r'NEVER_MATCHES_ANYTHING', '%Y-%m-%d')]
-        result = utils.parse_str_to_day("WT_2023-12-25_data", date_patterns=no_match_patterns)
-        assert result.year == 2023  # Falls back to dateutil parsing
-        assert result.month == 12
-        assert result.day == 25
+        with pytest.warns(UserWarning, match="Only 1 string token found"):
+            with pytest.warns(UserWarning, match="patterns.*matched.*back"):
+                result = utils.parse_str_to_day("WT_2023-12-25_data", date_patterns=no_match_patterns)
+                assert result.year == 2023  # Falls back to dateutil parsing
+                assert result.month == 12
+                assert result.day == 25
         
         # Test 4: Pattern matches but format string is incompatible
         bad_format_patterns = [(r'(\d{4})-(\d{2})-(\d{2})', '%d/%m/%Y')]  # Regex finds YYYY-MM-DD but format expects DD/MM/YYYY
-        result = utils.parse_str_to_day("test_2023-12-25_data", date_patterns=bad_format_patterns)
-        assert result.year == 2023  # Should fall back to token parsing
-        assert result.month == 12
-        assert result.day == 25
+        with pytest.warns(UserWarning, match="Only 1 string token found"):
+            with pytest.warns(UserWarning, match="patterns.*matched.*back"):
+                result = utils.parse_str_to_day("test_2023-12-25_data", date_patterns=bad_format_patterns)
+                assert result.year == 2023  # Should fall back to token parsing
+                assert result.month == 12
+                assert result.day == 25
         
         # Test 5: Pattern matches invalid date (e.g., Feb 30) - should fall back
         invalid_date_patterns = [(r'(\d{4})-(\d{2})-(\d{2})', '%Y-%m-%d')]
@@ -1060,8 +1075,10 @@ class TestParseStrToDay:
         
         for test_string in pure_old_dates:
             # These should fail completely since no valid fallback exists
-            with pytest.raises(ValueError, match="No valid date token found"):
-                utils.parse_str_to_day(test_string, date_patterns=iso_patterns)
+            with pytest.warns(UserWarning, match="patterns.*matched.*back"):
+                with pytest.warns(UserWarning, match="Only 1 string token found"):
+                    with pytest.raises(ValueError, match="No valid date token found"):
+                        utils.parse_str_to_day(test_string, date_patterns=iso_patterns)
 
     def test_date_patterns_malformed_dates(self):
         """Test handling of malformed dates that match regex but can't be parsed."""
@@ -1088,12 +1105,14 @@ class TestParseStrToDay:
         patterns = [(r'(\d{4})-(\d{2})-(\d{2})', '%Y-%m-%d')]
         
         # Empty string should still raise ValueError
-        with pytest.raises(ValueError, match="No valid date token found"):
-            utils.parse_str_to_day("", date_patterns=patterns)
+        with pytest.warns(UserWarning, match="patterns.*matched.*back"):
+            with pytest.raises(ValueError, match="No valid date token found"):
+                utils.parse_str_to_day("", date_patterns=patterns)
             
         # Whitespace only should still raise ValueError  
-        with pytest.raises(ValueError, match="No valid date token found"):
-            utils.parse_str_to_day("   ", date_patterns=patterns)
+        with pytest.warns(UserWarning, match="patterns.*matched.*back"):
+            with pytest.raises(ValueError, match="No valid date token found"):
+                utils.parse_str_to_day("   ", date_patterns=patterns)
 
     def test_date_patterns_priority_ordering(self):
         """Test that date patterns are processed in order and first successful match wins."""
@@ -1104,10 +1123,11 @@ class TestParseStrToDay:
         ]
         
         # Test with ambiguous date where interpretation matters
-        result = utils.parse_str_to_day("data_06/03/2023_file", date_patterns=priority_patterns)
-        assert result.year == 2023
-        assert result.month == 6   # Should use first pattern (US): June
-        assert result.day == 3
+        with pytest.warns(UserWarning, match="Multiple.*patterns.*matched"):
+            result = utils.parse_str_to_day("data_06/03/2023_file", date_patterns=priority_patterns)
+            assert result.year == 2023
+            assert result.month == 6   # Should use first pattern (US): June
+            assert result.day == 3
         
         # Reverse the order - European should win now
         reverse_patterns = [
@@ -1115,10 +1135,11 @@ class TestParseStrToDay:
             (r'(\d{2})/(\d{2})/(\d{4})', '%m/%d/%Y'),  # US format (MM/DD/YYYY) - lower priority
         ]
         
-        result = utils.parse_str_to_day("data_06/03/2023_file", date_patterns=reverse_patterns)
-        assert result.year == 2023
-        assert result.month == 3   # Should use first pattern (European): March
-        assert result.day == 6
+        with pytest.warns(UserWarning, match="Multiple.*patterns.*matched"):
+            result = utils.parse_str_to_day("data_06/03/2023_file", date_patterns=reverse_patterns)
+            assert result.year == 2023
+            assert result.month == 3   # Should use first pattern (European): March
+            assert result.day == 6
 
     def test_date_patterns_complex_formats(self):
         """Test various complex date formats beyond basic ISO/US/European."""
@@ -1153,10 +1174,13 @@ class TestParseStrToDay:
         invalid_patterns = [(r'[invalid regex', '%Y-%m-%d')]
         
         # Should still work via fallback token parsing
-        result = utils.parse_str_to_day("2023-07-04", date_patterns=invalid_patterns)
-        assert result.year == 2023
-        assert result.month == 7
-        assert result.day == 4
+        # This case generates both fallback warning and single token warning
+        with pytest.warns(UserWarning, match="patterns.*matched.*back"):
+            with pytest.warns(UserWarning, match="Only 1 string token found"):
+                result = utils.parse_str_to_day("2023-07-04", date_patterns=invalid_patterns)
+                assert result.year == 2023
+                assert result.month == 7
+                assert result.day == 4
 
     def test_date_patterns_warnings(self):
         """Test that appropriate warnings are raised for various conditions."""
@@ -1167,7 +1191,7 @@ class TestParseStrToDay:
             (r'(\d{1,2})/(\d{1,2})/(19\d{2}|20\d{2})', '%d/%m/%Y'),  # European format
         ]
         
-        with pytest.warns(UserWarning, match="Multiple date patterns matched"):
+        with pytest.warns(UserWarning, match="Multiple.*patterns.*matched"):
             result = utils.parse_str_to_day("12/06/2023_data", date_patterns=multiple_patterns)
             assert result.year == 2023
             assert result.month == 12  # Should use first pattern (US)
@@ -1175,16 +1199,17 @@ class TestParseStrToDay:
         # Test 2: Warning when patterns provided but none match (fallback to token parsing)
         no_match_patterns = [(r'NEVER_MATCHES_ANYTHING', '%Y-%m-%d')]
         
-        with pytest.warns(UserWarning, match="No user-provided date patterns matched.*Falling back"):
-            result = utils.parse_str_to_day("WT_2023-12-25_data", date_patterns=no_match_patterns)
-            assert result.year == 2023
-            assert result.month == 12
-            assert result.day == 25
+        with pytest.warns(UserWarning, match="patterns.*matched.*back"):
+            with pytest.warns(UserWarning, match="Only 1 string token found"):
+                result = utils.parse_str_to_day("WT_2023-12-25_data", date_patterns=no_match_patterns)
+                assert result.year == 2023
+                assert result.month == 12
+                assert result.day == 25
 
         # Test 3: Warning when multiple matches within same pattern 
         same_pattern_multiple_matches = [(r'(\d{4})-(\d{2})-(\d{2})', '%Y-%m-%d')]
         
-        with pytest.warns(UserWarning, match="Multiple date patterns matched"):
+        with pytest.warns(UserWarning, match="Multiple.*patterns.*matched"):
             result = utils.parse_str_to_day("data_2020-01-15_and_2021-03-10_files", 
                                           date_patterns=same_pattern_multiple_matches)
             assert result.year == 2020  # Should use first match
@@ -1194,14 +1219,15 @@ class TestParseStrToDay:
         # Test 4: Warning when no user patterns match (falls back to token parsing)
         non_matching_patterns = [(r'(\d{2})/(\d{2})/(\d{4})', '%m/%d/%Y')]  # MM/DD/YYYY format
         
-        with pytest.warns(UserWarning, match="No user-provided date patterns matched.*Falling back"):
-            # This string has no MM/DD/YYYY patterns but has valid tokens for fallback
-            result = utils.parse_str_to_day("data_experiment_2023-July-04_results", 
-                                          date_patterns=non_matching_patterns)
-            # Should get valid result from fallback token parsing
-            assert result.year == 2023
-            assert result.month == 7
-            assert result.day == 4
+        # This case generates both fallback warning and single token warning
+        with pytest.warns(UserWarning, match="patterns.*matched.*back"):
+            with pytest.warns(UserWarning, match="Only 1 string token found"):
+                result = utils.parse_str_to_day("data_experiment_2023-July-04_results", 
+                                            date_patterns=non_matching_patterns)
+                # Should get valid result from fallback token parsing
+                assert result.year == 2023
+                assert result.month == 7
+                assert result.day == 4
 
     def test_date_patterns_no_warnings_when_appropriate(self):
         """Test that warnings are NOT raised when they shouldn't be."""
@@ -1236,10 +1262,11 @@ class TestParseStrToDay:
     def test_original_behavior_without_date_patterns(self):
         """Test that original behavior is preserved when date_patterns is not provided."""
         # The main issue case should now work via improved token parsing
-        result = utils.parse_str_to_day("2001_2023-07-04_data")  
-        assert result.year == 2023  # Should find the complete date, not just the year
-        assert result.month == 7
-        assert result.day == 4
+        with pytest.warns(UserWarning, match="Only 1 string token found"):
+            result = utils.parse_str_to_day("2001_2023-07-04_data")  
+            assert result.year == 2023  # Should find the complete date, not just the year
+            assert result.month == 7
+            assert result.day == 4
             
     def test_complex_date_formats_parsemode_split(self):
         """Test parsing of complex date formats with parsemode split."""
@@ -1251,14 +1278,23 @@ class TestParseStrToDay:
         ]
         
         for string, expected_year, expected_month, expected_day in test_cases:
-            result = utils.parse_str_to_day(string, parse_mode="split")
-            assert result.year == expected_year, f"Failed for {string}"
-            assert result.month == expected_month, f"Failed for {string}"
-            assert result.day == expected_day, f"Failed for {string}"
+            # Strings with underscores but no spaces will generate single token warnings
+            if '_' in string and ' ' not in string:
+                with pytest.warns(UserWarning, match="Only 1 string token found"):
+                    result = utils.parse_str_to_day(string, parse_mode="split")
+                    assert result.year == expected_year, f"Failed for {string}"
+                    assert result.month == expected_month, f"Failed for {string}"
+                    assert result.day == expected_day, f"Failed for {string}"
+            else:
+                result = utils.parse_str_to_day(string, parse_mode="split")
+                assert result.year == expected_year, f"Failed for {string}"
+                assert result.month == expected_month, f"Failed for {string}"
+                assert result.day == expected_day, f"Failed for {string}"
             
     def test_parsemode_all(self):
         """Test underscore-separated date with parsemode 'all'"""
         # Note: year defaults to 2000
+        # parse_mode="all" can handle these without warnings due to full-string parsing
         result = utils.parse_str_to_day("Mouse_A10_December_25_2023_data", parse_mode="all")
         assert result.month == 12
         assert result.day == 25
@@ -1267,13 +1303,16 @@ class TestParseStrToDay:
         assert result.month == 3
         assert result.day == 15
 
-        result = utils.parse_str_to_day("ID1524_January_20_2012_data")
+        # This one uses default parse_mode which generates warning
+        with pytest.warns(UserWarning, match="Only 1 string token found"):
+            result = utils.parse_str_to_day("ID1524_January_20_2012_data")
         assert result.month == 1
         assert result.day == 20
 
     def test_parsemode_all_ambiguous_month_day(self):
         """Test underscore-separated date with parsemode 'all' with ambiguous month/day"""
         # Note: year defaults to 2000
+        # parse_mode="all" can handle these without warnings due to full-string parsing
         result = utils.parse_str_to_day("Mouse_A10_December_11_2023_data", parse_mode="all")
         assert result.month == 12
         assert result.day == 11
@@ -1282,7 +1321,9 @@ class TestParseStrToDay:
         assert result.month == 3
         assert result.day == 11
 
-        result = utils.parse_str_to_day("ID1524_January_11_2012_data")
+        # This one uses default parse_mode which generates warning
+        with pytest.warns(UserWarning, match="Only 1 string token found"):
+            result = utils.parse_str_to_day("ID1524_January_11_2012_data")
         assert result.month == 1
         assert result.day == 11
             
@@ -1341,11 +1382,13 @@ class TestParseStrToDay:
 
     def test_numeric_ids_without_dates_raise_error(self):
         """Test that numeric IDs without valid dates raise ValueError."""
-        with pytest.raises(ValueError, match="No valid date token found"):
-            utils.parse_str_to_day("123_invalid_data")
+        with pytest.warns(UserWarning, match="Only 1 string token found"):
+            with pytest.raises(ValueError, match="No valid date token found"):
+                utils.parse_str_to_day("123_invalid_data")
             
-        with pytest.raises(ValueError, match="No valid date token found"):
-            utils.parse_str_to_day("456_789_no_date_here")
+        with pytest.warns(UserWarning, match="Only 1 string token found"):
+            with pytest.raises(ValueError, match="No valid date token found"):
+                utils.parse_str_to_day("456_789_no_date_here")
 
     def test_parse_mode_full(self):
         """Test parse_mode='full' - only tries parsing the entire cleaned string."""
@@ -1400,6 +1443,7 @@ class TestParseStrToDay:
     def test_parse_mode_all(self):
         """Test parse_mode='all' - uses all three approaches in sequence."""
         # Should work with full string parsing (no patterns needed)
+        # parse_mode="all" tries full parsing first, so no warning for simple dates
         result = utils.parse_str_to_day("2023-07-04", parse_mode="all")
         assert result.year == 2023
         assert result.month == 7
@@ -1430,6 +1474,7 @@ class TestParseStrToDay:
     def test_parse_mode_default_behavior(self):
         """Test that default parse_mode is 'split'."""
         # Default should be 'split' mode
+        # This string has enough tokens to parse without warnings
         result = utils.parse_str_to_day("WT_A10_2023_07_04_data")
         assert result.year == 2000  # Conservative parsing uses default year
         assert result.month == 7
