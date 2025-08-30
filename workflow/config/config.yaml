@@ -1,0 +1,120 @@
+# PyEEG Snakemake Pipeline Configuration
+# =====================================
+
+# Core directories and paths
+base_folder: "/mnt/isilon/marsh_single_unit/PythonEEG"
+data_parent_folder: "/mnt/isilon/marsh_single_unit/PythonEEG Data Bins/Sox5/Dr. Lefebvre Project"
+temp_directory: "/scr1/users/dongjp"
+
+# Results directory structure
+results_dir: "results"
+wars_dir: "results/wars"
+temporal_heatmaps_dir: "results/temporal_heatmaps"
+diagnostic_figures_dir: "results/diagnostic_figures"
+flattened_wars_dir: "results/flattened_wars"
+final_analysis_dir: "results/final_analysis"
+
+# Sample configuration file
+samples_file: "workflow/config/samples.json"
+
+# Analysis parameters
+analysis:
+  # WAR generation parameters
+  war_generation:
+    mode: "nest"
+    assume_from_number: true
+    skip_days: ["bad"]
+    lro_kwargs:
+      mode: "bin"
+      multiprocess_mode: "dask"
+      overwrite_rowbins: false
+
+  # Filtering parameters for temporal diagnostics and flattened wars
+  filtering:
+    bad_channels_global: ["LHip", "RHip"]  # Applied globally for some analyses
+    morphological_smoothing_seconds: 300  # 5 minutes
+    aggregate_groupby: ["animalday", "isday"]
+    channel_reorder: ["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"]
+    use_abbrevs: true
+
+  # Figure generation parameters
+  figures:
+    coherecorr_spectral:
+      figsize: [20, 5]
+      score_type: "z"
+    
+    psd_histogram:
+      figsize: [10, 4]
+      avg_channels: true
+      plot_type: "loglog"
+    
+    psd_spectrogram:
+      figsize: [20, 4]
+      mode: "none"
+
+# SLURM cluster configuration
+cluster:
+  # WAR generation cluster (high-memory, high-core)
+  war_generation:
+    cores: 30
+    memory: "100GB"
+    walltime: "48:00:00"
+    interface: "eth1"
+    scale_jobs: 5
+    job_extra_directives:
+      - "--output=/dev/null"
+      - "--error=/dev/null"
+
+  # Spike analysis cluster (low-core, high-memory)
+  spike_analysis:
+    cores: 1
+    memory: "100GB"
+    processes: 1
+    walltime: "6:00:00"
+    interface: "eth1"
+    adapt_maximum_jobs: 15
+    job_extra_directives:
+      - "--output=/dev/null"
+      - "--error=/dev/null"
+
+  # Figure generation cluster (moderate resources)
+  figure_generation:
+    cores: 10
+    memory: "100GB"
+    walltime: "48:00:00"
+    interface: "eth1"
+    scale_jobs: 10
+    job_extra_directives:
+      - "--output=/dev/null"
+      - "--error=/dev/null"
+
+  # Flattening and final analysis (multiprocessing)
+  final_analysis:
+    cores: 14
+    memory: "400GB"
+    walltime: "24:00:00"
+
+# Processing subsets for testing/development
+processing:
+  # Use subsets for faster testing
+  use_subset: false
+  subset_fraction: 0.5  # Use half of the data
+  subset_start_fraction: 0.5  # Start from halfway through (last 1/2)
+
+# Known bad folder/animal day combinations to skip
+bad_folder_animalday:
+  - "012322_cohort4_group6_3mice_FMUT___MMUT_MWT MHET"
+  - "012322_cohort4_group6_3mice_FMUT___MMUT_MWT MMUT"
+  - "013122_cohort4_group7_2mice both_FHET FHET(2)"
+
+# Logging configuration
+logging:
+  level: "DEBUG"
+  format: "%(asctime)s - %(levelname)s - %(message)s"
+
+# Feature exclusions for plotting
+plotting:
+  exclude_features: ["nspike", "lognspike"]
+  catplot_params:
+    showfliers: false
+  plot_kinds: ["box", "swarm", "point"]
