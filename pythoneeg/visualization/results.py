@@ -1437,27 +1437,32 @@ class WindowAnalysisResult(AnimalFeatureParser):
         return result
 
     def save_pickle_and_json(
-        self, folder: str | Path, make_folder=True, slugify_filebase=True, save_abbrevs_as_chnames=False
+        self,
+        folder: str | Path,
+        make_folder=True,
+        filename: str = None,
+        slugify_filename=False,
+        save_abbrevs_as_chnames=False,
     ):
         """Archive window analysis result into the folder specified, as a pickle and json file.
 
         Args:
             folder (str | Path): Destination folder to save results to
             make_folder (bool, optional): If True, create the folder if it doesn't exist. Defaults to True.
-            slugify_filebase (bool, optional): If True, slugify the filebase (replace special characters). Defaults to True.
+            filename (str, optional): Name of the file to save. Defaults to "war".
+            slugify_filename (bool, optional): If True, slugify the filename (replace special characters). Defaults to False.
             save_abbrevs_as_chnames (bool, optional): If True, save the channel abbreviations as the channel names in the json file. Defaults to False.
         """
         folder = Path(folder)
         if make_folder:
             folder.mkdir(parents=True, exist_ok=True)
 
-        if slugify_filebase:
-            filebase = folder / slugify(f"{self.animal_id}-{self.genotype}")
-        else:
-            filebase = folder / f"{self.animal_id}-{self.genotype}"
-        filebase = str(filebase)
+        filename = "war" if filename is None else filename
+        filename = slugify(filename) if slugify_filename else filename
 
-        self.result.to_pickle(filebase + ".pkl")
+        filepath = str(folder / filename)
+
+        self.result.to_pickle(filepath + ".pkl")
 
         json_dict = {
             "animal_id": self.animal_id,
@@ -1469,7 +1474,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             "lof_scores_dict": self.lof_scores_dict.copy(),
         }
 
-        with open(filebase + ".json", "w") as f:
+        with open(filepath + ".json", "w") as f:
             json.dump(json_dict, f, indent=2)
 
     def apply_lof_threshold(self, lof_threshold: float) -> dict:
