@@ -50,6 +50,14 @@ Python scientific computing package for extracting features from mouse EEG recor
 - **Variable Scope**: Trace all code paths to ensure variables are properly defined in scope before implementing parameter changes
 - **Parameter Design**: Before adding new parameters, check if existing constants can be used. Prefer centralized configuration (constants.py) over scattered parameters. If users need to change values, they should modify constants rather than pass parameters
 
+**Snakemake and Workflow Management:**
+- **Rule Definition**: Use proper wildcard patterns, resource specifications, and rule dependencies
+- **Cluster Integration**: Understand SLURM resource allocation, environment variable persistence across jobs
+- **File Output Consistency**: Ensure script outputs match expected file patterns exactly - coordinate slugified vs. original naming
+- **Environment Variables**: Set once in main workflow, persist across all job submissions
+- **Logging Organization**: Use timestamped, run-specific log directories for debugging complex workflows
+- **Job Debugging**: Implement comprehensive logging and status checking for distributed execution
+
 **Error handling:** 
 - Return `np.nan` for math failures, insufficient data, undefined results
 - Raise exceptions for invalid input types/shapes, critical parameter violations
