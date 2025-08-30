@@ -162,10 +162,10 @@ def main():
             sys.exit(1)
 
         # Save WAR
-        output_dir = Path(snakemake.output.war_dir)
+        output_dir = Path(snakemake.output.war_pkl).parent
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        war.save_pickle_and_json(output_dir, slugify_filebase=False)
+        war.save_pickle_and_json(output_dir, filename="war", slugify_filename=False)
 
         # Save metadata for downstream rules
         metadata = {

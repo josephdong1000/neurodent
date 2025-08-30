@@ -11,9 +11,8 @@ rule generate_war:
     Generate WAR (Windowed Analysis Results) for a specific animal
     """
     output:
-        war_pkl="results/wars/{animal}/war.pkl", # savepklandjson does not save exact names, but should
+        war_pkl="results/wars/{animal}/war.pkl",
         war_json="results/wars/{animal}/war.json",
-        # metadata="results/wars/{animal}/metadata.json"
     params:
         animal_folder=get_animal_folder,
         animal_id=get_animal_id,

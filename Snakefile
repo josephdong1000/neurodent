@@ -105,8 +105,9 @@ include: "workflow/rules/final_analysis.smk"
 # Target rules - these are convenience rules for running specific pipeline stages
 rule all:
     input:
-        # WARs generated
-        expand("results/wars/{animal}", animal=ANIMALS),
+        # WARs generated with json metadata
+        expand("results/wars/{animal}/war.pkl", animal=ANIMALS),
+        expand("results/wars/{animal}/war.json", animal=ANIMALS),
         # Temporal heatmaps
         expand("results/temporal_heatmaps/{animal}/heatmap.png", animal=ANIMALS),
         # Diagnostic figures  
@@ -121,7 +122,8 @@ rule all:
 rule wars_only:
     """Generate WARs from raw data only"""
     input:
-        expand("results/wars/{animal}", animal=ANIMALS)
+        expand("results/wars/{animal}/war.pkl", animal=ANIMALS),
+        expand("results/wars/{animal}/war.json", animal=ANIMALS),
 
 rule temporal_only:
     """Generate temporal diagnostic heatmaps only"""
