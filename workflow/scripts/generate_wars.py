@@ -27,8 +27,18 @@ from pythoneeg import constants
 
 def setup_logging():
     """Set up logging configuration"""
+    # Log to both the Snakemake log file and stdout/stderr for SLURM
+    log_file = getattr(snakemake, 'log', [None])[0] if hasattr(snakemake, 'log') else None
+    
+    handlers = [logging.StreamHandler(sys.stdout)]
+    if log_file:
+        handlers.append(logging.FileHandler(log_file, mode='w'))
+    
     logging.basicConfig(
-        format="%(asctime)s - %(levelname)s - %(message)s", level=logging.DEBUG, stream=sys.stdout, force=True
+        format="%(asctime)s - %(levelname)s - %(message)s", 
+        level=logging.DEBUG, 
+        handlers=handlers,
+        force=True
     )
     return logging.getLogger()
 
