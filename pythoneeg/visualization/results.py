@@ -1153,6 +1153,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             self.assume_from_number,
             self.bad_channels_dict.copy(),
             self.suppress_short_interval_error,
+            self.lof_scores_dict.copy(),
         )
 
     def _create_filtered_copy(self, filter_mask: np.ndarray) -> "WindowAnalysisResult":
@@ -1173,6 +1174,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             self.assume_from_number,
             self.bad_channels_dict.copy(),
             self.suppress_short_interval_error,
+            self.lof_scores_dict.copy(),
         )
 
     def filter_logrms_range(self, z_range: float = 3) -> "WindowAnalysisResult":
