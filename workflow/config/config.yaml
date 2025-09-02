@@ -101,12 +101,6 @@ processing:
   subset_fraction: 0.5  # Use half of the data
   subset_start_fraction: 0.5  # Start from halfway through (last 1/2)
 
-# Known bad folder/animal day combinations to skip
-bad_folder_animalday:
-  - "012322_cohort4_group6_3mice_FMUT___MMUT_MWT MHET"
-  - "012322_cohort4_group6_3mice_FMUT___MMUT_MWT MMUT"
-  - "013122_cohort4_group7_2mice both_FHET FHET(2)"
-
 # Logging configuration
 logging:
   level: "DEBUG"

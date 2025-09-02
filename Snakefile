@@ -78,9 +78,18 @@ ANIMALS = []
 ANIMAL_TO_FOLDER_MAP = {}  # Maps slugified name back to (original_folder, original_animal_id)
 SLUGIFIED_TO_ORIGINAL = {}  # Maps slugified name back to original combined name
 
+# Get bad animaldays to filter out at job submission level
+bad_folder_animalday = samples_config.get("bad_folder_animalday", [])
+
 for folder, animals in samples_config["data_folders_to_animal_ids"].items():
     for animal in animals:
         combined_name = f"{folder} {animal}"
+        
+        # Skip bad animaldays entirely - prevents job submission
+        if combined_name in bad_folder_animalday:
+            print(f"⚠️  Skipping bad animalday: {combined_name}")
+            continue
+            
         slugified_name = slugify(combined_name, allow_unicode=True)
         
         ANIMALS.append(slugified_name)  # Use slugified names for file paths

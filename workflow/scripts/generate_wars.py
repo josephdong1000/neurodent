@@ -90,12 +90,8 @@ def generate_war_for_animal(samples_config, config, animal_folder, animal_id, lo
     # Set genotype aliases
     constants.GENOTYPE_ALIASES = samples_config["GENOTYPE_ALIASES"]
 
-    # Check if this animal/folder combo should be skipped
+    # Note: Bad animaldays are now filtered at the Snakemake level, so they won't reach this script
     animal_key = f"{animal_folder} {animal_id}"
-    bad_folder_animalday = config.get("bad_folder_animalday", [])
-    if animal_key in bad_folder_animalday:
-        logger.warning(f"Skipping {animal_key} because it is in bad_folder_animalday")
-        return None
 
     # Get resource allocation from SLURM environment or use defaults (30 cores, 100GB)
     available_cores = int(os.environ.get("SLURM_CPUS_PER_TASK", 30))
@@ -166,10 +162,6 @@ def main():
 
         # Generate WAR
         war = generate_war_for_animal(samples_config, config, animal_folder, animal_id, logger)
-
-        if war is None:
-            logger.error(f"Failed to generate WAR for {animal_folder} {animal_id}")
-            sys.exit(1)
 
         # Save WAR
         output_dir = Path(snakemake.output.war_pkl).parent

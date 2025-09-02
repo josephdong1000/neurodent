@@ -297,5 +297,10 @@
             "F9 FMut Jun-29-2022": ["LAud", "RMot"],
             "F9 FMut Jun-30-2022": ["LAud", "RMot"]
         }
-    }
+    },
+    "bad_folder_animalday": [
+        "012322_cohort4_group6_3mice_FMUT___MMUT_MWT MHET",
+        "012322_cohort4_group6_3mice_FMUT___MMUT_MWT MMUT",
+        "013122_cohort4_group7_2mice both_FHET FHET(2)"
+    ]
 }
