@@ -58,12 +58,8 @@ cluster:
   war_generation:
     cores: 30
     memory: "300GB"
-    walltime: "24:00:00"
+    walltime: "12:00:00"
     interface: "eth1"
-    # scale_jobs: 5
-    job_extra_directives:
-      - "--output=/dev/null"
-      - "--error=/dev/null"
 
   # Spike analysis cluster (low-core, high-memory)
   spike_analysis:
@@ -73,9 +69,6 @@ cluster:
     walltime: "6:00:00"
     interface: "eth1"
     adapt_maximum_jobs: 15
-    job_extra_directives:
-      - "--output=/dev/null"
-      - "--error=/dev/null"
 
   # Figure generation cluster (moderate resources)
   figure_generation:
@@ -83,10 +76,6 @@ cluster:
     memory: "100GB"
     walltime: "48:00:00"
     interface: "eth1"
-    # scale_jobs: 10
-    job_extra_directives:
-      - "--output=/dev/null"
-      - "--error=/dev/null"
 
   # Flattening and final analysis (multiprocessing)
   final_analysis:

@@ -20,10 +20,10 @@ rule generate_war:
         samples_config=samples_config,
         config=config
     resources:
-        mem_mb=102400,  # 100GB
-        cpus_per_task=20,
-        runtime=1440,   # 24 hours
-        # latency_wait=120,
+        cpus=config["cluster"]["war_generation"]["cores"],
+        mem=config["cluster"]["war_generation"]["memory"],
+        walltime=config["cluster"]["war_generation"]["walltime"],
+        interface=config["cluster"]["war_generation"]["interface"],
     log:
         "logs/war_generation/{animal}.log"
     script:
