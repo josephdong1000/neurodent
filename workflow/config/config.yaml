@@ -57,10 +57,10 @@ cluster:
   # WAR generation cluster (high-memory, high-core)
   war_generation:
     cores: 30
-    memory: "100GB"
-    walltime: "48:00:00"
+    memory: "300GB"
+    walltime: "24:00:00"
     interface: "eth1"
-    scale_jobs: 5
+    # scale_jobs: 5
     job_extra_directives:
       - "--output=/dev/null"
       - "--error=/dev/null"
@@ -83,7 +83,7 @@ cluster:
     memory: "100GB"
     walltime: "48:00:00"
     interface: "eth1"
-    scale_jobs: 10
+    # scale_jobs: 10
     job_extra_directives:
       - "--output=/dev/null"
       - "--error=/dev/null"
