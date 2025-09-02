@@ -65,11 +65,26 @@ find_animal_logs() {
     local animal_pattern="$1"
     echo "🔍 Searching for logs containing: $animal_pattern"
     
-    echo "SLURM logs:"
-    find "$LOG_DIR" -name "*.out" -o -name "*.err" | xargs grep -l "$animal_pattern" 2>/dev/null || echo "  No SLURM logs found"
+    echo "SLURM job logs:"
+    find "$LOG_DIR" -name "*.out" -o -name "*.err" | xargs grep -l "$animal_pattern" 2>/dev/null | while read -r logfile; do
+        echo "  📄 $logfile"
+        if [[ "$logfile" == *.err ]]; then
+            echo "    ERRORS:"
+            tail -10 "$logfile" | sed 's/^/      /'
+        else
+            echo "    OUTPUT:"
+            tail -5 "$logfile" | sed 's/^/      /'
+        fi
+        echo
+    done
     
-    echo "Pipeline logs:"  
-    find "$PIPELINE_LOGS" -name "*.log" | xargs grep -l "$animal_pattern" 2>/dev/null || echo "  No pipeline logs found"
+    echo "Snakemake rule logs:"  
+    find logs/war_generation -name "*.log" 2>/dev/null | grep -i "$animal_pattern" | while read -r logfile; do
+        echo "  📄 $logfile"
+        echo "    CONTENTS:"
+        tail -15 "$logfile" | sed 's/^/      /' || echo "      (empty or unreadable)"
+        echo
+    done
 }
 
 # Function to list recent runs
