@@ -26,6 +26,7 @@ import json
 import re
 import os
 import sys
+import logging
 from datetime import datetime
 from django.utils.text import slugify
 
@@ -61,7 +62,7 @@ def setup_run_logging():
     with open(".snakemake_run_id", "w") as f:
         f.write(run_id)
     
-    print(f"📁 Logs for this run: logs/slurm/{run_id}/")
+    logging.info(f"📁 Logs for this run: logs/slurm/{run_id}/")
     return run_id
 
 # Initialize run logging
@@ -87,7 +88,7 @@ for folder, animals in samples_config["data_folders_to_animal_ids"].items():
         
         # Skip bad animaldays entirely - prevents job submission
         if combined_name in bad_folder_animalday:
-            print(f"⚠️  Skipping bad animalday: {combined_name}")
+            logging.info(f"⚠️  Skipping bad animalday: {combined_name}")
             continue
             
         slugified_name = slugify(combined_name, allow_unicode=True)
