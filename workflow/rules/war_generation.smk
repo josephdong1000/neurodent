@@ -18,14 +18,14 @@ rule generate_war:
         animal_folder=get_animal_folder,
         animal_id=get_animal_id,
         samples_config=samples_config,
-        config=config
+        config=config,
     resources:
         cpus=config["cluster"]["war_generation"]["cores"],
         mem=config["cluster"]["war_generation"]["memory"],
         walltime=config["cluster"]["war_generation"]["walltime"],
         interface=config["cluster"]["war_generation"]["interface"],
     log:
-        "logs/war_generation/{animal}.log"
+        "logs/war_generation/{animal}.log",
     script:
         "../scripts/generate_wars.py"
 
