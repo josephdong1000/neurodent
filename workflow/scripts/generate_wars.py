@@ -15,7 +15,9 @@ import os
 import sys
 import logging
 import json
+import traceback
 from pathlib import Path
+import logging
 from tqdm import tqdm
 
 from dask.distributed import Client, LocalCluster
@@ -23,47 +25,6 @@ from dask.distributed import Client, LocalCluster
 from pythoneeg import core
 from pythoneeg import visualization
 from pythoneeg import constants
-
-
-def setup_logging():
-    """Set up logging configuration"""
-    # Log to both the Snakemake log file and stdout/stderr for SLURM
-    log_file = getattr(snakemake, 'log', [None])[0] if hasattr(snakemake, 'log') else None
-    
-    handlers = [logging.StreamHandler(sys.stdout)]
-    if log_file:
-        handlers.append(logging.FileHandler(log_file, mode='w'))
-    
-    logging.basicConfig(
-        format="%(asctime)s - %(levelname)s - %(message)s", 
-        level=logging.DEBUG, 
-        handlers=handlers,
-        force=True
-    )
-    return logging.getLogger()
-
-
-# def setup_local_cluster(available_cores, available_memory_gb):
-#     """Set up Local Dask cluster using full resources within this SLURM job"""
-#     # Use almost all available cores, leaving 2 for overhead
-#     n_workers = max(1, available_cores - 2)
-
-#     # Distribute memory among workers, leaving some overhead for the main process
-#     memory_per_worker = f"{int(available_memory_gb * 0.85 / n_workers)}GB"
-
-#     cluster = LocalCluster(
-#         n_workers=n_workers,
-#         threads_per_worker=1,  # Single-threaded workers for better memory isolation
-#         memory_limit=memory_per_worker,
-#         processes=True,  # Use separate processes for better memory management
-#         silence_logs=True,  # Reduce log noise
-#     )
-
-#     print(f"\n\nLocal Dask cluster dashboard: {cluster.dashboard_link}")
-#     print(f"Workers: {n_workers}, Memory per worker: {memory_per_worker}")
-#     print(f"Total resources: {available_cores} cores, {available_memory_gb}GB memory\n")
-
-#     return cluster
 
 
 def load_samples_and_config():
@@ -77,7 +38,7 @@ def load_samples_and_config():
     return samples_config, config, animal_folder, animal_id
 
 
-def generate_war_for_animal(samples_config, config, animal_folder, animal_id, logger):
+def generate_war_for_animal(samples_config, config, animal_folder, animal_id):
     """Generate WAR for a specific animal"""
 
     # Set up paths and parameters
@@ -104,7 +65,7 @@ def generate_war_for_animal(samples_config, config, animal_folder, animal_id, lo
     try:
         with (
             LocalCluster(
-                n_workers= n_workers,
+                n_workers=n_workers,
                 threads_per_worker=1,
                 processes=True,
                 memory_limit=memory_per_worker,
@@ -116,8 +77,8 @@ def generate_war_for_animal(samples_config, config, animal_folder, animal_id, lo
             logging.info(f"Workers: {n_workers}, Memory per worker: {memory_per_worker}")
             logging.info(f"Total resources: {available_cores} cores, {available_memory_gb}GB memory\n")
 
-            logger.info(f"Processing {animal_folder} - {animal_id}")
-            logger.info(f"Using {len(client.scheduler_info()['workers'])} Dask workers")
+            logging.info(f"Processing {animal_folder} - {animal_id}")
+            logging.info(f"Using {len(client.scheduler_info()['workers'])} Dask workers")
 
             # Create AnimalOrganizer
             analysis_config = config["analysis"]["war_generation"]
@@ -131,20 +92,38 @@ def generate_war_for_animal(samples_config, config, animal_folder, animal_id, lo
             )
 
             # Compute bad channels
-            logger.info(f"Computing bad channels for {animal_key}")
+            logging.info(f"Computing bad channels for {animal_key}")
             ao.compute_bad_channels()
 
             # Generate WAR using Dask
-            logger.info(f"Computing windowed analysis for {animal_key}")
+            logging.info(f"Computing windowed analysis for {animal_key}")
             war = ao.compute_windowed_analysis(["all"], multiprocess_mode="dask")
 
             # Apply bad channel filtering if defined
             bad_channels = samples_config.get("bad_channels", {})
+            logging.info(f"Looking for bad channels for: '{animal_key}'")
+
+            # First try exact match
             if animal_key in bad_channels:
-                logger.info(f"Filtering bad channels for {animal_key}: {bad_channels[animal_key]}")
+                logging.info(f"Found exact match - filtering bad channels: {bad_channels[animal_key]}")
                 war = war.filter_reject_channels_by_session(bad_channels[animal_key])
             else:
-                logger.info(f"No bad channels defined for {animal_key}")
+                # Try alternative key constructions if exact match fails
+                logging.info(f"No exact match found. Available keys: {list(bad_channels.keys())[:5]}...")
+
+                # Alternative approach: search for keys that end with the animal_id
+                matching_keys = [key for key in bad_channels.keys() if key.endswith(f" {animal_id}")]
+                if matching_keys:
+                    # Use the first matching key
+                    matching_key = matching_keys[0]
+                    logging.info(
+                        f"Found alternative match '{matching_key}' - filtering bad channels: {bad_channels[matching_key]}"
+                    )
+                    war = war.filter_reject_channels_by_session(bad_channels[matching_key])
+                else:
+                    logging.info(
+                        f"No bad channels defined for {animal_key} (tried exact match and ending with ' {animal_id}')"
+                    )
 
             return war
 
@@ -154,37 +133,51 @@ def generate_war_for_animal(samples_config, config, animal_folder, animal_id, lo
 
 def main():
     """Main execution function"""
-    logger = setup_logging()
 
-    try:
-        # Load configuration
-        samples_config, config, animal_folder, animal_id = load_samples_and_config()
+    with open(snakemake.log, "w") as f:
+        sys.stderr = sys.stdout = f
 
-        # Generate WAR
-        war = generate_war_for_animal(samples_config, config, animal_folder, animal_id, logger)
+        # Set up logging to the redirected stdout
+        logging.basicConfig(
+            format="%(asctime)s - %(levelname)s - %(message)s",
+            level=logging.DEBUG,
+            stream=sys.stdout,
+            force=True,
+        )
 
-        # Save WAR
-        output_dir = Path(snakemake.output.war_pkl).parent
-        output_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            logging.info("WAR generation script started successfully")
 
-        war.save_pickle_and_json(output_dir, filename="war", slugify_filename=False)
+            # Load configuration
+            samples_config, config, animal_folder, animal_id = load_samples_and_config()
 
-        # Save metadata for downstream rules
-        metadata = {
-            "animal_folder": animal_folder,
-            "animal_id": animal_id,
-            "animal_key": f"{animal_folder} {animal_id}",
-            "original_combined_name": f"{animal_folder} {animal_id}",
-            "slugified_name": snakemake.wildcards.animal,
-        }
-        with open(snakemake.output.metadata, "w") as f:
-            json.dump(metadata, f, indent=2)
+            # Generate WAR
+            war = generate_war_for_animal(samples_config, config, animal_folder, animal_id)
 
-        logger.info(f"Successfully saved WAR and metadata for {animal_folder} {animal_id}")
+            # Save WAR
+            output_dir = Path(snakemake.output.war_pkl).parent
+            output_dir.mkdir(parents=True, exist_ok=True)
 
-    except Exception as e:
-        logger.error(f"Error in WAR generation: {str(e)}")
-        raise
+            war.save_pickle_and_json(output_dir, filename="war", slugify_filename=False)
+
+            # Save metadata for downstream rules
+            metadata = {
+                "animal_folder": animal_folder,
+                "animal_id": animal_id,
+                "animal_key": f"{animal_folder} {animal_id}",
+                "original_combined_name": f"{animal_folder} {animal_id}",
+                "slugified_name": snakemake.wildcards.animal,
+            }
+            with open(snakemake.output.metadata, "w") as metadata_file:
+                json.dump(metadata, metadata_file, indent=2)
+
+            logging.info(f"Successfully saved WAR and metadata for {animal_folder} {animal_id}")
+
+        except Exception as e:
+            # Try to log to logger if available, otherwise print to stdout
+            error_msg = f"Error in WAR generation: {str(e)}\n\nTraceback:\n{traceback.format_exc()}"
+            logging.error(error_msg)
+            raise
 
 
 if __name__ == "__main__":
