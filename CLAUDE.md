@@ -30,6 +30,7 @@ Python scientific computing package for extracting features from mouse EEG recor
 - `pipenv install --dev` - Install dependencies
 - `pipenv requirements > requirements.txt` - Update requirements
 - `pip install -e .` - Development install
+- `source .venv/bin/activate` - Activate environment (ALWAYS ensure it's active)
 
 ## Critical Requirements
 
