@@ -134,7 +134,7 @@ def generate_war_for_animal(samples_config, config, animal_folder, animal_id):
 def main():
     """Main execution function"""
 
-    with open(snakemake.log, "w") as f:
+    with open(snakemake.log[0], "w") as f:
         sys.stderr = sys.stdout = f
 
         # Set up logging to the redirected stdout
