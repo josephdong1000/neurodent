@@ -57,7 +57,7 @@ cluster:
   # WAR generation cluster (high-memory, high-core)
   war_generation:
     cores: 30
-    memory: "300GB"
+    memory: "250GB"
     walltime: "12:00:00"
     interface: "eth1"
 
