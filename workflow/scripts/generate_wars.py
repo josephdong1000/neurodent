@@ -17,7 +17,6 @@ import logging
 import json
 import traceback
 from pathlib import Path
-import logging
 from tqdm import tqdm
 
 from dask.distributed import Client, LocalCluster
@@ -50,35 +49,25 @@ def generate_war_for_animal(samples_config, config, animal_folder, animal_id):
 
     # Set genotype aliases
     constants.GENOTYPE_ALIASES = samples_config["GENOTYPE_ALIASES"]
-
-    # Note: Bad animaldays are now filtered at the Snakemake level, so they won't reach this script
     animal_key = f"{animal_folder} {animal_id}"
-
-    # Get resource allocation from SLURM environment or use defaults (30 cores, 100GB)
-    available_cores = int(os.environ.get("SLURM_CPUS_PER_TASK", 30))
-    available_memory_gb = int(os.environ.get("SLURM_MEM_PER_NODE", 102400)) // 1000  # Convert MB to GB
-
-    # Set up local Dask cluster
-    n_workers = max(1, available_cores - 2)
-    memory_per_worker = f"{int(available_memory_gb * 0.9 / n_workers)}GB"
 
     try:
         with (
             LocalCluster(
-                n_workers=n_workers,
-                threads_per_worker=1,
-                processes=True,
-                memory_limit=memory_per_worker,
-                silence_logs=logging.WARN,
+                # n_workers=config["cluster"]["war_generation"]["cpu"],
+                # threads_per_worker=1,
+                # processes=True,
+                interface=config["cluster"]["war_generation"]["interface"],
             ) as cluster,
             Client(cluster) as client,
         ):
             logging.info(f"\n\nLocal Dask cluster dashboard: {cluster.dashboard_link}")
-            logging.info(f"Workers: {n_workers}, Memory per worker: {memory_per_worker}")
-            logging.info(f"Total resources: {available_cores} cores, {available_memory_gb}GB memory\n")
+            logging.info(f"Number of workers: {len(client.scheduler_info()['workers'])}")
+            for worker, info in client.scheduler_info()["workers"].items():
+                print(f"Worker {worker}: {info['memory_limit']}, CPUs: {info['nthreads']}")
+            print("\n")
 
             logging.info(f"Processing {animal_folder} - {animal_id}")
-            logging.info(f"Using {len(client.scheduler_info()['workers'])} Dask workers")
 
             # Create AnimalOrganizer
             analysis_config = config["analysis"]["war_generation"]
@@ -108,24 +97,9 @@ def generate_war_for_animal(samples_config, config, animal_folder, animal_id):
                 logging.info(f"Found exact match - filtering bad channels: {bad_channels[animal_key]}")
                 war = war.filter_reject_channels_by_session(bad_channels[animal_key])
             else:
-                # Try alternative key constructions if exact match fails
-                logging.info(f"No exact match found. Available keys: {list(bad_channels.keys())[:5]}...")
+                logging.info(f"No bad channels defined for {animal_key}")
 
-                # Alternative approach: search for keys that end with the animal_id
-                matching_keys = [key for key in bad_channels.keys() if key.endswith(f" {animal_id}")]
-                if matching_keys:
-                    # Use the first matching key
-                    matching_key = matching_keys[0]
-                    logging.info(
-                        f"Found alternative match '{matching_key}' - filtering bad channels: {bad_channels[matching_key]}"
-                    )
-                    war = war.filter_reject_channels_by_session(bad_channels[matching_key])
-                else:
-                    logging.info(
-                        f"No bad channels defined for {animal_key} (tried exact match and ending with ' {animal_id}')"
-                    )
-
-            return war
+        return war
 
     finally:
         cluster.close()
