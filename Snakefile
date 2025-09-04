@@ -7,11 +7,6 @@ This pipeline processes raw EEG data through multiple analysis stages:
 2. WARs → Temporal heatmaps (animal-level diagnostics)  
 3. WARs → Diagnostic figures
 4. WARs → Flattened WARs → Final EP figures
-
-Usage:
-    snakemake --profile slurm all
-    snakemake --profile slurm war_generation
-    snakemake --profile slurm final_analysis
 """
 
 from pathlib import Path
@@ -26,7 +21,6 @@ import json
 import re
 import os
 import sys
-import logging
 from datetime import datetime
 from django.utils.text import slugify
 
@@ -62,7 +56,7 @@ def setup_run_logging():
     with open(".snakemake_run_id", "w") as f:
         f.write(run_id)
     
-    logging.info(f"📁 Logs for this run: logs/slurm/{run_id}/")
+    print(f"📁 Logs for this run: logs/slurm/{run_id}/")
     return run_id
 
 # Initialize run logging
@@ -88,7 +82,7 @@ for folder, animals in samples_config["data_folders_to_animal_ids"].items():
         
         # Skip bad animaldays entirely - prevents job submission
         if combined_name in bad_folder_animalday:
-            logging.info(f"⚠️  Skipping bad animalday: {combined_name}")
+            print(f"⚠️  Skipping bad animalday: {combined_name}")
             continue
             
         slugified_name = slugify(combined_name, allow_unicode=True)
@@ -104,6 +98,11 @@ def get_animal_folder(wildcards):
 def get_animal_id(wildcards):
     """Get the animal ID for an animal from the combined name"""
     return ANIMAL_TO_FOLDER_MAP[wildcards.animal][1]
+
+def increment_memory(base_memory):
+    def mem(wildcards, attempt):
+        return base_memory * (2 ** (attempt - 1))
+    return mem
 
 # Include rule definitions
 include: "workflow/rules/war_generation.smk"
