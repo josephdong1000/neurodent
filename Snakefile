@@ -24,46 +24,7 @@ import sys
 from datetime import datetime
 from django.utils.text import slugify
 
-# Set up timestamped logging for this run
-def setup_run_logging():
-    """Set up timestamped logging directory and environment variables"""
-    # Check if run ID already exists (prevents multiple timestamps)
-    if "SNAKEMAKE_RUN_ID" in os.environ:
-        return os.environ["SNAKEMAKE_RUN_ID"]
-    
-    # Get target rule from command line arguments - look for known rule names
-    target_rule = "run"
-    known_rules = ["all", "wars_only", "temporal_only", "diagnostics_only", "flatten_only", "final_only"]
-    
-    for arg in sys.argv[1:]:
-        if arg in known_rules:
-            target_rule = arg
-            break
-    
-    # Create run identifier: timestamp + target rule (only once)
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    run_id = f"{timestamp}_{target_rule}"
-    
-    # Set environment variables for SLURM profile
-    os.environ["SNAKEMAKE_RUN_ID"] = run_id
-    os.environ["SNAKEMAKE_TARGET"] = target_rule
-    
-    # Create log directory
-    log_dir = Path(f"logs/slurm/{run_id}")
-    log_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Write run ID to a temp file for consistency across all processes
-    with open(".snakemake_run_id", "w") as f:
-        f.write(run_id)
-    
-    print(f"📁 Logs for this run: logs/slurm/{run_id}/")
-    return run_id
-
-# Initialize run logging
-RUN_ID = setup_run_logging()
-
-# Create safe animal identifiers for file paths while preserving originals
-
+# Load samples config
 with open(samples_file, 'r') as f:
     samples_config = json.load(f)
 
