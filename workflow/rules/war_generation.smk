@@ -20,7 +20,7 @@ rule generate_war:
         samples_config = samples_config,
         config = config,
     threads:
-        config['cluster']['war_generation']['cpu']
+        config["cluster"]["war_generation"]["threads"]
     resources:
         time = config["cluster"]["war_generation"]["time"],
         mem_mb = increment_memory(config["cluster"]["war_generation"]["mem"]),

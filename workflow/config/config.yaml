@@ -59,8 +59,8 @@ cluster:
     time: "3h"
     mem: 70_000 # MB
     nodes: 1
-    cpu: 10
-    interface: "eth1"
+    threads: 10
+    interface: null
 
   # Spike analysis cluster (low-core, high-memory)
   spike_analysis:
