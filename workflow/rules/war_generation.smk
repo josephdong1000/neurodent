@@ -19,11 +19,12 @@ rule generate_war:
         animal_id = get_animal_id,
         samples_config = samples_config,
         config = config,
+    threads:
+        config['cluster']['war_generation']['cpu']
     resources:
         time = config["cluster"]["war_generation"]["time"],
         mem_mb = increment_memory(config["cluster"]["war_generation"]["mem"]),
         nodes = config["cluster"]["war_generation"]["nodes"],
-        slurm = f"cpus-per-task={config['cluster']['war_generation']['cpu']}",
     log:
         "logs/war_generation/{animal}.log",
     script:
