@@ -54,9 +54,6 @@ def generate_war_for_animal(samples_config, config, animal_folder, animal_id):
     try:
         with (
             LocalCluster(
-                # n_workers=config["cluster"]["war_generation"]["cpu"],
-                # threads_per_worker=1,
-                # processes=True,
                 interface=config["cluster"]["war_generation"]["interface"],
             ) as cluster,
             Client(cluster) as client,
@@ -95,7 +92,9 @@ def generate_war_for_animal(samples_config, config, animal_folder, animal_id):
             # First try exact match
             if animal_key in bad_channels:
                 logging.info(f"Found exact match - filtering bad channels: {bad_channels[animal_key]}")
-                war = war.filter_reject_channels_by_session(bad_channels[animal_key])
+                war = war.filter_reject_channels_by_session(
+                    bad_channels[animal_key]
+                )  # FIXME bad channel dictionary is not populated -- expected behavior?
             else:
                 logging.info(f"No bad channels defined for {animal_key}")
 
