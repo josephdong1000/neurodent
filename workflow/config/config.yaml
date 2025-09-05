@@ -29,13 +29,23 @@ analysis:
       multiprocess_mode: "dask"
       overwrite_rowbins: false
 
-  # Filtering parameters for temporal diagnostics and flattened wars
-  filtering:
-    bad_channels_global: ["LHip", "RHip"]  # Applied globally for some analyses
-    morphological_smoothing_seconds: 300  # 5 minutes
-    aggregate_groupby: ["animalday", "isday"]
+  # Data processing parameters for diagnostic figures and analysis
+  processing:
+    # Preprocessing - channel setup (applied before filtering)
     channel_reorder: ["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"]
     use_abbrevs: true
+    
+    # Filtering parameters (passed directly to filter_all method)
+    filtering:
+      morphological_smoothing_seconds: null  # Temporal smoothing of artifact rejection mask
+      bad_channels: ["LHip", "RHip"]  # Additional bad channels for filtering
+      min_valid_channels: 3  # Minimum valid channels required per window
+      # reject_channels: true  # Enable automatic channel rejection
+      # reject_channels_by_session: false  # Per-session vs global channel rejection
+    
+    # Post-processing - aggregation (applied after filtering) 
+    aggregation:
+      groupby: ["animalday", "isday"]  # Time window grouping for aggregation
 
   # Figure generation parameters
   figures:
@@ -57,32 +67,40 @@ cluster:
   # WAR generation cluster (high-memory, high-core)
   war_generation:
     time: "3h"
-    mem: 70_000 # MB
+    mem_mb: 70_000
     nodes: 1
     threads: 10
+    interface: null
+
+  # Diagnostic figures cluster (single-animal, moderate resources)
+  diagnostic_figures:
+    time: "1h"
+    mem_mb: 30_000
+    nodes: 1
+    threads: 4
     interface: null
 
   # Spike analysis cluster (low-core, high-memory)
   spike_analysis:
     cores: 1
-    memory: "100GB"
+    memory_gb: 100
     processes: 1
-    walltime: "6:00:00"
+    runtime: 360
     interface: "eth1"
     adapt_maximum_jobs: 15
 
   # Figure generation cluster (moderate resources)
   figure_generation:
     cores: 10
-    memory: "100GB"
-    walltime: "48:00:00"
+    memory_gb: 100
+    runtime: 720
     interface: "eth1"
 
   # Flattening and final analysis (multiprocessing)
   final_analysis:
     cores: 14
-    memory: "400GB"
-    walltime: "24:00:00"
+    memory_gb: 400
+    runtime: 1440
 
 # Processing subsets for testing/development
 processing:

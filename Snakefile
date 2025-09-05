@@ -81,9 +81,7 @@ rule all:
         # Temporal heatmaps
         expand("results/temporal_heatmaps/{animal}/heatmap.png", animal=ANIMALS),
         # Diagnostic figures  
-        expand("results/diagnostic_figures/{animal}/coherecorr_spectral.png", animal=ANIMALS),
-        expand("results/diagnostic_figures/{animal}/psd_histogram.png", animal=ANIMALS),
-        expand("results/diagnostic_figures/{animal}/psd_spectrogram.png", animal=ANIMALS),
+        expand("results/diagnostic_figures/{animal}", animal=ANIMALS),
         # Flattened WARs
         "results/flattened_wars/combined_wars.pkl",
         # Final analysis outputs
@@ -92,8 +90,7 @@ rule all:
 rule wars_only:
     """Generate WARs from raw data only"""
     input:
-        expand("results/wars/{animal}/war.pkl", animal=ANIMALS),
-        expand("results/wars/{animal}/war.json", animal=ANIMALS),
+        "results/wars/generation_summary.txt"
 
 rule temporal_only:
     """Generate temporal diagnostic heatmaps only"""
@@ -103,9 +100,7 @@ rule temporal_only:
 rule diagnostics_only:
     """Generate diagnostic figures only"""
     input:
-        expand("results/diagnostic_figures/{animal}/coherecorr_spectral.png", animal=ANIMALS),
-        expand("results/diagnostic_figures/{animal}/psd_histogram.png", animal=ANIMALS),
-        expand("results/diagnostic_figures/{animal}/psd_spectrogram.png", animal=ANIMALS)
+        "results/diagnostic_figures/figures_summary.txt"
 
 rule flatten_only:
     """Generate flattened WARs only"""

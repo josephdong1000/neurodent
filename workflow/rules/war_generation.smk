@@ -23,7 +23,7 @@ rule generate_war:
         config["cluster"]["war_generation"]["threads"]
     resources:
         time = config["cluster"]["war_generation"]["time"],
-        mem_mb = increment_memory(config["cluster"]["war_generation"]["mem"]),
+        mem_mb = increment_memory(config["cluster"]["war_generation"]["mem_mb"]),
         nodes = config["cluster"]["war_generation"]["nodes"],
     log:
         "logs/war_generation/{animal}.log",
@@ -32,15 +32,34 @@ rule generate_war:
 
 rule war_generation_summary:
     """
-    Create a summary report of WAR generation
+    Create a summary report of WAR generation with validation
     """
     input:
-        wars = expand("results/wars/{animal}/war.pkl", animal=ANIMALS)
+        wars_pkl = expand("results/wars/{animal}/war.pkl", animal=ANIMALS),
+        wars_json = expand("results/wars/{animal}/war.json", animal=ANIMALS)
     output:
         summary = "results/wars/generation_summary.txt"
-    shell:
-        """
-        echo "WAR Generation Complete" > {output.summary}
-        echo "Total WARs generated: $(ls {input.wars} | wc -l)" >> {output.summary}
-        echo "Generated at: $(date)" >> {output.summary}
-        """
+    localrule:
+        True
+    run:
+        from pathlib import Path
+        
+        missing_files = []
+        for animal in ANIMALS:
+            pkl_file = Path(f"results/wars/{animal}/war.pkl")
+            json_file = Path(f"results/wars/{animal}/war.json")
+            if not pkl_file.exists():
+                missing_files.append(str(pkl_file))
+            if not json_file.exists():
+                missing_files.append(str(json_file))
+        
+        if missing_files:
+            raise FileNotFoundError(f"Missing WAR files: {missing_files}")
+            
+        with open(output.summary, 'w') as f:
+            f.write("WAR Generation Complete\n")
+            f.write(f"Total animals processed: {len(ANIMALS)}\n")
+            f.write(f"WAR files generated: {len(input.wars_pkl)}\n") 
+            f.write(f"JSON files generated: {len(input.wars_json)}\n")
+            f.write(f"✓ All required files validated\n")
+            f.write(f"Generated at: {__import__('datetime').datetime.now()}\n")
