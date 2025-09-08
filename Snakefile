@@ -16,6 +16,9 @@ import pandas as pd
 configfile: "workflow/config/config.yaml"
 samples_file = config["samples"]["samples_file"]
 
+workflow.rerun_incomplete = True
+workflow.default_latency_wait = 120
+
 # Load sample definitions
 import json
 import re
