@@ -14,7 +14,7 @@ import pandas as pd
 
 # Load configuration
 configfile: "workflow/config/config.yaml"
-samples_file = config.get("samples_file", "workflow/config/samples.json")
+samples_file = config["samples"]["samples_file"]
 
 # Load sample definitions
 import json
@@ -34,18 +34,9 @@ ANIMALS = []
 ANIMAL_TO_FOLDER_MAP = {}  # Maps slugified name back to (original_folder, original_animal_id)
 SLUGIFIED_TO_ORIGINAL = {}  # Maps slugified name back to original combined name
 
-# Get bad animaldays to filter out at job submission level
-bad_folder_animalday = samples_config.get("bad_folder_animalday", [])
-
 for folder, animals in samples_config["data_folders_to_animal_ids"].items():
     for animal in animals:
         combined_name = f"{folder} {animal}"
-        
-        # Skip bad animaldays entirely - prevents job submission
-        if combined_name in bad_folder_animalday:
-            print(f"⚠️  Skipping bad animalday: {combined_name}")
-            continue
-            
         slugified_name = slugify(combined_name, allow_unicode=True)
         
         ANIMALS.append(slugified_name)  # Use slugified names for file paths
@@ -65,9 +56,56 @@ def increment_memory(base_memory):
         return base_memory * (2 ** (attempt - 1))
     return mem
 
-# Include rule definitions
+def get_filtered_animals(wildcards):
+    """Discover animals that passed quality filtering"""
+    import os
+    filtered_animals = []
+    filtered_dir = "results/wars_filtered"
+    if os.path.exists(filtered_dir):
+        for item in os.listdir(filtered_dir):
+            if os.path.isdir(os.path.join(filtered_dir, item)):
+                war_file = os.path.join(filtered_dir, item, "war.pkl")
+                if os.path.exists(war_file):
+                    filtered_animals.append(item)
+    return filtered_animals
+
+def animal_passed_filtering(animal):
+    """Check if a specific animal passed quality filtering"""
+    import os
+    war_file = os.path.join("results", "wars_filtered", animal, "war.pkl")
+    return os.path.exists(war_file)
+
+def filtered_input(filename):
+    """Helper to create input function that only includes files for animals that passed filtering"""
+    def input_func(wildcards):
+        if animal_passed_filtering(wildcards.animal):
+            return f"results/wars_filtered/{wildcards.animal}/{filename}"
+        return []
+    return input_func
+
+def filtered_war_inputs():
+    """Convenient function to get all standard filtered WAR inputs"""
+    return {
+        'war_pkl': filtered_input('war.pkl'),
+        'war_json': filtered_input('war.json'), 
+        'metadata': filtered_input('metadata.json')
+    }
+
+def filtered_war_pkl():
+    """Convenience function for just the filtered WAR pickle"""
+    return filtered_input('war.pkl')
+
+def filtered_war_json():
+    """Convenience function for just the filtered WAR JSON"""
+    return filtered_input('war.json')
+
+# Wildcard constraints to prevent conflicts
+wildcard_constraints:
+    animal="[^/]+"  # Animal names cannot contain slashes
+
+# Include rule definitions  
 include: "workflow/rules/war_generation.smk"
-include: "workflow/rules/temporal_diagnostics.smk" 
+include: "workflow/rules/war_quality_filter.smk"
 include: "workflow/rules/diagnostic_figures.smk"
 include: "workflow/rules/war_flattening.smk"
 include: "workflow/rules/final_analysis.smk"
@@ -75,47 +113,53 @@ include: "workflow/rules/final_analysis.smk"
 # Target rules - these are convenience rules for running specific pipeline stages
 rule all:
     input:
-        # WARs generated with json metadata
-        expand("results/wars/{animal}/war.pkl", animal=ANIMALS),
-        expand("results/wars/{animal}/war.json", animal=ANIMALS),
-        # Temporal heatmaps
-        expand("results/temporal_heatmaps/{animal}/heatmap.png", animal=ANIMALS),
-        # Diagnostic figures  
-        expand("results/diagnostic_figures/{animal}", animal=ANIMALS),
+        # WARs generated with json metadata  
+        # expand("results/wars/{animal}/war.pkl", animal=ANIMALS),
+        # expand("results/wars/{animal}/war.json", animal=ANIMALS),
+        # Quality filtered WARs first - need to ensure filtering happens for all animals
+        expand("results/wars_filtered/{animal}", animal=ANIMALS),
+        # Then diagnostic figures - only for animals that pass filtering
+        # get_diagnostic_figures
+        lambda wc: expand("results/diagnostic_figures/{animal}", animal=get_filtered_animals(wc))
+
+
+        # Temporal heatmaps (using filtered WARs)
+        # lambda wildcards: expand("results/temporal_heatmaps/{animal}/heatmap.png", animal=get_filtered_animals(wildcards)),
         # Flattened WARs
-        "results/flattened_wars/combined_wars.pkl",
+        # "results/flattened_wars/combined_wars.pkl",
         # Final analysis outputs
-        "results/final_analysis/experiment_plots_complete.flag"
+        # "results/final_analysis/experiment_plots_complete.flag"
 
-rule wars_only:
-    """Generate WARs from raw data only"""
+rule wars_filtered_only:
+    """Generate quality-filtered WARs"""
     input:
-        "results/wars/generation_summary.txt"
+        expand("results/wars_filtered/{animal}", animal=ANIMALS)
+        # get_filtered_animals
 
-rule temporal_only:
-    """Generate temporal diagnostic heatmaps only"""
-    input:
-        expand("results/temporal_heatmaps/{animal}/heatmap.png", animal=ANIMALS)
+# rule diagnostics_only:
+#     """Generate diagnostic figures only (quality-filtered WARs)"""
+#     input:
+#         lambda wildcards: expand("results/diagnostic_figures/{animal}", animal=get_filtered_animals(wildcards))
+        
+# rule temporal_only:
+#     """Generate temporal diagnostic heatmaps only (quality-filtered WARs)"""
+#     input:
+#         lambda wildcards: expand("results/temporal_heatmaps/{animal}/heatmap.png", animal=get_filtered_animals(wildcards))
 
-rule diagnostics_only:
-    """Generate diagnostic figures only"""
-    input:
-        "results/diagnostic_figures/figures_summary.txt"
+# rule flatten_only:
+#     """Generate flattened WARs only"""
+#     input:
+#         "results/flattened_wars/combined_wars.pkl"
 
-rule flatten_only:
-    """Generate flattened WARs only"""
-    input:
-        "results/flattened_wars/combined_wars.pkl"
+# rule final_only:
+#     """Generate final EP figures and analysis only"""
+#     input:
+#         "results/final_analysis/experiment_plots_complete.flag"
 
-rule final_only:
-    """Generate final EP figures and analysis only"""
-    input:
-        "results/final_analysis/experiment_plots_complete.flag"
-
-rule clean:
-    """Clean all generated files"""
-    shell:
-        "rm -rf results/ logs/"
+# rule clean:
+#     """Clean all generated files"""
+#     shell:
+#         "rm -rf results/ logs/"
 
 # Configuration validation
 def validate_config():

@@ -8,10 +8,11 @@ This corresponds to the pipeline-epfig-so functionality in the original workflow
 
 rule flatten_wars:
     """
-    Flatten and combine all WARs for final analysis
+    Flatten and combine filtered WARs for final analysis
     """
     input:
-        wars=expand("results/wars/{animal}/war.pkl", animal=ANIMALS)
+        wars=lambda wildcards: [f"results/wars_filtered/{animal}/war.pkl" 
+                               for animal in get_filtered_animals(wildcards)]
     output:
         flattened_wars="results/flattened_wars/combined_wars.pkl",
         processing_log="results/flattened_wars/processing.log"

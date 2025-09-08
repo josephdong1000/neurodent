@@ -14,8 +14,15 @@ diagnostic_figures_dir: "results/diagnostic_figures"
 flattened_wars_dir: "results/flattened_wars"
 final_analysis_dir: "results/final_analysis"
 
-# Sample configuration file
-samples_file: "workflow/config/samples.json"
+# Sample configuration
+samples:
+  # Sample metadata file path
+  samples_file: "workflow/config/samples.json"
+  
+  # Quality filtering parameters
+  quality_filter:
+    exclude_unknown_genotypes: true
+    exclude_bad_animaldays: true
 
 # Analysis parameters
 analysis:
@@ -61,6 +68,14 @@ analysis:
     psd_spectrogram:
       figsize: [20, 4]
       mode: "none"
+    
+    # Temporal heatmap parameters
+    temporal_heatmap:
+      figsize: [15, 10]
+      colormap: "viridis"
+      feature_type: "rms_amplitude"  # Options: rms_amplitude, amplitude_variance, power_bands
+      interpolation: "nearest"
+      include_colorbar: true
 
 # SLURM cluster configuration
 cluster:

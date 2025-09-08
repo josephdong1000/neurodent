@@ -19,6 +19,7 @@ import matplotlib.pyplot as plt
 import matplotlib
 matplotlib.use('Agg')  # Non-interactive backend
 
+import numpy as np
 from pythoneeg import visualization
 
 
@@ -38,6 +39,62 @@ def load_war_and_config():
     )
     
     return war, config, animal_folder, animal_id, output_dir
+
+
+def generate_temporal_heatmap(war_data, config, output_dir, animal_id, version_name):
+    """Generate temporal heatmap visualization"""
+    try:
+        heatmap_config = config["analysis"]["figures"]["temporal_heatmap"]
+        feature_type = heatmap_config["feature_type"]
+        
+        # Extract the appropriate feature for temporal visualization
+        if feature_type == "rms_amplitude" and hasattr(war_data, 'rms_amplitude') and war_data.rms_amplitude is not None:
+            data = war_data.rms_amplitude
+            ylabel = "RMS Amplitude"
+        elif feature_type == "amplitude_variance" and hasattr(war_data, 'amplitude_variance') and war_data.amplitude_variance is not None:
+            data = war_data.amplitude_variance
+            ylabel = "Amplitude Variance" 
+        elif feature_type == "power_bands" and hasattr(war_data, 'power_bands') and war_data.power_bands is not None:
+            # Use total power across bands
+            data = np.sum(war_data.power_bands, axis=-1) if len(war_data.power_bands.shape) > 2 else war_data.power_bands
+            ylabel = "Power (All Bands)"
+        else:
+            logging.warning(f"Feature type '{feature_type}' not available or no data found")
+            return
+        
+        # Create the temporal heatmap
+        fig, ax = plt.subplots(figsize=heatmap_config["figsize"])
+        
+        # Transpose for proper orientation (channels x time)
+        if len(data.shape) == 2:
+            heatmap_data = data.T
+        else:
+            heatmap_data = data
+            
+        im = ax.imshow(heatmap_data, 
+                      aspect='auto', 
+                      cmap=heatmap_config["colormap"],
+                      interpolation=heatmap_config["interpolation"])
+        
+        ax.set_xlabel('Time Windows')
+        ax.set_ylabel('Channels')
+        ax.set_title(f'Temporal Heatmap - {ylabel} ({version_name.title()})')
+        
+        # Add colorbar if requested
+        if heatmap_config["include_colorbar"]:
+            plt.colorbar(im, ax=ax, label=ylabel)
+        
+        plt.tight_layout()
+        
+        # Save the heatmap
+        output_path = output_dir / f"{animal_id}_{version_name}_temporal_heatmap.png"
+        plt.savefig(output_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        logging.info(f"Temporal heatmap saved: {output_path}")
+        
+    except Exception as e:
+        logging.error(f"Failed to generate temporal heatmap: {str(e)}")
 
 
 def generate_figures_for_war_version(war_version, war, config, animal_id, output_subdir, version_name):
@@ -69,8 +126,12 @@ def generate_figures_for_war_version(war_version, war, config, animal_id, output
             mode=figure_config["psd_spectrogram"]["mode"]
         )
         
+        # Generate temporal heatmap for this version
+        logging.info(f"  - Generating {version_name} temporal heatmap")
+        generate_temporal_heatmap(war_version, config, output_subdir, animal_id, version_name)
+        
     except Exception as e:
-        logging.error(f"AnimalPlotter failed for {version_name}: {str(e)}")
+        logging.error(f"Figure generation failed for {version_name}: {str(e)}")
         raise
     
     created_files = list(output_subdir.glob("*.png"))
@@ -82,10 +143,6 @@ def generate_diagnostic_figures_for_animal(war, config, animal_folder, animal_id
     logging.info(f"Processing {animal_folder} - {animal_id}")
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    if war.genotype == "Unknown":
-        logging.info(f"Skipping {animal_id} because genotype is Unknown")
-        (output_dir / "empty_genotype_unknown.txt").write_text("Genotype unknown - no figures generated")
-        return
     
     processing_config = config["analysis"]["processing"]
     
