@@ -11,19 +11,17 @@ Input: Raw EEG data files
 Output: WAR pickle and JSON files
 """
 
+import json
+import logging
 import os
 import sys
-import logging
-import json
 import traceback
 from pathlib import Path
-from tqdm import tqdm
 
 from dask.distributed import Client, LocalCluster
+from tqdm import tqdm
 
-from pythoneeg import core
-from pythoneeg import visualization
-from pythoneeg import constants
+from pythoneeg import constants, core, visualization
 
 
 def load_samples_and_config():
