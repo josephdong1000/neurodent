@@ -24,9 +24,9 @@ checkpoint war_quality_filter:
     retries:
         0
     resources:
-        time = 60,
-        mem_mb = 4_000,
-        nodes = 1
+        time=config["cluster"]["war_quality_filter"]["time"],
+        mem_mb=increment_memory(config["cluster"]["war_quality_filter"]["mem_mb"]),
+        nodes=config["cluster"]["war_quality_filter"]["nodes"]
     run:
         import logging
         from pathlib import Path

@@ -69,13 +69,29 @@ analysis:
       figsize: [20, 4]
       mode: "none"
     
-    # Temporal heatmap parameters
-    temporal_heatmap:
-      figsize: [15, 10]
-      colormap: "viridis"
-      feature_type: "rms_amplitude"  # Options: rms_amplitude, amplitude_variance, power_bands
-      interpolation: "nearest"
-      include_colorbar: true
+    # Temporal heatmap parameters - configurable features with individual parameters
+    temporal_heatmaps:
+      features:
+        rms:
+          figsize: [10, 3]
+          cmap: "viridis"
+          norm_type: "fixed"
+          norm_params: 
+            vmin: 50
+            vmax: 300
+        psdslope:
+          figsize: [10, 3] 
+          cmap: "viridis"
+          norm_type: "fixed"
+          norm_params:
+            vmin: -3
+            vmax: 0
+        zpcorr:
+          figsize: [10, 3]
+          cmap: "RdBu_r"
+          norm_type: "centered"
+          norm_params:
+            halfrange: 1.5
 
 # SLURM cluster configuration
 cluster:
@@ -87,6 +103,14 @@ cluster:
     threads: 10
     interface: null
 
+  # WAR quality filtering cluster (lightweight)
+  war_quality_filter:
+    time: "1h"
+    mem_mb: 4_000
+    nodes: 1
+    threads: 1
+    interface: null
+
   # Diagnostic figures cluster (single-animal, moderate resources)
   diagnostic_figures:
     time: "1h"
@@ -95,27 +119,21 @@ cluster:
     threads: 4
     interface: null
 
-  # Spike analysis cluster (low-core, high-memory)
-  spike_analysis:
-    cores: 1
-    memory_gb: 100
-    processes: 1
-    runtime: 360
-    interface: "eth1"
-    adapt_maximum_jobs: 15
+  # WAR flattening cluster (high-memory, multiprocessing)
+  war_flattening:
+    time: "24h"
+    mem_mb: 400_000
+    nodes: 1
+    threads: 14
+    interface: null
 
-  # Figure generation cluster (moderate resources)
-  figure_generation:
-    cores: 10
-    memory_gb: 100
-    runtime: 720
-    interface: "eth1"
-
-  # Flattening and final analysis (multiprocessing)
+  # Final analysis cluster (high-memory, multiprocessing)
   final_analysis:
-    cores: 14
-    memory_gb: 400
-    runtime: 1440
+    time: "24h"
+    mem_mb: 409_600
+    nodes: 1
+    threads: 14
+    interface: null
 
 # Processing subsets for testing/development
 processing:

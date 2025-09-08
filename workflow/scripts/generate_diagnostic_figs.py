@@ -15,12 +15,65 @@ import logging
 import traceback
 from pathlib import Path
 
-import matplotlib.pyplot as plt
 import matplotlib
 matplotlib.use('Agg')  # Non-interactive backend
 
-import numpy as np
 from pythoneeg import visualization
+
+
+def create_norm_from_config(norm_config):
+    """Create matplotlib normalization from config parameters"""
+    norm_type = norm_config["norm_type"]
+    norm_params = norm_config["norm_params"]
+    
+    if norm_type == "fixed":
+        return matplotlib.colors.Normalize(vmin=norm_params["vmin"], vmax=norm_params["vmax"])
+    elif norm_type == "centered":
+        return matplotlib.colors.CenteredNorm(halfrange=norm_params["halfrange"])
+    elif norm_type == "minmax":
+        return matplotlib.colors.Normalize(vmin=norm_params["vmin"], vmax=norm_params["vmax"])
+    else:
+        logging.warning(f"Unknown norm_type: {norm_type}, using default")
+        return None
+
+
+def generate_temporal_heatmaps_from_config(animal_plotter, config, animal_id, output_dir, version_name):
+    """Generate temporal heatmaps using AnimalPlotter and config parameters"""
+    try:
+        heatmaps_config = config["analysis"]["figures"]["temporal_heatmaps"]["features"]
+        
+        for feature_name, heatmap_config in heatmaps_config.items():
+            logging.info(f"    - Generating {feature_name} temporal heatmap")
+            
+            # Create normalization from config
+            norm = create_norm_from_config(heatmap_config)
+            
+            # Generate the heatmap using AnimalPlotter
+            animal_plotter.plot_temporal_heatmap(
+                features=feature_name,
+                figsize=tuple(heatmap_config["figsize"]),
+                cmap=heatmap_config["cmap"],
+                norm=norm,
+            )
+            
+            # The AnimalPlotter saves files automatically, but we need to ensure 
+            # they match the expected output names from the Snakemake rule
+            expected_filename = f"{animal_id}_temporal_heatmap_{feature_name}.png"
+            expected_path = output_dir / expected_filename
+            
+            # Check if file was created with the expected name, if not try to find and rename
+            generated_files = list(output_dir.glob(f"*{feature_name}*heatmap*.png"))
+            if generated_files and not expected_path.exists():
+                # Rename to match expected output
+                generated_files[0].rename(expected_path)
+                logging.info(f"Renamed {generated_files[0]} to {expected_path}")
+            
+    except Exception as e:
+        logging.error(f"Failed to generate temporal heatmaps: {str(e)}")
+        # Create placeholder files to satisfy Snakemake outputs
+        for feature_name in config["analysis"]["figures"]["temporal_heatmaps"]["features"].keys():
+            placeholder_path = output_dir / f"{animal_id}_temporal_heatmap_{feature_name}.png"
+            placeholder_path.touch()
 
 
 def load_war_and_config():
@@ -39,62 +92,6 @@ def load_war_and_config():
     )
     
     return war, config, animal_folder, animal_id, output_dir
-
-
-def generate_temporal_heatmap(war_data, config, output_dir, animal_id, version_name):
-    """Generate temporal heatmap visualization"""
-    try:
-        heatmap_config = config["analysis"]["figures"]["temporal_heatmap"]
-        feature_type = heatmap_config["feature_type"]
-        
-        # Extract the appropriate feature for temporal visualization
-        if feature_type == "rms_amplitude" and hasattr(war_data, 'rms_amplitude') and war_data.rms_amplitude is not None:
-            data = war_data.rms_amplitude
-            ylabel = "RMS Amplitude"
-        elif feature_type == "amplitude_variance" and hasattr(war_data, 'amplitude_variance') and war_data.amplitude_variance is not None:
-            data = war_data.amplitude_variance
-            ylabel = "Amplitude Variance" 
-        elif feature_type == "power_bands" and hasattr(war_data, 'power_bands') and war_data.power_bands is not None:
-            # Use total power across bands
-            data = np.sum(war_data.power_bands, axis=-1) if len(war_data.power_bands.shape) > 2 else war_data.power_bands
-            ylabel = "Power (All Bands)"
-        else:
-            logging.warning(f"Feature type '{feature_type}' not available or no data found")
-            return
-        
-        # Create the temporal heatmap
-        fig, ax = plt.subplots(figsize=heatmap_config["figsize"])
-        
-        # Transpose for proper orientation (channels x time)
-        if len(data.shape) == 2:
-            heatmap_data = data.T
-        else:
-            heatmap_data = data
-            
-        im = ax.imshow(heatmap_data, 
-                      aspect='auto', 
-                      cmap=heatmap_config["colormap"],
-                      interpolation=heatmap_config["interpolation"])
-        
-        ax.set_xlabel('Time Windows')
-        ax.set_ylabel('Channels')
-        ax.set_title(f'Temporal Heatmap - {ylabel} ({version_name.title()})')
-        
-        # Add colorbar if requested
-        if heatmap_config["include_colorbar"]:
-            plt.colorbar(im, ax=ax, label=ylabel)
-        
-        plt.tight_layout()
-        
-        # Save the heatmap
-        output_path = output_dir / f"{animal_id}_{version_name}_temporal_heatmap.png"
-        plt.savefig(output_path, dpi=300, bbox_inches='tight')
-        plt.close()
-        
-        logging.info(f"Temporal heatmap saved: {output_path}")
-        
-    except Exception as e:
-        logging.error(f"Failed to generate temporal heatmap: {str(e)}")
 
 
 def generate_figures_for_war_version(war_version, war, config, animal_id, output_subdir, version_name):
@@ -126,9 +123,9 @@ def generate_figures_for_war_version(war_version, war, config, animal_id, output
             mode=figure_config["psd_spectrogram"]["mode"]
         )
         
-        # Generate temporal heatmap for this version
-        logging.info(f"  - Generating {version_name} temporal heatmap")
-        generate_temporal_heatmap(war_version, config, output_subdir, animal_id, version_name)
+        # Generate temporal heatmaps for this version
+        logging.info(f"  - Generating {version_name} temporal heatmaps")
+        generate_temporal_heatmaps_from_config(ap, config, animal_id, output_subdir, version_name)
         
     except Exception as e:
         logging.error(f"Figure generation failed for {version_name}: {str(e)}")

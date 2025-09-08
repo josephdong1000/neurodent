@@ -16,13 +16,15 @@ rule generate_final_analysis:
         completion_flag="results/final_analysis/experiment_plots_complete.flag",
         plots_dir=directory("results/final_analysis/plots"),
         stats_summary="results/final_analysis/statistical_summary.txt"
+    threads:
+        config["cluster"]["final_analysis"]["threads"]
     params:
         samples_config=samples_config,
         config=config
     resources:
-        mem_mb=409600,  # 400GB
-        cpus_per_task=14,
-        runtime=1440,   # 24 hours
+        time=config["cluster"]["final_analysis"]["time"],
+        mem_mb=increment_memory(config["cluster"]["final_analysis"]["mem_mb"]),
+        nodes=config["cluster"]["final_analysis"]["nodes"]
     log:
         "logs/final_analysis/final_analysis.log"
     script:
