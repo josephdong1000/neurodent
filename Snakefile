@@ -144,6 +144,9 @@ rule all:
         # Then diagnostic figures - only for animals that pass filtering
         # get_diagnostic_figures
         lambda wc: expand("results/diagnostic_figures/{animal}", animal=get_filtered_animals(wc)),
+        'results/graphs/rulegraph.png',
+        'results/graphs/filegraph.png',
+        'results/graphs/dag.png',
         # Temporal heatmaps (using filtered WARs)
         # lambda wildcards: expand("results/temporal_heatmaps/{animal}/heatmap.png", animal=get_filtered_animals(wildcards)),
         # Flattened WARs
@@ -157,6 +160,21 @@ rule wars_filtered_only:
     input:
         expand("results/wars_filtered/{animal}", animal=ANIMALS),
         # get_filtered_animals
+
+
+rule rulegraph:
+    output: "results/graphs/rulegraph.png"
+    shell: "snakemake --rulegraph | dot -Tpng > {output}"
+
+
+rule filegraph:
+    output: "results/graphs/filegraph.png"
+    shell: "snakemake --filegraph | dot -Tpng > {output}"
+
+
+rule dag:
+    output: "results/graphs/dag.png"
+    shell: "snakemake --dag | dot -Tpng > {output}"
 
 
 # rule diagnostics_only:
