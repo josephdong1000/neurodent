@@ -17,7 +17,7 @@ final_analysis_dir: "results/final_analysis"
 # Sample configuration
 samples:
   # Sample metadata file path
-  samples_file: "workflow/config/samples.json"
+  samples_file: "config/samples.json"
   
   # Quality filtering parameters
   quality_filter:
@@ -134,13 +134,6 @@ cluster:
     nodes: 1
     threads: 14
     interface: null
-
-# Processing subsets for testing/development
-processing:
-  # Use subsets for faster testing
-  use_subset: false
-  subset_fraction: 0.5  # Use half of the data
-  subset_start_fraction: 0.5  # Start from halfway through (last 1/2)
 
 # Logging configuration
 logging:

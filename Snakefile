@@ -14,7 +14,7 @@ import pandas as pd
 
 
 # Load configuration
-configfile: "workflow/config/config.yaml"
+configfile: "config/config.yaml"
 
 
 samples_file = config["samples"]["samples_file"]
