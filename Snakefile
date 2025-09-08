@@ -4,7 +4,7 @@ PyEEG Snakemake Pipeline
 
 This pipeline processes raw EEG data through multiple analysis stages:
 1. Raw files → WARs (Windowed Analysis Results)
-2. WARs → Temporal heatmaps (animal-level diagnostics)  
+2. WARs → Temporal heatmaps (animal-level diagnostics)
 3. WARs → Diagnostic figures
 4. WARs → Flattened WARs → Final EP figures
 """

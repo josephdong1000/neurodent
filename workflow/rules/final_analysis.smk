@@ -6,29 +6,30 @@ Rules for final analysis and EP figure generation.
 This integrates with the test_Joseph notebooks for final outputs.
 """
 
+
 rule generate_final_analysis:
     """
     Generate final EP figures and statistical analysis
     """
     input:
-        flattened_wars="results/flattened_wars/combined_wars.pkl"
+        flattened_wars="results/flattened_wars/combined_wars.pkl",
     output:
         completion_flag="results/final_analysis/experiment_plots_complete.flag",
         plots_dir=directory("results/final_analysis/plots"),
-        stats_summary="results/final_analysis/statistical_summary.txt"
-    threads:
-        config["cluster"]["final_analysis"]["threads"]
+        stats_summary="results/final_analysis/statistical_summary.txt",
+    threads: config["cluster"]["final_analysis"]["threads"]
     params:
         samples_config=samples_config,
-        config=config
+        config=config,
     resources:
         time=config["cluster"]["final_analysis"]["time"],
         mem_mb=increment_memory(config["cluster"]["final_analysis"]["mem_mb"]),
-        nodes=config["cluster"]["final_analysis"]["nodes"]
+        nodes=config["cluster"]["final_analysis"]["nodes"],
     log:
-        "logs/final_analysis/final_analysis.log"
+        "logs/final_analysis/final_analysis.log",
     script:
         "../scripts/final_analysis.py"
+
 
 rule final_analysis_summary:
     """
@@ -39,9 +40,9 @@ rule final_analysis_summary:
         temporal_summary="results/temporal_heatmaps/diagnostics_summary.txt",
         figures_summary="results/diagnostic_figures/figures_summary.txt",
         flattening_summary="results/flattened_wars/flattening_summary.txt",
-        final_flag="results/final_analysis/experiment_plots_complete.flag"
+        final_flag="results/final_analysis/experiment_plots_complete.flag",
     output:
-        pipeline_summary="results/pipeline_summary.txt"
+        pipeline_summary="results/pipeline_summary.txt",
     shell:
         """
         echo "PyEEG Snakemake Pipeline Summary" > {output.pipeline_summary}
