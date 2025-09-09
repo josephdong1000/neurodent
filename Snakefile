@@ -187,33 +187,8 @@ rule dag:
     shell: "snakemake --dag | dot -Tpng > {output}"
 
 
-# rule diagnostics_only:
-#     """Generate diagnostic figures only (quality-filtered WARs)"""
-#     input:
-#         lambda wildcards: expand("results/diagnostic_figures/{animal}", animal=get_filtered_animals(wildcards))
-
-# rule temporal_only:
-#     """Generate temporal diagnostic heatmaps only (quality-filtered WARs)"""
-#     input:
-#         lambda wildcards: expand("results/temporal_heatmaps/{animal}/heatmap.png", animal=get_filtered_animals(wildcards))
-
-# rule flatten_only:
-#     """Generate flattened WARs only"""
-#     input:
-#         "results/flattened_wars/combined_wars.pkl"
-
-# rule final_only:
-#     """Generate final EP figures and analysis only"""
-#     input:
-#         "results/final_analysis/experiment_plots_complete.flag"
-
-# rule clean:
-#     """Clean all generated files"""
-#     shell:
-#         "rm -rf results/ logs/"
-
-
 # Configuration validation
+# FIXME better to define in a json/yaml schema
 def validate_config():
     required_keys = ["base_folder", "data_parent_folder", "temp_directory"]
     for key in required_keys:
