@@ -9,13 +9,14 @@ This corresponds to the pipeline-epfig-so functionality in the original workflow
 
 rule flatten_wars:
     """
-    Flatten and combine filtered WARs for final analysis
+    Flatten filtered WARs by aggregating time windows for each animal individually
     """
     input:
-        wars=lambda wildcards: [f"results/wars_filtered/{animal}/war.pkl" for animal in get_filtered_animals(wildcards)],
+        war_pkl="results/wars_fragment_filtered/{animal}/war.pkl",
+        war_json="results/wars_fragment_filtered/{animal}/war.json",
     output:
-        flattened_wars="results/flattened_wars/combined_wars.pkl",
-        processing_log="results/flattened_wars/processing.log",
+        war_pkl="results/wars_flattened/{animal}/war.pkl",
+        war_json="results/wars_flattened/{animal}/war.json",
     threads: config["cluster"]["war_flattening"]["threads"]
     params:
         samples_config=samples_config,
@@ -25,6 +26,6 @@ rule flatten_wars:
         mem_mb=increment_memory(config["cluster"]["war_flattening"]["mem_mb"]),
         nodes=config["cluster"]["war_flattening"]["nodes"],
     log:
-        "logs/war_flattening/flatten_wars.log",
+        "logs/war_flattening/{animal}.log",
     script:
         "../scripts/flatten_wars.py"

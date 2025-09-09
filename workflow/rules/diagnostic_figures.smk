@@ -12,7 +12,7 @@ checkpoint make_diagnostic_figures:
     Generate diagnostic figures for a specific animal into subdirectories (filtered/unfiltered)
     """
     input:
-        **filtered_war_inputs(),
+        **fragment_filtered_war_inputs(),
     output:
         figure_dir=directory("results/diagnostic_figures/{animal}/"),
         unfiltered_dir=directory("results/diagnostic_figures/{animal}/unfiltered"),

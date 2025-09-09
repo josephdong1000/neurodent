@@ -131,18 +131,7 @@ def main():
 
             war.save_pickle_and_json(output_dir, filename="war", slugify_filename=False)
 
-            # Save metadata for downstream rules
-            metadata = {
-                "animal_folder": animal_folder,
-                "animal_id": animal_id,
-                "animal_key": f"{animal_folder} {animal_id}",
-                "original_combined_name": f"{animal_folder} {animal_id}",
-                "slugified_name": snakemake.wildcards.animal,
-            }
-            with open(snakemake.output.metadata, "w") as metadata_file:
-                json.dump(metadata, metadata_file, indent=2)
-
-            logging.info(f"Successfully saved WAR and metadata for {animal_folder} {animal_id}")
+            logging.info(f"Successfully saved WAR for {animal_folder} {animal_id}")
 
         except Exception as e:
             # Try to log to logger if available, otherwise print to stdout

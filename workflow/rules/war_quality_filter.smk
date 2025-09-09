@@ -15,9 +15,8 @@ checkpoint war_quality_filter:
     input:
         war_pkl="results/wars/{animal}/war.pkl",
         war_json="results/wars/{animal}/war.json",
-        metadata="results/wars/{animal}/metadata.json",
     output:
-        directory("results/wars_filtered/{animal}"),
+        directory("results/wars_quality_filtered/{animal}"),
     log:
         "logs/war_quality_filter/{animal}.log",
     threads: 1
@@ -48,15 +47,15 @@ checkpoint war_quality_filter:
         logger.info(f"Starting quality filtering for animal: {animal}")
 
 
-        # Helper function to clean up existing symlinks
-        def cleanup_existing_symlinks(destination_dir, input_files):
-            """Remove any existing symlinks for rejected animals"""
+        # Helper function to clean up existing files
+        def cleanup_existing_files(destination_dir, input_files):
+            """Remove any existing files for rejected animals"""
             for file_path in [Path(x) for x in input_files]:
                 if file_path.is_file():
                     destination_file = destination_dir / file_path.name
                     if destination_file.exists():
-                        destination_file.unlink()  # Remove existing symlink if present
-                        logging.info(f"Removed existing symlink: {destination_file}")
+                        destination_file.unlink()  # Remove existing file if present
+                        logging.info(f"Removed existing file: {destination_file}")
 
                 # Get bad animaldays from samples config via config parameter
 
@@ -73,10 +72,10 @@ checkpoint war_quality_filter:
             f"Quality filter settings - exclude_bad_animaldays: {exclude_bad_animaldays}, exclude_unknown_genotypes: {exclude_unknown_genotypes}"
         )
 
-        # Create filtered directory and clean up any existing symlinks
+        # Create filtered directory and clean up any existing files
         destination_dir = Path(output[0])
         destination_dir.mkdir(parents=True, exist_ok=True)
-        cleanup_existing_symlinks(destination_dir, input)
+        cleanup_existing_files(destination_dir, input)
 
         # Check if this is a bad animalday first
         combined_name = SLUGIFIED_TO_ORIGINAL[animal]
@@ -98,18 +97,19 @@ checkpoint war_quality_filter:
                     return
 
             logger.info(f"ACCEPTED: Animal {animal} passed all quality filters")
-            logger.info(f"Creating symlinks in: {destination_dir}")
+            logger.info(f"Copying files to: {destination_dir}")
 
-            # Create symlinks for all files from the original WAR directory
-            symlinked_files = []
+            # Copy all files from the original WAR directory
+            import shutil
+            copied_files = []
             for file_path in [Path(x) for x in input]:
                 if file_path.is_file():
                     destination_file = destination_dir / file_path.name
-                    destination_file.symlink_to(file_path.resolve())
-                    symlinked_files.append(file_path.name)
-                    logger.info(f"Created symlink: {file_path.name} -> {destination_file}")
+                    shutil.copy2(file_path, destination_file)
+                    copied_files.append(file_path.name)
+                    logger.info(f"Copied file: {file_path.name} -> {destination_file}")
 
-            logger.info(f"Successfully created {len(symlinked_files)} symlinks: {symlinked_files}")
+            logger.info(f"Successfully copied {len(copied_files)} files: {copied_files}")
 
         except Exception as e:
             logger.error(f"ERROR: Failed to process animal {animal}: {str(e)}")

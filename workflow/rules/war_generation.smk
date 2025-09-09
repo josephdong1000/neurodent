@@ -14,7 +14,6 @@ rule make_war:
     output:
         war_pkl="results/wars/{animal}/war.pkl",
         war_json="results/wars/{animal}/war.json",
-        metadata="results/wars/{animal}/metadata.json",
     params:
         animal_folder=get_animal_folder,
         animal_id=get_animal_id,

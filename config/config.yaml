@@ -9,9 +9,12 @@ temp_directory: "/scr1/users/dongjp"
 # Results directory structure
 results_dir: "results"
 wars_dir: "results/wars"
+wars_quality_filtered_dir: "results/wars_quality_filtered"
+wars_fragment_filtered_dir: "results/wars_fragment_filtered"
+wars_zeitgeber_dir: "results/wars_zeitgeber"
 temporal_heatmaps_dir: "results/temporal_heatmaps"
 diagnostic_figures_dir: "results/diagnostic_figures"
-flattened_wars_dir: "results/flattened_wars"
+flattened_wars_dir: "results/wars_flattened"
 final_analysis_dir: "results/final_analysis"
 
 # Sample configuration
@@ -53,6 +56,17 @@ analysis:
     # Post-processing - aggregation (applied after filtering) 
     aggregation:
       groupby: ["animalday", "isday"]  # Time window grouping for aggregation
+
+  # Fragment/channel filtering parameters (applied after quality filtering)
+  fragment_filtering:
+    bad_channels: ["LHip", "RHip"]  # Channels to filter out
+    morphological_smoothing_seconds: null  # Temporal smoothing of artifact rejection mask
+    # morphological_smoothing_seconds: 300  # 5 minutes smoothing alternative
+
+  # Zeitgeber time processing parameters
+  zeitgeber:
+    features: ["logpsdband", "logrms", "zpcorr"]  # Features to extract for zeitgeber analysis
+    time_aggregation_minutes: 60  # Time window for aggregation (60 = hourly)
 
   # Figure generation parameters
   figures:
@@ -119,18 +133,34 @@ cluster:
     threads: 4
     interface: null
 
-  # WAR flattening cluster (high-memory, multiprocessing)
-  war_flattening:
-    time: "24h"
-    mem_mb: 400_000
+  # WAR fragment filtering cluster (lightweight, per-animal)
+  war_fragment_filtering:
+    time: "1h"
+    mem_mb: 30_000
     nodes: 1
-    threads: 14
+    threads: 1
+    interface: null
+
+  # WAR flattening cluster (moderate resources, per-animal)
+  war_flattening:
+    time: "1h"
+    mem_mb: 30_000
+    nodes: 1
+    threads: 1
+    interface: null
+
+  # Zeitgeber feature extraction cluster (high-memory, processes all animals)
+  war_zeitgeber:
+    time: "2h"
+    mem_mb: 200_000
+    nodes: 1
+    threads: 15
     interface: null
 
   # Final analysis cluster (high-memory, multiprocessing)
   final_analysis:
     time: "24h"
-    mem_mb: 409_600
+    mem_mb: 400_000
     nodes: 1
     threads: 14
     interface: null
