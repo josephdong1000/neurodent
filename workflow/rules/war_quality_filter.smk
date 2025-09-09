@@ -20,7 +20,7 @@ checkpoint war_quality_filter:
     log:
         "logs/war_quality_filter/{animal}.log",
     threads: 1
-    retries: 0
+    retries: 1
     resources:
         time=config["cluster"]["war_quality_filter"]["time"],
         mem_mb=increment_memory(config["cluster"]["war_quality_filter"]["mem_mb"]),
