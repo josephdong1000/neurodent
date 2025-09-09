@@ -19,8 +19,6 @@ configfile: "config/config.yaml"
 
 samples_file = config["samples"]["samples_file"]
 
-workflow.rerun_incomplete = True
-workflow.default_latency_wait = 120
 
 # Load sample definitions
 import json
@@ -72,7 +70,7 @@ def get_filtered_animals(wildcards):
     import os
 
     filtered_animals = []
-    filtered_dir = "results/wars_filtered"
+    filtered_dir = "results/wars_quality_filtered"
     if os.path.exists(filtered_dir):
         for item in os.listdir(filtered_dir):
             if os.path.isdir(os.path.join(filtered_dir, item)):
@@ -86,37 +84,63 @@ def animal_passed_filtering(animal):
     """Check if a specific animal passed quality filtering"""
     import os
 
-    war_file = os.path.join("results", "wars_filtered", animal, "war.pkl")
+    war_file = os.path.join("results", "wars_quality_filtered", animal, "war.pkl")
     return os.path.exists(war_file)
 
 
 def filtered_input(filename):
-    """Helper to create input function that only includes files for animals that passed filtering"""
+    """Helper to create input function that only includes files for animals that passed quality filtering"""
 
     def input_func(wildcards):
         if animal_passed_filtering(wildcards.animal):
-            return f"results/wars_filtered/{wildcards.animal}/{filename}"
+            return f"results/wars_quality_filtered/{wildcards.animal}/{filename}"
         return []
 
     return input_func
 
 
+def fragment_filtered_input(filename):
+    """Helper to create input function for fragment-filtered WARs"""
+    
+    def input_func(wildcards):
+        # Check if fragment-filtered WAR exists for this animal
+        war_file = f"results/wars_fragment_filtered/{wildcards.animal}/war.pkl"
+        import os
+        if os.path.exists(war_file):
+            return f"results/wars_fragment_filtered/{wildcards.animal}/{filename}"
+        return []
+    
+    return input_func
+
+
 def filtered_war_inputs():
-    """Convenient function to get all standard filtered WAR inputs"""
+    """Convenient function to get all standard quality-filtered WAR inputs"""
     return {
         "war_pkl": filtered_input("war.pkl"),
         "war_json": filtered_input("war.json"),
-        "metadata": filtered_input("metadata.json"),
+    }
+
+
+def fragment_filtered_war_inputs():
+    """Convenient function to get all standard fragment-filtered WAR inputs"""
+    return {
+        "war_pkl": fragment_filtered_input("war.pkl"),
+        "war_json": fragment_filtered_input("war.json"),
     }
 
 
 def filtered_war_pkl():
-    """Convenience function for just the filtered WAR pickle"""
+    """Convenience function for just the quality-filtered WAR pickle"""
     return filtered_input("war.pkl")
 
 
+def fragment_filtered_war_pkl():
+    """Convenience function for just the fragment-filtered WAR pickle"""
+    return fragment_filtered_input("war.pkl")
+
+
 def filtered_war_json():
-    """Convenience function for just the filtered WAR JSON"""
+    """Convenience function for just the quality-filtered WAR JSON"""
     return filtered_input("war.json")
 
 
@@ -128,38 +152,24 @@ wildcard_constraints:
 # Include rule definitions
 include: "workflow/rules/war_generation.smk"
 include: "workflow/rules/war_quality_filter.smk"
+include: "workflow/rules/war_fragment_filtering.smk"
 include: "workflow/rules/diagnostic_figures.smk"
 include: "workflow/rules/war_flattening.smk"
+include: "workflow/rules/war_zeitgeber.smk"
 include: "workflow/rules/final_analysis.smk"
 
 
 # Target rules - these are convenience rules for running specific pipeline stages
 rule all:
     input:
-        # WARs generated with json metadata  
-        # expand("results/wars/{animal}/war.pkl", animal=ANIMALS),
-        # expand("results/wars/{animal}/war.json", animal=ANIMALS),
-        # Quality filtered WARs first - need to ensure filtering happens for all animals
-        expand("results/wars_filtered/{animal}", animal=ANIMALS),
-        # Then diagnostic figures - only for animals that pass filtering
-        # get_diagnostic_figures
+        expand("results/wars_quality_filtered/{animal}", animal=ANIMALS),
+        lambda wc: expand("results/wars_fragment_filtered/{animal}/war.pkl", animal=get_filtered_animals(wc)),
         lambda wc: expand("results/diagnostic_figures/{animal}", animal=get_filtered_animals(wc)),
+        lambda wc: expand("results/wars_flattened/{animal}/war.pkl", animal=get_filtered_animals(wc)),
+        "results/wars_zeitgeber/zeitgeber_features.pkl",
         'results/graphs/rulegraph.png',
         'results/graphs/filegraph.png',
         'results/graphs/dag.png',
-        # Temporal heatmaps (using filtered WARs)
-        # lambda wildcards: expand("results/temporal_heatmaps/{animal}/heatmap.png", animal=get_filtered_animals(wildcards)),
-        # Flattened WARs
-        # "results/flattened_wars/combined_wars.pkl",
-        # Final analysis outputs
-        # "results/final_analysis/experiment_plots_complete.flag"
-
-
-rule wars_filtered_only:
-    """Generate quality-filtered WARs"""
-    input:
-        expand("results/wars_filtered/{animal}", animal=ANIMALS),
-        # get_filtered_animals
 
 
 rule rulegraph:
