@@ -8,13 +8,15 @@ to ensure all downstream analysis uses consistently filtered data.
 """
 
 
-rule filter_wars_fragments:
+checkpoint filter_wars_fragments:
     """
     Apply fragment and channel filtering to quality-filtered WARs
     """
     input:
-        war_pkl="results/wars_quality_filtered/{animal}/war.pkl",
-        war_json="results/wars_quality_filtered/{animal}/war.json",
+        # war_pkl="results/wars_quality_filtered/{animal}/war.pkl",
+        # war_json="results/wars_quality_filtered/{animal}/war.json",
+        war_pkl=get_animal_quality_filtered_pkl,
+        war_json=get_animal_quality_filtered_json,
     output:
         war_pkl="results/wars_fragment_filtered/{animal}/war.pkl",
         war_json="results/wars_fragment_filtered/{animal}/war.json",

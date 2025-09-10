@@ -77,13 +77,25 @@ def get_animal_quality_filtered_json(wildcards):
     filenames = glob_wildcards(os.path.join(checkpoint_output, "{filename}.pkl")).filename
     return expand(os.path.join(checkpoint_output, "{filename}.json"), filename=filenames)
 
+def get_animal_fragment_filtered_pkl(wildcards):
+    return checkpoints.filter_wars_fragments.get(**wildcards).output.war_pkl
+    # checkpoint_output = checkpoints.filter_wars_fragments.get(**wildcards).output[0]
+    # filenames = glob_wildcards(os.path.join(checkpoint_output, "{filename}.pkl")).filename
+    # return expand(os.path.join(checkpoint_output, "{filename}.pkl"), filename=filenames)
+
+def get_animal_fragment_filtered_json(wildcards):
+    return checkpoints.filter_wars_fragments.get(**wildcards).output.war_json
+    # checkpoint_output = checkpoints.filter_wars_fragments.get(**wildcards).output[0]
+    # filenames = glob_wildcards(os.path.join(checkpoint_output, "{filename}.pkl")).filename
+    # return expand(os.path.join(checkpoint_output, "{filename}.json"), filename=filenames)
+
 
 # These should be defined because this is an aggregation step with an upstream checkpointed step
 def get_fragment_filtered_pkl(wildcards):
     all_fragment_filtered_files = []
     for anim in ANIMALS:
-        ck_output = checkpoints.war_quality_filter.get(animal=anim).output[0]
-        filename = glob_wildcards(os.path.join(f"results/wars_quality_filtered/{anim}", "{filename}.pkl")).filename
+        ck_output = checkpoints.filter_wars_fragments.get(animal=anim).output[0]
+        filename = glob_wildcards(os.path.join(f"results/wars_fragment_filtered/{anim}", "{filename}.pkl")).filename
         all_fragment_filtered_files.extend(expand(Path("results/wars_fragment_filtered") / anim / "{filename}.pkl", filename=filename))
     return all_fragment_filtered_files
 
@@ -91,8 +103,8 @@ def get_fragment_filtered_pkl(wildcards):
 def get_fragment_filtered_json(wildcards):
     all_fragment_filtered_files = []
     for anim in ANIMALS:
-        ck_output = checkpoints.war_quality_filter.get(animal=anim).output[0]
-        filename = glob_wildcards(os.path.join(f"results/wars_quality_filtered/{anim}", "{filename}.pkl")).filename
+        ck_output = checkpoints.filter_wars_fragments.get(animal=anim).output[0]
+        filename = glob_wildcards(os.path.join(f"results/wars_fragment_filtered/{anim}", "{filename}.json")).filename
         all_fragment_filtered_files.extend(expand(Path("results/wars_fragment_filtered") / anim / "{filename}.json", filename=filename))
     return all_fragment_filtered_files
 
@@ -113,6 +125,15 @@ def get_flattened_wars_json(wildcards):
         filename = glob_wildcards(os.path.join(f"results/wars_flattened/{anim}", "{filename}.json")).filename
         all_flattened_wars_files.extend(expand(Path("results/wars_flattened") / anim / "{filename}.json", filename=filename))
     return all_flattened_wars_files
+
+def get_all_diagnostic_figures(wildcards):
+    all_diagnostic_dirs = []
+    for anim in ANIMALS:
+        ck_unfiltered = checkpoints.make_diagnostic_figures_unfiltered.get(animal=anim).output[0]
+        all_diagnostic_dirs.append(ck_unfiltered)
+        ck_filtered = checkpoints.make_diagnostic_figures_filtered.get(animal=anim).output[0]
+        all_diagnostic_dirs.append(ck_filtered)
+    return all_diagnostic_dirs
 
 
 # Wildcard constraints to prevent conflicts
@@ -141,7 +162,7 @@ rule all:
         # WAR generation and prefiltering
         expand("results/wars_quality_filtered/{animal}", animal=ANIMALS),
         # WAR per-animal diagnostic plots
-        lambda wc: expand("results/diagnostic_figures/{animal}/", animal=glob_wildcards("results/wars_quality_filtered/{animal}/war.pkl").animal),
+        get_all_diagnostic_figures,
         # ZT time-based features
         "results/wars_zeitgeber/zeitgeber_features.pkl",
         "results/zeitgeber_plots/",

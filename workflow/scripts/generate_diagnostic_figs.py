@@ -93,78 +93,46 @@ def load_war_and_config():
     return war, config, animal_folder, animal_id, output_dir
 
 
-def generate_figures_for_war_version(war_version, war, config, animal_id, output_subdir, version_name):
-    """Generate figures for a specific version (filtered/unfiltered) of WAR data"""
-    logging.info(f"Generating {version_name} figures")
-    output_subdir.mkdir(parents=True, exist_ok=True)
+def generate_diagnostic_figures_for_animal(war, config, animal_folder, animal_id, output_dir):
+    logging.info(f"Processing {animal_folder} - {animal_id}")
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-    save_path_base = output_subdir / animal_id
-    ap = visualization.AnimalPlotter(war_version, save_fig=True, save_path=str(save_path_base))
+    save_path_base = output_dir / animal_id
+    ap = visualization.AnimalPlotter(war, save_fig=True, save_path=str(save_path_base))
     figure_config = config["analysis"]["figures"]
 
     try:
-        logging.info(f"  - Generating {version_name} PSD histogram")
+        logging.info("Generating PSD histogram")
         ap.plot_psd_histogram(
             figsize=figure_config["psd_histogram"]["figsize"],
             avg_channels=figure_config["psd_histogram"]["avg_channels"],
             plot_type=figure_config["psd_histogram"]["plot_type"],
         )
 
-        logging.info(f"  - Generating {version_name} coherence/correlation spectral plots")
+        logging.info("Generating coherence/correlation spectral plots")
         ap.plot_coherecorr_spectral(
             figsize=figure_config["coherecorr_spectral"]["figsize"],
             score_type=figure_config["coherecorr_spectral"]["score_type"],
         )
 
-        logging.info(f"  - Generating {version_name} PSD spectrogram")
+        logging.info("Generating PSD spectrogram")
         ap.plot_psd_spectrogram(
             figsize=figure_config["psd_spectrogram"]["figsize"], mode=figure_config["psd_spectrogram"]["mode"]
         )
 
-        # Generate temporal heatmaps for this version
-        logging.info(f"  - Generating {version_name} temporal heatmaps")
-        generate_temporal_heatmaps_from_config(ap, config, animal_id, output_subdir, version_name)
+        # Generate temporal heatmaps
+        logging.info("Generating temporal heatmaps")
+        generate_temporal_heatmaps_from_config(ap, config, animal_id, output_dir, "")
 
     except Exception as e:
-        logging.error(f"Figure generation failed for {version_name}: {str(e)}")
+        logging.error(f"Figure generation failed: {str(e)}")
         raise
 
-    created_files = list(output_subdir.glob("*.png"))
-    logging.info(f"Generated {len(created_files)} {version_name} figure files")
-    return created_files
-
-
-def generate_diagnostic_figures_for_animal(war, config, animal_folder, animal_id, output_dir):
-    logging.info(f"Processing {animal_folder} - {animal_id}")
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    processing_config = config["analysis"]["processing"]
-
-    # Preprocessing - Prepare WAR data (reorder/pad channels for both versions)
-    logging.info("Preprocessing: Reordering and padding channels")
-    war.reorder_and_pad_channels(processing_config["channel_reorder"], use_abbrevs=processing_config["use_abbrevs"])
-
-    # Generate unfiltered figures
-    unfiltered_dir = output_dir / "unfiltered"
-    unfiltered_files = generate_figures_for_war_version(war, war, config, animal_id, unfiltered_dir, "unfiltered")
-
-    # Generate filtered figures - pass all filtering parameters directly
-    filtering_config = processing_config["filtering"]
-    logging.info(f"Applying filtering with parameters: {filtering_config}")
-    war_filtered = war.filter_all(inplace=False, **filtering_config)
-
-    # Use consistent folder name - filtering details will be in summary
-    filtered_dir = output_dir / "filtered"
-
-    filtered_files = generate_figures_for_war_version(war_filtered, war, config, animal_id, filtered_dir, "filtered")
+    created_files = list(output_dir.glob("*.png"))
+    logging.info(f"Generated {len(created_files)} figure files")
 
     # Validate that files were created
-    total_files = unfiltered_files + filtered_files
-    logging.info(f"Generated {len(total_files)} total figure files:")
-    for f in total_files:
-        logging.info(f"  - {f.relative_to(output_dir)}")
-
-    if not total_files:
+    if not created_files:
         raise FileNotFoundError(f"No figure files were created in {output_dir}")
 
     logging.info(f"Successfully generated diagnostic figures for {animal_folder} {animal_id}")
