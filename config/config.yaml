@@ -76,6 +76,15 @@ analysis:
     features: ["logpsdband", "logrms", "zpcorr"]  # Features to extract for zeitgeber analysis
     time_aggregation_minutes: 60  # Time window for aggregation (60 = hourly)
 
+  # Zeitgeber temporal plots parameters
+  zeitgeber_plots:
+    features: ["logpsdband", "logrms", "zpcorr"]  # Features to plot in temporal analysis
+    baseline_hours: 12  # Hours to use for baseline correction (first N hours)
+    figure_format: "png"  # Figure output format: png, tif, pdf, svg
+    data_format: "csv"    # Data export format: csv, pkl
+    dpi: 300             # Figure resolution
+    figsize: [20, 20]    # Figure size [width, height]
+
   # ExperimentPlotter statistical figures parameters
   ep_figures:
     features: ["pcorr", "zpcorr", "cohere", "zcohere", "logpsdfrac", "logpsdband", "psd", "normpsd"]
@@ -195,6 +204,14 @@ cluster:
     mem_mb: 100_000
     nodes: 1
     threads: 4
+    interface: null
+
+  # Zeitgeber plots cluster (moderate resources for temporal visualization)
+  zeitgeber_plots:
+    time: "1h"
+    mem_mb: 20_000
+    nodes: 1
+    threads: 2
     interface: null
 
   # Final analysis cluster (high-memory, multiprocessing)

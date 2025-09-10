@@ -12,8 +12,6 @@ checkpoint make_diagnostic_figures:
     Generate diagnostic figures for a specific animal into subdirectories (filtered/unfiltered)
     """
     input:
-        # **quality_filtered_war_inputs(),
-        # war=quality_filtered_input # FIXME remove later
         war_pkl=get_animal_quality_filtered_pkl,
         war_json=get_animal_quality_filtered_json
     output:

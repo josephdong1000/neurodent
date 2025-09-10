@@ -127,24 +127,28 @@ include: "workflow/rules/war_fragment_filtering.smk"
 include: "workflow/rules/diagnostic_figures.smk"
 include: "workflow/rules/war_flattening.smk"
 include: "workflow/rules/war_zeitgeber.smk"
+include: "workflow/rules/zeitgeber_plots.smk"
 include: "workflow/rules/ep_analysis.smk"
 include: "workflow/rules/final_analysis.smk"
 
 
-# Target rules - these are convenience rules for running specific pipeline stages
 rule all:
     input:
+        # Pipeline visualization
+        'results/graphs/rulegraph.png',
+        'results/graphs/filegraph.png',
+        'results/graphs/dag.png',
+        # WAR generation and prefiltering
         expand("results/wars_quality_filtered/{animal}", animal=ANIMALS),
+        # WAR per-animal diagnostic plots
         lambda wc: expand("results/diagnostic_figures/{animal}/", animal=glob_wildcards("results/wars_quality_filtered/{animal}/war.pkl").animal),
+        # ZT time-based features
         "results/wars_zeitgeber/zeitgeber_features.pkl",
+        "results/zeitgeber_plots/",
+        # EP full experiment plots
         lambda wc: expand("results/wars_flattened/{animal}/war.pkl", animal=glob_wildcards("results/wars_quality_filtered/{animal}/war.pkl").animal),
         "results/ep_figures/",
         "results/ep_heatmaps/",
-        # lambda wc: get_quality_filtered_animals(wc, animal=ANIMALS)
-        # lambda wc: expand("results/wars_flattened/{animal}/war.pkl", animal=get_quality_filtered_animals(wc)),
-        # 'results/graphs/rulegraph.png',
-        # 'results/graphs/filegraph.png',
-        # 'results/graphs/dag.png',
 
 
 rule rulegraph:

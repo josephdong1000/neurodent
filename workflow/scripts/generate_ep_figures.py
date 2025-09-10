@@ -246,9 +246,6 @@ def main():
                     json_name=Path(json_file).name
                 )
                 
-                # Apply preprocessing matching EP example
-                war.add_unique_hash(4)
-                # Channel reordering should already be done in flattening step
                 wars.append(war)
                 logger.info(f"Loaded WAR for {war.animal_id} ({war.genotype})")
             
