@@ -7,7 +7,7 @@ This corresponds to the pipeline-epfig-so functionality in the original workflow
 """
 
 
-rule flatten_wars:
+checkpoint flatten_wars:
     """
     Flatten filtered WARs by aggregating time windows for each animal individually
     """

@@ -100,8 +100,8 @@ def get_fragment_filtered_json(wildcards):
 def get_flattened_wars_pkl(wildcards):
     all_flattened_wars_files = []
     for anim in ANIMALS:
-        ck_output = checkpoints.war_quality_filter.get(animal=anim).output[0]
-        filename = glob_wildcards(os.path.join(f"results/wars_quality_filtered/{anim}", "{filename}.pkl")).filename
+        ck_output = checkpoints.flatten_wars.get(animal=anim).output[0]
+        filename = glob_wildcards(os.path.join(f"results/wars_flattened/{anim}", "{filename}.pkl")).filename
         all_flattened_wars_files.extend(expand(Path("results/wars_flattened") / anim / "{filename}.pkl", filename=filename))
     return all_flattened_wars_files
 
@@ -109,8 +109,8 @@ def get_flattened_wars_pkl(wildcards):
 def get_flattened_wars_json(wildcards):
     all_flattened_wars_files = []
     for anim in ANIMALS:
-        ck_output = checkpoints.war_quality_filter.get(animal=anim).output[0]
-        filename = glob_wildcards(os.path.join(f"results/wars_quality_filtered/{anim}", "{filename}.pkl")).filename
+        ck_output = checkpoints.flatten_wars.get(animal=anim).output[0]
+        filename = glob_wildcards(os.path.join(f"results/wars_flattened/{anim}", "{filename}.json")).filename
         all_flattened_wars_files.extend(expand(Path("results/wars_flattened") / anim / "{filename}.json", filename=filename))
     return all_flattened_wars_files
 
