@@ -150,6 +150,11 @@ rule all:
         "results/ep_figures/",
         "results/ep_heatmaps/",
 
+rule graphs:
+    input:
+        'results/graphs/rulegraph.png',
+        'results/graphs/filegraph.png',
+        'results/graphs/dag.png',
 
 rule rulegraph:
     output: "results/graphs/rulegraph.png"
