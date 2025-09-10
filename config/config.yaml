@@ -62,6 +62,14 @@ analysis:
     bad_channels: ["LHip", "RHip"]  # Channels to filter out
     morphological_smoothing_seconds: null  # Temporal smoothing of artifact rejection mask
     # morphological_smoothing_seconds: 300  # 5 minutes smoothing alternative
+    
+    # Channel standardization (applied during fragment filtering)
+    channel_reorder: ["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"]
+    use_abbrevs: true
+    
+    # Unique hash addition
+    add_unique_hash: false  # Whether to add unique hash during fragment filtering
+    unique_hash_length: 4   # Length of unique hash if enabled
 
   # Zeitgeber time processing parameters
   zeitgeber:

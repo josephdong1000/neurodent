@@ -45,9 +45,22 @@ def main():
     bad_channels = filtering_params["bad_channels"]
     morphological_smoothing_seconds = filtering_params["morphological_smoothing_seconds"]
     
+    # Get channel reordering parameters
+    channel_reorder = filtering_params.get("channel_reorder", ["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"])
+    use_abbrevs = filtering_params.get("use_abbrevs", True)
+    
+    # Get unique hash parameters
+    add_unique_hash = filtering_params.get("add_unique_hash", False)
+    unique_hash_length = filtering_params.get("unique_hash_length", 4)
+    
     logging.info(f"Processing animal: {animal_name}")
     logging.info(f"Bad channels to filter: {bad_channels}")
     logging.info(f"Morphological smoothing: {morphological_smoothing_seconds}")
+    logging.info(f"Channel reorder: {channel_reorder}")
+    logging.info(f"Use abbreviations: {use_abbrevs}")
+    logging.info(f"Add unique hash: {add_unique_hash}")
+    if add_unique_hash:
+        logging.info(f"Unique hash length: {unique_hash_length}")
     
     try:
         # Load the quality-filtered WAR
@@ -57,6 +70,15 @@ def main():
             pickle_name=war_pkl_name, 
             json_name=war_json_name
         )
+        
+        # Apply channel standardization for all downstream steps
+        logging.info("Applying channel reordering and padding")
+        war.reorder_and_pad_channels(channel_reorder, use_abbrevs=use_abbrevs)
+        
+        # Add unique hash if requested
+        if add_unique_hash:
+            logging.info(f"Adding unique hash with length {unique_hash_length}")
+            war.add_unique_hash(unique_hash_length)
         
         # Apply fragment and channel filtering
         logging.info("Applying filter_all() with configured parameters")

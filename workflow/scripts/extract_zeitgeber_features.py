@@ -53,10 +53,7 @@ def load_war_for_zeitgeber(war_path_info):
             json_name=war_json_path.name
         )
         
-        # Apply channel standardization to ensure consistent array shapes
-        war.reorder_and_pad_channels(
-            ["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"], use_abbrevs=True
-        )
+        # Channel standardization already done in fragment filtering step
         
         # Extract features for zeitgeber analysis
         df = war.get_result(features=features_to_extract)
