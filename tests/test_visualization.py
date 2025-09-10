@@ -1658,6 +1658,215 @@ class TestWindowAnalysisResultLOF:
         assert results[3.0] == 0  # No channels bad with lenient threshold
 
 
+class TestWindowAnalysisResultPickleJsonParameters:
+    """Test pickle_name and json_name parameters in load_pickle_and_json."""
+    
+    @pytest.fixture
+    def temp_war_files(self):
+        """Create temporary WAR files for testing."""
+        import tempfile
+        from pathlib import Path
+        
+        # Create sample data
+        test_df = pd.DataFrame({
+            'animal': ['A1'] * 2,
+            'animalday': ['A1_day1', 'A1_day1'],
+            'genotype': ['WT'] * 2,
+            'duration': [4.0] * 2,
+            'rms': [[100.0, 110.0], [200.0, 210.0]],
+            'timestamp': pd.to_datetime(['2023-01-01 10:00:00', '2023-01-01 10:04:00'])
+        })
+        
+        war = WindowAnalysisResult(
+            result=test_df,
+            animal_id='A1',
+            genotype='WT',
+            channel_names=['LMot', 'RMot']
+        )
+        
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+            
+            # Save with default names
+            war.save_pickle_and_json(tmpdir, filename="war")
+            
+            # Create subdirectory structure
+            subdir = tmpdir / "subdir"
+            subdir.mkdir()
+            war.save_pickle_and_json(subdir, filename="nested_war")
+            
+            # Also save with custom names at root level
+            war.save_pickle_and_json(tmpdir, filename="custom_war")
+            
+            yield {
+                'tmpdir': tmpdir,
+                'subdir': subdir,
+                'war': war
+            }
+    
+    def test_load_default_behavior(self, temp_war_files):
+        """Test that default behavior (no pickle_name/json_name) still works."""
+        tmpdir = temp_war_files['tmpdir']
+        original_war = temp_war_files['war']
+        
+        # Remove other files to test single file case
+        for f in tmpdir.glob("*"):
+            if f.name not in ["war.pkl", "war.json"]:
+                if f.is_file():
+                    f.unlink()
+                else:
+                    import shutil
+                    shutil.rmtree(f)
+        
+        loaded_war = WindowAnalysisResult.load_pickle_and_json(folder_path=str(tmpdir))
+        
+        assert loaded_war.animal_id == original_war.animal_id
+        assert loaded_war.genotype == original_war.genotype
+        assert loaded_war.channel_names == original_war.channel_names
+        pd.testing.assert_frame_equal(loaded_war.result, original_war.result)
+    
+    def test_load_with_exact_filenames(self, temp_war_files):
+        """Test loading with exact pickle_name and json_name."""
+        tmpdir = temp_war_files['tmpdir']
+        original_war = temp_war_files['war']
+        
+        loaded_war = WindowAnalysisResult.load_pickle_and_json(
+            folder_path=str(tmpdir),
+            pickle_name="custom_war.pkl",
+            json_name="custom_war.json"
+        )
+        
+        assert loaded_war.animal_id == original_war.animal_id
+        pd.testing.assert_frame_equal(loaded_war.result, original_war.result)
+    
+    def test_load_with_relative_paths(self, temp_war_files):
+        """Test loading with relative paths from folder_path."""
+        tmpdir = temp_war_files['tmpdir']
+        original_war = temp_war_files['war']
+        
+        loaded_war = WindowAnalysisResult.load_pickle_and_json(
+            folder_path=str(tmpdir),
+            pickle_name="subdir/nested_war.pkl",
+            json_name="subdir/nested_war.json"
+        )
+        
+        assert loaded_war.animal_id == original_war.animal_id
+        pd.testing.assert_frame_equal(loaded_war.result, original_war.result)
+    
+    def test_load_with_absolute_paths(self, temp_war_files):
+        """Test loading with absolute paths."""
+        tmpdir = temp_war_files['tmpdir']
+        original_war = temp_war_files['war']
+        
+        pickle_path = tmpdir / "custom_war.pkl"
+        json_path = tmpdir / "custom_war.json"
+        
+        loaded_war = WindowAnalysisResult.load_pickle_and_json(
+            folder_path=str(tmpdir),
+            pickle_name=str(pickle_path),
+            json_name=str(json_path)
+        )
+        
+        assert loaded_war.animal_id == original_war.animal_id
+        pd.testing.assert_frame_equal(loaded_war.result, original_war.result)
+    
+    def test_load_without_folder_path(self, temp_war_files):
+        """Test loading with absolute paths only (no folder_path)."""
+        tmpdir = temp_war_files['tmpdir']
+        original_war = temp_war_files['war']
+        
+        pickle_path = tmpdir / "custom_war.pkl"
+        json_path = tmpdir / "custom_war.json"
+        
+        loaded_war = WindowAnalysisResult.load_pickle_and_json(
+            pickle_name=str(pickle_path),
+            json_name=str(json_path)
+        )
+        
+        assert loaded_war.animal_id == original_war.animal_id
+        pd.testing.assert_frame_equal(loaded_war.result, original_war.result)
+    
+    def test_load_pickle_not_found(self, temp_war_files):
+        """Test error when pickle file not found."""
+        tmpdir = temp_war_files['tmpdir']
+        
+        with pytest.raises(FileNotFoundError, match="Pickle file not found"):
+            WindowAnalysisResult.load_pickle_and_json(
+                folder_path=str(tmpdir),
+                pickle_name="nonexistent.pkl",
+                json_name="war.json"
+            )
+    
+    def test_load_json_not_found(self, temp_war_files):
+        """Test error when JSON file not found."""
+        tmpdir = temp_war_files['tmpdir']
+        
+        with pytest.raises(FileNotFoundError, match="JSON file not found"):
+            WindowAnalysisResult.load_pickle_and_json(
+                folder_path=str(tmpdir),
+                pickle_name="war.pkl",
+                json_name="nonexistent.json"
+            )
+    
+    def test_load_multiple_files_without_specification(self, temp_war_files):
+        """Test error when multiple files exist but none specified."""
+        tmpdir = temp_war_files['tmpdir']
+        
+        # There should be multiple .pkl and .json files in tmpdir
+        pkl_files = list(tmpdir.glob("*.pkl"))
+        json_files = list(tmpdir.glob("*.json"))
+        
+        # Ensure we have multiple files
+        assert len(pkl_files) > 1
+        assert len(json_files) > 1
+        
+        with pytest.raises(ValueError, match="Expected exactly one pickle file"):
+            WindowAnalysisResult.load_pickle_and_json(folder_path=str(tmpdir))
+    
+    def test_load_no_files_found(self):
+        """Test error when no files are found."""
+        import tempfile
+        
+        with tempfile.TemporaryDirectory() as empty_dir:
+            with pytest.raises(ValueError, match="Expected exactly one pickle file"):
+                WindowAnalysisResult.load_pickle_and_json(folder_path=empty_dir)
+    
+    def test_load_invalid_folder_path(self):
+        """Test error with invalid folder path."""
+        with pytest.raises(ValueError, match="Folder path .* does not exist"):
+            WindowAnalysisResult.load_pickle_and_json(folder_path="/nonexistent/path")
+    
+    def test_load_missing_parameters(self):
+        """Test error when required parameters are missing."""
+        # Neither folder_path nor both pickle_name/json_name provided
+        with pytest.raises(ValueError, match="Either folder_path must be provided"):
+            WindowAnalysisResult.load_pickle_and_json()
+        
+        # Only one of pickle_name/json_name provided without folder_path
+        with pytest.raises(ValueError, match="Either folder_path must be provided"):
+            WindowAnalysisResult.load_pickle_and_json(pickle_name="/some/path.pkl")
+        
+        with pytest.raises(ValueError, match="Either folder_path must be provided"):
+            WindowAnalysisResult.load_pickle_and_json(json_name="/some/path.json")
+    
+    def test_load_mixed_absolute_relative_paths(self, temp_war_files):
+        """Test mixing absolute and relative paths."""
+        tmpdir = temp_war_files['tmpdir']
+        original_war = temp_war_files['war']
+        
+        # Absolute pickle path, relative json path
+        pickle_path = tmpdir / "custom_war.pkl"
+        
+        loaded_war = WindowAnalysisResult.load_pickle_and_json(
+            folder_path=str(tmpdir),
+            pickle_name=str(pickle_path),  # Absolute
+            json_name="custom_war.json"    # Relative
+        )
+        
+        assert loaded_war.animal_id == original_war.animal_id
+        pd.testing.assert_frame_equal(loaded_war.result, original_war.result)
+
+
 class TestAnimalOrganizerLOF:
     """Test LOF functionality integration with AnimalOrganizer (mocked)."""
     

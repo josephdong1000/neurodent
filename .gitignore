@@ -48,3 +48,6 @@ notebooks/tests/test_all_functions_Yong.ipynb
 coverage.xml
 
 site/
+logs/
+results/
+.snakemake_run_id

@@ -1,0 +1,235 @@
+# PyEEG Snakemake Pipeline Configuration
+# =====================================
+
+# Core directories and paths
+base_folder: "/mnt/isilon/marsh_single_unit/PythonEEG"
+data_parent_folder: "/mnt/isilon/marsh_single_unit/PythonEEG Data Bins/Sox5/Dr. Lefebvre Project"
+temp_directory: "/scr1/users/dongjp"
+
+# Results directory structure
+results_dir: "results"
+wars_dir: "results/wars"
+wars_quality_filtered_dir: "results/wars_quality_filtered"
+wars_fragment_filtered_dir: "results/wars_fragment_filtered"
+wars_zeitgeber_dir: "results/wars_zeitgeber"
+temporal_heatmaps_dir: "results/temporal_heatmaps"
+diagnostic_figures_dir: "results/diagnostic_figures"
+flattened_wars_dir: "results/wars_flattened"
+final_analysis_dir: "results/final_analysis"
+
+# Sample configuration
+samples:
+  # Sample metadata file path
+  samples_file: "config/samples.json"
+  
+  # Quality filtering parameters
+  quality_filter:
+    exclude_unknown_genotypes: true
+    exclude_bad_animaldays: true
+
+# Analysis parameters
+analysis:
+  # WAR generation parameters
+  war_generation:
+    mode: "nest"
+    assume_from_number: true
+    skip_days: ["bad"]
+    lro_kwargs:
+      mode: "bin"
+      multiprocess_mode: "dask"
+      overwrite_rowbins: false
+
+  # Data processing parameters for diagnostic figures and analysis
+  processing:
+    # Preprocessing - channel setup (applied before filtering)
+    channel_reorder: ["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"]
+    use_abbrevs: true
+    
+    # Filtering parameters (passed directly to filter_all method)
+    filtering:
+      morphological_smoothing_seconds: null  # Temporal smoothing of artifact rejection mask
+      bad_channels: ["LHip", "RHip"]  # Additional bad channels for filtering
+      min_valid_channels: 3  # Minimum valid channels required per window
+      # reject_channels: true  # Enable automatic channel rejection
+      # reject_channels_by_session: false  # Per-session vs global channel rejection
+    
+    # Post-processing - aggregation (applied after filtering) 
+    aggregation:
+      groupby: ["animalday", "isday"]  # Time window grouping for aggregation
+
+  # Fragment/channel filtering parameters (applied after quality filtering)
+  fragment_filtering:
+    bad_channels: ["LHip", "RHip"]  # Channels to filter out
+    morphological_smoothing_seconds: null  # Temporal smoothing of artifact rejection mask
+    # morphological_smoothing_seconds: 300  # 5 minutes smoothing alternative
+    
+    # Channel standardization (applied during fragment filtering)
+    channel_reorder: ["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"]
+    use_abbrevs: true
+    
+    # Unique hash addition
+    add_unique_hash: false  # Whether to add unique hash during fragment filtering
+    unique_hash_length: 4   # Length of unique hash if enabled
+
+  # Zeitgeber time processing parameters
+  zeitgeber:
+    features: ["logpsdband", "logrms", "zpcorr"]  # Features to extract for zeitgeber analysis
+    time_aggregation_minutes: 60  # Time window for aggregation (60 = hourly)
+
+  # Zeitgeber temporal plots parameters
+  zeitgeber_plots:
+    features: ["logpsdband", "logrms", "zpcorr"]  # Features to plot in temporal analysis
+    baseline_hours: 12  # Hours to use for baseline correction (first N hours)
+    figure_format: "png"  # Figure output format: png, tif, pdf, svg
+    data_format: "csv"    # Data export format: csv, pkl
+    dpi: 300             # Figure resolution
+    figsize: [20, 20]    # Figure size [width, height]
+
+  # ExperimentPlotter statistical figures parameters
+  ep_figures:
+    features: ["pcorr", "zpcorr", "cohere", "zcohere", "logpsdfrac", "logpsdband", "psd", "normpsd"]
+    exclude_features: ["nspike", "lognspike"]  # Features to exclude from ExperimentPlotter
+    figure_format: "png"  # Figure output format: png, tif, pdf, svg
+    data_format: "csv"    # Data export format: csv, pkl
+    dpi: 300             # Figure resolution
+
+  # ExperimentPlotter heatmap parameters  
+  ep_heatmaps:
+    matrix_features: ["cohere", "imcoh", "zcohere", "zimcoh", "pcorr", "zpcorr"]
+    baseline_type: "sex_specific"  # "sex_specific" (e.g., MWT, FWT) or "global" (single baseline)
+    figure_format: "png"  # Figure output format: png, tif, pdf, svg
+    data_format: "pkl"    # Data export format: csv, pkl (heatmaps typically use pkl)
+    dpi: 300             # Figure resolution
+
+  # Figure generation parameters
+  figures:
+    coherecorr_spectral:
+      figsize: [20, 5]
+      score_type: "z"
+    
+    psd_histogram:
+      figsize: [10, 4]
+      avg_channels: true
+      plot_type: "loglog"
+    
+    psd_spectrogram:
+      figsize: [20, 4]
+      mode: "none"
+    
+    # Temporal heatmap parameters - configurable features with individual parameters
+    temporal_heatmaps:
+      features:
+        rms:
+          figsize: [10, 3]
+          cmap: "viridis"
+          norm_type: "fixed"
+          norm_params: 
+            vmin: 50
+            vmax: 300
+        psdslope:
+          figsize: [10, 3] 
+          cmap: "viridis"
+          norm_type: "fixed"
+          norm_params:
+            vmin: -3
+            vmax: 0
+        zpcorr:
+          figsize: [10, 3]
+          cmap: "RdBu_r"
+          norm_type: "centered"
+          norm_params:
+            halfrange: 1.5
+
+# SLURM cluster configuration
+cluster:
+  # WAR generation cluster (high-memory, high-core)
+  war_generation:
+    time: "3h"
+    mem_mb: 70_000
+    nodes: 1
+    threads: 10
+    interface: null
+
+  # WAR quality filtering cluster (lightweight)
+  war_quality_filter:
+    time: "1h"
+    mem_mb: 4_000
+    nodes: 1
+    threads: 1
+    interface: null
+
+  # Diagnostic figures cluster (single-animal, moderate resources)
+  diagnostic_figures:
+    time: "1h"
+    mem_mb: 30_000
+    nodes: 1
+    threads: 4
+    interface: null
+
+  # WAR fragment filtering cluster (lightweight, per-animal)
+  war_fragment_filtering:
+    time: "1h"
+    mem_mb: 30_000
+    nodes: 1
+    threads: 1
+    interface: null
+
+  # WAR flattening cluster (moderate resources, per-animal)
+  war_flattening:
+    time: "1h"
+    mem_mb: 30_000
+    nodes: 1
+    threads: 1
+    interface: null
+
+  # Zeitgeber feature extraction cluster (high-memory, processes all animals)
+  war_zeitgeber:
+    time: "2h"
+    mem_mb: 200_000
+    nodes: 1
+    threads: 15
+    interface: null
+
+  # EP statistical figures cluster (high-memory, processes all animals)
+  ep_figures:
+    time: "3h"
+    mem_mb: 150_000
+    nodes: 1
+    threads: 8
+    interface: null
+
+  # EP heatmaps cluster (high-memory, processes all animals)
+  ep_heatmaps:
+    time: "2h"
+    mem_mb: 100_000
+    nodes: 1
+    threads: 4
+    interface: null
+
+  # Zeitgeber plots cluster (moderate resources for temporal visualization)
+  zeitgeber_plots:
+    time: "1h"
+    mem_mb: 20_000
+    nodes: 1
+    threads: 2
+    interface: null
+
+  # Final analysis cluster (high-memory, multiprocessing)
+  final_analysis:
+    time: "24h"
+    mem_mb: 400_000
+    nodes: 1
+    threads: 14
+    interface: null
+
+# Logging configuration
+logging:
+  level: "DEBUG"
+  format: "%(asctime)s - %(levelname)s - %(message)s"
+
+# Feature exclusions for plotting
+plotting:
+  exclude_features: ["nspike", "lognspike"]
+  catplot_params:
+    showfliers: false
+  plot_kinds: ["box", "swarm", "point"]

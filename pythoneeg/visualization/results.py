@@ -1153,6 +1153,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             self.assume_from_number,
             self.bad_channels_dict.copy(),
             self.suppress_short_interval_error,
+            self.lof_scores_dict.copy(),
         )
 
     def _create_filtered_copy(self, filter_mask: np.ndarray) -> "WindowAnalysisResult":
@@ -1173,6 +1174,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             self.assume_from_number,
             self.bad_channels_dict.copy(),
             self.suppress_short_interval_error,
+            self.lof_scores_dict.copy(),
         )
 
     def filter_logrms_range(self, z_range: float = 3) -> "WindowAnalysisResult":
@@ -1437,27 +1439,32 @@ class WindowAnalysisResult(AnimalFeatureParser):
         return result
 
     def save_pickle_and_json(
-        self, folder: str | Path, make_folder=True, slugify_filebase=True, save_abbrevs_as_chnames=False
+        self,
+        folder: str | Path,
+        make_folder=True,
+        filename: str = None,
+        slugify_filename=False,
+        save_abbrevs_as_chnames=False,
     ):
         """Archive window analysis result into the folder specified, as a pickle and json file.
 
         Args:
             folder (str | Path): Destination folder to save results to
             make_folder (bool, optional): If True, create the folder if it doesn't exist. Defaults to True.
-            slugify_filebase (bool, optional): If True, slugify the filebase (replace special characters). Defaults to True.
+            filename (str, optional): Name of the file to save. Defaults to "war".
+            slugify_filename (bool, optional): If True, slugify the filename (replace special characters). Defaults to False.
             save_abbrevs_as_chnames (bool, optional): If True, save the channel abbreviations as the channel names in the json file. Defaults to False.
         """
         folder = Path(folder)
         if make_folder:
             folder.mkdir(parents=True, exist_ok=True)
 
-        if slugify_filebase:
-            filebase = folder / slugify(f"{self.animal_id}-{self.genotype}")
-        else:
-            filebase = folder / f"{self.animal_id}-{self.genotype}"
-        filebase = str(filebase)
+        filename = "war" if filename is None else filename
+        filename = slugify(filename) if slugify_filename else filename
 
-        self.result.to_pickle(filebase + ".pkl")
+        filepath = str(folder / filename)
+
+        self.result.to_pickle(filepath + ".pkl")
 
         json_dict = {
             "animal_id": self.animal_id,
@@ -1469,7 +1476,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             "lof_scores_dict": self.lof_scores_dict.copy(),
         }
 
-        with open(filebase + ".json", "w") as f:
+        with open(filepath + ".json", "w") as f:
             json.dump(json_dict, f, indent=2)
 
     def apply_lof_threshold(self, lof_threshold: float) -> dict:
@@ -1515,17 +1522,22 @@ class WindowAnalysisResult(AnimalFeatureParser):
         return result
 
     @classmethod
-    def load_pickle_and_json(cls, folder_path=None):
+    def load_pickle_and_json(cls, folder_path=None, pickle_name=None, json_name=None):
         """Load WindowAnalysisResult from folder
 
         Args:
-            folder_path (str, optional): Path of folder containing one .pkl and .json file each. Defaults to None.
-            df_pickle_path (str, optional): Path of .pkl file. If this and folder_path are not None, raises an error. Defaults to None.
-            json_path (str, optional): Path of .json file. If this and folder_path are not None, raises an error. Defaults to None.
+            folder_path (str, optional): Path of folder containing .pkl and .json files. Defaults to None.
+            pickle_name (str, optional): Name of the pickle file. Can be just the filename (e.g. "war.pkl") 
+                or a path relative to folder_path (e.g. "subdir/war.pkl"). If None and folder_path is provided,
+                expects exactly one .pkl file in folder_path. Defaults to None.
+            json_name (str, optional): Name of the JSON file. Can be just the filename (e.g. "war.json")
+                or a path relative to folder_path (e.g. "subdir/war.json"). If None and folder_path is provided,
+                expects exactly one .json file in folder_path. Defaults to None.
 
         Raises:
-            ValueError: Both df_pickle_path and json_path must be None if folder_path is provided
-            ValueError: Expected exactly one pickle and one json file in folder_path
+            ValueError: folder_path does not exist
+            ValueError: Expected exactly one pickle and one json file in folder_path (when pickle_name/json_name not specified)
+            FileNotFoundError: Specified pickle_name or json_name not found
 
         Returns:
             result: WindowAnalysisResult object
@@ -1535,14 +1547,48 @@ class WindowAnalysisResult(AnimalFeatureParser):
             if not folder_path.exists():
                 raise ValueError(f"Folder path {folder_path} does not exist")
 
-            pkl_files = list(folder_path.glob("*.pkl"))
-            json_files = list(folder_path.glob("*.json"))
+            if pickle_name is not None:
+                # Handle pickle_name as either absolute path or relative to folder_path
+                pickle_path = Path(pickle_name)
+                if pickle_path.is_absolute():
+                    df_pickle_path = pickle_path
+                else:
+                    df_pickle_path = folder_path / pickle_name
+                
+                if not df_pickle_path.exists():
+                    raise FileNotFoundError(f"Pickle file not found: {df_pickle_path}")
+            else:
+                pkl_files = list(folder_path.glob("*.pkl"))
+                if len(pkl_files) != 1:
+                    raise ValueError(f"Expected exactly one pickle file in {folder_path}, found {len(pkl_files)}")
+                df_pickle_path = pkl_files[0]
 
-            if len(pkl_files) != 1 or len(json_files) != 1:
-                raise ValueError(f"Expected exactly one pickle and one json file in {folder_path}")
-
-            df_pickle_path = pkl_files[0]
-            json_path = json_files[0]
+            if json_name is not None:
+                # Handle json_name as either absolute path or relative to folder_path
+                json_path = Path(json_name)
+                if json_path.is_absolute():
+                    json_path = json_path
+                else:
+                    json_path = folder_path / json_name
+                
+                if not json_path.exists():
+                    raise FileNotFoundError(f"JSON file not found: {json_path}")
+            else:
+                json_files = list(folder_path.glob("*.json"))
+                if len(json_files) != 1:
+                    raise ValueError(f"Expected exactly one json file in {folder_path}, found {len(json_files)}")
+                json_path = json_files[0]
+        else:
+            if pickle_name is None or json_name is None:
+                raise ValueError("Either folder_path must be provided, or both pickle_name and json_name must be provided as absolute paths")
+            
+            df_pickle_path = Path(pickle_name)
+            json_path = Path(json_name)
+            
+            if not df_pickle_path.exists():
+                raise FileNotFoundError(f"Pickle file not found: {df_pickle_path}")
+            if not json_path.exists():
+                raise FileNotFoundError(f"JSON file not found: {json_path}")
 
         with open(df_pickle_path, "rb") as f:
             data = pd.read_pickle(f)

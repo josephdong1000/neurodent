@@ -30,6 +30,7 @@ Python scientific computing package for extracting features from mouse EEG recor
 - `pipenv install --dev` - Install dependencies
 - `pipenv requirements > requirements.txt` - Update requirements
 - `pip install -e .` - Development install
+- `source .venv/bin/activate` - Activate environment (ALWAYS ensure it's active)
 
 ## Critical Requirements
 
@@ -49,6 +50,23 @@ Python scientific computing package for extracting features from mouse EEG recor
 - **Code Cleanup**: Remove unused functions, consolidate redundant code, clean up imports when requested
 - **Variable Scope**: Trace all code paths to ensure variables are properly defined in scope before implementing parameter changes
 - **Parameter Design**: Before adding new parameters, check if existing constants can be used. Prefer centralized configuration (constants.py) over scattered parameters. If users need to change values, they should modify constants rather than pass parameters
+
+**Snakemake and Workflow Management:**
+- **Rule Organization**: Keep rule-specific logic (validation, summaries) in their respective rule files, not in the main Snakefile
+- **Rule Definition**: Use proper wildcard patterns, resource specifications, and rule dependencies
+- **Cluster Integration**: Understand SLURM resource allocation, environment variable persistence across jobs
+- **File Output Consistency**: Ensure script outputs match expected file patterns exactly - coordinate slugified vs. original naming
+- **Environment Variables**: Set once in main workflow, persist across all job submissions
+- **Logging Organization**: Use timestamped, run-specific log directories for debugging complex workflows
+- **Job Debugging**: Implement comprehensive logging and status checking for distributed execution
+
+**Checkpoint Best Practices:**
+- **When to Use**: Checkpoints for variable output scenarios (unknown number of files until runtime)
+- **Pattern**: Use `directory()` output for checkpoints, avoid complex flag file systems
+- **Implementation**: Start simple before adding checkpoints - get workflow running in two parts first
+- **Validation Integration**: Integrate validation directly into summary rules, not separate validation rules
+- **Discovery Pattern**: Use aggregate functions with `glob_wildcards()` to discover checkpoint outputs
+- **Cleanup**: Mark intermediate outputs as `temp()` for automatic cleanup
 
 **Error handling:** 
 - Return `np.nan` for math failures, insufficient data, undefined results
@@ -102,3 +120,5 @@ Remember: This is scientific software researchers depend on for accurate results
 - Prefer robust statistical methods even if computationally expensive
 - Short epochs may trigger warnings but produce usable results for testing purposes
 - Real research data should use proper epoch lengths (≥5 cycles for lowest frequency of interest)
+- Ideally keep snakemake rules for specific functions quarantined to their individual snakemake files, and keep the snakefile clean
+- When testing snakemake, only perform dry runs. Defer full pipeline testing to the user
