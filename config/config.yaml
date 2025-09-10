@@ -80,13 +80,17 @@ analysis:
   ep_figures:
     features: ["pcorr", "zpcorr", "cohere", "zcohere", "logpsdfrac", "logpsdband", "psd", "normpsd"]
     exclude_features: ["nspike", "lognspike"]  # Features to exclude from ExperimentPlotter
-    output_formats: ["tif", "csv"]  # Output formats for figures and data
+    figure_format: "png"  # Figure output format: png, tif, pdf, svg
+    data_format: "csv"    # Data export format: csv, pkl
+    dpi: 300             # Figure resolution
 
   # ExperimentPlotter heatmap parameters  
   ep_heatmaps:
     matrix_features: ["cohere", "imcoh", "zcohere", "zimcoh", "pcorr", "zpcorr"]
     baseline_type: "sex_specific"  # "sex_specific" (e.g., MWT, FWT) or "global" (single baseline)
-    output_formats: ["tif", "csv"]
+    figure_format: "png"  # Figure output format: png, tif, pdf, svg
+    data_format: "pkl"    # Data export format: csv, pkl (heatmaps typically use pkl)
+    dpi: 300             # Figure resolution
 
   # Figure generation parameters
   figures:

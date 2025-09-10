@@ -87,11 +87,16 @@ def process_feature_dataframe(df, feature):
     return df, df_pivot
 
 
-def create_ep_plots(ep, feature, feature_label, output_dir, data_dir):
+def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config):
     """Create plots for a specific feature using seaborn objects"""
     
     logger = logging.getLogger(__name__)
     logger.info(f"Processing feature: {feature}")
+    
+    # Get format parameters from config
+    figure_format = ep_config.get("figure_format", "png")
+    data_format = ep_config.get("data_format", "csv")
+    dpi = ep_config.get("dpi", 300)
     
     try:
         # Pull data based on feature type
@@ -107,9 +112,13 @@ def create_ep_plots(ep, feature, feature_label, output_dir, data_dir):
         # Process dataframe
         df, df_pivot = process_feature_dataframe(df, feature)
 
-        # Save data
-        df.to_csv(data_dir / f"{feature}.csv", index=False)
-        df_pivot.to_csv(data_dir / f"{feature}-pivot.csv", index=False)
+        # Save data in configured format
+        if data_format == "csv":
+            df.to_csv(data_dir / f"{feature}.csv", index=False)
+            df_pivot.to_csv(data_dir / f"{feature}-pivot.csv", index=False)
+        else:  # default to pkl
+            df.to_pickle(data_dir / f"{feature}.pkl")
+            df_pivot.to_pickle(data_dir / f"{feature}-pivot.pkl")
 
         # Create plots based on feature type
         if feature in ["pcorr", "zpcorr"]:
@@ -129,7 +138,7 @@ def create_ep_plots(ep, feature, feature_label, output_dir, data_dir):
                 .layout(size=(6, 6))
                 .label(y=feature_label)
             )
-            p.save(output_dir / f"{feature}.tif", bbox_inches="tight", dpi=300)
+            p.save(output_dir / f"{feature}.{figure_format}", bbox_inches="tight", dpi=dpi)
 
         elif feature in ["logpsdfrac", "logpsdband", "psdband", "cohere", "zcohere", "imcoh", "zimcoh"]:
             # By band plot
@@ -149,7 +158,7 @@ def create_ep_plots(ep, feature, feature_label, output_dir, data_dir):
                 .label(x="Frequency band", y=feature_label)
                 .layout(size=(10, 6), engine="tight")
             )
-            p1.save(output_dir / f"byband-{feature}.tif", bbox_inches="tight", dpi=300)
+            p1.save(output_dir / f"byband-{feature}.{figure_format}", bbox_inches="tight", dpi=dpi)
 
             # By genotype plot
             p2 = (
@@ -167,7 +176,7 @@ def create_ep_plots(ep, feature, feature_label, output_dir, data_dir):
                 .layout(size=(10, 6), engine="tight")
                 .label(x="Genotype", y=feature_label)
             )
-            p2.save(output_dir / f"bygeno-{feature}.tif", bbox_inches="tight", dpi=300)
+            p2.save(output_dir / f"bygeno-{feature}.{figure_format}", bbox_inches="tight", dpi=dpi)
 
         elif feature == "psd" or feature == "normpsd":
             ylim = (1e-4, 1) if feature == "normpsd" else (0.3, 3000)
@@ -189,7 +198,7 @@ def create_ep_plots(ep, feature, feature_label, output_dir, data_dir):
                     .label(x="Frequency (Hz)", y=feature_label)
                 )
                 scale_name = 'linear' if callable(scale) else scale
-                p.save(output_dir / f"{feature}-{scale_name}.tif", bbox_inches="tight", dpi=300)
+                p.save(output_dir / f"{feature}-{scale_name}.{figure_format}", bbox_inches="tight", dpi=dpi)
 
         logger.info(f"Successfully processed feature: {feature}")
         
@@ -288,7 +297,7 @@ def main():
                 else:
                     feature_label = feature
                     
-                create_ep_plots(ep, feature, feature_label, output_dir, data_dir)
+                create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
             
             logger.info(f"Successfully generated EP statistical figures for {len(features)} features")
             

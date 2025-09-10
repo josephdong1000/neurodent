@@ -25,10 +25,15 @@ sys.path.insert(0, str(Path("pythoneeg").resolve()))
 from pythoneeg import visualization, constants
 
 
-def generate_regular_heatmaps(ep, features, output_dir, data_dir):
+def generate_regular_heatmaps(ep, features, output_dir, data_dir, ep_config):
     """Generate regular correlation/coherence heatmaps"""
     
     logger = logging.getLogger(__name__)
+    
+    # Get format parameters from config
+    figure_format = ep_config.get("figure_format", "png")
+    data_format = ep_config.get("data_format", "pkl")
+    dpi = ep_config.get("dpi", 300)
     
     for feature in features:
         logger.info(f"Generating regular heatmap for {feature}")
@@ -37,8 +42,11 @@ def generate_regular_heatmaps(ep, features, output_dir, data_dir):
             # Pull data for this feature
             df = ep.pull_timeseries_dataframe(feature, ['genotype', 'isday'], average_groupby=True)
             
-            # Save data
-            df.to_csv(data_dir / f"{feature}.csv", index=False)
+            # Save data in configured format
+            if data_format == "csv":
+                df.to_csv(data_dir / f"{feature}.csv", index=False)
+            else:  # default to pkl
+                df.to_pickle(data_dir / f"{feature}.pkl")
             
             if feature in ['cohere', 'imcoh', 'zcohere', 'zimcoh']:
                 # Band-based features - use faceted heatmaps
@@ -60,7 +68,7 @@ def generate_regular_heatmaps(ep, features, output_dir, data_dir):
                 
                 # Save each subplot
                 for i, g in enumerate(gs):
-                    g.savefig(output_dir / f"matrix-{feature}-{i}.tif", bbox_inches="tight", dpi=300)
+                    g.savefig(output_dir / f"matrix-{feature}-{i}.{figure_format}", bbox_inches="tight", dpi=dpi)
                     
             elif feature in ['pcorr', 'zpcorr']:
                 # Non-band features - single heatmap
@@ -75,7 +83,7 @@ def generate_regular_heatmaps(ep, features, output_dir, data_dir):
                     # Regular features
                     g = ep.plot_heatmap(feature, groupby=['genotype', 'isday'])
                 
-                g.savefig(output_dir / f"matrix-{feature}.tif", bbox_inches="tight", dpi=300)
+                g.savefig(output_dir / f"matrix-{feature}.{figure_format}", bbox_inches="tight", dpi=dpi)
             
             logger.info(f"Successfully generated regular heatmap for {feature}")
             
@@ -93,6 +101,8 @@ def generate_difference_heatmaps(wars, features, output_dir, config):
     # Get baseline configuration
     ep_config = config["analysis"]["ep_heatmaps"]
     baseline_type = ep_config.get("baseline_type", "sex_specific")  # "sex_specific" or "global"
+    figure_format = ep_config.get("figure_format", "png")
+    dpi = ep_config.get("dpi", 300)
     
     if baseline_type == "sex_specific":
         # Create separate EPs for male and female, compare to sex-specific WT
@@ -133,7 +143,7 @@ def generate_difference_heatmaps(wars, features, output_dir, config):
                             norm=colors.CenteredNorm(vcenter=0, halfrange=0.5),
                         )
                         for i, figure in enumerate(g):
-                            figure.savefig(output_dir / f"diffmatrix-{feature}-{sex}-{i}.tif", bbox_inches="tight", dpi=300)
+                            figure.savefig(output_dir / f"diffmatrix-{feature}-{sex}-{i}.{figure_format}", bbox_inches="tight", dpi=dpi)
                             
                     elif feature in ['pcorr', 'zpcorr']:
                         # Non-band features
@@ -144,7 +154,7 @@ def generate_difference_heatmaps(wars, features, output_dir, config):
                             baseline_groupby="genotype",
                             norm=colors.CenteredNorm(vcenter=0, halfrange=0.5),
                         )
-                        g.savefig(output_dir / f"diffmatrix-{feature}-{sex}.tif", bbox_inches="tight", dpi=300)
+                        g.savefig(output_dir / f"diffmatrix-{feature}-{sex}.{figure_format}", bbox_inches="tight", dpi=dpi)
                     
                     logger.info(f"Successfully generated difference heatmap for {feature} ({sex})")
                     
@@ -227,7 +237,7 @@ def main():
             
             # Generate regular heatmaps
             logger.info("Generating regular heatmaps")
-            generate_regular_heatmaps(ep, features, output_dir, data_dir)
+            generate_regular_heatmaps(ep, features, output_dir, data_dir, ep_config)
             
             # Generate difference heatmaps
             logger.info("Generating difference heatmaps")
