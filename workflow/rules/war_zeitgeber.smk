@@ -7,28 +7,13 @@ This implements the pipeline-alphadelta.py functionality to process features
 with respect to zeitgeber time rather than fragment index.
 """
 
-
-def get_fragment_filtered_animals(wildcards):
-    """Discover animals that have fragment-filtered WARs available"""
-    import os
-    filtered_animals = []
-    filtered_dir = "results/wars_fragment_filtered"
-    if os.path.exists(filtered_dir):
-        for item in os.listdir(filtered_dir):
-            if os.path.isdir(os.path.join(filtered_dir, item)):
-                war_file = os.path.join(filtered_dir, item, "war.pkl")
-                if os.path.exists(war_file):
-                    filtered_animals.append(item)
-    return filtered_animals
-
-
 rule extract_zeitgeber_features:
     """
     Extract zeitgeber time features from all fragment-filtered WARs
     """
     input:
-        wars=lambda wildcards: [f"results/wars_fragment_filtered/{animal}/war.pkl" 
-                               for animal in get_fragment_filtered_animals(wildcards)], # FIXME maybe more appropriate as a glob operation, this feels ad-hoc
+        war_pkl=get_fragment_filtered_pkl,
+        war_json=get_fragment_filtered_json,
     output:
         zeitgeber_features="results/wars_zeitgeber/zeitgeber_features.pkl",
     threads:

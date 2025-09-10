@@ -27,6 +27,7 @@ import os
 import sys
 from datetime import datetime
 from django.utils.text import slugify
+from snakemake.io import glob_wildcards
 
 # Load samples config
 with open(samples_file, "r") as f:
@@ -65,83 +66,53 @@ def increment_memory(base_memory):
     return mem
 
 
-def get_filtered_animals(wildcards):
-    """Discover animals that passed quality filtering"""
-    import os
-
-    filtered_animals = []
-    filtered_dir = "results/wars_quality_filtered"
-    if os.path.exists(filtered_dir):
-        for item in os.listdir(filtered_dir):
-            if os.path.isdir(os.path.join(filtered_dir, item)):
-                war_file = os.path.join(filtered_dir, item, "war.pkl")
-                if os.path.exists(war_file):
-                    filtered_animals.append(item)
-    return filtered_animals
+def get_animal_quality_filtered_pkl(wildcards):
+    checkpoint_output = checkpoints.war_quality_filter.get(**wildcards).output[0]
+    filenames = glob_wildcards(os.path.join(checkpoint_output, "{filename}.pkl")).filename
+    return expand(os.path.join(checkpoint_output, "{filename}.pkl"), filename=filenames)
 
 
-def animal_passed_filtering(animal):
-    """Check if a specific animal passed quality filtering"""
-    import os
-
-    war_file = os.path.join("results", "wars_quality_filtered", animal, "war.pkl")
-    return os.path.exists(war_file)
+def get_animal_quality_filtered_json(wildcards):
+    checkpoint_output = checkpoints.war_quality_filter.get(**wildcards).output[0]
+    filenames = glob_wildcards(os.path.join(checkpoint_output, "{filename}.pkl")).filename
+    return expand(os.path.join(checkpoint_output, "{filename}.json"), filename=filenames)
 
 
-def filtered_input(filename):
-    """Helper to create input function that only includes files for animals that passed quality filtering"""
-
-    def input_func(wildcards):
-        if animal_passed_filtering(wildcards.animal):
-            return f"results/wars_quality_filtered/{wildcards.animal}/{filename}"
-        return []
-
-    return input_func
-
-
-def fragment_filtered_input(filename):
-    """Helper to create input function for fragment-filtered WARs"""
-    
-    def input_func(wildcards):
-        # Check if fragment-filtered WAR exists for this animal
-        war_file = f"results/wars_fragment_filtered/{wildcards.animal}/war.pkl"
-        import os
-        if os.path.exists(war_file):
-            return f"results/wars_fragment_filtered/{wildcards.animal}/{filename}"
-        return []
-    
-    return input_func
+# These should be defined because this is an aggregation step with an upstream checkpointed step
+def get_fragment_filtered_pkl(wildcards):
+    all_fragment_filtered_files = []
+    for anim in ANIMALS:
+        ck_output = checkpoints.war_quality_filter.get(animal=anim).output[0]
+        filename = glob_wildcards(os.path.join(f"results/wars_quality_filtered/{anim}", "{filename}.pkl")).filename
+        all_fragment_filtered_files.extend(expand(Path("results/wars_fragment_filtered") / anim / "{filename}.pkl", filename=filename))
+    return all_fragment_filtered_files
 
 
-def filtered_war_inputs():
-    """Convenient function to get all standard quality-filtered WAR inputs"""
-    return {
-        "war_pkl": filtered_input("war.pkl"),
-        "war_json": filtered_input("war.json"),
-    }
+def get_fragment_filtered_json(wildcards):
+    all_fragment_filtered_files = []
+    for anim in ANIMALS:
+        ck_output = checkpoints.war_quality_filter.get(animal=anim).output[0]
+        filename = glob_wildcards(os.path.join(f"results/wars_quality_filtered/{anim}", "{filename}.pkl")).filename
+        all_fragment_filtered_files.extend(expand(Path("results/wars_fragment_filtered") / anim / "{filename}.json", filename=filename))
+    return all_fragment_filtered_files
 
 
-def fragment_filtered_war_inputs():
-    """Convenient function to get all standard fragment-filtered WAR inputs"""
-    return {
-        "war_pkl": fragment_filtered_input("war.pkl"),
-        "war_json": fragment_filtered_input("war.json"),
-    }
+def get_flattened_wars_pkl(wildcards):
+    all_flattened_wars_files = []
+    for anim in ANIMALS:
+        ck_output = checkpoints.war_quality_filter.get(animal=anim).output[0]
+        filename = glob_wildcards(os.path.join(f"results/wars_quality_filtered/{anim}", "{filename}.pkl")).filename
+        all_flattened_wars_files.extend(expand(Path("results/wars_flattened") / anim / "{filename}.pkl", filename=filename))
+    return all_flattened_wars_files
 
 
-def filtered_war_pkl():
-    """Convenience function for just the quality-filtered WAR pickle"""
-    return filtered_input("war.pkl")
-
-
-def fragment_filtered_war_pkl():
-    """Convenience function for just the fragment-filtered WAR pickle"""
-    return fragment_filtered_input("war.pkl")
-
-
-def filtered_war_json():
-    """Convenience function for just the quality-filtered WAR JSON"""
-    return filtered_input("war.json")
+def get_flattened_wars_json(wildcards):
+    all_flattened_wars_files = []
+    for anim in ANIMALS:
+        ck_output = checkpoints.war_quality_filter.get(animal=anim).output[0]
+        filename = glob_wildcards(os.path.join(f"results/wars_quality_filtered/{anim}", "{filename}.pkl")).filename
+        all_flattened_wars_files.extend(expand(Path("results/wars_flattened") / anim / "{filename}.json", filename=filename))
+    return all_flattened_wars_files
 
 
 # Wildcard constraints to prevent conflicts
@@ -156,6 +127,7 @@ include: "workflow/rules/war_fragment_filtering.smk"
 include: "workflow/rules/diagnostic_figures.smk"
 include: "workflow/rules/war_flattening.smk"
 include: "workflow/rules/war_zeitgeber.smk"
+include: "workflow/rules/ep_analysis.smk"
 include: "workflow/rules/final_analysis.smk"
 
 
@@ -163,13 +135,16 @@ include: "workflow/rules/final_analysis.smk"
 rule all:
     input:
         expand("results/wars_quality_filtered/{animal}", animal=ANIMALS),
-        lambda wc: expand("results/wars_fragment_filtered/{animal}/war.pkl", animal=get_filtered_animals(wc)),
-        lambda wc: expand("results/diagnostic_figures/{animal}", animal=get_filtered_animals(wc)),
-        lambda wc: expand("results/wars_flattened/{animal}/war.pkl", animal=get_filtered_animals(wc)),
+        lambda wc: expand("results/diagnostic_figures/{animal}/", animal=glob_wildcards("results/wars_quality_filtered/{animal}/war.pkl").animal),
         "results/wars_zeitgeber/zeitgeber_features.pkl",
-        'results/graphs/rulegraph.png',
-        'results/graphs/filegraph.png',
-        'results/graphs/dag.png',
+        lambda wc: expand("results/wars_flattened/{animal}/war.pkl", animal=glob_wildcards("results/wars_quality_filtered/{animal}/war.pkl").animal),
+        "results/ep_figures/",
+        "results/ep_heatmaps/",
+        # lambda wc: get_quality_filtered_animals(wc, animal=ANIMALS)
+        # lambda wc: expand("results/wars_flattened/{animal}/war.pkl", animal=get_quality_filtered_animals(wc)),
+        # 'results/graphs/rulegraph.png',
+        # 'results/graphs/filegraph.png',
+        # 'results/graphs/dag.png',
 
 
 rule rulegraph:

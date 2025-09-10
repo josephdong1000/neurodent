@@ -83,9 +83,9 @@ def load_war_and_config():
     animal_id = snakemake.params.animal_id
     output_dir = Path(snakemake.output.figure_dir)
 
-    war_dir = Path(snakemake.input.war_pkl).parent
-    war_pkl_name = Path(snakemake.input.war_pkl).name
-    war_json_name = Path(snakemake.input.war_json).name
+    war_dir = Path(snakemake.input.war_pkl[0]).parent
+    war_pkl_name = Path(snakemake.input.war_pkl[0]).name
+    war_json_name = Path(snakemake.input.war_json[0]).name
     war = visualization.WindowAnalysisResult.load_pickle_and_json(
         folder_path=war_dir, pickle_name=war_pkl_name, json_name=war_json_name
     )

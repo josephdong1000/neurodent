@@ -68,6 +68,18 @@ analysis:
     features: ["logpsdband", "logrms", "zpcorr"]  # Features to extract for zeitgeber analysis
     time_aggregation_minutes: 60  # Time window for aggregation (60 = hourly)
 
+  # ExperimentPlotter statistical figures parameters
+  ep_figures:
+    features: ["pcorr", "zpcorr", "cohere", "zcohere", "logpsdfrac", "logpsdband", "psd", "normpsd"]
+    exclude_features: ["nspike", "lognspike"]  # Features to exclude from ExperimentPlotter
+    output_formats: ["tif", "csv"]  # Output formats for figures and data
+
+  # ExperimentPlotter heatmap parameters  
+  ep_heatmaps:
+    matrix_features: ["cohere", "imcoh", "zcohere", "zimcoh", "pcorr", "zpcorr"]
+    baseline_type: "sex_specific"  # "sex_specific" (e.g., MWT, FWT) or "global" (single baseline)
+    output_formats: ["tif", "csv"]
+
   # Figure generation parameters
   figures:
     coherecorr_spectral:
@@ -155,6 +167,22 @@ cluster:
     mem_mb: 200_000
     nodes: 1
     threads: 15
+    interface: null
+
+  # EP statistical figures cluster (high-memory, processes all animals)
+  ep_figures:
+    time: "3h"
+    mem_mb: 150_000
+    nodes: 1
+    threads: 8
+    interface: null
+
+  # EP heatmaps cluster (high-memory, processes all animals)
+  ep_heatmaps:
+    time: "2h"
+    mem_mb: 100_000
+    nodes: 1
+    threads: 4
     interface: null
 
   # Final analysis cluster (high-memory, multiprocessing)

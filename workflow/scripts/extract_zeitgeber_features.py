@@ -36,21 +36,26 @@ def load_war_for_zeitgeber(war_path_info):
     Load a fragment-filtered WAR and extract features for zeitgeber analysis
     
     Args:
-        war_path_info: Tuple of (war_path, features_to_extract, animal_name)
+        war_path_info: Tuple of (war_pkl_path, war_json_path, features_to_extract, animal_name)
         
     Returns:
         pd.DataFrame: Processed dataframe with zeitgeber features, or None if failed
     """
-    war_path, features_to_extract, animal_name = war_path_info
+    war_pkl_path, war_json_path, features_to_extract, animal_name = war_path_info
     
     try:
         logger.info(f"Loading {animal_name}")
         
-        # Load fragment-filtered WAR
+        # Load fragment-filtered WAR using explicit PKL and JSON paths
         war = visualization.WindowAnalysisResult.load_pickle_and_json(
-            folder_path=war_path.parent, 
-            pickle_name=war_path.name, 
-            json_name=war_path.with_suffix('.json').name
+            folder_path=war_pkl_path.parent, 
+            pickle_name=war_pkl_path.name, 
+            json_name=war_json_path.name
+        )
+        
+        # Apply channel standardization to ensure consistent array shapes
+        war.reorder_and_pad_channels(
+            ["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"], use_abbrevs=True
         )
         
         # Extract features for zeitgeber analysis
@@ -73,15 +78,13 @@ def process_alphadelta_features(df):
     """
     logger.info("Processing alphadelta features")
     
-    # Extract band features
+    # Extract band features - exactly as in pipeline-alphadelta.py
     df_bands = pd.DataFrame(df["logpsdband"].tolist())
     alpha_array = np.stack(df_bands["alpha"].values)
     delta_array = np.stack(df_bands["delta"].values)
-    
-    # Create alphadelta ratio and individual band features
     df["alphadelta"] = (alpha_array / delta_array).tolist()
-    df["delta"] = delta_array.tolist()
-    df["alpha"] = alpha_array.tolist()
+    df["delta"] = (delta_array).tolist()  # Note: matches original with extra parentheses
+    df["alpha"] = (alpha_array).tolist()
     
     return df
 
@@ -120,7 +123,8 @@ def main():
     """Main zeitgeber feature extraction function"""
     
     # Get parameters from snakemake
-    input_wars = snakemake.input.wars
+    input_war_pkls = snakemake.input.war_pkl
+    input_war_jsons = snakemake.input.war_json
     output_pkl = snakemake.output.zeitgeber_features
     config = snakemake.params.config
     
@@ -129,16 +133,50 @@ def main():
     features_to_extract = zeitgeber_params["features"]
     threads = snakemake.threads
     
-    logger.info(f"Processing {len(input_wars)} fragment-filtered WARs")
+    logger.info(f"Processing {len(input_war_pkls)} fragment-filtered WARs")
     logger.info(f"Features to extract: {features_to_extract}")
     logger.info(f"Using {threads} threads")
     
+    # Validate that PKL and JSON inputs match
+    if len(input_war_pkls) != len(input_war_jsons):
+        raise ValueError(f"Mismatch between PKL files ({len(input_war_pkls)}) and JSON files ({len(input_war_jsons)})")
+    
+    # Create animal name to file path mappings
+    pkl_animals = {}
+    json_animals = {}
+    
+    for pkl_path in input_war_pkls:
+        pkl_path_obj = Path(pkl_path)
+        animal_name = pkl_path_obj.parent.name
+        pkl_animals[animal_name] = pkl_path_obj
+    
+    for json_path in input_war_jsons:
+        json_path_obj = Path(json_path)
+        animal_name = json_path_obj.parent.name
+        json_animals[animal_name] = json_path_obj
+    
+    # Validate that all animals have both PKL and JSON files
+    pkl_animal_set = set(pkl_animals.keys())
+    json_animal_set = set(json_animals.keys())
+    
+    if pkl_animal_set != json_animal_set:
+        missing_json = pkl_animal_set - json_animal_set
+        missing_pkl = json_animal_set - pkl_animal_set
+        error_msg = []
+        if missing_json:
+            error_msg.append(f"Animals missing JSON files: {missing_json}")
+        if missing_pkl:
+            error_msg.append(f"Animals missing PKL files: {missing_pkl}")
+        raise ValueError("; ".join(error_msg))
+    
+    logger.info(f"Validated {len(pkl_animal_set)} animals have both PKL and JSON files")
+    
     # Prepare war information for processing
     war_infos = []
-    for war_pkl_path in input_wars:
-        war_path = Path(war_pkl_path)
-        animal_name = war_path.parent.name
-        war_infos.append((war_path, features_to_extract, animal_name))
+    for animal_name in sorted(pkl_animal_set):
+        pkl_path = pkl_animals[animal_name]
+        json_path = json_animals[animal_name]
+        war_infos.append((pkl_path, json_path, features_to_extract, animal_name))
     
     # Process WARs to extract features (parallel processing)
     dfs = []
