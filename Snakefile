@@ -126,14 +126,23 @@ def get_flattened_wars_json(wildcards):
         all_flattened_wars_files.extend(expand(Path("results/wars_flattened") / anim / "{filename}.json", filename=filename))
     return all_flattened_wars_files
 
-def get_all_diagnostic_figures(wildcards):
-    all_diagnostic_dirs = []
+def get_diagnostic_figures_unfiltered(wildcards):
+    """Get unfiltered diagnostic figure directories for all animals"""
+    unfiltered_dirs = []
     for anim in ANIMALS:
-        ck_unfiltered = checkpoints.make_diagnostic_figures_unfiltered.get(animal=anim).output[0]
-        all_diagnostic_dirs.append(ck_unfiltered)
-        ck_filtered = checkpoints.make_diagnostic_figures_filtered.get(animal=anim).output[0]
-        all_diagnostic_dirs.append(ck_filtered)
-    return all_diagnostic_dirs
+        ck_output = checkpoints.make_diagnostic_figures_unfiltered.get(animal=anim).output
+        if ck_output:
+            unfiltered_dirs.append(f"results/diagnostic_figures/{anim}/unfiltered/")
+    return unfiltered_dirs
+
+def get_diagnostic_figures_filtered(wildcards):
+    """Get filtered diagnostic figure directories for fragment-filtered animals"""  
+    filtered_dirs = []
+    for anim in ANIMALS:
+        ck_output = checkpoints.make_diagnostic_figures_filtered.get(animal=anim).output
+        if ck_output:
+            filtered_dirs.append(f"results/diagnostic_figures/{anim}/filtered/")
+    return filtered_dirs
 
 
 # Wildcard constraints to prevent conflicts
@@ -161,8 +170,10 @@ rule all:
         'results/graphs/dag.png',
         # WAR generation and prefiltering
         expand("results/wars_quality_filtered/{animal}", animal=ANIMALS),
-        # WAR per-animal diagnostic plots
-        get_all_diagnostic_figures,
+        # WAR per-animal diagnostic plots (unfiltered)
+        lambda wc: get_diagnostic_figures_unfiltered(wc),
+        # WAR per-animal diagnostic plots (filtered) 
+        lambda wc: get_diagnostic_figures_filtered(wc),
         # ZT time-based features
         "results/wars_zeitgeber/zeitgeber_features.pkl",
         "results/zeitgeber_plots/",
@@ -190,6 +201,7 @@ rule filegraph:
 rule dag:
     output: "results/graphs/dag.png"
     shell: "snakemake --dag | dot -Tpng > {output}"
+
 
 
 # Configuration validation
