@@ -31,9 +31,18 @@ def main():
     """Main fragment filtering function for single animal (1-to-1 operation)"""
     
     # Get parameters from snakemake
-    input_war_dir = Path(snakemake.input.war_pkl).parent
-    war_pkl_name = Path(snakemake.input.war_pkl).name
-    war_json_name = Path(snakemake.input.war_json).name
+    logging.debug(f"snakemake.input.war_pkl: {snakemake.input.war_pkl}")
+    logging.debug(f"snakemake.input.war_json: {snakemake.input.war_json}")
+
+    # Handle both string and list inputs
+    war_pkl_path = snakemake.input.war_pkl[0] if isinstance(snakemake.input.war_pkl, list) else snakemake.input.war_pkl
+    war_json_path = (
+        snakemake.input.war_json[0] if isinstance(snakemake.input.war_json, list) else snakemake.input.war_json
+    )
+    input_war_dir = Path(war_pkl_path).parent
+    war_pkl_name = Path(war_pkl_path).name
+    war_json_name = Path(war_json_path).name
+
     output_war_pkl = snakemake.output.war_pkl
     config = snakemake.params.config
     
