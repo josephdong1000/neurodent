@@ -101,6 +101,18 @@ analysis:
     data_format: "pkl"    # Data export format: csv, pkl (heatmaps typically use pkl)
     dpi: 300             # Figure resolution
 
+  # LOF accuracy evaluation parameters
+  lof_evaluation:
+    threshold_range:
+      min: 1.0            # Minimum LOF threshold to test
+      max: 3.0            # Maximum LOF threshold to test  
+      step: 0.1           # Step size for threshold testing
+    # Subset of channels to evaluate (e.g., exclude hippocampal channels)
+    evaluation_channels: ["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"]
+    figure_format: "png"  # Figure output format: png, tif, pdf, svg
+    data_format: "csv"    # Data export format: csv, pkl
+    dpi: 300             # Figure resolution
+
   # Figure generation parameters
   figures:
     coherecorr_spectral:
@@ -220,6 +232,14 @@ cluster:
     mem_mb: 400_000
     nodes: 1
     threads: 14
+    interface: null
+
+  # LOF evaluation cluster (moderate resources, processes all flattened WARs)
+  lof_evaluation:
+    time: "2h"
+    mem_mb: 10_000
+    nodes: 1
+    threads: 4
     interface: null
 
 # Logging configuration
