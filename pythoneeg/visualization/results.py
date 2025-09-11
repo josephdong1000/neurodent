@@ -923,18 +923,37 @@ class WindowAnalysisResult(AnimalFeatureParser):
         out = np.broadcast_to(np.all(out, axis=-1)[:, np.newaxis], out.shape)
         return out
 
-    def get_filter_reject_channels(self, bad_channels: list[str], use_abbrevs: bool = None, **kwargs):
+    def get_filter_reject_channels(
+        self,
+        bad_channels: list[str],
+        use_abbrevs: bool = None,
+        save_bad_channels: Literal["overwrite", "union", None] = "union",
+        **kwargs,
+    ):
         """Filter channels to reject.
 
         Args:
             bad_channels (list[str]): List of channels to reject. Can be either full channel names or abbreviations.
-                The method will automatically detect which format is being used.
+                The method will automatically detect which format is being used. If None, no filtering is performed.
             use_abbrevs (bool, optional): Override automatic detection. If True, channels are assumed to be channel abbreviations. If False, channels are assumed to be channel names.
                 If None, channels are parsed to abbreviations and matched against self.channel_abbrevs.
+            save_bad_channels (Literal["overwrite", "union", None], optional): How to save bad channels to self.bad_channels_dict.
+                "overwrite": Replace self.bad_channels_dict completely with bad channels applied to all sessions.
+                "union": Merge bad channels with existing self.bad_channels_dict for all sessions.
+                None: Don't save to self.bad_channels_dict. Defaults to "union".
+                Note: When using "overwrite" mode, the bad_channels parameter and bad_channels_dict parameter
+                may conflict and overwrite each other's bad channel definitions if both are provided.
 
         Returns:
             out: np.ndarray of bool, (M fragments, N channels). True = keep window, False = remove window
         """
+        n_samples = len(self.result)
+        n_channels = len(self.channel_names)
+        mask = np.ones((n_samples, n_channels), dtype=bool)
+
+        if bad_channels is None:
+            return mask
+
         channel_targets = (
             self.channel_abbrevs if use_abbrevs or use_abbrevs is None else self.channel_names
         )  # Match to appropriate target
@@ -943,20 +962,49 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 core.parse_chname_to_abbrev(ch, assume_from_number=self.assume_from_number) for ch in bad_channels
             ]
 
-        n_samples = len(self.result)
-        n_channels = len(channel_targets)
-        mask = np.ones((n_samples, n_channels), dtype=bool)
-
         # Match channels to channel_targets
         for ch in bad_channels:
             if ch in channel_targets:
                 mask[:, channel_targets.index(ch)] = False
             else:
                 warnings.warn(f"Channel {ch} not found in {channel_targets}")
+
+        # Save bad channels to self.bad_channels_dict if requested
+        if save_bad_channels is not None:
+            # Get all unique animal days from the result
+            animaldays = self.result["animalday"].unique()
+
+            # Convert bad channels to the format used in bad_channels_dict (original channel names)
+            channels_to_save = (
+                bad_channels.copy()
+                if use_abbrevs is False
+                else [
+                    core.parse_chname_to_abbrev(ch, assume_from_number=self.assume_from_number) for ch in bad_channels
+                ]
+            )
+
+            if save_bad_channels == "overwrite":
+                # Replace entire dict with bad channels applied to all sessions
+                self.bad_channels_dict = {animalday: channels_to_save.copy() for animalday in animaldays}
+            elif save_bad_channels == "union":
+                # Merge with existing bad channels for all sessions
+                updated_dict = self.bad_channels_dict.copy()
+                for animalday in animaldays:
+                    if animalday in updated_dict:
+                        # Union of existing and new channels
+                        updated_dict[animalday] = list(set(updated_dict[animalday]) | set(channels_to_save))
+                    else:
+                        updated_dict[animalday] = channels_to_save.copy()
+                self.bad_channels_dict = updated_dict
+
         return mask
 
     def get_filter_reject_channels_by_recording_session(
-        self, bad_channels_dict: dict[str, list[str]] = None, use_abbrevs: bool = None
+        self,
+        bad_channels_dict: dict[str, list[str]] = None,
+        use_abbrevs: bool = None,
+        save_bad_channels: Literal["overwrite", "union", None] = "union",
+        **kwargs,
     ):
         """Filter channels to reject for each recording session
 
@@ -966,6 +1014,12 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 If None, the method will use the bad_channels_dict passed to the constructor.
             use_abbrevs (bool, optional): Override automatic detection. If True, channels are assumed to be channel abbreviations. If False, channels are assumed to be channel names.
                 If None, channels are parsed to abbreviations and matched against self.channel_abbrevs.
+            save_bad_channels (Literal["overwrite", "union", None], optional): How to save bad channels to self.bad_channels_dict.
+                "overwrite": Replace self.bad_channels_dict completely with bad_channels_dict.
+                "union": Merge bad_channels_dict with existing self.bad_channels_dict per session.
+                None: Don't save to self.bad_channels_dict. Defaults to "union".
+                Note: When using "overwrite" mode, the bad_channels parameter and bad_channels_dict parameter
+                may conflict and overwrite each other's bad channel definitions if both are provided.
 
         Returns:
             out: np.ndarray of bool, (M fragments, N channels). True = keep window, False = remove window
@@ -1004,6 +1058,21 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     mask[session_indices, ch_idx] = False
                 else:
                     logging.warning(f"Channel {ch} not found in {channel_targets} for session {animalday}")
+
+        # Save bad channels to self.bad_channels_dict if requested
+        if save_bad_channels is not None and bad_channels_dict is not None:
+            if save_bad_channels == "overwrite":
+                self.bad_channels_dict = bad_channels_dict.copy()
+            elif save_bad_channels == "union":
+                # Merge with existing bad channels per session
+                updated_dict = self.bad_channels_dict.copy()
+                for animalday, channels in bad_channels_dict.items():
+                    if animalday in updated_dict:
+                        # Union of existing and new channels
+                        updated_dict[animalday] = list(set(updated_dict[animalday]) | set(channels))
+                    else:
+                        updated_dict[animalday] = channels.copy()
+                self.bad_channels_dict = updated_dict
 
         return mask
 
@@ -1061,6 +1130,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         min_valid_channels=3,
         filters: list[callable] = None,
         morphological_smoothing_seconds: float = None,
+        save_bad_channels: Literal["overwrite", "union", None] = "union",
         **kwargs,
     ):
         """Apply a list of filters to the data. Filtering should be performed before aggregation.
@@ -1076,6 +1146,10 @@ class WindowAnalysisResult(AnimalFeatureParser):
             morphological_smoothing_seconds (float, optional): If provided, apply morphological opening/closing to smooth the filter mask.
                 This removes isolated false positives/negatives along the time axis for each channel independently.
                 The value specifies the time window in seconds for the morphological operations. Defaults to None.
+            save_bad_channels (Literal["overwrite", "union", None], optional): How to save bad channels to self.bad_channels_dict.
+                This parameter is passed to the filtering functions. Defaults to "union".
+                Note: When using "overwrite" mode, the bad_channels parameter and bad_channels_dict parameter
+                may conflict and overwrite each other's bad channel definitions if both are provided.
             **kwargs: Additional keyword arguments to pass to filter functions.
 
         Returns:
@@ -1090,6 +1164,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 self.get_filter_low_rms,
                 self.get_filter_high_beta,
                 self.get_filter_reject_channels_by_recording_session,
+                self.get_filter_reject_channels,
             ]
 
         filt_bools = []
@@ -1100,12 +1175,6 @@ class WindowAnalysisResult(AnimalFeatureParser):
             logging.info(
                 f"{filter_function.__name__}:\tfiltered {filt_bool.size - np.count_nonzero(filt_bool)}/{filt_bool.size}"
             )
-
-        # Filter channels manually
-        # REVIEW somehow add this to the main list of filters, but I'm not sure how to do this.
-        if bad_channels is not None:
-            filt_bools.append(self.get_filter_reject_channels(bad_channels))
-            logging.debug(f"Reject channels: {filt_bools[-1]}")
 
         # Apply all filters
         filt_bool_all = np.prod(np.stack(filt_bools, axis=-1), axis=-1).astype(bool)
@@ -1527,7 +1596,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
         Args:
             folder_path (str, optional): Path of folder containing .pkl and .json files. Defaults to None.
-            pickle_name (str, optional): Name of the pickle file. Can be just the filename (e.g. "war.pkl") 
+            pickle_name (str, optional): Name of the pickle file. Can be just the filename (e.g. "war.pkl")
                 or a path relative to folder_path (e.g. "subdir/war.pkl"). If None and folder_path is provided,
                 expects exactly one .pkl file in folder_path. Defaults to None.
             json_name (str, optional): Name of the JSON file. Can be just the filename (e.g. "war.json")
@@ -1554,7 +1623,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     df_pickle_path = pickle_path
                 else:
                     df_pickle_path = folder_path / pickle_name
-                
+
                 if not df_pickle_path.exists():
                     raise FileNotFoundError(f"Pickle file not found: {df_pickle_path}")
             else:
@@ -1570,7 +1639,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     json_path = json_path
                 else:
                     json_path = folder_path / json_name
-                
+
                 if not json_path.exists():
                     raise FileNotFoundError(f"JSON file not found: {json_path}")
             else:
@@ -1580,11 +1649,13 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 json_path = json_files[0]
         else:
             if pickle_name is None or json_name is None:
-                raise ValueError("Either folder_path must be provided, or both pickle_name and json_name must be provided as absolute paths")
-            
+                raise ValueError(
+                    "Either folder_path must be provided, or both pickle_name and json_name must be provided as absolute paths"
+                )
+
             df_pickle_path = Path(pickle_name)
             json_path = Path(json_name)
-            
+
             if not df_pickle_path.exists():
                 raise FileNotFoundError(f"Pickle file not found: {df_pickle_path}")
             if not json_path.exists():
