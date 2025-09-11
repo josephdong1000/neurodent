@@ -1573,6 +1573,8 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 is_inlier = scores < lof_threshold
                 bad_channels = [channel_names[i] for i in np.where(~is_inlier)[0]]
                 bad_channels_dict[animalday] = bad_channels
+            else:
+                raise ValueError(f"LOF scores not available for {animalday}")
 
         return bad_channels_dict
 
@@ -1583,7 +1585,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             dict: Dictionary mapping animal days to LOF score dictionaries.
         """
         if not hasattr(self, "lof_scores_dict") or not self.lof_scores_dict:
-            raise ValueError("LOF scores not available in this WAR.")
+            raise ValueError("LOF scores not available in this WAR. Compute LOF scores first.")
 
         result = {}
         for animalday, lof_data in self.lof_scores_dict.items():
@@ -1591,6 +1593,8 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 scores = lof_data["lof_scores"]
                 channel_names = lof_data["channel_names"]
                 result[animalday] = dict(zip(channel_names, scores))
+            else:
+                raise ValueError(f"LOF scores not available for {animalday}")
 
         return result
 
