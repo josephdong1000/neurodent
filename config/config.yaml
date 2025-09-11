@@ -15,7 +15,6 @@ wars_zeitgeber_dir: "results/wars_zeitgeber"
 temporal_heatmaps_dir: "results/temporal_heatmaps"
 diagnostic_figures_dir: "results/diagnostic_figures"
 flattened_wars_dir: "results/wars_flattened"
-final_analysis_dir: "results/final_analysis"
 
 # Sample configuration
 samples:

@@ -160,7 +160,6 @@ include: "workflow/rules/war_zeitgeber.smk"
 include: "workflow/rules/zeitgeber_plots.smk"
 include: "workflow/rules/ep_analysis.smk"
 include: "workflow/rules/lof_evaluation.smk"
-include: "workflow/rules/final_analysis.smk"
 
 
 rule all:
