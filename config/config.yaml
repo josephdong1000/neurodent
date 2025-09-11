@@ -164,7 +164,7 @@ cluster:
 
   # WAR quality filtering cluster (lightweight)
   war_quality_filter:
-    time: "1h"
+    time: "2h"
     mem_mb: 4_000
     nodes: 1
     threads: 1
@@ -172,7 +172,7 @@ cluster:
 
   # Diagnostic figures cluster (single-animal, moderate resources)
   diagnostic_figures:
-    time: "1h"
+    time: "2h"
     mem_mb: 30_000
     nodes: 1
     threads: 4
@@ -180,7 +180,7 @@ cluster:
 
   # WAR fragment filtering cluster (lightweight, per-animal)
   war_fragment_filtering:
-    time: "1h"
+    time: "2h"
     mem_mb: 30_000
     nodes: 1
     threads: 1
@@ -188,7 +188,7 @@ cluster:
 
   # WAR flattening cluster (moderate resources, per-animal)
   war_flattening:
-    time: "1h"
+    time: "2h"
     mem_mb: 30_000
     nodes: 1
     threads: 1
@@ -220,7 +220,7 @@ cluster:
 
   # Zeitgeber plots cluster (moderate resources for temporal visualization)
   zeitgeber_plots:
-    time: "1h"
+    time: "2h"
     mem_mb: 20_000
     nodes: 1
     threads: 2
