@@ -45,14 +45,34 @@ def main():
 
     output_war_pkl = snakemake.output.war_pkl
     config = snakemake.params.config
+    samples_config = snakemake.params.samples_config
+    animal_folder = snakemake.params.animal_folder
+    animal_id = snakemake.params.animal_id
     
-    # Get animal name from wildcards
+    # Get animal name from wildcards and construct the animal key
     animal_name = snakemake.wildcards.animal
+    animal_key = f"{animal_folder} {animal_id}"
     
     # Get fragment filtering parameters from config
     filtering_params = config["analysis"]["fragment_filtering"]
-    bad_channels = filtering_params["bad_channels"]
+    config_bad_channels = filtering_params["bad_channels"]
     morphological_smoothing_seconds = filtering_params["morphological_smoothing_seconds"]
+    
+    # Extract bad_channels_dict from samples.json for this animal
+    samples_bad_channels = samples_config.get("bad_channels", {})
+    bad_channels_dict = samples_bad_channels.get(animal_key, {})
+    
+    # Use both bad_channels_dict and bad_channels - let filter_all handle the union
+    bad_channels = config_bad_channels  # Always use the config bad_channels
+    
+    if bad_channels_dict:
+        logging.info(f"Using bad_channels_dict from samples.json for {animal_key}: {bad_channels_dict}")
+        logging.info(f"Using bad_channels from config: {bad_channels}")
+        logging.info("filter_all will combine both using union mode")
+    else:
+        logging.info(f"No bad_channels_dict found in samples.json for {animal_key}")
+        logging.info(f"Using only config bad_channels: {bad_channels}")
+        bad_channels_dict = None  # Set to None when not available
     
     # Get channel reordering parameters
     channel_reorder = filtering_params.get("channel_reorder", ["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"])
@@ -63,7 +83,10 @@ def main():
     unique_hash_length = filtering_params.get("unique_hash_length", 4)
     
     logging.info(f"Processing animal: {animal_name}")
-    logging.info(f"Bad channels to filter: {bad_channels}")
+    logging.info(f"Animal key: {animal_key}")
+    logging.info(f"Bad channels (config): {bad_channels}")
+    if bad_channels_dict:
+        logging.info(f"Bad channels dict (samples.json): {bad_channels_dict}")
     logging.info(f"Morphological smoothing: {morphological_smoothing_seconds}")
     logging.info(f"Channel reorder: {channel_reorder}")
     logging.info(f"Use abbreviations: {use_abbrevs}")
@@ -91,9 +114,14 @@ def main():
         
         # Apply fragment and channel filtering
         logging.info("Applying filter_all() with configured parameters")
+        
+        # Use both bad_channels and bad_channels_dict with union mode
+        logging.info("Applying filter_all with both bad_channels and bad_channels_dict parameters")
         war.filter_all(
             bad_channels=bad_channels,
-            morphological_smoothing_seconds=morphological_smoothing_seconds
+            bad_channels_dict=bad_channels_dict,
+            morphological_smoothing_seconds=morphological_smoothing_seconds,
+            save_bad_channels="union"  # Save the applied bad channels to war.bad_channels_dict
         )
         
         # Create output directory

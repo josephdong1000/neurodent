@@ -83,18 +83,6 @@ def generate_war_for_animal(samples_config, config, animal_folder, animal_id):
             logging.info(f"Computing windowed analysis for {animal_key}")
             war = ao.compute_windowed_analysis(["all"], multiprocess_mode="dask")
 
-            # TODO move this into fragment filtering stage, not at the war generation stage
-            # Apply bad channel filtering if defined
-            bad_channels = samples_config.get("bad_channels", {})
-            logging.info(f"Looking for bad channels for: '{animal_key}'")
-
-            # First try exact match
-            if animal_key in bad_channels:
-                logging.info(f"Found exact match - filtering bad channels: {bad_channels[animal_key]}")
-                war = war.filter_reject_channels_by_session(bad_channels[animal_key])
-            else:
-                logging.info(f"No bad channels defined for {animal_key}")
-
         return war
 
     finally:

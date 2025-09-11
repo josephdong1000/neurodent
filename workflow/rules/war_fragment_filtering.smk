@@ -24,6 +24,9 @@ checkpoint filter_wars_fragments:
         config["cluster"]["war_fragment_filtering"]["threads"]
     params:
         config=config,
+        samples_config=samples_config,
+        animal_folder=get_animal_folder,
+        animal_id=get_animal_id,
     resources:
         time=config["cluster"]["war_fragment_filtering"]["time"],
         mem_mb=increment_memory(config["cluster"]["war_fragment_filtering"]["mem_mb"]),
