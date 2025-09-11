@@ -925,7 +925,8 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
     def get_filter_reject_channels(
         self,
-        bad_channels: list[str],
+        df: pd.DataFrame = None,
+        bad_channels: list[str] = None,
         use_abbrevs: bool = None,
         save_bad_channels: Literal["overwrite", "union", None] = "union",
         **kwargs,
@@ -933,6 +934,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         """Filter channels to reject.
 
         Args:
+            df (pd.DataFrame, optional): If not None, this function will use this dataframe instead of self.result. Defaults to None.
             bad_channels (list[str]): List of channels to reject. Can be either full channel names or abbreviations.
                 The method will automatically detect which format is being used. If None, no filtering is performed.
             use_abbrevs (bool, optional): Override automatic detection. If True, channels are assumed to be channel abbreviations. If False, channels are assumed to be channel names.
@@ -1001,6 +1003,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
     def get_filter_reject_channels_by_recording_session(
         self,
+        df: pd.DataFrame = None,
         bad_channels_dict: dict[str, list[str]] = None,
         use_abbrevs: bool = None,
         save_bad_channels: Literal["overwrite", "union", None] = "union",
@@ -1009,6 +1012,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         """Filter channels to reject for each recording session
 
         Args:
+            df (pd.DataFrame, optional): If not None, this function will use this dataframe instead of self.result. Defaults to None.
             bad_channels_dict (dict[str, list[str]]): Dictionary of list of channels to reject for each recording session.
                 Can be either full channel names or abbreviations. The method will automatically detect which format is being used.
                 If None, the method will use the bad_channels_dict passed to the constructor.
@@ -1126,11 +1130,11 @@ class WindowAnalysisResult(AnimalFeatureParser):
         self,
         df: pd.DataFrame = None,
         inplace=True,
-        bad_channels: list[str] = None,
+        # bad_channels: list[str] = None,
         min_valid_channels=3,
         filters: list[callable] = None,
         morphological_smoothing_seconds: float = None,
-        save_bad_channels: Literal["overwrite", "union", None] = "union",
+        # save_bad_channels: Literal["overwrite", "union", None] = "union",
         **kwargs,
     ):
         """Apply a list of filters to the data. Filtering should be performed before aggregation.
@@ -1304,7 +1308,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         Returns:
             WindowAnalysisResult: New filtered instance
         """
-        mask = self.get_filter_reject_channels(bad_channels, use_abbrevs=use_abbrevs)
+        mask = self.get_filter_reject_channels(bad_channels=bad_channels, use_abbrevs=use_abbrevs)
         return self._create_filtered_copy(mask)
 
     def filter_reject_channels_by_session(
@@ -1356,7 +1360,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             - If a session identifier is not found in bad_channels_dict, a warning is logged but processing continues
             - If a channel name is not recognized, a warning is logged but other channels are still processed
         """
-        mask = self.get_filter_reject_channels_by_recording_session(bad_channels_dict, use_abbrevs=use_abbrevs)
+        mask = self.get_filter_reject_channels_by_recording_session(bad_channels_dict=bad_channels_dict, use_abbrevs=use_abbrevs)
         return self._create_filtered_copy(mask)
 
     def apply_filters(
