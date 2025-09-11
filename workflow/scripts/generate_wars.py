@@ -16,6 +16,7 @@ import logging
 import os
 import sys
 import traceback
+import warnings
 from pathlib import Path
 
 from dask.distributed import Client, LocalCluster
@@ -81,7 +82,13 @@ def generate_war_for_animal(samples_config, config, animal_folder, animal_id):
 
             # Generate WAR using Dask
             logging.info(f"Computing windowed analysis for {animal_key}")
-            war = ao.compute_windowed_analysis(["all"], multiprocess_mode="dask")
+            with warnings.catch_warnings():
+                warnings.filterwarnings(
+                    "ignore",
+                    message=".*fmin=.*corresponds to.*cycles.*Spectrum estimate will be unreliable.*",
+                    category=RuntimeWarning,
+                )
+                war = ao.compute_windowed_analysis(["all"], multiprocess_mode="dask")
 
         return war
 

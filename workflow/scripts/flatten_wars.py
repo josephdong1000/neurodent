@@ -20,12 +20,6 @@ import json
 sys.path.insert(0, str(Path("pythoneeg").resolve()))
 from pythoneeg import visualization
 
-# Setup logging
-logging.basicConfig(
-    format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO, stream=sys.stdout, force=True
-)
-
-
 def main():
     """Main flattening function for single animal (1-to-1 operation)"""
 
@@ -71,4 +65,12 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    with open(snakemake.log[0], "w") as f:
+        sys.stderr = sys.stdout = f
+        logging.basicConfig(
+            format="%(asctime)s - %(levelname)s - %(message)s",
+            level=logging.INFO,
+            stream=sys.stdout,
+            force=True
+        )
+        main()

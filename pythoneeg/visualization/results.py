@@ -1360,7 +1360,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
             - If a session identifier is not found in bad_channels_dict, a warning is logged but processing continues
             - If a channel name is not recognized, a warning is logged but other channels are still processed
         """
-        mask = self.get_filter_reject_channels_by_recording_session(bad_channels_dict=bad_channels_dict, use_abbrevs=use_abbrevs)
+        mask = self.get_filter_reject_channels_by_recording_session(
+            bad_channels_dict=bad_channels_dict, use_abbrevs=use_abbrevs
+        )
         return self._create_filtered_copy(mask)
 
     def apply_filters(
@@ -1597,6 +1599,84 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 raise ValueError(f"LOF scores not available for {animalday}")
 
         return result
+
+    def evaluate_lof_threshold_binary(
+        self, ground_truth_bad_channels: dict = None, threshold: float = None, evaluation_channels: list[str] = None
+    ) -> tuple:
+        """Evaluate single threshold against ground truth for binary classification.
+
+        Args:
+            ground_truth_bad_channels: Dict mapping animal-day to bad channel sets.
+                                     If None, uses self.bad_channels_dict as ground truth.
+            threshold: LOF threshold to test
+            evaluation_channels: Subset of channels to include in evaluation
+
+        Returns:
+            tuple: (y_true_list, y_pred_list) for sklearn.metrics.f1_score
+                   Each element represents one channel from one animal-day
+        """
+        if not hasattr(self, "lof_scores_dict") or not self.lof_scores_dict:
+            raise ValueError("LOF scores not available in this WAR. Run compute_bad_channels() first.")
+
+        if threshold is None:
+            raise ValueError("threshold parameter is required")
+
+        # Use self.bad_channels_dict as default ground truth
+        if ground_truth_bad_channels is None:
+            if hasattr(self, "bad_channels_dict") and self.bad_channels_dict:
+                ground_truth_bad_channels = {}
+
+                # Verify that bad_channels_dict keys match lof_scores_dict keys
+                lof_keys = set(self.lof_scores_dict.keys())
+                bad_channels_keys = set(self.bad_channels_dict.keys())
+
+                if not bad_channels_keys.issubset(lof_keys):
+                    missing_keys = bad_channels_keys - lof_keys
+                    raise ValueError(
+                        f"bad_channels_dict contains keys not found in lof_scores_dict: {missing_keys}. "
+                        f"Expected keys to match format 'id genotype date'. "
+                        f"Available LOF keys: {sorted(lof_keys)}"
+                    )
+
+                # Use bad_channels_dict directly as ground truth
+                ground_truth_bad_channels = self.bad_channels_dict.copy()
+                logging.info(
+                    f"Using self.bad_channels_dict as ground truth with {len(ground_truth_bad_channels)} animal-day sessions"
+                )
+            else:
+                raise ValueError("No ground truth provided and self.bad_channels_dict is empty.")
+
+        # Get all channels if no subset specified
+        if evaluation_channels is None:
+            evaluation_channels = self.channel_names
+
+        y_true_list = []
+        y_pred_list = []
+
+        # Iterate through each animal-day and evaluate channels
+        for animalday, lof_data in self.lof_scores_dict.items():
+            if "lof_scores" not in lof_data or "channel_names" not in lof_data:
+                raise ValueError(f"Invalid LOF data for {animalday}: missing required fields 'lof_scores' or 'channel_names'")
+
+            scores = np.array(lof_data["lof_scores"])
+            channel_names = lof_data["channel_names"]
+
+            # Get ground truth bad channels for this animal-day
+            animalday_bad_channels = ground_truth_bad_channels.get(animalday, set())
+
+            # Evaluate each channel in the evaluation subset
+            for i, channel in enumerate(channel_names):
+                if channel in evaluation_channels:
+                    # Ground truth: 1 if channel is marked as bad, 0 otherwise
+                    y_true = 1 if channel in animalday_bad_channels else 0
+
+                    # Prediction: 1 if LOF score > threshold, 0 otherwise
+                    y_pred = 1 if scores[i] > threshold else 0
+
+                    y_true_list.append(y_true)
+                    y_pred_list.append(y_pred)
+
+        return y_true_list, y_pred_list
 
     @classmethod
     def load_pickle_and_json(cls, folder_path=None, pickle_name=None, json_name=None):

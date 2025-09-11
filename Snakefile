@@ -159,6 +159,7 @@ include: "workflow/rules/war_flattening.smk"
 include: "workflow/rules/war_zeitgeber.smk"
 include: "workflow/rules/zeitgeber_plots.smk"
 include: "workflow/rules/ep_analysis.smk"
+include: "workflow/rules/lof_evaluation.smk"
 include: "workflow/rules/final_analysis.smk"
 
 
@@ -181,6 +182,9 @@ rule all:
         lambda wc: expand("results/wars_flattened/{animal}/war.pkl", animal=glob_wildcards("results/wars_quality_filtered/{animal}/war.pkl").animal),
         "results/ep_figures/",
         "results/ep_heatmaps/",
+        # LOF accuracy evaluation
+        "results/lof_evaluation/lof_accuracy_results.csv",
+        "results/lof_evaluation/lof_fscore_vs_threshold.png",
 
 rule graphs:
     input:

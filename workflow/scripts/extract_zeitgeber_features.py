@@ -22,13 +22,6 @@ import pandas as pd
 sys.path.insert(0, str(Path("pythoneeg").resolve()))
 from pythoneeg import visualization
 
-# Setup logging
-logging.basicConfig(
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    level=logging.INFO,
-    stream=sys.stdout,
-    force=True
-)
 logger = logging.getLogger(__name__)
 
 def load_war_for_zeitgeber(war_path_info):
@@ -249,4 +242,12 @@ def main():
     logger.info("Zeitgeber feature extraction completed successfully")
 
 if __name__ == "__main__":
-    main()
+    with open(snakemake.log[0], "w") as f:
+        sys.stderr = sys.stdout = f
+        logging.basicConfig(
+            format="%(asctime)s - %(levelname)s - %(message)s",
+            level=logging.INFO,
+            stream=sys.stdout,
+            force=True
+        )
+        main()
