@@ -203,16 +203,16 @@ cluster:
 
   # EP statistical figures cluster (high-memory, processes all animals)
   ep_figures:
-    time: "3h"
-    mem_mb: 150_000
+    time: "2h"
+    mem_mb: 50_000
     nodes: 1
     threads: 8
     interface: null
 
-  # EP heatmaps cluster (high-memory, processes all animals)
+  # EP heatmaps cluster (high-memory, processes all animals);
   ep_heatmaps:
     time: "2h"
-    mem_mb: 100_000
+    mem_mb: 50_000
     nodes: 1
     threads: 4
     interface: null
@@ -225,20 +225,20 @@ cluster:
     threads: 2
     interface: null
 
-  # Final analysis cluster (high-memory, multiprocessing)
-  final_analysis:
-    time: "24h"
-    mem_mb: 400_000
-    nodes: 1
-    threads: 14
-    interface: null
-
   # LOF evaluation cluster (moderate resources, processes all flattened WARs)
   lof_evaluation:
     time: "2h"
     mem_mb: 10_000
     nodes: 1
     threads: 4
+    interface: null
+
+  # Jupyter notebook execution cluster (moderate resources for interactive analysis)
+  notebook:
+    time: "1h"
+    mem_mb: 20_000
+    nodes: 1
+    threads: 2
     interface: null
 
 # Logging configuration
