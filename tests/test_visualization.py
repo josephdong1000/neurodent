@@ -1656,6 +1656,180 @@ class TestWindowAnalysisResultLOF:
         # Verify specific expectations
         assert results[1.0] == 3  # Most channels bad with strict threshold (LMot day1, LMot+RMot day2)
         assert results[3.0] == 0  # No channels bad with lenient threshold
+    
+    def test_war_evaluate_lof_threshold_binary(self, war_with_lof):
+        """Test evaluate_lof_threshold_binary method for F1 score calculation."""
+        # Create ground truth bad channels
+        ground_truth_bad_channels = {
+            'day1': {'LMot'},  # Only LMot is truly bad on day1
+            'day2': {'RMot'}   # Only RMot is truly bad on day2
+        }
+        
+        # Test threshold 1.5
+        # LOF scores: day1=[2.5, 0.8], day2=[1.1, 2.8]
+        # Predicted bad (>1.5): day1=[LMot], day2=[RMot]
+        # Ground truth bad: day1=[LMot], day2=[RMot]
+        y_true, y_pred = war_with_lof.evaluate_lof_threshold_binary(
+            ground_truth_bad_channels, 
+            threshold=1.5,
+            evaluation_channels=['LMot', 'RMot']
+        )
+        
+        # Expected:
+        # day1 LMot: y_true=1 (ground truth bad), y_pred=1 (LOF score 2.5 > 1.5)
+        # day1 RMot: y_true=0 (ground truth good), y_pred=0 (LOF score 0.8 < 1.5)
+        # day2 LMot: y_true=0 (ground truth good), y_pred=0 (LOF score 1.1 < 1.5)
+        # day2 RMot: y_true=1 (ground truth bad), y_pred=1 (LOF score 2.8 > 1.5)
+        expected_y_true = [1, 0, 0, 1]  # LMot day1, RMot day1, LMot day2, RMot day2
+        expected_y_pred = [1, 0, 0, 1]
+        
+        assert y_true == expected_y_true
+        assert y_pred == expected_y_pred
+        
+        # Test with sklearn f1_score
+        from sklearn.metrics import f1_score
+        f1 = f1_score(y_true, y_pred, average='binary')
+        assert f1 == 1.0  # Perfect prediction
+    
+    def test_war_evaluate_lof_threshold_binary_imperfect(self, war_with_lof):
+        """Test evaluate_lof_threshold_binary with imperfect predictions."""
+        # Create different ground truth to test imperfect predictions
+        ground_truth_bad_channels = {
+            'day1': {'RMot'},  # Ground truth says RMot is bad on day1
+            'day2': {'LMot'}   # Ground truth says LMot is bad on day2
+        }
+        
+        # Test threshold 1.5
+        # LOF scores: day1=[2.5, 0.8], day2=[1.1, 2.8]
+        # Predicted bad (>1.5): day1=[LMot], day2=[RMot]
+        # Ground truth bad: day1=[RMot], day2=[LMot]
+        y_true, y_pred = war_with_lof.evaluate_lof_threshold_binary(
+            ground_truth_bad_channels, 
+            threshold=1.5,
+            evaluation_channels=['LMot', 'RMot']
+        )
+        
+        # Expected:
+        # day1 LMot: y_true=0 (ground truth good), y_pred=1 (LOF score 2.5 > 1.5) - FALSE POSITIVE
+        # day1 RMot: y_true=1 (ground truth bad), y_pred=0 (LOF score 0.8 < 1.5) - FALSE NEGATIVE
+        # day2 LMot: y_true=1 (ground truth bad), y_pred=0 (LOF score 1.1 < 1.5) - FALSE NEGATIVE
+        # day2 RMot: y_true=0 (ground truth good), y_pred=1 (LOF score 2.8 > 1.5) - FALSE POSITIVE
+        expected_y_true = [0, 1, 1, 0]
+        expected_y_pred = [1, 0, 0, 1]
+        
+        assert y_true == expected_y_true
+        assert y_pred == expected_y_pred
+        
+        # Calculate F1 score - should be 0 (no true positives)
+        from sklearn.metrics import f1_score
+        f1 = f1_score(y_true, y_pred, average='binary', zero_division=0)
+        assert f1 == 0.0
+    
+    def test_war_evaluate_lof_threshold_binary_channel_subset(self, war_with_lof):
+        """Test evaluate_lof_threshold_binary with channel subset filtering."""
+        ground_truth_bad_channels = {
+            'day1': {'LMot'},
+            'day2': {'RMot'}
+        }
+        
+        # Test with only LMot channel
+        y_true, y_pred = war_with_lof.evaluate_lof_threshold_binary(
+            ground_truth_bad_channels, 
+            threshold=1.5,
+            evaluation_channels=['LMot']  # Only evaluate LMot
+        )
+        
+        # Should only have 2 evaluation points (LMot for day1 and day2)
+        assert len(y_true) == 2
+        assert len(y_pred) == 2
+        
+        # day1 LMot: y_true=1, y_pred=1
+        # day2 LMot: y_true=0, y_pred=0
+        expected_y_true = [1, 0]
+        expected_y_pred = [1, 0]
+        
+        assert y_true == expected_y_true
+        assert y_pred == expected_y_pred
+    
+    def test_war_evaluate_lof_threshold_binary_no_ground_truth(self, war_with_lof):
+        """Test evaluate_lof_threshold_binary with no ground truth data."""
+        # Empty ground truth
+        ground_truth_bad_channels = {}
+        
+        y_true, y_pred = war_with_lof.evaluate_lof_threshold_binary(
+            ground_truth_bad_channels, 
+            threshold=1.5,
+            evaluation_channels=['LMot', 'RMot']
+        )
+        
+        # All ground truth should be 0 (no bad channels)
+        # Predictions based on LOF scores: day1=[1,0], day2=[0,1]
+        expected_y_true = [0, 0, 0, 0]
+        expected_y_pred = [1, 0, 0, 1]
+        
+        assert y_true == expected_y_true
+        assert y_pred == expected_y_pred
+    
+    def test_war_evaluate_lof_threshold_binary_missing_lof_scores(self):
+        """Test error when LOF scores are missing."""
+        # Create WAR without LOF scores
+        test_df = pd.DataFrame({
+            'animal': ['A1'] * 2,
+            'animalday': ['day1', 'day1'],
+            'genotype': ['WT'] * 2,
+            'duration': [4.0] * 2,
+            'rms': [[100.0, 110.0]] * 2,
+            'timestamp': pd.to_datetime(['2023-01-01 10:00:00', '2023-01-01 10:04:00'])
+        })
+        war = WindowAnalysisResult(
+            result=test_df,
+            animal_id='A1',
+            genotype='WT',
+            channel_names=['LMot', 'RMot']
+        )
+        
+        ground_truth = {'day1': {'LMot'}}
+        
+        with pytest.raises(ValueError, match="LOF scores not available"):
+            war.evaluate_lof_threshold_binary(ground_truth, 1.5)
+    
+    def test_war_evaluate_lof_threshold_binary_default_ground_truth(self, war_with_lof):
+        """Test evaluate_lof_threshold_binary using self.bad_channels_dict as default ground truth."""
+        # Set up bad_channels_dict on the WAR with keys matching lof_scores_dict
+        war_with_lof.bad_channels_dict = {
+            'day1': ['LMot'],  # Matches LOF data keys exactly
+            'day2': ['RMot']   # Matches LOF data keys exactly
+        }
+        
+        # Test without providing ground_truth_bad_channels (should use self.bad_channels_dict)
+        y_true, y_pred = war_with_lof.evaluate_lof_threshold_binary(
+            threshold=1.5,
+            evaluation_channels=['LMot', 'RMot']
+        )
+        
+        # Expected: keys match exactly, so should work like explicit ground truth
+        expected_y_true = [1, 0, 0, 1]  # day1 LMot=bad, day1 RMot=good, day2 LMot=good, day2 RMot=bad
+        expected_y_pred = [1, 0, 0, 1]  # LOF scores: day1=[2.5,0.8], day2=[1.1,2.8] with threshold 1.5
+        
+        assert y_true == expected_y_true
+        assert y_pred == expected_y_pred
+    
+    def test_war_evaluate_lof_threshold_binary_key_mismatch(self, war_with_lof):
+        """Test error when bad_channels_dict keys don't match lof_scores_dict keys."""
+        # Set up bad_channels_dict with mismatched keys
+        war_with_lof.bad_channels_dict = {
+            'invalid_key': ['LMot'],  # This key doesn't exist in lof_scores_dict
+        }
+        
+        with pytest.raises(ValueError, match="bad_channels_dict contains keys not found in lof_scores_dict"):
+            war_with_lof.evaluate_lof_threshold_binary(threshold=1.5)
+    
+    def test_war_evaluate_lof_threshold_binary_missing_threshold(self, war_with_lof):
+        """Test error when threshold is missing."""
+        ground_truth = {'day1': {'LMot'}}
+        
+        with pytest.raises(ValueError, match="threshold parameter is required"):
+            war_with_lof.evaluate_lof_threshold_binary(ground_truth)
 
 
 class TestWindowAnalysisResultPickleJsonParameters:
