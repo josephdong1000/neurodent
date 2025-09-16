@@ -104,8 +104,8 @@ analysis:
   lof_evaluation:
     threshold_range:
       min: 1.0            # Minimum LOF threshold to test
-      max: 3.0            # Maximum LOF threshold to test  
-      step: 0.1           # Step size for threshold testing
+      max: 4.0            # Maximum LOF threshold to test  
+      step: 0.05           # Step size for threshold testing
     # Subset of channels to evaluate (e.g., exclude hippocampal channels)
     evaluation_channels: ["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"]
     figure_format: "png"  # Figure output format: png, tif, pdf, svg
