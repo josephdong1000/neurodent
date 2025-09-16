@@ -33,13 +33,10 @@ def extract_ground_truth_bad_channels(samples_config, animal_folder, animal_id):
     bad_channels_dict = samples_bad_channels.get(animal_key, {})
     
     # Convert to set format for each animal-day
+    # Use the full animalday_session key as-is since it matches LOF scores format
     ground_truth = {}
     for animalday_session, bad_channels_list in bad_channels_dict.items():
-        # Extract just the animal-day part (before genotype and date)
-        animalday = animalday_session.split()[0]  # e.g., "M3" from "M3 MHet Jan-08-2022"
-        if animalday not in ground_truth:
-            ground_truth[animalday] = set()
-        ground_truth[animalday].update(bad_channels_list)
+        ground_truth[animalday_session] = set(bad_channels_list)
     
     return ground_truth
 
@@ -81,6 +78,12 @@ def evaluate_lof_accuracy_across_animals(
                     samples_config, animal_folder, animal_id
                 )
                 
+                # Debug: Log before evaluation
+                logging.debug(f"Animal {animal_name}: ground_truth keys = {list(ground_truth.keys()) if ground_truth else 'None'}")
+                logging.debug(f"Animal {animal_name}: has lof_scores_dict = {hasattr(war, 'lof_scores_dict') and bool(war.lof_scores_dict)}")
+                if hasattr(war, 'lof_scores_dict') and war.lof_scores_dict:
+                    logging.debug(f"Animal {animal_name}: lof_scores_dict keys = {list(war.lof_scores_dict.keys())}")
+                
                 # Evaluate this threshold for this animal
                 # Use ground truth from samples.json, but could fall back to war.bad_channels_dict
                 y_true, y_pred = war.evaluate_lof_threshold_binary(
@@ -92,11 +95,16 @@ def evaluate_lof_accuracy_across_animals(
                 all_y_true.extend(y_true)
                 all_y_pred.extend(y_pred)
                 
-                logging.debug(f"Animal {animal_name}: {len(y_true)} evaluation points")
+                logging.debug(f"Animal {animal_name}: {len(y_true)} evaluation points returned")
+                if len(y_true) == 0:
+                    logging.warning(f"Animal {animal_name}: No evaluation points returned for threshold {threshold}")
                 
             except Exception as e:
                 logging.error(f"Failed to evaluate {animal_name}: {str(e)}")
                 continue
+        
+        # Debug: Log what we collected for this threshold
+        logging.debug(f"Threshold {threshold:.2f}: Collected {len(all_y_true)} total evaluation points from {len([name for name, _ in flattened_wars.items()])} animals")
         
         # Calculate metrics across all animals
         if len(all_y_true) > 0:
@@ -134,10 +142,14 @@ def create_lof_accuracy_plot(results_df, output_path, config):
     
     plt.figure(figsize=(10, 6))
     
-    # Main F1 score plot
-    plt.plot(results_df['threshold'], results_df['f1_score'], 'b-o', linewidth=2, markersize=6, label='F1 Score')
-    plt.plot(results_df['threshold'], results_df['precision'], 'g--s', linewidth=1, markersize=4, label='Precision')
-    plt.plot(results_df['threshold'], results_df['recall'], 'r--^', linewidth=1, markersize=4, label='Recall')
+    # Main F1 score plot - only if we have data
+    if len(results_df) > 0 and not results_df.empty:
+        plt.plot(results_df['threshold'], results_df['f1_score'], 'b-o', linewidth=2, markersize=6, label='F1 Score')
+        plt.plot(results_df['threshold'], results_df['precision'], 'g--s', linewidth=1, markersize=4, label='Precision')
+        plt.plot(results_df['threshold'], results_df['recall'], 'r--^', linewidth=1, markersize=4, label='Recall')
+    else:
+        # Plot empty placeholder
+        plt.text(0.5, 0.5, 'No evaluation data available', ha='center', va='center', transform=plt.gca().transAxes, fontsize=14)
     
     plt.xlabel('LOF Threshold', fontsize=12)
     plt.ylabel('Score', fontsize=12)
@@ -145,13 +157,15 @@ def create_lof_accuracy_plot(results_df, output_path, config):
     plt.grid(True, alpha=0.3)
     plt.legend()
     
-    # Find optimal threshold (max F1 score)
-    best_idx = results_df['f1_score'].idxmax()
-    best_threshold = results_df.loc[best_idx, 'threshold']
-    best_f1 = results_df.loc[best_idx, 'f1_score']
+    # Find optimal threshold (max F1 score) - skip if no results
+    if len(results_df) > 0 and not results_df.empty:
+        best_idx = results_df['f1_score'].idxmax()
+        best_threshold = results_df.loc[best_idx, 'threshold']
+        best_f1 = results_df.loc[best_idx, 'f1_score']
+        
+        plt.axvline(x=best_threshold, color='orange', linestyle=':', alpha=0.7, 
+                    label=f'Optimal: {best_threshold:.2f} (F1={best_f1:.3f})')
     
-    plt.axvline(x=best_threshold, color='orange', linestyle=':', alpha=0.7, 
-                label=f'Optimal: {best_threshold:.2f} (F1={best_f1:.3f})')
     plt.legend()
     
     # Add evaluation info
@@ -219,6 +233,15 @@ def main():
             evaluation_channels=evaluation_channels
         )
         
+        # Debug: Log results DataFrame info
+        logging.info(f"Results DataFrame shape: {results_df.shape}")
+        logging.info(f"Results DataFrame columns: {list(results_df.columns)}")
+        if len(results_df) > 0:
+            logging.info(f"Results DataFrame head:\n{results_df.head()}")
+            logging.info(f"F1 scores: {results_df['f1_score'].tolist()}")
+        else:
+            logging.warning("Results DataFrame is empty!")
+        
         # Create output directory
         output_dir = Path(output_csv).parent
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -230,12 +253,18 @@ def main():
         # Create and save plot
         create_lof_accuracy_plot(results_df, output_plot, config)
         
-        # Log summary
-        if len(results_df) > 0:
-            best_idx = results_df['f1_score'].idxmax()
-            best_threshold = results_df.loc[best_idx, 'threshold']
-            best_f1 = results_df.loc[best_idx, 'f1_score']
-            logging.info(f"Optimal threshold: {best_threshold:.2f} (F1 score: {best_f1:.3f})")
+        # Log summary - with safe handling of empty results
+        if len(results_df) > 0 and not results_df.empty and not results_df['f1_score'].isna().all():
+            try:
+                best_idx = results_df['f1_score'].idxmax()
+                best_threshold = results_df.loc[best_idx, 'threshold']
+                best_f1 = results_df.loc[best_idx, 'f1_score']
+                logging.info(f"Optimal threshold: {best_threshold:.2f} (F1 score: {best_f1:.3f})")
+            except Exception as e:
+                logging.error(f"Error finding optimal threshold: {str(e)}")
+                logging.warning("Cannot determine optimal threshold from results")
+        else:
+            logging.warning("No valid results available for summary")
         
         logging.info("LOF accuracy evaluation completed successfully")
         
@@ -249,7 +278,7 @@ if __name__ == "__main__":
         sys.stderr = sys.stdout = f
         logging.basicConfig(
             format="%(asctime)s - %(levelname)s - %(message)s",
-            level=logging.INFO,
+            level=logging.DEBUG,
             stream=sys.stdout,
             force=True
         )
