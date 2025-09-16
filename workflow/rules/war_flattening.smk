@@ -12,10 +12,8 @@ checkpoint flatten_wars:
     Flatten filtered WARs by aggregating time windows for each animal individually
     """
     input:
-        # war_pkl="results/wars_fragment_filtered/{animal}/war.pkl",
-        # war_json="results/wars_fragment_filtered/{animal}/war.json",
-        war_pkl=get_animal_fragment_filtered_pkl,
-        war_json=get_animal_fragment_filtered_json,
+        war_pkl="results/wars_fragment_filtered/{animal}/war.pkl",
+        war_json="results/wars_fragment_filtered/{animal}/war.json",
     output:
         war_pkl="results/wars_flattened/{animal}/war.pkl",
         war_json="results/wars_flattened/{animal}/war.json",

@@ -8,30 +8,28 @@ to ensure all downstream analysis uses consistently filtered data.
 """
 
 
-checkpoint filter_wars_fragments:
+checkpoint war_fragment_filter:
     """
     Apply fragment and channel filtering to quality-filtered WARs
     """
     input:
-        # war_pkl="results/wars_quality_filtered/{animal}/war.pkl",
-        # war_json="results/wars_quality_filtered/{animal}/war.json",
-        war_pkl=get_animal_quality_filtered_pkl,
-        war_json=get_animal_quality_filtered_json,
+        war_pkl="results/wars_quality_filtered/{animal}/war.pkl",
+        war_json="results/wars_quality_filtered/{animal}/war.json",
     output:
         war_pkl="results/wars_fragment_filtered/{animal}/war.pkl",
         war_json="results/wars_fragment_filtered/{animal}/war.json",
     threads:
-        config["cluster"]["war_fragment_filtering"]["threads"]
+        config["cluster"]["war_fragment_filter"]["threads"]
     params:
         config=config,
         samples_config=samples_config,
         animal_folder=get_animal_folder,
         animal_id=get_animal_id,
     resources:
-        time=config["cluster"]["war_fragment_filtering"]["time"],
-        mem_mb=increment_memory(config["cluster"]["war_fragment_filtering"]["mem_mb"]),
-        nodes=config["cluster"]["war_fragment_filtering"]["nodes"],
+        time=config["cluster"]["war_fragment_filter"]["time"],
+        mem_mb=increment_memory(config["cluster"]["war_fragment_filter"]["mem_mb"]),
+        nodes=config["cluster"]["war_fragment_filter"]["nodes"],
     log:
-        "logs/war_fragment_filtering/{animal}.log",
+        "logs/war_fragment_filter/{animal}.log",
     script:
         "../scripts/filter_wars_fragments.py"

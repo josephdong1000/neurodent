@@ -25,6 +25,7 @@ import json
 import re
 import os
 import sys
+import glob
 from datetime import datetime
 from django.utils.text import slugify
 from snakemake.io import glob_wildcards
@@ -62,87 +63,84 @@ def get_animal_id(wildcards):
 def increment_memory(base_memory):
     def mem(wildcards, attempt):
         return base_memory * (2 ** (attempt - 1))
-
     return mem
 
 
-def get_animal_quality_filtered_pkl(wildcards):
-    checkpoint_output = checkpoints.war_quality_filter.get(**wildcards).output[0]
-    filenames = glob_wildcards(os.path.join(checkpoint_output, "{filename}.pkl")).filename
-    return expand(os.path.join(checkpoint_output, "{filename}.pkl"), filename=filenames)
-
-
-def get_animal_quality_filtered_json(wildcards):
-    checkpoint_output = checkpoints.war_quality_filter.get(**wildcards).output[0]
-    filenames = glob_wildcards(os.path.join(checkpoint_output, "{filename}.pkl")).filename
-    return expand(os.path.join(checkpoint_output, "{filename}.json"), filename=filenames)
-
-def get_animal_fragment_filtered_pkl(wildcards):
-    return checkpoints.filter_wars_fragments.get(**wildcards).output.war_pkl
-    # checkpoint_output = checkpoints.filter_wars_fragments.get(**wildcards).output[0]
-    # filenames = glob_wildcards(os.path.join(checkpoint_output, "{filename}.pkl")).filename
-    # return expand(os.path.join(checkpoint_output, "{filename}.pkl"), filename=filenames)
-
-def get_animal_fragment_filtered_json(wildcards):
-    return checkpoints.filter_wars_fragments.get(**wildcards).output.war_json
-    # checkpoint_output = checkpoints.filter_wars_fragments.get(**wildcards).output[0]
-    # filenames = glob_wildcards(os.path.join(checkpoint_output, "{filename}.pkl")).filename
-    # return expand(os.path.join(checkpoint_output, "{filename}.json"), filename=filenames)
-
-
-# These should be defined because this is an aggregation step with an upstream checkpointed step
-def get_fragment_filtered_pkl(wildcards):
-    all_fragment_filtered_files = []
+def get_all_fragment_filtered_pkl(wildcards):
+    out = []
     for anim in ANIMALS:
-        ck_output = checkpoints.filter_wars_fragments.get(animal=anim).output[0]
-        filename = glob_wildcards(os.path.join(f"results/wars_fragment_filtered/{anim}", "{filename}.pkl")).filename
-        all_fragment_filtered_files.extend(expand(Path("results/wars_fragment_filtered") / anim / "{filename}.pkl", filename=filename))
-    return all_fragment_filtered_files
+        # Only process animals that have quality-filtered output
+        qual_filter_output = checkpoints.war_quality_filter.get(animal=anim).output[0]
+        qual_filenames = glob_wildcards(os.path.join(qual_filter_output, "{filename}.pkl")).filename
+        if qual_filenames:  # Only if quality filtering produced files
+            out.append(f"results/wars_fragment_filtered/{Path(qual_filter_output).name}/war.pkl")
+    return out
 
 
-def get_fragment_filtered_json(wildcards):
-    all_fragment_filtered_files = []
+def get_all_fragment_filtered_json(wildcards):
+    out = []
     for anim in ANIMALS:
-        ck_output = checkpoints.filter_wars_fragments.get(animal=anim).output[0]
-        filename = glob_wildcards(os.path.join(f"results/wars_fragment_filtered/{anim}", "{filename}.json")).filename
-        all_fragment_filtered_files.extend(expand(Path("results/wars_fragment_filtered") / anim / "{filename}.json", filename=filename))
-    return all_fragment_filtered_files
+        qual_filter_output = checkpoints.war_quality_filter.get(animal=anim).output[0]
+        qual_filenames = glob_wildcards(os.path.join(qual_filter_output, "{filename}.json")).filename
+        if qual_filenames:
+            out.append(f"results/wars_fragment_filtered/{Path(qual_filter_output).name}/war.json")
+    return out
 
 
 def get_flattened_wars_pkl(wildcards):
-    all_flattened_wars_files = []
+    out = []
     for anim in ANIMALS:
-        ck_output = checkpoints.flatten_wars.get(animal=anim).output[0]
-        filename = glob_wildcards(os.path.join(f"results/wars_flattened/{anim}", "{filename}.pkl")).filename
-        all_flattened_wars_files.extend(expand(Path("results/wars_flattened") / anim / "{filename}.pkl", filename=filename))
-    return all_flattened_wars_files
+        checkpoint_output = checkpoints.war_quality_filter.get(animal=anim).output[0]
+        qual_filenames = glob_wildcards(os.path.join(checkpoint_output, "{filename}.pkl")).filename
+        if qual_filenames:
+            out.append(f"results/wars_flattened/{Path(checkpoint_output).name}/war.pkl")
+    return out
 
 
 def get_flattened_wars_json(wildcards):
-    all_flattened_wars_files = []
+    out = []
     for anim in ANIMALS:
-        ck_output = checkpoints.flatten_wars.get(animal=anim).output[0]
-        filename = glob_wildcards(os.path.join(f"results/wars_flattened/{anim}", "{filename}.json")).filename
-        all_flattened_wars_files.extend(expand(Path("results/wars_flattened") / anim / "{filename}.json", filename=filename))
-    return all_flattened_wars_files
+        checkpoint_output = checkpoints.war_quality_filter.get(animal=anim).output[0]
+        qual_filenames = glob_wildcards(os.path.join(checkpoint_output, "{filename}.json")).filename
+        if qual_filenames:
+            out.append(f"results/wars_flattened/{Path(checkpoint_output).name}/war.json")
+    return out
+
 
 def get_diagnostic_figures_unfiltered(wildcards):
-    """Get unfiltered diagnostic figure directories for all animals"""
-    unfiltered_dirs = []
+    outputs = []
     for anim in ANIMALS:
-        ck_output = checkpoints.make_diagnostic_figures_unfiltered.get(animal=anim).output
-        if ck_output:
-            unfiltered_dirs.append(f"results/diagnostic_figures/{anim}/unfiltered/")
-    return unfiltered_dirs
+        checkpoint_output = checkpoints.war_quality_filter.get(animal=anim).output[0]
+        hypothetical_war_path = Path(checkpoint_output) / "war.pkl"
+        if os.path.exists(hypothetical_war_path):
+            # print(f"thing exists: {hypothetical_war_path}")
+            # outputs.extend(expand("results/diagnostic_figures/{a}/unfiltered", a=glob_wildcards()))
+            outputs.append(f"results/diagnostic_figures/{Path(checkpoint_output).name}/unfiltered")
+    return outputs
 
 def get_diagnostic_figures_filtered(wildcards):
-    """Get filtered diagnostic figure directories for fragment-filtered animals"""  
-    filtered_dirs = []
+    outputs = []
     for anim in ANIMALS:
-        ck_output = checkpoints.make_diagnostic_figures_filtered.get(animal=anim).output
-        if ck_output:
-            filtered_dirs.append(f"results/diagnostic_figures/{anim}/filtered/")
-    return filtered_dirs
+        checkpoint_output = checkpoints.war_quality_filter.get(animal=anim).output[0]
+        hypothetical_war_path = Path(checkpoint_output) / "war.pkl"
+        if os.path.exists(hypothetical_war_path):
+            # print(f"thing exists: {hypothetical_war_path}")
+            # outputs.extend(expand("results/diagnostic_figures/{a}/unfiltered", a=glob_wildcards()))
+            outputs.append(f"results/diagnostic_figures/{Path(checkpoint_output).name}/filtered")
+        # else:
+        #     print(f"does NOT exist: {hypothetical_war_path}")
+    return outputs
+
+
+
+# def get_diagnostic_figures_filtered(wildcards):
+#     """Get filtered diagnostic figure directories for fragment-filtered animals"""  
+#     filtered_dirs = []
+#     for anim in ANIMALS:
+#         ck_output = checkpoints.make_diagnostic_figures_filtered.get(animal=anim).output
+#         if ck_output:
+#             filtered_dirs.append(f"results/diagnostic_figures/{anim}/filtered/")
+#     return filtered_dirs
 
 
 # Wildcard constraints to prevent conflicts
@@ -160,6 +158,7 @@ include: "workflow/rules/war_zeitgeber.smk"
 include: "workflow/rules/zeitgeber_plots.smk"
 include: "workflow/rules/ep_analysis.smk"
 include: "workflow/rules/lof_evaluation.smk"
+include: "workflow/rules/notebook.smk"
 
 
 rule all:
@@ -168,22 +167,33 @@ rule all:
         'results/graphs/rulegraph.png',
         'results/graphs/filegraph.png',
         'results/graphs/dag.png',
+
         # WAR generation and prefiltering
         expand("results/wars_quality_filtered/{animal}", animal=ANIMALS),
+
         # WAR per-animal diagnostic plots (unfiltered)
-        lambda wc: get_diagnostic_figures_unfiltered(wc),
+        # NOTE also trigger fragment filtering + diagnostic figures filter unfiltered
+        get_diagnostic_figures_unfiltered,
+
         # WAR per-animal diagnostic plots (filtered) 
-        lambda wc: get_diagnostic_figures_filtered(wc),
+        get_diagnostic_figures_filtered,
+
         # ZT time-based features
         "results/wars_zeitgeber/zeitgeber_features.pkl",
         "results/zeitgeber_plots/",
+        
         # EP full experiment plots
-        lambda wc: expand("results/wars_flattened/{animal}/war.pkl", animal=glob_wildcards("results/wars_quality_filtered/{animal}/war.pkl").animal),
+        # expand("results/wars_flattened/{animal}/war.pkl", animal=glob_wildcards("results/wars_fragment_filtered/{animal}/war.pkl").animal),
+        # expand("results/wars_flattened/{animal}/war.pkl", animal=glob_wildcards("results/wars_fragment_filtered/{animal}/war.pkl").animal),
+        # get_fragment_filtered_pkl,
         "results/ep_figures/",
         "results/ep_heatmaps/",
+
         # LOF accuracy evaluation
         "results/lof_evaluation/lof_accuracy_results.csv",
         "results/lof_evaluation/lof_fscore_vs_threshold.png",
+        # Interactive analysis notebooks
+        # "results/notebooks/war_data_explorer.ipynb",
 
 rule graphs:
     input:
@@ -193,17 +203,17 @@ rule graphs:
 
 rule rulegraph:
     output: "results/graphs/rulegraph.png"
-    shell: "snakemake --rulegraph | dot -Tpng > {output}"
+    shell: "snakemake --rulegraph --forceall | dot -Tpng > {output}"
 
 
 rule filegraph:
     output: "results/graphs/filegraph.png"
-    shell: "snakemake --filegraph | dot -Tpng > {output}"
+    shell: "snakemake --filegraph --forceall | dot -Tpng > {output}"
 
 
 rule dag:
     output: "results/graphs/dag.png"
-    shell: "snakemake --dag | dot -Tpng > {output}"
+    shell: "snakemake --dag --forceall | dot -Tpng > {output}"
 
 
 

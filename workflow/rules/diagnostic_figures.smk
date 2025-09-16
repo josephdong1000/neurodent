@@ -7,13 +7,15 @@ This allows AnimalPlotter to generate variable numbers of files naturally.
 """
 
 
-checkpoint make_diagnostic_figures_unfiltered:
+rule make_diagnostic_figures_unfiltered:
     """
     Generate diagnostic figures from quality-filtered (unfiltered) data
     """
     input:
-        war_pkl=get_animal_quality_filtered_pkl,
-        war_json=get_animal_quality_filtered_json
+        war_pkl="results/wars_quality_filtered/{animal}/war.pkl",
+        war_json="results/wars_quality_filtered/{animal}/war.json",
+        # war_pkl=lambda wc: Path(checkpoints.war_quality_filter.get(**wc).output[0]) / "war.pkl",
+        # war_json=lambda wc: Path(checkpoints.war_quality_filter.get(**wc).output[0]) / "war.json",
     output:
         figure_dir=directory("results/diagnostic_figures/{animal}/unfiltered/"),
     params:
@@ -22,7 +24,7 @@ checkpoint make_diagnostic_figures_unfiltered:
         samples_config=samples_config,
         config=config,
     threads: config["cluster"]["diagnostic_figures"]["threads"]
-    retries: 2
+    retries: 1
     resources:
         time=config["cluster"]["diagnostic_figures"]["time"],
         mem_mb=increment_memory(config["cluster"]["diagnostic_figures"]["mem_mb"]),
@@ -33,13 +35,15 @@ checkpoint make_diagnostic_figures_unfiltered:
         "../scripts/generate_diagnostic_figs.py"
 
 
-checkpoint make_diagnostic_figures_filtered:
+rule make_diagnostic_figures_filtered:
     """
     Generate diagnostic figures from fragment-filtered data
     """
     input:
-        war_pkl=get_animal_fragment_filtered_pkl,
-        war_json=get_animal_fragment_filtered_json
+        war_pkl="results/wars_fragment_filtered/{animal}/war.pkl",
+        war_json="results/wars_fragment_filtered/{animal}/war.json",
+        # war_pkl=lambda wc: Path(checkpoints.war_fragment_filter.get(**wc).output[0]) / "war.pkl",
+        # war_json=lambda wc: Path(checkpoints.war_fragment_filter.get(**wc).output[0]) / "war.json",
     output:
         figure_dir=directory("results/diagnostic_figures/{animal}/filtered/"),
     params:
@@ -48,7 +52,7 @@ checkpoint make_diagnostic_figures_filtered:
         samples_config=samples_config,
         config=config,
     threads: config["cluster"]["diagnostic_figures"]["threads"]
-    retries: 2
+    retries: 1
     resources:
         time=config["cluster"]["diagnostic_figures"]["time"],
         mem_mb=increment_memory(config["cluster"]["diagnostic_figures"]["mem_mb"]),

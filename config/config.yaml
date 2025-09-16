@@ -178,7 +178,7 @@ cluster:
     interface: null
 
   # WAR fragment filtering cluster (lightweight, per-animal)
-  war_fragment_filtering:
+  war_fragment_filter:
     time: "2h"
     mem_mb: 30_000
     nodes: 1
