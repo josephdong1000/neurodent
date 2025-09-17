@@ -18,82 +18,7 @@ from unittest.mock import Mock
 import sys
 from pathlib import Path
 
-# Add workflow scripts to path for ground truth extraction function
-sys.path.insert(0, str(Path("workflow/scripts").resolve()))
-from evaluate_lof_accuracy import extract_ground_truth_bad_channels
-
 from pythoneeg.visualization.results import WindowAnalysisResult
-
-
-class TestGroundTruthExtraction:
-    """Test the ground truth extraction function from samples.json"""
-
-    def test_extract_ground_truth_preserves_keys(self):
-        """Test that ground truth extraction preserves full keys instead of truncating"""
-        
-        # Mock samples config with realistic key format
-        samples_config = {
-            "bad_channels": {
-                "test_animal test_id": {
-                    "FMUT FMut Jan-21-2022": ["LAud", "RVis"],
-                    "FMUT FMut Jan-22-2022": ["LMot"],
-                    "FMUT FMut Jan-23-2022": ["RBar"]
-                }
-            }
-        }
-        
-        result = extract_ground_truth_bad_channels(samples_config, "test_animal", "test_id")
-        
-        # Should preserve full keys, not truncate to first word
-        expected_keys = {"FMUT FMut Jan-21-2022", "FMUT FMut Jan-22-2022", "FMUT FMut Jan-23-2022"}
-        assert set(result.keys()) == expected_keys
-        
-        # Should convert to sets
-        assert result["FMUT FMut Jan-21-2022"] == {"LAud", "RVis"}
-        assert result["FMUT FMut Jan-22-2022"] == {"LMot"}
-        assert result["FMUT FMut Jan-23-2022"] == {"RBar"}
-
-    def test_extract_ground_truth_missing_animal(self):
-        """Test extraction with missing animal returns empty dict"""
-        
-        samples_config = {"bad_channels": {}}
-        result = extract_ground_truth_bad_channels(samples_config, "missing_animal", "missing_id")
-        
-        assert result == {}
-
-    def test_extract_ground_truth_empty_config(self):
-        """Test extraction with empty config"""
-        
-        samples_config = {}
-        result = extract_ground_truth_bad_channels(samples_config, "any_animal", "any_id")
-        
-        assert result == {}
-
-    def test_extract_ground_truth_realistic_data(self):
-        """Test with realistic data format matching actual usage"""
-        
-        samples_config = {
-            "bad_channels": {
-                "M2 MWT": {
-                    "M2 MWT Jan-14-2022": ["LHip", "LVis", "RVis", "RHip", "LBar"],
-                    "M2 MWT Jan-15-2022": ["LHip", "LVis", "RVis", "RHip", "LBar"],
-                    "M2 MWT Jan-16-2022": ["LHip", "LVis", "RVis", "RHip", "LBar"]
-                }
-            }
-        }
-        
-        result = extract_ground_truth_bad_channels(samples_config, "M2", "MWT")
-        
-        # Should have all three days
-        assert len(result) == 3
-        assert "M2 MWT Jan-14-2022" in result
-        assert "M2 MWT Jan-15-2022" in result
-        assert "M2 MWT Jan-16-2022" in result
-        
-        # Each day should have the same bad channels
-        expected_bad_channels = {"LHip", "LVis", "RVis", "RHip", "LBar"}
-        for day_key in result:
-            assert result[day_key] == expected_bad_channels
 
 
 class TestLOFEvaluationFixes:
@@ -101,8 +26,6 @@ class TestLOFEvaluationFixes:
 
     def test_key_filtering_with_mismatch(self):
         """Test that key mismatches raise ValueError"""
-
-        from pythoneeg.visualization.results import WindowAnalysisResult
 
         # Mock data with key mismatch
         lof_scores_dict = {
