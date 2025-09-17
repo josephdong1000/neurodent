@@ -13,6 +13,7 @@ import warnings
 import numpy as np
 import pandas as pd
 import pytest
+from scipy.spatial.distance import seuclidean
 try:
     import spikeinterface.core as si
 except Exception:
@@ -727,8 +728,8 @@ class TestLongRecordingOrganizer:
             mock_nn.read.assert_called_once()
             mock_nn.algorithm.assert_called_once()
             
-            # Verify LocalOutlierFactor was configured correctly  
-            mock_lof_class.assert_called_once_with(n_neighbors=3, metric="minkowski", p=2)
+            # Verify LocalOutlierFactor was configured correctly
+            mock_lof_class.assert_called_once_with(n_neighbors=3, metric=seuclidean)
             mock_lof.fit.assert_called_once()
             
             # Channel 4 should be identified as bad (score 2.0 > threshold 1.5)

@@ -29,6 +29,7 @@ except Exception:  # pragma: no cover - optional at import time for tests not us
     sw = None
 from scipy.signal import decimate
 from sklearn.neighbors import LocalOutlierFactor
+from scipy.spatial.distance import seuclidean
 
 from .. import constants
 from .utils import (
@@ -1223,7 +1224,8 @@ class LongRecordingOrganizer:
             logging.info(f"n_neighbors for LOF computation: {n_neighbors}")
 
             # Initialize LocalOutlierFactor
-            lof = LocalOutlierFactor(n_neighbors=n_neighbors, metric="minkowski", p=2)
+            # lof = LocalOutlierFactor(n_neighbors=n_neighbors, metric="minkowski", p=2)
+            lof = LocalOutlierFactor(n_neighbors=n_neighbors, metric=seuclidean)
 
             # Compute the outlier scores
             logging.debug("Computing outlier scores")
