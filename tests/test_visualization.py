@@ -1623,12 +1623,13 @@ class TestWindowAnalysisResultLOF:
             lof_scores_dict=invalid_lof_dict
         )
         
-        # Should not crash, but will skip invalid entries
-        scores = war.get_lof_scores()
-        assert scores == {}
-        
-        bad_channels = war.apply_lof_threshold(1.5)
-        assert bad_channels == {}
+        # Should raise ValueError for invalid data structure
+        with pytest.raises(ValueError, match="LOF scores not available for day1"):
+            war.get_lof_scores()
+
+        # apply_lof_threshold should also fail with invalid data
+        with pytest.raises(ValueError, match="LOF scores not available for day1"):
+            war.apply_lof_threshold(1.5)
     
     def test_war_lof_threshold_workflow_simulation(self, war_with_lof):
         """Test complete workflow of LOF threshold testing."""
