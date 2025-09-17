@@ -122,3 +122,4 @@ Remember: This is scientific software researchers depend on for accurate results
 - Real research data should use proper epoch lengths (≥5 cycles for lowest frequency of interest)
 - Ideally keep snakemake rules for specific functions quarantined to their individual snakemake files, and keep the snakefile clean
 - When testing snakemake, only perform dry runs. Defer full pipeline testing to the user
+- If catching the general exception Exception(), never let the script fail silently.
