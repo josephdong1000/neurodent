@@ -18,6 +18,7 @@ rule evaluate_lof_accuracy:
     output:
         results_csv="results/lof_evaluation/lof_accuracy_results.csv",
         plot_png="results/lof_evaluation/lof_fscore_vs_threshold.png",
+        barplot_png="results/lof_evaluation/lof_scores_by_channel.png",
     params:
         config=config,
         samples_config=samples_config,
