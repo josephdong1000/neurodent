@@ -59,7 +59,7 @@ def load_war_for_zeitgeber(war_path_info):
         
     except Exception as e:
         logger.error(f"Failed to process {animal_name}: {str(e)}")
-        return None
+        raise
 
 def process_alphadelta_features(df):
     """
@@ -111,6 +111,7 @@ def convert_to_zeitgeber_time(df):
 
 def main():
     """Main zeitgeber feature extraction function"""
+    global snakemake
     
     # Get parameters from snakemake
     input_war_pkls = snakemake.input.war_pkl

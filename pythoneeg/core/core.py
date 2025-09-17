@@ -243,7 +243,7 @@ def convert_ddfrowbin_to_si(bin_rowmajor_path, metadata):
             # Clean up temp file if it exists
             if os.path.exists(temppath):
                 os.remove(temppath)
-            raise e
+            raise
     else:
         rec = se.read_binary(bin_rowmajor_path, **params)
         temppath = None
@@ -858,9 +858,10 @@ class LongRecordingOrganizer:
                 except Exception as e:
                     if cache_policy == "always":
                         # 'always' policy: raise error if metadata invalid
-                        raise ValueError(
+                        logging.error(
                             f"Cache policy 'always' requires valid metadata, but failed to load {meta_fname}: {e}"
                         )
+                        raise
                     elif cache_policy == "auto":
                         # 'auto' policy: log and regenerate if metadata invalid
                         logging.info(f"Failed to load cached metadata from {meta_fname}: {e}")
@@ -1183,8 +1184,7 @@ class LongRecordingOrganizer:
                 logging.info(f"Computed LOF scores for {len(scores)} channels")
             except Exception as e:
                 logging.error(f"Failed to compute LOF scores for recording: {e}")
-                self.lof_scores = None
-                logging.warning("LOF scores set to None due to computation failure")
+                raise
 
         # Apply threshold if provided
         if lof_threshold is not None:

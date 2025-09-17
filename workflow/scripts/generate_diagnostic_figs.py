@@ -71,10 +71,7 @@ def generate_temporal_heatmaps_from_config(animal_plotter, config, animal_id, ou
 
     except Exception as e:
         logging.error(f"Failed to generate temporal heatmaps: {str(e)}")
-        # Create placeholder files to satisfy Snakemake outputs
-        for feature_name in config["analysis"]["figures"]["temporal_heatmaps"]["features"].keys():
-            placeholder_path = output_dir / f"{animal_id}_temporal_heatmap_{feature_name}.png"
-            placeholder_path.touch()
+        raise
 
 
 def load_war_and_config():
@@ -148,6 +145,7 @@ def generate_diagnostic_figures_for_animal(war, config, animal_folder, animal_id
 
 
 def main():
+    global snakemake
     with open(snakemake.log[0], "w") as f:
         sys.stderr = sys.stdout = f
         logging.basicConfig(
@@ -157,16 +155,10 @@ def main():
             force=True,
         )
 
-        try:
-            logging.info("Diagnostic figures generation started")
-            war, config, animal_folder, animal_id, output_dir = load_war_and_config()
-            generate_diagnostic_figures_for_animal(war, config, animal_folder, animal_id, output_dir)
-            logging.info(f"Completed diagnostic figures for {animal_folder} {animal_id}")
-
-        except Exception as e:
-            error_msg = f"Error: {str(e)}\n\nTraceback:\n{traceback.format_exc()}"
-            logging.error(error_msg)
-            raise
+        logging.info("Diagnostic figures generation started")
+        war, config, animal_folder, animal_id, output_dir = load_war_and_config()
+        generate_diagnostic_figures_for_animal(war, config, animal_folder, animal_id, output_dir)
+        logging.info(f"Completed diagnostic figures for {animal_folder} {animal_id}")
 
 
 if __name__ == "__main__":

@@ -175,13 +175,12 @@ def create_zeitgeber_plots(df, output_dir, data_dir, zt_config):
             
         except Exception as e:
             logger.error(f"Failed to create zeitgeber plot for {feature}: {str(e)}")
-            logger.error(traceback.format_exc())
-            continue
+            raise
 
 
 def main():
     """Main zeitgeber plots generation function"""
-    
+    global snakemake
     with open(snakemake.log[0], "w") as f:
         sys.stderr = sys.stdout = f
         logging.basicConfig(
@@ -192,40 +191,34 @@ def main():
         )
         logger = logging.getLogger(__name__)
 
-        try:
-            logger.info("Zeitgeber temporal plots generation started")
-            
-            # Get parameters from snakemake
-            zeitgeber_file = snakemake.input.zeitgeber_features
-            config = snakemake.params.config
-            
-            # Create output directories
-            output_dir = Path(snakemake.output.figure_dir)
-            data_dir = Path(snakemake.output.data_dir)
-            output_dir.mkdir(parents=True, exist_ok=True)
-            data_dir.mkdir(parents=True, exist_ok=True)
-            
-            logger.info(f"Loading zeitgeber features from {zeitgeber_file}")
-            
-            # Load zeitgeber features dataframe
-            df = pd.read_pickle(zeitgeber_file)
-            logger.info(f"Loaded zeitgeber data with shape: {df.shape}")
-            
-            # Process data for temporal plotting
-            df_processed = process_zeitgeber_data(df, config)
-            
-            # Get zeitgeber plots configuration
-            zt_config = config["analysis"]["zeitgeber_plots"]
-            
-            # Create zeitgeber temporal plots
-            create_zeitgeber_plots(df_processed, output_dir, data_dir, zt_config)
-            
-            logger.info("Successfully generated zeitgeber temporal plots")
-            
-        except Exception as e:
-            error_msg = f"Error: {str(e)}\\n\\nTraceback:\\n{traceback.format_exc()}"
-            logger.error(error_msg)
-            raise
+        logger.info("Zeitgeber temporal plots generation started")
+
+        # Get parameters from snakemake
+        zeitgeber_file = snakemake.input.zeitgeber_features
+        config = snakemake.params.config
+
+        # Create output directories
+        output_dir = Path(snakemake.output.figure_dir)
+        data_dir = Path(snakemake.output.data_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        data_dir.mkdir(parents=True, exist_ok=True)
+
+        logger.info(f"Loading zeitgeber features from {zeitgeber_file}")
+
+        # Load zeitgeber features dataframe
+        df = pd.read_pickle(zeitgeber_file)
+        logger.info(f"Loaded zeitgeber data with shape: {df.shape}")
+
+        # Process data for temporal plotting
+        df_processed = process_zeitgeber_data(df, config)
+
+        # Get zeitgeber plots configuration
+        zt_config = config["analysis"]["zeitgeber_plots"]
+
+        # Create zeitgeber temporal plots
+        create_zeitgeber_plots(df_processed, output_dir, data_dir, zt_config)
+
+        logger.info("Successfully generated zeitgeber temporal plots")
 
 
 if __name__ == "__main__":

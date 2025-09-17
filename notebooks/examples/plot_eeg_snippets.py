@@ -94,82 +94,60 @@ def load_and_sample_animal_data(animal_info: Tuple[str, str, str, Path]) -> Dict
     """
     animal_id, genotype, data_folder, data_parent_folder = animal_info
 
-    try:
-        logger.info(f"Processing {animal_id} ({genotype})")
+    logger.info(f"Processing {animal_id} ({genotype})")
 
-        # Create AnimalOrganizer with error handling
-        try:
-            ao = visualization.AnimalOrganizer(
-                data_parent_folder / data_folder,
-                animal_id,
-                mode="nest",
-                assume_from_number=True,
-                skip_days=["bad"],
-                # truncate=3,
-                lro_kwargs={
-                    "mode": "bin",
-                    "multiprocess_mode": "serial",  # Use serial for individual animals
-                    "overwrite_rowbins": False,
-                    "truncate": 5,
-                },
-            )
-        except Exception as e:
-            logger.error(f"Failed to create AnimalOrganizer for {animal_id}: {str(e)}")
-            return {
-                "animal_id": animal_id,
-                "genotype": genotype,
-                "snippets": [],
-                "success": False,
-                "error": f"Failed to create AnimalOrganizer: {str(e)}",
-            }
+    # Create AnimalOrganizer with error handling
+    ao = visualization.AnimalOrganizer(
+        data_parent_folder / data_folder,
+        animal_id,
+        mode="nest",
+        assume_from_number=True,
+        skip_days=["bad"],
+        # truncate=3,
+        lro_kwargs={
+            "mode": "bin",
+            "multiprocess_mode": "serial",  # Use serial for individual animals
+            "overwrite_rowbins": False,
+            "truncate": 5,
+        },
+    )
 
-        snippets = []
+    snippets = []
 
-        # Process each long recording
-        for lro_idx, lro in enumerate(ao.long_recordings):
-            try:
-                # Check total duration
-                total_duration = 0
-                valid_recs = []
-                rec = lro.LongRecording
-                rec = spre.notch_filter(rec, freq=60, q=100)
-                try:
-                    duration = rec.get_duration()
-                    if duration > 0:
-                        total_duration += duration
-                        valid_recs.append(rec)
-                except Exception as e:
-                    logger.warning(f"Failed to get duration for {animal_id} LRO {lro_idx} rec: {str(e)}")
-                    continue
+    # Process each long recording
+    for lro_idx, lro in enumerate(ao.long_recordings):
+        # Check total duration
+        total_duration = 0
+        valid_recs = []
+        rec = lro.LongRecording
+        rec = spre.notch_filter(rec, freq=60, q=100)
+        duration = rec.get_duration()
+        if duration > 0:
+            total_duration += duration
+            valid_recs.append(rec)
 
-                if total_duration < SNIPPET_DURATION:
-                    logger.warning(f"Recording too short for {animal_id} LRO {lro_idx}: {total_duration:.2f}s")
-                    continue
+        if total_duration < SNIPPET_DURATION:
+            logger.warning(f"Recording too short for {animal_id} LRO {lro_idx}: {total_duration:.2f}s")
+            continue
 
-                if not valid_recs:
-                    logger.warning(f"No valid recordings for {animal_id} LRO {lro_idx}")
-                    continue
+        if not valid_recs:
+            logger.warning(f"No valid recordings for {animal_id} LRO {lro_idx}")
+            continue
 
-                # Extract snippets from this long recording (use valid_recs instead of lro.recs)
-                recording_snippets = extract_snippets_from_lro_safe(valid_recs, animal_id, genotype, lro_idx)
-                snippets.extend(recording_snippets)
+        # Extract snippets from this long recording (use valid_recs instead of lro.recs)
+        recording_snippets = extract_snippets_from_lro_safe(valid_recs, animal_id, genotype, lro_idx)
+        snippets.extend(recording_snippets)
 
-                # Stop if we have enough snippets
-                if len(snippets) >= SNIPPETS_PER_ANIMAL:
-                    break
-            except Exception as e:
-                logger.warning(f"Error processing LRO {lro_idx} for {animal_id}: {str(e)}")
-                continue
+        # Stop if we have enough snippets
+        if len(snippets) >= SNIPPETS_PER_ANIMAL:
+            break
 
-        # Randomly sample the requested number of snippets
-        if len(snippets) > SNIPPETS_PER_ANIMAL:
-            snippets = random.sample(snippets, SNIPPETS_PER_ANIMAL)
+    # Randomly sample the requested number of snippets
+    if len(snippets) > SNIPPETS_PER_ANIMAL:
+        snippets = random.sample(snippets, SNIPPETS_PER_ANIMAL)
 
-        return {"animal_id": animal_id, "genotype": genotype, "snippets": snippets, "success": True}
+    return {"animal_id": animal_id, "genotype": genotype, "snippets": snippets, "success": True}
 
-    except Exception as e:
-        logger.error(f"Error processing {animal_id}: {str(e)}")
-        return {"animal_id": animal_id, "genotype": genotype, "snippets": [], "success": False, "error": str(e)}
 
 
 def extract_snippets_from_lro_safe(valid_recs: List, animal_id: str, genotype: str, lro_idx: int) -> List[Dict]:
@@ -365,11 +343,8 @@ def plot_genotype_snippets(genotype: str, snippets: List[Dict], save_folder: Pat
                 plot_channel_abbrevs = []
 
                 for ch_name in channel_names:
-                    try:
-                        abbrev = core.parse_chname_to_abbrev(ch_name, assume_from_number=True, strict_matching=False)
-                        plot_channel_abbrevs.append(abbrev)
-                    except Exception:
-                        plot_channel_abbrevs.append(str(ch_name)[:4])  # Fallback: first 4 chars
+                    abbrev = core.parse_chname_to_abbrev(ch_name, assume_from_number=True, strict_matching=False)
+                    plot_channel_abbrevs.append(abbrev)
 
                 # Calculate y-offsets for stacked channels - start with spacing from bottom
                 y_offset = global_min + channel_spacing

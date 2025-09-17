@@ -85,19 +85,21 @@ def generate_war_for_animal(samples_config, config, animal_folder, animal_id):
             with warnings.catch_warnings():
                 warnings.filterwarnings(
                     "ignore",
-                    message=".*fmin=.*corresponds to.*cycles.*Spectrum estimate will be unreliable.*",
+                    message=".*fmin=.*Spectrum estimate will be unreliable.*",
                     category=RuntimeWarning,
                 )
                 war = ao.compute_windowed_analysis(["all"], multiprocess_mode="dask")
-
         return war
-
+    except Exception as e:
+        raise
     finally:
         cluster.close()
 
 
 def main():
     """Main execution function"""
+
+    global snakemake
 
     with open(snakemake.log[0], "w") as f:
         sys.stderr = sys.stdout = f
@@ -110,28 +112,21 @@ def main():
             force=True,
         )
 
-        try:
-            logging.info("WAR generation script started successfully")
+        logging.info("WAR generation script started successfully")
 
-            # Load configuration
-            samples_config, config, animal_folder, animal_id = load_samples_and_config()
+        # Load configuration
+        samples_config, config, animal_folder, animal_id = load_samples_and_config()
 
-            # Generate WAR
-            war = generate_war_for_animal(samples_config, config, animal_folder, animal_id)
+        # Generate WAR
+        war = generate_war_for_animal(samples_config, config, animal_folder, animal_id)
 
-            # Save WAR
-            output_dir = Path(snakemake.output.war_pkl).parent
-            output_dir.mkdir(parents=True, exist_ok=True)
+        # Save WAR
+        output_dir = Path(snakemake.output.war_pkl).parent
+        output_dir.mkdir(parents=True, exist_ok=True)
 
-            war.save_pickle_and_json(output_dir, filename="war", slugify_filename=False)
+        war.save_pickle_and_json(output_dir, filename="war", slugify_filename=False)
 
-            logging.info(f"Successfully saved WAR for {animal_folder} {animal_id}")
-
-        except Exception as e:
-            # Try to log to logger if available, otherwise print to stdout
-            error_msg = f"Error in WAR generation: {str(e)}\n\nTraceback:\n{traceback.format_exc()}"
-            logging.error(error_msg)
-            raise
+        logging.info(f"Successfully saved WAR for {animal_folder} {animal_id}")
 
 
 if __name__ == "__main__":
