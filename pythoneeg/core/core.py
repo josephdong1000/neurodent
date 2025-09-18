@@ -301,12 +301,12 @@ class LongRecordingOrganizer:
                 or if manual time parameters are invalid.
         """
 
+        self.base_folder_path = Path(base_folder_path)
+
         self.n_truncate = parse_truncate(truncate)
         self.truncate = True if self.n_truncate > 0 else False
         if self.truncate:
             warnings.warn(f"LongRecording will be truncated to the first {self.n_truncate} files")
-
-        self.base_folder_path = Path(base_folder_path)
 
         # Store manual time parameters for validation
         self.manual_datetimes = manual_datetimes
@@ -1225,7 +1225,8 @@ class LongRecordingOrganizer:
 
             # Initialize LocalOutlierFactor
             # lof = LocalOutlierFactor(n_neighbors=n_neighbors, metric="minkowski", p=2)
-            distance_vector = pdist(rec_np, metric="seuclidean")
+            # distance_vector = pdist(rec_np, metric="seuclidean")
+            distance_vector = pdist(rec_np, metric="euclidean")
             distance_matrix = squareform(distance_vector)
             lof = LocalOutlierFactor(n_neighbors=n_neighbors, metric="precomputed")
             # lof = LocalOutlierFactor(n_neighbors=n_neighbors, metric=pdist, )
@@ -1447,6 +1448,83 @@ class LongRecordingOrganizer:
             f"{sampling_freq} Hz, {total_duration:.1f}s duration, "
             f"channels: {channel_info}{metadata_info}, timestamps: {timestamp_info}"
         )
+
+    def merge(self, other_lro):
+        """Merge another LRO into this one using si.concatenate_recordings.
+
+        This creates a new concatenated recording from this LRO and the other LRO.
+        The other LRO should represent a later time period to maintain temporal order.
+
+        Args:
+            other_lro (LongRecordingOrganizer): The LRO to merge into this one
+
+        Raises:
+            ValueError: If LROs are incompatible (different channels, sampling rates, etc.)
+            ImportError: If SpikeInterface is not available
+        """
+        if si is None:
+            raise ImportError("SpikeInterface is required for LRO merging")
+
+        # Validate merge compatibility
+        self._validate_merge_compatibility(other_lro)
+
+        # Concatenate recordings using SpikeInterface
+        logging.info(f"Merging LRO {other_lro.base_folder_path} into {self.base_folder_path}")
+        self.LongRecording = si.concatenate_recordings([self.LongRecording, other_lro.LongRecording])
+
+        # Update metadata after merge
+        self._update_metadata_after_merge(other_lro)
+
+        logging.info("Successfully merged LRO recordings")
+
+    def _validate_merge_compatibility(self, other_lro):
+        """Validate that two LROs can be safely merged.
+
+        Args:
+            other_lro (LongRecordingOrganizer): The LRO to validate against this one
+
+        Raises:
+            ValueError: If LROs are incompatible
+        """
+        # Check channel names
+        if self.channel_names != other_lro.channel_names:
+            raise ValueError(
+                f"Channel names mismatch: this LRO has {self.channel_names}, other LRO has {other_lro.channel_names}"
+            )
+
+        # Check sampling rates
+        if hasattr(self.meta, "f_s") and hasattr(other_lro.meta, "f_s"):
+            if self.meta.f_s != other_lro.meta.f_s:
+                raise ValueError(
+                    f"Sampling rate mismatch: this LRO has {self.meta.f_s} Hz, other LRO has {other_lro.meta.f_s} Hz"
+                )
+
+        # Check channel counts
+        if hasattr(self.meta, "n_channels") and hasattr(other_lro.meta, "n_channels"):
+            if self.meta.n_channels != other_lro.meta.n_channels:
+                raise ValueError(
+                    f"Channel count mismatch: "
+                    f"this LRO has {self.meta.n_channels} channels, "
+                    f"other LRO has {other_lro.meta.n_channels} channels"
+                )
+
+        # Check that both have valid recordings
+        if not hasattr(self, "LongRecording") or self.LongRecording is None:
+            raise ValueError("This LRO does not have a valid LongRecording")
+        if not hasattr(other_lro, "LongRecording") or other_lro.LongRecording is None:
+            raise ValueError("Other LRO does not have a valid LongRecording")
+
+    def _update_metadata_after_merge(self, other_lro):
+        """Update this LRO's metadata after merging with another LRO.
+
+        Args:
+            other_lro (LongRecordingOrganizer): The LRO that was merged into this one
+        """
+        # Update end time to reflect the merged recording duration
+        if hasattr(other_lro.meta, "dt_end") and hasattr(self.meta, "dt_end"):
+            self.meta.dt_end = other_lro.meta.dt_end
+
+        # Note: Channel names, sampling rate, etc. should already be validated as identical
 
     def __repr__(self):
         """Return a detailed string representation for debugging."""

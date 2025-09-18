@@ -150,8 +150,32 @@ class AnimalOrganizer(AnimalFeatureParser):
             core.parse_path_to_animalday(e, animal_param=self.animal_param, day_sep=self.day_sep, mode=self.read_mode)
             for e in self._bin_folders
         ]
-        self.animaldays = [x["animalday"] for x in animalday_dicts]
-        logging.info(f"self.animaldays: {self.animaldays}")
+
+        # Group folders by parsed animalday to handle overlapping days
+        animalday_to_folders = {}
+        for folder, animalday_dict in zip(self._bin_folders, animalday_dicts):
+            animalday = animalday_dict["animalday"]
+            if animalday not in animalday_to_folders:
+                animalday_to_folders[animalday] = []
+            animalday_to_folders[animalday].append(folder)
+
+        # Store grouping info
+        self._animalday_folder_groups = animalday_to_folders
+        self.unique_animaldays = list(animalday_to_folders.keys())
+
+        # Log merging operations for overlapping days
+        overlapping_days = 0
+        for animalday, folders in animalday_to_folders.items():
+            if len(folders) > 1:
+                overlapping_days += 1
+                logging.info(f"Merging {len(folders)} folders for {animalday}: {[Path(f).name for f in folders]}")
+
+        if overlapping_days > 0:
+            logging.info(f"Found {overlapping_days} animaldays with overlapping folders")
+
+        # Update animaldays to reflect unique days (not total folders)
+        self.animaldays = self.unique_animaldays
+        logging.info(f"self.animaldays (unique): {self.animaldays}")
 
         genotypes = [x["genotype"] for x in animalday_dicts]
         if len(set(genotypes)) > 1:
@@ -160,10 +184,56 @@ class AnimalOrganizer(AnimalFeatureParser):
         logging.info(f"self.genotype: {self.genotype}")
 
         self.long_analyzers: list[core.LongRecordingAnalyzer] = []
-        logging.debug(f"Creating {len(self._bin_folders)} LongRecordings")
-        self.long_recordings: list[core.LongRecordingOrganizer] = [
-            core.LongRecordingOrganizer(e, **lro_kwargs) for e in self._bin_folders
-        ]
+        logging.debug(f"Creating {len(self.unique_animaldays)} LongRecordings (one per unique animalday)")
+
+        # Create one LRO per unique animalday (not per folder)
+        self.long_recordings: list[core.LongRecordingOrganizer] = []
+        for animalday, folders in self._animalday_folder_groups.items():
+            if len(folders) == 1:
+                # Single folder - use existing logic
+                lro = core.LongRecordingOrganizer(folders[0], **lro_kwargs)
+            else:
+                # Multiple folders - create individual LROs then sort and merge
+                logging.info(f"Creating individual LROs for {len(folders)} folders for {animalday}")
+
+                # Create individual LROs first
+                folder_lro_pairs = []
+                for folder in folders:
+                    individual_lro = core.LongRecordingOrganizer(folder, **lro_kwargs)
+                    folder_lro_pairs.append((folder, individual_lro))
+
+                # Sort by median time using constructed LROs
+                sorted_folder_lro_pairs = self._sort_lros_by_median_time(folder_lro_pairs)
+
+                # Debug logging to show the order of LROs being merged
+                logging.info("LRO merge order for overlapping animalday:")
+                for i, (folder, lro) in enumerate(sorted_folder_lro_pairs):
+                    folder_name = Path(folder).name
+                    # Handle mock objects gracefully
+                    try:
+                        duration = (
+                            lro.LongRecording.get_duration()
+                            if hasattr(lro, "LongRecording") and lro.LongRecording
+                            else 0
+                        )
+                        duration_str = f"{float(duration):.1f}s"
+                    except (TypeError, ValueError):
+                        duration_str = "mock"
+                    logging.info(f"  {i + 1}. {folder_name} (duration: {duration_str})")
+
+                # Merge all LROs into the first one (in temporal order)
+                merged_lro = sorted_folder_lro_pairs[0][1]  # Get the LRO from first tuple
+                logging.info(f"Base LRO: {Path(sorted_folder_lro_pairs[0][0]).name}")
+
+                for i, (folder, lro) in enumerate(sorted_folder_lro_pairs[1:], 1):
+                    folder_name = Path(folder).name
+                    logging.info(f"Merging LRO {i}: {folder_name} into base LRO")
+                    merged_lro.merge(lro)
+
+                lro = merged_lro
+                logging.info(f"Successfully merged {len(sorted_folder_lro_pairs)} LROs for {animalday}")
+
+            self.long_recordings.append(lro)
 
         channel_names = [x.channel_names for x in self.long_recordings]
         if len(set([" ".join(x) for x in channel_names])) > 1:
@@ -178,6 +248,128 @@ class AnimalOrganizer(AnimalFeatureParser):
 
         self.features_df: pd.DataFrame = pd.DataFrame()
         self.features_avg_df: pd.DataFrame = pd.DataFrame()
+
+    def _sort_lros_by_median_time(self, folder_lro_pairs):
+        """Sort LROs by median timestamp of their constituent recordings.
+
+        Args:
+            folder_lro_pairs (list): List of (folder_path, lro) tuples
+
+        Returns:
+            list: Sorted (folder_path, lro) tuples in temporal order based on median timestamp
+
+        Note:
+            Extracts file_end_datetimes from each LRO (timestamps from LastEdit fields in metadata CSV files),
+            calculates the median timestamp of constituent recordings within each LRO, and sorts LROs
+            by this median timestamp. This ensures proper temporal ordering based on actual recording
+            content rather than folder naming conventions. Falls back to folder modification time if
+            no valid timestamps are available.
+        """
+        if len(folder_lro_pairs) <= 1:
+            return folder_lro_pairs
+
+        folder_lro_times = []
+
+        for folder_path, lro in folder_lro_pairs:
+            try:
+                # Get median timestamp from constituent recordings within the LRO
+                if hasattr(lro, "file_end_datetimes") and lro.file_end_datetimes:
+                    try:
+                        # Filter out None timestamps and get valid timestamps
+                        valid_timestamps = [ts for ts in lro.file_end_datetimes if ts is not None]
+                    except TypeError:
+                        # file_end_datetimes is not iterable (probably a Mock)
+                        valid_timestamps = []
+
+                    if valid_timestamps:
+                        # Sort timestamps and get the median
+                        valid_timestamps.sort()
+                        n_timestamps = len(valid_timestamps)
+
+                        if n_timestamps % 2 == 1:
+                            # Odd number of timestamps - take middle one
+                            median_timestamp = valid_timestamps[n_timestamps // 2]
+                        else:
+                            # Even number of timestamps - take average of two middle ones
+                            mid1 = valid_timestamps[n_timestamps // 2 - 1]
+                            mid2 = valid_timestamps[n_timestamps // 2]
+                            median_timestamp = mid1 + (mid2 - mid1) / 2
+
+                        # Convert to seconds since epoch for sorting
+                        median_time_seconds = median_timestamp.timestamp()
+                        logging.debug(
+                            f"LRO {Path(folder_path).name}: {n_timestamps} recordings, median timestamp: {median_timestamp}"
+                        )
+                    else:
+                        # No valid timestamps in this LRO, use folder modification time as fallback
+                        median_time_seconds = Path(folder_path).stat().st_mtime
+                        logging.warning(f"No valid timestamps in LRO {Path(folder_path).name}, using folder mtime")
+                else:
+                    # No file_end_datetimes available, use folder modification time as fallback
+                    median_time_seconds = Path(folder_path).stat().st_mtime
+                    logging.warning(f"No file_end_datetimes in LRO {Path(folder_path).name}, using folder mtime")
+
+                folder_lro_times.append((folder_path, lro, median_time_seconds))
+
+            except Exception as e:
+                logging.warning(f"Could not extract timing from {folder_path}: {e}")
+                raise
+
+        # Sort by median time
+        sorted_folder_lro_times = sorted(folder_lro_times, key=lambda x: x[2])
+        sorted_folder_lro_pairs = [(folder, lro) for folder, lro, _ in sorted_folder_lro_times]
+
+        # Log the sorting for debugging
+        if len(folder_lro_pairs) > 1:
+            logging.info("LRO temporal sorting details:")
+            for i, (folder, lro, median_time_seconds) in enumerate(sorted_folder_lro_times):
+                folder_name = Path(folder).name
+
+                # Convert back to datetime for readable logging
+                try:
+                    from datetime import datetime
+
+                    median_datetime = datetime.fromtimestamp(median_time_seconds)
+                    median_time_str = median_datetime.strftime("%Y-%m-%d %H:%M:%S")
+                except (TypeError, ValueError, OSError):
+                    median_time_str = f"{median_time_seconds:.1f}s"
+
+                # Handle mock objects gracefully for duration
+                try:
+                    duration = (
+                        lro.LongRecording.get_duration() if hasattr(lro, "LongRecording") and lro.LongRecording else 0
+                    )
+                    duration_str = f"{float(duration):.1f}s"
+                except (TypeError, ValueError):
+                    duration_str = "mock"
+
+                # Show number of recordings in LRO
+                try:
+                    n_recordings = (
+                        len(lro.file_end_datetimes)
+                        if hasattr(lro, "file_end_datetimes") and lro.file_end_datetimes
+                        else 0
+                    )
+                except (TypeError, AttributeError):
+                    n_recordings = "unknown"
+
+                logging.info(
+                    f"  {i + 1}. {folder_name}: median_timestamp={median_time_str}, {n_recordings} recordings, duration={duration_str}"
+                )
+
+            # Summary line for quick reference
+            folder_names = [Path(f).name for f, _, _ in sorted_folder_lro_times]
+            median_times = []
+            for _, _, median_time_seconds in sorted_folder_lro_times:
+                try:
+                    median_datetime = datetime.fromtimestamp(median_time_seconds)
+                    median_times.append(median_datetime.strftime("%H:%M:%S"))
+                except:
+                    median_times.append(f"{median_time_seconds:.1f}s")
+
+            logging.info(f"Final sort order: {list(zip(folder_names, median_times))}")
+
+        return sorted_folder_lro_pairs
 
     def convert_colbins_to_rowbins(self, overwrite=False, multiprocess_mode: Literal["dask", "serial"] = "serial"):
         for lrec in tqdm(self.long_recordings, desc="Converting column bins to row bins"):
