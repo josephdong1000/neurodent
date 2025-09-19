@@ -852,17 +852,18 @@ class TestLongRecordingOrganizer:
         assert organizer.meta.n_channels == 4
         assert organizer.meta.f_s == 1000.0
         
-    def test_convert_file_with_si_to_recording_file_mode(self, temp_dir):
+    @patch('spikeinterface.preprocessing.resample')
+    def test_convert_file_with_si_to_recording_file_mode(self, mock_resample, temp_dir):
         """Test convert_file_with_si_to_recording with single file input."""
         # Create test file
         test_file = temp_dir / "test.edf"
         test_file.touch()
-        
+
         from datetime import datetime
         organizer = LongRecordingOrganizer(temp_dir, mode=None,
                                          manual_datetimes=datetime(2023, 1, 1, 10, 0, 0),
                                          datetimes_are_start=True)
-        
+
         mock_extract = Mock()
         mock_recording = Mock()
         mock_recording.get_num_channels.return_value = 2
@@ -870,16 +871,26 @@ class TestLongRecordingOrganizer:
         mock_recording.get_channel_ids.return_value = np.array(['ch1', 'ch2'])
         mock_recording.get_duration.return_value = 1800.0
         mock_extract.return_value = mock_recording
-        
+
+        # Mock resampling since we're using mock recording
+        mock_resampled = Mock()
+        mock_resampled.get_num_channels.return_value = 2
+        mock_resampled.get_sampling_frequency.return_value = constants.GLOBAL_SAMPLING_RATE
+        mock_resampled.get_channel_ids.return_value = np.array(['ch1', 'ch2'])
+        mock_resampled.get_duration.return_value = 1800.0
+        mock_resample.return_value = mock_resampled
+
         organizer.convert_file_with_si_to_recording(
             extract_func=mock_extract,
             input_type="file",
             file_pattern="*.edf"
         )
-        
+
         # Should call extract with the found file
         mock_extract.assert_called_once_with(str(test_file))
-        assert organizer.LongRecording == mock_recording
+        # Should have resampled the recording since 500.0 != 1000.0
+        mock_resample.assert_called_once()
+        assert organizer.LongRecording == mock_resampled
         
     def test_convert_file_with_si_to_recording_files_mode(self, temp_dir):
         """Test convert_file_with_si_to_recording with multiple files."""
@@ -944,15 +955,23 @@ class TestLongRecordingOrganizer:
         
         mock_extract = Mock(return_value=mock_raw)
         
-        # Mock SpikeInterface recording
+        # Mock SpikeInterface recording - should have original sampling rate from MNE raw
         mock_si_rec = Mock()
         mock_si_rec.get_num_channels.return_value = 2
-        mock_si_rec.get_sampling_frequency.return_value = 1000.0
+        mock_si_rec.get_sampling_frequency.return_value = 2000.0  # Original MNE sampling rate
         mock_si_rec.get_channel_ids.return_value = np.array(['ch1', 'ch2'])
         mock_si_rec.get_duration.return_value = 3600.0
+
+        # Mock resampled recording
+        mock_resampled = Mock()
+        mock_resampled.get_num_channels.return_value = 2
+        mock_resampled.get_sampling_frequency.return_value = constants.GLOBAL_SAMPLING_RATE
+        mock_resampled.get_channel_ids.return_value = np.array(['ch1', 'ch2'])
+        mock_resampled.get_duration.return_value = 3600.0
         
         with patch('mne.export.export_raw') as mock_export, \
-             patch('spikeinterface.extractors.read_edf', return_value=mock_si_rec):
+             patch('spikeinterface.extractors.read_edf', return_value=mock_si_rec), \
+             patch('spikeinterface.preprocessing.resample', return_value=mock_resampled) as mock_resample:
             
             organizer.convert_file_with_mne_to_recording(
                 extract_func=mock_extract,
@@ -961,15 +980,12 @@ class TestLongRecordingOrganizer:
                 intermediate="edf"
             )
         
-        # Verify raw was resampled with correct parameters (MNE uses serial processing)
-        mock_raw.resample.assert_called_once()
-        call_args = mock_raw.resample.call_args
-        assert call_args[0][0] == constants.GLOBAL_SAMPLING_RATE  # First positional arg is sampling rate
-        assert call_args.kwargs['n_jobs'] == 1  # Serial processing for MNE
-        assert 'npad' in call_args.kwargs
-        assert 'method' in call_args.kwargs
+        # Verify raw was NOT resampled (new architecture moves resampling after intermediate file creation)
+        mock_raw.resample.assert_not_called()
+        # Verify SpikeInterface resampling WAS called since 2000.0 != 1000.0
+        mock_resample.assert_called_once()
         mock_export.assert_called_once()
-        assert organizer.LongRecording == mock_si_rec
+        assert organizer.LongRecording == mock_resampled
         
     def test_convert_file_with_mne_to_recording_bin_intermediate(self, temp_dir):
         """Test convert_file_with_mne_to_recording with binary intermediate."""
@@ -1023,6 +1039,184 @@ class TestLongRecordingOrganizer:
         np.testing.assert_array_almost_equal(written_data, expected_data)
         
         assert organizer.LongRecording == mock_si_rec
+
+    @patch('spikeinterface.preprocessing.resample')
+    def test_apply_resampling_different_sampling_rate(self, mock_resample, temp_dir):
+        """Test _apply_resampling method with different sampling rate."""
+        organizer = LongRecordingOrganizer(temp_dir, mode=None)
+
+        # Mock metadata
+        organizer.meta = Mock()
+        organizer.meta.update_sampling_rate = Mock()
+
+        # Mock input recording
+        mock_recording = Mock()
+        mock_recording.get_sampling_frequency.return_value = 2000.0
+
+        # Mock resampled recording
+        mock_resampled = Mock()
+        mock_resample.return_value = mock_resampled
+
+        result = organizer._apply_resampling(mock_recording)
+
+        # Verify resample was called with correct parameters
+        mock_resample.assert_called_once_with(
+            recording=mock_recording,
+            resample_rate=constants.GLOBAL_SAMPLING_RATE,
+            margin_ms=100.0
+        )
+
+        # Verify metadata was updated
+        organizer.meta.update_sampling_rate.assert_called_once_with(constants.GLOBAL_SAMPLING_RATE)
+
+        assert result == mock_resampled
+
+    def test_apply_resampling_same_sampling_rate(self, temp_dir):
+        """Test _apply_resampling method when no resampling needed."""
+        organizer = LongRecordingOrganizer(temp_dir, mode=None)
+
+        # Mock input recording at target rate
+        mock_recording = Mock()
+        mock_recording.get_sampling_frequency.return_value = constants.GLOBAL_SAMPLING_RATE
+
+        result = organizer._apply_resampling(mock_recording)
+
+        # Should return original recording without modification
+        assert result == mock_recording
+
+    def test_apply_resampling_no_metadata(self, temp_dir):
+        """Test _apply_resampling method when no metadata available."""
+        organizer = LongRecordingOrganizer(temp_dir, mode=None)
+        organizer.meta = None
+
+        # Mock input recording
+        mock_recording = Mock()
+        mock_recording.get_sampling_frequency.return_value = 2000.0
+
+        # Mock resampled recording
+        mock_resampled = Mock()
+        with patch('spikeinterface.preprocessing.resample', return_value=mock_resampled) as mock_resample:
+            result = organizer._apply_resampling(mock_recording)
+
+            # Verify resample was still called
+            mock_resample.assert_called_once()
+            assert result == mock_resampled
+
+    def test_apply_resampling_missing_spikeinterface(self, temp_dir):
+        """Test _apply_resampling method when SpikeInterface preprocessing not available."""
+        organizer = LongRecordingOrganizer(temp_dir, mode=None)
+
+        mock_recording = Mock()
+        mock_recording.get_sampling_frequency.return_value = 2000.0
+
+        # Mock missing preprocessing module
+        with patch('pythoneeg.core.core.spre', None):
+            with pytest.raises(ImportError, match="SpikeInterface preprocessing is required"):
+                organizer._apply_resampling(mock_recording)
+
+    def test_unified_resampling_metadata_consistency(self, temp_dir):
+        """Test that metadata is consistently updated across resampling scenarios."""
+        organizer = LongRecordingOrganizer(temp_dir, mode=None)
+
+        # Create mock metadata with specific sampling rate
+        organizer.meta = Mock()
+        organizer.meta.update_sampling_rate = Mock()
+        original_rate = 2000.0
+
+        # Test that metadata update is called when resampling occurs
+        mock_recording = Mock()
+        mock_recording.get_sampling_frequency.return_value = original_rate
+
+        with patch('spikeinterface.preprocessing.resample') as mock_resample:
+            mock_resampled = Mock()
+            mock_resample.return_value = mock_resampled
+
+            result = organizer._apply_resampling(mock_recording)
+
+            # Verify metadata was updated to target rate
+            organizer.meta.update_sampling_rate.assert_called_once_with(constants.GLOBAL_SAMPLING_RATE)
+
+    def test_unified_resampling_cross_pipeline_consistency(self, temp_dir):
+        """Test that all pipelines use the same resampling parameters."""
+        organizer = LongRecordingOrganizer(temp_dir, mode=None)
+
+        # Test recording with non-standard sampling rate
+        test_rates = [500.0, 2000.0, 4000.0]
+
+        for test_rate in test_rates:
+            mock_recording = Mock()
+            mock_recording.get_sampling_frequency.return_value = test_rate
+
+            with patch('spikeinterface.preprocessing.resample') as mock_resample:
+                mock_resampled = Mock()
+                mock_resample.return_value = mock_resampled
+
+                organizer._apply_resampling(mock_recording)
+
+                # Verify consistent parameters across all calls
+                if test_rate != constants.GLOBAL_SAMPLING_RATE:
+                    mock_resample.assert_called_once_with(
+                        recording=mock_recording,
+                        resample_rate=constants.GLOBAL_SAMPLING_RATE,
+                        margin_ms=100.0
+                    )
+                else:
+                    mock_resample.assert_not_called()
+
+    def test_unified_resampling_performance_parameters(self, temp_dir):
+        """Test that resampling uses appropriate performance parameters."""
+        organizer = LongRecordingOrganizer(temp_dir, mode=None)
+
+        mock_recording = Mock()
+        mock_recording.get_sampling_frequency.return_value = 2000.0
+
+        with patch('spikeinterface.preprocessing.resample') as mock_resample:
+            mock_resampled = Mock()
+            mock_resample.return_value = mock_resampled
+
+            organizer._apply_resampling(mock_recording)
+
+            # Verify performance-oriented parameters
+            mock_resample.assert_called_once_with(
+                recording=mock_recording,
+                resample_rate=constants.GLOBAL_SAMPLING_RATE,
+                margin_ms=100.0  # Should include margin for edge effects
+            )
+
+    def test_unified_resampling_logging_behavior(self, temp_dir):
+        """Test that resampling provides appropriate logging."""
+        organizer = LongRecordingOrganizer(temp_dir, mode=None)
+
+        # Test logging when resampling is needed
+        mock_recording = Mock()
+        mock_recording.get_sampling_frequency.return_value = 2000.0
+
+        with patch('spikeinterface.preprocessing.resample') as mock_resample, \
+             patch('pythoneeg.core.core.logging') as mock_logging:
+
+            mock_resampled = Mock()
+            mock_resample.return_value = mock_resampled
+
+            organizer._apply_resampling(mock_recording)
+
+            # Should log the resampling operation
+            mock_logging.info.assert_any_call(
+                f"Resampling recording from 2000.0 Hz to {constants.GLOBAL_SAMPLING_RATE} Hz using SpikeInterface"
+            )
+            mock_logging.info.assert_any_call(
+                f"Successfully resampled recording to {constants.GLOBAL_SAMPLING_RATE} Hz"
+            )
+
+        # Test logging when no resampling is needed
+        mock_recording.get_sampling_frequency.return_value = constants.GLOBAL_SAMPLING_RATE
+
+        with patch('pythoneeg.core.core.logging') as mock_logging:
+            organizer._apply_resampling(mock_recording)
+
+            # Should log that no resampling is needed
+            mock_logging.info.assert_called_with(
+                f"Recording already at target sampling rate ({constants.GLOBAL_SAMPLING_RATE} Hz), no resampling needed"
+            )
 
 
 class TestMNENJobsParameter:
@@ -1078,10 +1272,8 @@ class TestMNENJobsParameter:
                 intermediate="edf"
             )
         
-        # Should use n_jobs=1 (default)
-        mock_raw.resample.assert_called_once()
-        call_args = mock_raw.resample.call_args
-        assert call_args.kwargs['n_jobs'] == 1
+        # MNE resample should NOT be called (new architecture uses SpikeInterface resampling)
+        mock_raw.resample.assert_not_called()
     
     def test_explicit_n_jobs_override(self, temp_dir):
         """Test that users can override n_jobs parameter."""
@@ -1128,10 +1320,8 @@ class TestMNENJobsParameter:
                 intermediate="edf"
             )
         
-        # Should use user-specified n_jobs=4
-        mock_raw.resample.assert_called_once()
-        call_args = mock_raw.resample.call_args
-        assert call_args.kwargs['n_jobs'] == 4
+        # MNE resample should NOT be called (new architecture uses SpikeInterface resampling)
+        mock_raw.resample.assert_not_called()
     
     def test_n_jobs_direct_method_call(self, temp_dir):
         """Test n_jobs parameter when calling convert_file_with_mne_to_recording directly."""
@@ -1177,10 +1367,8 @@ class TestMNENJobsParameter:
                 n_jobs=6  # Override the instance default
             )
         
-        # Should use the method parameter n_jobs=6, not instance n_jobs=1
-        mock_raw.resample.assert_called_once()
-        call_args = mock_raw.resample.call_args
-        assert call_args.kwargs['n_jobs'] == 6
+        # MNE resample should NOT be called (new architecture uses SpikeInterface resampling)
+        mock_raw.resample.assert_not_called()
 
 
 @pytest.fixture

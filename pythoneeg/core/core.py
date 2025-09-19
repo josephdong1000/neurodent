@@ -17,6 +17,7 @@ except Exception:  # pragma: no cover - optional at import time for tests that d
 import mne
 import numpy as np
 import pandas as pd
+
 try:
     import spikeinterface.core as si
     import spikeinterface.extractors as se
@@ -254,6 +255,68 @@ def convert_ddfrowbin_to_si(bin_rowmajor_path, metadata):
         # Update metadata to reflect the new sampling rate
         metadata.update_sampling_rate(constants.GLOBAL_SAMPLING_RATE)
 
+    rec = spre.astype(rec, dtype=constants.GLOBAL_DTYPE)
+
+    return rec, temppath
+
+
+def _convert_ddfrowbin_to_si_no_resample(bin_rowmajor_path, metadata):
+    """Convert a row-major binary file to a SpikeInterface recording object WITHOUT resampling.
+
+    This is an internal function used by the unified resampling pipeline to avoid
+    resampling individual recordings before concatenation. Resampling is applied
+    once after concatenation for better performance.
+
+    Args:
+        bin_rowmajor_path (str): Path to the row-major binary file
+        metadata (DDFBinaryMetadata): Metadata object containing information about the recording
+
+    Returns:
+        tuple: A tuple containing:
+            - se.BaseRecording: The SpikeInterface Recording object (NOT resampled).
+            - str or None: Path to temporary file if created, None otherwise.
+    """
+    if se is None:
+        raise ImportError("SpikeInterface is required for _convert_ddfrowbin_to_si_no_resample")
+    assert isinstance(metadata, DDFBinaryMetadata), "Metadata needs to be of type DDFBinaryMetadata"
+
+    bin_rowmajor_path = Path(bin_rowmajor_path)
+    params = {
+        "sampling_frequency": metadata.f_s,
+        "dtype": metadata.precision,
+        "num_channels": metadata.n_channels,
+        "gain_to_uV": metadata.mult_to_uV,
+        "offset_to_uV": 0,
+        "time_axis": 0,
+        "is_filtered": False,
+    }
+
+    # Read either .npy.gz files or .bin files into the recording object
+    if ".npy.gz" in str(bin_rowmajor_path):
+        temppath = os.path.join(get_temp_directory(), os.urandom(24).hex())
+        try:
+            with open(temppath, "wb") as tmp:
+                try:
+                    fcomp = gzip.GzipFile(bin_rowmajor_path, "r")
+                    bin_rowmajor_decomp = np.load(fcomp)
+                    bin_rowmajor_decomp.tofile(tmp)
+                except (EOFError, OSError) as e:
+                    logging.error(
+                        f"Failed to read .npy.gz file: {bin_rowmajor_path}. Try regenerating row-major files."
+                    )
+                    raise
+
+            rec = se.read_binary(tmp.name, **params)
+        except Exception as e:
+            # Clean up temp file if it exists
+            if os.path.exists(temppath):
+                os.remove(temppath)
+            raise
+    else:
+        rec = se.read_binary(bin_rowmajor_path, **params)
+        temppath = None
+
+    # NOTE: No resampling applied here - will be handled by unified resampling after concatenation
     rec = spre.astype(rec, dtype=constants.GLOBAL_DTYPE)
 
     return rec, temppath
@@ -599,7 +662,7 @@ class LongRecordingOrganizer:
                 # Compute all conversions in parallel
                 delayed_results = []
                 for i, e in enumerate(self.rowbins):
-                    delayed_results.append((i, dask.delayed(convert_ddfrowbin_to_si)(e, self.meta)))
+                    delayed_results.append((i, dask.delayed(_convert_ddfrowbin_to_si_no_resample)(e, self.meta)))
                 computed_results = dask.compute(*delayed_results)
 
                 # Reconstruct results in the correct order
@@ -609,7 +672,7 @@ class LongRecordingOrganizer:
                 logging.info(f"self.rowbins: {[Path(x).name for x in self.rowbins]}")
 
             case "serial":
-                results = [convert_ddfrowbin_to_si(e, self.meta) for e in self.rowbins]
+                results = [_convert_ddfrowbin_to_si_no_resample(e, self.meta) for e in self.rowbins]
             case _:
                 raise ValueError(f"Invalid multiprocess_mode: {multiprocess_mode}")
 
@@ -629,7 +692,11 @@ class LongRecordingOrganizer:
         elif len(recs) < len(self.rowbins):
             logging.warning(f"Only {len(recs)} recordings generated. Some row-major files may be missing.")
 
-        self.LongRecording: "si.BaseRecording" = si.concatenate_recordings(recs).rename_channels(self.channel_names)
+        # Concatenate recordings first
+        concatenated_recording = si.concatenate_recordings(recs).rename_channels(self.channel_names)
+
+        # Apply unified resampling to the concatenated recording
+        self.LongRecording: "si.BaseRecording" = self._apply_resampling(concatenated_recording)
 
         # Debug logging for critical recording features
         logging.info(f"LongRecording created: {self}")
@@ -709,7 +776,9 @@ class LongRecordingOrganizer:
         # Store number of processed files for timestamp handling
         self._n_processed_files = n_processed_files
 
-        self.LongRecording = rec
+        # Apply unified resampling to the recording
+        self.LongRecording = self._apply_resampling(rec)
+
         # For SI mode, don't use confusing DEFAULT_DAY if we have manual timestamps
         dt_end = None if self.manual_datetimes is not None else None  # Will be set by finalize_file_timestamps
 
@@ -785,6 +854,42 @@ class LongRecordingOrganizer:
             logging.info(
                 f"Sampling frequency already matches {constants.GLOBAL_SAMPLING_RATE} Hz, no resampling needed"
             )
+
+        return raw
+
+    def _load_mne_data_no_resample(
+        self, extract_func, input_type, datafolder, datafile, datafiles, **kwargs
+    ) -> mne.io.Raw:
+        """Load MNE data without resampling for unified resampling pipeline.
+
+        This method loads and concatenates MNE data but skips resampling,
+        allowing the unified resampling to be applied after intermediate file creation.
+        """
+        # Load data based on input type
+        if input_type == "folder":
+            raw: mne.io.Raw = extract_func(datafolder, **kwargs)
+        elif input_type == "file":
+            raw: mne.io.Raw = extract_func(datafile, **kwargs)
+        elif input_type == "files":
+            logging.info(f"Running extract_func on {len(datafiles)} files")
+            raws: list[mne.io.Raw] = [extract_func(x, **kwargs) for x in datafiles]
+            logging.info(f"Concatenating {len(raws)} raws")
+            raw: mne.io.Raw = mne.concatenate_raws(raws)
+            del raws
+        else:
+            raise ValueError(f"Invalid input_type: {input_type}")
+
+        logging.info(f"raw.info: {raw.info}")
+
+        # Ensure data is preloaded
+        if not raw.preload:
+            logging.info("Preloading data")
+            raw.load_data()
+
+        # NOTE: No resampling applied here - will be handled by unified resampling after loading from cache
+        logging.info(
+            f"Data loaded at original sampling rate ({raw.info['sfreq']} Hz) - resampling will be applied later"
+        )
 
         return raw
 
@@ -917,10 +1022,8 @@ class LongRecordingOrganizer:
             )
             logging.info(f"Created metadata from raw: {metadata.n_channels} channels, {metadata.f_s} Hz")
 
-            # Load and process all the data (this may resample and update metadata)
-            raw = self._load_and_process_mne_data(
-                extract_func, input_type, datafolder, datafile, datafiles, n_jobs, metadata_to_update=metadata, **kwargs
-            )
+            # Load data without resampling (resampling will be applied after intermediate file loading)
+            raw = self._load_mne_data_no_resample(extract_func, input_type, datafolder, datafile, datafiles, **kwargs)
 
             # Create the intermediate file
             if intermediate == "edf":
@@ -1045,7 +1148,7 @@ class LongRecordingOrganizer:
         fname = self.base_folder_path / f"{intermediate_name}.{intermediate}"
 
         # Get or create the intermediate file (this handles caching logic)
-        rec, raw, metadata = self._get_or_create_intermediate_file(
+        rec, _, metadata = self._get_or_create_intermediate_file(
             fname=fname,
             source_paths=source_paths,
             cache_policy=cache_policy,
@@ -1059,14 +1162,15 @@ class LongRecordingOrganizer:
             **kwargs,
         )
 
-        self.LongRecording = rec
+        # Set metadata first so resampling can update it
+        self.meta = metadata
 
-        # Use the metadata object that was either loaded from cache or created from raw data
+        # Apply unified resampling to the loaded recording (this will update metadata sampling rate)
+        self.LongRecording = self._apply_resampling(rec)
+
         # Update dt_end for manual timestamps (will be properly set by finalize_file_timestamps)
         if self.manual_datetimes is not None:
-            metadata.dt_end = None  # Will be set by finalize_file_timestamps
-
-        self.meta = metadata
+            self.meta.dt_end = None  # Will be set by finalize_file_timestamps
         self.channel_names = self.meta.channel_names
 
         # For mne mode, handle multiple files or single file
@@ -1206,13 +1310,13 @@ class LongRecordingOrganizer:
             logging.info(f"Computing LOF scores for {rec.__str__()}")
             logging.debug("Getting traces from recording object")
             rec_np = rec.get_traces(return_scaled=True)  # (n_samples, n_channels)
-            
+
             if rec_np is None or rec_np.size == 0:
                 logging.error("Failed to get traces from recording - data is None or empty")
                 raise ValueError("Recording traces are None or empty")
-            
+
             logging.debug(f"Got traces shape: {rec_np.shape}")
-            
+
             if limit_memory:
                 rec_np = rec_np.astype(np.float16)
                 rec_np = decimate(rec_np, 10, axis=0)
@@ -1242,11 +1346,13 @@ class LongRecordingOrganizer:
             logging.debug(f"LOF scores: {scores}")
 
             return scores
-            
+
         except Exception as e:
             logging.error(f"Failed to compute LOF scores: {e}")
-            logging.error(f"Recording info: channels={getattr(self, 'channel_names', 'unknown')}, "
-                         f"duration={getattr(rec, 'duration', 'unknown') if 'rec' in locals() else 'unknown'}")
+            logging.error(
+                f"Recording info: channels={getattr(self, 'channel_names', 'unknown')}, "
+                f"duration={getattr(rec, 'duration', 'unknown') if 'rec' in locals() else 'unknown'}"
+            )
             raise
 
     def apply_lof_threshold(self, lof_threshold: float):
@@ -1448,6 +1554,46 @@ class LongRecordingOrganizer:
             f"{sampling_freq} Hz, {total_duration:.1f}s duration, "
             f"channels: {channel_info}{metadata_info}, timestamps: {timestamp_info}"
         )
+
+    def _apply_resampling(self, recording: "si.BaseRecording") -> "si.BaseRecording":
+        """Apply unified resampling using SpikeInterface preprocessing.
+
+        This method centralizes all resampling logic across the different data loading pipelines
+        (binary, MNE, SI) to use the fast SpikeInterface resampling implementation consistently.
+
+        Args:
+            recording (si.BaseRecording): The recording to resample
+
+        Returns:
+            si.BaseRecording: The resampled recording
+
+        Raises:
+            ImportError: If SpikeInterface preprocessing is not available
+        """
+        if spre is None:
+            raise ImportError("SpikeInterface preprocessing is required for resampling")
+
+        current_rate = recording.get_sampling_frequency()
+        target_rate = constants.GLOBAL_SAMPLING_RATE
+
+        if current_rate == target_rate:
+            logging.info(f"Recording already at target sampling rate ({target_rate} Hz), no resampling needed")
+            return recording
+
+        logging.info(f"Resampling recording from {current_rate} Hz to {target_rate} Hz using SpikeInterface")
+
+        # Use SpikeInterface resampling with margin to reduce edge effects
+        resampled_recording = spre.resample(
+            recording=recording,
+            resample_rate=target_rate,
+        )
+
+        # Update metadata to reflect new sampling rate
+        if hasattr(self, "meta") and self.meta is not None:
+            self.meta.update_sampling_rate(target_rate)
+
+        logging.info(f"Successfully resampled recording to {target_rate} Hz")
+        return resampled_recording
 
     def merge(self, other_lro):
         """Merge another LRO into this one using si.concatenate_recordings.
