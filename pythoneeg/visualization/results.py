@@ -129,6 +129,16 @@ class AnimalOrganizer(AnimalFeatureParser):
                 raise ValueError(f"Invalid mode: {mode}")
 
         self._bin_folders = glob.glob(str(self.bin_folder_pattern))
+
+        # Filter to only include directories (LongRecordingOrganizer expects folder paths)
+        before_filter_count = len(self._bin_folders)
+        self._bin_folders = [x for x in self._bin_folders if Path(x).is_dir()]
+        after_filter_count = len(self._bin_folders)
+
+        if before_filter_count > after_filter_count:
+            filtered_count = before_filter_count - after_filter_count
+            logging.info(f"Filtered out {filtered_count} non-directory items (files) from glob results")
+
         # if mode != 'noday':
         #     self.__bin_folders = [x for x in self.__bin_folders if datetime.strptime(Path(x).name, self.date_format)]
         truncate = core.utils.parse_truncate(truncate)
@@ -144,7 +154,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         if mode == "noday" and len(self._bin_folders) > 1:
             raise ValueError(f"Animal ID '{self.anim_id}' is not unique, found: {', '.join(self._bin_folders)}")
         elif len(self._bin_folders) == 0:
-            raise ValueError(f"No files found for animal ID {self.anim_id}")
+            raise ValueError(f"No directories found for animal ID {self.anim_id} (pattern: {self.bin_folder_pattern})")
 
         animalday_dicts = [
             core.parse_path_to_animalday(e, animal_param=self.animal_param, day_sep=self.day_sep, mode=self.read_mode)
