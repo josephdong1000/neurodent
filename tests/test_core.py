@@ -1062,8 +1062,7 @@ class TestLongRecordingOrganizer:
         # Verify resample was called with correct parameters
         mock_resample.assert_called_once_with(
             recording=mock_recording,
-            resample_rate=constants.GLOBAL_SAMPLING_RATE,
-            margin_ms=100.0
+            resample_rate=constants.GLOBAL_SAMPLING_RATE
         )
 
         # Verify metadata was updated
@@ -1157,8 +1156,7 @@ class TestLongRecordingOrganizer:
                 if test_rate != constants.GLOBAL_SAMPLING_RATE:
                     mock_resample.assert_called_once_with(
                         recording=mock_recording,
-                        resample_rate=constants.GLOBAL_SAMPLING_RATE,
-                        margin_ms=100.0
+                        resample_rate=constants.GLOBAL_SAMPLING_RATE
                     )
                 else:
                     mock_resample.assert_not_called()
@@ -1179,8 +1177,7 @@ class TestLongRecordingOrganizer:
             # Verify performance-oriented parameters
             mock_resample.assert_called_once_with(
                 recording=mock_recording,
-                resample_rate=constants.GLOBAL_SAMPLING_RATE,
-                margin_ms=100.0  # Should include margin for edge effects
+                resample_rate=constants.GLOBAL_SAMPLING_RATE
             )
 
     def test_unified_resampling_logging_behavior(self, temp_dir):
