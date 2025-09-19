@@ -187,7 +187,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         self.animaldays = self.unique_animaldays
         logging.info(f"self.animaldays (unique): {self.animaldays}")
 
-        genotypes = [x["genotype"] for x in animalday_dicts]
+        genotypes = [x["genotype"] for x in self._animalday_dicts]
         if len(set(genotypes)) > 1:
             warnings.warn(f"Inconsistent genotypes in {genotypes}")
         self.genotype = genotypes[0]
@@ -197,16 +197,14 @@ class AnimalOrganizer(AnimalFeatureParser):
         logging.debug(f"Creating {len(self.unique_animaldays)} LongRecordings (one per unique animalday)")
 
         # Process manual_datetimes if provided in lro_kwargs
-        if 'manual_datetimes' in lro_kwargs:
+        if "manual_datetimes" in lro_kwargs:
             logging.info("Processing manual_datetimes configuration")
             # Create base kwargs without manual_datetimes for duration estimation
             base_lro_kwargs = lro_kwargs.copy()
-            del base_lro_kwargs['manual_datetimes']
+            del base_lro_kwargs["manual_datetimes"]
 
             self._processed_timestamps = self._process_all_timestamps(
-                lro_kwargs['manual_datetimes'],
-                self._animalday_folder_groups,
-                base_lro_kwargs
+                lro_kwargs["manual_datetimes"], self._animalday_folder_groups, base_lro_kwargs
             )
             # Remove from lro_kwargs since we'll handle it manually
             lro_kwargs = base_lro_kwargs
@@ -237,7 +235,9 @@ class AnimalOrganizer(AnimalFeatureParser):
         elif isinstance(input_spec, list):
             # Validate that all items are datetime objects
             if not all(isinstance(dt, datetime) for dt in input_spec):
-                raise TypeError(f"All items in timestamp list must be datetime objects, got: {[type(dt) for dt in input_spec]}")
+                raise TypeError(
+                    f"All items in timestamp list must be datetime objects, got: {[type(dt) for dt in input_spec]}"
+                )
             return input_spec
 
         elif callable(input_spec):
@@ -251,8 +251,9 @@ class AnimalOrganizer(AnimalFeatureParser):
                 raise
 
         else:
-            raise TypeError(f"Invalid timestamp input type: {type(input_spec)}. "
-                          f"Expected: datetime, List[datetime], or Callable")
+            raise TypeError(
+                f"Invalid timestamp input type: {type(input_spec)}. Expected: datetime, List[datetime], or Callable"
+            )
 
     def _find_folder_by_name(self, folder_name: str, animalday_to_folders: dict) -> Path:
         """Find folder path by name in the animalday groups."""
@@ -267,7 +268,9 @@ class AnimalOrganizer(AnimalFeatureParser):
 
         raise ValueError(f"Folder name '{folder_name}' not found. Available folders: {available_names}")
 
-    def _compute_global_timeline(self, base_datetime: datetime, animalday_to_folders: dict, base_lro_kwargs: dict) -> dict:
+    def _compute_global_timeline(
+        self, base_datetime: datetime, animalday_to_folders: dict, base_lro_kwargs: dict
+    ) -> dict:
         """
         Compute contiguous timeline for all folders starting from base_datetime.
 
@@ -320,16 +323,15 @@ class AnimalOrganizer(AnimalFeatureParser):
         folder_durations = {}
 
         for folder in ordered_folders:
-            try:
-                # Create temporary LRO to get duration
-                temp_lro = core.LongRecordingOrganizer(folder, **base_lro_kwargs)
-                duration = temp_lro.LongRecording.get_duration() if hasattr(temp_lro, 'LongRecording') and temp_lro.LongRecording else 0.0
-                folder_durations[folder] = duration
-                logging.debug(f"Folder {Path(folder).name}: estimated duration = {duration:.1f}s")
-            except Exception as e:
-                logging.warning(f"Failed to estimate duration for {folder}: {e}. Using default 3600s (1 hour)")
-                folder_durations[folder] = 3600.0  # Default to 1 hour
-
+            # Create temporary LRO to get duration
+            temp_lro = core.LongRecordingOrganizer(folder, **base_lro_kwargs)
+            duration = (
+                temp_lro.LongRecording.get_duration()
+                if hasattr(temp_lro, "LongRecording") and temp_lro.LongRecording
+                else 0.0
+            )
+            folder_durations[folder] = duration
+            logging.debug(f"Folder {Path(folder).name}: estimated duration = {duration:.1f}s")
         # Step 3: Compute continuous start times
         result = {}
         current_start_time = base_datetime
@@ -345,7 +347,9 @@ class AnimalOrganizer(AnimalFeatureParser):
             logging.debug(f"Timeline: {folder_name} starts at {result[folder_name]}, duration {duration:.1f}s")
 
         total_timeline_duration = sum(folder_durations.values())
-        logging.info(f"Continuous timeline computed: {len(result)} folders, total duration {total_timeline_duration:.1f}s")
+        logging.info(
+            f"Continuous timeline computed: {len(result)} folders, total duration {total_timeline_duration:.1f}s"
+        )
 
         return result
 
@@ -405,7 +409,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         if folder_name in self._processed_timestamps:
             # Add the processed timestamps for this folder
             kwargs = base_lro_kwargs.copy()
-            kwargs['manual_datetimes'] = self._processed_timestamps[folder_name]
+            kwargs["manual_datetimes"] = self._processed_timestamps[folder_name]
             logging.debug(f"Using processed timestamps for folder {folder_name}: {kwargs['manual_datetimes']}")
             return kwargs
         else:
@@ -425,9 +429,11 @@ class AnimalOrganizer(AnimalFeatureParser):
             try:
                 start_time = self._get_lro_start_time(lro)
                 end_time = self._get_lro_end_time(lro)
-                duration = lro.LongRecording.get_duration() if hasattr(lro, 'LongRecording') and lro.LongRecording else 0
-                n_files = len(lro.file_durations) if hasattr(lro, 'file_durations') and lro.file_durations else 1
-                folder_path = getattr(lro, 'base_folder_path', 'unknown')
+                duration = (
+                    lro.LongRecording.get_duration() if hasattr(lro, "LongRecording") and lro.LongRecording else 0
+                )
+                n_files = len(lro.file_durations) if hasattr(lro, "file_durations") and lro.file_durations else 1
+                folder_path = getattr(lro, "base_folder_path", "unknown")
 
                 logging.info(
                     f"LRO {i}: {start_time} → {end_time} "
@@ -440,8 +446,8 @@ class AnimalOrganizer(AnimalFeatureParser):
 
     def _get_lro_start_time(self, lro):
         """Get the start time of an LRO."""
-        if hasattr(lro, 'file_end_datetimes') and lro.file_end_datetimes:
-            if hasattr(lro, 'file_durations') and lro.file_durations:
+        if hasattr(lro, "file_end_datetimes") and lro.file_end_datetimes:
+            if hasattr(lro, "file_durations") and lro.file_durations:
                 # Calculate start time from first end time and duration
                 first_end = next(dt for dt in lro.file_end_datetimes if dt is not None)
                 first_duration = lro.file_durations[0]
@@ -450,7 +456,7 @@ class AnimalOrganizer(AnimalFeatureParser):
 
     def _get_lro_end_time(self, lro):
         """Get the end time of an LRO."""
-        if hasattr(lro, 'file_end_datetimes') and lro.file_end_datetimes:
+        if hasattr(lro, "file_end_datetimes") and lro.file_end_datetimes:
             # Get the last non-None end time
             end_times = [dt for dt in lro.file_end_datetimes if dt is not None]
             if end_times:
@@ -479,33 +485,41 @@ class AnimalOrganizer(AnimalFeatureParser):
             try:
                 start_time = self._get_lro_start_time(lro)
                 end_time = self._get_lro_end_time(lro)
-                duration = lro.LongRecording.get_duration() if hasattr(lro, 'LongRecording') and lro.LongRecording else 0
-                n_files = len(lro.file_durations) if hasattr(lro, 'file_durations') and lro.file_durations else 1
-                folder_path = getattr(lro, 'base_folder_path', 'unknown')
+                duration = (
+                    lro.LongRecording.get_duration() if hasattr(lro, "LongRecording") and lro.LongRecording else 0
+                )
+                n_files = len(lro.file_durations) if hasattr(lro, "file_durations") and lro.file_durations else 1
+                folder_path = getattr(lro, "base_folder_path", "unknown")
 
-                timeline_data.append({
-                    'lro_index': i,
-                    'start_time': start_time,
-                    'end_time': end_time,
-                    'duration_s': duration,
-                    'n_files': n_files,
-                    'folder_path': str(folder_path),
-                    'folder_name': Path(folder_path).name if folder_path != 'unknown' else 'unknown',
-                    'animalday': getattr(lro, '_animalday', 'unknown')  # This might not exist, but useful if it does
-                })
+                timeline_data.append(
+                    {
+                        "lro_index": i,
+                        "start_time": start_time,
+                        "end_time": end_time,
+                        "duration_s": duration,
+                        "n_files": n_files,
+                        "folder_path": str(folder_path),
+                        "folder_name": Path(folder_path).name if folder_path != "unknown" else "unknown",
+                        "animalday": getattr(
+                            lro, "_animalday", "unknown"
+                        ),  # This might not exist, but useful if it does
+                    }
+                )
             except Exception as e:
                 # Include failed LROs in the summary for debugging
-                timeline_data.append({
-                    'lro_index': i,
-                    'start_time': 'error',
-                    'end_time': 'error',
-                    'duration_s': 0,
-                    'n_files': 0,
-                    'folder_path': 'error',
-                    'folder_name': 'error',
-                    'animalday': 'error',
-                    'error': str(e)
-                })
+                timeline_data.append(
+                    {
+                        "lro_index": i,
+                        "start_time": "error",
+                        "end_time": "error",
+                        "duration_s": 0,
+                        "n_files": 0,
+                        "folder_path": "error",
+                        "folder_name": "error",
+                        "animalday": "error",
+                        "error": str(e),
+                    }
+                )
 
         return pd.DataFrame(timeline_data)
 
