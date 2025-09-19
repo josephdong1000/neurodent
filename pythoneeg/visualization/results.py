@@ -7,7 +7,7 @@ import re
 import tempfile
 import time
 import warnings
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Literal
 
@@ -156,14 +156,14 @@ class AnimalOrganizer(AnimalFeatureParser):
         elif len(self._bin_folders) == 0:
             raise ValueError(f"No directories found for animal ID {self.anim_id} (pattern: {self.bin_folder_pattern})")
 
-        animalday_dicts = [
+        self._animalday_dicts = [
             core.parse_path_to_animalday(e, animal_param=self.animal_param, day_sep=self.day_sep, mode=self.read_mode)
             for e in self._bin_folders
         ]
 
         # Group folders by parsed animalday to handle overlapping days
         animalday_to_folders = {}
-        for folder, animalday_dict in zip(self._bin_folders, animalday_dicts):
+        for folder, animalday_dict in zip(self._bin_folders, self._animalday_dicts):
             animalday = animalday_dict["animalday"]
             if animalday not in animalday_to_folders:
                 animalday_to_folders[animalday] = []
@@ -196,20 +196,337 @@ class AnimalOrganizer(AnimalFeatureParser):
         self.long_analyzers: list[core.LongRecordingAnalyzer] = []
         logging.debug(f"Creating {len(self.unique_animaldays)} LongRecordings (one per unique animalday)")
 
+        # Process manual_datetimes if provided in lro_kwargs
+        if 'manual_datetimes' in lro_kwargs:
+            logging.info("Processing manual_datetimes configuration")
+            # Create base kwargs without manual_datetimes for duration estimation
+            base_lro_kwargs = lro_kwargs.copy()
+            del base_lro_kwargs['manual_datetimes']
+
+            self._processed_timestamps = self._process_all_timestamps(
+                lro_kwargs['manual_datetimes'],
+                self._animalday_folder_groups,
+                base_lro_kwargs
+            )
+            # Remove from lro_kwargs since we'll handle it manually
+            lro_kwargs = base_lro_kwargs
+        else:
+            self._processed_timestamps = None
+
+        # Create LongRecordingOrganizer instances
+        self._create_long_recordings(lro_kwargs)
+
+    def _resolve_timestamp_input(self, input_spec, folder_path: Path):
+        """
+        Recursively resolve any timestamp input type to concrete datetime(s).
+
+        Args:
+            input_spec: datetime, List[datetime], or Callable returning either
+            folder_path: Path to folder for function execution context
+
+        Returns:
+            Union[datetime, List[datetime]]: Resolved timestamp(s)
+
+        Raises:
+            TypeError: If input_spec is not a supported type
+            Exception: If user function fails (wrapped with context)
+        """
+        if isinstance(input_spec, datetime):
+            return input_spec
+
+        elif isinstance(input_spec, list):
+            # Validate that all items are datetime objects
+            if not all(isinstance(dt, datetime) for dt in input_spec):
+                raise TypeError(f"All items in timestamp list must be datetime objects, got: {[type(dt) for dt in input_spec]}")
+            return input_spec
+
+        elif callable(input_spec):
+            try:
+                logging.debug(f"Executing user timestamp function on folder: {folder_path}")
+                result = input_spec(folder_path)
+                # Recursively process the result (functions can return datetime or list)
+                return self._resolve_timestamp_input(result, folder_path)
+            except Exception as e:
+                logging.error(f"User timestamp function failed on folder '{folder_path}': {e}")
+                raise
+
+        else:
+            raise TypeError(f"Invalid timestamp input type: {type(input_spec)}. "
+                          f"Expected: datetime, List[datetime], or Callable")
+
+    def _find_folder_by_name(self, folder_name: str, animalday_to_folders: dict) -> Path:
+        """Find folder path by name in the animalday groups."""
+        for animalday, folders in animalday_to_folders.items():
+            for folder in folders:
+                if Path(folder).name == folder_name:
+                    return Path(folder)
+
+        available_names = []
+        for folders in animalday_to_folders.values():
+            available_names.extend([Path(f).name for f in folders])
+
+        raise ValueError(f"Folder name '{folder_name}' not found. Available folders: {available_names}")
+
+    def _compute_global_timeline(self, base_datetime: datetime, animalday_to_folders: dict, base_lro_kwargs: dict) -> dict:
+        """
+        Compute contiguous timeline for all folders starting from base_datetime.
+
+        This uses a two-pass approach:
+        1. Create temporary LROs to determine durations
+        2. Compute continuous start times based on cumulative durations
+        3. Return timeline mapping for final LRO creation
+
+        Args:
+            base_datetime: Starting datetime for the timeline
+            animalday_to_folders: Mapping of animalday -> list of folder paths
+            base_lro_kwargs: Base kwargs for LRO construction (without manual_datetimes)
+
+        Returns:
+            dict: Mapping of folder_name -> start_datetime for continuous timeline
+        """
+        total_folders = sum(len(folders) for folders in animalday_to_folders.values())
+        total_animaldays = len(animalday_to_folders)
+
+        logging.info(
+            f"Computing continuous timeline for {total_animaldays} animaldays ({total_folders} total folders) "
+            f"starting at {base_datetime}"
+        )
+
+        # Step 1: Create temporary LROs to determine durations
+        # We need to create LROs in the order they will appear in the final timeline
+        ordered_folders = []
+        for animalday in sorted(animalday_to_folders.keys()):
+            folders = animalday_to_folders[animalday]
+            if len(folders) > 1:
+                # For overlapping folders, we need to sort them by temporal order
+                # Create temp LROs to get timing info for sorting
+                folder_lro_pairs = []
+                for folder in folders:
+                    try:
+                        temp_lro = core.LongRecordingOrganizer(folder, **base_lro_kwargs)
+                        folder_lro_pairs.append((folder, temp_lro))
+                    except Exception as e:
+                        logging.warning(f"Failed to create temp LRO for duration estimation in {folder}: {e}")
+                        # Use folder order as fallback
+                        folder_lro_pairs.append((folder, None))
+
+                # Sort by median time if possible
+                sorted_pairs = self._sort_lros_by_median_time(folder_lro_pairs)
+                ordered_folders.extend([folder for folder, _ in sorted_pairs])
+            else:
+                ordered_folders.extend(folders)
+
+        # Step 2: Estimate total duration for each folder
+        folder_durations = {}
+
+        for folder in ordered_folders:
+            try:
+                # Create temporary LRO to get duration
+                temp_lro = core.LongRecordingOrganizer(folder, **base_lro_kwargs)
+                duration = temp_lro.LongRecording.get_duration() if hasattr(temp_lro, 'LongRecording') and temp_lro.LongRecording else 0.0
+                folder_durations[folder] = duration
+                logging.debug(f"Folder {Path(folder).name}: estimated duration = {duration:.1f}s")
+            except Exception as e:
+                logging.warning(f"Failed to estimate duration for {folder}: {e}. Using default 3600s (1 hour)")
+                folder_durations[folder] = 3600.0  # Default to 1 hour
+
+        # Step 3: Compute continuous start times
+        result = {}
+        current_start_time = base_datetime
+
+        for folder in ordered_folders:
+            folder_name = Path(folder).name
+            result[folder_name] = current_start_time
+
+            # Move to next start time (current start + duration)
+            duration = folder_durations[folder]
+            current_start_time = current_start_time + timedelta(seconds=duration)
+
+            logging.debug(f"Timeline: {folder_name} starts at {result[folder_name]}, duration {duration:.1f}s")
+
+        total_timeline_duration = sum(folder_durations.values())
+        logging.info(f"Continuous timeline computed: {len(result)} folders, total duration {total_timeline_duration:.1f}s")
+
+        return result
+
+    def _process_all_timestamps(self, manual_datetimes, animalday_to_folders: dict, base_lro_kwargs: dict) -> dict:
+        """
+        Process the top-level manual_datetimes input and return folder_name -> resolved_timestamps mapping.
+
+        Args:
+            manual_datetimes: Any supported timestamp input type
+            animalday_to_folders: Mapping of animalday -> list of folder paths
+            base_lro_kwargs: Base kwargs for LRO construction (without manual_datetimes)
+
+        Returns:
+            dict: Mapping of folder_name -> Union[datetime, List[datetime]]
+        """
+        if isinstance(manual_datetimes, dict):
+            # Per-folder specification
+            logging.info("Processing per-folder timestamp specification")
+            resolved = {}
+            for folder_name, folder_spec in manual_datetimes.items():
+                folder_path = self._find_folder_by_name(folder_name, animalday_to_folders)
+                resolved[folder_name] = self._resolve_timestamp_input(folder_spec, folder_path)
+                logging.debug(f"Resolved timestamps for {folder_name}: {resolved[folder_name]}")
+            return resolved
+
+        elif isinstance(manual_datetimes, datetime):
+            # Global timeline - compute contiguous spacing
+            logging.info(f"Processing global timeline starting at {manual_datetimes}")
+            return self._compute_global_timeline(manual_datetimes, animalday_to_folders, base_lro_kwargs)
+
+        else:
+            # Function or list at top level - apply to all folders
+            logging.info("Processing timestamp input for all folders")
+            resolved = {}
+            for animalday, folders in animalday_to_folders.items():
+                for folder in folders:
+                    folder_name = Path(folder).name
+                    resolved[folder_name] = self._resolve_timestamp_input(manual_datetimes, Path(folder))
+                    logging.debug(f"Resolved timestamps for {folder_name}: {resolved[folder_name]}")
+            return resolved
+
+    def _get_lro_kwargs_for_folder(self, folder_path: str, base_lro_kwargs: dict) -> dict:
+        """
+        Get the appropriate lro_kwargs for a specific folder, including processed timestamps if available.
+
+        Args:
+            folder_path: Path to the folder
+            base_lro_kwargs: Base kwargs to extend
+
+        Returns:
+            dict: lro_kwargs with manual_datetimes added if available
+        """
+        if self._processed_timestamps is None:
+            return base_lro_kwargs
+
+        folder_name = Path(folder_path).name
+        if folder_name in self._processed_timestamps:
+            # Add the processed timestamps for this folder
+            kwargs = base_lro_kwargs.copy()
+            kwargs['manual_datetimes'] = self._processed_timestamps[folder_name]
+            logging.debug(f"Using processed timestamps for folder {folder_name}: {kwargs['manual_datetimes']}")
+            return kwargs
+        else:
+            # No processed timestamps for this folder - use base kwargs
+            logging.debug(f"No processed timestamps for folder {folder_name}, using base kwargs")
+            return base_lro_kwargs
+
+    def _log_timeline_summary(self):
+        """Log timeline summary for debugging purposes."""
+        if not self.long_recordings:
+            logging.info("=== AnimalOrganizer Timeline Summary ===")
+            logging.info("No LongRecordings created")
+            return
+
+        logging.info("=== AnimalOrganizer Timeline Summary ===")
+        for i, lro in enumerate(self.long_recordings):
+            try:
+                start_time = self._get_lro_start_time(lro)
+                end_time = self._get_lro_end_time(lro)
+                duration = lro.LongRecording.get_duration() if hasattr(lro, 'LongRecording') and lro.LongRecording else 0
+                n_files = len(lro.file_durations) if hasattr(lro, 'file_durations') and lro.file_durations else 1
+                folder_path = getattr(lro, 'base_folder_path', 'unknown')
+
+                logging.info(
+                    f"LRO {i}: {start_time} → {end_time} "
+                    f"(duration: {duration:.1f}s, files: {n_files}, folder: {Path(folder_path).name})"
+                )
+            except Exception as e:
+                logging.warning(f"Failed to get timeline info for LRO {i}: {e}")
+
+        logging.info("=== End Timeline Summary ===")
+
+    def _get_lro_start_time(self, lro):
+        """Get the start time of an LRO."""
+        if hasattr(lro, 'file_end_datetimes') and lro.file_end_datetimes:
+            if hasattr(lro, 'file_durations') and lro.file_durations:
+                # Calculate start time from first end time and duration
+                first_end = next(dt for dt in lro.file_end_datetimes if dt is not None)
+                first_duration = lro.file_durations[0]
+                return first_end - timedelta(seconds=first_duration)
+        return "unknown"
+
+    def _get_lro_end_time(self, lro):
+        """Get the end time of an LRO."""
+        if hasattr(lro, 'file_end_datetimes') and lro.file_end_datetimes:
+            # Get the last non-None end time
+            end_times = [dt for dt in lro.file_end_datetimes if dt is not None]
+            if end_times:
+                return max(end_times)
+        return "unknown"
+
+    def get_timeline_summary(self) -> pd.DataFrame:
+        """
+        Get timeline summary as a DataFrame for user inspection and debugging.
+
+        Returns:
+            pd.DataFrame: Timeline information with columns:
+                - lro_index: Index of the LRO
+                - start_time: Start datetime of the LRO
+                - end_time: End datetime of the LRO
+                - duration_s: Duration in seconds
+                - n_files: Number of files in the LRO
+                - folder_path: Base folder path
+                - animalday: Parsed animalday identifier
+        """
+        if not self.long_recordings:
+            return pd.DataFrame()
+
+        timeline_data = []
+        for i, lro in enumerate(self.long_recordings):
+            try:
+                start_time = self._get_lro_start_time(lro)
+                end_time = self._get_lro_end_time(lro)
+                duration = lro.LongRecording.get_duration() if hasattr(lro, 'LongRecording') and lro.LongRecording else 0
+                n_files = len(lro.file_durations) if hasattr(lro, 'file_durations') and lro.file_durations else 1
+                folder_path = getattr(lro, 'base_folder_path', 'unknown')
+
+                timeline_data.append({
+                    'lro_index': i,
+                    'start_time': start_time,
+                    'end_time': end_time,
+                    'duration_s': duration,
+                    'n_files': n_files,
+                    'folder_path': str(folder_path),
+                    'folder_name': Path(folder_path).name if folder_path != 'unknown' else 'unknown',
+                    'animalday': getattr(lro, '_animalday', 'unknown')  # This might not exist, but useful if it does
+                })
+            except Exception as e:
+                # Include failed LROs in the summary for debugging
+                timeline_data.append({
+                    'lro_index': i,
+                    'start_time': 'error',
+                    'end_time': 'error',
+                    'duration_s': 0,
+                    'n_files': 0,
+                    'folder_path': 'error',
+                    'folder_name': 'error',
+                    'animalday': 'error',
+                    'error': str(e)
+                })
+
+        return pd.DataFrame(timeline_data)
+
+    def _create_long_recordings(self, lro_kwargs: dict):
+        """Create LongRecordingOrganizer instances for each unique animalday."""
         # Create one LRO per unique animalday (not per folder)
         self.long_recordings: list[core.LongRecordingOrganizer] = []
         for animalday, folders in self._animalday_folder_groups.items():
             if len(folders) == 1:
-                # Single folder - use existing logic
-                lro = core.LongRecordingOrganizer(folders[0], **lro_kwargs)
+                # Single folder - use processed timestamps if available
+                folder_kwargs = self._get_lro_kwargs_for_folder(folders[0], lro_kwargs)
+                lro = core.LongRecordingOrganizer(folders[0], **folder_kwargs)
             else:
                 # Multiple folders - create individual LROs then sort and merge
                 logging.info(f"Creating individual LROs for {len(folders)} folders for {animalday}")
 
-                # Create individual LROs first
+                # Create individual LROs first, each with their own processed timestamps
                 folder_lro_pairs = []
                 for folder in folders:
-                    individual_lro = core.LongRecordingOrganizer(folder, **lro_kwargs)
+                    folder_kwargs = self._get_lro_kwargs_for_folder(folder, lro_kwargs)
+                    individual_lro = core.LongRecordingOrganizer(folder, **folder_kwargs)
                     folder_lro_pairs.append((folder, individual_lro))
 
                 # Sort by median time using constructed LROs
@@ -245,13 +562,16 @@ class AnimalOrganizer(AnimalFeatureParser):
 
             self.long_recordings.append(lro)
 
+        # Log timeline summary for debugging
+        self._log_timeline_summary()
+
         channel_names = [x.channel_names for x in self.long_recordings]
         if len(set([" ".join(x) for x in channel_names])) > 1:
             warnings.warn(f"Inconsistent channel names in long_recordings: {channel_names}")
         self.channel_names = channel_names[0]
         self.bad_channels_dict = {}
 
-        animal_ids = [x["animal"] for x in animalday_dicts]
+        animal_ids = [x["animal"] for x in self._animalday_dicts]
         if len(set(animal_ids)) > 1:
             warnings.warn(f"Inconsistent animal IDs in {animal_ids}")
         self.animal_id = animal_ids[0]
