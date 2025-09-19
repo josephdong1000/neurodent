@@ -619,10 +619,8 @@ class AnimalOrganizer(AnimalFeatureParser):
                 # Get median timestamp from constituent recordings within the LRO
                 if hasattr(lro, "file_end_datetimes") and lro.file_end_datetimes:
                     try:
-                        # Filter out None timestamps and get valid timestamps
                         valid_timestamps = [ts for ts in lro.file_end_datetimes if ts is not None]
                     except TypeError:
-                        # file_end_datetimes is not iterable (probably a Mock)
                         valid_timestamps = []
 
                     if valid_timestamps:
@@ -645,13 +643,9 @@ class AnimalOrganizer(AnimalFeatureParser):
                             f"LRO {Path(folder_path).name}: {n_timestamps} recordings, median timestamp: {median_timestamp}"
                         )
                     else:
-                        # No valid timestamps in this LRO, use folder modification time as fallback
-                        median_time_seconds = Path(folder_path).stat().st_mtime
-                        logging.warning(f"No valid timestamps in LRO {Path(folder_path).name}, using folder mtime")
+                        raise ValueError(f"No file_end_datetimes available in LRO {Path(folder_path).name}, cannot determine temporal order")
                 else:
-                    # No file_end_datetimes available, use folder modification time as fallback
-                    median_time_seconds = Path(folder_path).stat().st_mtime
-                    logging.warning(f"No file_end_datetimes in LRO {Path(folder_path).name}, using folder mtime")
+                    raise ValueError(f"No file_end_datetimes available in LRO {Path(folder_path).name}, cannot determine temporal order")
 
                 folder_lro_times.append((folder_path, lro, median_time_seconds))
 
@@ -705,11 +699,8 @@ class AnimalOrganizer(AnimalFeatureParser):
             folder_names = [Path(f).name for f, _, _ in sorted_folder_lro_times]
             median_times = []
             for _, _, median_time_seconds in sorted_folder_lro_times:
-                try:
-                    median_datetime = datetime.fromtimestamp(median_time_seconds)
-                    median_times.append(median_datetime.strftime("%H:%M:%S"))
-                except:
-                    median_times.append(f"{median_time_seconds:.1f}s")
+                median_datetime = datetime.fromtimestamp(median_time_seconds)
+                median_times.append(median_datetime.strftime("%H:%M:%S"))
 
             logging.info(f"Final sort order: {list(zip(folder_names, median_times))}")
 
