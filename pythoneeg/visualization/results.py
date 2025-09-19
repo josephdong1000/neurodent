@@ -199,9 +199,8 @@ class AnimalOrganizer(AnimalFeatureParser):
         # Process manual_datetimes if provided in lro_kwargs
         if "manual_datetimes" in lro_kwargs:
             logging.info("Processing manual_datetimes configuration")
-            # Create base kwargs without manual_datetimes for duration estimation
             base_lro_kwargs = lro_kwargs.copy()
-            del base_lro_kwargs["manual_datetimes"]
+            base_lro_kwargs["manual_datetimes"] = datetime(2000, 1, 1, 0, 0, 0)  # dummy manual_datetime
 
             self._processed_timestamps = self._process_all_timestamps(
                 lro_kwargs["manual_datetimes"], self._animalday_folder_groups, base_lro_kwargs
