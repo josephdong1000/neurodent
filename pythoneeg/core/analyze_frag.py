@@ -37,12 +37,15 @@ class FragmentAnalyzer:
         # Z-transforms
         "zpcorr": ["pcorr"],
         "zcohere": ["cohere"],
+        "zimcoh": ["imcoh"],
         # PSD-dependent features
         "psdband": ["psd"],
         "psdtotal": ["psd"],
         "psdslope": ["psd"],
-        # Multi-dependency features
-        "psdfrac": ["psdband", "psdtotal"],
+        "psdfrac": ["psdband"],
+        # Coherency-dependent features
+        "cohere": ["coherency"],
+        "imcoh": ["coherency"],
     }
 
     @staticmethod
@@ -271,17 +274,16 @@ class FragmentAnalyzer:
         bands: list[tuple[float, float]] = constants.FREQ_BANDS,
         total_band: tuple[float, float] = constants.FREQ_BAND_TOTAL,
         multitaper: bool = False,
-        precomputed_psd: tuple = None,
         precomputed_psdband: dict = None,
-        precomputed_psdtotal: np.ndarray = None,
         **kwargs,
     ) -> dict[str, np.ndarray]:
         """Compute the power spectral density of bands as a fraction of the total power."""
         FragmentAnalyzer._check_rec_np(rec)
 
-        psdband = FragmentAnalyzer.compute_psdband(
-            rec, f_s, welch_bin_t, notch_filter, bands, multitaper, precomputed_psd=precomputed_psd, **kwargs
-        )
+        if precomputed_psdband is not None:
+            psdband = precomputed_psdband
+        else:
+            psdband = FragmentAnalyzer.compute_psdband(rec, f_s, welch_bin_t, notch_filter, bands, multitaper, **kwargs)
         psdtotal = sum(psdband.values())
 
         return {k: v / psdtotal for k, v in psdband.items()}
@@ -295,22 +297,20 @@ class FragmentAnalyzer:
         bands: list[tuple[float, float]] = constants.FREQ_BANDS,
         total_band: tuple[float, float] = constants.FREQ_BAND_TOTAL,
         multitaper: bool = False,
-        precomputed_psd: tuple = None,
-        precomputed_psdband: dict = None,
-        precomputed_psdtotal: np.ndarray = None,
         precomputed_psdfrac: dict = None,
         **kwargs,
     ) -> dict[str, np.ndarray]:
         """Compute the log of the power spectral density of bands as a fraction of the log total power."""
         FragmentAnalyzer._check_rec_np(rec)
 
-        psd_band = FragmentAnalyzer.compute_psdband(
-            rec, f_s, welch_bin_t, notch_filter, bands, multitaper, precomputed_psd=precomputed_psd, **kwargs
-        )
-        psd_total = sum(psd_band.values())
-        # Local import to avoid importing heavy dependencies from utils at module import time
+        if precomputed_psdfrac is not None:
+            psdfrac = precomputed_psdfrac
+        else:
+            psdfrac = FragmentAnalyzer.compute_psdfrac(
+                rec, f_s, welch_bin_t, notch_filter, bands, total_band, multitaper, **kwargs
+            )
 
-        return {k: log_transform(v / psd_total) for k, v in psd_band.items()}
+        return {k: log_transform(v) for k, v in psdfrac.items()}
 
     @staticmethod
     def compute_psdslope(
@@ -392,7 +392,7 @@ class FragmentAnalyzer:
         epsilon: float = 1e-2,
         **kwargs,
     ) -> np.ndarray:
-        """Compute the coherence of the signal."""
+        """Compute the complex coherency of the signal."""
         FragmentAnalyzer._check_rec_np(rec)
 
         rec_mne = FragmentAnalyzer._reshape_np_for_mne(rec)
@@ -458,68 +458,16 @@ class FragmentAnalyzer:
     def compute_cohere(
         rec: np.ndarray,
         f_s: float,
+        precomputed_coherency: dict = None,
         **kwargs,
     ) -> np.ndarray:
         """Compute the coherence of the signal."""
         FragmentAnalyzer._check_rec_np(rec)
-        cohere = FragmentAnalyzer.compute_coherency(rec, f_s, **kwargs)
+        if precomputed_coherency is not None:
+            cohere = precomputed_coherency
+        else:
+            cohere = FragmentAnalyzer.compute_coherency(rec, f_s, **kwargs)
         return {k: np.abs(v) for k, v in cohere.items()}
-
-        # rec_mne = FragmentAnalyzer._reshape_np_for_mne(rec)
-        # rec_mne = decimate(rec_mne, q=downsamp_q, axis=2)  # Along the time axis
-        # f_s = int(f_s / downsamp_q)
-
-        # f, n_cycles = FragmentAnalyzer._get_freqs_cycles(
-        #     rec=rec_mne,
-        #     f_s=f_s,
-        #     freq_res=freq_res,
-        #     geomspace=geomspace,
-        #     mode=mode,
-        #     cwt_n_cycles_max=cwt_n_cycles_max,
-        #     epsilon=epsilon,
-        # )
-
-        # try:
-        #     con = spectral_connectivity_epochs(
-        #         rec_mne,
-        #         freqs=f,
-        #         method="coh",
-        #         average=True,
-        #         faverage=True,
-        #         mode=mode,
-        #         fmin=constants.FREQ_MINS,
-        #         fmax=constants.FREQ_MAXS,
-        #         sfreq=f_s,
-        #         n_cycles=n_cycles,
-        #         mt_bandwidth=mt_bandwidth,
-        #         verbose=False,
-        #     )
-        # except MemoryError as e:
-        #     raise MemoryError(
-        #         "Out of memory. Use a larger freq_res parameter, a smaller n_cycles_max parameter, or a larger downsamp_q parameter"
-        #     ) from e
-
-        # data = con.get_data()
-        # n_channels = rec.shape[1]
-
-        # out = {}
-        # # Make data symmetric
-        # for i, band_name in enumerate(constants.BAND_NAMES):
-        #     if i >= data.shape[1]:  # Skip if we don't have data for this band
-        #         warnings.warn(f"No coherence data for band {band_name}")
-        #         continue
-
-        #     band_data = data[:, i]
-
-        #     full_matrix = band_data.reshape((n_channels, n_channels))
-
-        #     symmetric_matrix = full_matrix.copy()
-        #     symmetric_matrix = np.triu(symmetric_matrix.T, k=1) + np.tril(symmetric_matrix, k=-1)
-
-        #     np.fill_diagonal(symmetric_matrix, 1.0)
-
-        #     out[band_name] = symmetric_matrix
-        # return out
 
     @staticmethod
     def compute_zcohere(
@@ -544,17 +492,27 @@ class FragmentAnalyzer:
         return {k: np.arctanh(np.clip(v, clip_min, clip_max)) for k, v in cohere.items()}
 
     @staticmethod
-    def compute_imcoh(rec: np.ndarray, f_s: float, **kwargs) -> dict[str, np.ndarray]:
+    def compute_imcoh(
+        rec: np.ndarray, f_s: float, precomputed_coherency: dict = None, **kwargs
+    ) -> dict[str, np.ndarray]:
         """Compute the imaginary coherence of the signal."""
         FragmentAnalyzer._check_rec_np(rec)
-        cohere = FragmentAnalyzer.compute_coherency(rec, f_s, **kwargs)
+        if precomputed_coherency is not None:
+            cohere = precomputed_coherency
+        else:
+            cohere = FragmentAnalyzer.compute_coherency(rec, f_s, **kwargs)
         return {k: np.imag(v) for k, v in cohere.items()}
 
     @staticmethod
-    def compute_zimcoh(rec: np.ndarray, f_s: float, z_epsilon: float = 1e-6, **kwargs) -> dict[str, np.ndarray]:
+    def compute_zimcoh(
+        rec: np.ndarray, f_s: float, z_epsilon: float = 1e-6, precomputed_imcoh: dict = None, **kwargs
+    ) -> dict[str, np.ndarray]:
         """Compute the Fisher z-transformed imaginary coherence of the signal."""
         FragmentAnalyzer._check_rec_np(rec)
-        imcoh = FragmentAnalyzer.compute_imcoh(rec, f_s, **kwargs)
+        if precomputed_imcoh is not None:
+            imcoh = precomputed_imcoh
+        else:
+            imcoh = FragmentAnalyzer.compute_imcoh(rec, f_s, **kwargs)
         clip_max = 1.0 - z_epsilon
         clip_min = -1.0 + z_epsilon
         return {k: np.arctanh(np.clip(v, clip_min, clip_max)) for k, v in imcoh.items()}
