@@ -331,7 +331,7 @@ class AnimalOrganizer(AnimalFeatureParser):
             )
             folder_durations[folder] = duration
             logging.debug(f"Folder {Path(folder).name}: estimated duration = {duration:.1f}s")
-            
+
         # Step 3: Compute continuous start times
         result = {}
         current_start_time = base_datetime
@@ -419,30 +419,30 @@ class AnimalOrganizer(AnimalFeatureParser):
 
     def _log_timeline_summary(self):
         """Log timeline summary for debugging purposes."""
+
+        lines = ["AnimalOrganizer Timeline Summary:"]
+
         if not self.long_recordings:
-            logging.info("=== AnimalOrganizer Timeline Summary ===")
-            logging.info("No LongRecordings created")
-            return
+            lines.append("No LongRecordings created")
+        else:
+            for i, lro in enumerate(self.long_recordings):
+                try:
+                    start_time = self._get_lro_start_time(lro)
+                    end_time = self._get_lro_end_time(lro)
+                    duration = (
+                        lro.LongRecording.get_duration() if hasattr(lro, "LongRecording") and lro.LongRecording else 0
+                    )
+                    n_files = len(lro.file_durations) if hasattr(lro, "file_durations") and lro.file_durations else 1
+                    folder_path = getattr(lro, "base_folder_path", "unknown")
 
-        logging.info("=== AnimalOrganizer Timeline Summary ===")
-        for i, lro in enumerate(self.long_recordings):
-            try:
-                start_time = self._get_lro_start_time(lro)
-                end_time = self._get_lro_end_time(lro)
-                duration = (
-                    lro.LongRecording.get_duration() if hasattr(lro, "LongRecording") and lro.LongRecording else 0
-                )
-                n_files = len(lro.file_durations) if hasattr(lro, "file_durations") and lro.file_durations else 1
-                folder_path = getattr(lro, "base_folder_path", "unknown")
+                    lines.append(
+                        f"LRO {i}: {start_time} → {end_time} "
+                        f"(duration: {duration:.1f}s, files: {n_files}, folder: {Path(folder_path).name})"
+                    )
+                except Exception as e:
+                    lines.append(f"Failed to get timeline info for LRO {i}: {e}")
 
-                logging.info(
-                    f"LRO {i}: {start_time} → {end_time} "
-                    f"(duration: {duration:.1f}s, files: {n_files}, folder: {Path(folder_path).name})"
-                )
-            except Exception as e:
-                logging.warning(f"Failed to get timeline info for LRO {i}: {e}")
-
-        logging.info("=== End Timeline Summary ===")
+        logging.info("\n".join(lines))
 
     def _get_lro_start_time(self, lro):
         """Get the start time of an LRO."""
@@ -2068,6 +2068,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         filepath = str(folder / filename)
 
         self.result.to_pickle(filepath + ".pkl")
+        logging.info(f"Saved WAR to {filepath + '.pkl'}")
 
         json_dict = {
             "animal_id": self.animal_id,
@@ -2081,6 +2082,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
         with open(filepath + ".json", "w") as f:
             json.dump(json_dict, f, indent=2)
+            logging.info(f"Saved WAR to {filepath + '.json'}")
 
     def apply_lof_threshold(self, lof_threshold: float) -> dict:
         """Apply LOF threshold directly to stored scores to get bad channels.
