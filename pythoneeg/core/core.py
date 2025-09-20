@@ -38,6 +38,7 @@ from .utils import (
     TimestampMapper,
     convert_colpath_to_rowpath,
     convert_units_to_multiplier,
+    extract_mne_unit_info,
     filepath_to_index,
     get_temp_directory,
     parse_truncate,
@@ -56,6 +57,8 @@ class DDFBinaryMetadata:
         f_s: float | None = None,
         dt_end: datetime | None = None,
         channel_names: list[str] | None = None,
+        V_units: str | None = None,
+        mult_to_uV: float | None = None,
     ) -> None:
         """Initialize DDFBinaryMetadata either from a file path or direct parameters.
 
@@ -65,11 +68,13 @@ class DDFBinaryMetadata:
             f_s (float, optional): Sampling frequency in Hz
             dt_end (datetime, optional): End datetime of recording
             channel_names (list, optional): List of channel names
+            V_units (str, optional): Voltage units (e.g., 'µV', 'mV', 'V')
+            mult_to_uV (float, optional): Multiplication factor to convert to microvolts
         """
         if metadata_path is not None:
             self._init_from_path(metadata_path)
         else:
-            self._init_from_params(n_channels, f_s, dt_end, channel_names)
+            self._init_from_params(n_channels, f_s, dt_end, channel_names, V_units, mult_to_uV)
 
     def _init_from_path(self, metadata_path):
         self.metadata_path = metadata_path
@@ -93,7 +98,7 @@ class DDFBinaryMetadata:
 
         self.channel_names = self.metadata_df["ProbeInfo"].tolist()
 
-    def _init_from_params(self, n_channels, f_s, dt_end, channel_names):
+    def _init_from_params(self, n_channels, f_s, dt_end, channel_names, V_units=None, mult_to_uV=None):
         if None in (n_channels, f_s, channel_names):
             raise ValueError("All parameters must be provided when not using metadata_path")
 
@@ -101,8 +106,8 @@ class DDFBinaryMetadata:
         self.metadata_df = None
         self.n_channels = n_channels
         self.f_s = f_s  # NOTE see above note about f_s
-        self.V_units = None
-        self.mult_to_uV = None
+        self.V_units = V_units
+        self.mult_to_uV = mult_to_uV
         self.precision = None
         self.dt_end = dt_end
 
@@ -143,6 +148,8 @@ class DDFBinaryMetadata:
             f_s=data["f_s"],
             dt_end=dt_end,
             channel_names=data["channel_names"],
+            V_units=data.get("V_units"),
+            mult_to_uV=data.get("mult_to_uV"),
         )
 
     def to_json(self, file_path: Path) -> None:
@@ -1013,14 +1020,24 @@ class LongRecordingOrganizer:
 
             # Create metadata from the original raw object (before resampling)
             original_info = sample_raw.info
+
+            # Extract unit information from MNE Raw object
+            unit_str, mult_to_uv = extract_mne_unit_info(original_info)
+
             metadata = DDFBinaryMetadata(
                 metadata_path=None,
                 n_channels=original_info["nchan"],
                 f_s=original_info["sfreq"],  # Original sampling rate
                 dt_end=None,  # Will be set later by finalize_file_timestamps
                 channel_names=original_info["ch_names"],
+                V_units=unit_str,
+                mult_to_uV=mult_to_uv,
             )
             logging.info(f"Created metadata from raw: {metadata.n_channels} channels, {metadata.f_s} Hz")
+            if unit_str and mult_to_uv:
+                logging.info(f"Extracted unit information: {unit_str} (mult_to_uV = {mult_to_uv})")
+            else:
+                logging.warning("No unit information could be extracted from MNE Raw object")
 
             # Load data without resampling (resampling will be applied after intermediate file loading)
             raw = self._load_mne_data_no_resample(extract_func, input_type, datafolder, datafile, datafiles, **kwargs)
@@ -1307,25 +1324,25 @@ class LongRecordingOrganizer:
             nn = Natural_Neighbor()
             rec = self.LongRecording
 
-            logging.info(f"Computing LOF scores for {rec.__str__()}")
-            logging.debug("Getting traces from recording object")
+            logging.debug(f"Computing LOF scores for {rec.__str__()}")
             rec_np = rec.get_traces(return_scaled=True)  # (n_samples, n_channels)
 
             if rec_np is None or rec_np.size == 0:
                 logging.error("Failed to get traces from recording - data is None or empty")
                 raise ValueError("Recording traces are None or empty")
-
-            logging.debug(f"Got traces shape: {rec_np.shape}")
+            logging.debug(f"Got recording shape: {rec_np.shape}")
 
             if limit_memory:
                 rec_np = rec_np.astype(np.float16)
                 rec_np = decimate(rec_np, 10, axis=0)
+            logging.debug(f"Decimated traces shape: {rec_np.shape}")
             rec_np = rec_np.T  # (n_channels, n_samples)
+            logging.debug(f"Transposed traces shape: {rec_np.shape}")
 
             # Compute the optimal number of neighbors
             nn.read(rec_np)
             n_neighbors = nn.algorithm()
-            logging.info(f"n_neighbors for LOF computation: {n_neighbors}")
+            logging.info(f"Computed n_neighbors for LOF computation: {n_neighbors}")
 
             # Initialize LocalOutlierFactor
             # lof = LocalOutlierFactor(n_neighbors=n_neighbors, metric="minkowski", p=2)
