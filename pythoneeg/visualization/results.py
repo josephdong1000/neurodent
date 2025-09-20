@@ -200,7 +200,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         if "manual_datetimes" in lro_kwargs:
             logging.info("Processing manual_datetimes configuration")
             base_lro_kwargs = lro_kwargs.copy()
-            base_lro_kwargs["manual_datetimes"] = datetime(2000, 1, 1, 0, 0, 0)  # dummy manual_datetime
+            base_lro_kwargs["manual_datetimes"] = datetime(2000, 1, 1, 0, 0, 0)
 
             self._processed_timestamps = self._process_all_timestamps(
                 lro_kwargs["manual_datetimes"], self._animalday_folder_groups, base_lro_kwargs
@@ -247,7 +247,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                 return self._resolve_timestamp_input(result, folder_path)
             except Exception as e:
                 logging.error(f"User timestamp function failed on folder '{folder_path}': {e}")
-                raise
+                raise Exception(f"User timestamp function failed on folder '{folder_path}': {e}") from e
 
         else:
             raise TypeError(
@@ -331,6 +331,7 @@ class AnimalOrganizer(AnimalFeatureParser):
             )
             folder_durations[folder] = duration
             logging.debug(f"Folder {Path(folder).name}: estimated duration = {duration:.1f}s")
+            
         # Step 3: Compute continuous start times
         result = {}
         current_start_time = base_datetime
