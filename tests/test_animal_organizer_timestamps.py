@@ -514,6 +514,11 @@ class TestAnimalOrganizerTimestampHandling:
             mock_recording.get_sampling_frequency.return_value = 1000.0
             mock_lro.LongRecording = mock_recording
 
+            # Add file_end_datetimes based on expected median times
+            # Create timestamps that will result in the expected median times
+            base_time = datetime(2023, 1, 15, 8, 0, 0)
+            mock_lro.file_end_datetimes = [base_time + timedelta(seconds=median_time)]
+
             # Add merge method
             def mock_merge(other_lro):
                 pass
