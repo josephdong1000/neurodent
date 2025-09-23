@@ -1466,7 +1466,7 @@ class TestWindowAnalysisResultLOF:
     def test_war_apply_lof_threshold(self, war_with_lof):
         """Test applying LOF threshold to WindowAnalysisResult."""
         # Test threshold 1.5
-        bad_channels_1_5 = war_with_lof.apply_lof_threshold(1.5)
+        bad_channels_1_5 = war_with_lof.get_bad_channels_by_lof_threshold(1.5)
         
         assert isinstance(bad_channels_1_5, dict)
         assert 'day1' in bad_channels_1_5
@@ -1481,7 +1481,7 @@ class TestWindowAnalysisResultLOF:
         assert set(bad_channels_1_5['day2']) == {'RMot'}
         
         # Test different threshold
-        bad_channels_2_0 = war_with_lof.apply_lof_threshold(2.0)
+        bad_channels_2_0 = war_with_lof.get_bad_channels_by_lof_threshold(2.0)
         
         # Day1: only LMot (2.5) is >= 2.0
         assert set(bad_channels_2_0['day1']) == {'LMot'}
@@ -1491,7 +1491,7 @@ class TestWindowAnalysisResultLOF:
     
     def test_war_apply_lof_threshold_strict(self, war_with_lof):
         """Test very strict LOF threshold."""
-        bad_channels = war_with_lof.apply_lof_threshold(1.0)
+        bad_channels = war_with_lof.get_bad_channels_by_lof_threshold(1.0)
         
         # Day1: LMot (2.5) >= 1.0, RMot (0.8) < 1.0
         assert set(bad_channels['day1']) == {'LMot'}
@@ -1501,7 +1501,7 @@ class TestWindowAnalysisResultLOF:
     
     def test_war_apply_lof_threshold_lenient(self, war_with_lof):
         """Test very lenient LOF threshold."""
-        bad_channels = war_with_lof.apply_lof_threshold(3.5)
+        bad_channels = war_with_lof.get_bad_channels_by_lof_threshold(3.5)
         
         # All scores are < 3.5
         assert bad_channels['day1'] == []
@@ -1593,7 +1593,7 @@ class TestWindowAnalysisResultLOF:
             new_scores = new_war.get_lof_scores()
             assert original_scores == new_scores
             
-            original_bad_channels = war_with_lof.apply_lof_threshold(1.5)
+            original_bad_channels = war_with_lof.get_bad_channels_by_lof_threshold(1.5)
             new_bad_channels = new_war.get_bad_channels_by_lof_threshold(1.5)
             assert original_bad_channels == new_bad_channels
     
@@ -1644,7 +1644,7 @@ class TestWindowAnalysisResultLOF:
         results = {}
         
         for threshold in thresholds:
-            bad_channels = war_with_lof.apply_lof_threshold(threshold)
+            bad_channels = war_with_lof.get_bad_channels_by_lof_threshold(threshold)
             total_bad = sum(len(channels) for channels in bad_channels.values())
             results[threshold] = total_bad
         
