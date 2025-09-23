@@ -84,6 +84,15 @@ ep.plot_feature("rms", groupby="genotype")
 - **Data Filtering**: Built-in filtering for artifacts and outliers
 - **Flexible Grouping**: Group analysis by genotype, time of day, recording session, etc.
 
+## Snakemake Workflow
+
+PyEEG includes a **Snakemake workflow** for automated, scalable EEG analysis pipelines. The **workflow** processes multiple animals in parallel through WAR generation, quality filtering, fragment/channel filtering, and statistical analysis with SLURM cluster integration.
+
+```bash
+# Run the complete workflow
+snakemake --profile slurm all
+```
+
 ## Setup (for developing)
 
 <!-- - Install Microsoft Visual C++ 14.0 or greater (to get SpikeInterface to work)
