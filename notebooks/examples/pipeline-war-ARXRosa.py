@@ -1,18 +1,12 @@
 import sys
 from pathlib import Path
-import time
-import tempfile
 import logging
-import json
 from datetime import datetime
 
 import matplotlib.pyplot as plt
-import matplotlib.colors as colors
-import mne
+from mne.io import read_raw_edf
 from dask_jobqueue import SLURMCluster
 from dask.distributed import Client
-from django.utils.text import slugify
-import joblib
 
 base_folder = Path("/mnt/isilon/marsh_single_unit/PythonEEG")
 sys.path.append(str(base_folder))
@@ -25,40 +19,45 @@ core.set_temp_directory("/scr1/users/dongjp")
 
 
 # SECTION 1: Set up clusters
-try:
-    cluster_window = SLURMCluster(
-        cores=30,
-        memory="100GB",
-        walltime="48:00:00",
-        interface=None,
-        job_extra_directives=["--output=/dev/null", "--error=/dev/null"],
-    )
-except ValueError as e:
-    if "interface 'eth1' doesn't have an IPv4 address" in str(e):
-        cluster_window = SLURMCluster(
-            cores=30,
-            memory="100GB",
-            walltime="48:00:00",
-            interface=None,
-            scheduler_options={"interface": "eth1"},
-            job_extra_directives=["--output=/dev/null", "--error=/dev/null"],
-        )
-    else:
-        raise
+# try:
+#     cluster_window = SLURMCluster(
+#         cores=30,
+#         memory="100GB",
+#         walltime="48:00:00",
+#         interface="eth1",
+#         job_extra_directives=["--output=/dev/null", "--error=/dev/null"],
+#     )
+# except ValueError as e:
+#     if "interface 'eth1' doesn't have an IPv4 address" in str(e):
+#         cluster_window = SLURMCluster(
+#             cores=30,
+#             memory="100GB",
+#             walltime="48:00:00",
+#             interface=None,
+#             scheduler_options={"interface": "eth1"},
+#             job_extra_directives=["--output=/dev/null", "--error=/dev/null"],
+#         )
+#     else:
+#         raise
+cluster_window = SLURMCluster(
+    cores=30,
+    memory="100GB",
+    walltime="48:00:00",
+    interface=None,
+    scheduler_options={"interface": "eth1"},
+    job_extra_directives=["--output=/dev/null", "--error=/dev/null"],
+)
 print(f"\n\n\tcluster_window.dashboard_link: {cluster_window.dashboard_link}\n\n")
 cluster_window.scale(jobs=10)
 
 # SECTION 2: Setup windowed analysis
 logging.basicConfig(
-    format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO, stream=sys.stdout, force=True
+    format="%(asctime)s - %(levelname)s - %(message)s", level=logging.DEBUG, stream=sys.stdout, force=True
 )
-logger = logging.getLogger()
 
-
-from mne.io import read_raw_edf
 
 data_folder = Path("/mnt/isilon/marsh_single_unit/PythonEEG Data Bins/Arx Rosa")
-save_folder = Path("/home/dongjp/Downloads/8-13-25 war from edf")
+save_folder = Path("/home/dongjp/Downloads/9-19-25 war from edf")
 
 if not save_folder.exists():
     save_folder.mkdir(parents=True)
@@ -123,36 +122,36 @@ for animal_id in ["1017 1015"]:
         ao = visualization.AnimalOrganizer(
             data_folder,
             animal_id,
-            mode="concat",
+            mode="nest",
             # assume_from_number=True,
-            skip_days=["bad"],
+            skip_days=["bad", "band data"],
             lro_kwargs={
-                # "truncate": 2,  # REVIEW put back when testing
-                # REVIEW when the truncate number changes, should the user be notified and be advised to force regenerate?
                 "mode": "mne",
                 "extract_func": read_raw_edf,
                 "file_pattern": "*.EDF",
                 "input_type": "files",
                 "intermediate": "bin",
-                "cache_policy": "force_regenerate",
-                # "cache_policy": "force_regenerate",
+                # "cache_policy": "force_regenerate", # Use auto mode
                 "manual_datetimes": datetime(2015, 2, 25, 8, 37, 45),
             },
         )
 
+        ao.compute_bad_channels()
         war = ao.compute_windowed_analysis(["all"], multiprocess_mode="dask")
 
-    save_path = save_folder / f"{animal_id}"
-    if not save_path.exists():
-        save_path.mkdir(parents=True)
-    ap = visualization.AnimalPlotter(war, save_fig=True, save_path=save_path / animal_id)
+        save_path = save_folder / f"{animal_id}"
+        if not save_path.exists():
+            save_path.mkdir(parents=True)
+        war.save_pickle_and_json(save_path, filename="war")
 
-    ap.plot_coherecorr_spectral(figsize=(20, 5), score_type="z")
-    ap.plot_psd_histogram(figsize=(10, 4), avg_channels=True, plot_type="loglog")
-    ap.plot_psd_spectrogram(figsize=(20, 4), mode="none")
+    # ap = visualization.AnimalPlotter(war, save_fig=True, save_path=save_path / animal_id)
 
-    ap.plot_coherecorr_matrix(figsize=(12, 4))
-    ap.plot_linear_temporal(features=["rms", "ampvar", "psdtotal", "psdband", "psdfrac"], figsize=(20, 40))
+    # ap.plot_coherecorr_spectral(figsize=(20, 5), score_type="z")
+    # ap.plot_psd_histogram(figsize=(10, 4), avg_channels=True, plot_type="loglog")
+    # ap.plot_psd_spectrogram(figsize=(20, 4), mode="none")
+
+    # ap.plot_coherecorr_matrix(figsize=(12, 4))
+    # ap.plot_linear_temporal(features=["rms", "ampvar", "psdtotal", "psdband", "psdfrac"], figsize=(20, 40))
 
 # with open(base_folder / "notebooks" / "tests" / "sox5 combine genotypes.json", "r") as f:
 #     data = json.load(f)
