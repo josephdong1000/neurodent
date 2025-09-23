@@ -83,12 +83,8 @@ def main():
             logging.info(f"Adding unique hash with length {unique_hash_length}")
             war.add_unique_hash(unique_hash_length)
 
-        # Create output directory
-        output_dir = Path(output_war_pkl).parent
-        output_dir.mkdir(parents=True, exist_ok=True)
-
         # Save preprocessed WAR as both pickle and json
-        war.save_pickle_and_json(output_dir)
+        war.save_pickle_and_json(Path(output_war_pkl).parent)
 
         logging.info(f"Successfully standardized and saved {animal_name}")
 

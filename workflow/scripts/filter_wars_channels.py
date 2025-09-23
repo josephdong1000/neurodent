@@ -102,12 +102,8 @@ def main():
         )
         logging.info(f"{filter_type} - Applied channel filtering")
 
-        # Create output directory
-        output_dir = Path(output_war_pkl).parent
-        output_dir.mkdir(parents=True, exist_ok=True)
-
         # Save channel-filtered WAR as both pickle and json
-        war.save_pickle_and_json(output_dir)
+        war.save_pickle_and_json(Path(output_war_pkl).parent)
 
         logging.info(f"Successfully channel-filtered ({filter_type}) and saved {animal_name}")
 

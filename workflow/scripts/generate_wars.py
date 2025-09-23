@@ -121,10 +121,7 @@ def main():
         war = generate_war_for_animal(samples_config, config, animal_folder, animal_id)
 
         # Save WAR
-        output_dir = Path(snakemake.output.war_pkl).parent
-        output_dir.mkdir(parents=True, exist_ok=True)
-
-        war.save_pickle_and_json(output_dir, filename="war", slugify_filename=False)
+        war.save_pickle_and_json(Path(snakemake.output.war_pkl).parent, filename="war", slugify_filename=False)
 
         logging.info(f"Successfully saved WAR for {animal_folder} {animal_id}")
 

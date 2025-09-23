@@ -66,12 +66,8 @@ def main():
         # Apply filters using configuration-based approach
         war = war.apply_filters(filter_config=fragment_filter_config, min_valid_channels=3)
 
-        # Create output directory
-        output_dir = Path(output_war_pkl).parent
-        output_dir.mkdir(parents=True, exist_ok=True)
-
         # Save fragment-filtered WAR as both pickle and json
-        war.save_pickle_and_json(output_dir)
+        war.save_pickle_and_json(Path(output_war_pkl).parent)
 
         logging.info(f"Successfully filtered and saved {animal_name}")
 

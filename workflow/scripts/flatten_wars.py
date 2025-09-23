@@ -49,12 +49,8 @@ def main():
         # Aggregate time windows using configurable groupby
         war.aggregate_time_windows(groupby=groupby_params)
 
-        # Create output directory
-        output_dir = Path(output_war_pkl).parent
-        output_dir.mkdir(parents=True, exist_ok=True)
-
         # Save aggregated WAR as both pickle and json
-        war.save_pickle_and_json(output_dir)
+        war.save_pickle_and_json(Path(output_war_pkl).parent)
 
         logging.info(f"Successfully aggregated and saved {animal_name}")
 
