@@ -26,5 +26,6 @@ fi
 # Run the Python script with unbuffered output
 echo "Starting pipeline with script: $1"
 python -u "$1"
+# python -u -m cProfile -o profile.prof "$1"
 
 echo "Pipeline finished successfully."
