@@ -2084,7 +2084,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             json.dump(json_dict, f, indent=2)
             logging.info(f"Saved WAR to {filepath + '.json'}")
 
-    def apply_lof_threshold(self, lof_threshold: float) -> dict:
+    def get_bad_channels_by_lof_threshold(self, lof_threshold: float) -> dict:
         """Apply LOF threshold directly to stored scores to get bad channels.
 
         Args:

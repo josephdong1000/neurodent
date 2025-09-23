@@ -91,6 +91,7 @@ def generate_war_for_animal(samples_config, config, animal_folder, animal_id):
                 war = ao.compute_windowed_analysis(["all"], multiprocess_mode="dask")
         return war
     except Exception as e:
+        logging.error(f"Failed to generate WAR for {animal_key}: {e}")
         raise
     finally:
         cluster.close()
@@ -98,7 +99,6 @@ def generate_war_for_animal(samples_config, config, animal_folder, animal_id):
 
 def main():
     """Main execution function"""
-
     global snakemake
 
     with open(snakemake.log[0], "w") as f:

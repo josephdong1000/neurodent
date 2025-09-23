@@ -411,7 +411,6 @@ def main():
             config=config,
         )
 
-        # Log summary - with safe handling of empty results
         if len(results_df) > 0 and not results_df.empty and not results_df["f1_score"].isna().all():
             try:
                 best_idx = results_df["f1_score"].idxmax()

@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """
-WAR Fragment Filtering Script
-============================
+WAR Standardization Script
+==========================
 
-This script applies fragment-level filtering to standardized WARs.
-Only applies fragment filters (temporal artifact removal), not channel filtering.
+This script handles the standardization steps for quality-filtered WARs:
+- Channel reordering and padding
+- Unique hash addition
 
-Input: Standardized WARs (channel reordering/padding already applied)
-Output: Fragment-filtered WARs (ready for channel filtering)
+This is separated from fragment filtering to enable modular pipeline organization.
+
+Input: Quality-filtered WARs (genotype/bad animal filtering already applied)
+Output: Standardized WARs ready for fragment filtering
 """
 
 import logging
@@ -20,7 +23,7 @@ from pythoneeg import visualization
 
 
 def main():
-    """Main fragment filtering function for single animal (1-to-1 operation)"""
+    """Main standardization function for single animal (1-to-1 operation)"""
     global snakemake
 
     # Get parameters from snakemake
@@ -45,41 +48,55 @@ def main():
     animal_name = snakemake.wildcards.animal
     animal_key = f"{animal_folder} {animal_id}"
 
+    # Get standardization parameters from config
+    standardization_params = config["analysis"]["standardization"]
+
+    # Get channel reordering parameters
+    channel_reorder = standardization_params.get("channel_reorder")
+    use_abbrevs = standardization_params.get("use_abbrevs", True)
+
+    # Get unique hash parameters
+    add_unique_hash = standardization_params.get("add_unique_hash", False)
+    unique_hash_length = standardization_params.get("unique_hash_length", 4)
+
     logging.info(f"Processing animal: {animal_name}")
     logging.info(f"Animal key: {animal_key}")
+    logging.info(f"Channel reorder: {channel_reorder}")
+    logging.info(f"Use abbreviations: {use_abbrevs}")
+    logging.info(f"Add unique hash: {add_unique_hash}")
+    if add_unique_hash:
+        logging.info(f"Unique hash length: {unique_hash_length}")
 
     try:
-        # Load the standardized WAR
+        # Load the quality-filtered WAR
         logging.info(f"Loading WAR from: {input_war_dir}")
         war = visualization.WindowAnalysisResult.load_pickle_and_json(
             folder_path=input_war_dir, pickle_name=war_pkl_name, json_name=war_json_name
         )
 
-        # Apply fragment filtering only (no channel filtering)
-        logging.info("Applying fragment filtering only")
+        # Apply channel standardization for all downstream steps
+        logging.info("Applying channel reordering and padding")
+        war.reorder_and_pad_channels(channel_reorder, use_abbrevs=use_abbrevs)
 
-        # Get fragment filter configuration from config
-        fragment_filter_config = config["analysis"]["fragment_filter_config"].copy()
-
-        logging.info(f"Fragment filter configuration: {fragment_filter_config}")
-
-        # Apply filters using configuration-based approach
-        war = war.apply_filters(filter_config=fragment_filter_config, min_valid_channels=3)
+        # Add unique hash if requested
+        if add_unique_hash:
+            logging.info(f"Adding unique hash with length {unique_hash_length}")
+            war.add_unique_hash(unique_hash_length)
 
         # Create output directory
         output_dir = Path(output_war_pkl).parent
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Save fragment-filtered WAR as both pickle and json
+        # Save preprocessed WAR as both pickle and json
         war.save_pickle_and_json(output_dir)
 
-        logging.info(f"Successfully filtered and saved {animal_name}")
+        logging.info(f"Successfully standardized and saved {animal_name}")
 
     except Exception as e:
-        logging.error(f"Failed to process {animal_name}: {str(e)}")
+        logging.error(f"Failed to standardize {animal_name}: {str(e)}")
         raise
 
-    logging.info("WAR fragment filtering script completed successfully")
+    logging.info("WAR standardization script completed successfully")
 
 
 if __name__ == "__main__":

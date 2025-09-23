@@ -10,11 +10,17 @@ temp_directory: "/scr1/users/dongjp"
 results_dir: "results"
 wars_dir: "results/wars"
 wars_quality_filtered_dir: "results/wars_quality_filtered"
+wars_standardized_dir: "results/wars_standardized"
 wars_fragment_filtered_dir: "results/wars_fragment_filtered"
+wars_channel_filtered_manual_dir: "results/wars_channel_filtered_manual"
+wars_channel_filtered_lof_dir: "results/wars_channel_filtered_lof"
 wars_zeitgeber_dir: "results/wars_zeitgeber"
 temporal_heatmaps_dir: "results/temporal_heatmaps"
 diagnostic_figures_dir: "results/diagnostic_figures"
 flattened_wars_dir: "results/wars_flattened"
+flattened_wars_manual_dir: "results/wars_flattened_manual"
+flattened_wars_lof_dir: "results/wars_flattened_lof"
+filtering_comparison_dir: "results/filtering_comparison_plots"
 
 # Sample configuration
 samples:
@@ -38,37 +44,40 @@ analysis:
       multiprocess_mode: "dask"
       overwrite_rowbins: false
 
-  # Data processing parameters for diagnostic figures and analysis
-  processing:
-    # Preprocessing - channel setup (applied before filtering)
+  # WAR standardization parameters (channel setup applied before filtering)
+  standardization:
     channel_reorder: ["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"]
     use_abbrevs: true
-    
-    # Filtering parameters (passed directly to filter_all method)
-    filtering:
-      morphological_smoothing_seconds: null  # Temporal smoothing of artifact rejection mask
-      bad_channels: ["LHip", "RHip"]  # Additional bad channels for filtering
-      min_valid_channels: 3  # Minimum valid channels required per window
-      # reject_channels: true  # Enable automatic channel rejection
-      # reject_channels_by_session: false  # Per-session vs global channel rejection
-    
-    # Post-processing - aggregation (applied after filtering) 
-    aggregation:
-      groupby: ["animalday", "isday"]  # Time window grouping for aggregation
-
-  # Fragment/channel filtering parameters (applied after quality filtering)
-  fragment_filtering:
-    bad_channels: ["LHip", "RHip"]  # Channels to filter out
-    morphological_smoothing_seconds: null  # Temporal smoothing of artifact rejection mask
-    # morphological_smoothing_seconds: 300  # 5 minutes smoothing alternative
-    
-    # Channel standardization (applied during fragment filtering)
-    channel_reorder: ["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"]
-    use_abbrevs: true
-    
-    # Unique hash addition
-    add_unique_hash: false  # Whether to add unique hash during fragment filtering
+    add_unique_hash: false  # Whether to add unique hash during standardization
     unique_hash_length: 4   # Length of unique hash if enabled
+
+  # Fragment filtering configuration (temporal artifact removal)
+  fragment_filter_config:
+    logrms_range:
+      z_range: 3
+    high_rms:
+      max_rms: 500
+    low_rms:
+      min_rms: 50
+    high_beta:
+      max_beta_prop: 0.4
+    # morphological_smoothing:
+    #   smoothing_seconds: 300  # Uncomment to enable temporal smoothing
+
+  # Channel filtering configurations (spatial artifact removal)
+  channel_filter_config:
+    manual:
+      reject_channels_by_session: false  # Use per-session bad channels
+      reject_channels: ["LHip", "RHip"]  # List of channels to reject globally
+      min_valid_channels: 3
+    lof:
+      reject_lof_threshold: 2.5
+      reject_channels: []  # List of channels to reject globally
+      min_valid_channels: 3
+
+  # Data aggregation parameters (applied after filtering)
+  aggregation:
+    groupby: ["animalday", "isday"]  # Time window grouping for aggregation
 
   # Zeitgeber time processing parameters
   zeitgeber:
@@ -104,13 +113,24 @@ analysis:
   lof_evaluation:
     threshold_range:
       min: 0.5            # Minimum LOF threshold to test
-      max: 4.0            # Maximum LOF threshold to test  
+      max: 4.0            # Maximum LOF threshold to test
       step: 0.05           # Step size for threshold testing
     # Subset of channels to evaluate (e.g., exclude hippocampal channels)
     evaluation_channels: ["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"]
     figure_format: "png"  # Figure output format: png, tif, pdf, svg
     data_format: "csv"    # Data export format: csv, pkl
     dpi: 300             # Figure resolution
+
+  # Filtering comparison parameters (manual vs LOF channel filtering)
+  filtering_comparison:
+    enabled: true
+    lof_threshold: 2.0
+    features_to_compare: ["delta", "rms", "beta", "logpsdband", "pcorr", "cohere"]
+    plot_types: ["feature_scatter", "channel_impact", "animal_correlation"]
+    baseline_type: "manual"  # Use manual filtering as baseline
+    figure_format: "png"
+    data_format: "csv"
+    dpi: 300
 
   # Figure generation parameters
   figures:
@@ -153,7 +173,6 @@ analysis:
 
 # SLURM cluster configuration
 cluster:
-  # WAR generation cluster (high-memory, high-core)
   war_generation:
     time: "3h"
     mem_mb: 70_000
@@ -161,7 +180,6 @@ cluster:
     threads: 10
     interface: null
 
-  # WAR quality filtering cluster (lightweight)
   war_quality_filter:
     time: "2h"
     mem_mb: 4_000
@@ -169,7 +187,6 @@ cluster:
     threads: 1
     interface: null
 
-  # Diagnostic figures cluster (single-animal, moderate resources)
   diagnostic_figures:
     time: "2h"
     mem_mb: 30_000
@@ -177,7 +194,6 @@ cluster:
     threads: 4
     interface: null
 
-  # WAR fragment filtering cluster (lightweight, per-animal)
   war_fragment_filter:
     time: "2h"
     mem_mb: 30_000
@@ -185,7 +201,6 @@ cluster:
     threads: 1
     interface: null
 
-  # WAR flattening cluster (moderate resources, per-animal)
   war_flattening:
     time: "2h"
     mem_mb: 30_000
@@ -193,7 +208,6 @@ cluster:
     threads: 1
     interface: null
 
-  # Zeitgeber feature extraction cluster (high-memory, processes all animals)
   war_zeitgeber:
     time: "2h"
     mem_mb: 200_000
@@ -201,7 +215,6 @@ cluster:
     threads: 15
     interface: null
 
-  # EP statistical figures cluster (high-memory, processes all animals)
   ep_figures:
     time: "2h"
     mem_mb: 50_000
@@ -209,7 +222,6 @@ cluster:
     threads: 8
     interface: null
 
-  # EP heatmaps cluster (high-memory, processes all animals);
   ep_heatmaps:
     time: "2h"
     mem_mb: 50_000
@@ -217,7 +229,6 @@ cluster:
     threads: 4
     interface: null
 
-  # Zeitgeber plots cluster (moderate resources for temporal visualization)
   zeitgeber_plots:
     time: "2h"
     mem_mb: 20_000
@@ -225,7 +236,6 @@ cluster:
     threads: 2
     interface: null
 
-  # LOF evaluation cluster (moderate resources, processes all flattened WARs)
   lof_evaluation:
     time: "2h"
     mem_mb: 10_000
@@ -233,12 +243,32 @@ cluster:
     threads: 4
     interface: null
 
-  # Jupyter notebook execution cluster (moderate resources for interactive analysis)
   notebook:
     time: "1h"
     mem_mb: 20_000
     nodes: 1
     threads: 2
+    interface: null
+
+  war_standardize:
+    time: "1h"
+    mem_mb: 20_000
+    nodes: 1
+    threads: 1
+    interface: null
+
+  war_channel_filtering:
+    time: "1h"
+    mem_mb: 20_000
+    nodes: 1
+    threads: 1
+    interface: null
+
+  filtering_comparison:
+    time: "2h"
+    mem_mb: 10_000
+    nodes: 1
+    threads: 4
     interface: null
 
 # Logging configuration

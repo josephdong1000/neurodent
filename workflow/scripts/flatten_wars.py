@@ -22,6 +22,7 @@ from pythoneeg import visualization
 
 def main():
     """Main flattening function for single animal (1-to-1 operation)"""
+    global snakemake
 
     # Get parameters from snakemake
     input_war_dir = Path(snakemake.input.war_pkl).parent
@@ -34,7 +35,7 @@ def main():
     animal_name = snakemake.wildcards.animal
 
     # Get groupby parameters from config
-    groupby_params = config["analysis"]["processing"]["aggregation"]["groupby"]
+    groupby_params = config["analysis"]["aggregation"]["groupby"]
     logging.info(f"Processing animal: {animal_name}")
     logging.info(f"Using groupby parameters: {groupby_params}")
 

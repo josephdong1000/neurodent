@@ -107,6 +107,28 @@ def get_flattened_wars_json(wildcards):
     return out
 
 
+def get_all_flattened_manual_wars(wildcards):
+    """Get all manually channel-filtered flattened WAR paths"""
+    out = []
+    for anim in ANIMALS:
+        checkpoint_output = checkpoints.war_quality_filter.get(animal=anim).output[0]
+        qual_filenames = glob_wildcards(os.path.join(checkpoint_output, "{filename}.pkl")).filename
+        if qual_filenames:
+            out.append(f"results/wars_flattened_manual/{Path(checkpoint_output).name}/war.pkl")
+    return out
+
+
+def get_all_flattened_lof_wars(wildcards):
+    """Get all LOF channel-filtered flattened WAR paths"""
+    out = []
+    for anim in ANIMALS:
+        checkpoint_output = checkpoints.war_quality_filter.get(animal=anim).output[0]
+        qual_filenames = glob_wildcards(os.path.join(checkpoint_output, "{filename}.pkl")).filename
+        if qual_filenames:
+            out.append(f"results/wars_flattened_lof/{Path(checkpoint_output).name}/war.pkl")
+    return out
+
+
 def get_diagnostic_figures_unfiltered(wildcards):
     outputs = []
     for anim in ANIMALS:
@@ -151,13 +173,16 @@ wildcard_constraints:
 # Include rule definitions
 include: "workflow/rules/war_generation.smk"
 include: "workflow/rules/war_quality_filter.smk"
+include: "workflow/rules/war_standardize.smk"
 include: "workflow/rules/war_fragment_filtering.smk"
+include: "workflow/rules/war_channel_filtering.smk"
 include: "workflow/rules/diagnostic_figures.smk"
 include: "workflow/rules/war_flattening.smk"
 include: "workflow/rules/war_zeitgeber.smk"
 include: "workflow/rules/zeitgeber_plots.smk"
 include: "workflow/rules/ep_analysis.smk"
 include: "workflow/rules/lof_evaluation.smk"
+include: "workflow/rules/filtering_comparison.smk"
 include: "workflow/rules/notebook.smk"
 
 
@@ -175,13 +200,13 @@ rule all:
         # NOTE also trigger fragment filtering + diagnostic figures filter unfiltered
         get_diagnostic_figures_unfiltered,
 
-        # WAR per-animal diagnostic plots (filtered) 
+        # WAR per-animal diagnostic plots (filtered)
         get_diagnostic_figures_filtered,
 
         # ZT time-based features
         "results/wars_zeitgeber/zeitgeber_features.pkl",
         "results/zeitgeber_plots/",
-        
+
         # EP full experiment plots
         # expand("results/wars_flattened/{animal}/war.pkl", animal=glob_wildcards("results/wars_fragment_filtered/{animal}/war.pkl").animal),
         # expand("results/wars_flattened/{animal}/war.pkl", animal=glob_wildcards("results/wars_fragment_filtered/{animal}/war.pkl").animal),
@@ -192,6 +217,10 @@ rule all:
         # LOF accuracy evaluation
         "results/lof_evaluation/lof_accuracy_results.csv",
         "results/lof_evaluation/lof_fscore_vs_threshold.png",
+
+        # Filtering comparison analysis (manual vs LOF)
+        "results/filtering_comparison_plots/",
+
         # Interactive analysis notebooks
         # "results/notebooks/war_data_explorer.ipynb",
 

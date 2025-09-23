@@ -1529,7 +1529,7 @@ class TestWindowAnalysisResultLOF:
             war.get_lof_scores()
         
         with pytest.raises(ValueError, match="LOF scores not available"):
-            war.apply_lof_threshold(1.5)
+            war.get_bad_channels_by_lof_threshold(1.5)
     
     def test_war_lof_scores_empty_dict(self):
         """Test behavior with empty LOF scores dictionary."""
@@ -1553,7 +1553,7 @@ class TestWindowAnalysisResultLOF:
             war.get_lof_scores()
         
         with pytest.raises(ValueError, match="LOF scores not available"):
-            war.apply_lof_threshold(1.5)
+            war.get_bad_channels_by_lof_threshold(1.5)
     
     def test_war_save_load_preserves_lof_scores(self, war_with_lof):
         """Test that LOF scores are preserved through save/load cycle."""
@@ -1594,7 +1594,7 @@ class TestWindowAnalysisResultLOF:
             assert original_scores == new_scores
             
             original_bad_channels = war_with_lof.apply_lof_threshold(1.5)
-            new_bad_channels = new_war.apply_lof_threshold(1.5)
+            new_bad_channels = new_war.get_bad_channels_by_lof_threshold(1.5)
             assert original_bad_channels == new_bad_channels
     
     def test_war_lof_scores_invalid_data_structure(self):
@@ -1629,7 +1629,7 @@ class TestWindowAnalysisResultLOF:
 
         # apply_lof_threshold should also fail with invalid data
         with pytest.raises(ValueError, match="LOF scores not available for day1"):
-            war.apply_lof_threshold(1.5)
+            war.get_bad_channels_by_lof_threshold(1.5)
     
     def test_war_lof_threshold_workflow_simulation(self, war_with_lof):
         """Test complete workflow of LOF threshold testing."""

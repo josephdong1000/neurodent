@@ -10,11 +10,11 @@ to ensure all downstream analysis uses consistently filtered data.
 
 checkpoint war_fragment_filter:
     """
-    Apply fragment and channel filtering to quality-filtered WARs
+    Apply fragment filtering to standardized WARs (no channel filtering)
     """
     input:
-        war_pkl="results/wars_quality_filtered/{animal}/war.pkl",
-        war_json="results/wars_quality_filtered/{animal}/war.json",
+        war_pkl="results/wars_standardized/{animal}/war.pkl",
+        war_json="results/wars_standardized/{animal}/war.json",
     output:
         war_pkl="results/wars_fragment_filtered/{animal}/war.pkl",
         war_json="results/wars_fragment_filtered/{animal}/war.json",
