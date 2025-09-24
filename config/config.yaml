@@ -6,22 +6,6 @@ base_folder: "/mnt/isilon/marsh_single_unit/PythonEEG"
 data_parent_folder: "/mnt/isilon/marsh_single_unit/PythonEEG Data Bins/Sox5/Dr. Lefebvre Project"
 temp_directory: "/scr1/users/dongjp"
 
-# Results directory structure
-results_dir: "results"
-wars_dir: "results/wars"
-wars_quality_filtered_dir: "results/wars_quality_filtered"
-wars_standardized_dir: "results/wars_standardized"
-wars_fragment_filtered_dir: "results/wars_fragment_filtered"
-wars_channel_filtered_manual_dir: "results/wars_channel_filtered_manual"
-wars_channel_filtered_lof_dir: "results/wars_channel_filtered_lof"
-wars_zeitgeber_dir: "results/wars_zeitgeber"
-temporal_heatmaps_dir: "results/temporal_heatmaps"
-diagnostic_figures_dir: "results/diagnostic_figures"
-flattened_wars_dir: "results/wars_flattened"
-flattened_wars_manual_dir: "results/wars_flattened_manual"
-flattened_wars_lof_dir: "results/wars_flattened_lof"
-filtering_comparison_dir: "results/filtering_comparison_plots"
-
 # Sample configuration
 samples:
   # Sample metadata file path
@@ -71,7 +55,7 @@ analysis:
       reject_channels: ["LHip", "RHip"]  # List of channels to reject globally
       min_valid_channels: 3
     lof:
-      reject_lof_threshold: 2.5
+      reject_lof_threshold: 2.5  # LOF threshold above which channels are considered bad
       reject_channels: []  # List of channels to reject globally
       min_valid_channels: 3
 
@@ -123,14 +107,13 @@ analysis:
 
   # Filtering comparison parameters (manual vs LOF channel filtering)
   filtering_comparison:
-    enabled: true
-    lof_threshold: 2.0
     features_to_compare: ["delta", "rms", "beta", "logpsdband", "pcorr", "cohere"]
     plot_types: ["feature_scatter", "channel_impact", "animal_correlation"]
-    baseline_type: "manual"  # Use manual filtering as baseline
-    figure_format: "png"
-    data_format: "csv"
-    dpi: 300
+    # NOTE these features below should be explored later
+    # baseline_type: "manual"  # Use manual filtering as baseline
+    # figure_format: "png"
+    # data_format: "csv"
+    # dpi: 300
 
   # Figure generation parameters
   figures:
@@ -275,10 +258,3 @@ cluster:
 logging:
   level: "DEBUG"
   format: "%(asctime)s - %(levelname)s - %(message)s"
-
-# Feature exclusions for plotting
-plotting:
-  exclude_features: ["nspike", "lognspike"]
-  catplot_params:
-    showfliers: false
-  plot_kinds: ["box", "swarm", "point"]
