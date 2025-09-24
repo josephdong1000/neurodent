@@ -87,25 +87,35 @@ def get_all_fragment_filtered_json(wildcards):
     return out
 
 
-def get_flattened_wars_pkl(wildcards):
+# def get_flattened_wars_pkl(wildcards):
+#     out = []
+#     for anim in ANIMALS:
+#         checkpoint_output = checkpoints.war_quality_filter.get(animal=anim).output[0]
+#         qual_filenames = glob_wildcards(os.path.join(checkpoint_output, "{filename}.pkl")).filename
+#         if qual_filenames:
+#             out.append(f"results/wars_flattened/{Path(checkpoint_output).name}/war.pkl")
+#     return out
+
+
+# def get_flattened_wars_json(wildcards):
+#     out = []
+#     for anim in ANIMALS:
+#         checkpoint_output = checkpoints.war_quality_filter.get(animal=anim).output[0]
+#         qual_filenames = glob_wildcards(os.path.join(checkpoint_output, "{filename}.json")).filename
+#         if qual_filenames:
+#             out.append(f"results/wars_flattened/{Path(checkpoint_output).name}/war.json")
+#     return out
+
+def get_wars_after_quality_filtered(wildcards, filepath_prepend, filepath_append):
+    """General case function to get any desired WAR files for steps after quality filter"""
     out = []
     for anim in ANIMALS:
         checkpoint_output = checkpoints.war_quality_filter.get(animal=anim).output[0]
-        qual_filenames = glob_wildcards(os.path.join(checkpoint_output, "{filename}.pkl")).filename
+        animal_name = Path(checkpoint_output).name
+        qual_filenames = glob.glob(os.path.join(checkpoint_output, "war.pkl"))
         if qual_filenames:
-            out.append(f"results/wars_flattened/{Path(checkpoint_output).name}/war.pkl")
+            out.append(str(Path(filepath_prepend) / animal_name / filepath_append))
     return out
-
-
-def get_flattened_wars_json(wildcards):
-    out = []
-    for anim in ANIMALS:
-        checkpoint_output = checkpoints.war_quality_filter.get(animal=anim).output[0]
-        qual_filenames = glob_wildcards(os.path.join(checkpoint_output, "{filename}.json")).filename
-        if qual_filenames:
-            out.append(f"results/wars_flattened/{Path(checkpoint_output).name}/war.json")
-    return out
-
 
 def get_all_flattened_manual_wars(wildcards):
     """Get all manually channel-filtered flattened WAR paths"""
