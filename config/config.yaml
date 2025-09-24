@@ -248,7 +248,7 @@ cluster:
     interface: null
 
   filtering_comparison:
-    time: "2h"
+    time: "1h"
     mem_mb: 10_000
     nodes: 1
     threads: 4
