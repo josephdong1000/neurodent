@@ -28,14 +28,23 @@ from pythoneeg import visualization, constants
 def load_wars_from_paths(war_paths, label):
     """Load multiple WARs and create ExperimentPlotter instance"""
     wars = []
+    path_to_hash_mapping = {}  # Store mapping from file path identifier to hash
+
     for path in war_paths:
         try:
             war_dir = Path(path).parent
             war = visualization.WindowAnalysisResult.load_pickle_and_json(
                 folder_path=war_dir, pickle_name="war.pkl", json_name="war.json"
             )
+            war.add_unique_hash()
+
+            # Extract path identifier for matching (use the parent directory name as identifier)
+            path_identifier = war_dir.name
+            path_to_hash_mapping[path_identifier] = war.animal_id
+
             wars.append(war)
-            logging.info(f"Loaded {label} WAR for {war.animal_id}: {len(war.result)} records")
+            logging.info(f"Loaded {label} WAR for {war.animal_id}: {len(war.result)} rows")
+            logging.debug(f"Path identifier '{path_identifier}' -> hash '{war.animal_id}'")
 
         except Exception as e:
             logging.error(f"Failed to load WAR from {path}: {e}")
@@ -43,32 +52,113 @@ def load_wars_from_paths(war_paths, label):
 
     if wars:
         logging.info(f"Creating ExperimentPlotter for {label} dataset: {len(wars)} animals")
-        return visualization.ExperimentPlotter(wars)
+        ep = visualization.ExperimentPlotter(wars)
+        # Store the path mapping for later use
+        ep.path_to_hash_mapping = path_to_hash_mapping
+        return ep
     else:
         logging.warning(f"No {label} WARs loaded successfully")
         return None
 
 
-def extract_feature_dataframe(ep, feature, label):
-    """Extract feature data using ExperimentPlotter's built-in methods"""
-    try:
-        logging.info(f"Extracting feature '{feature}' from {label} ExperimentPlotter")
+def create_hash_mapping(manual_ep, lof_ep):
+    """
+    Create a mapping between manual and LOF hashes using file path identifiers
 
-        # Use PyEEG's built-in method to properly handle different feature types
-        if feature in constants.BAND_FEATURES + constants.MATRIX_FEATURES:
-            # Band and matrix features need special handling - include band in groupby for proper expansion
-            df = ep.pull_timeseries_dataframe(
-                feature=feature, groupby=["animal", "isday"], collapse_channels=True, average_groupby=False
-            )
-        else:
-            # Linear features can be processed normally
-            df = ep.pull_timeseries_dataframe(
-                feature=feature, groupby=["animal", "isday"], collapse_channels=True, average_groupby=False
-            )
+    Parameters:
+    -----------
+    manual_ep : ExperimentPlotter
+        Manual filtering ExperimentPlotter with path_to_hash_mapping
+    lof_ep : ExperimentPlotter
+        LOF filtering ExperimentPlotter with path_to_hash_mapping
+
+    Returns:
+    --------
+    dict
+        Dictionary mapping manual_hash -> lof_hash for matching animals
+    """
+    hash_mapping = {}
+
+    if not hasattr(manual_ep, "path_to_hash_mapping") or not hasattr(lof_ep, "path_to_hash_mapping"):
+        logging.warning("Path mappings not available - cannot create hash mapping")
+        return hash_mapping
+
+    manual_paths = manual_ep.path_to_hash_mapping
+    lof_paths = lof_ep.path_to_hash_mapping
+
+    # Find common path identifiers
+    common_paths = set(manual_paths.keys()).intersection(set(lof_paths.keys()))
+    logging.info(f"Found {len(common_paths)} common path identifiers for hash mapping")
+
+    for path_id in common_paths:
+        manual_hash = manual_paths[path_id]
+        lof_hash = lof_paths[path_id]
+        hash_mapping[manual_hash] = lof_hash
+        logging.debug(f"Mapped: {manual_hash} -> {lof_hash} (path: {path_id})")
+
+    logging.info(f"Created hash mapping for {len(hash_mapping)} animals")
+    return hash_mapping
+
+
+def extract_feature_dataframe(ep, feature, label):
+    """
+    Extract feature data using ExperimentPlotter's built-in methods with proper animal-level aggregation
+
+    Parameters:
+    -----------
+    ep : ExperimentPlotter
+        PyEEG ExperimentPlotter instance containing the WAR data
+    feature : str
+        Feature name to extract (e.g., 'logpsdband', 'rms', 'cohere')
+    label : str
+        Label for filtering method ('manual' or 'lof')
+
+    Returns:
+    --------
+    pd.DataFrame or None
+        DataFrame with animal-level aggregated feature data, or None if extraction fails
+        - For LINEAR_FEATURES (rms, ampvar, etc.): One row per animal
+        - For BAND_FEATURES (logpsdband, psdfrac, etc.): Multiple rows per animal (one per frequency band)
+        - For MATRIX_FEATURES (cohere, pcorr, etc.): Multiple rows per animal (one per frequency band for spectral features)
+    """
+    try:
+        # Use animal-level aggregation across channels and time periods
+        # This gives us ~48-62 data points (one per animal) for linear features
+        # For band/matrix features, we get multiple rows per animal (one per frequency band)
+        df = ep.pull_timeseries_dataframe(
+            feature=feature,
+            groupby=["animal"],
+            collapse_channels=True,
+            average_groupby=True,  # Average across time periods for each animal
+        )
 
         # Add filtering method label
         df["filtering_method"] = label
-        logging.info(f"Extracted {label} feature '{feature}': {len(df)} records")
+
+        # Add genotype information if available
+        if hasattr(ep, "results") and ep.results:
+            # Create a mapping from animal to genotype
+            animal_to_genotype = {}
+            for war in ep.results:
+                animal_to_genotype[war.animal_id] = war.genotype
+            logging.info(f"Retrieved genotype information for {len(animal_to_genotype)} animals")
+
+            # Add genotype column to the dataframe
+            if animal_to_genotype:
+                df["genotype"] = df["animal"].map(animal_to_genotype)
+                logging.info(f"Added genotype information for {len(animal_to_genotype)} animals")
+
+        # Log the result structure
+        if "band" in df.columns:
+            bands = sorted(df["band"].unique())
+            animals = df["animal"].nunique()
+            logging.info(
+                f"Extracted {label} feature '{feature}': {len(df)} records ({animals} animals × {len(bands)} bands)"
+            )
+        else:
+            animals = df["animal"].nunique()
+            logging.info(f"Extracted {label} feature '{feature}': {len(df)} records ({animals} animals)")
+
         return df
 
     except Exception as e:
@@ -76,18 +166,69 @@ def extract_feature_dataframe(ep, feature, label):
         return None
 
 
-def generate_feature_scatter_plots(manual_ep, lof_ep, features, output_dir):
-    """Generate scatter plots comparing features between manual and LOF filtering using PyEEG methods"""
+def generate_feature_scatter_plots(manual_ep, lof_ep, features, output_dir, hash_mapping=None):
+    """
+    Generate individual scatter plots comparing features between manual and LOF filtering methods
+
+    Creates separate plots for each frequency band of band/matrix features, enabling clear comparison
+    of specific frequency components between the two filtering approaches.
+
+    Parameters:
+    -----------
+    manual_ep : ExperimentPlotter
+        PyEEG ExperimentPlotter instance with manually filtered data
+    lof_ep : ExperimentPlotter
+        PyEEG ExperimentPlotter instance with LOF-filtered data
+    features : list[str]
+        List of feature names to compare (e.g., ['logpsdband', 'rms', 'cohere'])
+    output_dir : Path
+        Directory to save scatter plot PNG files
+
+    Output Files:
+    -------------
+    For LINEAR_FEATURES (rms, ampvar, psdtotal, etc.):
+        - scatter_{feature}.png (e.g., scatter_rms.png)
+        - One plot per feature, ~48-62 data points (one per animal)
+
+    For BAND_FEATURES (logpsdband, psdband, psdfrac):
+        - scatter_{feature}_{band}.png (e.g., scatter_logpsdband_delta.png)
+        - Five plots per feature (delta, theta, alpha, beta, gamma)
+        - Each plot: ~48-62 data points (one per animal for that frequency band)
+        - Delta: 1-4 Hz, Theta: 4-8 Hz, Alpha: 8-13 Hz, Beta: 13-25 Hz, Gamma: 25-40 Hz
+
+    For MATRIX_FEATURES with bands (cohere, imcoh, zcohere, zimcoh):
+        - scatter_{feature}_{band}.png (e.g., scatter_cohere_theta.png)
+        - Five plots per feature (delta, theta, alpha, beta, gamma)
+        - Each plot: ~48-62 data points (one per animal for that frequency band)
+        - Represents coherence/imaginary coherence averaged across channel pairs in that band
+
+    For MATRIX_FEATURES without bands (pcorr, zpcorr):
+        - scatter_{feature}.png (e.g., scatter_pcorr.png)
+        - One plot per feature, ~48-62 data points (one per animal)
+        - Represents correlation averaged across channel pairs and time
+
+    Plot Content:
+    -------------
+    - X-axis: Manual filtering values
+    - Y-axis: LOF filtering values
+    - Red dashed line: Perfect correlation (y=x)
+    - Text box: Pearson correlation coefficient and RMSE
+    - Each data point: One animal's aggregated value for that feature/band combination
+    """
 
     logging.info("Generating feature scatter plots using PyEEG ExperimentPlotter methods")
 
-    try:
-        feature_data = {}
+    # Use the provided hash mapping for merging manual and LOF data
+    if hash_mapping is None:
+        hash_mapping = create_hash_mapping(manual_ep, lof_ep)
 
-        # Extract data for each feature using PyEEG's proper methods
-        logging.info("Step 1: Extracting feature data using PyEEG methods")
+    try:
+        # Extract data and organize plots (separate plots for each frequency band)
+        logging.info("Extracting and organizing feature data for individual band plotting")
+        plots_to_create = {}  # Will store plot_name -> {"manual": df, "lof": df, "feature_col": str, "title": str}
+
         for i, feature in enumerate(features):
-            logging.info(f"Processing feature {i + 1}/{len(features)}: {feature}")
+            logging.debug(f"Processing feature {i + 1}/{len(features)}: {feature}")
 
             # Extract manual data
             manual_df = extract_feature_dataframe(manual_ep, feature, "manual")
@@ -101,59 +242,153 @@ def generate_feature_scatter_plots(manual_ep, lof_ep, features, output_dir):
                 logging.warning(f"Failed to extract LOF data for {feature}, skipping")
                 continue
 
-            feature_data[feature] = {"manual": manual_df, "lof": lof_df}
+            # Check if this is a band feature (has 'band' column)
+            if "band" in manual_df.columns and "band" in lof_df.columns:
+                # Band feature - create separate plots for each band
+                bands = sorted(manual_df["band"].unique())
+                logging.debug(f"Feature '{feature}' is a band feature with bands: {bands}")
 
-        if not feature_data:
-            logging.error("No feature data could be extracted")
+                for band in bands:
+                    # Filter data for this specific band
+                    manual_band = manual_df[manual_df["band"] == band].copy()
+                    lof_band = lof_df[lof_df["band"] == band].copy()
+
+                    # Create unique plot name for this band
+                    plot_name = f"{feature}_{band}"
+                    freq_range = constants.FREQ_BANDS.get(band, "Unknown")
+                    freq_str = (
+                        f"{freq_range[0]}-{freq_range[1]} Hz" if isinstance(freq_range, tuple) else str(freq_range)
+                    )
+
+                    plots_to_create[plot_name] = {
+                        "manual": manual_band,
+                        "lof": lof_band,
+                        "feature_col": feature,  # The actual column name to plot
+                        "title": f"{feature} - {band.capitalize()} Band ({freq_str})",
+                    }
+                    logging.debug(
+                        f"Prepared plot '{plot_name}' with {len(manual_band)} manual and {len(lof_band)} LOF records"
+                    )
+            else:
+                # Linear feature - single plot
+                plot_name = feature
+                plots_to_create[plot_name] = {
+                    "manual": manual_df,
+                    "lof": lof_df,
+                    "feature_col": feature,
+                    "title": f"{feature} Comparison",
+                }
+                logging.debug(f"Prepared plot '{plot_name}' with {len(manual_df)} manual and {len(lof_df)} LOF records")
+
+        if not plots_to_create:
+            logging.error("No plots could be prepared")
             return
 
-        logging.info(f"Successfully extracted data for {len(feature_data)} features")
+        logging.info(f"Successfully prepared {len(plots_to_create)} plots: {list(plots_to_create.keys())}")
 
-        # Create individual scatter plots for each feature
-        logging.info("Step 2: Creating individual scatter plots for each feature")
+        # Create individual scatter plots
+        logging.info("Creating individual scatter plots")
 
-        for i, (feature, data) in enumerate(feature_data.items()):
-            logging.info(f"Creating plot for feature {i + 1}/{len(feature_data)}: {feature}")
+        for i, (plot_name, plot_data) in enumerate(plots_to_create.items()):
+            logging.debug(f"Creating plot {i + 1}/{len(plots_to_create)}: {plot_name}")
 
-            # Create individual figure for this feature
+            # Create individual figure for this plot
             fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+            ax.set_box_aspect(1)
 
             try:
-                manual_df = data["manual"]
-                lof_df = data["lof"]
+                manual_df = plot_data["manual"]
+                lof_df = plot_data["lof"]
+                feature_col = plot_data["feature_col"]
+                plot_title = plot_data["title"]
 
-                # Aggregate data by animal and isday (and band if present)
-                groupby_cols = ["animal", "isday"]
-                if "band" in manual_df.columns and "band" in lof_df.columns:
-                    groupby_cols.append("band")
+                # Data is already animal-level aggregated by PyEEG
+                # For band features, we may have multiple rows per animal (one per band)
+                # For linear features, we have one row per animal
 
-                # Calculate means for each group
-                manual_agg = manual_df.groupby(groupby_cols)[feature].mean().reset_index()
-                lof_agg = lof_df.groupby(groupby_cols)[feature].mean().reset_index()
+                # For band-separated plots, we only have data for one specific band now
+                # Use hash mapping to merge manual and LOF data
+                logging.debug(
+                    f"Hash mapping available: {hash_mapping is not None}, size: {len(hash_mapping) if hash_mapping else 0}"
+                )
+                if hash_mapping:
+                    # Create a reverse mapping for LOF data
+                    lof_to_manual_mapping = {v: k for k, v in hash_mapping.items()}
 
-                # Merge the datasets
-                merged = pd.merge(manual_agg, lof_agg, on=groupby_cols, suffixes=("_manual", "_lof"), how="inner")
+                    # Add mapping columns to enable merging
+                    manual_df_temp = manual_df.copy()
+                    lof_df_temp = lof_df.copy()
+
+                    # Map LOF hashes to manual hashes for merging
+                    lof_df_temp["manual_hash"] = lof_df_temp["animal"].map(lof_to_manual_mapping)
+                    manual_df_temp["manual_hash"] = manual_df_temp["animal"]
+
+                    # Check for mapping failures
+                    manual_na_count = manual_df_temp["manual_hash"].isna().sum()
+                    lof_na_count = lof_df_temp["manual_hash"].isna().sum()
+                    if manual_na_count > 0 or lof_na_count > 0:
+                        logging.warning(
+                            f"Hash mapping failures - Manual NAs: {manual_na_count}, LOF NAs: {lof_na_count}"
+                        )
+
+                    # Merge on the mapped manual hash
+                    merged = pd.merge(
+                        manual_df_temp, lof_df_temp, on=["manual_hash"], suffixes=("_manual", "_lof"), how="inner"
+                    )
+                    logging.debug(f"Hash-based merge for {plot_name}: {len(merged)} records")
+                else:
+                    logging.error(f"Hash mapping not available for {plot_name}")
+                    raise ValueError("Hash mapping not available")
 
                 if merged.empty:
-                    logging.warning(f"No matching records for {feature}")
+                    logging.warning(f"No matching records for {plot_name}")
                     ax.text(0.5, 0.5, "No matching data", transform=ax.transAxes, ha="center")
-                    ax.set_title(f"{feature} (No Data)")
+                    ax.set_title(f"{plot_name} (No Data)")
                     continue
 
-                # Extract values for plotting
-                manual_vals = merged[f"{feature}_manual"]
-                lof_vals = merged[f"{feature}_lof"]
+                # Extract values for plotting using the correct feature column name
+                manual_vals = merged[f"{feature_col}_manual"]
+                lof_vals = merged[f"{feature_col}_lof"]
 
                 # Remove infinite and NaN values
                 valid_mask = np.isfinite(manual_vals) & np.isfinite(lof_vals)
                 manual_clean = manual_vals[valid_mask]
                 lof_clean = lof_vals[valid_mask]
 
-                logging.info(f"Feature {feature}: {len(manual_clean)} valid data points")
+                # Log data point information
+                # Use manual_hash column to count unique animals since 'animal' column is now split
+                if "manual_hash" in merged.columns:
+                    unique_animals = merged["manual_hash"].nunique()
+                else:
+                    unique_animals = len(merged)
+                logging.debug(f"Plot {plot_name}: {len(manual_clean)} valid data points ({unique_animals} animals)")
 
                 if len(manual_clean) > 0:
-                    # Create scatter plot
-                    ax.scatter(manual_clean, lof_clean, alpha=0.6, s=20)
+                    # Create scatter plot with genotype-based coloring
+                    if "genotype" in merged.columns:
+                        # Get unique genotypes and create color mapping
+                        unique_genotypes = sorted(merged["genotype"].dropna().unique())
+                        genotype_colors = {gt: f"C{i}" for i, gt in enumerate(unique_genotypes)}
+
+                        # Plot each genotype with different colors
+                        for genotype in unique_genotypes:
+                            genotype_mask = merged["genotype"] == genotype
+                            valid_genotype_mask = valid_mask & genotype_mask
+
+                            if valid_genotype_mask.sum() > 0:
+                                manual_genotype = manual_vals[valid_genotype_mask]
+                                lof_genotype = lof_vals[valid_genotype_mask]
+                                ax.scatter(
+                                    manual_genotype,
+                                    lof_genotype,
+                                    alpha=0.6,
+                                    s=20,
+                                    c=genotype_colors[genotype],
+                                    label=f"{genotype} (n={len(manual_genotype)})",
+                                )
+                    else:
+                        # No genotype information available, use default color
+                        ax.scatter(manual_clean, lof_clean, alpha=0.6, s=20, c="C0")
 
                     # Add diagonal line (perfect correlation)
                     min_val = min(manual_clean.min(), lof_clean.min())
@@ -164,7 +399,7 @@ def generate_feature_scatter_plots(manual_ep, lof_ep, features, output_dir):
                     if len(manual_clean) > 1:
                         correlation = stats.pearsonr(manual_clean, lof_clean)[0]
                         rmse = np.sqrt(mean_squared_error(manual_clean, lof_clean))
-                        logging.info(f"Feature {feature}: correlation={correlation:.3f}, RMSE={rmse:.3f}")
+                        logging.debug(f"Plot {plot_name}: correlation={correlation:.3f}, RMSE={rmse:.3f}")
 
                         ax.text(
                             0.05,
@@ -175,28 +410,28 @@ def generate_feature_scatter_plots(manual_ep, lof_ep, features, output_dir):
                             bbox=dict(boxstyle="round", facecolor="white", alpha=0.8),
                         )
 
-                    ax.set_xlabel(f"{feature} (Manual Filtering)")
-                    ax.set_ylabel(f"{feature} (LOF Filtering)")
-                    ax.set_title(f"{feature} Comparison")
+                    ax.set_xlabel(f"{plot_title} (Manual Filtering)")
+                    ax.set_ylabel(f"{plot_title} (LOF Filtering)")
+                    ax.set_title(plot_title)
                     ax.legend()
 
                 else:
                     ax.text(0.5, 0.5, "No valid data", transform=ax.transAxes, ha="center")
-                    ax.set_title(f"{feature} (No Data)")
+                    ax.set_title(f"{plot_name} (No Data)")
 
             except Exception as e:
-                logging.error(f"Error processing feature {feature}: {str(e)}")
+                logging.error(f"Error processing plot {plot_name}: {str(e)}")
                 ax.text(0.5, 0.5, f"Error: {str(e)}", transform=ax.transAxes, ha="center")
-                ax.set_title(f"{feature} (Error)")
+                ax.set_title(f"{plot_name} (Error)")
 
             # Save individual plot
-            plt.tight_layout()
-            output_filename = f"scatter_{feature}.png"
-            plt.savefig(output_dir / output_filename, dpi=300, bbox_inches="tight")
-            plt.close()
-            logging.info(f"Saved scatter plot: {output_filename}")
+            fig.tight_layout()
+            output_filename = f"scatter_{plot_name}.png"
+            fig.savefig(output_dir / output_filename, dpi=300, bbox_inches="tight")
+            plt.close(fig)
+            logging.debug(f"Saved scatter plot: {output_filename}")
 
-        logging.info("All feature scatter plots saved successfully")
+        logging.info("All scatter plots saved successfully")
 
     except Exception as e:
         logging.error(f"Critical error in generate_feature_scatter_plots: {str(e)}")
@@ -206,7 +441,7 @@ def generate_feature_scatter_plots(manual_ep, lof_ep, features, output_dir):
         raise
 
 
-def generate_channel_impact_analysis(manual_ep, lof_ep, features, output_dir):
+def generate_channel_impact_analysis(manual_ep, lof_ep, features, output_dir, hash_mapping=None):
     """Analyze the impact of filtering on different channels using PyEEG ExperimentPlotter methods"""
 
     logging.info("Generating channel impact analysis using PyEEG ExperimentPlotter methods")
@@ -257,8 +492,11 @@ def generate_channel_impact_analysis(manual_ep, lof_ep, features, output_dir):
         elif "isday" in available_cols:
             group_col = "isday"
             group_label = "DayNight"
+        elif "genotype" in available_cols:
+            group_col = "genotype"
+            group_label = "Genotype"
         else:
-            logging.warning("No suitable grouping column found (neither 'band' nor 'isday')")
+            logging.warning("No suitable grouping column found (neither 'band', 'isday', nor 'genotype')")
             return
 
         logging.info(f"Using '{group_col}' for grouping analysis")
@@ -268,22 +506,27 @@ def generate_channel_impact_analysis(manual_ep, lof_ep, features, output_dir):
         lof_grouped_data = {}
 
         for feature in manual_feature_data.keys():
-            logging.info(f"Aggregating feature '{feature}' by {group_label.lower()}")
+            logging.info(f"Processing feature '{feature}' for {group_label.lower()}-wise analysis")
 
             manual_df = manual_feature_data[feature]
             lof_df = lof_feature_data[feature]
 
-            # Group and average the feature values
+            # Group by the determined grouping column
             if group_col in manual_df.columns and group_col in lof_df.columns:
+                # Group by the specified column across all animals
                 manual_grouped = manual_df.groupby(group_col)[feature].mean()
                 lof_grouped = lof_df.groupby(group_col)[feature].mean()
-
-                manual_grouped_data[feature] = manual_grouped
-                lof_grouped_data[feature] = lof_grouped
-
-                logging.info(f"Feature '{feature}': manual groups={len(manual_grouped)}, lof groups={len(lof_grouped)}")
             else:
-                logging.warning(f"Grouping column '{group_col}' not found in {feature} data")
+                # If the grouping column is not available, skip this feature
+                logging.info(
+                    f"Feature '{feature}' does not have '{group_col}' column - skipping {group_label.lower()} impact analysis"
+                )
+                continue
+
+            manual_grouped_data[feature] = manual_grouped
+            lof_grouped_data[feature] = lof_grouped
+
+            logging.info(f"Feature '{feature}': manual groups={len(manual_grouped)}, lof groups={len(lof_grouped)}")
 
         if not manual_grouped_data or not lof_grouped_data:
             logging.error(f"No features could be grouped by {group_col}")
@@ -348,7 +591,7 @@ def generate_channel_impact_analysis(manual_ep, lof_ep, features, output_dir):
         raise
 
 
-def generate_animal_correlation_analysis(manual_ep, lof_ep, features, output_dir):
+def generate_animal_correlation_analysis(manual_ep, lof_ep, features, output_dir, hash_mapping=None):
     """Analyze correlation of animal-level aggregated features using PyEEG ExperimentPlotter methods"""
 
     logging.info("Generating animal-level correlation analysis using PyEEG ExperimentPlotter methods")
@@ -384,12 +627,12 @@ def generate_animal_correlation_analysis(manual_ep, lof_ep, features, output_dir
 
         logging.info(f"Successfully extracted data for {len(manual_feature_data)} features")
 
-        logging.info("Step 2: Aggregating features by animal")
+        logging.info("Aggregating features by animal for correlation analysis")
         manual_animal_data = {}
         lof_animal_data = {}
 
         for feature in manual_feature_data.keys():
-            logging.info(f"Aggregating feature '{feature}' by animal")
+            logging.debug(f"Processing feature '{feature}' for animal-level correlation analysis")
 
             manual_df = manual_feature_data[feature]
             lof_df = lof_feature_data[feature]
@@ -399,9 +642,16 @@ def generate_animal_correlation_analysis(manual_ep, lof_ep, features, output_dir
                 logging.warning(f"Missing 'animal' column for feature {feature}, skipping")
                 continue
 
-            # Group and average by animal
-            manual_animal = manual_df.groupby("animal")[feature].mean()
-            lof_animal = lof_df.groupby("animal")[feature].mean()
+            # Data is already animal-level aggregated
+            # For band features, we need to average across bands for each animal to get single value per animal
+            if "band" in manual_df.columns and "band" in lof_df.columns:
+                # Average across bands for each animal to get one correlation per feature
+                manual_animal = manual_df.groupby("animal")[feature].mean()
+                lof_animal = lof_df.groupby("animal")[feature].mean()
+            else:
+                # Linear features already have one value per animal
+                manual_animal = manual_df.set_index("animal")[feature]
+                lof_animal = lof_df.set_index("animal")[feature]
 
             manual_animal_data[feature] = manual_animal
             lof_animal_data[feature] = lof_animal
@@ -505,7 +755,7 @@ def generate_animal_correlation_analysis(manual_ep, lof_ep, features, output_dir
         raise
 
 
-def generate_summary_statistics(manual_ep, lof_ep, features, output_dir):
+def generate_summary_statistics(manual_ep, lof_ep, features, output_dir, hash_mapping=None):
     """Generate summary statistics comparing the two filtering methods using PyEEG ExperimentPlotter methods"""
 
     logging.info("Generating summary statistics using PyEEG ExperimentPlotter methods")
@@ -633,28 +883,32 @@ def main():
     features_to_analyze = features_to_compare
     logging.info(f"Analyzing features: {features_to_analyze}")
 
+    # Create hash mapping for merging manual and LOF data
+    hash_mapping = create_hash_mapping(manual_ep, lof_ep)
+    logging.info(f"Main function hash mapping created: {len(hash_mapping) if hash_mapping else 0} mappings")
+
     # Generate analyses based on requested plot types
     logging.info("Starting plot generation phase")
 
     try:
         if "feature_scatter" in plot_types:
             logging.info("Calling generate_feature_scatter_plots...")
-            generate_feature_scatter_plots(manual_ep, lof_ep, features_to_analyze, comparison_dir)
+            generate_feature_scatter_plots(manual_ep, lof_ep, features_to_analyze, comparison_dir, hash_mapping)
             logging.info("generate_feature_scatter_plots completed successfully")
 
         if "channel_impact" in plot_types:
             logging.info("Calling generate_channel_impact_analysis...")
-            generate_channel_impact_analysis(manual_ep, lof_ep, features_to_analyze, comparison_dir)
+            generate_channel_impact_analysis(manual_ep, lof_ep, features_to_analyze, comparison_dir, hash_mapping)
             logging.info("generate_channel_impact_analysis completed successfully")
 
         if "animal_correlation" in plot_types:
             logging.info("Calling generate_animal_correlation_analysis...")
-            generate_animal_correlation_analysis(manual_ep, lof_ep, features_to_analyze, comparison_dir)
+            generate_animal_correlation_analysis(manual_ep, lof_ep, features_to_analyze, comparison_dir, hash_mapping)
             logging.info("generate_animal_correlation_analysis completed successfully")
 
         # Always generate summary statistics
         logging.info("Calling generate_summary_statistics...")
-        generate_summary_statistics(manual_ep, lof_ep, features_to_analyze, data_dir)
+        generate_summary_statistics(manual_ep, lof_ep, features_to_analyze, data_dir, hash_mapping)
         logging.info("generate_summary_statistics completed successfully")
 
         logging.info("Filtering comparison analysis completed successfully")
