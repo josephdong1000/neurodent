@@ -100,6 +100,71 @@ def create_hash_mapping(manual_ep, lof_ep):
     return hash_mapping
 
 
+def calculate_feature_correlation(manual_vals, lof_vals, feature_name, hash_mapping=None):
+    """
+    Calculate correlation between manual and LOF feature values, handling hash mapping
+
+    Parameters:
+    -----------
+    manual_vals : pd.Series
+        Manual filtering feature values indexed by animal ID
+    lof_vals : pd.Series
+        LOF filtering feature values indexed by animal ID
+    feature_name : str
+        Name of the feature for logging
+    hash_mapping : dict, optional
+        Mapping from manual animal IDs to LOF animal IDs
+
+    Returns:
+    --------
+    dict or None
+        Dictionary with correlation, p_value, and n_animals if successful, None otherwise
+    """
+    try:
+        if hash_mapping:
+            # Use hash mapping to match animals
+            manual_animals_with_mapping = [animal for animal in manual_vals.index if animal in hash_mapping]
+            matched_manual_animals = [animal for animal in manual_animals_with_mapping
+                                    if hash_mapping[animal] in lof_vals.index]
+
+            if len(matched_manual_animals) == 0:
+                logging.warning(f"No animals could be matched via hash mapping for feature {feature_name}")
+                return None
+
+            # Get values for matched animals
+            manual_common = manual_vals.loc[matched_manual_animals]
+            lof_matched_animals = [hash_mapping[animal] for animal in matched_manual_animals]
+            lof_common = lof_vals.loc[lof_matched_animals]
+
+            logging.debug(f"Feature {feature_name}: {len(matched_manual_animals)} animals matched via hash mapping")
+        else:
+            # Direct matching by animal ID (fallback)
+            common_animals = manual_vals.index.intersection(lof_vals.index)
+            if len(common_animals) == 0:
+                logging.warning(f"No common animals found for feature {feature_name}")
+                return None
+
+            manual_common = manual_vals.loc[common_animals]
+            lof_common = lof_vals.loc[common_animals]
+
+            logging.debug(f"Feature {feature_name}: {len(common_animals)} common animals found")
+
+        # Remove infinite and NaN values - use .values to avoid index alignment issues
+        valid_mask = np.isfinite(manual_common.values) & np.isfinite(lof_common.values)
+        n_valid = valid_mask.sum()
+
+        if n_valid > 1:
+            corr, p_val = stats.pearsonr(manual_common.values[valid_mask], lof_common.values[valid_mask])
+            return {"correlation": corr, "p_value": p_val, "n_animals": n_valid}
+        else:
+            logging.warning(f"Insufficient valid data for correlation: {feature_name} (n_valid={n_valid})")
+            return None
+
+    except Exception as e:
+        logging.error(f"Error calculating correlation for {feature_name}: {e}")
+        return None
+
+
 def extract_feature_dataframe(ep, feature, label):
     """
     Extract feature data using ExperimentPlotter's built-in methods with proper animal-level aggregation
@@ -511,22 +576,34 @@ def generate_channel_impact_analysis(manual_ep, lof_ep, features, output_dir, ha
             manual_df = manual_feature_data[feature]
             lof_df = lof_feature_data[feature]
 
-            # Group by the determined grouping column
-            if group_col in manual_df.columns and group_col in lof_df.columns:
-                # Group by the specified column across all animals
-                manual_grouped = manual_df.groupby(group_col)[feature].mean()
-                lof_grouped = lof_df.groupby(group_col)[feature].mean()
+            # Process features: create per-band entries for band features
+            if "band" in manual_df.columns and "band" in lof_df.columns:
+                # Band feature - create separate entries for each band
+                for band in manual_df['band'].unique():
+                    if band in lof_df['band'].unique():
+                        manual_band_data = manual_df[manual_df['band'] == band]
+                        lof_band_data = lof_df[lof_df['band'] == band]
+
+                        # Group by the grouping column within this band
+                        manual_grouped = manual_band_data.groupby(group_col)[feature].mean()
+                        lof_grouped = lof_band_data.groupby(group_col)[feature].mean()
+
+                        manual_grouped_data[f"{feature}_{band}"] = manual_grouped
+                        lof_grouped_data[f"{feature}_{band}"] = lof_grouped
             else:
-                # If the grouping column is not available, skip this feature
-                logging.info(
-                    f"Feature '{feature}' does not have '{group_col}' column - skipping {group_label.lower()} impact analysis"
-                )
-                continue
+                # Linear feature - group directly by grouping column
+                if group_col in manual_df.columns and group_col in lof_df.columns:
+                    manual_grouped = manual_df.groupby(group_col)[feature].mean()
+                    lof_grouped = lof_df.groupby(group_col)[feature].mean()
+                    manual_grouped_data[feature] = manual_grouped
+                    lof_grouped_data[feature] = lof_grouped
+                else:
+                    logging.warning(f"Feature '{feature}' missing '{group_col}' column - skipping")
+                    continue
 
-            manual_grouped_data[feature] = manual_grouped
-            lof_grouped_data[feature] = lof_grouped
-
-            logging.info(f"Feature '{feature}': manual groups={len(manual_grouped)}, lof groups={len(lof_grouped)}")
+            # Count what we added
+            current_keys = [k for k in manual_grouped_data.keys() if k.startswith(feature)]
+            logging.info(f"Feature '{feature}': created {len(current_keys)} analysis groups")
 
         if not manual_grouped_data or not lof_grouped_data:
             logging.error(f"No features could be grouped by {group_col}")
@@ -555,30 +632,66 @@ def generate_channel_impact_analysis(manual_ep, lof_ep, features, output_dir, ha
         group_diff = lof_grouped_df.loc[common_groups] - manual_grouped_df.loc[common_groups]
         logging.info(f"{group_label} difference matrix shape: {group_diff.shape}")
 
-        logging.info("Step 5: Creating heatmap figure")
-        plt.figure(figsize=(12, 8))
+        logging.info("Step 5: Creating three versions of the heatmap")
 
-        logging.info("Step 6: Creating seaborn heatmap")
-        sns.heatmap(group_diff.T, annot=True, cmap="RdBu_r", center=0, fmt=".3f", cbar_kws={"label": "LOF - Manual"})
+        # Create three versions: absolute differences, z-score-like, and log2 fold-change
+        from matplotlib.colors import TwoSlopeNorm
 
-        logging.info("Step 7: Setting plot labels")
-        plt.title(f"{group_label}-wise Feature Differences (LOF - Manual Filtering)")
-        plt.xlabel(group_label)
-        plt.ylabel("Feature")
+        versions = [
+            ("absolute", "Absolute Differences (LOF - Manual)", group_diff),
+            ("zscore", "Z-score-like Differences", None),  # Will calculate below
+            ("log2fc", "Log2 Fold-Change log2(LOF/Manual)", None)  # Will calculate below
+        ]
 
-        logging.info("Step 8: Applying tight layout")
-        plt.tight_layout()
+        # Calculate z-score-like version (divide by std of differences)
+        group_diff_zscore = group_diff / group_diff.std()
+        versions[1] = ("zscore", "Z-score-like Differences", group_diff_zscore)
 
-        logging.info("Step 9: Saving heatmap")
-        heatmap_filename = f"{group_label.lower()}_impact_heatmap.png"
-        plt.savefig(output_dir / heatmap_filename, dpi=300, bbox_inches="tight")
+        # Calculate log2 fold-change version
+        # Need original values, not differences, for fold-change calculation
+        # log2(LOF/Manual) = log2(LOF) - log2(Manual)
+        manual_vals = manual_grouped_df.loc[common_groups]
+        lof_vals = lof_grouped_df.loc[common_groups]
 
-        logging.info("Step 10: Closing figure")
-        plt.close()
+        # Avoid log of zero or negative values by adding small epsilon
+        epsilon = 1e-10
+        manual_safe = np.maximum(manual_vals, epsilon)
+        lof_safe = np.maximum(lof_vals, epsilon)
 
-        logging.info("Step 11: Saving group difference data to CSV")
-        csv_filename = f"{group_label.lower()}_impact_differences.csv"
-        group_diff.to_csv(output_dir / csv_filename)
+        group_diff_log2fc = np.log2(lof_safe) - np.log2(manual_safe)
+        versions[2] = ("log2fc", "Log2 Fold-Change log2(LOF/Manual)", group_diff_log2fc)
+
+        for version_name, version_title, version_data in versions:
+            if version_data is None:
+                continue
+
+            logging.info(f"Creating {version_name} heatmap")
+
+            plt.figure(figsize=(12, max(8, len(version_data.columns) * 0.6)))
+
+            # Calculate symmetric limits for proper centering
+            abs_max = np.abs(version_data.values).max()
+            vmin, vmax = -abs_max, abs_max
+
+            # Use TwoSlopeNorm for proper centering at zero with red-blue colormap
+            norm = TwoSlopeNorm(vmin=vmin, vcenter=0, vmax=vmax)
+
+            sns.heatmap(version_data.T, annot=True, cmap="RdBu_r", norm=norm, fmt=".3f",
+                       cbar_kws={"label": f"{version_title}"})
+
+            plt.title(f"{group_label}-wise Feature {version_title}")
+            plt.xlabel(group_label)
+            plt.ylabel("Feature")
+            plt.tight_layout()
+
+            # Save heatmap
+            heatmap_filename = f"{group_label.lower()}_impact_heatmap_{version_name}.png"
+            plt.savefig(output_dir / heatmap_filename, dpi=300, bbox_inches="tight")
+            plt.close()
+
+            # Save data
+            csv_filename = f"{group_label.lower()}_impact_differences_{version_name}.csv"
+            version_data.to_csv(output_dir / csv_filename)
 
         logging.info(f"{group_label} impact analysis saved successfully")
 
@@ -627,7 +740,7 @@ def generate_animal_correlation_analysis(manual_ep, lof_ep, features, output_dir
 
         logging.info(f"Successfully extracted data for {len(manual_feature_data)} features")
 
-        logging.info("Aggregating features by animal for correlation analysis")
+        logging.info("Aggregating features by animal for correlation analysis (per-band for band features)")
         manual_animal_data = {}
         lof_animal_data = {}
 
@@ -642,21 +755,29 @@ def generate_animal_correlation_analysis(manual_ep, lof_ep, features, output_dir
                 logging.warning(f"Missing 'animal' column for feature {feature}, skipping")
                 continue
 
-            # Data is already animal-level aggregated
-            # For band features, we need to average across bands for each animal to get single value per animal
+            # For band features, create separate correlations for each band
             if "band" in manual_df.columns and "band" in lof_df.columns:
-                # Average across bands for each animal to get one correlation per feature
-                manual_animal = manual_df.groupby("animal")[feature].mean()
-                lof_animal = lof_df.groupby("animal")[feature].mean()
+                for band in manual_df['band'].unique():
+                    if band in lof_df['band'].unique():
+                        manual_band_data = manual_df[manual_df['band'] == band]
+                        lof_band_data = lof_df[lof_df['band'] == band]
+
+                        manual_animal = manual_band_data.set_index("animal")[feature]
+                        lof_animal = lof_band_data.set_index("animal")[feature]
+
+                        manual_animal_data[f"{feature}_{band}"] = manual_animal
+                        lof_animal_data[f"{feature}_{band}"] = lof_animal
+
+                        logging.info(f"Feature '{feature}_{band}': manual animals={len(manual_animal)}, lof animals={len(lof_animal)}")
             else:
                 # Linear features already have one value per animal
                 manual_animal = manual_df.set_index("animal")[feature]
                 lof_animal = lof_df.set_index("animal")[feature]
 
-            manual_animal_data[feature] = manual_animal
-            lof_animal_data[feature] = lof_animal
+                manual_animal_data[feature] = manual_animal
+                lof_animal_data[feature] = lof_animal
 
-            logging.info(f"Feature '{feature}': manual animals={len(manual_animal)}, lof animals={len(lof_animal)}")
+                logging.info(f"Feature '{feature}': manual animals={len(manual_animal)}, lof animals={len(lof_animal)}")
 
         if not manual_animal_data or not lof_animal_data:
             logging.error("No features could be aggregated by animal")
@@ -664,8 +785,12 @@ def generate_animal_correlation_analysis(manual_ep, lof_ep, features, output_dir
 
         logging.info(f"Successfully aggregated {len(manual_animal_data)} features by animal")
 
-        logging.info("Step 3: Calculating correlations for each feature")
+        logging.info("Step 3: Calculating correlations for each feature using hash mapping")
         correlations = {}
+
+        if not hash_mapping:
+            logging.error("Hash mapping not available for correlation analysis")
+            return
 
         for i, feature in enumerate(manual_animal_data.keys()):
             logging.info(f"Calculating correlation for feature {i + 1}/{len(manual_animal_data)}: {feature}")
@@ -673,27 +798,14 @@ def generate_animal_correlation_analysis(manual_ep, lof_ep, features, output_dir
             manual_vals = manual_animal_data[feature]
             lof_vals = lof_animal_data[feature]
 
-            # Find common animals
-            common_animals = manual_vals.index.intersection(lof_vals.index)
-            logging.info(f"Feature {feature}: {len(common_animals)} common animals")
+            # Use the shared correlation calculation function
+            correlation_result = calculate_feature_correlation(manual_vals, lof_vals, feature, hash_mapping)
 
-            if len(common_animals) == 0:
-                logging.warning(f"No common animals found for feature {feature}")
-                continue
-
-            # Get values for common animals
-            manual_common = manual_vals.loc[common_animals]
-            lof_common = lof_vals.loc[common_animals]
-
-            # Remove infinite and NaN values
-            valid_mask = np.isfinite(manual_common) & np.isfinite(lof_common)
-            n_valid = valid_mask.sum()
-            logging.info(f"Feature {feature}: {n_valid} valid values")
-
-            if n_valid > 1:
-                corr, p_val = stats.pearsonr(manual_common[valid_mask], lof_common[valid_mask])
-                correlations[feature] = {"correlation": corr, "p_value": p_val, "n_animals": n_valid}
-                logging.info(f"Feature {feature}: correlation={corr:.3f}, p_value={p_val:.6f}")
+            if correlation_result:
+                correlations[feature] = correlation_result
+                logging.info(f"Feature {feature}: correlation={correlation_result['correlation']:.3f}, p_value={correlation_result['p_value']:.6f}, n_animals={correlation_result['n_animals']}")
+            else:
+                logging.warning(f"Could not calculate correlation for feature {feature}")
 
         logging.info(f"Calculated correlations for {len(correlations)} features")
 

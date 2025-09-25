@@ -107,7 +107,7 @@ analysis:
 
   # Filtering comparison parameters (manual vs LOF channel filtering)
   filtering_comparison:
-    features_to_compare: ["delta", "rms", "beta", "logpsdband", "pcorr", "cohere"]
+    features_to_compare: ["rms", "logpsdband", "psdslope", "logpsdfrac", "logpsdtotal", "zpcorr", "zcohere", "zimcoh"]
     plot_types: ["feature_scatter", "channel_impact", "animal_correlation"]
     # NOTE these features below should be explored later
     # baseline_type: "manual"  # Use manual filtering as baseline
