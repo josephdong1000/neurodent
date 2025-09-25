@@ -430,14 +430,21 @@ def generate_feature_scatter_plots(manual_ep, lof_ep, features, output_dir, hash
 
                 if len(manual_clean) > 0:
                     # Create scatter plot with genotype-based coloring
-                    if "genotype" in merged.columns:
+                    # After merge, genotype column has suffix, use genotype_manual
+                    genotype_col = None
+                    if "genotype_manual" in merged.columns:
+                        genotype_col = "genotype_manual"
+                    elif "genotype" in merged.columns:
+                        genotype_col = "genotype"
+
+                    if genotype_col:
                         # Get unique genotypes and create color mapping
-                        unique_genotypes = sorted(merged["genotype"].dropna().unique())
+                        unique_genotypes = sorted(merged[genotype_col].dropna().unique())
                         genotype_colors = {gt: f"C{i}" for i, gt in enumerate(unique_genotypes)}
 
                         # Plot each genotype with different colors
                         for genotype in unique_genotypes:
-                            genotype_mask = merged["genotype"] == genotype
+                            genotype_mask = merged[genotype_col] == genotype
                             valid_genotype_mask = valid_mask & genotype_mask
 
                             if valid_genotype_mask.sum() > 0:
@@ -451,6 +458,9 @@ def generate_feature_scatter_plots(manual_ep, lof_ep, features, output_dir, hash
                                     c=genotype_colors[genotype],
                                     label=f"{genotype} (n={len(manual_genotype)})",
                                 )
+
+                        # Add legend for genotypes
+                        ax.legend(loc='upper left', fontsize=8)
                     else:
                         # No genotype information available, use default color
                         ax.scatter(manual_clean, lof_clean, alpha=0.6, s=20, c="C0")
