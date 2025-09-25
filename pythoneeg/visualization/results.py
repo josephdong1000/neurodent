@@ -1060,8 +1060,8 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
         self.__update_instance_vars()
 
-        print(f"Channel names: \t{self.channel_names}")
-        print(f"Channel abbreviations: \t{self.channel_abbrevs}")
+        logging.info(f"Channel names: \t{self.channel_names}")
+        logging.info(f"Channel abbreviations: \t{self.channel_abbrevs}")
 
     def __str__(self) -> str:
         return f"{self.animaldays}"
