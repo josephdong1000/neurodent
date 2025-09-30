@@ -28,6 +28,60 @@ analysis:
       multiprocess_mode: "dask"
       overwrite_rowbins: false
 
+  # Frequency domain spike detection parameters
+  frequency_domain_spike_detection:
+    # Default detection parameters
+    default_params:
+      bp: [3.0, 40.0]              # bandpass filter Hz [low, high]
+      notch: 60.0                  # notch filter Hz
+      notch_q: 30.0                # notch filter quality factor
+      freq_slices: [10.0, 20.0]    # STFT energy slices Hz [freq1, freq2, ...]
+      sneo_percentile: 99.99       # SNEO threshold percentile (higher = fewer detections)
+      cluster_gap_ms: 80.0         # minimum gap between spikes (ms)
+      search_ms: 160.0             # spike refinement search window (ms)
+      baseline_ms: 500.0           # baseline analysis window (ms)
+      k_sigma: 3.0                 # statistical significance threshold (sigma)
+      smooth_window: 7             # smoothing kernel size for spike refinement
+      vote_k: 2                    # minimum votes required across frequency bands
+      smooth_len: 5                # SNEO smoothing window length
+
+    # Parameter grid for systematic testing (optional)
+    parameter_grid:
+      - bp: [3, 40]
+        notch: 60
+        notch_q: 30
+        freq_slices: [10, 20]
+        sneo_percentile: 99.99
+        cluster_gap_ms: 80
+        label: "bp3-40_fs10-20_p99.99"
+      - bp: [3, 40]
+        notch: 60
+        notch_q: 30
+        freq_slices: [15, 20]
+        sneo_percentile: 99.99
+        cluster_gap_ms: 80
+        label: "bp3-40_fs15-20_p99.99"
+      - bp: [3, 40]
+        notch: 60
+        notch_q: 30
+        freq_slices: [15, 25]
+        sneo_percentile: 99.99
+        cluster_gap_ms: 80
+        label: "bp3-40_fs15-25_p99.99"
+
+    # Processing parameters
+    max_length: null               # maximum samples to analyze per recording (null = no limit)
+    multiprocess_mode: "serial"    # "dask" or "serial"
+
+    # Visualization parameters
+    spike_averaged_traces:
+      tmin: -0.5                   # epoch start time (seconds)
+      tmax: 0.5                    # epoch end time (seconds)
+      baseline: null               # baseline correction period [tmin, tmax] or null
+      save_epochs: true            # whether to save epoch data (.fif files)
+      figure_format: "png"         # output format for plots
+      dpi: 300                     # figure resolution
+
   # WAR standardization parameters (channel setup applied before filtering)
   standardization:
     channel_reorder: ["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"]
@@ -161,6 +215,20 @@ cluster:
     mem_mb: 70_000
     nodes: 1
     threads: 10
+    interface: null
+
+  frequency_domain_spike_detection:
+    time: "2h"
+    mem_mb: 40_000
+    nodes: 1
+    threads: 8
+    interface: null
+
+  spike_averaged_traces:
+    time: "1h"
+    mem_mb: 20_000
+    nodes: 1
+    threads: 4
     interface: null
 
   war_quality_filter:
