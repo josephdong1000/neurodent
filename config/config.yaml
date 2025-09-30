@@ -70,7 +70,6 @@ analysis:
         label: "bp3-40_fs15-25_p99.99"
 
     # Processing parameters
-    max_length: null               # maximum samples to analyze per recording (null = no limit)
     multiprocess_mode: "serial"    # "dask" or "serial"
 
     # Visualization parameters

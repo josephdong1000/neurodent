@@ -182,6 +182,7 @@ wildcard_constraints:
 
 # Include rule definitions
 include: "workflow/rules/war_generation.smk"
+include: "workflow/rules/fdsar_diagnostics.smk"
 include: "workflow/rules/war_quality_filter.smk"
 include: "workflow/rules/war_standardize.smk"
 include: "workflow/rules/war_fragment_filtering.smk"
@@ -203,8 +204,11 @@ rule all:
         'results/graphs/filegraph.png',
         'results/graphs/dag.png',
 
-        # WAR generation and prefiltering
+        # WAR generation and prefiltering (includes spike detection)
         expand("results/wars_quality_filtered/{animal}", animal=ANIMALS),
+
+        # FDSAR spike detection diagnostics
+        expand("results/fdsar_diagnostics/{animal}", animal=ANIMALS),
 
         # WAR per-animal diagnostic plots (unfiltered)
         # NOTE also trigger fragment filtering + diagnostic figures filter unfiltered
