@@ -9,7 +9,7 @@ import time
 import warnings
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Union
 
 import dask
 import dask.array as da
@@ -27,6 +27,7 @@ from tqdm import tqdm
 from .. import constants, core
 from ..core import FragmentAnalyzer, get_temp_directory
 from ..core.analyze_sort import MOUNTAINSORT_AVAILABLE
+from ..core.frequency_domain_spike_detection import FrequencyDomainSpikeDetector
 from ..core.utils import parse_chname_to_abbrev
 
 
@@ -957,6 +958,80 @@ class AnimalOrganizer(AnimalFeatureParser):
         self.spike_analysis_results = sars
         return self.spike_analysis_results
 
+    def compute_frequency_domain_spike_analysis(
+        self,
+        detection_params: dict = None,
+        max_length: int = None,
+        multiprocess_mode: Literal["dask", "serial"] = "serial"
+    ):
+        """
+        Compute frequency-domain spike detection on all long recordings.
+
+        Args:
+            detection_params (dict, optional): Detection parameters. Uses defaults if None.
+            max_length (int, optional): Maximum length in samples to analyze per recording
+            multiprocess_mode (Literal["dask", "serial"]): Processing mode
+
+        Returns:
+            list[FrequencyDomainSpikeAnalysisResult]: Results for each recording session
+
+        Raises:
+            ImportError: If SpikeInterface is not available
+        """
+        # Import here to avoid circular imports
+        from .frequency_domain_results import FrequencyDomainSpikeAnalysisResult
+
+        fdsar_list = []
+        recs = [lrec.LongRecording for lrec in self.long_recordings]
+
+        logging.info(f"Running frequency-domain spike detection on {len(recs)} recordings")
+        logging.info(f"Detection parameters: {detection_params}")
+
+        for i, rec in enumerate(recs):
+            if rec.get_total_samples() == 0:
+                logging.warning(f"Skipping {rec} because it has no samples")
+                continue
+
+            try:
+                # Run frequency domain spike detection
+                spike_indices_per_channel, mne_raw_with_annotations = (
+                    FrequencyDomainSpikeDetector.detect_spikes_recording(
+                        rec,
+                        detection_params=detection_params,
+                        max_length=max_length,
+                        multiprocess_mode=multiprocess_mode
+                    )
+                )
+
+                # Create FrequencyDomainSpikeAnalysisResult
+                fdsar = FrequencyDomainSpikeAnalysisResult.from_detection_results(
+                    spike_indices_per_channel=spike_indices_per_channel,
+                    mne_raw_with_annotations=mne_raw_with_annotations,
+                    detection_params=detection_params or {},
+                    animal_id=self.animal_id,
+                    genotype=self.genotype,
+                    animal_day=self.animaldays[i],
+                    bin_folder_name=self.bin_folder_names[i],
+                    metadata=self.long_recordings[i].meta,
+                    assume_from_number=self.assume_from_number,
+                )
+
+                fdsar_list.append(fdsar)
+
+                # Log results
+                total_spikes = sum(len(spikes) for spikes in spike_indices_per_channel)
+                logging.info(f"Recording {i+1}/{len(recs)}: Detected {total_spikes} spikes across {len(spike_indices_per_channel)} channels")
+
+            except Exception as e:
+                logging.error(f"Error processing recording {i+1}/{len(recs)}: {e}")
+                raise
+
+        # Store results for later access
+        self.frequency_domain_spike_analysis_results = fdsar_list
+
+        logging.info(f"Completed frequency-domain spike detection. Total recordings processed: {len(fdsar_list)}")
+        return fdsar_list
+
     def _process_fragment_serial(self, idx, features, lan: core.LongRecordingAnalyzer, window_s, kwargs: dict):
         row = self._process_fragment_metadata(idx, lan, window_s)
         row.update(self._process_fragment_features(idx, features, lan, kwargs))
@@ -1222,7 +1297,43 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
         return result
 
-    def read_sars_spikes(self, sars: list["SpikeAnalysisResult"], read_mode: Literal["sa", "mne"] = "sa", inplace=True):
+    def read_sars_spikes(
+        self,
+        sars: list[Union["SpikeAnalysisResult", "FrequencyDomainSpikeAnalysisResult"]],
+        read_mode: Literal["sa", "mne"] = "sa",
+        inplace=True
+    ):
+        """
+        Integrate spike analysis results into WAR by adding nspike/lognspike features.
+
+        This method extracts spike timing information from spike detection results and bins
+        them according to the WAR's time windows, adding spike count features to each row.
+
+        Args:
+            sars: List of SpikeAnalysisResult or FrequencyDomainSpikeAnalysisResult objects.
+                  One result per recording session (animalday).
+            read_mode: Mode for extracting spike data:
+                - "sa": Read from SortingAnalyzer objects (result_sas attribute)
+                - "mne": Read from MNE RawArray objects (result_mne attribute)
+            inplace: If True, modifies self.result and returns self.
+                    If False, returns a new WindowAnalysisResult.
+
+        Returns:
+            WindowAnalysisResult: WAR object with added spike features (nspike, lognspike).
+                - If inplace=True: returns self with modified result DataFrame
+                - If inplace=False: returns new WAR object with enhanced result DataFrame
+
+        Notes:
+            - The number of sars must match the number of unique animaldays in self.result
+            - Spikes are binned into time windows matching the existing WAR fragments
+            - nspike: array of spike counts per channel for each time window
+            - lognspike: log-transformed spike counts using core.log_transform()
+
+        Example:
+            >>> # After computing WAR and spike detection
+            >>> enhanced_war = war.read_sars_spikes(fdsar_list, read_mode="sa", inplace=False)
+            >>> enhanced_war.result['nspike']  # Spike counts per channel per window
+        """
         match read_mode:
             case "sa":
                 spikes_all = []
@@ -1243,6 +1354,32 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 raise ValueError(f"Invalid read_mode: {read_mode}")
 
     def read_mnes_spikes(self, raws: list[mne.io.RawArray], inplace=True):
+        """
+        Extract spike features from MNE RawArray objects with spike annotations.
+
+        This method extracts spike timing from MNE annotations (where spikes are marked
+        with channel-specific event labels) and bins them into WAR time windows.
+
+        Args:
+            raws: List of MNE RawArray objects with spike annotations. One per recording
+                  session (animalday). Each should have annotations with channel names
+                  as event labels (e.g., 'LMot', 'RMot', etc.).
+            inplace: If True, modifies self.result and returns self.
+                    If False, returns a new WindowAnalysisResult.
+
+        Returns:
+            WindowAnalysisResult: WAR object with added spike features (nspike, lognspike).
+
+        Notes:
+            - Expects MNE annotations with channel names as event descriptions
+            - Spike times are extracted from event onsets and binned to WAR windows
+            - Channels not found in annotations will have empty spike arrays
+            - Delegates to _read_from_spikes_all() for the actual binning logic
+
+        Example:
+            >>> # From MNE spike annotations
+            >>> enhanced_war = war.read_mnes_spikes([mne_raw1, mne_raw2], inplace=False)
+        """
         spikes_all = []
         for raw in raws:
             # each mne is a contiguous recording session
@@ -1263,6 +1400,34 @@ class WindowAnalysisResult(AnimalFeatureParser):
         return self._read_from_spikes_all(spikes_all, inplace=inplace)
 
     def _read_from_spikes_all(self, spikes_all: list[list[list[float]]], inplace=True):
+        """
+        Internal method to bin spike times into WAR time windows and add as features.
+
+        This is the common endpoint for both read_sars_spikes() and read_mnes_spikes().
+        It bins spike times according to the WAR's time windows and adds nspike/lognspike
+        features to the result DataFrame.
+
+        Args:
+            spikes_all: Nested list structure of spike times in seconds:
+                - Outer list: recording sessions (one per animalday)
+                - Middle list: channels (one per EEG channel)
+                - Inner list/array: spike times in seconds for that channel
+                Example: [[[0.5, 1.2], [0.8]], [[1.1, 2.3], []]]
+                         = 2 sessions, 2 channels each
+            inplace: If True, modifies self.result and returns self.
+                    If False, returns a new WindowAnalysisResult with enhanced data.
+
+        Returns:
+            WindowAnalysisResult: WAR object with spike features added to result DataFrame.
+
+        Notes:
+            - Groups self.result by 'animalday' and matches to spikes_all by index
+            - Uses _bin_spike_df() helper to count spikes within each time window
+            - Adds two new columns:
+                - 'nspike': array of spike counts per channel for each window
+                - 'lognspike': log-transformed spike counts via core.log_transform()
+            - Warns if spike count size doesn't match result DataFrame size
+        """
         # Each groupby animalday is a recording session
         grouped = self.result.groupby("animalday")
         animaldays = grouped.groups.keys()
@@ -1279,7 +1444,12 @@ class WindowAnalysisResult(AnimalFeatureParser):
         result["lognspike"] = list(core.log_transform(np.stack(result["nspike"].tolist(), axis=0)))
         if inplace:
             self.result = result
-        return result
+            return self
+        else:
+            # Create a new WindowAnalysisResult
+            new_war = copy.deepcopy(self)
+            new_war.result = result
+            return new_war
 
     def get_info(self):
         """Returns a formatted string with basic information about the WindowAnalysisResult object"""
