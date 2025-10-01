@@ -8,7 +8,6 @@ providing compatibility with the existing SpikeAnalysisResult infrastructure.
 
 import json
 import logging
-import os
 import warnings
 from pathlib import Path
 from typing import Union
@@ -363,9 +362,8 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
         # Load MNE data
         result_mne = mne.io.read_raw_fif(fif_path, preload=True)
 
-        # Extract spike indices from saved counts (approximate reconstruction)
-        spike_counts = data.get("spike_counts_per_channel", [])
-        spike_indices = [np.array([]) for _ in spike_counts]  # Placeholder - actual indices not preserved
+        # Extract spike indices from MNE annotations
+        spike_indices = cls._extract_spike_indices_from_mne(result_mne)
 
         # Fix detection params: convert lists back to tuples for specific parameters
         detection_params = data.get("detection_params", {})
@@ -468,6 +466,32 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
 
         return event_counts
 
+    @staticmethod
+    def _extract_spike_indices_from_mne(mne_raw: mne.io.RawArray) -> list[np.ndarray]:
+        """
+        Extract spike sample indices from MNE annotations.
+
+        Args:
+            mne_raw: MNE RawArray with spike annotations
+
+        Returns:
+            list[np.ndarray]: Spike indices per channel
+        """
+        events, event_id = mne.events_from_annotations(mne_raw)
+        spike_event_id = {k: v for k, v in event_id.items() if k.startswith("Spike_Ch")}
+
+        n_channels = len(mne_raw.ch_names)
+        spike_indices = [np.array([], dtype=int) for _ in range(n_channels)]
+
+        for event_name, code in spike_event_id.items():
+            ch_idx = int(event_name.split("_Ch")[-1])
+            if ch_idx < n_channels:
+                # Extract sample indices from events array (column 0)
+                channel_spike_samples = events[events[:, 2] == code, 0]
+                spike_indices[ch_idx] = channel_spike_samples
+
+        return spike_indices
+
     def get_spike_counts_per_channel(self) -> list[int]:
         """
         Get spike counts per channel.
@@ -478,17 +502,9 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
         if self.spike_indices:
             return [len(spikes) for spikes in self.spike_indices]
         elif self.result_mne:
-            # Extract from MNE annotations
-            events, event_id = mne.events_from_annotations(self.result_mne)
-            spike_event_id = {k: v for k, v in event_id.items() if k.startswith("Spike_Ch")}
-
-            counts = [0] * len(self.result_mne.ch_names)
-            for event_name, code in spike_event_id.items():
-                ch_idx = int(event_name.split("_Ch")[-1])
-                channel_events = events[events[:, 2] == code]
-                if ch_idx < len(counts):
-                    counts[ch_idx] = len(channel_events)
-            return counts
+            # Extract from MNE annotations if spike_indices not available
+            spike_indices = self._extract_spike_indices_from_mne(self.result_mne)
+            return [len(spikes) for spikes in spike_indices]
         else:
             return []
 

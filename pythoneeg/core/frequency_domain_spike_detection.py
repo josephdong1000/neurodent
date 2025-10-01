@@ -15,7 +15,6 @@ from typing import Literal
 
 try:
     import dask
-    import dask.distributed
 except Exception:  # pragma: no cover
     dask = None
 
@@ -29,8 +28,6 @@ try:
 except ImportError:  # pragma: no cover
     si = None
     SPIKEINTERFACE_AVAILABLE = False
-
-from .. import constants
 
 
 class FrequencyDomainSpikeDetector:
@@ -190,20 +187,33 @@ class FrequencyDomainSpikeDetector:
         Returns:
             spike_indices: Array of spike sample indices
         """
+        logging.debug(f"Starting spike detection for channel - signal length: {len(signal)} samples, fs: {fs} Hz")
+
         # Step 1: STFT analysis
+        logging.debug(
+            f"Step 1/4: Computing STFT slices at frequencies {params['freq_slices']} Hz with window size {params['window_s']} s"
+        )
         slices_dict = FrequencyDomainSpikeDetector._compute_stft_slices(
             signal, fs, freqs=params['freq_slices'], window_s=params['window_s']
         )
+        logging.debug(f"Step 1/4: Completed STFT analysis - extracted {len(slices_dict)} frequency bands")
 
         # Step 2: SNEO detection with multi-band voting
+        logging.debug(
+            f"Step 2/4: Applying SNEO detection with threshold percentile {params['sneo_percentile']} and vote_k={params['vote_k']}"
+        )
         sneo_spikes, _ = FrequencyDomainSpikeDetector._apply_sneo_on_slices(
             slices_dict, fs,
             threshold_percentile=params['sneo_percentile'],
             smooth_len=params['smooth_len'],
             vote_k=params['vote_k']
         )
+        logging.info(f"Step 2/4: SNEO detection found {len(sneo_spikes)} candidate spikes")
 
         # Step 3: Spike refinement and morphological validation
+        logging.debug(
+            f"Step 3/4: Refining spikes with morphological validation (search_ms={params['search_ms']}, k_sigma={params['k_sigma']})"
+        )
         neg_spikes = FrequencyDomainSpikeDetector._enforce_downward_and_refine_minimal(
             signal, fs, sneo_spikes,
             search_ms=params['search_ms'],
@@ -211,14 +221,17 @@ class FrequencyDomainSpikeDetector:
             k_sigma=params['k_sigma'],
             smooth_window=params['smooth_window']
         )
+        logging.info(f"Step 3/4: After refinement and validation: {len(neg_spikes)} spikes retained")
 
         # Step 4: Temporal clustering and deduplication
+        logging.debug(f"Step 4/4: Clustering and deduplicating spikes (min_gap_ms={params['cluster_gap_ms']})")
         final_spikes = FrequencyDomainSpikeDetector._filter_close_spikes_by_min_local(
             signal, fs, neg_spikes,
             min_gap_ms=params['cluster_gap_ms'],
             window_ms=60.0,
             smooth_window=5
         )
+        logging.info(f"Step 4/4: Final spike count after clustering: {len(final_spikes)} spikes")
 
         return final_spikes.astype(int)
 
@@ -239,24 +252,48 @@ class FrequencyDomainSpikeDetector:
             dict: Frequency -> energy time series mapping
         """
         N = len(signal)
+        logging.debug(f"Computing STFT slices - signal length: {N} samples, fs: {fs} Hz")
 
         # Default window length informed by expected spike width (~125 ms)
         nperseg = int(round(fs * window_s))
+        logging.debug(
+            f"STFT parameters: window={window}, nperseg={nperseg} samples ({window_s} s), noverlap={noverlap}"
+        )
 
         f, t, Zxx = stft(signal, fs=fs, window=window, nperseg=nperseg, noverlap=noverlap)
         t_samp = (t * fs).astype(float)
+
+        logging.debug(f"STFT output dimensions: frequency bins={len(f)}, time bins={len(t)}, Zxx shape={Zxx.shape}")
+        logging.debug(f"Frequency range: {f[0]:.2f} - {f[-1]:.2f} Hz, frequency resolution: {f[1] - f[0]:.2f} Hz")
+        logging.debug(
+            f"Time range: {t[0]:.4f} - {t[-1]:.4f} s, STFT time samples: {len(t_samp)}, Original signal samples: {N}"
+        )
 
         slices_dict = {}
         pow_spec = np.abs(Zxx) ** 2
 
         for f0 in freqs:
             idx = int(np.argmin(np.abs(f - f0)))
+            actual_freq = f[idx]
             energy = pow_spec[idx]
+            logging.debug(
+                f"Extracting frequency slice: target={f0} Hz, actual={actual_freq:.2f} Hz (index={idx}), energy length={len(energy)}"
+            )
+
             # REVIEW the output of stft should already be the correct length, so unsure why interpolation is required
             # Interpolate back to original sampling rate
             energy_resampled = np.interp(np.arange(N), t_samp, energy, left=energy[0], right=energy[-1])
+            logging.debug(f"Interpolated energy from {len(energy)} to {len(energy_resampled)} samples")
+            logging.debug(
+                f"Energy stats - original: min={energy.min():.2e}, max={energy.max():.2e}, mean={energy.mean():.2e}"
+            )
+            logging.debug(
+                f"Energy stats - resampled: min={energy_resampled.min():.2e}, max={energy_resampled.max():.2e}, mean={energy_resampled.mean():.2e}"
+            )
+
             slices_dict[float(f0)] = energy_resampled
 
+        logging.debug(f"STFT slices computed for {len(slices_dict)} frequency bands")
         return slices_dict
 
     @staticmethod
