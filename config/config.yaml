@@ -91,7 +91,7 @@ analysis:
     figure_format: "png"  # Figure output format: png, tif, pdf, svg
     data_format: "csv"    # Data export format: csv, pkl
     dpi: 300             # Figure resolution
-    figsize: [20, 20]    # Figure size [width, height]
+    figsize: [10, 20]    # Figure size [width, height]
 
   # ExperimentPlotter statistical figures parameters
   ep_figures:

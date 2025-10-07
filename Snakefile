@@ -196,6 +196,9 @@ rule all:
         # WAR generation and prefiltering
         expand("results/wars_quality_filtered/{animal}", animal=ANIMALS),
 
+        # FDSAR spike detection diagnostics
+        # expand("results/fdsar_diagnostics/{animal}", animal=ANIMALS), # FIXME either this or the above crashes the repository
+
         # WAR per-animal diagnostic plots (unfiltered)
         # NOTE also trigger fragment filtering + diagnostic figures filter unfiltered
         get_diagnostic_figures_unfiltered,

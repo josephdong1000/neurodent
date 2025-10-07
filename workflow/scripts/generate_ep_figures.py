@@ -131,7 +131,7 @@ def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
                 .scale(marker=so.Nominal(["o", "s"], order=["Female", "Male"]))
                 .theme(
                     axes_style("ticks")
-                    | sns.plotting_context("notebook")
+                    | sns.plotting_context("talk")
                     | {"axes.prop_cycle": plt.cycler(color=["blue", "blueviolet", "red"])}
                     | {"axes.spines.right": False, "axes.spines.top": False}
                 )

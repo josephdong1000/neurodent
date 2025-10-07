@@ -23,6 +23,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn.objects as so
+import seaborn as sns
 from seaborn import axes_style
 
 # Add pythoneeg to path
@@ -141,13 +142,13 @@ def create_zeitgeber_plots(df, output_dir, data_dir, zt_config):
         
         try:
             p = (
-                so.Plot(df, x="total_minutes", y=feature, color='gene')
-                .facet(col='sex', row='gene') 
+                so.Plot(df, x="total_minutes", y=feature, color="gene")
+                .facet(col="sex", row="gene")
                 .add(so.Line(linewidth=2), so.Agg())
                 .add(so.Dot(), so.Agg())
                 .add(so.Band(), so.Est())
                 .layout(size=(1, 1))
-                .theme(axes_style("ticks"))
+                .theme(axes_style("ticks") | sns.plotting_context("poster"))
                 .label(y=feature_to_label.get(feature, feature))
             )
             
