@@ -455,14 +455,23 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
 
             # Create and save plot
             try:
-                fig = epochs.plot_image(title=f"{event_name} (FD Detection)", show=(save_dir is None))
+                fig = epochs.plot_image(
+                    title=f"{event_name} (FD Detection)",
+                    show=(save_dir is None),
+                    combine="mean",
+                )
                 if save_dir:
-                    fig_path = save_dir / f"{event_name}_fd_detection.png"
+                    # Include animal_id in filename to prevent overwriting across days
+                    if animal_id:
+                        fig_path = save_dir / f"{animal_id}_{event_name}_fd_detection.png"
+                    else:
+                        fig_path = save_dir / f"{event_name}_fd_detection.png"
                     fig[0].savefig(str(fig_path), dpi=300, bbox_inches='tight')
                     plt.close(fig[0])
                     logging.info(f"Saved spike-averaged plot: {fig_path}")
             except Exception as e:
-                logging.warning(f"Failed to create plot for {event_name}: {e}")
+                logging.error(f"Failed to create plot for {event_name}: {e}")
+                raise e
 
         return event_counts
 

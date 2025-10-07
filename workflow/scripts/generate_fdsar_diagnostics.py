@@ -61,7 +61,7 @@ def load_fdsar_results(fdsar_base_dir: Path):
     return fdsar_list
 
 
-def generate_diagnostics(fdsar_list, output_dir: Path):
+def generate_diagnostics(fdsar_list: list[FrequencyDomainSpikeAnalysisResult], output_dir: Path):
     """Generate diagnostic plots for all FDSAR results"""
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -97,7 +97,7 @@ def generate_diagnostics(fdsar_list, output_dir: Path):
                     baseline=None,
                     save_dir=output_dir,
                     animal_id=f"{fdsar.animal_id}_{fdsar.animal_day}",
-                    save_epoch=True
+                    save_epoch=False,
                 )
 
             logging.info(f"  Generated plots for {len([c for c in returned_counts if c > 0])} channels with spikes")
