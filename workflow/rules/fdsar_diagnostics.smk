@@ -15,13 +15,18 @@ rule make_fdsar_diagnostics:
     1. Loads FDSAR results from results/fdsars/{animal}/
     2. Generates spike-averaged trace plots for each channel
     3. Saves epoch data (.fif) and plots (.png) to results/fdsar_diagnostics/{animal}/
+
+    Note: Input changed from directory to WAR JSON file to avoid checkpoint-related
+    DAG deadlocks. The FDSAR directory is still accessed via the script, but Snakemake
+    only tracks the WAR completion as the trigger.
     """
     input:
-        fdsar_dir="results/fdsars/{animal}",
+        war_json="results/wars/{animal}/war.json",
     output:
         diagnostics_dir=directory("results/fdsar_diagnostics/{animal}"),
     params:
         config=config,
+        fdsar_dir="results/fdsars/{animal}",
     threads: config["cluster"]["spike_averaged_traces"]["threads"]
     resources:
         time=config["cluster"]["spike_averaged_traces"]["time"],

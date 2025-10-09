@@ -127,7 +127,7 @@ def main():
         logging.info("FDSAR diagnostics script started")
 
         # Load FDSAR results
-        fdsar_dir = Path(snakemake.input.fdsar_dir)
+        fdsar_dir = Path(snakemake.params.fdsar_dir)
         output_dir = Path(snakemake.output.diagnostics_dir)
 
         logging.info(f"Loading FDSAR results from: {fdsar_dir}")
