@@ -191,6 +191,7 @@ include: "workflow/rules/diagnostic_figures.smk"
 include: "workflow/rules/war_flattening.smk"
 include: "workflow/rules/war_zeitgeber.smk"
 include: "workflow/rules/zeitgeber_plots.smk"
+include: "workflow/rules/war_relfreq_plots.smk"
 include: "workflow/rules/ep_analysis.smk"
 include: "workflow/rules/lof_evaluation.smk"
 include: "workflow/rules/filtering_comparison.smk"
@@ -208,8 +209,7 @@ rule all:
         expand("results/wars_quality_filtered/{animal}", animal=ANIMALS),
 
         # FDSAR spike detection diagnostics
-        expand("results/fdsar_diagnostics/{animal}", animal=ANIMALS), # FIXME this crashes the repository
-
+        # expand("results/fdsar_diagnostics/{animal}", animal=ANIMALS), # FIXME this crashes my VDI - perhaps a logic issue
         # WAR per-animal diagnostic plots (unfiltered)
         # NOTE also trigger fragment filtering + diagnostic figures filter unfiltered
         get_diagnostic_figures_unfiltered,
@@ -221,10 +221,10 @@ rule all:
         "results/wars_zeitgeber/zeitgeber_features.pkl",
         "results/zeitgeber_plots/",
 
+        # Relative frequency distribution plots
+        "results/relfreq_plots/",
+
         # EP full experiment plots
-        # expand("results/wars_flattened/{animal}/war.pkl", animal=glob_wildcards("results/wars_fragment_filtered/{animal}/war.pkl").animal),
-        # expand("results/wars_flattened/{animal}/war.pkl", animal=glob_wildcards("results/wars_fragment_filtered/{animal}/war.pkl").animal),
-        # get_fragment_filtered_pkl,
         "results/ep_figures/",
         "results/ep_heatmaps/",
 
@@ -236,7 +236,7 @@ rule all:
         "results/filtering_comparison_plots/",
 
         # Interactive analysis notebooks
-        # "results/notebooks/war_data_explorer.ipynb",
+        # "results/notebooks/war_data_explorer.ipynb", # FIXME configure the notebook so that it runs on Snakemake
 
 rule graphs:
     input:

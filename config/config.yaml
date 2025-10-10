@@ -130,6 +130,13 @@ analysis:
     dpi: 300             # Figure resolution
     figsize: [10, 20]    # Figure size [width, height]
 
+  # Relative frequency distribution plots parameters
+  relfreq_plots:
+    features: ["nspike", "lognspike", "pcorr", "zpcorr", "cohere", "zcohere", "imcoh", "zimcoh", "logpsdfrac", "logpsdband", "psdband"]
+    figure_format: "png"  # Figure output format: png, tif, pdf, svg
+    data_format: "csv"    # Data export format: csv, pkl
+    dpi: 300             # Figure resolution
+
   # ExperimentPlotter statistical figures parameters
   ep_figures:
     # features: ["pcorr", "zpcorr", "cohere", "zcohere", "logpsdfrac", "logpsdband", "psd", "normpsd", "nspike", "lognspike"]
@@ -261,7 +268,14 @@ cluster:
 
   war_zeitgeber:
     time: "2h"
-    mem_mb: 200_000
+    mem_mb: 300_000
+    nodes: 1
+    threads: 15
+    interface: null
+
+  relfreq_plots:
+    time: "2h"
+    mem_mb: 300_000
     nodes: 1
     threads: 15
     interface: null

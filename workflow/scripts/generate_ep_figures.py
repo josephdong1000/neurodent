@@ -20,7 +20,6 @@ import matplotlib
 matplotlib.use("Agg")  # Non-interactive backend
 
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 import seaborn as sns
 import seaborn.objects as so
@@ -95,92 +94,6 @@ def process_feature_dataframe(df, feature):
     return df, df_pivot
 
 
-def add_animal_weights(df):
-    """
-    Add weights to dataframe so each animal contributes equally.
-
-    For use with seaborn histplot to ensure equal contribution from each animal
-    regardless of sample size.
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        Raw dataframe with 'animal' column
-
-    Returns
-    -------
-    pd.DataFrame
-        DataFrame with added 'weight' column
-    """
-
-    # Count samples per animal
-    animal_counts = df.groupby("animal").size()
-
-    # Calculate weight for each animal (1 / n_samples) so each animal sums to 1
-    df = df.copy()
-    df["weight"] = df["animal"].map(lambda a: 1.0 / animal_counts[a])
-
-    return df
-
-
-def create_pmf_plot(df, feature, feature_label, hue, hue_order, palette, log_scale, output_path, dpi):
-    """
-    Create a PMF plot using FacetGrid and histplot with weighted data.
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        Weighted dataframe with 'weight' column
-    feature : str
-        Feature column name
-    feature_label : str
-        Label for x-axis
-    hue : str
-        Column name for hue (e.g., 'gene' or 'band')
-    hue_order : list
-        Order of hue categories
-    palette : list
-        Color palette
-    log_scale : bool
-        Whether to use log scale
-    output_path : Path
-        Output file path
-    dpi : int
-        DPI for output figure
-    """
-    logger = logging.getLogger(__name__)
-
-    # Compute bins once across entire dataset to ensure consistency across and within plots
-    bins = np.histogram_bin_edges(df[feature].dropna(), bins="auto").tolist()
-    logger.info(f"\tBins: {bins}")
-
-    g = sns.FacetGrid(
-        df,
-        col="sex",
-        row="isday",
-        hue=hue,
-        hue_order=hue_order,
-        palette=palette,
-        height=4,
-        aspect=1.2,
-    )
-    g.map_dataframe(
-        sns.histplot,
-        x=feature,
-        weights="weight",
-        bins=bins,
-        stat="density",
-        element="step",
-        fill=True,
-        alpha=0.6,
-        log_scale=log_scale,
-    )
-    g.add_legend(title=hue.capitalize())
-    g.set_axis_labels(feature_label, "Relative Frequency")
-    g.savefig(output_path, bbox_inches="tight", dpi=dpi)
-    plt.close()
-
-
 def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config):
     """Create plots for a specific feature using seaborn objects"""
 
@@ -214,19 +127,6 @@ def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
 
         # Process averaged dataframe (adds sex and gene columns)
         df, df_pivot = process_feature_dataframe(df_avg, feature)
-
-        # Pipeline 2: Pull raw timeseries data for PMF plots (except psd/normpsd)
-        if feature not in ["psd", "normpsd"]:
-            # Get raw data without averaging
-            df_raw = ep.pull_timeseries_dataframe(
-                feature=feature, groupby=["animal", "genotype", "isday"], collapse_channels=True, average_groupby=False
-            )
-
-            # Process raw dataframe (adds sex and gene columns)
-            df_raw_processed, _ = process_feature_dataframe(df_raw, feature)
-
-            # Add weights for equal animal contribution to histogram
-            df_weighted = add_animal_weights(df_raw_processed)
 
         # Save data in configured format
         if data_format == "csv":
@@ -320,51 +220,6 @@ def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
                 )
                 scale_name = "linear" if callable(scale) else scale
                 p.save(output_dir / f"{feature}-{scale_name}.{figure_format}", bbox_inches="tight", dpi=dpi)
-
-        # For all features except psd/normpsd, also create PMF distribution plots
-        if feature not in ["psd", "normpsd"]:
-            if feature in ["logpsdfrac", "logpsdband", "psdband", "cohere", "zcohere", "imcoh", "zimcoh"]:
-                # For band features, create per-band PMF plots
-                bands = ["delta", "theta", "alpha", "beta", "gamma"]
-                for band in bands:
-                    df_band = df_weighted[df_weighted["band"] == band]
-                    create_pmf_plot(
-                        df=df_band,
-                        feature=feature,
-                        feature_label=f"{feature_label} ({band})",
-                        hue="gene",
-                        hue_order=["WT", "Het", "Mut"],
-                        palette=["blue", "blueviolet", "red"],
-                        log_scale=False,
-                        output_path=output_dir / f"{feature}-pmf-{band}.{figure_format}",
-                        dpi=dpi,
-                    )
-
-                # Also create combined band comparison plot
-                create_pmf_plot(
-                    df=df_weighted,
-                    feature=feature,
-                    feature_label=feature_label,
-                    hue="band",
-                    hue_order=["delta", "theta", "alpha", "beta", "gamma"],
-                    palette=[blue, orange, red, green, purple],
-                    log_scale=False,
-                    output_path=output_dir / f"{feature}-pmf-byband.{figure_format}",
-                    dpi=dpi,
-                )
-            else:
-                # For non-band features, single PMF plot
-                create_pmf_plot(
-                    df=df_weighted,
-                    feature=feature,
-                    feature_label=feature_label,
-                    hue="gene",
-                    hue_order=["WT", "Het", "Mut"],
-                    palette=["blue", "blueviolet", "red"],
-                    log_scale=False,
-                    output_path=output_dir / f"{feature}-pmf.{figure_format}",
-                    dpi=dpi,
-                )
 
         logger.info(f"Successfully processed feature: {feature}")
 
