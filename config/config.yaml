@@ -132,8 +132,9 @@ analysis:
 
   # ExperimentPlotter statistical figures parameters
   ep_figures:
-    features: ["pcorr", "zpcorr", "cohere", "zcohere", "logpsdfrac", "logpsdband", "psd", "normpsd"]
-    exclude_features: ["nspike", "lognspike"]  # Features to exclude from ExperimentPlotter
+    # features: ["pcorr", "zpcorr", "cohere", "zcohere", "logpsdfrac", "logpsdband", "psd", "normpsd", "nspike", "lognspike"]
+    features: ["nspike", "lognspike", "pcorr", "zpcorr"]
+    exclude_features: null  # Features to exclude from ExperimentPlotter
     figure_format: "png"  # Figure output format: png, tif, pdf, svg
     data_format: "csv"    # Data export format: csv, pkl
     dpi: 300             # Figure resolution
@@ -267,14 +268,14 @@ cluster:
 
   ep_figures:
     time: "2h"
-    mem_mb: 50_000
+    mem_mb: 10_000
     nodes: 1
-    threads: 8
+    threads: 4
     interface: null
 
   ep_heatmaps:
     time: "2h"
-    mem_mb: 50_000
+    mem_mb: 10_000
     nodes: 1
     threads: 4
     interface: null
@@ -283,7 +284,7 @@ cluster:
     time: "2h"
     mem_mb: 20_000
     nodes: 1
-    threads: 2
+    threads: 4
     interface: null
 
   lof_evaluation:
@@ -297,7 +298,7 @@ cluster:
     time: "1h"
     mem_mb: 20_000
     nodes: 1
-    threads: 2
+    threads: 4
     interface: null
 
   war_standardize:
