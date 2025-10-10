@@ -16,6 +16,7 @@ import traceback
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")  # Non-interactive backend
 
 import matplotlib.pyplot as plt
@@ -33,7 +34,7 @@ from pythoneeg import visualization, constants
 
 def process_feature_dataframe(df, feature):
     """Process feature dataframe by adding categorical columns and pivoting.
-    
+
     Based on the process_feature_dataframe function from EP example.
 
     Args:
@@ -49,7 +50,7 @@ def process_feature_dataframe(df, feature):
         groupby = ["animal", "isday"]
     else:
         raise ValueError(f"Feature {feature} not supported")
-    
+
     if "isday" not in df.columns:
         groupby.remove("isday")
 
@@ -66,14 +67,20 @@ def process_feature_dataframe(df, feature):
         if x in ["MMut", "FMut"]
         else x
     )
-    
+
     if "isday" in df.columns:
         df["isday"] = df["isday"].map(lambda x: "Day" if x else "Night")
 
     # Create pivot table
     df_pivot = df.pivot_table(
         index=["animal", "gene", "sex"] if "freq" not in df.columns else ["animal", "gene", "sex", "freq"],
-        columns=["isday", "band"] if ("isday" in df.columns and "band" in df.columns) else "band" if "band" in df.columns else "isday" if "isday" in df.columns else None,
+        columns=["isday", "band"]
+        if ("isday" in df.columns and "band" in df.columns)
+        else "band"
+        if "band" in df.columns
+        else "isday"
+        if "isday" in df.columns
+        else None,
         values=feature,
         aggfunc="mean",
         observed=True,
@@ -88,85 +95,90 @@ def process_feature_dataframe(df, feature):
     return df, df_pivot
 
 
-def compute_pmf_per_animal(df, feature, groupby_cols):
+def add_animal_weights(df):
     """
-    Compute PMF for each animal separately, then average the PMFs.
+    Add weights to dataframe so each animal contributes equally.
 
-    Designed for discrete spike count data (nspike, lognspike). This prevents
-    bias from unequal sample sizes across animals by computing per-animal PMFs
-    first, then averaging them.
+    For use with seaborn histplot to ensure equal contribution from each animal
+    regardless of sample size.
 
     Parameters
     ----------
     df : pd.DataFrame
-        Raw dataframe with individual samples (not averaged)
-    feature : str
-        Feature column name (e.g., 'nspike', 'lognspike')
-    groupby_cols : list
-        Columns to group by (e.g., ['genotype', 'isday', 'sex', 'gene'])
+        Raw dataframe with 'animal' column
 
     Returns
     -------
     pd.DataFrame
-        DataFrame with averaged PMF values for each unique spike count value
+        DataFrame with added 'weight' column
     """
-    import logging
+
+    # Count samples per animal
+    animal_counts = df.groupby("animal").size()
+
+    # Calculate weight for each animal (1 / n_samples) so each animal sums to 1
+    df = df.copy()
+    df["weight"] = df["animal"].map(lambda a: 1.0 / animal_counts[a])
+
+    return df
+
+
+def create_pmf_plot(df, feature, feature_label, hue, hue_order, palette, log_scale, output_path, dpi):
+    """
+    Create a PMF plot using FacetGrid and histplot with weighted data.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Weighted dataframe with 'weight' column
+    feature : str
+        Feature column name
+    feature_label : str
+        Label for x-axis
+    hue : str
+        Column name for hue (e.g., 'gene' or 'band')
+    hue_order : list
+        Order of hue categories
+    palette : list
+        Color palette
+    log_scale : bool
+        Whether to use log scale
+    output_path : Path
+        Output file path
+    dpi : int
+        DPI for output figure
+    """
     logger = logging.getLogger(__name__)
 
-    # Get data range across all animals to create consistent bins
-    data_min = df[feature].min()
-    data_max = df[feature].max()
+    # Compute bins once across entire dataset to ensure consistency across and within plots
+    bins = np.histogram_bin_edges(df[feature].dropna(), bins="auto").tolist()
+    logger.info(f"\tBins: {bins}")
 
-    # Create bin edges with consistent spacing (default 0.1 bin width)
-    bin_width = 0.1
-    bin_edges = np.arange(data_min, data_max + bin_width, bin_width)
-
-    # Bin centers for plotting
-    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-
-    # Debug logging
-    logger.info(f"PMF computation for {feature}:")
-    logger.info(f"  Total samples: {len(df)}")
-    logger.info(f"  Value range: {data_min:.6f} to {data_max:.6f}")
-    logger.info(f"  Bin width: {bin_width}")
-    logger.info(f"  Number of bins: {len(bin_centers)}")
-    logger.info(f"  Data type: {df[feature].dtype}")
-
-    # For each animal, compute the PMF
-    pmf_list = []
-
-    for animal, animal_df in df.groupby("animal"):
-        # Get the groupby metadata for this animal
-        animal_meta = animal_df[groupby_cols].iloc[0].to_dict()
-
-        # Compute histogram with consistent bins across all animals
-        counts, _ = np.histogram(animal_df[feature].dropna(), bins=bin_edges)
-
-        # Normalize to get PMF (sum to 1)
-        total_counts = counts.sum()
-        if total_counts > 0:
-            pmf_values = counts / total_counts
-        else:
-            pmf_values = np.zeros_like(counts, dtype=float)
-
-        # Convert to dataframe
-        animal_pmf = pd.DataFrame({feature: bin_centers, "pmf": pmf_values, "animal": animal})
-
-        # Add metadata
-        for col, val in animal_meta.items():
-            animal_pmf[col] = val
-
-        pmf_list.append(animal_pmf)
-
-    # Concatenate all animal PMFs
-    all_pmfs = pd.concat(pmf_list, ignore_index=True)
-
-    # Average the PMFs across animals within each group
-    # This is the key step: average PMFs, not raw counts
-    # All animals have same bin_centers, so groupby will align correctly
-    averaged_pmf = all_pmfs.groupby(groupby_cols + [feature])["pmf"].mean().reset_index()
-
-    return averaged_pmf
+    g = sns.FacetGrid(
+        df,
+        col="sex",
+        row="isday",
+        hue=hue,
+        hue_order=hue_order,
+        palette=palette,
+        height=4,
+        aspect=1.2,
+    )
+    g.map_dataframe(
+        sns.histplot,
+        x=feature,
+        weights="weight",
+        bins=bins,
+        stat="density",
+        element="step",
+        fill=True,
+        alpha=0.6,
+        log_scale=log_scale,
+    )
+    g.add_legend(title=hue.capitalize())
+    g.set_axis_labels(feature_label, "Relative Frequency")
+    g.savefig(output_path, bbox_inches="tight", dpi=dpi)
+    plt.close()
 
 
 def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config):
@@ -213,24 +225,16 @@ def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
             # Process raw dataframe (adds sex and gene columns)
             df_raw_processed, _ = process_feature_dataframe(df_raw, feature)
 
-            # Compute PMF per animal, then average PMFs
-            # For band features, include band in groupby to get separate PMFs per band
-            if feature in ["logpsdfrac", "logpsdband", "psdband", "cohere", "zcohere", "imcoh", "zimcoh"]:
-                df_pmf = compute_pmf_per_animal(df_raw_processed, feature, ["genotype", "isday", "sex", "gene", "band"])
-            else:
-                df_pmf = compute_pmf_per_animal(df_raw_processed, feature, ["genotype", "isday", "sex", "gene"])
+            # Add weights for equal animal contribution to histogram
+            df_weighted = add_animal_weights(df_raw_processed)
 
         # Save data in configured format
         if data_format == "csv":
             df.to_csv(data_dir / f"{feature}.csv", index=False)
             df_pivot.to_csv(data_dir / f"{feature}-pivot.csv", index=False)
-            if feature not in ["psd", "normpsd"]:
-                df_pmf.to_csv(data_dir / f"{feature}-pmf.csv", index=False)
         else:  # default to pkl
             df.to_pickle(data_dir / f"{feature}.pkl")
             df_pivot.to_pickle(data_dir / f"{feature}-pivot.pkl")
-            if feature not in ["psd", "normpsd"]:
-                df_pmf.to_pickle(data_dir / f"{feature}-pmf.pkl")
 
         # Create plots based on feature type
         if feature in ["pcorr", "zpcorr", "nspike", "lognspike"]:
@@ -283,7 +287,11 @@ def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
                 .theme(
                     axes_style("ticks")
                     | sns.plotting_context("notebook")
-                    | {"axes.prop_cycle": plt.cycler(color=[blue, orange, red, green, purple, yellow, lightblue, black])}
+                    | {
+                        "axes.prop_cycle": plt.cycler(
+                            color=[blue, orange, red, green, purple, yellow, lightblue, black]
+                        )
+                    }
                     | {"axes.spines.right": False, "axes.spines.top": False}
                 )
                 .layout(size=(10, 6), engine="tight")
@@ -293,7 +301,7 @@ def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
 
         elif feature == "psd" or feature == "normpsd":
             ylim = (1e-4, 1) if feature == "normpsd" else (0.3, 3000)
-            for scale in [so.Continuous(), 'log']:
+            for scale in [so.Continuous(), "log"]:
                 p = (
                     so.Plot(df, x="freq", y=feature, color="gene")
                     .facet(col="sex", row="isday")
@@ -306,11 +314,11 @@ def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
                         | {"axes.spines.right": False, "axes.spines.top": False}
                     )
                     .scale(x=scale, y=scale)
-                    .limit(x=(lambda x: (1,60) if callable(x) else (1,100))(scale), y=ylim)
+                    .limit(x=(lambda x: (1, 60) if callable(x) else (1, 100))(scale), y=ylim)
                     .layout(size=(10, 6))
                     .label(x="Frequency (Hz)", y=feature_label)
                 )
-                scale_name = 'linear' if callable(scale) else scale
+                scale_name = "linear" if callable(scale) else scale
                 p.save(output_dir / f"{feature}-{scale_name}.{figure_format}", bbox_inches="tight", dpi=dpi)
 
         # For all features except psd/normpsd, also create PMF distribution plots
@@ -319,74 +327,47 @@ def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
                 # For band features, create per-band PMF plots
                 bands = ["delta", "theta", "alpha", "beta", "gamma"]
                 for band in bands:
-                    df_pmf_band = df_pmf[df_pmf["band"] == band]
-                    for scale in [so.Continuous(), "log"]:
-                        p = (
-                            so.Plot(df_pmf_band, x=feature, y="pmf", color="gene")
-                            .facet(col="sex", row="isday")
-                            .add(so.Line(), so.Agg())
-                            .add(so.Band(), so.Est())
-                            .theme(
-                                axes_style("ticks")
-                                | sns.plotting_context("notebook")
-                                | {"axes.prop_cycle": plt.cycler(color=["blue", "blueviolet", "red"])}
-                                | {"axes.spines.right": False, "axes.spines.top": False}
-                            )
-                            .scale(x=scale, y=scale)
-                            .layout(size=(10, 6))
-                            .label(x=f"{feature_label} ({band})", y="Probability Mass")
-                        )
-                        scale_name = "linear" if callable(scale) else scale
-                        p.save(
-                            output_dir / f"{feature}-pmf-{band}-{scale_name}.{figure_format}",
-                            bbox_inches="tight",
-                            dpi=dpi,
-                        )
+                    df_band = df_weighted[df_weighted["band"] == band]
+                    create_pmf_plot(
+                        df=df_band,
+                        feature=feature,
+                        feature_label=f"{feature_label} ({band})",
+                        hue="gene",
+                        hue_order=["WT", "Het", "Mut"],
+                        palette=["blue", "blueviolet", "red"],
+                        log_scale=False,
+                        output_path=output_dir / f"{feature}-pmf-{band}.{figure_format}",
+                        dpi=dpi,
+                    )
 
                 # Also create combined band comparison plot
-                for scale in [so.Continuous(), "log"]:
-                    p = (
-                        so.Plot(df_pmf, x=feature, y="pmf", color="band")
-                        .facet(col="sex", row="isday")
-                        .add(so.Line(), so.Agg())
-                        .add(so.Band(), so.Est())
-                        .theme(
-                            axes_style("ticks")
-                            | sns.plotting_context("notebook")
-                            | {"axes.prop_cycle": plt.cycler(color=[blue, orange, red, green, purple])}
-                            | {"axes.spines.right": False, "axes.spines.top": False}
-                        )
-                        .scale(x=scale, y=scale)
-                        .layout(size=(10, 6))
-                        .label(x=feature_label, y="Probability Mass")
-                    )
-                    scale_name = "linear" if callable(scale) else scale
-                    p.save(
-                        output_dir / f"{feature}-pmf-byband-{scale_name}.{figure_format}", bbox_inches="tight", dpi=dpi
-                    )
+                create_pmf_plot(
+                    df=df_weighted,
+                    feature=feature,
+                    feature_label=feature_label,
+                    hue="band",
+                    hue_order=["delta", "theta", "alpha", "beta", "gamma"],
+                    palette=[blue, orange, red, green, purple],
+                    log_scale=False,
+                    output_path=output_dir / f"{feature}-pmf-byband.{figure_format}",
+                    dpi=dpi,
+                )
             else:
                 # For non-band features, single PMF plot
-                for scale in [so.Continuous(), "log"]:
-                    p = (
-                        so.Plot(df_pmf, x=feature, y="pmf", color="gene")
-                        .facet(col="sex", row="isday")
-                        .add(so.Line(), so.Agg())
-                        .add(so.Band(), so.Est())
-                        .theme(
-                            axes_style("ticks")
-                            | sns.plotting_context("notebook")
-                            | {"axes.prop_cycle": plt.cycler(color=["blue", "blueviolet", "red"])}
-                            | {"axes.spines.right": False, "axes.spines.top": False}
-                        )
-                        .scale(x=scale, y=scale)
-                        .layout(size=(10, 6))
-                        .label(x=feature_label, y="Probability Mass")
-                    )
-                    scale_name = "linear" if callable(scale) else scale
-                    p.save(output_dir / f"{feature}-pmf-{scale_name}.{figure_format}", bbox_inches="tight", dpi=dpi)
+                create_pmf_plot(
+                    df=df_weighted,
+                    feature=feature,
+                    feature_label=feature_label,
+                    hue="gene",
+                    hue_order=["WT", "Het", "Mut"],
+                    palette=["blue", "blueviolet", "red"],
+                    log_scale=False,
+                    output_path=output_dir / f"{feature}-pmf.{figure_format}",
+                    dpi=dpi,
+                )
 
         logger.info(f"Successfully processed feature: {feature}")
-        
+
     except Exception as e:
         logger.error(f"Failed to process feature {feature}: {str(e)}")
         raise
@@ -406,55 +387,49 @@ def main():
         logger = logging.getLogger(__name__)
 
         logger.info("EP statistical figures generation started")
-        
+
         # Get parameters from snakemake
         war_pkl_files = snakemake.input.war_pkl
         war_json_files = snakemake.input.war_json
         config = snakemake.params.config
-        
+
         # Create output directories
         output_dir = Path(snakemake.output.figure_dir)
         data_dir = Path(snakemake.output.data_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
         data_dir.mkdir(parents=True, exist_ok=True)
-        
+
         logger.info(f"Loading {len(war_pkl_files)} flattened WARs")
-        
+
         # Load WARs - let failures be visible rather than silently continuing
         wars = []
         for pkl_file, json_file in zip(war_pkl_files, war_json_files):
             war = visualization.WindowAnalysisResult.load_pickle_and_json(
-                folder_path=Path(pkl_file).parent,
-                pickle_name=Path(pkl_file).name,
-                json_name=Path(json_file).name
+                folder_path=Path(pkl_file).parent, pickle_name=Path(pkl_file).name, json_name=Path(json_file).name
             )
-            
+
             wars.append(war)
             logger.info(f"Loaded WAR for {war.animal_id} ({war.genotype})")
-        
+
         if not wars:
             raise RuntimeError("No WARs were successfully loaded")
-        
+
         logger.info(f"Successfully loaded {len(wars)} WARs")
-        
+
         # Get EP configuration
         ep_config = config["analysis"]["ep_figures"]
         features = ep_config["features"]
         exclude_features = ep_config.get("exclude_features", [])
-        
+
         # Create genotype ordering
-        genotype_order = ['MWT', 'MHet', 'MMut', 'FWT', 'FHet', 'FMut']
+        genotype_order = ["MWT", "MHet", "MMut", "FWT", "FHet", "FMut"]
         plot_order = constants.DF_SORT_ORDER.copy()
-        plot_order['genotype'] = genotype_order
-        
+        plot_order["genotype"] = genotype_order
+
         # Create ExperimentPlotter
         logger.info("Creating ExperimentPlotter")
-        ep = visualization.ExperimentPlotter(
-            wars=wars,
-            exclude=exclude_features,
-            plot_order=plot_order
-        )
-        
+        ep = visualization.ExperimentPlotter(wars=wars, exclude=exclude_features, plot_order=plot_order)
+
         # Feature to label mapping
         feature_to_label = {
             "pcorr": "PCC",
@@ -471,16 +446,16 @@ def main():
             "nspike": "n_spike / t_window",
             "lognspike": "Log(n_spike / t_window)",
         }
-        
+
         # Process each feature
         for feature in features:
             if feature in feature_to_label:
                 feature_label = feature_to_label[feature]
             else:
                 feature_label = feature
-                
+
             create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
-        
+
         logger.info(f"Successfully generated EP statistical figures for {len(features)} features")
 
 
