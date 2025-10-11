@@ -5,10 +5,11 @@
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/josephdong1000/PyEEG/)
 
 **Extracts features from mouse EEGs and generates figures**
+> Presented at [USRSE'25](https://doi.org/10.5281/zenodo.17274681)!
 
 ## Overview
 
-PyEEG is a comprehensive Python library for extracting features from mouse EEG recordings and generating publication-ready figures. The library processes EEG data by dividing it into time windows (default 4 seconds, adjustable) and computing various features across the dataset.
+PyEEG is a comprehensive Python library for extracting features from mouse EEG recordings and generating publication-ready figures. The library processes EEG data by dividing across time windows and channels, and computing features in parallel.
 
 ### What PyEEG Does
 
@@ -55,7 +56,7 @@ Documentation can be found at https://josephdong1000.github.io/PyEEG/
 #### Basic Workflow
 1. **Load Data**: Use `LongRecordingOrganizer` to load EEG recordings from various formats
 2. **Windowed Analysis**: Create `AnimalOrganizer` to compute features across time windows
-3. **Spike Analysis**: Integrate spike-sorted data using MountainSort5
+3. **Spike Analysis**: Integrate spike-sorted data from `MountainSortAnalyzer`
 4. **Visualization**: Generate plots using `ExperimentPlotter` and `AnimalPlotter`
 
 #### Example Usage
@@ -68,46 +69,43 @@ ao = AnimalOrganizer(lro)
 war = ao.compute_windowed_analysis(features=["rms", "psdband", "cohere"])
 
 # Generate plots
-ep = ExperimentPlotter(war)
+ep = ExperimentPlotter([war])
 ep.plot_feature("rms", groupby="genotype")
 ```
 
 #### Advanced Features
 - **Flexible Data Loading**: PyEEG uses MNE and SpikeInterface loaders in Python and custom loaders for proprietary formats using MATLAB, including:
-  - Binary (.bin) files with separate metadata
   - Neuroscope/Neuralynx (.dat, .eeg)
   - Open Ephys (.continuous)
-  - SpikeGLX (.bin, .meta)
   - NWB (.nwb) neurophysiology format
-- **Bad Channel Detection**: Automatic identification of problematic channels using Local Outlier Factor
-- **Multi-processing**: Parallel processing with Dask for large datasets
+  - Binary (.bin) files
+- **Bad Channel Detection**: Automatic identification of bad channels using Local Outlier Factor
+- **Multi-processing**: Parallel/distributed processing with Dask for large datasets
 - **Data Filtering**: Built-in filtering for artifacts and outliers
 - **Flexible Grouping**: Group analysis by genotype, time of day, recording session, etc.
 
 ## Snakemake Workflow
 
-PyEEG includes a **Snakemake workflow** for automated, scalable EEG analysis pipelines. The **workflow** processes multiple animals in parallel through WAR generation, quality filtering, fragment/channel filtering, and statistical analysis with SLURM cluster integration.
+A companion Snakemake workflow is provided for building automated PyEEG analysis pipelines.
+
+The workflow processes multiple animals in parallel through WAR generation, quality filtering, fragment/channel filtering, and statistical analysis with SLURM cluster integration.
+
+To run Snakemake on a specific computing environment, first create a [Snakemake profile](https://github.com/snakemake-profiles/doc), then run Snakemake:
 
 ```bash
 # Run the complete workflow
-snakemake --profile slurm all
+snakemake
 ```
 
 ## Setup (for developing)
 
-<!-- - Install Microsoft Visual C++ 14.0 or greater (to get SpikeInterface to work)
-  - https://visualstudio.microsoft.com/visual-cpp-build-tools/
-  - Minimal install required, Visual Studio Build Tools 2022 should be sufficient -->
-- Have Python installed
-  - https://www.python.org/downloads/
-  - Software is tested and run on Python 3.10.8
-- Set up the Python environment
-  - Create environment: `python -m venv .venv`
-  - Activate environment: `source .venv/bin/activate`
-    - Check that `which python` returns the .venv environment
-  - Install requirements: `pip install -r requirements.txt`
-- Install VSCode, or other appropriate development software
-  - https://code.visualstudio.com/
+```bash
+# Create and activate virtual environment
+python -m venv .venv
+source .venv/bin/activate
+# Install requirements
+pip install -r requirements.txt
+```
 
 ### Planned features
 - Cross-frequency coupling (CFC)
