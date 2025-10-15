@@ -18,6 +18,7 @@ rule extract_zeitgeber_features:
         zeitgeber_features="results/wars_zeitgeber/zeitgeber_features.pkl",
     threads:
         config["cluster"]["war_zeitgeber"]["threads"]
+    retries: 1
     params:
         config=config,
     resources:
