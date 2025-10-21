@@ -8,6 +8,11 @@
 
 A Python package for standardizing rodent EEG analysis and figure generation. Various EEG formats are loadable and features are extracted in parallel. Also includes a Snakemake workflow for automated analysis.
 
+## Usage
+
+Tutorial: *WIP!*
+API documentation: https://josephdong1000.github.io/PyEEG/
+
 ## Overview
 
 PyEEG provides two main analysis workflows:
@@ -45,10 +50,6 @@ The library supports multiple data formats (binary files, SpikeInterface recordi
 
 #### Frequency Bands
 - **Delta**: 0.1-4 Hz, **Theta**: 4-8 Hz, **Alpha**: 8-13 Hz, **Beta**: 13-25 Hz, **Gamma**: 25-40 Hz
-
-### How to Use PyEEG
-
-Documentation can be found at https://josephdong1000.github.io/PyEEG/
 
 #### Basic Workflow
 1. **Load Data**: Use `LongRecordingOrganizer` to load EEG recordings from various formats
