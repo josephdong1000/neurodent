@@ -28,6 +28,8 @@ pythoneeg = {path = ".", editable = true}
 okabeito = "*"
 openpyxl = "*"
 appnope = "*"
+pulp = "==2.7.0"
+snakemake = "*"
 
 [dev-packages]
 nodejs = "*"
@@ -46,7 +48,5 @@ pytest-html = ">=3.1.0"
 pytest-json-report = ">=1.5.0"
 factory-boy = ">=3.2.0"
 faker = ">=18.0.0"
-pulp = "==2.7.0"
-snakemake = "*"
 snakefmt = "*"
 yamllint = "*"
