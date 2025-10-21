@@ -16,8 +16,7 @@ rule war_explorer_notebook:
     outputs serves as a comprehensive analysis report.
     """
     input:
-        # All flattened WAR files from all animals
-        war_files=get_flattened_wars_pkl
+        war_files=lambda wc: get_wars_after_quality_filtered(wc, filepath_prepend="results/wars_flattened_manual", filepath_append="war.pkl"),
     output:
         # Executed notebook with embedded outputs
         notebook="results/notebooks/war_data_explorer.ipynb"

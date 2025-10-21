@@ -51,3 +51,4 @@ site/
 logs/
 results/
 .snakemake_run_id
+CLAUDE.md

@@ -390,10 +390,6 @@ def main():
         else:
             logging.warning("Results DataFrame is empty!")
 
-        # Create output directory
-        output_dir = Path(output_csv).parent
-        output_dir.mkdir(parents=True, exist_ok=True)
-
         # Save results CSV
         results_df.to_csv(output_csv, index=False)
         logging.info(f"Results saved to: {output_csv}")
