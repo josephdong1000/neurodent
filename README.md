@@ -94,36 +94,19 @@ To run Snakemake on a specific computing environment, first create a [Snakemake 
 snakemake
 ```
 
-## Setup (for developing)
 
-```bash
-# Create and activate virtual environment
-python -m venv .venv
-source .venv/bin/activate
-# Install requirements
-pip install -r requirements.txt
+## Citation
+
+If you find PyEEG useful, please cite our work!
+
+```bibtex
+@misc{https://doi.org/10.5281/zenodo.17051374,
+  doi = {10.5281/ZENODO.17051374},
+  url = {https://zenodo.org/doi/10.5281/zenodo.17051374},
+  author = {Dong,  Joseph and Yongtaek Oh,   and Marsh,  Eric},
+  title = {josephdong1000/PyEEG: 0.1.1},
+  publisher = {Zenodo},
+  year = {2025},
+  copyright = {MIT License}
+}
 ```
-
-### Planned features
-- Cross-frequency coupling (CFC)
-  - Phase-Locking Value (PLV)
-    - [phase-phase]
-  - Phase-Lag Index (PLI / wPLI / dPLI)
-    - [phase-phase]
-    - wPLI is resistant to volume conduction
-    - dPLI determines direction (leading/lagging)
-  - Phase-Amplitude Coupling (PAC)
-    - [phase-amplitude]
-    - Driven auto-regressive (DAR) model from `pactools`
-  - Amplitude-Envelope Coupling (AEC)
-    - [amplitude-amplitude]
-- Spike-LFP coupling
-  <!-- - **Caveat**: is this legitimate for population spiking?
-    - I only see papers for single unit spiking
-    - Maybe useful for examining interictal cortical discharges -->
-  - Pairwise-Phase Consistency (PPC)
-    - [spike-phase]
-    - Corrected PPC (Vinck 2011)
-- Canonical coherence
-  - [channels-channels]
-- Peri-spike EEG
