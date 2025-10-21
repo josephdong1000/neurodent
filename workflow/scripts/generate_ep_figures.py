@@ -16,6 +16,7 @@ import traceback
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")  # Non-interactive backend
 
 import matplotlib.pyplot as plt
@@ -32,7 +33,7 @@ from pythoneeg import visualization, constants
 
 def process_feature_dataframe(df, feature):
     """Process feature dataframe by adding categorical columns and pivoting.
-    
+
     Based on the process_feature_dataframe function from EP example.
 
     Args:
@@ -44,11 +45,11 @@ def process_feature_dataframe(df, feature):
     """
     if feature in ["logpsdfrac", "logpsdband", "psdband", "cohere", "zcohere", "imcoh", "zimcoh"]:
         groupby = ["animal", "isday", "band"]
-    elif feature in ["pcorr", "zpcorr", "psd", "normpsd"]:
+    elif feature in ["pcorr", "zpcorr", "psd", "normpsd", "nspike", "lognspike"]:
         groupby = ["animal", "isday"]
     else:
         raise ValueError(f"Feature {feature} not supported")
-    
+
     if "isday" not in df.columns:
         groupby.remove("isday")
 
@@ -65,14 +66,20 @@ def process_feature_dataframe(df, feature):
         if x in ["MMut", "FMut"]
         else x
     )
-    
+
     if "isday" in df.columns:
         df["isday"] = df["isday"].map(lambda x: "Day" if x else "Night")
 
     # Create pivot table
     df_pivot = df.pivot_table(
         index=["animal", "gene", "sex"] if "freq" not in df.columns else ["animal", "gene", "sex", "freq"],
-        columns=["isday", "band"] if ("isday" in df.columns and "band" in df.columns) else "band" if "band" in df.columns else "isday" if "isday" in df.columns else None,
+        columns=["isday", "band"]
+        if ("isday" in df.columns and "band" in df.columns)
+        else "band"
+        if "band" in df.columns
+        else "isday"
+        if "isday" in df.columns
+        else None,
         values=feature,
         aggfunc="mean",
         observed=True,
@@ -89,28 +96,37 @@ def process_feature_dataframe(df, feature):
 
 def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config):
     """Create plots for a specific feature using seaborn objects"""
-    
+
     logger = logging.getLogger(__name__)
     logger.info(f"Processing feature: {feature}")
-    
+
     # Get format parameters from config
     figure_format = ep_config.get("figure_format", "png")
     data_format = ep_config.get("data_format", "csv")
     dpi = ep_config.get("dpi", 300)
-    
-    try:
-        # Pull data based on feature type
-        if feature == "normpsd":
-            df = ep.pull_timeseries_dataframe(feature="psd", groupby=["animal", "genotype", 'isday'], collapse_channels=True, average_groupby=True)
-            df_total = ep.pull_timeseries_dataframe(feature="psdtotal", groupby=["animal", "genotype", 'isday'], collapse_channels=True, average_groupby=True)
-            
-            df = df.merge(df_total, on=["animal", "genotype", "channel"], suffixes=("", "_total"))
-            df["normpsd"] = df["psd"] / df["psdtotal"]
-        else:
-            df = ep.pull_timeseries_dataframe(feature=feature, groupby=["animal", "genotype", 'isday'], collapse_channels=True, average_groupby=True)
 
-        # Process dataframe
-        df, df_pivot = process_feature_dataframe(df, feature)
+    try:
+        # Pipeline 1: Pull averaged data for traditional plots (1 point per animal)
+        if feature == "normpsd":
+            df_avg = ep.pull_timeseries_dataframe(
+                feature="psd", groupby=["animal", "genotype", "isday"], collapse_channels=True, average_groupby=True
+            )
+            df_total = ep.pull_timeseries_dataframe(
+                feature="psdtotal",
+                groupby=["animal", "genotype", "isday"],
+                collapse_channels=True,
+                average_groupby=True,
+            )
+
+            df_avg = df_avg.merge(df_total, on=["animal", "genotype", "channel"], suffixes=("", "_total"))
+            df_avg["normpsd"] = df_avg["psd"] / df_avg["psdtotal"]
+        else:
+            df_avg = ep.pull_timeseries_dataframe(
+                feature=feature, groupby=["animal", "genotype", "isday"], collapse_channels=True, average_groupby=True
+            )
+
+        # Process averaged dataframe (adds sex and gene columns)
+        df, df_pivot = process_feature_dataframe(df_avg, feature)
 
         # Save data in configured format
         if data_format == "csv":
@@ -121,7 +137,8 @@ def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
             df_pivot.to_pickle(data_dir / f"{feature}-pivot.pkl")
 
         # Create plots based on feature type
-        if feature in ["pcorr", "zpcorr"]:
+        if feature in ["pcorr", "zpcorr", "nspike", "lognspike"]:
+            # Bar plot with individual points
             p = (
                 so.Plot(df, x="sex", y=feature, color="gene", marker="sex")
                 .facet(col="isday")
@@ -170,7 +187,11 @@ def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
                 .theme(
                     axes_style("ticks")
                     | sns.plotting_context("notebook")
-                    | {"axes.prop_cycle": plt.cycler(color=[blue, orange, red, green, purple, yellow, lightblue, black])}
+                    | {
+                        "axes.prop_cycle": plt.cycler(
+                            color=[blue, orange, red, green, purple, yellow, lightblue, black]
+                        )
+                    }
                     | {"axes.spines.right": False, "axes.spines.top": False}
                 )
                 .layout(size=(10, 6), engine="tight")
@@ -180,7 +201,7 @@ def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
 
         elif feature == "psd" or feature == "normpsd":
             ylim = (1e-4, 1) if feature == "normpsd" else (0.3, 3000)
-            for scale in [so.Continuous(), 'log']:
+            for scale in [so.Continuous(), "log"]:
                 p = (
                     so.Plot(df, x="freq", y=feature, color="gene")
                     .facet(col="sex", row="isday")
@@ -193,15 +214,15 @@ def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
                         | {"axes.spines.right": False, "axes.spines.top": False}
                     )
                     .scale(x=scale, y=scale)
-                    .limit(x=(lambda x: (1,60) if callable(x) else (1,100))(scale), y=ylim)
+                    .limit(x=(lambda x: (1, 60) if callable(x) else (1, 100))(scale), y=ylim)
                     .layout(size=(10, 6))
                     .label(x="Frequency (Hz)", y=feature_label)
                 )
-                scale_name = 'linear' if callable(scale) else scale
+                scale_name = "linear" if callable(scale) else scale
                 p.save(output_dir / f"{feature}-{scale_name}.{figure_format}", bbox_inches="tight", dpi=dpi)
 
         logger.info(f"Successfully processed feature: {feature}")
-        
+
     except Exception as e:
         logger.error(f"Failed to process feature {feature}: {str(e)}")
         raise
@@ -221,55 +242,49 @@ def main():
         logger = logging.getLogger(__name__)
 
         logger.info("EP statistical figures generation started")
-        
+
         # Get parameters from snakemake
         war_pkl_files = snakemake.input.war_pkl
         war_json_files = snakemake.input.war_json
         config = snakemake.params.config
-        
+
         # Create output directories
         output_dir = Path(snakemake.output.figure_dir)
         data_dir = Path(snakemake.output.data_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
         data_dir.mkdir(parents=True, exist_ok=True)
-        
+
         logger.info(f"Loading {len(war_pkl_files)} flattened WARs")
-        
+
         # Load WARs - let failures be visible rather than silently continuing
         wars = []
         for pkl_file, json_file in zip(war_pkl_files, war_json_files):
             war = visualization.WindowAnalysisResult.load_pickle_and_json(
-                folder_path=Path(pkl_file).parent,
-                pickle_name=Path(pkl_file).name,
-                json_name=Path(json_file).name
+                folder_path=Path(pkl_file).parent, pickle_name=Path(pkl_file).name, json_name=Path(json_file).name
             )
-            
+
             wars.append(war)
             logger.info(f"Loaded WAR for {war.animal_id} ({war.genotype})")
-        
+
         if not wars:
             raise RuntimeError("No WARs were successfully loaded")
-        
+
         logger.info(f"Successfully loaded {len(wars)} WARs")
-        
+
         # Get EP configuration
         ep_config = config["analysis"]["ep_figures"]
         features = ep_config["features"]
         exclude_features = ep_config.get("exclude_features", [])
-        
+
         # Create genotype ordering
-        genotype_order = ['MWT', 'MHet', 'MMut', 'FWT', 'FHet', 'FMut']
+        genotype_order = ["MWT", "MHet", "MMut", "FWT", "FHet", "FMut"]
         plot_order = constants.DF_SORT_ORDER.copy()
-        plot_order['genotype'] = genotype_order
-        
+        plot_order["genotype"] = genotype_order
+
         # Create ExperimentPlotter
         logger.info("Creating ExperimentPlotter")
-        ep = visualization.ExperimentPlotter(
-            wars=wars,
-            exclude=exclude_features,
-            plot_order=plot_order
-        )
-        
+        ep = visualization.ExperimentPlotter(wars=wars, exclude=exclude_features, plot_order=plot_order)
+
         # Feature to label mapping
         feature_to_label = {
             "pcorr": "PCC",
@@ -283,17 +298,19 @@ def main():
             "psdband": "Band Power ($\\mu V^2$)",
             "psd": "PSD ($\\mu V^2/Hz$)",
             "normpsd": "Normalized PSD",
+            "nspike": "n_spike / t_window",
+            "lognspike": "Log(n_spike / t_window)",
         }
-        
+
         # Process each feature
         for feature in features:
             if feature in feature_to_label:
                 feature_label = feature_to_label[feature]
             else:
                 feature_label = feature
-                
+
             create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
-        
+
         logger.info(f"Successfully generated EP statistical figures for {len(features)} features")
 
 

@@ -18,8 +18,6 @@ from tqdm import tqdm
 import numpy as np
 import pandas as pd
 
-# Add pythoneeg to path
-sys.path.insert(0, str(Path("pythoneeg").resolve()))
 from pythoneeg import visualization
 
 logger = logging.getLogger(__name__)

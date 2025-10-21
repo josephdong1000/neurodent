@@ -19,7 +19,7 @@ checkpoint war_quality_filter:
         directory("results/wars_quality_filtered/{animal}"),
     log:
         "logs/war_quality_filter/{animal}.log",
-    threads: 1
+    threads: config["cluster"]["war_quality_filter"]["threads"]
     retries: 0
     resources:
         time=config["cluster"]["war_quality_filter"]["time"],

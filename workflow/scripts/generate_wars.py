@@ -89,7 +89,23 @@ def generate_war_for_animal(samples_config, config, animal_folder, animal_id):
                     category=RuntimeWarning,
                 )
                 war = ao.compute_windowed_analysis(["all"], multiprocess_mode="dask")
-        return war
+
+            # Frequency-domain spike detection
+            logging.info(f"Computing frequency-domain spike detection for {animal_key}")
+            fdsar_config = config["analysis"]["frequency_domain_spike_detection"]
+            detection_params = fdsar_config["default_params"]
+            multiprocess_mode = fdsar_config.get("multiprocess_mode", "serial")
+
+            fdsar_list = ao.compute_frequency_domain_spike_analysis(
+                detection_params=detection_params,
+                multiprocess_mode=multiprocess_mode
+            )
+
+            # Integrate spike features into WAR
+            logging.info(f"Integrating spike features into WAR for {animal_key}")
+            war = war.read_sars_spikes(fdsar_list, read_mode="sa", inplace=True)
+
+        return war, fdsar_list
     except Exception as e:
         logging.error(f"Failed to generate WAR for {animal_key}: {e}")
         raise
@@ -117,13 +133,31 @@ def main():
         # Load configuration
         samples_config, config, animal_folder, animal_id = load_samples_and_config()
 
-        # Generate WAR
-        war = generate_war_for_animal(samples_config, config, animal_folder, animal_id)
+        # Generate WAR with integrated spike detection
+        war, fdsar_list = generate_war_for_animal(samples_config, config, animal_folder, animal_id)
 
-        # Save WAR
+        # Save WAR (now includes nspike/lognspike features)
         war.save_pickle_and_json(Path(snakemake.output.war_pkl).parent, filename="war", slugify_filename=False)
-
         logging.info(f"Successfully saved WAR for {animal_folder} {animal_id}")
+
+        # Save FDSAR results - each animalday gets its own subdirectory
+        fdsar_base_dir = Path(snakemake.output.fdsar_dir)
+        fdsar_base_dir.mkdir(parents=True, exist_ok=True)
+
+        for fdsar in fdsar_list:
+            # Create subdirectory for this animalday
+            animalday_dir = fdsar_base_dir / f"{fdsar.animal_id}-{fdsar.genotype}-{fdsar.animal_day}"
+            animalday_dir.mkdir(parents=True, exist_ok=True)
+
+            fdsar.save_fif_and_json(
+                animalday_dir,
+                convert_to_mne=True,
+                slugify_filebase=False,
+                overwrite=True
+            )
+            logging.info(f"Saved FDSAR for {fdsar.animal_id} {fdsar.animal_day} to {animalday_dir}")
+
+        logging.info(f"Successfully saved {len(fdsar_list)} FDSAR results to {fdsar_base_dir}")
 
 
 if __name__ == "__main__":
