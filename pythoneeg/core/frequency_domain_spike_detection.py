@@ -44,10 +44,10 @@ class FrequencyDomainSpikeDetector:
 
     # Default detection parameters
     DEFAULT_PARAMS = {
-        'bp': (3.0, 40.0),              # bandpass filter Hz
+        'bp': [3.0, 40.0],              # bandpass filter Hz
         'notch': 60.0,                  # notch filter Hz
         'notch_q': 30.0,                # notch filter quality factor
-        'freq_slices': (10.0, 20.0),    # STFT energy slices Hz
+        'freq_slices': [10.0, 20.0],    # STFT energy slices Hz
         'window_s': 0.125,              # STFT window size s
         'sneo_percentile': 99.99,       # SNEO threshold percentile
         'cluster_gap_ms': 80.0,         # clustering gap ms
