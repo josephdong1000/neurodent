@@ -19,7 +19,7 @@ import matplotlib
 
 matplotlib.use("Agg")  # Non-interactive backend
 
-from pythoneeg import visualization
+from neurodent import visualization
 
 
 def create_norm_from_config(norm_config):

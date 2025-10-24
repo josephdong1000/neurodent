@@ -127,11 +127,11 @@ def extract_mne_unit_info(raw_info: dict) -> tuple[str | None, float | None]:
     # Convert MNE unit codes to string representation using FIFF constants
     # Based on MNE FIFF constants documentation
     unit_str = None
-    if hasattr(FIFF, 'FIFF_UNIT_V') and unit_code == FIFF.FIFF_UNIT_V:
+    if hasattr(FIFF, "FIFF_UNIT_V") and unit_code == FIFF.FIFF_UNIT_V:
         unit_str = "V"
-    elif hasattr(FIFF, 'FIFF_UNIT_T') and unit_code == FIFF.FIFF_UNIT_T:
+    elif hasattr(FIFF, "FIFF_UNIT_T") and unit_code == FIFF.FIFF_UNIT_T:
         unit_str = "T"  # Tesla - MEG magnetometer
-    elif hasattr(FIFF, 'FIFF_UNIT_T_M') and unit_code == FIFF.FIFF_UNIT_T_M:
+    elif hasattr(FIFF, "FIFF_UNIT_T_M") and unit_code == FIFF.FIFF_UNIT_T_M:
         unit_str = "T/m"  # Tesla/meter - MEG gradiometer
     else:
         logging.warning(f"Unknown MNE unit code {unit_code}, using default units")
@@ -139,27 +139,27 @@ def extract_mne_unit_info(raw_info: dict) -> tuple[str | None, float | None]:
 
     # Convert unit multipliers using FIFF constants
     multiplier = None
-    if hasattr(FIFF, 'FIFF_UNITM_NONE') and unit_mul == FIFF.FIFF_UNITM_NONE:
+    if hasattr(FIFF, "FIFF_UNITM_NONE") and unit_mul == FIFF.FIFF_UNITM_NONE:
         multiplier = 1.0
-    elif hasattr(FIFF, 'FIFF_UNITM_MU') and unit_mul == FIFF.FIFF_UNITM_MU:
+    elif hasattr(FIFF, "FIFF_UNITM_MU") and unit_mul == FIFF.FIFF_UNITM_MU:
         multiplier = 1e-6  # micro
-    elif hasattr(FIFF, 'FIFF_UNITM_M') and unit_mul == FIFF.FIFF_UNITM_M:
+    elif hasattr(FIFF, "FIFF_UNITM_M") and unit_mul == FIFF.FIFF_UNITM_M:
         multiplier = 1e-3  # milli
-    elif hasattr(FIFF, 'FIFF_UNITM_N') and unit_mul == FIFF.FIFF_UNITM_N:
+    elif hasattr(FIFF, "FIFF_UNITM_N") and unit_mul == FIFF.FIFF_UNITM_N:
         multiplier = 1e-9  # nano
-    elif hasattr(FIFF, 'FIFF_UNITM_P') and unit_mul == FIFF.FIFF_UNITM_P:
+    elif hasattr(FIFF, "FIFF_UNITM_P") and unit_mul == FIFF.FIFF_UNITM_P:
         multiplier = 1e-12  # pico
-    elif hasattr(FIFF, 'FIFF_UNITM_F') and unit_mul == FIFF.FIFF_UNITM_F:
+    elif hasattr(FIFF, "FIFF_UNITM_F") and unit_mul == FIFF.FIFF_UNITM_F:
         multiplier = 1e-15  # femto
     else:
         # Fallback to numerical interpretation if FIFF constants not available
         mul_mapping = {
-            0: 1.0,        # FIFF_UNITM_NONE
-            -3: 1e-3,      # FIFF_UNITM_M (milli)
-            -6: 1e-6,      # FIFF_UNITM_MU (micro)
-            -9: 1e-9,      # FIFF_UNITM_N (nano)
-            -12: 1e-12,    # FIFF_UNITM_P (pico)
-            -15: 1e-15,    # FIFF_UNITM_F (femto)
+            0: 1.0,  # FIFF_UNITM_NONE
+            -3: 1e-3,  # FIFF_UNITM_M (milli)
+            -6: 1e-6,  # FIFF_UNITM_MU (micro)
+            -9: 1e-9,  # FIFF_UNITM_N (nano)
+            -12: 1e-12,  # FIFF_UNITM_P (pico)
+            -15: 1e-15,  # FIFF_UNITM_F (femto)
         }
         multiplier = mul_mapping.get(unit_mul)
         if multiplier is None:
@@ -222,7 +222,7 @@ def convert_colpath_to_rowpath(
     Convert a ColMajor file path to its corresponding RowMajor file path.
 
     This function transforms file paths from column-major format to row-major format,
-    which is used when converting between different data storage layouts in PyEEG.
+    which is used when converting between different data storage layouts in Neurodent.
 
     Args:
         rowdir_path (str | Path): Directory path where the RowMajor file should be located.
@@ -519,9 +519,9 @@ def parse_str_to_day(
             "all": Use all three approaches in the order "full", "split", "window
         date_patterns (list[tuple[str, str]], optional): List of (regex_pattern, strptime_format) tuples
             to try before falling back to token-based parsing. This allows users to specify
-            exact formats to handle ambiguous cases like MM/DD/YYYY vs DD/MM/YYYY. 
+            exact formats to handle ambiguous cases like MM/DD/YYYY vs DD/MM/YYYY.
             Only used in "split" and "all" modes. Defaults to None (no regex patterns).
-            
+
     Returns:
         datetime: Datetime object corresponding to the day of the binfolder.
 
@@ -534,7 +534,7 @@ def parse_str_to_day(
         >>> patterns = [(r'(19\d{2}|20\d{2})-(\d{1,2})-(\d{1,2})', '%Y-%m-%d')]
         >>> parse_str_to_day('2001_2023-07-04_data', date_patterns=patterns)
         datetime.datetime(2023, 7, 4, 0, 0)
-        
+
         >>> # European format pattern
         >>> patterns = [(r'(\d{1,2})/(\d{1,2})/(19\d{2}|20\d{2})', '%d/%m/%Y')]
         >>> parse_str_to_day('04/07/2023_data', date_patterns=patterns)
@@ -566,7 +566,7 @@ def parse_str_to_day(
         raise ValueError(f"Invalid parse_mode: {parse_mode}. Must be one of {valid_modes}")
 
     clean_str = _clean_str_for_date(string)
-    
+
     # Only use user-provided regex patterns for "split" and "all" modes
     if date_patterns and parse_mode in ["split", "all"]:
         date_result = _try_user_regex_patterns(clean_str, date_patterns)
@@ -577,7 +577,7 @@ def parse_str_to_day(
             warnings.warn(
                 f"No user-provided date patterns matched '{clean_str}'. "
                 f"Falling back to token-based parsing which may be ambiguous.",
-                UserWarning
+                UserWarning,
             )
 
     # Fallback to original token-based approach
@@ -628,16 +628,16 @@ def parse_str_to_day(
 def _try_user_regex_patterns(clean_str: str, date_patterns: list[tuple[str, str]]) -> Optional[datetime]:
     """
     Try user-provided regex patterns to find complete date patterns.
-    
+
     Args:
         clean_str (str): Cleaned string to search for date patterns
         date_patterns (list[tuple[str, str]]): List of (regex_pattern, strptime_format) tuples
-        
+
     Returns:
         Optional[datetime]: Parsed datetime if a pattern matches, None otherwise
     """
     successful_matches = []
-    
+
     for pattern_idx, (pattern, date_format) in enumerate(date_patterns):
         try:
             regex_matches = re.finditer(pattern, clean_str, re.IGNORECASE)
@@ -652,16 +652,16 @@ def _try_user_regex_patterns(clean_str: str, date_patterns: list[tuple[str, str]
                     continue
         except re.error as e:
             logging.warning(f"Invalid regex pattern '{pattern}': {e}")
-    
+
     # Check for multiple successful matches and warn
     if len(successful_matches) > 1:
         match_details = [f"pattern {idx}: '{match}'" for match, idx in successful_matches]
         warnings.warn(
             f"Multiple date patterns matched in '{clean_str}': {', '.join(match_details)}. "
-            f"Using first match: '{successful_matches[0][0]}'", 
-            UserWarning
+            f"Using first match: '{successful_matches[0][0]}'",
+            UserWarning,
         )
-    
+
     # Return first successful match
     if successful_matches:
         first_match_str, first_pattern_idx = successful_matches[0]
@@ -670,7 +670,7 @@ def _try_user_regex_patterns(clean_str: str, date_patterns: list[tuple[str, str]
             return datetime.strptime(first_match_str, date_format)
         except (ValueError, TypeError):
             return None
-    
+
     return None
 
 
@@ -794,17 +794,17 @@ def _get_key_from_match_values(input_string: str, alias_dict: dict, strict_match
 
 def set_temp_directory(path: str | Path) -> None:
     """
-    Set the temporary directory for PyEEG operations.
+    Set the temporary directory for Neurodent operations.
 
-    This function configures the temporary directory used by PyEEG for intermediate
+    This function configures the temporary directory used by Neurodent for intermediate
     files and operations. The directory will be created if it doesn't exist.
 
     Args:
         path (str | Path): Path to the temporary directory. Will be created if it doesn't exist.
 
     Examples:
-        >>> set_temp_directory("/tmp/pyeeg_temp")
-        >>> set_temp_directory(Path.home() / "pyeeg_workspace" / "temp")
+        >>> set_temp_directory("/tmp/neurodent_temp")
+        >>> set_temp_directory(Path.home() / "neurodent_workspace" / "temp")
 
     Note:
         This function modifies the TMPDIR environment variable, which affects
@@ -819,7 +819,7 @@ def set_temp_directory(path: str | Path) -> None:
 
 def get_temp_directory() -> Path:
     """
-    Get the current temporary directory used by PyEEG.
+    Get the current temporary directory used by Neurodent.
 
     Returns:
         Path: Path object representing the current temporary directory.
@@ -827,7 +827,7 @@ def get_temp_directory() -> Path:
     Examples:
         >>> temp_dir = get_temp_directory()
         >>> print(f"Current temp directory: {temp_dir}")
-        Current temp directory: /tmp/pyeeg_temp
+        Current temp directory: /tmp/neurodent_temp
 
     Raises:
         KeyError: If TMPDIR environment variable is not set.
@@ -1343,11 +1343,11 @@ def validate_timestamps(timestamps: list[datetime], gap_threshold_seconds: float
 def should_use_cached_file(
     cache_path: Union[str, Path],
     source_paths: list[Union[str, Path]],
-    use_cached: Literal["auto", "always", "never", "error"] = "auto"
+    use_cached: Literal["auto", "always", "never", "error"] = "auto",
 ) -> bool:
     """
     Determine whether to use a cached intermediate file based on caching policy and file timestamps.
-    
+
     Args:
         cache_path: Path to the cached intermediate file
         source_paths: List of source file paths that the cache depends on
@@ -1356,17 +1356,17 @@ def should_use_cached_file(
             - "always": Always use cached if it exists
             - "never": Never use cached (always regenerate)
             - "error": Raise error if cached doesn't exist
-    
+
     Returns:
         bool: True if cached file should be used, False if it should be regenerated
-        
+
     Raises:
         FileNotFoundError: When use_cached="error" and cache doesn't exist
         ValueError: For invalid use_cached values
     """
     cache_path = Path(cache_path)
     source_paths = [Path(p) for p in source_paths]
-    
+
     if use_cached == "never":
         return False
     elif use_cached == "error":
@@ -1378,30 +1378,27 @@ def should_use_cached_file(
     elif use_cached == "auto":
         if not cache_path.exists():
             return False
-        
+
         # Check if cache is newer than all source files
         cache_mtime = cache_path.stat().st_mtime
-        
+
         for source_path in source_paths:
             if not source_path.exists():
                 continue  # Skip missing source files
             if source_path.stat().st_mtime > cache_mtime:
                 logging.info(f"Cache {cache_path.name} is older than {source_path.name}, regenerating")
                 return False
-        
+
         logging.info(f"Using cached intermediate file: {cache_path.name}")
         return True
     else:
         raise ValueError(f"Invalid use_cached value: {use_cached}")
 
 
-def get_cache_status_message(
-    cache_path: Union[str, Path], 
-    use_cached: bool
-) -> str:
+def get_cache_status_message(cache_path: Union[str, Path], use_cached: bool) -> str:
     """Generate a descriptive message about cache usage for logging."""
     cache_path = Path(cache_path)
-    
+
     if use_cached:
         return f"Using cached intermediate: {cache_path.name}"
     else:
@@ -1409,12 +1406,12 @@ def get_cache_status_message(
 
 
 def should_use_cache_unified(
-    cache_path: Union[str, Path], 
-    source_paths: list[Union[str, Path]], 
-    cache_policy: Literal["auto", "always", "force_regenerate"]
+    cache_path: Union[str, Path],
+    source_paths: list[Union[str, Path]],
+    cache_policy: Literal["auto", "always", "force_regenerate"],
 ) -> bool:
     """Unified cache decision logic for all intermediate files.
-    
+
     Args:
         cache_path: Path to the cache file
         source_paths: List of source file paths to check timestamps against
@@ -1422,10 +1419,10 @@ def should_use_cache_unified(
             - "auto": Use cache if exists and newer than sources, regenerate with logging if missing/invalid
             - "always": Use cache if exists, raise error if missing/invalid
             - "force_regenerate": Always regenerate and overwrite existing cache
-        
+
     Returns:
         bool: True if cache should be used, False if should regenerate
-        
+
     Raises:
         ValueError: If cache_policy is invalid
     """

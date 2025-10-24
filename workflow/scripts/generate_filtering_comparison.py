@@ -20,9 +20,7 @@ import seaborn as sns
 from scipy import stats
 from sklearn.metrics import mean_squared_error
 
-# Add pythoneeg to path
-sys.path.insert(0, str(Path("pythoneeg").resolve()))
-from pythoneeg import visualization, constants
+from neurodent import visualization, constants
 
 
 def load_wars_from_paths(war_paths, label):
@@ -124,8 +122,9 @@ def calculate_feature_correlation(manual_vals, lof_vals, feature_name, hash_mapp
         if hash_mapping:
             # Use hash mapping to match animals
             manual_animals_with_mapping = [animal for animal in manual_vals.index if animal in hash_mapping]
-            matched_manual_animals = [animal for animal in manual_animals_with_mapping
-                                    if hash_mapping[animal] in lof_vals.index]
+            matched_manual_animals = [
+                animal for animal in manual_animals_with_mapping if hash_mapping[animal] in lof_vals.index
+            ]
 
             if len(matched_manual_animals) == 0:
                 logging.warning(f"No animals could be matched via hash mapping for feature {feature_name}")
@@ -172,7 +171,7 @@ def extract_feature_dataframe(ep, feature, label):
     Parameters:
     -----------
     ep : ExperimentPlotter
-        PyEEG ExperimentPlotter instance containing the WAR data
+        Neurodent ExperimentPlotter instance containing the WAR data
     feature : str
         Feature name to extract (e.g., 'logpsdband', 'rms', 'cohere')
     label : str
@@ -241,9 +240,9 @@ def generate_feature_scatter_plots(manual_ep, lof_ep, features, output_dir, hash
     Parameters:
     -----------
     manual_ep : ExperimentPlotter
-        PyEEG ExperimentPlotter instance with manually filtered data
+        Neurodent ExperimentPlotter instance with manually filtered data
     lof_ep : ExperimentPlotter
-        PyEEG ExperimentPlotter instance with LOF-filtered data
+        Neurodent ExperimentPlotter instance with LOF-filtered data
     features : list[str]
         List of feature names to compare (e.g., ['logpsdband', 'rms', 'cohere'])
     output_dir : Path
@@ -281,7 +280,7 @@ def generate_feature_scatter_plots(manual_ep, lof_ep, features, output_dir, hash
     - Each data point: One animal's aggregated value for that feature/band combination
     """
 
-    logging.info("Generating feature scatter plots using PyEEG ExperimentPlotter methods")
+    logging.info("Generating feature scatter plots using Neurodent ExperimentPlotter methods")
 
     # Use the provided hash mapping for merging manual and LOF data
     if hash_mapping is None:
@@ -367,7 +366,7 @@ def generate_feature_scatter_plots(manual_ep, lof_ep, features, output_dir, hash
                 feature_col = plot_data["feature_col"]
                 plot_title = plot_data["title"]
 
-                # Data is already animal-level aggregated by PyEEG
+                # Data is already animal-level aggregated by Neurodent
                 # For band features, we may have multiple rows per animal (one per band)
                 # For linear features, we have one row per animal
 
@@ -460,7 +459,7 @@ def generate_feature_scatter_plots(manual_ep, lof_ep, features, output_dir, hash
                                 )
 
                         # Add legend for genotypes
-                        ax.legend(loc='upper left', fontsize=8)
+                        ax.legend(loc="upper left", fontsize=8)
                     else:
                         # No genotype information available, use default color
                         ax.scatter(manual_clean, lof_clean, alpha=0.6, s=20, c="C0")
@@ -517,9 +516,9 @@ def generate_feature_scatter_plots(manual_ep, lof_ep, features, output_dir, hash
 
 
 def generate_channel_impact_analysis(manual_ep, lof_ep, features, output_dir, hash_mapping=None):
-    """Analyze the impact of filtering on different channels using PyEEG ExperimentPlotter methods"""
+    """Analyze the impact of filtering on different channels using Neurodent ExperimentPlotter methods"""
 
-    logging.info("Generating channel impact analysis using PyEEG ExperimentPlotter methods")
+    logging.info("Generating channel impact analysis using Neurodent ExperimentPlotter methods")
 
     try:
         logging.info("Step 1: Extracting feature data for comparison analysis")
@@ -531,7 +530,7 @@ def generate_channel_impact_analysis(manual_ep, lof_ep, features, output_dir, ha
         manual_feature_data = {}
         lof_feature_data = {}
 
-        # Extract data for each feature using PyEEG's proper methods
+        # Extract data for each feature using Neurodent's proper methods
         for i, feature in enumerate(features):
             logging.info(f"Processing feature {i + 1}/{len(features)}: {feature}")
 
@@ -589,10 +588,10 @@ def generate_channel_impact_analysis(manual_ep, lof_ep, features, output_dir, ha
             # Process features: create per-band entries for band features
             if "band" in manual_df.columns and "band" in lof_df.columns:
                 # Band feature - create separate entries for each band
-                for band in manual_df['band'].unique():
-                    if band in lof_df['band'].unique():
-                        manual_band_data = manual_df[manual_df['band'] == band]
-                        lof_band_data = lof_df[lof_df['band'] == band]
+                for band in manual_df["band"].unique():
+                    if band in lof_df["band"].unique():
+                        manual_band_data = manual_df[manual_df["band"] == band]
+                        lof_band_data = lof_df[lof_df["band"] == band]
 
                         # Group by the grouping column within this band
                         manual_grouped = manual_band_data.groupby(group_col)[feature].mean()
@@ -650,7 +649,7 @@ def generate_channel_impact_analysis(manual_ep, lof_ep, features, output_dir, ha
         versions = [
             ("absolute", "Absolute Differences (LOF - Manual)", group_diff),
             ("zscore", "Z-score-like Differences", None),  # Will calculate below
-            ("log2fc", "Log2 Fold-Change log2(LOF/Manual)", None)  # Will calculate below
+            ("log2fc", "Log2 Fold-Change log2(LOF/Manual)", None),  # Will calculate below
         ]
 
         # Calculate z-score-like version (divide by std of differences)
@@ -686,8 +685,9 @@ def generate_channel_impact_analysis(manual_ep, lof_ep, features, output_dir, ha
             # Use TwoSlopeNorm for proper centering at zero with red-blue colormap
             norm = TwoSlopeNorm(vmin=vmin, vcenter=0, vmax=vmax)
 
-            sns.heatmap(version_data.T, annot=True, cmap="RdBu_r", norm=norm, fmt=".3f",
-                       cbar_kws={"label": f"{version_title}"})
+            sns.heatmap(
+                version_data.T, annot=True, cmap="RdBu_r", norm=norm, fmt=".3f", cbar_kws={"label": f"{version_title}"}
+            )
 
             plt.title(f"{group_label}-wise Feature {version_title}")
             plt.xlabel(group_label)
@@ -715,9 +715,9 @@ def generate_channel_impact_analysis(manual_ep, lof_ep, features, output_dir, ha
 
 
 def generate_animal_correlation_analysis(manual_ep, lof_ep, features, output_dir, hash_mapping=None):
-    """Analyze correlation of animal-level aggregated features using PyEEG ExperimentPlotter methods"""
+    """Analyze correlation of animal-level aggregated features using Neurodent ExperimentPlotter methods"""
 
-    logging.info("Generating animal-level correlation analysis using PyEEG ExperimentPlotter methods")
+    logging.info("Generating animal-level correlation analysis using Neurodent ExperimentPlotter methods")
 
     try:
         logging.info("Step 1: Extracting feature data for correlation analysis")
@@ -725,7 +725,7 @@ def generate_animal_correlation_analysis(manual_ep, lof_ep, features, output_dir
         manual_feature_data = {}
         lof_feature_data = {}
 
-        # Extract data for each feature using PyEEG's proper methods
+        # Extract data for each feature using Neurodent's proper methods
         for i, feature in enumerate(features):
             logging.info(f"Processing feature {i + 1}/{len(features)}: {feature}")
 
@@ -767,10 +767,10 @@ def generate_animal_correlation_analysis(manual_ep, lof_ep, features, output_dir
 
             # For band features, create separate correlations for each band
             if "band" in manual_df.columns and "band" in lof_df.columns:
-                for band in manual_df['band'].unique():
-                    if band in lof_df['band'].unique():
-                        manual_band_data = manual_df[manual_df['band'] == band]
-                        lof_band_data = lof_df[lof_df['band'] == band]
+                for band in manual_df["band"].unique():
+                    if band in lof_df["band"].unique():
+                        manual_band_data = manual_df[manual_df["band"] == band]
+                        lof_band_data = lof_df[lof_df["band"] == band]
 
                         manual_animal = manual_band_data.set_index("animal")[feature]
                         lof_animal = lof_band_data.set_index("animal")[feature]
@@ -778,7 +778,9 @@ def generate_animal_correlation_analysis(manual_ep, lof_ep, features, output_dir
                         manual_animal_data[f"{feature}_{band}"] = manual_animal
                         lof_animal_data[f"{feature}_{band}"] = lof_animal
 
-                        logging.info(f"Feature '{feature}_{band}': manual animals={len(manual_animal)}, lof animals={len(lof_animal)}")
+                        logging.info(
+                            f"Feature '{feature}_{band}': manual animals={len(manual_animal)}, lof animals={len(lof_animal)}"
+                        )
             else:
                 # Linear features already have one value per animal
                 manual_animal = manual_df.set_index("animal")[feature]
@@ -813,7 +815,9 @@ def generate_animal_correlation_analysis(manual_ep, lof_ep, features, output_dir
 
             if correlation_result:
                 correlations[feature] = correlation_result
-                logging.info(f"Feature {feature}: correlation={correlation_result['correlation']:.3f}, p_value={correlation_result['p_value']:.6f}, n_animals={correlation_result['n_animals']}")
+                logging.info(
+                    f"Feature {feature}: correlation={correlation_result['correlation']:.3f}, p_value={correlation_result['p_value']:.6f}, n_animals={correlation_result['n_animals']}"
+                )
             else:
                 logging.warning(f"Could not calculate correlation for feature {feature}")
 
@@ -878,9 +882,9 @@ def generate_animal_correlation_analysis(manual_ep, lof_ep, features, output_dir
 
 
 def generate_summary_statistics(manual_ep, lof_ep, features, output_dir, hash_mapping=None):
-    """Generate summary statistics comparing the two filtering methods using PyEEG ExperimentPlotter methods"""
+    """Generate summary statistics comparing the two filtering methods using Neurodent ExperimentPlotter methods"""
 
-    logging.info("Generating summary statistics using PyEEG ExperimentPlotter methods")
+    logging.info("Generating summary statistics using Neurodent ExperimentPlotter methods")
 
     try:
         logging.info("Step 1: Extracting feature data for summary statistics")
@@ -895,7 +899,7 @@ def generate_summary_statistics(manual_ep, lof_ep, features, output_dir, hash_ma
             "effect_size": [],
         }
 
-        # Extract data for each feature using PyEEG's proper methods
+        # Extract data for each feature using Neurodent's proper methods
         for i, feature in enumerate(features):
             logging.info(f"Processing feature {i + 1}/{len(features)}: {feature}")
 
@@ -911,7 +915,7 @@ def generate_summary_statistics(manual_ep, lof_ep, features, output_dir, hash_ma
                 logging.warning(f"Failed to extract LOF data for {feature}, skipping")
                 continue
 
-            # Get feature values (already properly extracted by PyEEG methods)
+            # Get feature values (already properly extracted by Neurodent methods)
             manual_vals = manual_df[feature].dropna()
             lof_vals = lof_df[feature].dropna()
             logging.info(f"Feature {feature}: manual={len(manual_vals)} values, lof={len(lof_vals)} values")
@@ -1001,7 +1005,7 @@ def main():
         logging.error("Failed to load data from one or both filtering methods")
         return
 
-    # Use features_to_compare directly since PyEEG methods handle feature validation
+    # Use features_to_compare directly since Neurodent methods handle feature validation
     features_to_analyze = features_to_compare
     logging.info(f"Analyzing features: {features_to_analyze}")
 

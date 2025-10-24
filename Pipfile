@@ -24,7 +24,7 @@ statannotations = "*"
 statsmodels = "*"
 django = "*"
 build = "*"
-pythoneeg = {path = ".", editable = true}
+neurodent = {path = ".", editable = true}
 okabeito = "*"
 openpyxl = "*"
 appnope = "*"

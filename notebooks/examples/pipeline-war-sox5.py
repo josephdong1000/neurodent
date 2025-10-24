@@ -8,9 +8,7 @@ from tqdm import tqdm
 from dask_jobqueue import SLURMCluster
 from dask.distributed import Client
 
-from pythoneeg import core
-from pythoneeg import visualization
-from pythoneeg import constants
+from neurodent import core, visualization, constants
 
 core.set_temp_directory("/scr1/users/dongjp")
 
@@ -44,7 +42,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger()
 
-base_folder = Path("/mnt/isilon/marsh_single_unit/PythonEEG")
+base_folder = Path("/mnt/isilon/marsh_single_unit/Neurodent")
 with open(base_folder / "notebooks" / "tests" / "sox5 combine genotypes.json", "r") as f:
     data = json.load(f)
 bad_channels = data["bad_channels"]
@@ -75,15 +73,15 @@ for data_folder, animal_ids in tqdm(data_folders_to_animal_ids.items(), desc="Pr
             continue
         with Client(cluster_window) as client:
             client.run(lambda: os.system(f"pip install -e {base_folder}"))
-            
+
             # SECTION 1: Find bin files
-            ao = visualization.AnimalOrganizer(data_parent_folder / data_folder, animal_id,
-                                        mode="nest", 
-                                        assume_from_number=True,
-                                        skip_days=['bad'],
-                                        lro_kwargs={'mode': 'bin',
-                                                    'multiprocess_mode': 'dask',
-                                                    'overwrite_rowbins': False},
+            ao = visualization.AnimalOrganizer(
+                data_parent_folder / data_folder,
+                animal_id,
+                mode="nest",
+                assume_from_number=True,
+                skip_days=["bad"],
+                lro_kwargs={"mode": "bin", "multiprocess_mode": "dask", "overwrite_rowbins": False},
             )
             ao.compute_bad_channels()
 
@@ -99,7 +97,7 @@ for data_folder, animal_ids in tqdm(data_folders_to_animal_ids.items(), desc="Pr
         # SECTION 3: Make SARs, save SARs and load into WAR
         # with Client(cluster_spike) as client:
         #     client.run(lambda: os.system(f"pip install -e {base_folder}"))
-            
+
         #     sars = ao.compute_spike_analysis(multiprocess_mode='dask')
         #     for sar in sars:
         #         sar.save_fif_and_json(base_folder / 'notebooks' / 'tests' / 'test-sars-full' / f'{data_folder} {slugify(sar.animal_day, allow_unicode=True)}', overwrite=True) # animal_day not unique for Sox5 rec sessions, so add bin_folder_name
@@ -116,5 +114,5 @@ for data_folder, animal_ids in tqdm(data_folders_to_animal_ids.items(), desc="Pr
 # !SECTION
 
 """
-sbatch --mem 700G -c 4 -t 48:00:00 /mnt/isilon/marsh_single_unit/PythonEEG/notebooks/examples/pipeline.sh /mnt/isilon/marsh_single_unit/PythonEEG/notebooks/examples/pipeline-war-sox5.py
+sbatch --mem 700G -c 4 -t 48:00:00 /mnt/isilon/marsh_single_unit/Neurodent/notebooks/examples/pipeline.sh /mnt/isilon/marsh_single_unit/Neurodent/notebooks/examples/pipeline-war-sox5.py
 """

@@ -1,5 +1,5 @@
 """
-Unit tests for pythoneeg.core.core module.
+Unit tests for neurodent.core.core module.
 """
 import gzip
 import gc
@@ -19,13 +19,13 @@ try:
 except Exception:
     si = None
 
-from pythoneeg.core.core import (
+from neurodent.core.core import (
     DDFBinaryMetadata,
     LongRecordingOrganizer,
     convert_ddfcolbin_to_ddfrowbin,
     convert_ddfrowbin_to_si,
 )
-from pythoneeg import constants
+from neurodent import constants
 
 
 class TestDDFBinaryMetadata:
@@ -352,8 +352,8 @@ class TestConvertDdfrowbinToSi:
         
         with pytest.raises((EOFError, OSError)):
             convert_ddfrowbin_to_si(rowbin_path, metadata)
-            
-    @patch('pythoneeg.core.core.spre.resample')
+
+    @patch("neurodent.core.core.spre.resample")
     def test_convert_different_sampling_rate_resamples(self, mock_resample, temp_dir):
         """Test that different sampling rates trigger resampling."""
         # Create test data
@@ -707,9 +707,11 @@ class TestLongRecordingOrganizer:
         mock_recording.__str__ = Mock(return_value="MockRecording")
         organizer.LongRecording = mock_recording
         organizer.channel_names = ['ch1', 'ch2', 'ch3', 'ch4']
-        
-        with patch('pythoneeg.core.core.Natural_Neighbor') as mock_nn_class, \
-             patch('pythoneeg.core.core.LocalOutlierFactor') as mock_lof_class:
+
+        with (
+            patch("neurodent.core.core.Natural_Neighbor") as mock_nn_class,
+            patch("neurodent.core.core.LocalOutlierFactor") as mock_lof_class,
+        ):
             
             # Mock Natural_Neighbor
             mock_nn = Mock()
@@ -749,10 +751,12 @@ class TestLongRecordingOrganizer:
         mock_recording.__str__ = Mock(return_value="MockRecording")
         organizer.LongRecording = mock_recording
         organizer.channel_names = ['ch1', 'ch2']
-        
-        with patch('pythoneeg.core.core.Natural_Neighbor') as mock_nn_class, \
-             patch('pythoneeg.core.core.LocalOutlierFactor') as mock_lof_class, \
-             patch('pythoneeg.core.core.decimate') as mock_decimate:
+
+        with (
+            patch("neurodent.core.core.Natural_Neighbor") as mock_nn_class,
+            patch("neurodent.core.core.LocalOutlierFactor") as mock_lof_class,
+            patch("neurodent.core.core.decimate") as mock_decimate,
+        ):
             
             mock_nn = Mock()
             mock_nn.algorithm.return_value = 2
@@ -789,11 +793,13 @@ class TestLongRecordingOrganizer:
         mock_meta.channel_names = ['ch1']
         mock_meta.metadata_df = pd.DataFrame({'ProbeInfo': ['ch1']})
         
-        with patch.object(organizer, '_LongRecordingOrganizer__update_colbins_rowbins_metas'), \
-             patch.object(organizer, '_LongRecordingOrganizer__check_colbins_rowbins_metas_folders_exist'), \
-             patch.object(organizer, '_LongRecordingOrganizer__check_colbins_rowbins_metas_not_empty'), \
-             patch.object(organizer, '_validate_metadata_consistency') as mock_validate, \
-             patch('pythoneeg.core.core.DDFBinaryMetadata', return_value=mock_meta):
+        with (
+            patch.object(organizer, "_LongRecordingOrganizer__update_colbins_rowbins_metas"),
+            patch.object(organizer, "_LongRecordingOrganizer__check_colbins_rowbins_metas_folders_exist"),
+            patch.object(organizer, "_LongRecordingOrganizer__check_colbins_rowbins_metas_not_empty"),
+            patch.object(organizer, "_validate_metadata_consistency") as mock_validate,
+            patch("neurodent.core.core.DDFBinaryMetadata", return_value=mock_meta),
+        ):
             
             organizer.prepare_colbins_rowbins_metas()
             
@@ -813,8 +819,8 @@ class TestLongRecordingOrganizer:
         (temp_dir / "file1_Meta.csv").write_text("ProbeInfo,SampleRate\nch1,1000")
         
         organizer = LongRecordingOrganizer(temp_dir, mode=None)
-        
-        with patch('pythoneeg.core.core.DDFBinaryMetadata') as mock_metadata_class:
+
+        with patch("neurodent.core.core.DDFBinaryMetadata") as mock_metadata_class:
             mock_meta = Mock()
             mock_meta.dt_end = None  # No date - this should trigger the ValueError
             mock_meta.channel_names = ['ch1']
@@ -1113,7 +1119,7 @@ class TestLongRecordingOrganizer:
         mock_recording.get_sampling_frequency.return_value = 2000.0
 
         # Mock missing preprocessing module
-        with patch('pythoneeg.core.core.spre', None):
+        with patch("neurodent.core.core.spre", None):
             with pytest.raises(ImportError, match="SpikeInterface preprocessing is required"):
                 organizer._apply_resampling(mock_recording)
 
@@ -1192,8 +1198,10 @@ class TestLongRecordingOrganizer:
         mock_recording = Mock()
         mock_recording.get_sampling_frequency.return_value = 2000.0
 
-        with patch('spikeinterface.preprocessing.resample') as mock_resample, \
-             patch('pythoneeg.core.core.logging') as mock_logging:
+        with (
+            patch("spikeinterface.preprocessing.resample") as mock_resample,
+            patch("neurodent.core.core.logging") as mock_logging,
+        ):
 
             mock_resampled = Mock()
             mock_resample.return_value = mock_resampled
@@ -1211,7 +1219,7 @@ class TestLongRecordingOrganizer:
         # Test logging when no resampling is needed
         mock_recording.get_sampling_frequency.return_value = constants.GLOBAL_SAMPLING_RATE
 
-        with patch('pythoneeg.core.core.logging') as mock_logging:
+        with patch("neurodent.core.core.logging") as mock_logging:
             organizer._apply_resampling(mock_recording)
 
             # Should log that no resampling is needed

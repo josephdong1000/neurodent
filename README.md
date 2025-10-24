@@ -1,9 +1,10 @@
-# PythonEEG
+# Neurodent
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.15780751.svg)](https://doi.org/10.5281/zenodo.15780751)
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/josephdong1000/PyEEG/HEAD) 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/josephdong1000/PyEEG/)
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/josephdong1000/Neurodent/HEAD) 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/josephdong1000/neurodent/)
 
+> Formerly PyEEG
 > Presented at [USRSE'25](https://doi.org/10.5281/zenodo.17274681)!
 
 A Python package for standardizing rodent EEG analysis and figure generation. Various EEG formats are loadable and features are extracted in parallel. Also includes a Snakemake workflow for automated analysis.
@@ -11,11 +12,11 @@ A Python package for standardizing rodent EEG analysis and figure generation. Va
 ## Usage
 
 Tutorial: *WIP!*
-API documentation: https://josephdong1000.github.io/PyEEG/
+API documentation: https://josephdong1000.github.io/neurodent/
 
 ## Overview
 
-PyEEG provides two main analysis workflows:
+Neurodent provides two main analysis workflows:
 
 1. **Windowed Analysis Results (WAR)** - Extracts features from continuous EEG data divided into time windows
 2. **Spike Analysis Results (SAR)** - Analyzes spike-sorted neural data and integrates it with EEG features
@@ -72,7 +73,7 @@ ep.plot_feature("rms", groupby="genotype")
 ```
 
 #### Advanced Features
-- **Flexible Data Loading**: PyEEG uses MNE and SpikeInterface loaders in Python and custom loaders for proprietary formats using MATLAB, including:
+- **Flexible Data Loading**: Neurodent uses MNE and SpikeInterface loaders in Python and custom loaders for proprietary formats using MATLAB, including:
   - Neuroscope/Neuralynx (.dat, .eeg)
   - Open Ephys (.continuous)
   - NWB (.nwb) neurophysiology format
@@ -84,7 +85,7 @@ ep.plot_feature("rms", groupby="genotype")
 
 ## Snakemake Workflow
 
-A companion Snakemake workflow is provided for building automated PyEEG analysis pipelines.
+A companion Snakemake workflow is provided for building automated Neurodent analysis pipelines.
 
 The workflow processes multiple animals in parallel through WAR generation, quality filtering, fragment/channel filtering, and statistical analysis with SLURM cluster integration.
 
@@ -95,10 +96,13 @@ To run Snakemake on a specific computing environment, first create a [Snakemake 
 snakemake
 ```
 
+## Acknowledgements
+
+This project benefited from insights and best practices described in Peter K. G. Williams’s [One Good Tutorial](https://onegoodtutorial.org/).
 
 ## Citation
 
-If you find PyEEG useful, please cite our work!
+If you find Neurodent useful, please cite our work!
 
 ```bibtex
 @misc{https://doi.org/10.5281/zenodo.17051374,

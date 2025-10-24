@@ -26,9 +26,6 @@ import seaborn.objects as so
 import seaborn as sns
 from seaborn import axes_style
 
-# Add pythoneeg to path
-sys.path.insert(0, str(Path("pythoneeg").resolve()))
-
 
 def process_zeitgeber_data(df, config):
     """Process zeitgeber dataframe for temporal plotting.

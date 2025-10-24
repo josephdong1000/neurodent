@@ -19,11 +19,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.metrics import f1_score, precision_score, recall_score
 
-# Add pythoneeg to path
-sys.path.insert(0, str(Path("pythoneeg").resolve()))
-from pythoneeg import visualization, core
-
-# Logging setup moved to if __name__ == "__main__" block
+from neurodent import visualization, core
 
 
 def get_ground_truth_bad_channels(samples_config, animal_folder, animal_id):
@@ -266,7 +262,9 @@ def create_lof_channel_barplot(
             logging.error(f"Failed to process LOF scores for {animal_name}: {str(e)}")
             raise
 
-    logging.info(f"Creating LOF channel barplot with {len(evaluation_channels)} channels from {animals_processed} animals")
+    logging.info(
+        f"Creating LOF channel barplot with {len(evaluation_channels)} channels from {animals_processed} animals"
+    )
 
     # Create the barplot
     plt.figure(figsize=(12, 6))
@@ -285,7 +283,7 @@ def create_lof_channel_barplot(
 
         # Create adjacent bars - all blue (C0)
         x_positions = np.arange(len(valid_scores))
-        plt.bar(x_positions, valid_scores, color='C0')
+        plt.bar(x_positions, valid_scores, color="C0")
 
         # Customize the plot
         plt.xlabel("Channels", fontsize=12)

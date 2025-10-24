@@ -12,11 +12,9 @@ import statsmodels.api as sm
 from scipy import stats
 from statannotations.Annotator import Annotator
 
-from pythoneeg import constants
-
 from ... import core
 from ... import visualization as viz
-
+from ... import constants
 
 class ExperimentPlotter:
     """

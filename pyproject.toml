@@ -3,7 +3,7 @@ requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "pythoneeg"
+name = "neurodent"
 version = "0.1.0"
 description = "Mouse EEG analysis tools"
 readme = "README.md"
@@ -67,7 +67,7 @@ dev = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["pythoneeg*"]
+include = ["neurodent*"]
 exclude = ["notebooks", "docs", "tmp"]
 
 [tool.pytest.ini_options]
@@ -80,7 +80,7 @@ addopts = [
     "--strict-config",
     "--tb=short",
 ]
-# For coverage reports, add: --cov=pythoneeg --cov-report=term-missing --cov-fail-under=80
+# For coverage reports, add: --cov=neurodent --cov-report=term-missing --cov-fail-under=80
 # For slow tests, use: -m "not slow"
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
@@ -94,7 +94,7 @@ markers = [
 ]
 
 [tool.coverage.run]
-source = ["pythoneeg"]
+source = ["neurodent"]
 omit = [
     "*/tests/*",
     "*/test_*",

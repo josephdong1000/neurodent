@@ -5,7 +5,7 @@ from pathlib import Path
 
 from tqdm import tqdm
 
-from pythoneeg import core, visualization
+from neurodent import core, visualization
 
 core.set_temp_directory("/scr1/users/dongjp")
 
@@ -14,7 +14,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger()
 
-base_folder = Path("/mnt/isilon/marsh_single_unit/PythonEEG")
+base_folder = Path("/mnt/isilon/marsh_single_unit/Neurodent")
 load_folder = base_folder / "notebooks" / "tests" / "test-wars-sox5-9"
 save_folder = base_folder / "notebooks" / "tests" / "test-wars-sox5-collapsed-9-isday"
 

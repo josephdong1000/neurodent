@@ -41,8 +41,6 @@ checkpoint war_quality_filter:
         )
         logger = logging.getLogger()
 
-        sys.path.insert(0, str(Path("pythoneeg").resolve()))
-
         animal = wildcards.animal
         logger.info(f"Starting quality filtering for animal: {animal}")
 

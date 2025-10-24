@@ -1,6 +1,6 @@
-# PythonEEG
+# Neurodent
 
-Python package to extract features from mouse EEG and generate figures.
+`neurodent` is a Python package for standardizing rodent EEG analysis and figure generation. Various EEG formats are loadable and features are extracted in parallel. It also includes a Snakemake workflow for automated analysis.
 
 ## Usage
 

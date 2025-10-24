@@ -59,17 +59,17 @@ jobs:
         
     - name: Test package import
       run: |
-        python -c "import pythoneeg; print('Package imports successfully')"
+        python -c "import neurodent; print('Package imports successfully')"
         
     - name: Run tests with coverage (Windows, no parallel)
       if: runner.os == 'Windows'
       run: |
-        python -m pytest tests/ --cov=pythoneeg --cov-report=xml --cov-report=term-missing -v -n 1 --dist no
+        python -m pytest tests/ --cov=neurodent --cov-report=xml --cov-report=term-missing -v -n 1 --dist no
 
     - name: Run tests with coverage
       if: runner.os != 'Windows'
       run: |
-        python -m pytest tests/ --cov=pythoneeg --cov-report=xml --cov-report=term-missing -v
+        python -m pytest tests/ --cov=neurodent --cov-report=xml --cov-report=term-missing -v
         
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v5

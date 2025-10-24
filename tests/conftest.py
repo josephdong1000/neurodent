@@ -1,6 +1,7 @@
 """
-Pytest configuration and common fixtures for PythonEEG tests.
+Pytest configuration and common fixtures for Neurodent tests.
 """
+
 import tempfile
 from pathlib import Path
 from typing import Generator
@@ -10,7 +11,7 @@ import pandas as pd
 import pytest
 from unittest.mock import Mock
 
-from pythoneeg import constants
+from neurodent import constants
 
 
 @pytest.fixture(scope="session")
@@ -27,17 +28,17 @@ def sample_eeg_data() -> np.ndarray:
     duration = 10  # seconds
     fs = constants.GLOBAL_SAMPLING_RATE
     t = np.linspace(0, duration, duration * fs, endpoint=False)
-    
+
     # Create realistic EEG signal with multiple frequency components
     signal = (
-        50 * np.sin(2 * np.pi * 2 * t) +      # Delta (2 Hz)
-        30 * np.sin(2 * np.pi * 6 * t) +      # Theta (6 Hz)
-        20 * np.sin(2 * np.pi * 10 * t) +     # Alpha (10 Hz)
-        15 * np.sin(2 * np.pi * 20 * t) +     # Beta (20 Hz)
-        10 * np.sin(2 * np.pi * 30 * t) +     # Gamma (30 Hz)
-        5 * np.random.randn(len(t))           # Noise
+        50 * np.sin(2 * np.pi * 2 * t)  # Delta (2 Hz)
+        + 30 * np.sin(2 * np.pi * 6 * t)  # Theta (6 Hz)
+        + 20 * np.sin(2 * np.pi * 10 * t)  # Alpha (10 Hz)
+        + 15 * np.sin(2 * np.pi * 20 * t)  # Beta (20 Hz)
+        + 10 * np.sin(2 * np.pi * 30 * t)  # Gamma (30 Hz)
+        + 5 * np.random.randn(len(t))  # Noise
     )
-    
+
     return signal.astype(constants.GLOBAL_DTYPE)
 
 
@@ -49,19 +50,19 @@ def sample_multi_channel_eeg_data() -> np.ndarray:
     fs = constants.GLOBAL_SAMPLING_RATE
     n_channels = 8
     t = np.linspace(0, duration, duration * fs, endpoint=False)
-    
+
     data = np.zeros((n_channels, len(t)))
-    
+
     for ch in range(n_channels):
         # Different frequency components for each channel
         freq_base = 2 + ch * 2  # Different base frequency per channel
         data[ch] = (
-            50 * np.sin(2 * np.pi * freq_base * t) +
-            30 * np.sin(2 * np.pi * (freq_base + 4) * t) +
-            20 * np.sin(2 * np.pi * (freq_base + 8) * t) +
-            10 * np.random.randn(len(t))
+            50 * np.sin(2 * np.pi * freq_base * t)
+            + 30 * np.sin(2 * np.pi * (freq_base + 4) * t)
+            + 20 * np.sin(2 * np.pi * (freq_base + 8) * t)
+            + 10 * np.random.randn(len(t))
         )
-    
+
     return data.astype(constants.GLOBAL_DTYPE)
 
 
@@ -83,7 +84,7 @@ def sample_metadata() -> dict:
 def sample_dataframe() -> pd.DataFrame:
     """Sample DataFrame for testing analysis functions."""
     np.random.seed(42)
-    
+
     data = {
         "animal": ["A10", "A10", "A11", "A11"] * 3,
         "genotype": ["WT", "WT", "KO", "KO"] * 3,
@@ -94,7 +95,7 @@ def sample_dataframe() -> pd.DataFrame:
         "cohere": np.random.randn(12) * 0.1 + 0.5,
         "isday": [True, False] * 6,
     }
-    
+
     return pd.DataFrame(data)
 
 
@@ -105,11 +106,11 @@ def mock_spikeinterface():
     mock_recording.get_num_channels.return_value = 8
     mock_recording.get_sampling_frequency.return_value = constants.GLOBAL_SAMPLING_RATE
     mock_recording.get_num_samples.return_value = 10000
-    
+
     mock_sorting = Mock()
     mock_sorting.get_unit_ids.return_value = [1, 2, 3]
     mock_sorting.get_unit_spike_train.return_value = np.array([100, 200, 300, 400, 500])
-    
+
     return {
         "recording": mock_recording,
         "sorting": mock_sorting,
@@ -129,10 +130,7 @@ def real_spikeinterface_recording():
 
         # Generate synthetic data
         recording = si.generate_recording(
-            num_channels=n_channels,
-            sampling_frequency=sampling_frequency,
-            durations=[duration],
-            seed=42
+            num_channels=n_channels, sampling_frequency=sampling_frequency, durations=[duration], seed=42
         )
 
         return recording
@@ -150,7 +148,7 @@ def mock_mne():
     mock_raw.info["sfreq"] = constants.GLOBAL_SAMPLING_RATE
     mock_raw.info["nchan"] = 8
     mock_raw.n_times = 10000
-    
+
     return {
         "raw": mock_raw,
     }
@@ -195,6 +193,7 @@ def test_file_paths(temp_dir) -> dict:
 # Follows pytest best practices for organizing mocks in a central location.
 # ============================================================================
 
+
 @pytest.fixture
 def mock_long_recording_organizer():
     """
@@ -215,6 +214,7 @@ def mock_long_recording_organizer():
     Returns:
         Callable that returns configured Mock objects
     """
+
     def _create_mock_lro(
         channel_names=None,
         lof_scores=None,
@@ -222,12 +222,12 @@ def mock_long_recording_organizer():
         sampling_rate=1000.0,
         n_channels=None,
         file_end_datetimes=None,
-        meta_dict=None
+        meta_dict=None,
     ):
         """Create a mock LongRecordingOrganizer with specified parameters."""
         from datetime import datetime
 
-        channel_names = channel_names or ['ch1', 'ch2']
+        channel_names = channel_names or ["ch1", "ch2"]
         n_channels = n_channels or len(channel_names)
 
         mock_lro = Mock()
@@ -287,13 +287,7 @@ def create_test_directory_structure():
 
     created_temps = []
 
-    def _create_structure(
-        mode="concat",
-        animal_id="A123",
-        genotype="WT",
-        include_files=True,
-        base_path=None
-    ):
+    def _create_structure(mode="concat", animal_id="A123", genotype="WT", include_files=True, base_path=None):
         """
         Create a test directory structure.
 
@@ -364,4 +358,4 @@ def create_test_directory_structure():
 
     # Cleanup
     for temp_dir in created_temps:
-        shutil.rmtree(temp_dir, ignore_errors=True) 
+        shutil.rmtree(temp_dir, ignore_errors=True)

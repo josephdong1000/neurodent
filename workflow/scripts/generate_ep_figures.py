@@ -26,9 +26,7 @@ import seaborn.objects as so
 from okabeito import black, blue, green, lightblue, orange, purple, red, yellow
 from seaborn import axes_style
 
-# Add pythoneeg to path
-sys.path.insert(0, str(Path("pythoneeg").resolve()))
-from pythoneeg import visualization, constants
+from neurodent import visualization, constants
 
 
 def process_feature_dataframe(df, feature):

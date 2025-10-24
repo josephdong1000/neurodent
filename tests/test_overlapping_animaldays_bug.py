@@ -15,8 +15,8 @@ from pathlib import Path
 import tempfile
 from datetime import datetime, timedelta
 
-from pythoneeg.visualization import results
-from pythoneeg import core
+from neurodent.visualization import results
+from neurodent import core
 
 
 class TestOverlappingAnimaldaysBug:
@@ -70,7 +70,7 @@ class TestOverlappingAnimaldaysBug:
             for i, (scores, median_time) in enumerate(zip(expected_lof_scores, expected_median_times)):
                 mock_lro = Mock()
                 mock_lro.lof_scores = scores
-                mock_lro.channel_names = ['LMot', 'RMot', 'LAud']
+                mock_lro.channel_names = ["LMot", "RMot", "LAud"]
                 mock_lro.meta = {}
 
                 # Mock the LongRecording with median time data
@@ -87,20 +87,21 @@ class TestOverlappingAnimaldaysBug:
                 mock_lros.append(mock_lro)
 
             # Patch glob.glob to return our test folders
-            with patch('glob.glob') as mock_glob:
+            with patch("glob.glob") as mock_glob:
                 mock_glob.return_value = [str(folder1), str(folder2), str(folder3)]
 
                 # Patch LongRecordingOrganizer creation - will be called multiple times for sorting + final creation
-                with patch.object(core, 'LongRecordingOrganizer') as mock_lro_class:
+                with patch.object(core, "LongRecordingOrganizer") as mock_lro_class:
                     # Return different mocks each time, cycling through our prepared LROs
                     call_count = 0
+
                     def mock_lro_side_effect(*args, **kwargs):
                         nonlocal call_count
                         # Map folder paths to their corresponding mock LROs
                         folder_path = str(args[0])
-                        if 'WT_A10_2023-01-15(2)' in folder_path:
+                        if "WT_A10_2023-01-15(2)" in folder_path:
                             return mock_lros[2]  # Highest median time (150.0)
-                        elif 'WT_A10_2023-01-15(1)' in folder_path:
+                        elif "WT_A10_2023-01-15(1)" in folder_path:
                             return mock_lros[1]  # Lowest median time (50.0)
                         else:  # WT_A10_2023-01-15
                             return mock_lros[0]  # Middle median time (100.0)
@@ -108,20 +109,12 @@ class TestOverlappingAnimaldaysBug:
                     mock_lro_class.side_effect = mock_lro_side_effect
 
                     # Create AnimalOrganizer - this should trigger the bug
-                    ao = results.AnimalOrganizer(
-                        anim_id="A10",
-                        base_folder_path=temp_path,
-                        mode="base"
-                    )
+                    ao = results.AnimalOrganizer(anim_id="A10", base_folder_path=temp_path, mode="base")
 
                     # Verify that all folders parse to same animalday
                     parsed_animaldays = []
                     for folder in [folder1, folder2, folder3]:
-                        parsed = core.parse_path_to_animalday(
-                            folder,
-                            animal_param=["A10"],
-                            mode="base"
-                        )
+                        parsed = core.parse_path_to_animalday(folder, animal_param=["A10"], mode="base")
                         parsed_animaldays.append(parsed["animalday"])
 
                     # All should parse to same animalday (parentheses removed)
@@ -130,11 +123,14 @@ class TestOverlappingAnimaldaysBug:
 
                     # Create a simple DataFrame to simulate windowed analysis results
                     import pandas as pd
-                    mock_df = pd.DataFrame({
-                        'timestamp': [pd.Timestamp('2023-01-15 10:00:00')] * 3,
-                        'animalday': [expected_animalday] * 3,  # All same animalday
-                        'rms': [1.0, 1.1, 1.2]
-                    })
+
+                    mock_df = pd.DataFrame(
+                        {
+                            "timestamp": [pd.Timestamp("2023-01-15 10:00:00")] * 3,
+                            "animalday": [expected_animalday] * 3,  # All same animalday
+                            "rms": [1.0, 1.1, 1.2],
+                        }
+                    )
 
                     # Create WindowAnalysisResult directly to test LOF collection bug
                     # This simulates what happens in compute_windowed_analysis
@@ -142,8 +138,8 @@ class TestOverlappingAnimaldaysBug:
                         result=mock_df,
                         animal_id="A10",
                         genotype="WT",
-                        channel_names=['LMot', 'RMot', 'LAud'],
-                        lof_scores_dict={}  # Empty initially
+                        channel_names=["LMot", "RMot", "LAud"],
+                        lof_scores_dict={},  # Empty initially
                     )
 
                     # Manually trigger the LOF collection that happens in compute_windowed_analysis
@@ -167,11 +163,13 @@ class TestOverlappingAnimaldaysBug:
 
                     # After fix: We expect 1 LRO per unique animalday (not per folder)
                     assert len(ao.long_recordings) == 1, f"Expected 1 merged LRO, got {len(ao.long_recordings)}"
-                    assert len(war.lof_scores_dict) == 1, f"Expected 1 LOF entry (no collision), got {len(war.lof_scores_dict)}"
+                    assert len(war.lof_scores_dict) == 1, (
+                        f"Expected 1 LOF entry (no collision), got {len(war.lof_scores_dict)}"
+                    )
 
                     # The LOF scores should be computed on concatenated data from all 3 folders
                     # This is more comprehensive than any single folder's LOF scores
-                    surviving_scores = war.lof_scores_dict[expected_animalday]['lof_scores']
+                    surviving_scores = war.lof_scores_dict[expected_animalday]["lof_scores"]
 
                     # Verify the LOF scores are valid (should be different from individual folder scores)
                     # The concatenated data should produce different LOF scores than any single folder
@@ -179,8 +177,10 @@ class TestOverlappingAnimaldaysBug:
 
                     # Success: No data loss, single LRO handles all folders
                     folder_count = 3  # We created 3 test folders
-                    print(f"SUCCESS: Fix implemented correctly. "
-                          f"Merged {folder_count} overlapping folders into 1 LRO with 1 comprehensive LOF analysis.")
+                    print(
+                        f"SUCCESS: Fix implemented correctly. "
+                        f"Merged {folder_count} overlapping folders into 1 LRO with 1 comprehensive LOF analysis."
+                    )
 
                     # Verify temporal ordering: folders should be processed in median time order (50.0, 100.0, 150.0)
                     # This means folder2 (50.0), folder1 (100.0), folder3 (150.0)
@@ -213,18 +213,19 @@ class TestOverlappingAnimaldaysBug:
 
             # Set up timing for each mock LRO using file_end_datetimes
             from datetime import datetime, timedelta
+
             base_time = datetime(2023, 1, 15, 10, 0, 0)  # Base time: 10:00 AM
 
             # folder_a should have middle time (around 12:00 PM)
             mock_lro_a.file_end_datetimes = [
-                base_time + timedelta(hours=2, minutes=0),   # 12:00 PM
+                base_time + timedelta(hours=2, minutes=0),  # 12:00 PM
                 base_time + timedelta(hours=2, minutes=30),  # 12:30 PM
-                base_time + timedelta(hours=3, minutes=0),   # 1:00 PM
+                base_time + timedelta(hours=3, minutes=0),  # 1:00 PM
             ]
 
             # folder_b should have earliest time (around 10:30 AM)
             mock_lro_b.file_end_datetimes = [
-                base_time + timedelta(minutes=0),   # 10:00 AM
+                base_time + timedelta(minutes=0),  # 10:00 AM
                 base_time + timedelta(minutes=30),  # 10:30 AM
                 base_time + timedelta(minutes=60),  # 11:00 AM
             ]
@@ -232,13 +233,13 @@ class TestOverlappingAnimaldaysBug:
             # folder_c should have latest time (around 2:00 PM)
             mock_lro_c.file_end_datetimes = [
                 base_time + timedelta(hours=3, minutes=30),  # 1:30 PM
-                base_time + timedelta(hours=4, minutes=0),   # 2:00 PM
+                base_time + timedelta(hours=4, minutes=0),  # 2:00 PM
                 base_time + timedelta(hours=4, minutes=30),  # 2:30 PM
             ]
 
             # Set up other attributes for each mock LRO
             for mock_lro in [mock_lro_a, mock_lro_b, mock_lro_c]:
-                mock_lro.channel_names = ['LMot', 'RMot', 'LAud']
+                mock_lro.channel_names = ["LMot", "RMot", "LAud"]
                 mock_lro.meta = Mock()
                 mock_lro.lof_scores = np.array([1.0, 1.0, 1.0])
 
@@ -248,18 +249,19 @@ class TestOverlappingAnimaldaysBug:
                 mock_lro.LongRecording = mock_recording
 
             # Patch glob to return folders
-            with patch('glob.glob') as mock_glob:
+            with patch("glob.glob") as mock_glob:
                 mock_glob.return_value = [str(folder_a), str(folder_b), str(folder_c)]
 
                 # Patch LongRecordingOrganizer to return specific mocks
-                with patch.object(core, 'LongRecordingOrganizer') as mock_lro_class:
+                with patch.object(core, "LongRecordingOrganizer") as mock_lro_class:
+
                     def mock_lro_side_effect(*args, **kwargs):
                         folder_path = str(args[0])
-                        if folder_path.endswith('WT_A10_2023-01-15'):
+                        if folder_path.endswith("WT_A10_2023-01-15"):
                             return mock_lro_a  # Middle time (100.0s)
-                        elif folder_path.endswith('WT_A10_2023-01-15(1)'):
+                        elif folder_path.endswith("WT_A10_2023-01-15(1)"):
                             return mock_lro_b  # Earliest time (50.0s)
-                        elif folder_path.endswith('WT_A10_2023-01-15(2)'):
+                        elif folder_path.endswith("WT_A10_2023-01-15(2)"):
                             return mock_lro_c  # Latest time (150.0s)
                         return Mock()
 
@@ -267,6 +269,7 @@ class TestOverlappingAnimaldaysBug:
 
                     # Add mock merge method to track merging
                     merge_call_count = 0
+
                     def mock_merge(other_lro):
                         nonlocal merge_call_count
                         merge_call_count += 1
@@ -277,11 +280,7 @@ class TestOverlappingAnimaldaysBug:
                     mock_lro_c.merge = mock_merge
 
                     # Create AnimalOrganizer which should trigger temporal sorting and merging
-                    ao = results.AnimalOrganizer(
-                        anim_id="A10",
-                        base_folder_path=temp_path,
-                        mode="base"
-                    )
+                    ao = results.AnimalOrganizer(anim_id="A10", base_folder_path=temp_path, mode="base")
 
                     # Verify that we have one merged LRO (overlapping folders)
                     assert len(ao.long_recordings) == 1
@@ -312,53 +311,49 @@ class TestOverlappingAnimaldaysBug:
                 (folder / "dummy_Meta_001.json").touch()
 
             # Mock glob to return test folders
-            with patch('glob.glob') as mock_glob:
+            with patch("glob.glob") as mock_glob:
                 mock_glob.return_value = [str(folder1), str(folder2), str(folder3)]
 
                 # Mock LRO creation to avoid file processing
-                with patch.object(core, 'LongRecordingOrganizer') as mock_lro_class:
+                with patch.object(core, "LongRecordingOrganizer") as mock_lro_class:
                     # Create separate mock LROs for each folder
                     mock_lro1 = Mock()
-                    mock_lro1.channel_names = ['LMot', 'RMot', 'LAud']
+                    mock_lro1.channel_names = ["LMot", "RMot", "LAud"]
                     mock_lro1.meta = Mock()
                     mock_lro1.file_end_datetimes = [datetime(2023, 1, 15, 10, 0, 0)]
                     mock_lro1.LongRecording = Mock()
 
                     mock_lro2 = Mock()
-                    mock_lro2.channel_names = ['LMot', 'RMot', 'LAud']
+                    mock_lro2.channel_names = ["LMot", "RMot", "LAud"]
                     mock_lro2.meta = Mock()
                     mock_lro2.file_end_datetimes = [datetime(2023, 1, 15, 11, 0, 0)]
                     mock_lro2.LongRecording = Mock()
 
                     mock_lro3 = Mock()
-                    mock_lro3.channel_names = ['LMot', 'RMot', 'LAud']
+                    mock_lro3.channel_names = ["LMot", "RMot", "LAud"]
                     mock_lro3.meta = Mock()
                     mock_lro3.file_end_datetimes = [datetime(2023, 1, 16, 10, 0, 0)]
                     mock_lro3.LongRecording = Mock()
 
                     def mock_lro_side_effect(*args, **kwargs):
                         folder_path = str(args[0])
-                        if 'WT_A10_2023-01-15(1)' in folder_path:
+                        if "WT_A10_2023-01-15(1)" in folder_path:
                             return mock_lro2
-                        elif 'WT_A10_2023-01-16' in folder_path:
+                        elif "WT_A10_2023-01-16" in folder_path:
                             return mock_lro3
                         else:  # WT_A10_2023-01-15
                             return mock_lro1
 
                     mock_lro_class.side_effect = mock_lro_side_effect
 
-                    ao = results.AnimalOrganizer(
-                        anim_id="A10",
-                        base_folder_path=temp_path,
-                        mode="base"
-                    )
+                    ao = results.AnimalOrganizer(anim_id="A10", base_folder_path=temp_path, mode="base")
 
                     # Should have 2 unique animaldays, not 3 folders
                     assert len(ao.animaldays) == 2
                     assert len(ao.long_recordings) == 2
 
                     # Check folder grouping
-                    assert hasattr(ao, '_animalday_folder_groups')
+                    assert hasattr(ao, "_animalday_folder_groups")
                     assert len(ao._animalday_folder_groups) == 2
 
                     # One animalday should have 2 folders (overlapping)
@@ -379,10 +374,12 @@ class TestOverlappingAnimaldaysBug:
                 folder.mkdir(parents=True)
 
             # Mock LRO creation and setup - patch the entire mode processing
-            with patch.object(core.LongRecordingOrganizer, 'convert_colbins_rowbins_to_rec'):
-                with patch.object(core.LongRecordingOrganizer, 'prepare_colbins_rowbins_metas'):
+            with patch.object(core.LongRecordingOrganizer, "convert_colbins_rowbins_to_rec"):
+                with patch.object(core.LongRecordingOrganizer, "prepare_colbins_rowbins_metas"):
                     # Create two mock LROs
-                    lro1 = core.LongRecordingOrganizer(base_folder_path=folder1, mode=None)  # Use None to skip processing
+                    lro1 = core.LongRecordingOrganizer(
+                        base_folder_path=folder1, mode=None
+                    )  # Use None to skip processing
                     lro2 = core.LongRecordingOrganizer(base_folder_path=folder2, mode=None)
 
                 # Mock the recordings and metadata
@@ -392,13 +389,13 @@ class TestOverlappingAnimaldaysBug:
 
                 lro1.LongRecording = mock_recording1
                 lro2.LongRecording = mock_recording2
-                lro1.channel_names = ['LMot', 'RMot', 'LAud']
-                lro2.channel_names = ['LMot', 'RMot', 'LAud']
+                lro1.channel_names = ["LMot", "RMot", "LAud"]
+                lro2.channel_names = ["LMot", "RMot", "LAud"]
                 lro1.meta = Mock(f_s=1000, n_channels=3)
                 lro2.meta = Mock(f_s=1000, n_channels=3)
 
                 # Mock si.concatenate_recordings at the module level
-                with patch('pythoneeg.core.core.si.concatenate_recordings') as mock_concat:
+                with patch("neurodent.core.core.si.concatenate_recordings") as mock_concat:
                     mock_concat.return_value = mock_merged_recording
 
                     # Test merge functionality
@@ -485,12 +482,12 @@ class TestAnimalOrganizerDirectoryFiltering:
     def _create_mock_lro(self):
         """Create a mock LongRecordingOrganizer for testing."""
         mock_lro = Mock()
-        mock_lro.channel_names = ['ch1', 'ch2']
+        mock_lro.channel_names = ["ch1", "ch2"]
         mock_lro.LongRecording = Mock()
         mock_lro.LongRecording.get_duration.return_value = 100.0
         return mock_lro
 
-    @patch('pythoneeg.visualization.results.core.LongRecordingOrganizer')
+    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
     def test_concat_mode_filters_files(self, mock_lro):
         """Test that concat mode filters out files and only processes directories."""
         # Create mixed structure
@@ -500,11 +497,7 @@ class TestAnimalOrganizerDirectoryFiltering:
         mock_lro.return_value = self._create_mock_lro()
 
         # Create AnimalOrganizer
-        ao = results.AnimalOrganizer(
-            base_folder_path=str(self.base_path),
-            anim_id=self.animal_id,
-            mode="concat"
-        )
+        ao = results.AnimalOrganizer(base_folder_path=str(self.base_path), anim_id=self.animal_id, mode="concat")
 
         # Verify only directories were found
         assert len(ao._bin_folders) == 2  # 2 directories created
@@ -518,7 +511,7 @@ class TestAnimalOrganizerDirectoryFiltering:
             folder_path = call[0][0]  # First positional argument
             assert Path(folder_path).is_dir()
 
-    @patch('pythoneeg.visualization.results.core.LongRecordingOrganizer')
+    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
     def test_nest_mode_filters_files(self, mock_lro):
         """Test that nest mode filters out files and only processes directories."""
         # Create mixed structure
@@ -528,18 +521,14 @@ class TestAnimalOrganizerDirectoryFiltering:
         mock_lro.return_value = self._create_mock_lro()
 
         # Create AnimalOrganizer
-        ao = results.AnimalOrganizer(
-            base_folder_path=str(self.base_path),
-            anim_id=self.animal_id,
-            mode="nest"
-        )
+        ao = results.AnimalOrganizer(base_folder_path=str(self.base_path), anim_id=self.animal_id, mode="nest")
 
         # Verify only directories were found
         assert len(ao._bin_folders) == 2  # 2 directories created
         for folder_path in ao._bin_folders:
             assert Path(folder_path).is_dir()
 
-    @patch('pythoneeg.visualization.results.core.LongRecordingOrganizer')
+    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
     def test_noday_mode_filters_files(self, mock_lro):
         """Test that noday mode filters out files and only processes directories."""
         # Create structure with only one directory for noday mode
@@ -556,11 +545,7 @@ class TestAnimalOrganizerDirectoryFiltering:
         mock_lro.return_value = self._create_mock_lro()
 
         # Create AnimalOrganizer
-        ao = results.AnimalOrganizer(
-            base_folder_path=str(self.base_path),
-            anim_id=self.animal_id,
-            mode="noday"
-        )
+        ao = results.AnimalOrganizer(base_folder_path=str(self.base_path), anim_id=self.animal_id, mode="noday")
 
         # Verify only one directory was found
         assert len(ao._bin_folders) == 1
@@ -576,17 +561,13 @@ class TestAnimalOrganizerDirectoryFiltering:
 
         # Should raise ValueError when no directories found
         with pytest.raises(ValueError) as exc_info:
-            results.AnimalOrganizer(
-                base_folder_path=str(self.base_path),
-                anim_id=self.animal_id,
-                mode="concat"
-            )
+            results.AnimalOrganizer(base_folder_path=str(self.base_path), anim_id=self.animal_id, mode="concat")
 
         error_message = str(exc_info.value)
         assert "No directories found" in error_message
         assert self.animal_id in error_message
 
-    @patch('pythoneeg.core.LongRecordingOrganizer')
+    @patch("neurodent.core.LongRecordingOrganizer")
     def test_noday_mode_multiple_directories_error(self, mock_lro):
         """Test that noday mode raises error when multiple directories are found."""
         # Create multiple directories
@@ -597,16 +578,12 @@ class TestAnimalOrganizerDirectoryFiltering:
 
         # Should raise ValueError for multiple directories in noday mode
         with pytest.raises(ValueError) as exc_info:
-            results.AnimalOrganizer(
-                base_folder_path=str(self.base_path),
-                anim_id=self.animal_id,
-                mode="noday"
-            )
+            results.AnimalOrganizer(base_folder_path=str(self.base_path), anim_id=self.animal_id, mode="noday")
 
         error_message = str(exc_info.value)
         assert "not unique" in error_message
 
-    @patch('pythoneeg.visualization.results.core.LongRecordingOrganizer')
+    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
     def test_base_mode_directory_handling(self, mock_lro):
         """Test that base mode correctly handles the base directory."""
         # For base mode, create a properly named base directory with date
@@ -623,18 +600,14 @@ class TestAnimalOrganizerDirectoryFiltering:
         mock_lro.return_value = self._create_mock_lro()
 
         # Create AnimalOrganizer in base mode using the properly named directory
-        ao = results.AnimalOrganizer(
-            base_folder_path=str(base_dir),
-            anim_id=self.animal_id,
-            mode="base"
-        )
+        ao = results.AnimalOrganizer(base_folder_path=str(base_dir), anim_id=self.animal_id, mode="base")
 
         # In base mode, should use the base directory itself
         assert len(ao._bin_folders) == 1
         assert ao._bin_folders[0] == str(base_dir)
 
-    @patch('logging.info')
-    @patch('pythoneeg.visualization.results.core.LongRecordingOrganizer')
+    @patch("logging.info")
+    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
     def test_logging_filtering_information(self, mock_lro, mock_logging):
         """Test that filtering information is logged when files are filtered out."""
         # Create mixed structure
@@ -644,11 +617,7 @@ class TestAnimalOrganizerDirectoryFiltering:
         mock_lro.return_value = self._create_mock_lro()
 
         # Create AnimalOrganizer
-        _ = results.AnimalOrganizer(
-            base_folder_path=str(self.base_path),
-            anim_id=self.animal_id,
-            mode="concat"
-        )
+        _ = results.AnimalOrganizer(base_folder_path=str(self.base_path), anim_id=self.animal_id, mode="concat")
 
         # Check that filtering information was logged
         logged_messages = [call[0][0] for call in mock_logging.call_args_list]

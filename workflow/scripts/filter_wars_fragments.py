@@ -14,9 +14,7 @@ import logging
 import sys
 from pathlib import Path
 
-# Add pythoneeg to path
-sys.path.insert(0, str(Path("pythoneeg").resolve()))
-from pythoneeg import visualization
+from neurodent import visualization
 
 
 def main():

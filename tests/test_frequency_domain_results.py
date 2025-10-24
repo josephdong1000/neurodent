@@ -1,6 +1,7 @@
 """
-Unit tests for pythoneeg.visualization.frequency_domain_results module.
+Unit tests for neurodent.visualization.frequency_domain_results module.
 """
+
 import json
 import tempfile
 from pathlib import Path
@@ -11,6 +12,7 @@ import warnings
 
 try:
     import spikeinterface.core as si
+
     SPIKEINTERFACE_AVAILABLE = True
 except ImportError:
     si = None
@@ -18,8 +20,8 @@ except ImportError:
 
 import mne
 
-from pythoneeg.visualization.frequency_domain_results import FrequencyDomainSpikeAnalysisResult
-from pythoneeg import core
+from neurodent.visualization.frequency_domain_results import FrequencyDomainSpikeAnalysisResult
+from neurodent import core
 
 
 @pytest.mark.skipif(not SPIKEINTERFACE_AVAILABLE, reason="SpikeInterface not available")
@@ -31,9 +33,9 @@ class TestFrequencyDomainSpikeAnalysisResult:
         """Sample spike indices for testing."""
         return [
             np.array([500, 1500, 3000]),  # ch0
-            np.array([800, 2200]),        # ch1
-            np.array([1000]),             # ch2
-            np.array([])                  # ch3 (no spikes)
+            np.array([800, 2200]),  # ch1
+            np.array([1000]),  # ch2
+            np.array([]),  # ch3 (no spikes)
         ]
 
     @pytest.fixture
@@ -44,11 +46,7 @@ class TestFrequencyDomainSpikeAnalysisResult:
         duration = 5.0
         n_samples = int(duration * fs)
 
-        info = mne.create_info(
-            ch_names=[f'ch{i}' for i in range(n_channels)],
-            sfreq=fs,
-            ch_types='eeg'
-        )
+        info = mne.create_info(ch_names=[f"ch{i}" for i in range(n_channels)], sfreq=fs, ch_types="eeg")
         data = np.random.randn(n_channels, n_samples) * 0.1
         raw = mne.io.RawArray(data, info)
 
@@ -59,14 +57,10 @@ class TestFrequencyDomainSpikeAnalysisResult:
         for ch_idx, spike_indices in enumerate(sample_spike_indices):
             for spike_idx in spike_indices:
                 onsets.append(spike_idx / fs)
-                descriptions.append(f'Spike_Ch{ch_idx}')
+                descriptions.append(f"Spike_Ch{ch_idx}")
 
         if onsets:
-            annotations = mne.Annotations(
-                onset=onsets,
-                duration=[0.0] * len(onsets),
-                description=descriptions
-            )
+            annotations = mne.Annotations(onset=onsets, duration=[0.0] * len(onsets), description=descriptions)
             raw.set_annotations(annotations)
 
         return raw
@@ -75,21 +69,21 @@ class TestFrequencyDomainSpikeAnalysisResult:
     def detection_params(self):
         """Sample detection parameters."""
         return {
-            'bp': (3.0, 40.0),
-            'notch': (59.0, 61.0),
-            'freq_slices': (10.0, 20.0),
-            'sneo_percentile': 99.9,
-            'cluster_gap_ms': 80.0,
+            "bp": (3.0, 40.0),
+            "notch": (59.0, 61.0),
+            "freq_slices": (10.0, 20.0),
+            "sneo_percentile": 99.9,
+            "cluster_gap_ms": 80.0,
         }
 
     @pytest.fixture
     def mock_sorting_analyzer(self):
         """Create mock SortingAnalyzer for testing."""
         mock_sa = MagicMock()
-        mock_sa.sorting.get_unit_ids.return_value = ['0']
+        mock_sa.sorting.get_unit_ids.return_value = ["0"]
         mock_sa.sorting.get_sampling_frequency.return_value = 1000.0
         mock_sa.sorting.get_unit_spike_train.return_value = np.array([500, 1500, 3000])
-        mock_sa.recording.get_channel_ids.return_value = ['ch0']
+        mock_sa.recording.get_channel_ids.return_value = ["ch0"]
         return mock_sa
 
     def test_init_with_result_sas(self, mock_sorting_analyzer, detection_params):
@@ -101,7 +95,7 @@ class TestFrequencyDomainSpikeAnalysisResult:
             detection_params=detection_params,
             animal_id="test_animal",
             genotype="WT",
-            channel_names=["ch0"]
+            channel_names=["ch0"],
         )
 
         assert fdsar.result_sas == result_sas
@@ -117,7 +111,7 @@ class TestFrequencyDomainSpikeAnalysisResult:
             detection_params=detection_params,
             animal_id="test_animal",
             genotype="WT",
-            channel_names=sample_mne_raw.ch_names
+            channel_names=sample_mne_raw.ch_names,
         )
 
         assert fdsar.result_sas is None
@@ -128,16 +122,13 @@ class TestFrequencyDomainSpikeAnalysisResult:
         """Test that providing both or neither result types raises error."""
         # Both provided
         with pytest.raises(ValueError, match="Exactly one of result_sas or result_mne must be provided"):
-            FrequencyDomainSpikeAnalysisResult(
-                result_sas=[mock_sorting_analyzer],
-                result_mne=sample_mne_raw
-            )
+            FrequencyDomainSpikeAnalysisResult(result_sas=[mock_sorting_analyzer], result_mne=sample_mne_raw)
 
         # Neither provided
         with pytest.raises(ValueError, match="Exactly one of result_sas or result_mne must be provided"):
             FrequencyDomainSpikeAnalysisResult()
 
-    @patch.object(FrequencyDomainSpikeAnalysisResult, '_convert_to_spikeinterface')
+    @patch.object(FrequencyDomainSpikeAnalysisResult, "_convert_to_spikeinterface")
     def test_from_detection_results(self, mock_convert, sample_spike_indices, sample_mne_raw, detection_params):
         """Test creation from raw detection results."""
         mock_convert.return_value = [MagicMock()]
@@ -147,7 +138,7 @@ class TestFrequencyDomainSpikeAnalysisResult:
             mne_raw_with_annotations=sample_mne_raw,
             detection_params=detection_params,
             animal_id="test_animal",
-            genotype="WT"
+            genotype="WT",
         )
 
         mock_convert.assert_called_once()
@@ -168,8 +159,8 @@ class TestFrequencyDomainSpikeAnalysisResult:
 
         # Check each channel
         for ch_idx, sa in enumerate(result_sas):
-            assert hasattr(sa, 'sorting')
-            assert hasattr(sa, 'recording')
+            assert hasattr(sa, "sorting")
+            assert hasattr(sa, "recording")
 
             # Check units
             unit_ids = sa.sorting.get_unit_ids()
@@ -186,7 +177,7 @@ class TestFrequencyDomainSpikeAnalysisResult:
             result_mne=sample_mne_raw,
             spike_indices=sample_spike_indices,
             detection_params=detection_params,
-            channel_names=sample_mne_raw.ch_names
+            channel_names=sample_mne_raw.ch_names,
         )
 
         counts = fdsar.get_spike_counts_per_channel()
@@ -200,7 +191,7 @@ class TestFrequencyDomainSpikeAnalysisResult:
             result_mne=sample_mne_raw,
             spike_indices=None,  # No direct spike indices
             detection_params=detection_params,
-            channel_names=sample_mne_raw.ch_names
+            channel_names=sample_mne_raw.ch_names,
         )
 
         counts = fdsar.get_spike_counts_per_channel()
@@ -215,7 +206,7 @@ class TestFrequencyDomainSpikeAnalysisResult:
             result_mne=sample_mne_raw,
             spike_indices=sample_spike_indices,
             detection_params=detection_params,
-            channel_names=sample_mne_raw.ch_names
+            channel_names=sample_mne_raw.ch_names,
         )
 
         total = fdsar.get_total_spike_count()
@@ -236,7 +227,7 @@ class TestFrequencyDomainSpikeAnalysisResult:
                 animal_id="test_animal",
                 genotype="WT",
                 animal_day="day1",
-                channel_names=sample_mne_raw.ch_names
+                channel_names=sample_mne_raw.ch_names,
             )
 
             # Save
@@ -266,20 +257,14 @@ class TestFrequencyDomainSpikeAnalysisResult:
             save_dir = Path(temp_dir)
 
             fdsar = FrequencyDomainSpikeAnalysisResult(
-                result_mne=sample_mne_raw,
-                detection_params=detection_params,
-                channel_names=sample_mne_raw.ch_names
+                result_mne=sample_mne_raw, detection_params=detection_params, channel_names=sample_mne_raw.ch_names
             )
 
             with warnings.catch_warnings():
                 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
                 # Test plotting with saving
-                counts = fdsar.plot_spike_averaged_traces(
-                    save_dir=save_dir,
-                    animal_id="test_animal",
-                    save_epoch=True
-                )
+                counts = fdsar.plot_spike_averaged_traces(save_dir=save_dir, animal_id="test_animal", save_epoch=True)
 
             # Check that counts are returned
             assert isinstance(counts, dict)
@@ -295,13 +280,11 @@ class TestFrequencyDomainSpikeAnalysisResult:
     def test_convert_to_mne(self, mock_sorting_analyzer, detection_params):
         """Test conversion to MNE format."""
         fdsar = FrequencyDomainSpikeAnalysisResult(
-            result_sas=[mock_sorting_analyzer],
-            detection_params=detection_params,
-            channel_names=["ch0"]
+            result_sas=[mock_sorting_analyzer], detection_params=detection_params, channel_names=["ch0"]
         )
 
         # Mock the conversion method
-        with patch('pythoneeg.visualization.results.SpikeAnalysisResult.convert_sas_to_mne') as mock_convert:
+        with patch("neurodent.visualization.results.SpikeAnalysisResult.convert_sas_to_mne") as mock_convert:
             mock_mne = MagicMock()
             mock_convert.return_value = mock_mne
 
@@ -319,7 +302,7 @@ class TestFrequencyDomainSpikeAnalysisResult:
             animal_id="test_animal",
             genotype="WT",
             animal_day="day1",
-            channel_names=sample_mne_raw.ch_names
+            channel_names=sample_mne_raw.ch_names,
         )
 
         str_repr = str(fdsar)
@@ -365,12 +348,11 @@ class TestFrequencyDomainSpikeAnalysisResultUtils:
         fdsar.assume_from_number = False
 
         # Mock the parse function
-        with patch('pythoneeg.core.parse_chname_to_abbrev') as mock_parse:
+        with patch("neurodent.core.parse_chname_to_abbrev") as mock_parse:
             mock_parse.return_value = "parsed"
 
             fdsar.channel_abbrevs = [
-                core.parse_chname_to_abbrev(x, assume_from_number=False)
-                for x in fdsar.channel_names
+                core.parse_chname_to_abbrev(x, assume_from_number=False) for x in fdsar.channel_names
             ]
 
             assert len(fdsar.channel_abbrevs) == 2
