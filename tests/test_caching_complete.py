@@ -514,8 +514,9 @@ class TestMNECachingOptimization:
             
             # Mock MNE export and SpikeInterface read to avoid actual file operations
             with patch('pythoneeg.core.core.mne.export.export_raw') as mock_export, \
-                 patch('pythoneeg.core.core.se.read_edf') as mock_read_edf:
-                
+                 patch('pythoneeg.core.core.se.read_edf') as mock_read_edf, \
+                 patch('pythoneeg.core.core.spre.resample') as mock_resample:
+
                 # Mock the SpikeInterface read_edf to return something reasonable
                 mock_recording = Mock()
                 mock_recording.get_num_channels.return_value = 4
@@ -523,12 +524,15 @@ class TestMNECachingOptimization:
                 mock_recording.get_duration.return_value = 10.0
                 mock_recording.get_channel_ids.return_value = np.array(['ch0', 'ch1', 'ch2', 'ch3'])
                 mock_read_edf.return_value = mock_recording
-                
+
+                # Mock resample to return the same mock_recording (simulating no resampling needed)
+                mock_resample.return_value = mock_recording
+
                 lro = core.LongRecordingOrganizer(
                     base_folder_path=tmpdir_path,
                     mode="mne",
                     extract_func=mock_func,
-                    input_type="file", 
+                    input_type="file",
                     file_pattern="test.edf",
                     intermediate="edf",
                     cache_policy="auto",  # Will create cache since it doesn't exist

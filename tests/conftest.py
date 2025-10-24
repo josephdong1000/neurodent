@@ -1,7 +1,6 @@
 """
 Pytest configuration and common fixtures for PythonEEG tests.
 """
-import os
 import tempfile
 from pathlib import Path
 from typing import Generator
@@ -117,28 +116,27 @@ def mock_spikeinterface():
     }
 
 
-@pytest.fixture(scope="session") 
+@pytest.fixture(scope="session")
 def real_spikeinterface_recording():
     """Create a real SpikeInterface recording for proper integration testing."""
     try:
         import spikeinterface as si
-        import spikeinterface.preprocessing as spre
-        
+
         # Create a minimal synthetic recording
         duration = 2.0  # seconds
         sampling_frequency = constants.GLOBAL_SAMPLING_RATE
         n_channels = 8
-        
+
         # Generate synthetic data
         recording = si.generate_recording(
             num_channels=n_channels,
-            sampling_frequency=sampling_frequency, 
+            sampling_frequency=sampling_frequency,
             durations=[duration],
             seed=42
         )
-        
+
         return recording
-        
+
     except ImportError:
         # Fallback if SpikeInterface not available
         return None
@@ -161,15 +159,7 @@ def mock_mne():
 @pytest.fixture(autouse=True)
 def setup_test_environment():
     """Setup test environment before each test."""
-    # Set temporary directory for tests
-    temp_dir = tempfile.mkdtemp()
-    os.environ["TMPDIR"] = temp_dir
-    
     yield
-    
-    # Cleanup
-    import shutil
-    shutil.rmtree(temp_dir, ignore_errors=True)
 
 
 @pytest.fixture(scope="session")
@@ -183,7 +173,7 @@ def test_file_paths(temp_dir) -> dict:
         "npy": temp_dir / "test_data.npy",
         "csv": temp_dir / "test_data.csv",
     }
-    
+
     # Create some dummy files
     for path in paths.values():
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -193,5 +183,185 @@ def test_file_paths(temp_dir) -> dict:
             pd.DataFrame({"col1": [1, 2, 3], "col2": [4, 5, 6]}).to_csv(path, index=False)
         else:
             path.touch()
-    
-    return paths 
+
+    return paths
+
+
+# ============================================================================
+# MOCK FACTORIES - Reusable Mock Creation Patterns
+# ============================================================================
+# These factory functions reduce duplication across test files by providing
+# standardized mock objects with sensible defaults that can be customized.
+# Follows pytest best practices for organizing mocks in a central location.
+# ============================================================================
+
+@pytest.fixture
+def mock_long_recording_organizer():
+    """
+    Factory fixture for creating LongRecordingOrganizer mocks.
+
+    Returns a callable that creates configured mock LRO instances with
+    customizable parameters. This reduces duplication across tests that
+    need to mock LongRecordingOrganizer behavior.
+
+    Usage:
+        def test_something(mock_long_recording_organizer):
+            mock_lro = mock_long_recording_organizer(
+                channel_names=['LMot', 'RMot'],
+                lof_scores=np.array([1.5, 2.0])
+            )
+            # Use mock_lro in your test...
+
+    Returns:
+        Callable that returns configured Mock objects
+    """
+    def _create_mock_lro(
+        channel_names=None,
+        lof_scores=None,
+        duration=100.0,
+        sampling_rate=1000.0,
+        n_channels=None,
+        file_end_datetimes=None,
+        meta_dict=None
+    ):
+        """Create a mock LongRecordingOrganizer with specified parameters."""
+        from datetime import datetime
+
+        channel_names = channel_names or ['ch1', 'ch2']
+        n_channels = n_channels or len(channel_names)
+
+        mock_lro = Mock()
+        mock_lro.channel_names = channel_names
+        mock_lro.lof_scores = lof_scores if lof_scores is not None else np.array([1.0] * n_channels)
+
+        # Mock the recording object
+        mock_recording = Mock()
+        mock_recording.get_duration.return_value = duration
+        mock_recording.get_num_samples.return_value = int(duration * sampling_rate)
+        mock_recording.get_sampling_frequency.return_value = sampling_rate
+        mock_recording.get_num_channels.return_value = n_channels
+        mock_lro.LongRecording = mock_recording
+
+        # Mock metadata
+        if meta_dict:
+            mock_lro.meta = meta_dict
+        else:
+            mock_lro.meta = Mock(f_s=sampling_rate, n_channels=n_channels)
+
+        # Mock file_end_datetimes
+        if file_end_datetimes:
+            mock_lro.file_end_datetimes = file_end_datetimes
+        else:
+            mock_lro.file_end_datetimes = [datetime(2023, 1, 1, 12, 0, 0)]
+
+        # Mock cleanup method
+        mock_lro.cleanup_rec = Mock()
+
+        return mock_lro
+
+    return _create_mock_lro
+
+
+@pytest.fixture
+def create_test_directory_structure():
+    """
+    Factory fixture for creating test directory structures.
+
+    This reduces duplication in tests that need to create temporary
+    directories with specific layouts (e.g., for AnimalOrganizer tests).
+
+    Usage:
+        def test_something(create_test_directory_structure):
+            base_path, dirs = create_test_directory_structure(
+                mode="concat",
+                animal_id="A123"
+            )
+            # Use the created structure...
+
+    Returns:
+        Callable that creates directory structures and returns paths
+    """
+    import tempfile
+    import shutil
+    from pathlib import Path
+
+    created_temps = []
+
+    def _create_structure(
+        mode="concat",
+        animal_id="A123",
+        genotype="WT",
+        include_files=True,
+        base_path=None
+    ):
+        """
+        Create a test directory structure.
+
+        Args:
+            mode: Directory mode ("concat", "nest", "noday", "base")
+            animal_id: Animal identifier
+            genotype: Animal genotype
+            include_files: Whether to include test files (for filtering tests)
+            base_path: Optional base path (creates temp dir if None)
+
+        Returns:
+            tuple: (base_path, dict with 'directories' and 'files' lists)
+        """
+        if base_path is None:
+            temp_dir = tempfile.mkdtemp()
+            created_temps.append(temp_dir)
+            base_path = Path(temp_dir)
+        else:
+            base_path = Path(base_path)
+
+        result = {"directories": [], "files": []}
+
+        if mode == "nest":
+            # Create animal subfolder structure
+            animal_dir = base_path / f"{genotype}_{animal_id}_data"
+            animal_dir.mkdir(exist_ok=True)
+
+            day1_dir = animal_dir / f"{genotype}_2023-01-01"
+            day2_dir = animal_dir / f"{genotype}_2023-01-02"
+            day1_dir.mkdir(exist_ok=True)
+            day2_dir.mkdir(exist_ok=True)
+            result["directories"].extend([day1_dir, day2_dir])
+
+            if include_files:
+                edf_file = animal_dir / "recording.edf"
+                bin_file = animal_dir / "data.bin"
+                edf_file.touch()
+                bin_file.touch()
+                result["files"].extend([edf_file, bin_file])
+
+        elif mode in ["concat", "noday"]:
+            day1_dir = base_path / f"{genotype}_{animal_id}_2023-01-01"
+            day2_dir = base_path / f"{genotype}_{animal_id}_2023-01-02"
+            day1_dir.mkdir(exist_ok=True)
+
+            if mode == "concat":
+                day2_dir.mkdir(exist_ok=True)
+                result["directories"].extend([day1_dir, day2_dir])
+            else:
+                result["directories"].append(day1_dir)
+
+            if include_files:
+                for ext in ["edf", "bin", "json"]:
+                    f = base_path / f"{genotype}_{animal_id}_recording.{ext}"
+                    f.touch()
+                    result["files"].append(f)
+
+        elif mode == "base":
+            if include_files:
+                for ext in ["edf", "bin"]:
+                    f = base_path / f"recording.{ext}"
+                    f.touch()
+                    result["files"].append(f)
+
+        return base_path, result
+
+    yield _create_structure
+
+    # Cleanup
+    for temp_dir in created_temps:
+        shutil.rmtree(temp_dir, ignore_errors=True) 

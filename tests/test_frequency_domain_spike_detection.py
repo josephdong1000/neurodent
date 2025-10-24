@@ -38,9 +38,9 @@ class TestFrequencyDomainSpikeDetector:
         mock_rec.clone.return_value = mock_rec
         mock_rec.set_channel_ids.return_value = None
 
-        # Mock data
+        # Mock data - transposed to (samples, channels) format as get_traces returns
         np.random.seed(42)
-        mock_data = np.random.randn(4, 10000) * 0.1
+        mock_data = np.random.randn(10000, 4) * 0.1
         mock_rec.get_traces.return_value = mock_data
 
         return mock_rec
@@ -49,10 +49,11 @@ class TestFrequencyDomainSpikeDetector:
     def detection_params(self):
         """Default detection parameters for testing."""
         return {
-            'bp': (3.0, 40.0),
+            'bp': [3.0, 40.0],
             'notch': 60.0,
             'notch_q': 30.0,
-            'freq_slices': (10.0, 20.0),
+            'freq_slices': [10.0, 20.0],
+            'window_s': 0.125,
             'sneo_percentile': 99.0,  # Lower for testing
             'cluster_gap_ms': 80.0,
             'search_ms': 160.0,
@@ -97,7 +98,7 @@ class TestFrequencyDomainSpikeDetector:
             assert key in params, f"Missing required parameter: {key}"
 
         # Test parameter types and ranges
-        assert isinstance(params['bp'], tuple)
+        assert isinstance(params['bp'], list)
         assert len(params['bp']) == 2
         assert params['bp'][0] < params['bp'][1]
 
@@ -228,15 +229,9 @@ class TestFrequencyDomainSpikeDetector:
         assert len(spike_indices) >= 0
 
     @patch('spikeinterface.core.NumpyRecording')
-    @patch('mne.io.RawArray')
-    @patch('mne.create_info')
-    def test_apply_preprocessing(self, mock_create_info, mock_raw_array, mock_numpy_recording, mock_recording, detection_params):
+    def test_apply_preprocessing(self, mock_numpy_recording, mock_recording, detection_params):
         """Test preprocessing application."""
-        # Mock the preprocessing chain
-        mock_info = MagicMock()
-        mock_create_info.return_value = mock_info
-        mock_raw = MagicMock()
-        mock_raw_array.return_value = mock_raw
+        # Mock the SpikeInterface recording
         mock_numpy_recording.return_value = mock_recording
 
         result = FrequencyDomainSpikeDetector._apply_preprocessing(mock_recording, detection_params)
@@ -245,8 +240,8 @@ class TestFrequencyDomainSpikeDetector:
         assert result is not None
         mock_recording.clone.assert_called_once()
         mock_recording.get_traces.assert_called()
-        mock_create_info.assert_called_once()
-        mock_raw_array.assert_called_once()
+        # Verify NumpyRecording was created with filtered data
+        mock_numpy_recording.assert_called_once()
 
     def test_add_spike_annotations(self):
         """Test MNE annotation creation."""

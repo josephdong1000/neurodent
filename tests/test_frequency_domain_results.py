@@ -244,9 +244,9 @@ class TestFrequencyDomainSpikeAnalysisResult:
                 warnings.filterwarnings("ignore", category=RuntimeWarning)
                 fdsar.save_fif_and_json(save_dir)
 
-            # Check files exist
-            assert (save_dir / "test_animal-WT-day1-raw.fif").exists()
-            assert (save_dir / "test_animal-WT-day1.json").exists()
+            # Check files exist (slugify lowercases the filename)
+            assert (save_dir / "test_animal-wt-day1-raw.fif").exists()
+            assert (save_dir / "test_animal-wt-day1.json").exists()
 
             # Load
             with warnings.catch_warnings():

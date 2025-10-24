@@ -317,10 +317,35 @@ class TestOverlappingAnimaldaysBug:
 
                 # Mock LRO creation to avoid file processing
                 with patch.object(core, 'LongRecordingOrganizer') as mock_lro_class:
-                    mock_lro = Mock()
-                    mock_lro.channel_names = ['LMot', 'RMot', 'LAud']
-                    mock_lro.meta = Mock()
-                    mock_lro_class.return_value = mock_lro
+                    # Create separate mock LROs for each folder
+                    mock_lro1 = Mock()
+                    mock_lro1.channel_names = ['LMot', 'RMot', 'LAud']
+                    mock_lro1.meta = Mock()
+                    mock_lro1.file_end_datetimes = [datetime(2023, 1, 15, 10, 0, 0)]
+                    mock_lro1.LongRecording = Mock()
+
+                    mock_lro2 = Mock()
+                    mock_lro2.channel_names = ['LMot', 'RMot', 'LAud']
+                    mock_lro2.meta = Mock()
+                    mock_lro2.file_end_datetimes = [datetime(2023, 1, 15, 11, 0, 0)]
+                    mock_lro2.LongRecording = Mock()
+
+                    mock_lro3 = Mock()
+                    mock_lro3.channel_names = ['LMot', 'RMot', 'LAud']
+                    mock_lro3.meta = Mock()
+                    mock_lro3.file_end_datetimes = [datetime(2023, 1, 16, 10, 0, 0)]
+                    mock_lro3.LongRecording = Mock()
+
+                    def mock_lro_side_effect(*args, **kwargs):
+                        folder_path = str(args[0])
+                        if 'WT_A10_2023-01-15(1)' in folder_path:
+                            return mock_lro2
+                        elif 'WT_A10_2023-01-16' in folder_path:
+                            return mock_lro3
+                        else:  # WT_A10_2023-01-15
+                            return mock_lro1
+
+                    mock_lro_class.side_effect = mock_lro_side_effect
 
                     ao = results.AnimalOrganizer(
                         anim_id="A10",
@@ -387,16 +412,14 @@ class TestOverlappingAnimaldaysBug:
 class TestAnimalOrganizerDirectoryFiltering:
     """Test AnimalOrganizer's directory filtering functionality."""
 
-    def setup_method(self):
+    @pytest.fixture(autouse=True)
+    def setup_test_env(self, tmp_path):
         """Set up test fixtures with mixed file/directory structures."""
-        self.temp_dir = tempfile.mkdtemp()
-        self.base_path = Path(self.temp_dir)
+        self.temp_dir = tmp_path
+        self.base_path = Path(tmp_path)
         self.animal_id = "A123"
-
-    def teardown_method(self):
-        """Clean up test fixtures."""
-        import shutil
-        shutil.rmtree(self.temp_dir)
+        yield
+        # Cleanup happens automatically with tmp_path fixture
 
     def _create_mixed_structure(self, mode="concat"):
         """Create a mixed file/directory structure for testing.
@@ -467,11 +490,11 @@ class TestAnimalOrganizerDirectoryFiltering:
         mock_lro.LongRecording.get_duration.return_value = 100.0
         return mock_lro
 
-    @patch('pythoneeg.core.LongRecordingOrganizer')
+    @patch('pythoneeg.visualization.results.core.LongRecordingOrganizer')
     def test_concat_mode_filters_files(self, mock_lro):
         """Test that concat mode filters out files and only processes directories."""
         # Create mixed structure
-        created_items = self._create_mixed_structure("concat")
+        _ = self._create_mixed_structure("concat")
 
         # Configure mock to avoid actual data processing
         mock_lro.return_value = self._create_mock_lro()
@@ -495,11 +518,11 @@ class TestAnimalOrganizerDirectoryFiltering:
             folder_path = call[0][0]  # First positional argument
             assert Path(folder_path).is_dir()
 
-    @patch('pythoneeg.core.LongRecordingOrganizer')
+    @patch('pythoneeg.visualization.results.core.LongRecordingOrganizer')
     def test_nest_mode_filters_files(self, mock_lro):
         """Test that nest mode filters out files and only processes directories."""
         # Create mixed structure
-        created_items = self._create_mixed_structure("nest")
+        _ = self._create_mixed_structure("nest")
 
         # Configure mock to avoid actual data processing
         mock_lro.return_value = self._create_mock_lro()
@@ -516,7 +539,7 @@ class TestAnimalOrganizerDirectoryFiltering:
         for folder_path in ao._bin_folders:
             assert Path(folder_path).is_dir()
 
-    @patch('pythoneeg.core.LongRecordingOrganizer')
+    @patch('pythoneeg.visualization.results.core.LongRecordingOrganizer')
     def test_noday_mode_filters_files(self, mock_lro):
         """Test that noday mode filters out files and only processes directories."""
         # Create structure with only one directory for noday mode
@@ -583,7 +606,7 @@ class TestAnimalOrganizerDirectoryFiltering:
         error_message = str(exc_info.value)
         assert "not unique" in error_message
 
-    @patch('pythoneeg.core.LongRecordingOrganizer')
+    @patch('pythoneeg.visualization.results.core.LongRecordingOrganizer')
     def test_base_mode_directory_handling(self, mock_lro):
         """Test that base mode correctly handles the base directory."""
         # For base mode, create a properly named base directory with date
@@ -611,17 +634,17 @@ class TestAnimalOrganizerDirectoryFiltering:
         assert ao._bin_folders[0] == str(base_dir)
 
     @patch('logging.info')
-    @patch('pythoneeg.core.LongRecordingOrganizer')
+    @patch('pythoneeg.visualization.results.core.LongRecordingOrganizer')
     def test_logging_filtering_information(self, mock_lro, mock_logging):
         """Test that filtering information is logged when files are filtered out."""
         # Create mixed structure
-        created_items = self._create_mixed_structure("concat")
+        _ = self._create_mixed_structure("concat")
 
         # Configure mock to avoid actual data processing
         mock_lro.return_value = self._create_mock_lro()
 
         # Create AnimalOrganizer
-        ao = results.AnimalOrganizer(
+        _ = results.AnimalOrganizer(
             base_folder_path=str(self.base_path),
             anim_id=self.animal_id,
             mode="concat"

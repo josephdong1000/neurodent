@@ -28,9 +28,9 @@ TEST_ANIMALS = ['A10'] if TEST_DATA_BASE.exists() else []  # Use one animal for 
 
 # Parameters for testing
 TEST_DETECTION_PARAMS = {
-    'bp': (3.0, 40.0),
-    'notch': (59.0, 61.0),
-    'freq_slices': (10.0, 20.0),
+    'bp': [3.0, 40.0],
+    'notch': 60.0,
+    'freq_slices': [10.0, 20.0],
     'sneo_percentile': 95.0,  # Lower threshold for test data
     'cluster_gap_ms': 80.0,
     'vote_k': 1,
