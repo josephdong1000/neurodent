@@ -8,8 +8,6 @@ from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 import pytest
 
-# Import the module under test
-sys.path.insert(0, str(Path(__file__).parent))
 from run_tests import run_tests, run_specific_test, run_linting, run_type_checking, main
 
 
