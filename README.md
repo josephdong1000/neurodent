@@ -1,19 +1,23 @@
-# PythonEEG
+# Neurodent
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.15780751.svg)](https://doi.org/10.5281/zenodo.15780751)
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/josephdong1000/PyEEG/HEAD) 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/josephdong1000/PyEEG/)
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/josephdong1000/Neurodent/HEAD) 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/josephdong1000/neurodent/)
 
-**Extracts features from mouse EEGs and generates figures**
+
 > Presented at [USRSE'25](https://doi.org/10.5281/zenodo.17274681)!
+
+A Python package for standardizing rodent EEG analysis and figure generation. Various EEG formats are loadable and features are extracted in parallel. Also includes a Snakemake workflow for automated analysis.
+
+## Usage
+
+Tutorial: *WIP!*
+
+API documentation: https://josephdong1000.github.io/neurodent/
 
 ## Overview
 
-PyEEG is a comprehensive Python library for extracting features from mouse EEG recordings and generating publication-ready figures. The library processes EEG data by dividing across time windows and channels, and computing features in parallel.
-
-### What PyEEG Does
-
-PyEEG provides two main analysis workflows:
+Neurodent provides two main analysis workflows:
 
 1. **Windowed Analysis Results (WAR)** - Extracts features from continuous EEG data divided into time windows
 2. **Spike Analysis Results (SAR)** - Analyzes spike-sorted neural data and integrates it with EEG features
@@ -49,10 +53,6 @@ The library supports multiple data formats (binary files, SpikeInterface recordi
 #### Frequency Bands
 - **Delta**: 0.1-4 Hz, **Theta**: 4-8 Hz, **Alpha**: 8-13 Hz, **Beta**: 13-25 Hz, **Gamma**: 25-40 Hz
 
-### How to Use PyEEG
-
-Documentation can be found at https://josephdong1000.github.io/PyEEG/
-
 #### Basic Workflow
 1. **Load Data**: Use `LongRecordingOrganizer` to load EEG recordings from various formats
 2. **Windowed Analysis**: Create `AnimalOrganizer` to compute features across time windows
@@ -74,7 +74,7 @@ ep.plot_feature("rms", groupby="genotype")
 ```
 
 #### Advanced Features
-- **Flexible Data Loading**: PyEEG uses MNE and SpikeInterface loaders in Python and custom loaders for proprietary formats using MATLAB, including:
+- **Flexible Data Loading**: Neurodent uses MNE and SpikeInterface loaders in Python and custom loaders for proprietary formats using MATLAB, including:
   - Neuroscope/Neuralynx (.dat, .eeg)
   - Open Ephys (.continuous)
   - NWB (.nwb) neurophysiology format
@@ -86,7 +86,7 @@ ep.plot_feature("rms", groupby="genotype")
 
 ## Snakemake Workflow
 
-A companion Snakemake workflow is provided for building automated PyEEG analysis pipelines.
+A companion Snakemake workflow is provided for building automated Neurodent analysis pipelines.
 
 The workflow processes multiple animals in parallel through WAR generation, quality filtering, fragment/channel filtering, and statistical analysis with SLURM cluster integration.
 
@@ -97,36 +97,22 @@ To run Snakemake on a specific computing environment, first create a [Snakemake 
 snakemake
 ```
 
-## Setup (for developing)
+## Acknowledgements
 
-```bash
-# Create and activate virtual environment
-python -m venv .venv
-source .venv/bin/activate
-# Install requirements
-pip install -r requirements.txt
+This project benefited from insights and best practices described in Peter K. G. Williams’s [One Good Tutorial](https://onegoodtutorial.org/).
+
+## Citation
+
+If you find Neurodent useful, please cite our work!
+
+```bibtex
+@misc{https://doi.org/10.5281/zenodo.17051374,
+  doi = {10.5281/ZENODO.17051374},
+  url = {https://zenodo.org/doi/10.5281/zenodo.17051374},
+  author = {Dong,  Joseph and Yongtaek Oh,   and Marsh,  Eric},
+  title = {josephdong1000/PyEEG: 0.1.1},
+  publisher = {Zenodo},
+  year = {2025},
+  copyright = {MIT License}
+}
 ```
-
-### Planned features
-- Cross-frequency coupling (CFC)
-  - Phase-Locking Value (PLV)
-    - [phase-phase]
-  - Phase-Lag Index (PLI / wPLI / dPLI)
-    - [phase-phase]
-    - wPLI is resistant to volume conduction
-    - dPLI determines direction (leading/lagging)
-  - Phase-Amplitude Coupling (PAC)
-    - [phase-amplitude]
-    - Driven auto-regressive (DAR) model from `pactools`
-  - Amplitude-Envelope Coupling (AEC)
-    - [amplitude-amplitude]
-- Spike-LFP coupling
-  <!-- - **Caveat**: is this legitimate for population spiking?
-    - I only see papers for single unit spiking
-    - Maybe useful for examining interictal cortical discharges -->
-  - Pairwise-Phase Consistency (PPC)
-    - [spike-phase]
-    - Corrected PPC (Vinck 2011)
-- Canonical coherence
-  - [channels-channels]
-- Peri-spike EEG

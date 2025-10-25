@@ -19,7 +19,8 @@ import seaborn as sns
 import seaborn.objects as so
 from okabeito import black, blue, green, lightblue, orange, purple, red, yellow
 from seaborn import axes_style
-from pythoneeg import constants, core, visualization
+
+from neurodent import constants, core, visualization
 
 core.set_temp_directory("/scr1/users/dongjp")
 
@@ -28,7 +29,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger()
 
-base_folder = Path("/mnt/isilon/marsh_single_unit/PythonEEG")
+base_folder = Path("/mnt/isilon/marsh_single_unit/Neurodent")
 load_folder = base_folder / "notebooks" / "tests" / "test-wars-sox5-9"
 save_folder = base_folder / "notebooks" / "examples"
 
@@ -67,6 +68,7 @@ animal_ids = [p.name for p in load_folder.glob("*") if p.is_dir()]
 # ]
 # animal_ids = [p for p in animal_ids if p not in bad_animal_ids]
 
+
 def load_war(animal_id):
     logger.info(f"Loading {animal_id}")
     war = visualization.WindowAnalysisResult.load_pickle_and_json(Path(load_folder / f"{animal_id}"))
@@ -75,9 +77,7 @@ def load_war(animal_id):
         return None
 
     # war.filter_all(bad_channels=["LHip", "RHip"])
-    war.reorder_and_pad_channels(
-        ["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"], use_abbrevs=True
-    )
+    war.reorder_and_pad_channels(["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"], use_abbrevs=True)
     # war.filter_all(morphological_smoothing_seconds=60 * 5)
     war.filter_all(morphological_smoothing_seconds=None)
 

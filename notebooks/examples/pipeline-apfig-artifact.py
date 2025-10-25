@@ -6,7 +6,7 @@ from pathlib import Path
 import matplotlib
 from tqdm import tqdm
 
-from pythoneeg import constants, core, visualization
+from neurodent import constants, core, visualization
 
 core.set_temp_directory("/scr1/users/dongjp")
 
@@ -15,7 +15,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger()
 
-base_folder = Path("/mnt/isilon/marsh_single_unit/PythonEEG")
+base_folder = Path("/mnt/isilon/marsh_single_unit/Neurodent")
 load_folder = base_folder / "notebooks" / "tests" / "test-wars-sox5-7"
 save_folder = Path("/home/dongjp/Downloads/8-4 artifact finefilter")
 if not save_folder.exists():
@@ -31,6 +31,7 @@ animal_ids = [p.name for p in load_folder.glob("*") if p.is_dir()]
 #     "012322_cohort4_group6_3mice_FMUT___MMUT_MWT FHET",
 # ]
 # animal_ids = [p for p in animal_ids if p not in bad_animal_ids]
+
 
 def plot_animal(animal_id):
     logger.info(f"Plotting {animal_id}")

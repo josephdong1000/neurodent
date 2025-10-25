@@ -3,58 +3,59 @@ requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "pythoneeg"
-version = "0.1.0"
-description = "Mouse EEG analysis tools"
+name = "neurodent"
+version = "0.2.0"
+description = "Rodent EEG analysis tools"
 readme = "README.md"
+license = { text = "MIT" }
 authors = [
-    { name="Joseph Dong", email="dongjp@chop.edu" },
-    { name="Yongtaek Oh", email="ohy2@chop.edu" },
-    { name="Eric Marsh", email="marshe@chop.edu" },
+    { name = "Joseph Dong", email = "dongjp@chop.edu" },
+    { name = "Yongtaek Oh", email = "ohy2@chop.edu" },
+    { name = "Eric Marsh", email = "marshe@chop.edu" },
 ]
 dependencies = [
-    "cmasher",
+    "numpy",
     "matplotlib",
     "mne",
     "mne-connectivity",
-    "numpy",
-    "pactools",
+    # "cmasher", # this is not used directly but is a nice package
     "pandas",
-    "probeinterface",
-    "pyinstaller",
-    "scipy",
     "spikeinterface",
-    "ipykernel",
+    "probeinterface",
+    "scipy",
     "dask[distributed]",
-    "dask-labextension",
-    "bokeh",
     "dask-jobqueue",
     "seaborn",
-    "pipreqs",
     "pyarrow",
-    "mountainsort5",
     "statannotations",
     "statsmodels",
     "django",
-    "neo",
-    "pyedflib",
-    "edfio",
-    "build",
-    "pyprep",
-    "okabeito",
+    "okabeito", # this could be just a line in constants
     "openpyxl",
-    "starbars",
     "appnope",
+    "zarr>=2.18.3",
+    "scikit-learn>=1.7.2",
 ]
 requires-python = ">=3.10"
-keywords = ["EEG", "rodent", "mouse", "neuroscience", "data analysis"]
+keywords = [
+    "EEG",
+    "rodent",
+    "neuroscience",
+    "data analysis",
+    "pipeline",
+    "PythonEEG",
+    "PyEEG",
+]
 
-[project.optional-dependencies]
+[project.urls]
+Homepage = "https://github.com/josephdong1000/neurodent"
+Documentation = "https://josephdong1000.github.io/neurodent/"
+Repository = "https://github.com/josephdong1000/neurodent"
+"Issue Tracker" = "https://github.com/josephdong1000/neurodent/issues"
+
+[dependency-groups]
 dev = [
-    "nodejs",
-    "npm",
     "snakeviz",
-    "pyqt5",
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
     "pytest-mock>=3.10.0",
@@ -67,22 +68,14 @@ dev = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["pythoneeg*"]
-exclude = ["notebooks", "docs", "tmp"]
+where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = [
-    "--strict-markers",
-    "--strict-config",
-    "--tb=short",
-    "--dist", "loadfile",
-]
-# For coverage reports, add: --cov=pythoneeg --cov-report=term-missing --cov-fail-under=80
-# For slow tests, use: -m "not slow"
+addopts = ["--strict-markers", "--strict-config", "--tb=short"]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "integration: marks tests as integration tests",
@@ -95,7 +88,7 @@ markers = [
 ]
 
 [tool.coverage.run]
-source = ["pythoneeg"]
+source = ["neurodent"]
 omit = [
     "*/tests/*",
     "*/test_*",
@@ -120,3 +113,6 @@ exclude_lines = [
     "@(abc\\.)?abstractmethod",
 ]
 
+[tool.uv]
+package = true
+default-groups = ["dev"]

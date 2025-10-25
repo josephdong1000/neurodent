@@ -1,6 +1,7 @@
 """
-Unit tests for pythoneeg.core.frequency_domain_spike_detection module.
+Unit tests for neurodent.core.frequency_domain_spike_detection module.
 """
+
 import os
 import tempfile
 from pathlib import Path
@@ -11,6 +12,7 @@ import warnings
 
 try:
     import spikeinterface.core as si
+
     SPIKEINTERFACE_AVAILABLE = True
 except ImportError:
     si = None
@@ -18,8 +20,8 @@ except ImportError:
 
 import mne
 
-from pythoneeg.core.frequency_domain_spike_detection import FrequencyDomainSpikeDetector
-from pythoneeg import constants
+from neurodent.core.frequency_domain_spike_detection import FrequencyDomainSpikeDetector
+from neurodent import constants
 
 
 @pytest.mark.skipif(not SPIKEINTERFACE_AVAILABLE, reason="SpikeInterface not available")
@@ -31,16 +33,16 @@ class TestFrequencyDomainSpikeDetector:
         """Create a mock SpikeInterface recording for testing."""
         mock_rec = MagicMock()
         mock_rec.get_num_channels.return_value = 4
-        mock_rec.get_channel_ids.return_value = ['ch1', 'ch2', 'ch3', 'ch4']
+        mock_rec.get_channel_ids.return_value = ["ch1", "ch2", "ch3", "ch4"]
         mock_rec.get_sampling_frequency.return_value = 1000.0
         mock_rec.get_num_frames.return_value = 10000
         mock_rec.get_dtype.return_value = np.float32
         mock_rec.clone.return_value = mock_rec
         mock_rec.set_channel_ids.return_value = None
 
-        # Mock data
+        # Mock data - transposed to (samples, channels) format as get_traces returns
         np.random.seed(42)
-        mock_data = np.random.randn(4, 10000) * 0.1
+        mock_data = np.random.randn(10000, 4) * 0.1
         mock_rec.get_traces.return_value = mock_data
 
         return mock_rec
@@ -49,18 +51,19 @@ class TestFrequencyDomainSpikeDetector:
     def detection_params(self):
         """Default detection parameters for testing."""
         return {
-            'bp': (3.0, 40.0),
-            'notch': 60.0,
-            'notch_q': 30.0,
-            'freq_slices': (10.0, 20.0),
-            'sneo_percentile': 99.0,  # Lower for testing
-            'cluster_gap_ms': 80.0,
-            'search_ms': 160.0,
-            'baseline_ms': 500.0,
-            'k_sigma': 3.0,
-            'smooth_window': 7,
-            'vote_k': 1,  # Lower for testing
-            'smooth_len': 5,
+            "bp": [3.0, 40.0],
+            "notch": 60.0,
+            "notch_q": 30.0,
+            "freq_slices": [10.0, 20.0],
+            "window_s": 0.125,
+            "sneo_percentile": 99.0,  # Lower for testing
+            "cluster_gap_ms": 80.0,
+            "search_ms": 160.0,
+            "baseline_ms": 500.0,
+            "k_sigma": 3.0,
+            "smooth_window": 7,
+            "vote_k": 1,  # Lower for testing
+            "smooth_len": 5,
         }
 
     @pytest.fixture
@@ -68,7 +71,7 @@ class TestFrequencyDomainSpikeDetector:
         """Create a test signal with known characteristics."""
         fs = 1000.0
         duration = 10.0  # 10 seconds
-        t = np.arange(0, duration, 1/fs)
+        t = np.arange(0, duration, 1 / fs)
 
         # Base signal with some noise
         signal = np.random.randn(len(t)) * 0.1
@@ -80,9 +83,10 @@ class TestFrequencyDomainSpikeDetector:
             if spike_idx < len(signal):
                 # Create a negative spike
                 spike_width = int(0.02 * fs)  # 20ms wide
-                spike_indices = np.arange(max(0, spike_idx - spike_width//2),
-                                        min(len(signal), spike_idx + spike_width//2))
-                signal[spike_indices] -= np.exp(-((spike_indices - spike_idx) / (spike_width/4))**2) * 2.0
+                spike_indices = np.arange(
+                    max(0, spike_idx - spike_width // 2), min(len(signal), spike_idx + spike_width // 2)
+                )
+                signal[spike_indices] -= np.exp(-(((spike_indices - spike_idx) / (spike_width / 4)) ** 2)) * 2.0
 
         return signal, fs, spike_times
 
@@ -90,28 +94,34 @@ class TestFrequencyDomainSpikeDetector:
         """Test default parameters are properly defined."""
         params = FrequencyDomainSpikeDetector.DEFAULT_PARAMS
 
-        required_keys = ['bp', 'notch', 'freq_slices', 'sneo_percentile',
-                        'cluster_gap_ms', 'search_ms', 'baseline_ms', 'k_sigma']
+        required_keys = [
+            "bp",
+            "notch",
+            "freq_slices",
+            "sneo_percentile",
+            "cluster_gap_ms",
+            "search_ms",
+            "baseline_ms",
+            "k_sigma",
+        ]
 
         for key in required_keys:
             assert key in params, f"Missing required parameter: {key}"
 
         # Test parameter types and ranges
-        assert isinstance(params['bp'], tuple)
-        assert len(params['bp']) == 2
-        assert params['bp'][0] < params['bp'][1]
+        assert isinstance(params["bp"], list)
+        assert len(params["bp"]) == 2
+        assert params["bp"][0] < params["bp"][1]
 
-        assert isinstance(params['sneo_percentile'], (int, float))
-        assert 0 <= params['sneo_percentile'] <= 100
+        assert isinstance(params["sneo_percentile"], (int, float))
+        assert 0 <= params["sneo_percentile"] <= 100
 
     def test_compute_stft_slices(self, test_signal):
         """Test STFT slice computation."""
         signal, fs, _ = test_signal
         freqs = (10.0, 20.0)
 
-        slices_dict = FrequencyDomainSpikeDetector._compute_stft_slices(
-            signal, fs, freqs=freqs
-        )
+        slices_dict = FrequencyDomainSpikeDetector._compute_stft_slices(signal, fs, freqs=freqs)
 
         # Check output structure
         assert isinstance(slices_dict, dict)
@@ -129,11 +139,13 @@ class TestFrequencyDomainSpikeDetector:
         result = FrequencyDomainSpikeDetector._sneo(x)
 
         # SNEO: x[n]^2 - x[n-1] * x[n+1]
-        expected = np.array([
-            2**2 - 1*3,  # 4 - 3 = 1
-            3**2 - 2*2,  # 9 - 4 = 5
-            2**2 - 3*1   # 4 - 3 = 1
-        ])
+        expected = np.array(
+            [
+                2**2 - 1 * 3,  # 4 - 3 = 1
+                3**2 - 2 * 2,  # 9 - 4 = 5
+                2**2 - 3 * 1,  # 4 - 3 = 1
+            ]
+        )
 
         np.testing.assert_array_equal(result, expected)
 
@@ -144,7 +156,7 @@ class TestFrequencyDomainSpikeDetector:
         # Create simple slice dict
         slices_dict = {
             10.0: signal + np.random.randn(len(signal)) * 0.05,
-            20.0: signal + np.random.randn(len(signal)) * 0.05
+            20.0: signal + np.random.randn(len(signal)) * 0.05,
         }
 
         spikes, sneo_combined = FrequencyDomainSpikeDetector._apply_sneo_on_slices(
@@ -167,7 +179,10 @@ class TestFrequencyDomainSpikeDetector:
         candidates = [int(t * fs) for t in spike_times]
 
         refined = FrequencyDomainSpikeDetector._enforce_downward_and_refine_minimal(
-            signal, fs, candidates, k_sigma=2.0  # Lower threshold for testing
+            signal,
+            fs,
+            candidates,
+            k_sigma=2.0,  # Lower threshold for testing
         )
 
         # Check output structure
@@ -193,7 +208,10 @@ class TestFrequencyDomainSpikeDetector:
         spike_indices = np.array([1000, 1020, 1025, 2000, 2015, 4000])  # Some close pairs
 
         filtered = FrequencyDomainSpikeDetector._filter_close_spikes_by_min_local(
-            signal, fs, spike_indices, min_gap_ms=50.0  # 50ms minimum gap
+            signal,
+            fs,
+            spike_indices,
+            min_gap_ms=50.0,  # 50ms minimum gap
         )
 
         # Check output structure
@@ -212,12 +230,10 @@ class TestFrequencyDomainSpikeDetector:
 
         # Lower thresholds for testing
         test_params = detection_params.copy()
-        test_params['sneo_percentile'] = 90.0
-        test_params['vote_k'] = 1
+        test_params["sneo_percentile"] = 90.0
+        test_params["vote_k"] = 1
 
-        spike_indices = FrequencyDomainSpikeDetector._detect_spikes_channel(
-            signal, fs, test_params
-        )
+        spike_indices = FrequencyDomainSpikeDetector._detect_spikes_channel(signal, fs, test_params)
 
         # Check output structure
         assert isinstance(spike_indices, np.ndarray)
@@ -227,16 +243,10 @@ class TestFrequencyDomainSpikeDetector:
         # This is more of a smoke test than precise validation
         assert len(spike_indices) >= 0
 
-    @patch('spikeinterface.core.NumpyRecording')
-    @patch('mne.io.RawArray')
-    @patch('mne.create_info')
-    def test_apply_preprocessing(self, mock_create_info, mock_raw_array, mock_numpy_recording, mock_recording, detection_params):
+    @patch("spikeinterface.core.NumpyRecording")
+    def test_apply_preprocessing(self, mock_numpy_recording, mock_recording, detection_params):
         """Test preprocessing application."""
-        # Mock the preprocessing chain
-        mock_info = MagicMock()
-        mock_create_info.return_value = mock_info
-        mock_raw = MagicMock()
-        mock_raw_array.return_value = mock_raw
+        # Mock the SpikeInterface recording
         mock_numpy_recording.return_value = mock_recording
 
         result = FrequencyDomainSpikeDetector._apply_preprocessing(mock_recording, detection_params)
@@ -245,8 +255,8 @@ class TestFrequencyDomainSpikeDetector:
         assert result is not None
         mock_recording.clone.assert_called_once()
         mock_recording.get_traces.assert_called()
-        mock_create_info.assert_called_once()
-        mock_raw_array.assert_called_once()
+        # Verify NumpyRecording was created with filtered data
+        mock_numpy_recording.assert_called_once()
 
     def test_add_spike_annotations(self):
         """Test MNE annotation creation."""
@@ -256,27 +266,21 @@ class TestFrequencyDomainSpikeDetector:
         duration = 5.0
         n_samples = int(duration * fs)
 
-        info = mne.create_info(
-            ch_names=[f'ch{i}' for i in range(n_channels)],
-            sfreq=fs,
-            ch_types='eeg'
-        )
+        info = mne.create_info(ch_names=[f"ch{i}" for i in range(n_channels)], sfreq=fs, ch_types="eeg")
         data = np.random.randn(n_channels, n_samples) * 0.1
         raw = mne.io.RawArray(data, info)
 
         # Create spike indices
         spike_indices_per_channel = [
             np.array([500, 1500, 3000]),  # ch0
-            np.array([800, 2200]),        # ch1
-            np.array([])                  # ch2 (no spikes)
+            np.array([800, 2200]),  # ch1
+            np.array([]),  # ch2 (no spikes)
         ]
 
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=RuntimeWarning)
 
-            annotated_raw = FrequencyDomainSpikeDetector._add_spike_annotations(
-                raw, spike_indices_per_channel, fs
-            )
+            annotated_raw = FrequencyDomainSpikeDetector._add_spike_annotations(raw, spike_indices_per_channel, fs)
 
         # Check annotations
         annotations = annotated_raw.annotations
@@ -284,21 +288,22 @@ class TestFrequencyDomainSpikeDetector:
 
         # Check annotation descriptions
         descriptions = annotations.description
-        spike_descriptions = [desc for desc in descriptions if desc.startswith('Spike_Ch')]
+        spike_descriptions = [desc for desc in descriptions if desc.startswith("Spike_Ch")]
         assert len(spike_descriptions) == 5
 
-    @patch.object(FrequencyDomainSpikeDetector, '_apply_preprocessing')
-    @patch.object(FrequencyDomainSpikeDetector, '_detect_spikes_channel')
-    @patch.object(FrequencyDomainSpikeDetector, '_add_spike_annotations')
-    def test_detect_spikes_recording_serial(self, mock_add_annotations, mock_detect_channel,
-                                          mock_preprocess, mock_recording, detection_params):
+    @patch.object(FrequencyDomainSpikeDetector, "_apply_preprocessing")
+    @patch.object(FrequencyDomainSpikeDetector, "_detect_spikes_channel")
+    @patch.object(FrequencyDomainSpikeDetector, "_add_spike_annotations")
+    def test_detect_spikes_recording_serial(
+        self, mock_add_annotations, mock_detect_channel, mock_preprocess, mock_recording, detection_params
+    ):
         """Test full spike detection pipeline in serial mode."""
         # Setup mocks
         mock_preprocess.return_value = mock_recording
         mock_detect_channel.return_value = np.array([100, 500, 1000])
 
         # Mock MNE creation
-        with patch('mne.create_info'), patch('mne.io.RawArray') as mock_raw_array:
+        with patch("mne.create_info"), patch("mne.io.RawArray") as mock_raw_array:
             mock_raw = MagicMock()
             mock_raw_array.return_value = mock_raw
             mock_add_annotations.return_value = mock_raw
@@ -327,7 +332,7 @@ class TestFrequencyDomainSpikeDetectorUtils:
         x = np.array([1, 2, 3])
         result = FrequencyDomainSpikeDetector._sneo(x)
         assert len(result) == 1
-        assert result[0] == 2**2 - 1*3  # 4 - 3 = 1
+        assert result[0] == 2**2 - 1 * 3  # 4 - 3 = 1
 
         # Test with zeros
         x = np.array([0, 0, 0, 0])
@@ -341,9 +346,7 @@ class TestFrequencyDomainSpikeDetectorUtils:
         fs = 100.0
         freqs = (10.0,)
 
-        slices_dict = FrequencyDomainSpikeDetector._compute_stft_slices(
-            signal, fs, freqs=freqs
-        )
+        slices_dict = FrequencyDomainSpikeDetector._compute_stft_slices(signal, fs, freqs=freqs)
 
         assert 10.0 in slices_dict
         assert len(slices_dict[10.0]) == len(signal)
@@ -353,9 +356,7 @@ class TestFrequencyDomainSpikeDetectorUtils:
         signal = np.random.randn(1000)
         fs = 1000.0
 
-        result = FrequencyDomainSpikeDetector._filter_close_spikes_by_min_local(
-            signal, fs, np.array([])
-        )
+        result = FrequencyDomainSpikeDetector._filter_close_spikes_by_min_local(signal, fs, np.array([]))
 
         assert isinstance(result, np.ndarray)
         assert len(result) == 0
@@ -365,9 +366,7 @@ class TestFrequencyDomainSpikeDetectorUtils:
         signal = np.random.randn(1000)
         fs = 1000.0
 
-        result = FrequencyDomainSpikeDetector._enforce_downward_and_refine_minimal(
-            signal, fs, np.array([])
-        )
+        result = FrequencyDomainSpikeDetector._enforce_downward_and_refine_minimal(signal, fs, np.array([]))
 
         assert isinstance(result, np.ndarray)
         assert len(result) == 0

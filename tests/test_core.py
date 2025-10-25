@@ -1,5 +1,5 @@
 """
-Unit tests for pythoneeg.core.core module.
+Unit tests for neurodent.core.core module.
 """
 import gzip
 import gc
@@ -19,13 +19,13 @@ try:
 except Exception:
     si = None
 
-from pythoneeg.core.core import (
+from neurodent.core.core import (
     DDFBinaryMetadata,
     LongRecordingOrganizer,
     convert_ddfcolbin_to_ddfrowbin,
     convert_ddfrowbin_to_si,
 )
-from pythoneeg import constants
+from neurodent import constants
 
 
 class TestDDFBinaryMetadata:
@@ -352,8 +352,8 @@ class TestConvertDdfrowbinToSi:
         
         with pytest.raises((EOFError, OSError)):
             convert_ddfrowbin_to_si(rowbin_path, metadata)
-            
-    @patch('pythoneeg.core.core.spre.resample')
+
+    @patch("neurodent.core.core.spre.resample")
     def test_convert_different_sampling_rate_resamples(self, mock_resample, temp_dir):
         """Test that different sampling rates trigger resampling."""
         # Create test data
@@ -707,9 +707,11 @@ class TestLongRecordingOrganizer:
         mock_recording.__str__ = Mock(return_value="MockRecording")
         organizer.LongRecording = mock_recording
         organizer.channel_names = ['ch1', 'ch2', 'ch3', 'ch4']
-        
-        with patch('pythoneeg.core.core.Natural_Neighbor') as mock_nn_class, \
-             patch('pythoneeg.core.core.LocalOutlierFactor') as mock_lof_class:
+
+        with (
+            patch("neurodent.core.core.Natural_Neighbor") as mock_nn_class,
+            patch("neurodent.core.core.LocalOutlierFactor") as mock_lof_class,
+        ):
             
             # Mock Natural_Neighbor
             mock_nn = Mock()
@@ -749,10 +751,12 @@ class TestLongRecordingOrganizer:
         mock_recording.__str__ = Mock(return_value="MockRecording")
         organizer.LongRecording = mock_recording
         organizer.channel_names = ['ch1', 'ch2']
-        
-        with patch('pythoneeg.core.core.Natural_Neighbor') as mock_nn_class, \
-             patch('pythoneeg.core.core.LocalOutlierFactor') as mock_lof_class, \
-             patch('pythoneeg.core.core.decimate') as mock_decimate:
+
+        with (
+            patch("neurodent.core.core.Natural_Neighbor") as mock_nn_class,
+            patch("neurodent.core.core.LocalOutlierFactor") as mock_lof_class,
+            patch("neurodent.core.core.decimate") as mock_decimate,
+        ):
             
             mock_nn = Mock()
             mock_nn.algorithm.return_value = 2
@@ -789,11 +793,13 @@ class TestLongRecordingOrganizer:
         mock_meta.channel_names = ['ch1']
         mock_meta.metadata_df = pd.DataFrame({'ProbeInfo': ['ch1']})
         
-        with patch.object(organizer, '_LongRecordingOrganizer__update_colbins_rowbins_metas'), \
-             patch.object(organizer, '_LongRecordingOrganizer__check_colbins_rowbins_metas_folders_exist'), \
-             patch.object(organizer, '_LongRecordingOrganizer__check_colbins_rowbins_metas_not_empty'), \
-             patch.object(organizer, '_validate_metadata_consistency') as mock_validate, \
-             patch('pythoneeg.core.core.DDFBinaryMetadata', return_value=mock_meta):
+        with (
+            patch.object(organizer, "_LongRecordingOrganizer__update_colbins_rowbins_metas"),
+            patch.object(organizer, "_LongRecordingOrganizer__check_colbins_rowbins_metas_folders_exist"),
+            patch.object(organizer, "_LongRecordingOrganizer__check_colbins_rowbins_metas_not_empty"),
+            patch.object(organizer, "_validate_metadata_consistency") as mock_validate,
+            patch("neurodent.core.core.DDFBinaryMetadata", return_value=mock_meta),
+        ):
             
             organizer.prepare_colbins_rowbins_metas()
             
@@ -813,8 +819,8 @@ class TestLongRecordingOrganizer:
         (temp_dir / "file1_Meta.csv").write_text("ProbeInfo,SampleRate\nch1,1000")
         
         organizer = LongRecordingOrganizer(temp_dir, mode=None)
-        
-        with patch('pythoneeg.core.core.DDFBinaryMetadata') as mock_metadata_class:
+
+        with patch("neurodent.core.core.DDFBinaryMetadata") as mock_metadata_class:
             mock_meta = Mock()
             mock_meta.dt_end = None  # No date - this should trigger the ValueError
             mock_meta.channel_names = ['ch1']
@@ -936,25 +942,27 @@ class TestLongRecordingOrganizer:
         """Test convert_file_with_mne_to_recording with EDF intermediate."""
         test_file = temp_dir / "test.bdf"
         test_file.touch()
-        
+
         from datetime import datetime
         organizer = LongRecordingOrganizer(temp_dir, mode=None,
                                          manual_datetimes=datetime(2023, 1, 1, 10, 0, 0),
                                          datetimes_are_start=True)
-        
+
         # Mock MNE raw object
         mock_raw = Mock()
         mock_info = Mock()
         mock_info.sfreq = 2000.0
         mock_info.nchan = 2
         mock_info.ch_names = ["ch1", "ch2"]  # Add channel names
-        mock_info.__getitem__ = lambda self, key: getattr(self, key)  # Allow dict-style access
+        mock_info.chs = []  # Add empty chs list for extract_mne_unit_info
+        mock_info.__getitem__ = Mock(side_effect=lambda key: getattr(mock_info, key))
+        mock_info.__contains__ = Mock(side_effect=lambda key: hasattr(mock_info, key))
         mock_raw.info = mock_info
         mock_raw.resample.return_value = mock_raw
         mock_raw.get_data.return_value = np.random.randn(2, 3600000)
-        
+
         mock_extract = Mock(return_value=mock_raw)
-        
+
         # Mock SpikeInterface recording - should have original sampling rate from MNE raw
         mock_si_rec = Mock()
         mock_si_rec.get_num_channels.return_value = 2
@@ -968,18 +976,18 @@ class TestLongRecordingOrganizer:
         mock_resampled.get_sampling_frequency.return_value = constants.GLOBAL_SAMPLING_RATE
         mock_resampled.get_channel_ids.return_value = np.array(['ch1', 'ch2'])
         mock_resampled.get_duration.return_value = 3600.0
-        
+
         with patch('mne.export.export_raw') as mock_export, \
              patch('spikeinterface.extractors.read_edf', return_value=mock_si_rec), \
              patch('spikeinterface.preprocessing.resample', return_value=mock_resampled) as mock_resample:
-            
+
             organizer.convert_file_with_mne_to_recording(
                 extract_func=mock_extract,
                 input_type="file",
                 file_pattern="*.bdf",
                 intermediate="edf"
             )
-        
+
         # Verify raw was NOT resampled (new architecture moves resampling after intermediate file creation)
         mock_raw.resample.assert_not_called()
         # Verify SpikeInterface resampling WAS called since 2000.0 != 1000.0
@@ -991,40 +999,42 @@ class TestLongRecordingOrganizer:
         """Test convert_file_with_mne_to_recording with binary intermediate."""
         test_file = temp_dir / "test.bdf"
         test_file.touch()
-        
+
         from datetime import datetime
         organizer = LongRecordingOrganizer(temp_dir, mode=None,
                                          manual_datetimes=datetime(2023, 1, 1, 10, 0, 0),
                                          datetimes_are_start=True)
-        
+
         # Mock MNE raw object with test data
         n_channels = 3
         n_samples = 1000
         test_data = np.random.randn(n_channels, n_samples).astype(np.float32)
-        
+
         mock_raw = Mock()
         mock_info = Mock()
         mock_info.sfreq = 1000.0
         mock_info.nchan = n_channels
         mock_info.ch_names = ["ch1", "ch2", "ch3"]  # Add channel names
-        mock_info.__getitem__ = lambda self, key: getattr(self, key)  # Allow dict-style access
+        mock_info.chs = []  # Add empty chs list for extract_mne_unit_info
+        mock_info.__getitem__ = Mock(side_effect=lambda key: getattr(mock_info, key))
+        mock_info.__contains__ = Mock(side_effect=lambda key: hasattr(mock_info, key))
         mock_raw.info = mock_info
         mock_raw.resample.return_value = mock_raw
         mock_raw.get_data.return_value = test_data
-        
+
         mock_extract = Mock(return_value=mock_raw)
-        
+
         # Mock SpikeInterface recording
         mock_si_rec = Mock()
         mock_si_rec.get_num_channels.return_value = n_channels
         mock_si_rec.get_sampling_frequency.return_value = 1000.0
         mock_si_rec.get_channel_ids.return_value = np.array(['ch1', 'ch2', 'ch3'])
         mock_si_rec.get_duration.return_value = 1.0  # 1000 samples at 1000 Hz = 1 second
-        
+
         with patch('spikeinterface.extractors.read_binary', return_value=mock_si_rec):
             organizer.convert_file_with_mne_to_recording(
                 extract_func=mock_extract,
-                input_type="file", 
+                input_type="file",
                 file_pattern="*.bdf",
                 intermediate="bin"
             )
@@ -1109,7 +1119,7 @@ class TestLongRecordingOrganizer:
         mock_recording.get_sampling_frequency.return_value = 2000.0
 
         # Mock missing preprocessing module
-        with patch('pythoneeg.core.core.spre', None):
+        with patch("neurodent.core.core.spre", None):
             with pytest.raises(ImportError, match="SpikeInterface preprocessing is required"):
                 organizer._apply_resampling(mock_recording)
 
@@ -1188,8 +1198,10 @@ class TestLongRecordingOrganizer:
         mock_recording = Mock()
         mock_recording.get_sampling_frequency.return_value = 2000.0
 
-        with patch('spikeinterface.preprocessing.resample') as mock_resample, \
-             patch('pythoneeg.core.core.logging') as mock_logging:
+        with (
+            patch("spikeinterface.preprocessing.resample") as mock_resample,
+            patch("neurodent.core.core.logging") as mock_logging,
+        ):
 
             mock_resampled = Mock()
             mock_resample.return_value = mock_resampled
@@ -1207,7 +1219,7 @@ class TestLongRecordingOrganizer:
         # Test logging when no resampling is needed
         mock_recording.get_sampling_frequency.return_value = constants.GLOBAL_SAMPLING_RATE
 
-        with patch('pythoneeg.core.core.logging') as mock_logging:
+        with patch("neurodent.core.core.logging") as mock_logging:
             organizer._apply_resampling(mock_recording)
 
             # Should log that no resampling is needed
@@ -1229,46 +1241,49 @@ class TestMNENJobsParameter:
         """Test that n_jobs defaults to 1 for safety."""
         test_file = temp_dir / "test.bdf"
         test_file.touch()
-        
+
         # Default n_jobs should be 1
         organizer = LongRecordingOrganizer(
             temp_dir, mode=None,
             manual_datetimes=datetime(2023, 1, 1, 10, 0, 0),
             datetimes_are_start=True
         )
-        
+
         assert organizer.n_jobs == 1
-        
+
         # Mock MNE raw object
         mock_raw = Mock()
         mock_info = Mock()
         mock_info.sfreq = 2000.0
         mock_info.nchan = 2
         mock_info.ch_names = ["ch1", "ch2"]  # Add channel names
-        mock_info.__getitem__ = lambda self, key: getattr(self, key)
+        mock_info.chs = []  # Add empty chs list for extract_mne_unit_info
+        mock_info.__getitem__ = Mock(side_effect=lambda key: getattr(mock_info, key))
+        mock_info.__contains__ = Mock(side_effect=lambda key: hasattr(mock_info, key))
         mock_raw.info = mock_info
         mock_raw.resample.return_value = mock_raw
         mock_raw.get_data.return_value = np.random.randn(2, 3600)
-        
+
         mock_extract = Mock(return_value=mock_raw)
-        
+
         # Mock SpikeInterface recording
         mock_si_rec = Mock()
         mock_si_rec.get_num_channels.return_value = 2
         mock_si_rec.get_sampling_frequency.return_value = constants.GLOBAL_SAMPLING_RATE
         mock_si_rec.get_channel_ids.return_value = np.array(['ch1', 'ch2'])
         mock_si_rec.get_duration.return_value = 3.6
-        
+
         with patch('mne.export.export_raw'), \
-             patch('spikeinterface.extractors.read_edf', return_value=mock_si_rec):
-            
+             patch('spikeinterface.extractors.read_edf', return_value=mock_si_rec), \
+             patch('spikeinterface.preprocessing.resample', return_value=mock_si_rec):
+
             organizer.convert_file_with_mne_to_recording(
                 extract_func=mock_extract,
                 input_type="file",
                 file_pattern="*.bdf",
                 intermediate="edf"
             )
-        
+
         # MNE resample should NOT be called (new architecture uses SpikeInterface resampling)
         mock_raw.resample.assert_not_called()
     
@@ -1276,7 +1291,7 @@ class TestMNENJobsParameter:
         """Test that users can override n_jobs parameter."""
         test_file = temp_dir / "test.bdf"
         test_file.touch()
-        
+
         # User specifies n_jobs=4
         organizer = LongRecordingOrganizer(
             temp_dir, mode=None,
@@ -1284,39 +1299,42 @@ class TestMNENJobsParameter:
             datetimes_are_start=True,
             n_jobs=4
         )
-        
+
         assert organizer.n_jobs == 4
-        
+
         # Mock MNE raw object
         mock_raw = Mock()
         mock_info = Mock()
         mock_info.sfreq = 2000.0
         mock_info.nchan = 2
         mock_info.ch_names = ["ch1", "ch2"]  # Add channel names
-        mock_info.__getitem__ = lambda self, key: getattr(self, key)
+        mock_info.chs = []  # Add empty chs list for extract_mne_unit_info
+        mock_info.__getitem__ = Mock(side_effect=lambda key: getattr(mock_info, key))
+        mock_info.__contains__ = Mock(side_effect=lambda key: hasattr(mock_info, key))
         mock_raw.info = mock_info
         mock_raw.resample.return_value = mock_raw
         mock_raw.get_data.return_value = np.random.randn(2, 3600)
-        
+
         mock_extract = Mock(return_value=mock_raw)
-        
+
         # Mock SpikeInterface recording
         mock_si_rec = Mock()
         mock_si_rec.get_num_channels.return_value = 2
         mock_si_rec.get_sampling_frequency.return_value = constants.GLOBAL_SAMPLING_RATE
         mock_si_rec.get_channel_ids.return_value = np.array(['ch1', 'ch2'])
         mock_si_rec.get_duration.return_value = 3.6
-        
+
         with patch('mne.export.export_raw'), \
-             patch('spikeinterface.extractors.read_edf', return_value=mock_si_rec):
-            
+             patch('spikeinterface.extractors.read_edf', return_value=mock_si_rec), \
+             patch('spikeinterface.preprocessing.resample', return_value=mock_si_rec):
+
             organizer.convert_file_with_mne_to_recording(
                 extract_func=mock_extract,
                 input_type="file",
                 file_pattern="*.bdf",
                 intermediate="edf"
             )
-        
+
         # MNE resample should NOT be called (new architecture uses SpikeInterface resampling)
         mock_raw.resample.assert_not_called()
     
@@ -1324,37 +1342,40 @@ class TestMNENJobsParameter:
         """Test n_jobs parameter when calling convert_file_with_mne_to_recording directly."""
         test_file = temp_dir / "test.bdf"
         test_file.touch()
-        
+
         organizer = LongRecordingOrganizer(
             temp_dir, mode=None,
             manual_datetimes=datetime(2023, 1, 1, 10, 0, 0),
             datetimes_are_start=True,
             n_jobs=1  # Default
         )
-        
+
         # Mock MNE raw object
         mock_raw = Mock()
         mock_info = Mock()
         mock_info.sfreq = 2000.0
         mock_info.nchan = 2
         mock_info.ch_names = ["ch1", "ch2"]  # Add channel names
-        mock_info.__getitem__ = lambda self, key: getattr(self, key)
+        mock_info.chs = []  # Add empty chs list for extract_mne_unit_info
+        mock_info.__getitem__ = Mock(side_effect=lambda key: getattr(mock_info, key))
+        mock_info.__contains__ = Mock(side_effect=lambda key: hasattr(mock_info, key))
         mock_raw.info = mock_info
         mock_raw.resample.return_value = mock_raw
         mock_raw.get_data.return_value = np.random.randn(2, 1000)
-        
+
         mock_extract = Mock(return_value=mock_raw)
-        
+
         # Mock SpikeInterface recording
         mock_si_rec = Mock()
         mock_si_rec.get_num_channels.return_value = 2
         mock_si_rec.get_sampling_frequency.return_value = constants.GLOBAL_SAMPLING_RATE
         mock_si_rec.get_channel_ids.return_value = np.array(['ch1', 'ch2'])
         mock_si_rec.get_duration.return_value = 1.0
-        
+
         with patch('mne.export.export_raw'), \
-             patch('spikeinterface.extractors.read_edf', return_value=mock_si_rec):
-            
+             patch('spikeinterface.extractors.read_edf', return_value=mock_si_rec), \
+             patch('spikeinterface.preprocessing.resample', return_value=mock_si_rec):
+
             # Call directly with override n_jobs=6
             organizer.convert_file_with_mne_to_recording(
                 extract_func=mock_extract,
@@ -1363,7 +1384,7 @@ class TestMNENJobsParameter:
                 intermediate="edf",
                 n_jobs=6  # Override the instance default
             )
-        
+
         # MNE resample should NOT be called (new architecture uses SpikeInterface resampling)
         mock_raw.resample.assert_not_called()
 

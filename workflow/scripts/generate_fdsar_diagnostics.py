@@ -16,7 +16,7 @@ import sys
 import warnings
 from pathlib import Path
 
-from pythoneeg.visualization.frequency_domain_results import FrequencyDomainSpikeAnalysisResult
+from neurodent.visualization.frequency_domain_results import FrequencyDomainSpikeAnalysisResult
 
 
 def load_fdsar_results(fdsar_base_dir: Path):
@@ -74,7 +74,7 @@ def generate_diagnostics(fdsar_list: list[FrequencyDomainSpikeAnalysisResult], o
 
     total_spikes = 0
     for i, fdsar in enumerate(fdsar_list):
-        logging.info(f"Processing FDSAR {i+1}/{len(fdsar_list)}: {fdsar.animal_id} - {fdsar.animal_day}")
+        logging.info(f"Processing FDSAR {i + 1}/{len(fdsar_list)}: {fdsar.animal_id} - {fdsar.animal_day}")
 
         spike_counts = fdsar.get_spike_counts_per_channel()
         session_total = sum(spike_counts)

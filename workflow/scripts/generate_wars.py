@@ -22,7 +22,7 @@ from pathlib import Path
 from dask.distributed import Client, LocalCluster
 from tqdm import tqdm
 
-from pythoneeg import constants, core, visualization
+from neurodent import constants, core, visualization
 
 
 def load_samples_and_config():
@@ -97,8 +97,7 @@ def generate_war_for_animal(samples_config, config, animal_folder, animal_id):
             multiprocess_mode = fdsar_config.get("multiprocess_mode", "serial")
 
             fdsar_list = ao.compute_frequency_domain_spike_analysis(
-                detection_params=detection_params,
-                multiprocess_mode=multiprocess_mode
+                detection_params=detection_params, multiprocess_mode=multiprocess_mode
             )
 
             # Integrate spike features into WAR
@@ -149,12 +148,7 @@ def main():
             animalday_dir = fdsar_base_dir / f"{fdsar.animal_id}-{fdsar.genotype}-{fdsar.animal_day}"
             animalday_dir.mkdir(parents=True, exist_ok=True)
 
-            fdsar.save_fif_and_json(
-                animalday_dir,
-                convert_to_mne=True,
-                slugify_filebase=False,
-                overwrite=True
-            )
+            fdsar.save_fif_and_json(animalday_dir, convert_to_mne=True, slugify_filebase=False, overwrite=True)
             logging.info(f"Saved FDSAR for {fdsar.animal_id} {fdsar.animal_day} to {animalday_dir}")
 
         logging.info(f"Successfully saved {len(fdsar_list)} FDSAR results to {fdsar_base_dir}")

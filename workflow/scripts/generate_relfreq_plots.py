@@ -30,7 +30,7 @@ import numpy as np
 import seaborn as sns
 from okabeito import blue, green, orange, purple, red
 
-from pythoneeg import visualization, constants
+from neurodent import visualization, constants
 
 logger = logging.getLogger(__name__)
 

@@ -16,9 +16,8 @@ import sys
 from pathlib import Path
 import json
 
-# Add pythoneeg to path
-sys.path.insert(0, str(Path("pythoneeg").resolve()))
-from pythoneeg import visualization
+from neurodent import visualization
+
 
 def main():
     """Main flattening function for single animal (1-to-1 operation)"""
@@ -65,9 +64,6 @@ if __name__ == "__main__":
     with open(snakemake.log[0], "w") as f:
         sys.stderr = sys.stdout = f
         logging.basicConfig(
-            format="%(asctime)s - %(levelname)s - %(message)s",
-            level=logging.INFO,
-            stream=sys.stdout,
-            force=True
+            format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO, stream=sys.stdout, force=True
         )
         main()

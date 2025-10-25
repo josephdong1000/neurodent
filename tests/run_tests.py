@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-Test runner script for PythonEEG package.
+Test runner script for Neurodent package.
 """
+
 import sys
 import subprocess
 import argparse
@@ -11,7 +12,7 @@ from pathlib import Path
 def run_tests(test_type="all", coverage=True, verbose=False, parallel=False):
     """
     Run tests with specified options.
-    
+
     Args:
         test_type (str): Type of tests to run ('all', 'unit', 'integration', 'slow')
         coverage (bool): Whether to run with coverage
@@ -20,7 +21,7 @@ def run_tests(test_type="all", coverage=True, verbose=False, parallel=False):
     """
     # Base pytest command
     cmd = ["python", "-m", "pytest"]
-    
+
     # Add test type filters
     if test_type == "unit":
         cmd.extend(["-m", "unit"])
@@ -30,24 +31,24 @@ def run_tests(test_type="all", coverage=True, verbose=False, parallel=False):
         cmd.extend(["-m", "slow"])
     elif test_type == "fast":
         cmd.extend(["-m", "not slow"])
-    
+
     # Add coverage options
     if coverage:
-        cmd.extend(["--cov=pythoneeg", "--cov-report=term-missing", "--cov-report=html"])
-    
+        cmd.extend(["--cov=neurodent", "--cov-report=term-missing", "--cov-report=html"])
+
     # Add verbose option
     if verbose:
         cmd.append("-v")
-    
+
     # Add parallel option
     if parallel:
         cmd.extend(["-n", "auto"])
-    
+
     # Add test discovery
     cmd.append("tests/")
-    
+
     print(f"Running tests with command: {' '.join(cmd)}")
-    
+
     try:
         result = subprocess.run(cmd, check=True)
         print("All tests passed!")
@@ -60,18 +61,18 @@ def run_tests(test_type="all", coverage=True, verbose=False, parallel=False):
 def run_specific_test(test_file, verbose=False):
     """
     Run a specific test file.
-    
+
     Args:
         test_file (str): Path to test file
         verbose (bool): Whether to run in verbose mode
     """
     cmd = ["python", "-m", "pytest", test_file]
-    
+
     if verbose:
         cmd.append("-v")
-    
+
     print(f"Running specific test: {' '.join(cmd)}")
-    
+
     try:
         result = subprocess.run(cmd, check=True)
         print("Test passed!")
@@ -84,11 +85,10 @@ def run_specific_test(test_file, verbose=False):
 def run_linting():
     """Run code linting checks."""
     print("Running linting checks...")
-    
+
     # Check if flake8 is available
     try:
-        result = subprocess.run(["flake8", "pythoneeg/", "tests/"], 
-                              capture_output=True, text=True)
+        result = subprocess.run(["flake8", "neurodent/", "tests/"], capture_output=True, text=True)
         if result.returncode == 0:
             print("Linting passed!")
             return True
@@ -104,10 +104,9 @@ def run_linting():
 def run_type_checking():
     """Run type checking with mypy."""
     print("Running type checking...")
-    
+
     try:
-        result = subprocess.run(["mypy", "pythoneeg/"], 
-                              capture_output=True, text=True)
+        result = subprocess.run(["mypy", "neurodent/"], capture_output=True, text=True)
         if result.returncode == 0:
             print("Type checking passed!")
             return True
@@ -122,25 +121,22 @@ def run_type_checking():
 
 def main():
     """Main function for test runner."""
-    parser = argparse.ArgumentParser(description="Run PythonEEG tests")
-    parser.add_argument("--type", choices=["all", "unit", "integration", "slow", "fast"],
-                       default="all", help="Type of tests to run")
-    parser.add_argument("--no-coverage", action="store_true", 
-                       help="Disable coverage reporting")
-    parser.add_argument("--verbose", "-v", action="store_true", 
-                       help="Run in verbose mode")
-    parser.add_argument("--parallel", "-p", action="store_true", 
-                       help="Run tests in parallel")
+    parser = argparse.ArgumentParser(description="Run Neurodent tests")
+    parser.add_argument(
+        "--type", choices=["all", "unit", "integration", "slow", "fast"], default="all", help="Type of tests to run"
+    )
+    parser.add_argument("--no-coverage", action="store_true", help="Disable coverage reporting")
+    parser.add_argument("--verbose", "-v", action="store_true", help="Run in verbose mode")
+    parser.add_argument("--parallel", "-p", action="store_true", help="Run tests in parallel")
     parser.add_argument("--file", "-f", help="Run specific test file")
     parser.add_argument("--lint", action="store_true", help="Run linting checks")
     parser.add_argument("--type-check", action="store_true", help="Run type checking")
-    parser.add_argument("--all-checks", action="store_true", 
-                       help="Run all checks (tests, linting, type checking)")
-    
+    parser.add_argument("--all-checks", action="store_true", help="Run all checks (tests, linting, type checking)")
+
     args = parser.parse_args()
-    
+
     success = True
-    
+
     if args.file:
         success = run_specific_test(args.file, args.verbose)
     elif args.lint:
@@ -149,14 +145,16 @@ def main():
         success = run_type_checking()
     elif args.all_checks:
         print("Running all checks...")
-        success = run_linting() and run_type_checking() and run_tests(
-            args.type, not args.no_coverage, args.verbose, args.parallel
+        success = (
+            run_linting()
+            and run_type_checking()
+            and run_tests(args.type, not args.no_coverage, args.verbose, args.parallel)
         )
     else:
         success = run_tests(args.type, not args.no_coverage, args.verbose, args.parallel)
-    
+
     sys.exit(0 if success else 1)
 
 
 if __name__ == "__main__":
-    main() 
+    main()

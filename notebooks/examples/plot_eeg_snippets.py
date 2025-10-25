@@ -13,7 +13,7 @@ import numpy as np
 from tqdm import tqdm
 import spikeinterface.preprocessing as spre
 
-from pythoneeg import constants, core, visualization
+from neurodent import constants, core, visualization
 
 # Configure logging
 logging.basicConfig(
@@ -29,7 +29,7 @@ random.seed(42)
 np.random.seed(42)
 
 # Configuration
-base_folder = Path("/mnt/isilon/marsh_single_unit/PythonEEG")
+base_folder = Path("/mnt/isilon/marsh_single_unit/Neurodent")
 genotype_json_path = base_folder / "notebooks" / "tests" / "sox5 combine genotypes.json"
 save_folder = base_folder / "notebooks" / "examples" / "eeg_snippets_plots"
 save_folder.mkdir(parents=True, exist_ok=True)
@@ -147,7 +147,6 @@ def load_and_sample_animal_data(animal_info: Tuple[str, str, str, Path]) -> Dict
         snippets = random.sample(snippets, SNIPPETS_PER_ANIMAL)
 
     return {"animal_id": animal_id, "genotype": genotype, "snippets": snippets, "success": True}
-
 
 
 def extract_snippets_from_lro_safe(valid_recs: List, animal_id: str, genotype: str, lro_idx: int) -> List[Dict]:
@@ -540,5 +539,5 @@ if __name__ == "__main__":
 """
 To run this script on SLURM:
 
-sbatch --mem 200GB -c 11 -t 12:00:00 /mnt/isilon/marsh_single_unit/PythonEEG/notebooks/examples/pipeline.sh /mnt/isilon/marsh_single_unit/PythonEEG/notebooks/examples/plot_eeg_snippets.py
+sbatch --mem 200GB -c 11 -t 12:00:00 /mnt/isilon/marsh_single_unit/Neurodent/notebooks/examples/pipeline.sh /mnt/isilon/marsh_single_unit/Neurodent/notebooks/examples/plot_eeg_snippets.py
 """

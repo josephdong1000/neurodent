@@ -1,3 +1,3 @@
 """
-Unit tests for PythonEEG package.
-""" 
+Unit tests for Neurodent package.
+"""
