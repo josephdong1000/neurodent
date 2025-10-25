@@ -8,6 +8,10 @@ from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 import pytest
 
+# Add tests directory to path to import run_tests module
+# This is needed because run_tests.py is a utility script in tests/
+sys.path.insert(0, str(Path(__file__).parent))
+
 from run_tests import run_tests, run_specific_test, run_linting, run_type_checking, main
 
 
