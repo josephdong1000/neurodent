@@ -30,10 +30,11 @@ dependencies = [
     "statannotations",
     "statsmodels",
     "django",
-    "okabeito",          # this could be just a line in constants
+    "okabeito", # this could be just a line in constants
     "openpyxl",
     "appnope",
     "zarr>=2.18.3",
+    "scikit-learn>=1.7.2",
 ]
 requires-python = ">=3.10"
 keywords = [
@@ -52,7 +53,7 @@ Documentation = "https://josephdong1000.github.io/neurodent/"
 Repository = "https://github.com/josephdong1000/neurodent"
 "Bug Tracker" = "https://github.com/josephdong1000/neurodent/issues"
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
     "snakeviz",
     "pytest>=7.0.0",
@@ -67,8 +68,7 @@ dev = [
 ]
 
 [tool.setuptools.packages.find]
-include = ["neurodent*"]
-exclude = ["notebooks", "docs", "tmp"]
+where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -112,3 +112,7 @@ exclude_lines = [
     "class .*\\bProtocol\\):",
     "@(abc\\.)?abstractmethod",
 ]
+
+[tool.uv]
+package = true
+default-groups = ["dev"]
