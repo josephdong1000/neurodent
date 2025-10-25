@@ -5,7 +5,7 @@ on:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
-  workflow_dispatch:  # Allow manual triggering
+  workflow_dispatch:
 
 jobs:
   test:
@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10.8", "3.11", "3.12", "3.13"]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
         os: ["ubuntu-latest", "macos-latest", "windows-latest"]
     runs-on: ${{ matrix.os }}
     
@@ -21,6 +21,11 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
+    - name: Install uv
+      uses: astral-sh/setup-uv@v6
+      with:
+        enable-cache: true
+        
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v4
       with:
@@ -37,40 +42,25 @@ jobs:
     - name: macOS Pre-install isosplit6 and mountainsort5 from source
       if: runner.os == 'macOS'
       run: |
-        python -m pip install --upgrade pip setuptools wheel
-        pip install --no-binary :all: isosplit6
-        pip install mountainsort5
+        uv pip install --upgrade pip setuptools wheel
+        uv pip install --no-binary :all: isosplit6
+        uv pip install mountainsort5
         
-    - name: Cache pip dependencies
-      uses: actions/cache@v3
-      with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('**/requirements.txt') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-${{ matrix.python-version }}-
-        
-    - name: Install dependencies
+    - name: Install package and dependencies
       run: |
-        python -m pip install --upgrade pip setuptools wheel
-        pip install -r requirements.txt
-        echo "Python version: $(python --version)"
+        uv sync --all-groups
+        echo "Python version: $(uv run python --version)"
         echo "Installed packages:"
-        python -m pip list
+        uv pip list
         
     - name: Test package import
       run: |
-        python -c "import neurodent; print('Package imports successfully')"
+        uv run python -c "import neurodent; print('Package imports successfully')"
         
     - name: Run tests with coverage (Windows, no parallel)
-      if: runner.os == 'Windows'
       run: |
-        python -m pytest tests/ --cov=neurodent --cov-report=xml --cov-report=term-missing -v -n 1 --dist no
+        uv run pytest tests/ --cov=neurodent --cov-report=xml --cov-report=term-missing -v
 
-    - name: Run tests with coverage
-      if: runner.os != 'Windows'
-      run: |
-        python -m pytest tests/ --cov=neurodent --cov-report=xml --cov-report=term-missing -v
-        
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v5
       with:
@@ -87,19 +77,17 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
+    - name: Install uv
+      uses: astral-sh/setup-uv@v6
+        
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.10.8'
         
-    - name: Install build dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install build twine
-        
     - name: Build package
       run: |
-        python -m build
+        uv build
         echo "Package built successfully!"
         echo "Distribution files:"
         ls -la dist/
@@ -124,6 +112,9 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
+    - name: Install uv
+      uses: astral-sh/setup-uv@v6
+      
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
@@ -131,13 +122,12 @@ jobs:
         
     - name: Install documentation dependencies
       run: |
-        python -m pip install --upgrade pip
-        pip install mkdocs mkdocstrings[python] mkdocs-material
+        uv pip install mkdocs mkdocstrings[python] mkdocs-material
         
     - name: Build documentation
       run: |
         echo "Building documentation..."
-        mkdocs build --verbose
+        uv run mkdocs build --verbose
         echo "Documentation built successfully!"
         echo "Site directory contents:"
         ls -la site/
@@ -162,6 +152,9 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+      
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
@@ -169,11 +162,10 @@ jobs:
         
     - name: Install documentation dependencies
       run: |
-        python -m pip install --upgrade pip
-        pip install mkdocs mkdocstrings[python] mkdocs-material
+        uv pip install mkdocs mkdocstrings[python] mkdocs-material
         
     - name: Build documentation
-      run: mkdocs build
+      run: uv run mkdocs build
       
     - name: Deploy to GitHub Pages
-      run: mkdocs gh-deploy --force 
+      run: uv run mkdocs gh-deploy --force 
