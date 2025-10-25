@@ -38,13 +38,6 @@ jobs:
         echo "CXX=g++" >> $GITHUB_ENV
         echo "CXXFLAGS=-std=c++14 -I$(xcrun --show-sdk-path)/usr/include/c++/v1" >> $GITHUB_ENV
         echo "LDFLAGS=-L$(xcrun --show-sdk-path)/usr/lib" >> $GITHUB_ENV
-
-    - name: macOS Pre-install isosplit6 and mountainsort5 from source
-      if: runner.os == 'macOS'
-      run: |
-        uv pip install --upgrade pip setuptools wheel
-        uv pip install --no-binary :all: isosplit6
-        uv pip install mountainsort5
         
     - name: Install package and dependencies
       run: |
@@ -52,6 +45,12 @@ jobs:
         echo "Python version: $(uv run python --version)"
         echo "Installed packages:"
         uv pip list
+
+    - name: macOS install isosplit6 and mountainsort5
+      if: runner.os == 'macOS'
+      run: |
+        uv pip install --reinstall --no-binary :all: isosplit6
+        uv pip install --reinstall mountainsort5
         
     - name: Test package import
       run: |
