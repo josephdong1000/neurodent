@@ -51,7 +51,7 @@ keywords = [
 Homepage = "https://github.com/josephdong1000/neurodent"
 Documentation = "https://josephdong1000.github.io/neurodent/"
 Repository = "https://github.com/josephdong1000/neurodent"
-"Bug Tracker" = "https://github.com/josephdong1000/neurodent/issues"
+"Issue Tracker" = "https://github.com/josephdong1000/neurodent/issues"
 
 [dependency-groups]
 dev = [

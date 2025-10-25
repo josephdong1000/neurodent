@@ -4,7 +4,7 @@
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/josephdong1000/Neurodent/HEAD) 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/josephdong1000/neurodent/)
 
-> Formerly PyEEG
+
 > Presented at [USRSE'25](https://doi.org/10.5281/zenodo.17274681)!
 
 A Python package for standardizing rodent EEG analysis and figure generation. Various EEG formats are loadable and features are extracted in parallel. Also includes a Snakemake workflow for automated analysis.
@@ -12,6 +12,7 @@ A Python package for standardizing rodent EEG analysis and figure generation. Va
 ## Usage
 
 Tutorial: *WIP!*
+
 API documentation: https://josephdong1000.github.io/neurodent/
 
 ## Overview
