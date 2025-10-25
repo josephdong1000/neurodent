@@ -33,6 +33,7 @@ dependencies = [
     "okabeito",          # this could be just a line in constants
     "openpyxl",
     "appnope",
+    "zarr>=2.18.3",
 ]
 requires-python = ">=3.10"
 keywords = [
