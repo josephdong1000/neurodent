@@ -4,57 +4,57 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "neurodent"
-version = "0.1.0"
-description = "Mouse EEG analysis tools"
+version = "0.2.0"
+description = "Rodent EEG analysis tools"
 readme = "README.md"
+license = { text = "MIT" }
 authors = [
-    { name="Joseph Dong", email="dongjp@chop.edu" },
-    { name="Yongtaek Oh", email="ohy2@chop.edu" },
-    { name="Eric Marsh", email="marshe@chop.edu" },
+    { name = "Joseph Dong", email = "dongjp@chop.edu" },
+    { name = "Yongtaek Oh", email = "ohy2@chop.edu" },
+    { name = "Eric Marsh", email = "marshe@chop.edu" },
 ]
 dependencies = [
-    "cmasher",
+    "numpy",
     "matplotlib",
     "mne",
     "mne-connectivity",
-    "numpy",
-    "pactools",
+    # "cmasher", # this is not used directly but is a nice package
     "pandas",
-    "probeinterface",
-    "pyinstaller",
-    "scipy",
     "spikeinterface",
-    "ipykernel",
+    "probeinterface",
+    "scipy",
     "dask[distributed]",
-    "dask-labextension",
-    "bokeh",
     "dask-jobqueue",
     "seaborn",
-    "pipreqs",
     "pyarrow",
-    "mountainsort5",
     "statannotations",
     "statsmodels",
     "django",
-    "neo",
-    "pyedflib",
-    "edfio",
-    "build",
-    "pyprep",
-    "okabeito",
+    "okabeito",          # this could be just a line in constants
     "openpyxl",
-    "starbars",
     "appnope",
 ]
 requires-python = ">=3.10"
-keywords = ["EEG", "rodent", "mouse", "neuroscience", "data analysis"]
+keywords = [
+    "EEG",
+    "rodent",
+    "neuroscience",
+    "data analysis",
+    "pipeline",
+    "PythonEEG",
+    "PyEEG",
+]
+
+[project.urls]
+Homepage = "https://github.com/josephdong1000/neurodent"
+Documentation = "https://josephdong1000.github.io/neurodent/"
+Repository = "https://github.com/josephdong1000/neurodent"
+"Bug Tracker" = "https://github.com/josephdong1000/neurodent/issues"
 
 [project.optional-dependencies]
 dev = [
-    "nodejs",
-    "npm",
+    "build",
     "snakeviz",
-    "pyqt5",
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
     "pytest-mock>=3.10.0",
@@ -75,13 +75,7 @@ testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = [
-    "--strict-markers",
-    "--strict-config",
-    "--tb=short",
-]
-# For coverage reports, add: --cov=neurodent --cov-report=term-missing --cov-fail-under=80
-# For slow tests, use: -m "not slow"
+addopts = ["--strict-markers", "--strict-config", "--tb=short"]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "integration: marks tests as integration tests",
@@ -118,4 +112,3 @@ exclude_lines = [
     "class .*\\bProtocol\\):",
     "@(abc\\.)?abstractmethod",
 ]
-
