@@ -2,6 +2,12 @@
 Pytest configuration and common fixtures for Neurodent tests.
 """
 
+# Set matplotlib backend to non-interactive before any imports
+# This prevents Tkinter issues in CI environments (especially Windows)
+import matplotlib
+
+matplotlib.use("Agg")
+
 import tempfile
 from pathlib import Path
 from typing import Generator
