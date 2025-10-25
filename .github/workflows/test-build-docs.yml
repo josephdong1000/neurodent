@@ -56,7 +56,7 @@ jobs:
       run: |
         uv run python -c "import neurodent; print('Package imports successfully')"
         
-    - name: Run tests with coverage (Windows, no parallel)
+    - name: Run tests with coverage
       run: |
         uv run pytest tests/ --cov=neurodent --cov-report=xml --cov-report=term-missing -v
 
