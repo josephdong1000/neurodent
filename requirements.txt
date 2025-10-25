@@ -1707,11 +1707,15 @@ xarray==2025.10.1 ; python_full_version >= '3.11' \
 zarr==2.18.3 ; python_full_version < '3.11' \
     --hash=sha256:2580d8cb6dd84621771a10d31c4d777dca8a27706a1a89b29f42d2d37e2df5ce \
     --hash=sha256:b1f7dfd2496f436745cdd4c7bcf8d3b4bc1dceef5fdd0d589c87130d842496dd
-    # via spikeinterface
+    # via
+    #   neurodent
+    #   spikeinterface
 zarr==2.18.7 ; python_full_version >= '3.11' \
     --hash=sha256:ac3dc4033e9ae4e9d7b5e27c97ea3eaf1003cc0a07f010bd83d5134bf8c4b223 \
     --hash=sha256:b2b8f66f14dac4af66b180d2338819981b981f70e196c9a66e6bfaa9e59572f5
-    # via spikeinterface
+    # via
+    #   neurodent
+    #   spikeinterface
 zict==3.0.0 \
     --hash=sha256:5796e36bd0e0cc8cf0fbc1ace6a68912611c1dbd74750a3f3026b9b9d6a327ae \
     --hash=sha256:e321e263b6a97aafc0790c3cfb3c04656b7066e6738c37fffcca95d803c9fba5
