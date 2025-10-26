@@ -7,11 +7,22 @@ name = "neurodent"
 version = "0.2.0"
 description = "Rodent EEG analysis tools"
 readme = "README.md"
-license = { text = "MIT" }
+license = "MIT"
 authors = [
     { name = "Joseph Dong", email = "dongjp@chop.edu" },
     { name = "Yongtaek Oh", email = "ohy2@chop.edu" },
     { name = "Eric Marsh", email = "marshe@chop.edu" },
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+    "Operating System :: OS Independent",
 ]
 dependencies = [
     "numpy",
