@@ -60,12 +60,25 @@ jobs:
       run: |
         uv run pytest tests/ --cov=neurodent --cov-report=xml --cov-report=term-missing -v
 
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v5
-      with:
-        file: ./coverage.xml
-        fail_ci_if_error: false
-        token: ${{ secrets.CODECOV_TOKEN }}
+    - name: Upload coverage to Codecov (Linux)
+      if: runner.os == 'Linux'
+      run: |
+        curl -Os https://cli.codecov.io/latest/linux/codecov
+        chmod +x codecov
+        ./codecov --verbose upload-process --fail-on-error -t ${{ secrets.CODECOV_TOKEN }} -n 'neurodent-${{ matrix.python-version }}-${{ matrix.os }}' -F tests -f coverage.xml
+
+    - name: Upload coverage to Codecov (macOS)
+      if: runner.os == 'macOS'
+      run: |
+        curl -Os https://cli.codecov.io/latest/macos/codecov
+        chmod +x codecov
+        ./codecov --verbose upload-process --fail-on-error -t ${{ secrets.CODECOV_TOKEN }} -n 'neurodent-${{ matrix.python-version }}-${{ matrix.os }}' -F tests -f coverage.xml
+
+    - name: Upload coverage to Codecov (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        curl -Os https://cli.codecov.io/latest/windows/codecov.exe
+        ./codecov.exe --verbose upload-process --fail-on-error -t ${{ secrets.CODECOV_TOKEN }} -n 'neurodent-${{ matrix.python-version }}-${{ matrix.os }}' -F tests -f coverage.xml
 
   build-package:
     name: Build Package
