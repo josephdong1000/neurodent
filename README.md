@@ -9,11 +9,28 @@
 
 A Python package for standardizing rodent EEG analysis and figure generation. Various EEG formats are loadable and features are extracted in parallel. Also includes a Snakemake workflow for automated analysis.
 
+## Installation
+
+Neurodent can be installed via pip:
+
+```
+pip install neurodent
+```
+
+We recommend you install Neurodent with [`uv`, an all-in-one Python package and project manager](https://docs.astral.sh/uv/getting-started/).
+```
+uv init yourprojectname
+cd yourprojectname
+uv add neurodent
+```
+
+You can learn more about the features of `uv` [here](https://docs.astral.sh/uv/getting-started/features/).
+
 ## Usage
 
-Tutorial: *WIP!*
+**Tutorial:** *WIP!*
 
-API documentation: https://josephdong1000.github.io/neurodent/
+**API documentation:** https://josephdong1000.github.io/neurodent/
 
 ## Overview
 
