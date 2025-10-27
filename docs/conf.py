@@ -33,14 +33,16 @@ copyright = f'2025, {author}'
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 extensions = [
-    'sphinx.ext.autodoc',
-    'sphinx.ext.autosummary',
-    'sphinx.ext.napoleon',
-    'sphinx.ext.viewcode',
-    'sphinx.ext.intersphinx',
-    'sphinx_autodoc_typehints',
-    'myst_parser',
-    'nbsphinx',
+    "sphinx.ext.autodoc",
+    "sphinx.ext.autosummary",
+    "sphinx.ext.napoleon",
+    "sphinx.ext.viewcode",
+    "sphinx.ext.intersphinx",
+    "sphinx_autodoc_typehints",
+    "myst_parser",
+    "sphinx_design",
+    "nbsphinx",
+    "sphinx_multiversion",
 ]
 
 # MyST parser configuration (for markdown support)
@@ -84,6 +86,9 @@ autodoc_default_options = {
 autodoc_typehints = 'description'
 autosummary_generate = True
 
+# Ensure all modules are imported for module index
+autodoc_mock_imports = []
+
 # Intersphinx mapping
 intersphinx_mapping = {
     'python': ('https://docs.python.org/3', None),
@@ -125,6 +130,22 @@ source_suffix = {
 # The master document
 master_doc = 'index'
 
+# -- Sphinx-multiversion configuration ---------------------------------------
+# Whitelist pattern for tags (Sphinx will build docs for tags matching this pattern)
+smv_tag_whitelist = r"^v\d+\.\d+.*$"  # Matches v0.1.0, v1.0.0, etc.
+
+# Whitelist pattern for branches
+smv_branch_whitelist = r"^(main|develop)$"  # Only build main and develop branches
+
+# Whitelist pattern for remotes
+smv_remote_whitelist = r"^origin$"
+
+# Pattern for released versions (tags only, not branches)
+smv_released_pattern = r"^refs/tags/v\d+\.\d+.*$"
+
+# Output directory for versioned docs
+smv_outputdir_format = "{ref.name}"
+
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
@@ -147,11 +168,24 @@ html_theme_options = {
             "icon": "fab fa-python",
         },
     ],
+    "switcher": {
+        "json_url": "https://josephdong1000.github.io/neurodent/_static/switcher.json",
+        "version_match": release,
+    },
+    "navbar_end": ["version-switcher", "theme-switcher", "navbar-icon-links"],
 }
 
 # Force all pages to use the main navigation sidebar
 html_sidebars = {
     "**": ["sidebar-nav-bs.html"]
+}
+
+# HTML context for version information
+html_context = {
+    "github_user": "josephdong1000",
+    "github_repo": "neurodent",
+    "github_version": "main",
+    "doc_path": "docs",
 }
 
 # Output file base name for HTML help builder
