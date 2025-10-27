@@ -149,6 +149,11 @@ html_theme_options = {
     ],
 }
 
+# Force all pages to use the main navigation sidebar
+html_sidebars = {
+    "**": ["sidebar-nav-bs.html"]
+}
+
 # Output file base name for HTML help builder
 htmlhelp_basename = f'{project}doc'
 

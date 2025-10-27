@@ -1,5 +1,5 @@
-Getting Started
-===============
+Quickstart
+==========
 
 New to Neurodent? Start here to learn the basics of loading data and running your first analysis.
 

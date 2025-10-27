@@ -12,9 +12,13 @@ Documentation Contents
 .. toctree::
    :titlesonly:
 
-   getting_started/index
+   installation/index
+   quickstart/index
    tutorials/index
+   examples/index
    api/index
+   contributing/index
+   license/index
 
 Acknowledgements
 ------------------

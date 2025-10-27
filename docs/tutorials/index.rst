@@ -1,5 +1,5 @@
-Advanced Tutorials
-==================
+Tutorials
+=========
 
 Deep dive into specific features and analysis workflows.
 
@@ -23,12 +23,3 @@ Deep dive into specific features and analysis workflows.
    windowed_analysis
    spike_analysis
    visualization
-
-Additional Resources
---------------------
-
-.. toctree::
-   :maxdepth: 1
-
-   ../reference/examples
-   ../reference/contributing
