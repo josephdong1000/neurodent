@@ -134,11 +134,11 @@ master_doc = 'index'
 # Whitelist pattern for tags (Sphinx will build docs for tags matching this pattern)
 smv_tag_whitelist = r"^v\d+\.\d+.*$"  # Matches v0.1.0, v1.0.0, etc.
 
-# Whitelist pattern for branches
-smv_branch_whitelist = r"^(main|develop)$"  # Only build main and develop branches
+# Whitelist pattern for branches (accepts both local and remote branches)
+smv_branch_whitelist = r"^(main|develop|origin/main|origin/develop)$"
 
 # Whitelist pattern for remotes
-smv_remote_whitelist = r"^origin$"
+smv_remote_whitelist = r"^(origin)$"
 
 # Pattern for released versions (tags only, not branches)
 smv_released_pattern = r"^refs/tags/v\d+\.\d+.*$"

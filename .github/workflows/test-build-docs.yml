@@ -134,6 +134,11 @@ jobs:
       run: |
         uv sync --all-groups
 
+    - name: Fetch all refs for sphinx-multiversion
+      run: |
+        git fetch --all --tags
+        echo "Fetched all refs"
+
     - name: Debug - Check git refs for sphinx-multiversion
       run: |
         echo "=== Git Tags ==="
@@ -154,7 +159,7 @@ jobs:
     - name: Build multi-version documentation
       run: |
         echo "Building multi-version documentation with sphinx-multiversion..."
-        uv run sphinx-multiversion docs docs/_build/html
+        uv run sphinx-multiversion docs docs/_build/html --dump-metadata
         echo "Documentation built successfully!"
 
     - name: Generate version switcher JSON
