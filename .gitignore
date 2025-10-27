@@ -54,3 +54,4 @@ results/
 CLAUDE.md
 
 docs/_build/
+**/generated/
