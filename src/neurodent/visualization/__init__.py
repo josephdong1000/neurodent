@@ -8,12 +8,14 @@ from .plotting import (
     AnimalPlotter,
     ExperimentPlotter,
 )
+from .frequency_domain_results import FrequencyDomainSpikeAnalysisResult
 
 __all__ = [
-    "WindowAnalysisResult", 
-    "AnimalFeatureParser", 
-    "AnimalOrganizer", 
+    "WindowAnalysisResult",
+    "AnimalFeatureParser",
+    "AnimalOrganizer",
     "SpikeAnalysisResult",
-    "AnimalPlotter", 
-    "ExperimentPlotter"
+    "FrequencyDomainSpikeAnalysisResult",
+    "AnimalPlotter",
+    "ExperimentPlotter",
 ]

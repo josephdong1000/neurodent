@@ -16,11 +16,11 @@ jobs:
         python-version: ["3.10", "3.11", "3.12", "3.13"]
         os: ["ubuntu-latest", "macos-latest", "windows-latest"]
     runs-on: ${{ matrix.os }}
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
     - name: Install uv
       uses: astral-sh/setup-uv@v6
       with:
@@ -109,71 +109,110 @@ jobs:
     name: Build Documentation
     runs-on: ubuntu-latest
     # needs: test
-    
+
     steps:
-    - name: Checkout code
+    - name: Checkout code with full history
       uses: actions/checkout@v4
-      
+      with:
+        fetch-depth: 0  # Fetch all history for all tags and branches
+        fetch-tags: true  # Explicitly fetch tags
+
+    - name: Install pandoc (fast)
+      uses: pandoc/actions/setup@v1
+      # with:
+      #   version: 3.1.11
+
     - name: Install uv
       uses: astral-sh/setup-uv@v6
-      
+
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.10.8'
-        
-    - name: Create virtual environment
-      run: uv venv
-        
-    - name: Install documentation dependencies
+
+    - name: Install package and documentation dependencies
       run: |
-        uv pip install mkdocs mkdocstrings[python] mkdocs-material
-        
-    - name: Build documentation
+        uv sync --all-groups
+
+    - name: Fetch all refs for sphinx-multiversion
       run: |
-        echo "Building documentation..."
-        uv run mkdocs build --verbose
+        git fetch --all --tags
+        echo "Fetched all refs"
+
+    - name: Debug - Check git refs for sphinx-multiversion
+      run: |
+        echo "=== Git Tags ==="
+        git tag -l
+        echo ""
+        echo "=== Git Branches ==="
+        git branch -a
+        echo ""
+        echo "=== Current Branch ==="
+        git rev-parse --abbrev-ref HEAD
+        echo ""
+        echo "=== Tags matching v*.*.* pattern ==="
+        git tag -l "v*.*.*"
+        echo ""
+        echo "=== Remote refs ==="
+        git ls-remote --tags --heads origin
+
+    - name: Build multi-version documentation
+      run: |
+        echo "Building multi-version documentation with sphinx-multiversion..."
+        uv run sphinx-multiversion docs docs/_build/html --dump-metadata
         echo "Documentation built successfully!"
-        echo "Site directory contents:"
-        ls -la site/
-        echo "Site size:"
-        du -sh site/
-        
+
+    - name: Generate version switcher JSON
+      run: |
+        echo "Generating switcher.json..."
+        uv run python docs/generate_switcher.py
+
+    - name: Add root redirect and .nojekyll
+      run: |
+        echo "Adding root index.html redirect..."
+        cp docs/redirect_index.html docs/_build/html/index.html
+        echo "Adding .nojekyll to disable GitHub Pages Jekyll processing..."
+        touch docs/_build/html/.nojekyll
+        echo "Build output structure:"
+        ls -la docs/_build/html/
+
+    # - name: Prune uv cache for efficiency
+    #   run: |
+    #     uv cache prune --ci
+
     - name: Upload documentation artifacts
       uses: actions/upload-artifact@v4
       with:
         name: documentation
-        path: site/
+        path: docs/_build/html/
         retention-days: 30
 
   deploy-docs:
     name: Deploy Documentation
     runs-on: ubuntu-latest
-    # needs: [test, build-docs]
     needs: build-docs
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-    
+
+    # Permissions needed for GitHub Pages deployment
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Install uv
-      uses: astral-sh/setup-uv@v6
-      
-    - name: Set up Python
-      uses: actions/setup-python@v4
+    - name: Download documentation artifact
+      uses: actions/download-artifact@v4
       with:
-        python-version: '3.10.8'
-        
-    - name: Create virtual environment
-      run: uv venv
-        
-    - name: Install documentation dependencies
-      run: |
-        uv pip install mkdocs mkdocstrings[python] mkdocs-material
-        
-    - name: Build documentation
-      run: uv run mkdocs build
-      
+        name: documentation
+        path: docs/_build/html
+
     - name: Deploy to GitHub Pages
-      run: uv run mkdocs gh-deploy --force 
+      uses: peaceiris/actions-gh-pages@v4
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: docs/_build/html
+        publish_branch: gh-pages
+        force_orphan: true
+        user_name: 'github-actions[bot]'
+        user_email: 'github-actions[bot]@users.noreply.github.com'
+        commit_message: 'Deploy documentation for ${{ github.sha }}' 
