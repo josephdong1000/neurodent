@@ -3,6 +3,10 @@ Core Module
 
 The core module provides the fundamental classes for loading, organizing, and analyzing EEG data.
 
+.. automodule:: neurodent.core
+   :no-members:
+   :no-undoc-members:
+
 .. currentmodule:: neurodent.core
 
 Classes

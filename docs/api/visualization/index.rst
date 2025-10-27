@@ -3,6 +3,10 @@ Visualization Module
 
 The visualization module provides classes for organizing analysis results and creating plots.
 
+.. automodule:: neurodent.visualization
+   :no-members:
+   :no-undoc-members:
+
 .. currentmodule:: neurodent.visualization
 
 Classes
