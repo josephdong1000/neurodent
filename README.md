@@ -17,7 +17,7 @@ Neurodent can be installed via pip:
 pip install neurodent
 ```
 
-We recommend you install Neurodent with [`uv`, an all-in-one Python package and project manager](https://docs.astral.sh/uv/getting-started/).
+We recommend you install Neurodent with `uv`, [an all-in-one Python package and project manager](https://docs.astral.sh/uv/getting-started/).
 ```
 uv init yourprojectname
 cd yourprojectname
