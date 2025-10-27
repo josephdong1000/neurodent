@@ -5,11 +5,6 @@ import tempfile
 if not os.environ.get("TMPDIR"):
     os.environ["TMPDIR"] = tempfile.gettempdir()
 
-# Import core classes and functions immediately for better IDE support
-# Note: This will import heavier dependencies (MNE, SpikeInterface) but provides
-# better documentation and autocomplete experience
-
-# === PUBLIC API ===
 # Core classes
 from .core import (
     LongRecordingOrganizer,
@@ -17,8 +12,10 @@ from .core import (
     convert_ddfcolbin_to_ddfrowbin,
     convert_ddfrowbin_to_si,
 )
-from .analyze_frag import FragmentAnalyzer
 from .analysis import LongRecordingAnalyzer
+from .analyze_frag import FragmentAnalyzer
+from .analyze_sort import MountainSortAnalyzer
+from .frequency_domain_spike_detection import FrequencyDomainSpikeDetector
 
 # Essential utilities for users
 from .utils import (
@@ -33,26 +30,26 @@ from .utils import (
     should_use_cache_unified,
 )
 
-# === INTERNAL/ADVANCED UTILITIES ===
-# Import the utils module for internal functions
 from . import utils
 
 __all__: list[str] = [
     # === PUBLIC API ===
     # Core classes
     "LongRecordingOrganizer",
-    "DDFBinaryMetadata", 
+    "DDFBinaryMetadata",
     "convert_ddfcolbin_to_ddfrowbin",
     "convert_ddfrowbin_to_si",
     "LongRecordingAnalyzer",
     "FragmentAnalyzer",
+    "MountainSortAnalyzer",
+    "FrequencyDomainSpikeDetector",
     # Essential utilities
     "get_temp_directory",
-    "set_temp_directory", 
+    "set_temp_directory",
     "parse_chname_to_abbrev",
     "parse_path_to_animalday",
     "validate_timestamps",
-    "nanaverage", 
+    "nanaverage",
     "log_transform",
     "get_cache_status_message",
     "should_use_cache_unified",
