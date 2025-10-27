@@ -4,7 +4,17 @@ Neurodent
 .. include:: ../README.md
    :parser: myst_parser.sphinx_
    :start-after: # Neurodent
-   :end-before: ## Usage
+   :end-before: ## Installation
+
+Installation
+------------
+
+.. button-link:: installation/index.html
+   :ref-type: ref
+   :color: info
+   :shadow:
+
+   Get Started with Installation!
 
 Documentation Contents
 ----------------------
