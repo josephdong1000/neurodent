@@ -109,7 +109,7 @@ def main():
     # Determine output path
     # This script should be run after sphinx-multiversion build
     # Save to the root of the build output
-    output_dir = Path(__file__).parent / "_build" / "html"
+    output_dir = Path(__file__).parent / "_build"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     output_file = output_dir / "switcher.json"
