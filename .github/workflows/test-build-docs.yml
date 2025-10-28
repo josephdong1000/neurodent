@@ -172,6 +172,9 @@ jobs:
       run: |
         echo "Generating switcher.json..."
         uv run python docs/generate_switcher.py
+        echo "Copying switcher.json to _static folder for theme..."
+        mkdir -p build/html/_static
+        cp build/html/switcher.json build/html/_static/switcher.json
 
     - name: Add root redirect and .nojekyll
       run: |
