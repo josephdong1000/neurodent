@@ -39,9 +39,8 @@ extensions = [
     "sphinx.ext.viewcode",
     "sphinx.ext.intersphinx",
     "sphinx_autodoc_typehints",
-    "myst_parser",
+    "myst_nb",
     "sphinx_design",
-    "nbsphinx",
     "sphinx_multiversion",
 ]
 
@@ -71,8 +70,17 @@ napoleon_use_admonition_for_references = False
 napoleon_use_ivar = False
 napoleon_use_param = True
 napoleon_use_rtype = True
-napoleon_preprocess_types = False
-napoleon_type_aliases = None
+napoleon_preprocess_types = True
+napoleon_type_aliases = {
+    # Map common type aliases for better cross-referencing
+    'array-like': ':term:`array-like <numpy:array_like>`',
+    'array_like': ':term:`array-like <numpy:array_like>`',
+    'ndarray': '~numpy.ndarray',
+    'DataFrame': '~pandas.DataFrame',
+    'Series': '~pandas.Series',
+    'Raw': '~mne.io.Raw',
+    'Epochs': '~mne.Epochs',
+}
 napoleon_attr_annotations = True
 
 # Autodoc settings
@@ -86,10 +94,16 @@ autodoc_default_options = {
 autodoc_typehints = 'description'
 autosummary_generate = True
 
+# Configure sphinx_autodoc_typehints to not link built-in types
+typehints_defaults = 'braces'
+always_use_bars_union = True
+typehints_use_signature = True
+typehints_use_signature_return = True
+
 # Ensure all modules are imported for module index
 autodoc_mock_imports = []
 
-# Intersphinx mapping
+# Intersphinx mapping for cross-referencing external packages
 intersphinx_mapping = {
     'python': ('https://docs.python.org/3', None),
     'numpy': ('https://numpy.org/doc/stable/', None),
@@ -97,19 +111,34 @@ intersphinx_mapping = {
     'matplotlib': ('https://matplotlib.org/stable/', None),
     'pandas': ('https://pandas.pydata.org/docs/', None),
     'mne': ('https://mne.tools/stable/', None),
+    'spikeinterface': ('https://spikeinterface.readthedocs.io/en/stable/', None),
 }
 
-# nbsphinx configuration
-nbsphinx_execute = 'never'  # Set to 'auto' to execute notebooks during build
-nbsphinx_allow_errors = False
-nbsphinx_timeout = 600  # 10 minutes timeout for notebook execution
-nbsphinx_kernel_name = 'python3'
+# Speed up intersphinx by setting timeout and cache
+intersphinx_timeout = 10  # seconds - faster timeout for slow sites
+intersphinx_cache_limit = 5  # days - cache inventories
 
-# Notebook cell execution environment variables
-nbsphinx_execute_arguments = [
-    "--InlineBackend.figure_formats={'svg', 'pdf'}",
-    "--InlineBackend.rc={'figure.dpi': 96}",
-]
+# Disable intersphinx for built-in types to avoid linking int, str, etc.
+intersphinx_disabled_reftypes = ['*']
+
+# MyST-NB configuration (replaces nbsphinx)
+nb_execution_mode = 'off'  # Don't execute notebooks during build
+nb_execution_allow_errors = False
+nb_execution_timeout = 600  # 10 minutes timeout for notebook execution
+
+# Enable MyST extensions for notebooks
+myst_url_schemes = ['http', 'https', 'mailto']
+myst_heading_anchors = 3  # Auto-generate anchors for headings
+
+# Make MyST use default_role for inline code
+# This allows `ClassName` in markdown to auto-link to API docs
+nb_custom_formats = {
+    '.ipynb': ['jupytext.reads', {'fmt': 'ipynb'}]
+}
+
+# Configure MyST to process inline code as cross-references
+# when they match known Python objects
+myst_dmath_double_inline = True
 
 # Exclude patterns
 exclude_patterns = [
@@ -129,6 +158,9 @@ source_suffix = {
 
 # The master document
 master_doc = 'index'
+
+# Default role for inline code (allows `code` to auto-link to Python objects)
+default_role = 'py:obj'
 
 # -- Sphinx-multiversion configuration ---------------------------------------
 # Whitelist pattern for tags (Sphinx will build docs for tags matching this pattern)
