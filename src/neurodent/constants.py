@@ -104,12 +104,17 @@ FEATURE_PLOT_HEIGHT_RATIOS = {
 }
 
 FREQ_BANDS = {
-    "delta": (1, 4),  # Changed from 0.1-4 to 1-4 Hz to avoid insufficient cycles warning
+    "delta": (1, 4),
     "theta": (4, 8),
     "alpha": (8, 13),
     "beta": (13, 25),
     "gamma": (25, 40),
-}  # Delta band adjusted to 1-4 Hz for reliable coherence estimation with short epochs
+}
+"""Dictionary of frequency band ranges in Hz.
+
+Delta band adjusted to 1-4 Hz (changed from 0.1-4 Hz) for reliable coherence
+estimation with short epochs and to avoid insufficient cycles warnings.
+"""
 BAND_NAMES = [k for k, _ in FREQ_BANDS.items()]
 
 FREQ_BAND_TOTAL = (1, 40)  # Updated to match new delta band minimum
