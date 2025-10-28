@@ -24,13 +24,13 @@ To run the test suite:
 
 .. code-block:: bash
 
-   pytest
+   uv run pytest
 
 To run tests with coverage:
 
 .. code-block:: bash
 
-   pytest --cov=neurodent
+   uv run pytest --cov=neurodent
 
 Building Documentation
 ----------------------
@@ -39,14 +39,13 @@ To build the documentation locally:
 
 .. code-block:: bash
 
-   cd docs
-   sphinx-build -b html . _build/html
+   uv run sphinx-build -b html docs docs/_build/html
 
 For live-reloading during development:
 
 .. code-block:: bash
 
-   sphinx-autobuild docs docs/_build/html
+   uv run sphinx-autobuild docs docs/_build/html
 
 Code Style
 ----------
