@@ -25,13 +25,13 @@ Feature Lists
 .. autodata:: MATRIX_FEATURES
    :annotation: = List of matrix/connectivity feature names
 
-.. autodata:: FREQUENCY_FEATURES
-   :annotation: = List of frequency domain feature names
+.. autodata:: HIST_FEATURES
+   :annotation: = List of histogram/frequency domain feature names
 
 Frequency Bands
 ---------------
 
-.. autodata:: BANDS
+.. autodata:: FREQ_BANDS
    :annotation: = Dictionary of frequency band ranges
 
 .. autodata:: BAND_NAMES
