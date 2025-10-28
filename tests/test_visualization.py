@@ -148,6 +148,43 @@ class TestWindowAnalysisResult:
         assert war.channel_names == ["LMot", "RMot"]
         assert len(war.result) == len(sample_result_df)
 
+    def test_copy(self, filtering_war):
+        """Test that copy creates an independent deep copy of WindowAnalysisResult."""
+        # Create a copy
+        war_copy = filtering_war.copy()
+
+        # Check that the copy has the same attributes
+        assert war_copy.animal_id == filtering_war.animal_id
+        assert war_copy.genotype == filtering_war.genotype
+        assert war_copy.channel_names == filtering_war.channel_names
+        assert war_copy.assume_from_number == filtering_war.assume_from_number
+        assert war_copy.suppress_short_interval_error == filtering_war.suppress_short_interval_error
+
+        # Check that DataFrames are equal but independent
+        pd.testing.assert_frame_equal(war_copy.result, filtering_war.result)
+        assert war_copy.result is not filtering_war.result
+
+        # Check that channel_names list is independent
+        assert war_copy.channel_names is not filtering_war.channel_names
+
+        # Check that bad_channels_dict is independent (deep copy)
+        assert war_copy.bad_channels_dict == filtering_war.bad_channels_dict
+        assert war_copy.bad_channels_dict is not filtering_war.bad_channels_dict
+
+        # Check that lof_scores_dict is independent (deep copy)
+        assert war_copy.lof_scores_dict == filtering_war.lof_scores_dict
+        assert war_copy.lof_scores_dict is not filtering_war.lof_scores_dict
+
+        # Modify the copy and ensure original is unchanged
+        original_rms = list(filtering_war.result.loc[0, "rms"])
+        war_copy.result.at[0, "rms"] = [999.0, 999.0, 999.0]
+        # Original should remain unchanged
+        assert filtering_war.result.loc[0, "rms"] == original_rms
+
+        # Modify bad_channels_dict in copy and ensure original is unchanged
+        war_copy.bad_channels_dict["A1_20230103"] = ["LBar"]
+        assert "A1_20230103" not in filtering_war.bad_channels_dict
+
     def test_get_result(self, war):
         """Test getting specific features from result."""
         result = war.get_result(features=["rms", "psdtotal"])

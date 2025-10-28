@@ -1141,6 +1141,24 @@ class WindowAnalysisResult(AnimalFeatureParser):
     def __str__(self) -> str:
         return f"{self.animaldays}"
 
+    def copy(self):
+        """
+        Create a deep copy of the WindowAnalysisResult object.
+
+        Returns:
+            WindowAnalysisResult: A deep copy of the current instance with all attributes copied.
+        """
+        return WindowAnalysisResult(
+            result=self.result.copy(deep=True),
+            animal_id=self.animal_id,
+            genotype=self.genotype,
+            channel_names=self.channel_names.copy() if self.channel_names is not None else None,
+            assume_from_number=self.assume_from_number,
+            bad_channels_dict=copy.deepcopy(self.bad_channels_dict),
+            suppress_short_interval_error=self.suppress_short_interval_error,
+            lof_scores_dict=copy.deepcopy(self.lof_scores_dict),
+        )
+
     def __update_instance_vars(self):
         """Run after updating self.result, or other init values"""
         if "index" in self.result.columns:
