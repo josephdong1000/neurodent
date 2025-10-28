@@ -173,14 +173,8 @@ jobs:
         }
         echo "Documentation built successfully!"
         echo ""
-        echo "=== Checking where files were actually created ==="
-        find . -name "main" -type d 2>/dev/null | head -10
-        echo ""
-        echo "=== Build output structure (if exists) ==="
-        ls -la docs/_build/html/ 2>/dev/null || echo "docs/_build/html/ does not exist"
-        echo ""
-        echo "=== Searching for HTML files ==="
-        find docs/_build -name "*.html" 2>/dev/null | head -20
+        echo "=== Build output structure ==="
+        ls -laR docs/_build/html/
 
     - name: Generate version switcher JSON
       run: |

@@ -132,7 +132,8 @@ master_doc = 'index'
 
 # -- Sphinx-multiversion configuration ---------------------------------------
 # Whitelist pattern for tags (Sphinx will build docs for tags matching this pattern)
-smv_tag_whitelist = r"^v.*$"  # Matches all tags starting with v
+# NOTE: Old tags may not have Sphinx docs, so they might be skipped
+smv_tag_whitelist = r"^v\d+\.\d+.*$"  # Matches v0.1.0, v0.2.0, etc.
 
 # Whitelist pattern for branches - only match local branches (not remotes)
 smv_branch_whitelist = r"^main$|^develop$"
@@ -141,10 +142,13 @@ smv_branch_whitelist = r"^main$|^develop$"
 smv_remote_whitelist = None
 
 # Pattern for released versions (tags only, not branches)
-smv_released_pattern = r"^refs/tags/v.*$"
+smv_released_pattern = r"^refs/tags/v\d+\.\d+.*$"
 
-# Output directory for versioned docs
+# Output directory for versioned docs (use ref.name for simple naming)
 smv_outputdir_format = "{ref.name}"
+
+# Prefer latest branch if available
+smv_prefer_remote_refs = False
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
