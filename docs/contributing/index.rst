@@ -46,7 +46,7 @@ For live-reloading during development:
 
 .. code-block:: bash
 
-   sphinx-autobuild docs docs/_build
+   sphinx-autobuild docs docs/_build/html
 
 Code Style
 ----------

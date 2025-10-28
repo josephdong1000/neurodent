@@ -165,16 +165,13 @@ jobs:
     - name: Build multi-version documentation
       run: |
         echo "Building multi-version documentation with sphinx-multiversion..."
-        uv run sphinx-multiversion docs docs/_build --dump-metadata || {
-          echo "ERROR: sphinx-multiversion failed!"
-          echo "Trying with verbose output..."
-          uv run sphinx-multiversion -v docs docs/_build
-          exit 1
-        }
+        uv run sphinx-multiversion docs docs/_build/html --dump-metadata
         echo "Documentation built successfully!"
         echo ""
         echo "=== Build output structure ==="
-        ls -laR docs/_build/
+        ls -la docs/
+        ls -la docs/_build/
+        ls -laR docs/_build/html/
 
     - name: Generate version switcher JSON
       run: |
@@ -184,11 +181,11 @@ jobs:
     - name: Add root redirect and .nojekyll
       run: |
         echo "Adding root index.html redirect..."
-        cp docs/redirect_index.html docs/_build/index.html
+        cp docs/redirect_index.html docs/_build/html/index.html
         echo "Adding .nojekyll to disable GitHub Pages Jekyll processing..."
-        touch docs/_build/.nojekyll
+        touch docs/_build/html/.nojekyll
         echo "Build output structure:"
-        ls -la docs/_build/
+        ls -la docs/_build/html/
 
     # - name: Prune uv cache for efficiency
     #   run: |
@@ -198,7 +195,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: documentation
-        path: docs/_build/
+        path: docs/_build/html/
         retention-days: 30
 
   deploy-docs:
@@ -218,13 +215,13 @@ jobs:
       uses: actions/download-artifact@v4
       with:
         name: documentation
-        path: docs/_build
+        path: docs/_build/html
 
     - name: Deploy to GitHub Pages
       uses: peaceiris/actions-gh-pages@v4
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: docs/_build
+        publish_dir: docs/_build/html
         publish_branch: gh-pages
         force_orphan: true
         user_name: 'github-actions[bot]'
