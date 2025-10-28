@@ -73,7 +73,6 @@ jobs:
   build-package:
     name: Build Package
     runs-on: ubuntu-latest
-    # needs: test
     
     steps:
     - name: Checkout code
@@ -119,8 +118,6 @@ jobs:
 
     - name: Install pandoc (fast)
       uses: pandoc/actions/setup@v1
-      # with:
-      #   version: 3.1.11
 
     - name: Install uv
       uses: astral-sh/setup-uv@v6
@@ -185,16 +182,13 @@ jobs:
         echo "Final build structure:"
         ls -la build/html/
 
-    # - name: Prune uv cache for efficiency
-    #   run: |
-    #     uv cache prune --ci
-
     - name: Upload documentation artifacts
       uses: actions/upload-artifact@v4
       with:
         name: documentation
         path: build/html/
         retention-days: 30
+        include-hidden-files: true
 
   deploy-docs:
     name: Deploy Documentation
@@ -214,6 +208,14 @@ jobs:
       with:
         name: documentation
         path: build/html
+
+    - name: Debug - List downloaded artifact contents
+      run: |
+        echo "=== Directory structure ==="
+        ls -laR build/html/
+        echo ""
+        echo "=== Verify .nojekyll exists ==="
+        ls -la build/html/.nojekyll
 
     - name: Deploy to GitHub Pages
       uses: peaceiris/actions-gh-pages@v4
