@@ -24,7 +24,7 @@ class ExperimentPlotter:
     scatter plot, etc.) from experimental data with consistent data processing and styling.
 
     Plot Ordering
-    ------------
+    -------------
     The class automatically sorts data according to predefined plot orders for columns like
     'channel', 'genotype', 'sex', 'isday', and 'band'. Users can customize this ordering
     during initialization:
@@ -34,7 +34,7 @@ class ExperimentPlotter:
     The default plot orders are defined in constants.DF_SORT_ORDER.
 
     Validation and Warnings
-    ----------------------
+    -----------------------
     The class automatically validates plot order against the processed DataFrame during plotting
     and raises warnings for any mismatches. Use validate_plot_order() to explicitly validate:
 
