@@ -165,7 +165,7 @@ jobs:
     - name: Build multi-version documentation
       run: |
         echo "Building multi-version documentation with sphinx-multiversion..."
-        uv run sphinx-multiversion docs build/html --dump-metadata
+        uv run sphinx-multiversion docs build/html
         echo "Documentation built successfully!"
         echo ""
         echo "=== Build output structure ==="
