@@ -722,6 +722,7 @@ class LongRecordingOrganizer:
         ``self.base_folder_path`` and builds a ``si.BaseRecording`` accordingly.
 
         Modes:
+
         - ``folder``: Passes ``self.base_folder_path`` directly to ``extract_func``.
         - ``file``: Uses ``glob`` with ``file_pattern`` relative to ``self.base_folder_path``.
           If multiple matches are found, the first match is used and a warning is issued.

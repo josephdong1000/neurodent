@@ -773,22 +773,22 @@ class AnimalOrganizer(AnimalFeatureParser):
         suppress_short_interval_error=False,
         apply_notch_filter=True,
         **kwargs,
-    ):
+    ) -> "WindowAnalysisResult":
         """Computes windowed analysis of animal recordings. The data is divided into windows (time bins), then features are extracted from each window. The result is
         formatted to a Dataframe and wrapped into a WindowAnalysisResult object.
 
         Args:
-            features (list[str]): List of features to compute. See individual compute_...() functions for output format
+            features (list[str]): List of features to compute. See individual ``compute_...()`` functions for output format
             exclude (list[str], optional): List of features to ignore. Will override the features parameter. Defaults to [].
             window_s (int, optional): Length of each window in seconds. Note that some features break with very short window times. Defaults to 4.
             suppress_short_interval_error (bool, optional): If True, suppress ValueError for short intervals between timestamps in resulting WindowAnalysisResult. Useful for aggregated WARs. Defaults to False.
             apply_notch_filter (bool, optional): Whether to apply notch filtering to remove line noise. Uses constants.LINE_FREQ. Defaults to True.
 
         Raises:
-            AttributeError: If a feature's compute_...() function was not implemented, this error will be raised.
+            AttributeError: If a feature's ``compute_...()`` function was not implemented, this error will be raised.
 
         Returns:
-            window_analysis_result: a WindowAnalysisResult object
+            WindowAnalysisResult: A WindowAnalysisResult object containing extracted features for all recordings
         """
         features = _sanitize_feature_request(features, exclude)
 
@@ -898,15 +898,15 @@ class AnimalOrganizer(AnimalFeatureParser):
 
         return self.window_analysis_result
 
-    def compute_spike_analysis(self, multiprocess_mode: Literal["dask", "serial"] = "serial"):
+    def compute_spike_analysis(self, multiprocess_mode: Literal["dask", "serial"] = "serial") -> list["SpikeAnalysisResult"]:
         """Compute spike sorting on all long recordings and return a list of SpikeAnalysisResult objects
 
         Args:
             multiprocess_mode (Literal['dask', 'serial']): Whether to use Dask for parallel processing. Defaults to 'serial'.
 
         Returns:
-            spike_analysis_results: list[SpikeAnalysisResult]. Each SpikeAnalysisResult object corresponds to a LongRecording object,
-            typically a different day or recording session.
+            list[SpikeAnalysisResult]: List of SpikeAnalysisResult objects. Each SpikeAnalysisResult object corresponds
+                to a LongRecording object, typically a different day or recording session.
 
         Raises:
             ImportError: If mountainsort5 is not available.
@@ -1493,7 +1493,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             allow_missing (bool, optional): If True, will return all requested features as columns regardless if they exist in result. Defaults to False.
 
         Returns:
-            result: pd.DataFrame object with features in columns and windows in rows
+            pd.DataFrame: DataFrame with features in columns and windows in rows
         """
         features = _sanitize_feature_request(features, exclude)
         if not allow_missing:
@@ -1513,7 +1513,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             groupby (str, optional): Feature or list of features to group by before averaging. Passed to the `by` parameter in pd.DataFrame.groupby(). Defaults to "animalday".
 
         Returns:
-            grouped_result: result grouped by `groupby` and averaged for each group.
+            pd.DataFrame: Result grouped by `groupby` and averaged for each group.
         """
         result_grouped, result_validcols = self.__get_groups(features=features, exclude=exclude, df=df, groupby=groupby)
         features = _sanitize_feature_request(features, exclude)
@@ -1555,7 +1555,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             z_range (float, optional): The z-score range to filter by. Values outside this range will be set to NaN.
 
         Returns:
-            out: np.ndarray of bool, (M fragments, N channels). True = keep window, False = remove window
+            np.ndarray: Boolean array of shape (M fragments, N channels). True = keep window, False = remove window
         """
         result = df.copy() if df is not None else self.result.copy()
         z_range = abs(z_range)
@@ -1577,7 +1577,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             max_rms (float, optional): The maximum rms value to filter by. Values above this will be set to NaN.
 
         Returns:
-            out: np.ndarray of bool, (M fragments, N channels). True = keep window, False = remove window
+            np.ndarray: Boolean array of shape (M fragments, N channels). True = keep window, False = remove window
         """
         result = df.copy() if df is not None else self.result.copy()
         np_rms = np.array(result["rms"].tolist())
@@ -1600,7 +1600,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             min_rms (float, optional): The minimum rms value to filter by. Values below this will be set to NaN.
 
         Returns:
-            out: np.ndarray of bool, (M fragments, N channels). True = keep window, False = remove window
+            np.ndarray: Boolean array of shape (M fragments, N channels). True = keep window, False = remove window
         """
         result = df.copy() if df is not None else self.result.copy()
         np_rms = np.array(result["rms"].tolist())
@@ -1620,7 +1620,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             max_beta_prop (float, optional): The maximum beta power to filter by. Values above this will be set to NaN. Defaults to 0.4.
 
         Returns:
-            out: np.ndarray of bool, (M fragments, N channels). True = keep window, False = remove window
+            np.ndarray: Boolean array of shape (M fragments, N channels). True = keep window, False = remove window
         """
         result = df.copy() if df is not None else self.result.copy()
         if "psdfrac" in result.columns:
@@ -1663,7 +1663,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 may conflict and overwrite each other's bad channel definitions if both are provided.
 
         Returns:
-            out: np.ndarray of bool, (M fragments, N channels). True = keep window, False = remove window
+            np.ndarray: Boolean array of shape (M fragments, N channels). True = keep window, False = remove window
         """
         n_samples = len(self.result)
         n_channels = len(self.channel_names)
@@ -1742,7 +1742,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 may conflict and overwrite each other's bad channel definitions if both are provided.
 
         Returns:
-            out: np.ndarray of bool, (M fragments, N channels). True = keep window, False = remove window
+            np.ndarray: Boolean array of shape (M fragments, N channels). True = keep window, False = remove window
         """
         if bad_channels_dict is None:
             bad_channels_dict = self.bad_channels_dict.copy()

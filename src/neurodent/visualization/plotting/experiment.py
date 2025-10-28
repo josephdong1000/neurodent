@@ -27,28 +27,29 @@ class ExperimentPlotter:
     -------------
     The class automatically sorts data according to predefined plot orders for columns like
     'channel', 'genotype', 'sex', 'isday', and 'band'. Users can customize this ordering
-    during initialization:
+    during initialization::
 
-    plotter = ExperimentPlotter(wars, plot_order={'channel': ['LMot', 'RMot', ...]})
+        plotter = ExperimentPlotter(wars, plot_order={'channel': ['LMot', 'RMot', ...]})
 
     The default plot orders are defined in constants.DF_SORT_ORDER.
 
     Validation and Warnings
     -----------------------
     The class automatically validates plot order against the processed DataFrame during plotting
-    and raises warnings for any mismatches. Use validate_plot_order() to explicitly validate:
+    and raises warnings for any mismatches. Use validate_plot_order() to explicitly validate::
 
-    plotter.validate_plot_order(df)
+        plotter.validate_plot_order(df)
 
     Examples
     --------
-    # Customize plot ordering during initialization
-    custom_order = {
-        'channel': ['LMot', 'RMot', 'LBar', 'RBar'],  # Only include specific channels
-        'genotype': ['WT', 'KO'],  # Standard order
-        'sex': ['Female', 'Male']  # Custom order
-    }
-    plotter = ExperimentPlotter(wars, plot_order=custom_order)
+    Customize plot ordering during initialization::
+
+        custom_order = {
+            'channel': ['LMot', 'RMot', 'LBar', 'RBar'],  # Only include specific channels
+            'genotype': ['WT', 'KO'],  # Standard order
+            'sex': ['Female', 'Male']  # Custom order
+        }
+        plotter = ExperimentPlotter(wars, plot_order=custom_order)
     """
 
     def __init__(
