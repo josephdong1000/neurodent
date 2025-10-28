@@ -11,26 +11,22 @@ A Python package for standardizing rodent EEG analysis and figure generation. Va
 
 ## Installation
 
-Neurodent can be installed via pip:
+Neurodent can be installed via `pip`:
 
 ```
 pip install neurodent
 ```
 
-We recommend you install Neurodent with `uv`, [an all-in-one Python package and project manager](https://docs.astral.sh/uv/getting-started/).
-```
-uv init yourprojectname
-cd yourprojectname
-uv add neurodent
-```
-
-You can learn more about the features of `uv` [here](https://docs.astral.sh/uv/getting-started/features/).
+For more info, check out the [full installation guide](https://josephdong1000.github.io/neurodent/main/installation/index.html).
 
 ## Usage
 
-**Tutorial:** *WIP!*
+> **Visit the full documentation** for more how-tos and examples:
+> https://josephdong1000.github.io/neurodent
 
-**API documentation:** https://josephdong1000.github.io/neurodent/
+- [Quickstart](https://josephdong1000.github.io/neurodent/main/quickstart/index.html)
+- [Tutorials](https://josephdong1000.github.io/neurodent/main/tutorials/index.html)  
+- [API documentation](https://josephdong1000.github.io/neurodent/main/api/index.html)
 
 ## Overview
 
