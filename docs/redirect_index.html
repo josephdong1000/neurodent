@@ -3,13 +3,17 @@
   <head>
     <meta charset="utf-8">
     <title>Redirecting to Neurodent documentation</title>
-    <meta http-equiv="refresh" content="0; url=./v1.0.0/index.html">
-    <link rel="canonical" href="https://josephdong1000.github.io/neurodent/v1.0.0/">
+    <script>
+      // For now, redirect to main since old version tags don't have Sphinx docs
+      // TODO: When stable releases have Sphinx docs, use preferred version from switcher.json
+      window.location.href = "./main/index.html";
+    </script>
+    <noscript>
+      <meta http-equiv="refresh" content="0; url=./main/index.html">
+      <p>Redirecting to the <a href="./main/index.html">documentation</a>...</p>
+    </noscript>
   </head>
   <body>
-    <p>Redirecting to the <a href="./v1.0.0/index.html">latest stable version</a> of the documentation...</p>
-    <script>
-      window.location.href = "./v1.0.0/index.html";
-    </script>
+    <p>Redirecting to the latest version of the documentation...</p>
   </body>
 </html>
