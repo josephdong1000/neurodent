@@ -96,6 +96,22 @@ def generate_switcher_json(base_url="https://josephdong1000.github.io/neurodent"
     return switcher_data
 
 
+def get_repo_root():
+    """Get the git repository root directory"""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        return Path(result.stdout.strip())
+    except subprocess.CalledProcessError as e:
+        print(f"Error getting repo root: {e}", file=sys.stderr)
+        # Fallback to relative path
+        return Path(__file__).parent.parent
+
+
 def main():
     """Generate and save switcher.json"""
 
@@ -109,7 +125,8 @@ def main():
     # Determine output path
     # This script should be run after sphinx-multiversion build
     # Save to the root of the build output
-    output_dir = Path(__file__).parent / "_build"
+    repo_root = get_repo_root()
+    output_dir = repo_root / "build" / "html"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     output_file = output_dir / "switcher.json"
