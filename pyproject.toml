@@ -46,6 +46,8 @@ dependencies = [
     "appnope",
     "zarr>=2.18.3",
     "scikit-learn>=1.7.2",
+    "snakemake>=7.32.4",
+    "pulp==2.7.0 ; python_full_version < '3.11'",
 ]
 requires-python = ">=3.10"
 keywords = [
