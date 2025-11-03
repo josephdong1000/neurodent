@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test runner script for Neurodent package.
+Test runner script for NeuRodent package.
 """
 
 import sys
@@ -121,7 +121,7 @@ def run_type_checking():
 
 def main():
     """Main function for test runner."""
-    parser = argparse.ArgumentParser(description="Run Neurodent tests")
+    parser = argparse.ArgumentParser(description="Run NeuRodent tests")
     parser.add_argument(
         "--type", choices=["all", "unit", "integration", "slow", "fast"], default="all", help="Type of tests to run"
     )

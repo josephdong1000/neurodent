@@ -1,7 +1,7 @@
-# Neurodent 🐁
+# NeuRodent 🐁
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.15780751.svg)](https://doi.org/10.5281/zenodo.15780751)
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/josephdong1000/Neurodent/HEAD) 
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/josephdong1000/neurodent/HEAD) 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/josephdong1000/neurodent/)
 
 
@@ -11,7 +11,7 @@ A Python package for standardizing rodent EEG analysis and figure generation. Va
 
 ## Installation
 
-Neurodent can be installed via `pip`:
+NeuRodent can be installed via `pip`:
 
 ```
 pip install neurodent
@@ -30,7 +30,7 @@ For more info, check out the [full installation guide](https://josephdong1000.gi
 
 ## Overview
 
-Neurodent provides two main analysis workflows:
+NeuRodent provides two main analysis workflows:
 
 1. **Windowed Analysis Results (WAR)** - Extracts features from continuous EEG data divided into time windows
 2. **Spike Analysis Results (SAR)** - Analyzes spike-sorted neural data and integrates it with EEG features
@@ -87,7 +87,7 @@ ep.plot_feature("rms", groupby="genotype")
 ```
 
 #### Advanced Features
-- **Flexible Data Loading**: Neurodent uses MNE and SpikeInterface loaders in Python and custom loaders for proprietary formats using MATLAB, including:
+- **Flexible Data Loading**: NeuRodent uses MNE and SpikeInterface loaders in Python and custom loaders for proprietary formats using MATLAB, including:
   - Neuroscope/Neuralynx (.dat, .eeg)
   - Open Ephys (.continuous)
   - NWB (.nwb) neurophysiology format
@@ -99,7 +99,7 @@ ep.plot_feature("rms", groupby="genotype")
 
 ## Snakemake Workflow
 
-A companion Snakemake workflow is provided for building automated Neurodent analysis pipelines.
+A companion Snakemake workflow is provided for building automated NeuRodent analysis pipelines.
 
 The workflow processes multiple animals in parallel through WAR generation, quality filtering, fragment/channel filtering, and statistical analysis with SLURM cluster integration.
 
@@ -116,7 +116,7 @@ This project benefited from insights and best practices described in Peter K. G.
 
 ## Citation
 
-If you find Neurodent useful, please cite our work!
+If you find NeuRodent useful, please cite our work!
 
 ```bibtex
 @misc{https://doi.org/10.5281/zenodo.17051374,

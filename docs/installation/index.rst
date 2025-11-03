@@ -4,7 +4,7 @@ Installation
 Prerequisites
 -------------
 
-Neurodent requires Python 3.10 or higher. If you don't have Python installed, visit `python.org <https://www.python.org/downloads/>`_ to download and install it.
+NeuRodent requires Python 3.10 or higher. If you don't have Python installed, visit `python.org <https://www.python.org/downloads/>`_ to download and install it.
 
 To check if Python is installed on your system, open a terminal (Command Prompt on Windows, Terminal on macOS/Linux) and run:
 
@@ -15,7 +15,7 @@ To check if Python is installed on your system, open a terminal (Command Prompt 
 Quick Installation
 ------------------
 
-Install Neurodent using pip:
+Install NeuRodent using pip:
 
 .. code-block:: bash
 
@@ -23,19 +23,19 @@ Install Neurodent using pip:
 
 .. note::
 
-   **New to Python?** Pip is Python's package installer that comes bundled with Python. Open your terminal and copy-paste the command above, then press Enter. This will automatically download and install Neurodent and all its dependencies.
+   **New to Python?** Pip is Python's package installer that comes bundled with Python. Open your terminal and copy-paste the command above, then press Enter. This will automatically download and install NeuRodent and all its dependencies.
 
 Verifying Installation
 ----------------------
 
-To verify that Neurodent is installed correctly, open a Python interpreter by typing ``python`` in your terminal, then try importing Neurodent:
+To verify that NeuRodent is installed correctly, open a Python interpreter by typing ``python`` in your terminal, then try importing ``neurodent``:
 
 .. code-block:: python
 
    import neurodent
    print(neurodent.__version__)
 
-If this runs without errors, you're ready to start using Neurodent!
+If this runs without errors, you're ready to start using NeuRodent!
 
 Installing with ``uv``
 -----------------------------------
@@ -55,7 +55,7 @@ Though not required, we recommend using `uv <https://docs.astral.sh/uv/getting-s
 
 First, install uv by following the instructions at `docs.astral.sh/uv <https://docs.astral.sh/uv/getting-started/installation/>`_.
 
-Then create a new project with Neurodent:
+Then create a new project with NeuRodent:
 
 .. code-block:: bash
 
@@ -63,9 +63,9 @@ Then create a new project with Neurodent:
    cd yourprojectname
    uv add neurodent
 
-This creates a new directory, sets up a virtual environment, and installs Neurodent—all in one go.
+This creates a new directory, sets up a virtual environment, and installs NeuRodent—all in one go.
 
 Next Steps
 ----------
 
-Check out the :doc:`../quickstart/index` guide to learn how to use Neurodent for EEG analysis.
+Check out the :doc:`../quickstart/index` guide to learn how to use NeuRodent for EEG analysis.

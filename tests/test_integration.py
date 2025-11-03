@@ -1,5 +1,5 @@
 """
-Integration tests for Neurodent package.
+Integration tests for NeuRodent package.
 """
 
 import numpy as np

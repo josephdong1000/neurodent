@@ -1,9 +1,9 @@
-Neurodent 🐁
+NeuRodent 🐁
 ============
 
 .. include:: ../README.md
    :parser: myst_parser.sphinx_
-   :start-after: # Neurodent 🐁
+   :start-after: # NeuRodent 🐁
    :end-before: ## Installation
 
 Installation

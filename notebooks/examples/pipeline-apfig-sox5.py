@@ -14,7 +14,7 @@ from dask_jobqueue import SLURMCluster
 from dask.distributed import Client
 from django.utils.text import slugify
 
-base_folder = Path("/mnt/isilon/marsh_single_unit/Neurodent")
+base_folder = Path("/mnt/isilon/marsh_single_unit/NeuRodent")
 sys.path.append(str(base_folder))
 
 from neurodent import core, visualization, constants
@@ -90,5 +90,5 @@ for data_folder, animal_ids in data_folders_to_animal_ids.items():
 # !SECTION
 
 """
-sbatch --mem 300G -c 4 -t 48:00:00 /mnt/isilon/marsh_single_unit/Neurodent/notebooks/examples/pipeline.sh /mnt/isilon/marsh_single_unit/Neurodent/notebooks/examples/pipeline-apfig-sox5.py
+sbatch --mem 300G -c 4 -t 48:00:00 /mnt/isilon/marsh_single_unit/NeuRodent/notebooks/examples/pipeline.sh /mnt/isilon/marsh_single_unit/NeuRodent/notebooks/examples/pipeline-apfig-sox5.py
 """

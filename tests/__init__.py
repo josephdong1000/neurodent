@@ -1,3 +1,3 @@
 """
-Unit tests for Neurodent package.
+Unit tests for NeuRodent package.
 """

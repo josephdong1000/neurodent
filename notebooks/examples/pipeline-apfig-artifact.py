@@ -15,7 +15,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger()
 
-base_folder = Path("/mnt/isilon/marsh_single_unit/Neurodent")
+base_folder = Path("/mnt/isilon/marsh_single_unit/NeuRodent")
 load_folder = base_folder / "notebooks" / "tests" / "test-wars-sox5-7"
 save_folder = Path("/home/dongjp/Downloads/8-4 artifact finefilter")
 if not save_folder.exists():

@@ -421,7 +421,7 @@ class TestRunTestsIntegration:
         result = subprocess.run([sys.executable, "tests/run_tests.py", "--help"], capture_output=True, text=True)
 
         assert result.returncode == 0
-        assert "Run Neurodent tests" in result.stdout
+        assert "Run NeuRodent tests" in result.stdout
         assert "--type" in result.stdout
         assert "--no-coverage" in result.stdout
         assert "--verbose" in result.stdout

@@ -1,7 +1,7 @@
 API Reference
 =============
 
-This is the complete API reference for Neurodent.
+This is the complete API reference for NeuRodent.
 
 Modules
 -------

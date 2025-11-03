@@ -171,7 +171,7 @@ def extract_feature_dataframe(ep, feature, label):
     Parameters:
     -----------
     ep : ExperimentPlotter
-        Neurodent ExperimentPlotter instance containing the WAR data
+        NeuRodent ExperimentPlotter instance containing the WAR data
     feature : str
         Feature name to extract (e.g., 'logpsdband', 'rms', 'cohere')
     label : str
@@ -240,9 +240,9 @@ def generate_feature_scatter_plots(manual_ep, lof_ep, features, output_dir, hash
     Parameters:
     -----------
     manual_ep : ExperimentPlotter
-        Neurodent ExperimentPlotter instance with manually filtered data
+        NeuRodent ExperimentPlotter instance with manually filtered data
     lof_ep : ExperimentPlotter
-        Neurodent ExperimentPlotter instance with LOF-filtered data
+        NeuRodent ExperimentPlotter instance with LOF-filtered data
     features : list[str]
         List of feature names to compare (e.g., ['logpsdband', 'rms', 'cohere'])
     output_dir : Path
@@ -280,7 +280,7 @@ def generate_feature_scatter_plots(manual_ep, lof_ep, features, output_dir, hash
     - Each data point: One animal's aggregated value for that feature/band combination
     """
 
-    logging.info("Generating feature scatter plots using Neurodent ExperimentPlotter methods")
+    logging.info("Generating feature scatter plots using NeuRodent ExperimentPlotter methods")
 
     # Use the provided hash mapping for merging manual and LOF data
     if hash_mapping is None:
@@ -366,7 +366,7 @@ def generate_feature_scatter_plots(manual_ep, lof_ep, features, output_dir, hash
                 feature_col = plot_data["feature_col"]
                 plot_title = plot_data["title"]
 
-                # Data is already animal-level aggregated by Neurodent
+                # Data is already animal-level aggregated by NeuRodent
                 # For band features, we may have multiple rows per animal (one per band)
                 # For linear features, we have one row per animal
 
@@ -516,9 +516,9 @@ def generate_feature_scatter_plots(manual_ep, lof_ep, features, output_dir, hash
 
 
 def generate_channel_impact_analysis(manual_ep, lof_ep, features, output_dir, hash_mapping=None):
-    """Analyze the impact of filtering on different channels using Neurodent ExperimentPlotter methods"""
+    """Analyze the impact of filtering on different channels using NeuRodent ExperimentPlotter methods"""
 
-    logging.info("Generating channel impact analysis using Neurodent ExperimentPlotter methods")
+    logging.info("Generating channel impact analysis using NeuRodent ExperimentPlotter methods")
 
     try:
         logging.info("Step 1: Extracting feature data for comparison analysis")
@@ -530,7 +530,7 @@ def generate_channel_impact_analysis(manual_ep, lof_ep, features, output_dir, ha
         manual_feature_data = {}
         lof_feature_data = {}
 
-        # Extract data for each feature using Neurodent's proper methods
+        # Extract data for each feature using NeuRodent's proper methods
         for i, feature in enumerate(features):
             logging.info(f"Processing feature {i + 1}/{len(features)}: {feature}")
 
@@ -715,9 +715,9 @@ def generate_channel_impact_analysis(manual_ep, lof_ep, features, output_dir, ha
 
 
 def generate_animal_correlation_analysis(manual_ep, lof_ep, features, output_dir, hash_mapping=None):
-    """Analyze correlation of animal-level aggregated features using Neurodent ExperimentPlotter methods"""
+    """Analyze correlation of animal-level aggregated features using NeuRodent ExperimentPlotter methods"""
 
-    logging.info("Generating animal-level correlation analysis using Neurodent ExperimentPlotter methods")
+    logging.info("Generating animal-level correlation analysis using NeuRodent ExperimentPlotter methods")
 
     try:
         logging.info("Step 1: Extracting feature data for correlation analysis")
@@ -725,7 +725,7 @@ def generate_animal_correlation_analysis(manual_ep, lof_ep, features, output_dir
         manual_feature_data = {}
         lof_feature_data = {}
 
-        # Extract data for each feature using Neurodent's proper methods
+        # Extract data for each feature using NeuRodent's proper methods
         for i, feature in enumerate(features):
             logging.info(f"Processing feature {i + 1}/{len(features)}: {feature}")
 
@@ -882,9 +882,9 @@ def generate_animal_correlation_analysis(manual_ep, lof_ep, features, output_dir
 
 
 def generate_summary_statistics(manual_ep, lof_ep, features, output_dir, hash_mapping=None):
-    """Generate summary statistics comparing the two filtering methods using Neurodent ExperimentPlotter methods"""
+    """Generate summary statistics comparing the two filtering methods using NeuRodent ExperimentPlotter methods"""
 
-    logging.info("Generating summary statistics using Neurodent ExperimentPlotter methods")
+    logging.info("Generating summary statistics using NeuRodent ExperimentPlotter methods")
 
     try:
         logging.info("Step 1: Extracting feature data for summary statistics")
@@ -899,7 +899,7 @@ def generate_summary_statistics(manual_ep, lof_ep, features, output_dir, hash_ma
             "effect_size": [],
         }
 
-        # Extract data for each feature using Neurodent's proper methods
+        # Extract data for each feature using NeuRodent's proper methods
         for i, feature in enumerate(features):
             logging.info(f"Processing feature {i + 1}/{len(features)}: {feature}")
 
@@ -915,7 +915,7 @@ def generate_summary_statistics(manual_ep, lof_ep, features, output_dir, hash_ma
                 logging.warning(f"Failed to extract LOF data for {feature}, skipping")
                 continue
 
-            # Get feature values (already properly extracted by Neurodent methods)
+            # Get feature values (already properly extracted by NeuRodent methods)
             manual_vals = manual_df[feature].dropna()
             lof_vals = lof_df[feature].dropna()
             logging.info(f"Feature {feature}: manual={len(manual_vals)} values, lof={len(lof_vals)} values")
@@ -1005,7 +1005,7 @@ def main():
         logging.error("Failed to load data from one or both filtering methods")
         return
 
-    # Use features_to_compare directly since Neurodent methods handle feature validation
+    # Use features_to_compare directly since NeuRodent methods handle feature validation
     features_to_analyze = features_to_compare
     logging.info(f"Analyzing features: {features_to_analyze}")
 

@@ -7,7 +7,7 @@ set -e
 module load Python/3.10.8-GCCcore-12.2.0.lua
 
 # Set working directory
-cd /mnt/isilon/marsh_single_unit/Neurodent
+cd /mnt/isilon/marsh_single_unit/NeuRodent
 
 # Activate virtual environment
 if [ ! -f .venv/bin/activate ]; then

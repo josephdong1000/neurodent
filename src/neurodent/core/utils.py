@@ -222,7 +222,7 @@ def convert_colpath_to_rowpath(
     Convert a ColMajor file path to its corresponding RowMajor file path.
 
     This function transforms file paths from column-major format to row-major format,
-    which is used when converting between different data storage layouts in Neurodent.
+    which is used when converting between different data storage layouts in NeuRodent.
 
     Args:
         rowdir_path (str | Path): Directory path where the RowMajor file should be located.
@@ -795,9 +795,9 @@ def _get_key_from_match_values(input_string: str, alias_dict: dict, strict_match
 
 def set_temp_directory(path: str | Path) -> None:
     """
-    Set the temporary directory for Neurodent operations.
+    Set the temporary directory for NeuRodent operations.
 
-    This function configures the temporary directory used by Neurodent for intermediate
+    This function configures the temporary directory used by NeuRodent for intermediate
     files and operations. The directory will be created if it doesn't exist.
 
     Args:
@@ -820,7 +820,7 @@ def set_temp_directory(path: str | Path) -> None:
 
 def get_temp_directory() -> Path:
     """
-    Get the current temporary directory used by Neurodent.
+    Get the current temporary directory used by NeuRodent.
 
     Returns:
         Path: Path object representing the current temporary directory.

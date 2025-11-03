@@ -1,5 +1,5 @@
 """
-Neurodent Snakemake Pipeline
+NeuRodent Snakemake Pipeline
 ========================
 
 This pipeline processes raw EEG data through multiple analysis stages:

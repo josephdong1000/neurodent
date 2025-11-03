@@ -1,7 +1,7 @@
 Contributing
 ============
 
-We welcome contributions to Neurodent! This guide will help you get started with developing and contributing to the project.
+We welcome contributions to NeuRodent! This guide will help you get started with developing and contributing to the project.
 
 Development Setup
 -----------------

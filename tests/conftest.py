@@ -1,5 +1,5 @@
 """
-Pytest configuration and common fixtures for Neurodent tests.
+Pytest configuration and common fixtures for NeuRodent tests.
 """
 
 # Set matplotlib backend to non-interactive before any imports

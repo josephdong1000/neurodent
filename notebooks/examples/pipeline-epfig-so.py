@@ -14,7 +14,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger()
 
-base_folder = Path("/mnt/isilon/marsh_single_unit/Neurodent")
+base_folder = Path("/mnt/isilon/marsh_single_unit/NeuRodent")
 load_folder = base_folder / "notebooks" / "tests" / "test-wars-sox5-9"
 save_folder = base_folder / "notebooks" / "tests" / "test-wars-sox5-collapsed-9-isday"
 

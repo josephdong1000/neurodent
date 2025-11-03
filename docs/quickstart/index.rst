@@ -1,7 +1,7 @@
 Quickstart
 ==========
 
-New to Neurodent? Start here to learn the basics of loading data and running your first analysis.
+New to NeuRodent? Start here to learn the basics of loading data and running your first analysis.
 
 .. list-table::
    :widths: 30 70

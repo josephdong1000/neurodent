@@ -42,7 +42,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger()
 
-base_folder = Path("/mnt/isilon/marsh_single_unit/Neurodent")
+base_folder = Path("/mnt/isilon/marsh_single_unit/NeuRodent")
 with open(base_folder / "notebooks" / "tests" / "sox5 combine genotypes.json", "r") as f:
     data = json.load(f)
 bad_channels = data["bad_channels"]
@@ -114,5 +114,5 @@ for data_folder, animal_ids in tqdm(data_folders_to_animal_ids.items(), desc="Pr
 # !SECTION
 
 """
-sbatch --mem 700G -c 4 -t 48:00:00 /mnt/isilon/marsh_single_unit/Neurodent/notebooks/examples/pipeline.sh /mnt/isilon/marsh_single_unit/Neurodent/notebooks/examples/pipeline-war-sox5.py
+sbatch --mem 700G -c 4 -t 48:00:00 /mnt/isilon/marsh_single_unit/NeuRodent/notebooks/examples/pipeline.sh /mnt/isilon/marsh_single_unit/NeuRodent/notebooks/examples/pipeline-war-sox5.py
 """

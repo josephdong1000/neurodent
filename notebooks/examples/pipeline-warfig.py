@@ -18,7 +18,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger()
 
-base_folder = Path("/mnt/isilon/marsh_single_unit/Neurodent")
+base_folder = Path("/mnt/isilon/marsh_single_unit/NeuRodent")
 # animal_ids = ['A5', 'A10', 'F22', 'G25', 'G26', 'N21', 'N22', 'N23', 'N24', 'N25']
 # animal_ids = ['A5', 'A10']
 animal_ids = [p.name for p in (base_folder / "notebooks" / "tests" / "test-wars-sox5-2").glob("*") if p.is_dir()]

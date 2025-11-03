@@ -1,4 +1,5 @@
-"""Neurodent: Rodent EEG analysis tools."""
+"""NeuRodent: Rodent EEG analysis tools."""
+
 import importlib.metadata
 
 __version__ = importlib.metadata.version("neurodent")

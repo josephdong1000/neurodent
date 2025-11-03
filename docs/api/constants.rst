@@ -1,7 +1,7 @@
 Constants
 =========
 
-This module defines constants used throughout Neurodent for feature names, frequency bands, and other configuration values.
+This module defines constants used throughout NeuRodent for feature names, frequency bands, and other configuration values.
 
 .. currentmodule:: neurodent.constants
 

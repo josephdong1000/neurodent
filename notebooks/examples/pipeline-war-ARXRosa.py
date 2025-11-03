@@ -8,7 +8,7 @@ from mne.io import read_raw_edf
 from dask_jobqueue import SLURMCluster
 from dask.distributed import Client
 
-base_folder = Path("/mnt/isilon/marsh_single_unit/Neurodent")
+base_folder = Path("/mnt/isilon/marsh_single_unit/NeuRodent")
 sys.path.append(str(base_folder))
 
 from neurodent import core, visualization, constants
@@ -159,5 +159,5 @@ for animal_id in ["1017 1015"]:
 
 
 """
-sbatch --mem 300G -c 4 -t 48:00:00 /mnt/isilon/marsh_single_unit/Neurodent/notebooks/examples/pipeline.sh /mnt/isilon/marsh_single_unit/Neurodent/notebooks/examples/pipeline-war-ARXRosa.py
+sbatch --mem 300G -c 4 -t 48:00:00 /mnt/isilon/marsh_single_unit/NeuRodent/notebooks/examples/pipeline.sh /mnt/isilon/marsh_single_unit/NeuRodent/notebooks/examples/pipeline-war-ARXRosa.py
 """

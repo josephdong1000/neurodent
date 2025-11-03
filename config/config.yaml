@@ -1,8 +1,8 @@
-# Neurodent Snakemake Pipeline Configuration
+# NeuRodent Snakemake Pipeline Configuration
 # =====================================
 
 # Core directories and paths
-base_folder: "/mnt/isilon/marsh_single_unit/Neurodent"
+base_folder: "/mnt/isilon/marsh_single_unit/NeuRodent"
 data_parent_folder: "/mnt/isilon/marsh_single_unit/PythonEEG Data Bins/Sox5/Dr. Lefebvre Project"
 temp_directory: "/scr1/users/dongjp"
 

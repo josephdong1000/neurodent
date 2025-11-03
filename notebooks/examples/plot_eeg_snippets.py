@@ -29,7 +29,7 @@ random.seed(42)
 np.random.seed(42)
 
 # Configuration
-base_folder = Path("/mnt/isilon/marsh_single_unit/Neurodent")
+base_folder = Path("/mnt/isilon/marsh_single_unit/NeuRodent")
 genotype_json_path = base_folder / "notebooks" / "tests" / "sox5 combine genotypes.json"
 save_folder = base_folder / "notebooks" / "examples" / "eeg_snippets_plots"
 save_folder.mkdir(parents=True, exist_ok=True)
@@ -539,5 +539,5 @@ if __name__ == "__main__":
 """
 To run this script on SLURM:
 
-sbatch --mem 200GB -c 11 -t 12:00:00 /mnt/isilon/marsh_single_unit/Neurodent/notebooks/examples/pipeline.sh /mnt/isilon/marsh_single_unit/Neurodent/notebooks/examples/plot_eeg_snippets.py
+sbatch --mem 200GB -c 11 -t 12:00:00 /mnt/isilon/marsh_single_unit/NeuRodent/notebooks/examples/pipeline.sh /mnt/isilon/marsh_single_unit/NeuRodent/notebooks/examples/plot_eeg_snippets.py
 """

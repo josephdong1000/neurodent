@@ -49,7 +49,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger()
 
-base_folder = Path("/mnt/isilon/marsh_single_unit/Neurodent")
+base_folder = Path("/mnt/isilon/marsh_single_unit/NeuRodent")
 data_parent_folder = Path("/mnt/isilon/marsh_single_unit/PythonEEG Data Bins")
 data_folders_to_animal_ids = {
     "": ["A5", "A10", "F22", "G25", "G26", "N21", "N22", "N23", "N24", "N25"]
@@ -103,5 +103,5 @@ for data_folder, animal_ids in data_folders_to_animal_ids.items():
 # !SECTION
 
 """
-sbatch --mem 200G -c 4 -t 48:00:00 /mnt/isilon/marsh_single_unit/Neurodent/notebooks/examples/pipeline.sh /mnt/isilon/marsh_single_unit/Neurodent/notebooks/examples/pipeline-war-davidson2.py
+sbatch --mem 200G -c 4 -t 48:00:00 /mnt/isilon/marsh_single_unit/NeuRodent/notebooks/examples/pipeline.sh /mnt/isilon/marsh_single_unit/NeuRodent/notebooks/examples/pipeline-war-davidson2.py
 """
