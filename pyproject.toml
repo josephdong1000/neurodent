@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "neurodent"
-version = "0.2.0"
+version = "0.2.3"
 description = "Rodent EEG analysis tools"
 readme = "README.md"
 license = "MIT"
