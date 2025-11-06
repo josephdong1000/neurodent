@@ -1,0 +1,982 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Data Loading Tutorial &#8212; Neurodent 0.2.0 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinx-design.min.css?v=95c83b7e" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../_static/documentation_options.js?v=938c9ccc"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/design-tabs.js?v=f930bc37"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'quickstart/data_loading';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.16.1';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://josephdong1000.github.io/neurodent/_static/switcher.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = '0.2.3';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner =
+            false;
+        </script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Configuration and Tips" href="configuration.html" />
+    <link rel="prev" title="Basic Usage Tutorial" href="basic_usage.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">NeuRodent</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../installation/index.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="index.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/index.html">
+    Tutorials
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../examples/index.html">
+    Examples
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../api/index.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../contributing/index.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../license/index.html">
+    License
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+<div class="version-switcher__container dropdown pst-js-only">
+  <button id="pst-version-switcher-button-2"
+    type="button"
+    class="version-switcher__button btn btn-sm dropdown-toggle"
+    data-bs-toggle="dropdown"
+    aria-haspopup="listbox"
+    aria-controls="pst-version-switcher-list-2"
+    aria-label="Version switcher list"
+  >
+    Choose version  <!-- this text may get changed later by javascript -->
+    <span class="caret"></span>
+  </button>
+  <div id="pst-version-switcher-list-2"
+    class="version-switcher__menu dropdown-menu list-group-flush py-0"
+    role="listbox" aria-labelledby="pst-version-switcher-button-2">
+    <!-- dropdown will be populated by javascript on page load -->
+  </div>
+</div></div>
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/josephdong1000/neurodent" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-square-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://pypi.org/project/neurodent/" title="PyPI" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-python fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">PyPI</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../installation/index.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="index.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../tutorials/index.html">
+    Tutorials
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../examples/index.html">
+    Examples
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../api/index.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../contributing/index.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../license/index.html">
+    License
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+<div class="version-switcher__container dropdown pst-js-only">
+  <button id="pst-version-switcher-button-3"
+    type="button"
+    class="version-switcher__button btn btn-sm dropdown-toggle"
+    data-bs-toggle="dropdown"
+    aria-haspopup="listbox"
+    aria-controls="pst-version-switcher-list-3"
+    aria-label="Version switcher list"
+  >
+    Choose version  <!-- this text may get changed later by javascript -->
+    <span class="caret"></span>
+  </button>
+  <div id="pst-version-switcher-list-3"
+    class="version-switcher__menu dropdown-menu list-group-flush py-0"
+    role="listbox" aria-labelledby="pst-version-switcher-button-3">
+    <!-- dropdown will be populated by javascript on page load -->
+  </div>
+</div></div>
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/josephdong1000/neurodent" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-square-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://pypi.org/project/neurodent/" title="PyPI" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-python fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">PyPI</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="basic_usage.html">Basic Usage Tutorial</a></li>
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">Data Loading Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Configuration and Tips</a></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="index.html" class="nav-link">Quickstart</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">Data Loading Tutorial</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section class="tex2jax_ignore mathjax_ignore" id="data-loading-tutorial">
+<h1>Data Loading Tutorial<a class="headerlink" href="#data-loading-tutorial" title="Link to this heading">#</a></h1>
+<p>This tutorial covers how to load EEG data from various formats supported by Neurodent.</p>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Link to this heading">#</a></h2>
+<p>Neurodent supports multiple data formats commonly used in rodent EEG research:</p>
+<ol class="arabic simple">
+<li><p><strong>Binary files</strong> (<code class="docutils literal notranslate"><span class="pre">.bin</span></code>) - Custom binary format</p></li>
+<li><p><strong>SpikeInterface recordings</strong> - Via the SpikeInterface library</p></li>
+<li><p><strong>MNE objects</strong> - From the MNE-Python library</p></li>
+<li><p><strong>Neuroscope/Neuralynx</strong> (<code class="docutils literal notranslate"><span class="pre">.dat</span></code>, <code class="docutils literal notranslate"><span class="pre">.eeg</span></code>)</p></li>
+<li><p><strong>Open Ephys</strong> (<code class="docutils literal notranslate"><span class="pre">.continuous</span></code>)</p></li>
+<li><p><strong>NWB files</strong> (<code class="docutils literal notranslate"><span class="pre">.nwb</span></code>) - Neurodata Without Borders format</p></li>
+</ol>
+<p>The <code class="docutils literal notranslate"><span class="pre">LongRecordingOrganizer</span></code> class handles loading and organizing recordings from these formats.</p>
+</section>
+<section id="setup">
+<h2>Setup<a class="headerlink" href="#setup" title="Link to this heading">#</a></h2>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">neurodent</span><span class="w"> </span><span class="kn">import</span> <span class="n">core</span>
+
+<span class="c1"># Set up logging</span>
+<span class="n">logging</span><span class="o">.</span><span class="n">basicConfig</span><span class="p">(</span>
+    <span class="nb">format</span><span class="o">=</span><span class="s2">&quot;</span><span class="si">%(asctime)s</span><span class="s2"> - </span><span class="si">%(levelname)s</span><span class="s2"> - </span><span class="si">%(message)s</span><span class="s2">&quot;</span><span class="p">,</span> 
+    <span class="n">level</span><span class="o">=</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span>
+<span class="p">)</span>
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="loading-binary-files">
+<h2>1. Loading Binary Files<a class="headerlink" href="#loading-binary-files" title="Link to this heading">#</a></h2>
+<p>Binary files are a common format for storing continuous EEG data. Neurodent can load binary files with associated metadata.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Example: Loading binary files</span>
+<span class="n">data_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;/path/to/binary/data&quot;</span><span class="p">)</span>
+<span class="n">animal_id</span> <span class="o">=</span> <span class="s2">&quot;animal_001&quot;</span>
+
+<span class="n">lro_bin</span> <span class="o">=</span> <span class="n">core</span><span class="o">.</span><span class="n">LongRecordingOrganizer</span><span class="p">(</span>
+    <span class="n">base_folder</span><span class="o">=</span><span class="n">data_path</span><span class="p">,</span>
+    <span class="n">animal_id</span><span class="o">=</span><span class="n">animal_id</span><span class="p">,</span>
+    <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;bin&quot;</span><span class="p">,</span>  <span class="c1"># Specify binary mode</span>
+<span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Loaded </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">lro_bin</span><span class="o">.</span><span class="n">recordings</span><span class="p">)</span><span class="si">}</span><span class="s2"> binary recordings&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Sample rate: </span><span class="si">{</span><span class="n">lro_bin</span><span class="o">.</span><span class="n">recordings</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">get_sampling_frequency</span><span class="p">()</span><span class="si">}</span><span class="s2"> Hz&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Channels: </span><span class="si">{</span><span class="n">lro_bin</span><span class="o">.</span><span class="n">recordings</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">get_channel_ids</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<section id="binary-file-format-details">
+<h3>Binary File Format Details<a class="headerlink" href="#binary-file-format-details" title="Link to this heading">#</a></h3>
+<p>Neurodent supports two binary layouts:</p>
+<ol class="arabic simple">
+<li><p><strong>Column-major</strong> (default): Each file contains data for one channel</p></li>
+<li><p><strong>Row-major</strong>: Each file contains all channels, with samples interleaved</p></li>
+</ol>
+<p>You can convert between formats:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Convert column-major to row-major format</span>
+<span class="n">col_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;/path/to/colmajor/data&quot;</span><span class="p">)</span>
+<span class="n">row_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;/path/to/rowmajor/output&quot;</span><span class="p">)</span>
+
+<span class="n">core</span><span class="o">.</span><span class="n">convert_ddfcolbin_to_ddfrowbin</span><span class="p">(</span>
+    <span class="n">ddf_colpath</span><span class="o">=</span><span class="n">col_path</span><span class="p">,</span>
+    <span class="n">ddf_rowpath</span><span class="o">=</span><span class="n">row_path</span><span class="p">,</span>
+    <span class="n">overwrite</span><span class="o">=</span><span class="kc">False</span>
+<span class="p">)</span>
+
+<span class="c1"># Convert to SpikeInterface format</span>
+<span class="n">core</span><span class="o">.</span><span class="n">convert_ddfrowbin_to_si</span><span class="p">(</span>
+    <span class="n">ddf_rowpath</span><span class="o">=</span><span class="n">row_path</span><span class="p">,</span>
+    <span class="n">overwrite</span><span class="o">=</span><span class="kc">False</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="loading-spikeinterface-recordings">
+<h2>2. Loading SpikeInterface Recordings<a class="headerlink" href="#loading-spikeinterface-recordings" title="Link to this heading">#</a></h2>
+<p>SpikeInterface is a popular Python library for extracellular electrophysiology data. Neurodent can directly use SpikeInterface recordings:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Example: Loading SpikeInterface recordings</span>
+<span class="n">si_data_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;/path/to/spikeinterface/data&quot;</span><span class="p">)</span>
+
+<span class="n">lro_si</span> <span class="o">=</span> <span class="n">core</span><span class="o">.</span><span class="n">LongRecordingOrganizer</span><span class="p">(</span>
+    <span class="n">base_folder</span><span class="o">=</span><span class="n">si_data_path</span><span class="p">,</span>
+    <span class="n">animal_id</span><span class="o">=</span><span class="n">animal_id</span><span class="p">,</span>
+    <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;si&quot;</span><span class="p">,</span>  <span class="c1"># SpikeInterface mode</span>
+<span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Loaded </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">lro_si</span><span class="o">.</span><span class="n">recordings</span><span class="p">)</span><span class="si">}</span><span class="s2"> SpikeInterface recordings&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="loading-mne-objects">
+<h2>3. Loading MNE Objects<a class="headerlink" href="#loading-mne-objects" title="Link to this heading">#</a></h2>
+<p>MNE-Python is a widely-used library for MEG and EEG analysis. Neurodent can work with MNE Raw objects:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">mne</span>
+
+<span class="c1"># Load data using MNE first</span>
+<span class="n">mne_file</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;/path/to/mne/data.fif&quot;</span><span class="p">)</span>
+<span class="n">raw_mne</span> <span class="o">=</span> <span class="n">mne</span><span class="o">.</span><span class="n">io</span><span class="o">.</span><span class="n">read_raw_fif</span><span class="p">(</span><span class="n">mne_file</span><span class="p">,</span> <span class="n">preload</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+<span class="c1"># Create LongRecordingOrganizer with MNE object</span>
+<span class="n">lro_mne</span> <span class="o">=</span> <span class="n">core</span><span class="o">.</span><span class="n">LongRecordingOrganizer</span><span class="p">(</span>
+    <span class="n">base_folder</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">animal_id</span><span class="o">=</span><span class="n">animal_id</span><span class="p">,</span>
+    <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;mne&quot;</span><span class="p">,</span>
+    <span class="n">mne_objects</span><span class="o">=</span><span class="p">[</span><span class="n">raw_mne</span><span class="p">],</span>  <span class="c1"># Pass MNE objects directly</span>
+<span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Loaded </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">lro_mne</span><span class="o">.</span><span class="n">recordings</span><span class="p">)</span><span class="si">}</span><span class="s2"> MNE recordings&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="loading-nwb-files">
+<h2>4. Loading NWB Files<a class="headerlink" href="#loading-nwb-files" title="Link to this heading">#</a></h2>
+<p>Neurodata Without Borders (NWB) is a standardized format for neurophysiology data:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Example: Loading NWB files</span>
+<span class="n">nwb_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;/path/to/nwb/file.nwb&quot;</span><span class="p">)</span>
+
+<span class="c1"># First, load with SpikeInterface&#39;s NWB extractor</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">spikeinterface.extractors</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">se</span>
+
+<span class="n">recording_nwb</span> <span class="o">=</span> <span class="n">se</span><span class="o">.</span><span class="n">read_nwb</span><span class="p">(</span><span class="n">nwb_path</span><span class="p">)</span>
+
+<span class="c1"># Then use with LongRecordingOrganizer</span>
+<span class="n">lro_nwb</span> <span class="o">=</span> <span class="n">core</span><span class="o">.</span><span class="n">LongRecordingOrganizer</span><span class="p">(</span>
+    <span class="n">base_folder</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">animal_id</span><span class="o">=</span><span class="n">animal_id</span><span class="p">,</span>
+    <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;si&quot;</span><span class="p">,</span>
+    <span class="n">si_recordings</span><span class="o">=</span><span class="p">[</span><span class="n">recording_nwb</span><span class="p">],</span>
+<span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Loaded NWB data with </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">lro_nwb</span><span class="o">.</span><span class="n">recordings</span><span class="p">)</span><span class="si">}</span><span class="s2"> recordings&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="loading-other-formats">
+<h2>5. Loading Other Formats<a class="headerlink" href="#loading-other-formats" title="Link to this heading">#</a></h2>
+<section id="neuroscope-neuralynx">
+<h3>Neuroscope/Neuralynx<a class="headerlink" href="#neuroscope-neuralynx" title="Link to this heading">#</a></h3>
+<p>For <code class="docutils literal notranslate"><span class="pre">.dat</span></code> or <code class="docutils literal notranslate"><span class="pre">.eeg</span></code> files:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Load using SpikeInterface extractors</span>
+<span class="n">neuroscope_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;/path/to/neuroscope/data.dat&quot;</span><span class="p">)</span>
+<span class="n">recording_neuroscope</span> <span class="o">=</span> <span class="n">se</span><span class="o">.</span><span class="n">read_neuroscope</span><span class="p">(</span><span class="n">neuroscope_path</span><span class="p">)</span>
+
+<span class="n">lro_neuroscope</span> <span class="o">=</span> <span class="n">core</span><span class="o">.</span><span class="n">LongRecordingOrganizer</span><span class="p">(</span>
+    <span class="n">base_folder</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">animal_id</span><span class="o">=</span><span class="n">animal_id</span><span class="p">,</span>
+    <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;si&quot;</span><span class="p">,</span>
+    <span class="n">si_recordings</span><span class="o">=</span><span class="p">[</span><span class="n">recording_neuroscope</span><span class="p">],</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="open-ephys">
+<h3>Open Ephys<a class="headerlink" href="#open-ephys" title="Link to this heading">#</a></h3>
+<p>For Open Ephys <code class="docutils literal notranslate"><span class="pre">.continuous</span></code> files:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Load using SpikeInterface extractors</span>
+<span class="n">openephys_path</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;/path/to/openephys/folder&quot;</span><span class="p">)</span>
+<span class="n">recording_openephys</span> <span class="o">=</span> <span class="n">se</span><span class="o">.</span><span class="n">read_openephys</span><span class="p">(</span><span class="n">openephys_path</span><span class="p">)</span>
+
+<span class="n">lro_openephys</span> <span class="o">=</span> <span class="n">core</span><span class="o">.</span><span class="n">LongRecordingOrganizer</span><span class="p">(</span>
+    <span class="n">base_folder</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">animal_id</span><span class="o">=</span><span class="n">animal_id</span><span class="p">,</span>
+    <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;si&quot;</span><span class="p">,</span>
+    <span class="n">si_recordings</span><span class="o">=</span><span class="p">[</span><span class="n">recording_openephys</span><span class="p">],</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="inspecting-loaded-data">
+<h2>6. Inspecting Loaded Data<a class="headerlink" href="#inspecting-loaded-data" title="Link to this heading">#</a></h2>
+<p>Once data is loaded, you can inspect its properties:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Access recordings</span>
+<span class="n">recording</span> <span class="o">=</span> <span class="n">lro_bin</span><span class="o">.</span><span class="n">recordings</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+<span class="c1"># Get basic properties</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Sampling frequency: </span><span class="si">{</span><span class="n">recording</span><span class="o">.</span><span class="n">get_sampling_frequency</span><span class="p">()</span><span class="si">}</span><span class="s2"> Hz&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Number of channels: </span><span class="si">{</span><span class="n">recording</span><span class="o">.</span><span class="n">get_num_channels</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Channel IDs: </span><span class="si">{</span><span class="n">recording</span><span class="o">.</span><span class="n">get_channel_ids</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Duration: </span><span class="si">{</span><span class="n">recording</span><span class="o">.</span><span class="n">get_num_frames</span><span class="p">()</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">recording</span><span class="o">.</span><span class="n">get_sampling_frequency</span><span class="p">()</span><span class="si">}</span><span class="s2"> seconds&quot;</span><span class="p">)</span>
+
+<span class="c1"># Get channel metadata</span>
+<span class="n">channel_locations</span> <span class="o">=</span> <span class="n">recording</span><span class="o">.</span><span class="n">get_channel_locations</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Channel locations: </span><span class="si">{</span><span class="n">channel_locations</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="working-with-multiple-recordings">
+<h2>7. Working with Multiple Recordings<a class="headerlink" href="#working-with-multiple-recordings" title="Link to this heading">#</a></h2>
+<p>Neurodent can handle multiple recordings from the same animal (e.g., different sessions or days):</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Example: Loading multiple recordings</span>
+<span class="n">data_folder</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">&quot;/path/to/multi/session/data&quot;</span><span class="p">)</span>
+
+<span class="n">lro_multi</span> <span class="o">=</span> <span class="n">core</span><span class="o">.</span><span class="n">LongRecordingOrganizer</span><span class="p">(</span>
+    <span class="n">base_folder</span><span class="o">=</span><span class="n">data_folder</span><span class="p">,</span>
+    <span class="n">animal_id</span><span class="o">=</span><span class="n">animal_id</span><span class="p">,</span>
+    <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;bin&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Total recordings: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">lro_multi</span><span class="o">.</span><span class="n">recordings</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<span class="c1"># Iterate through recordings</span>
+<span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">recording</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">lro_multi</span><span class="o">.</span><span class="n">recordings</span><span class="p">):</span>
+    <span class="n">duration</span> <span class="o">=</span> <span class="n">recording</span><span class="o">.</span><span class="n">get_num_frames</span><span class="p">()</span> <span class="o">/</span> <span class="n">recording</span><span class="o">.</span><span class="n">get_sampling_frequency</span><span class="p">()</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Recording </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">duration</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2"> seconds&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="metadata-and-time-information">
+<h2>8. Metadata and Time Information<a class="headerlink" href="#metadata-and-time-information" title="Link to this heading">#</a></h2>
+<p>Neurodent extracts metadata from filenames and paths, including timing information:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">neurodent.core</span><span class="w"> </span><span class="kn">import</span> <span class="n">is_day</span>
+
+<span class="c1"># Check if recording is during day or night</span>
+<span class="c1"># (assuming timestamp in filename or metadata)</span>
+<span class="n">example_timestamp</span> <span class="o">=</span> <span class="s2">&quot;2023-12-15_14-30-00&quot;</span>  <span class="c1"># Example: 2:30 PM</span>
+
+<span class="n">is_daytime</span> <span class="o">=</span> <span class="n">is_day</span><span class="p">(</span><span class="n">example_timestamp</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Recording at </span><span class="si">{</span><span class="n">example_timestamp</span><span class="si">}</span><span class="s2"> is </span><span class="si">{</span><span class="s1">&#39;day&#39;</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">is_daytime</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s1">&#39;night&#39;</span><span class="si">}</span><span class="s2">time&quot;</span><span class="p">)</span>
+
+<span class="c1"># Access metadata from recordings</span>
+<span class="k">for</span> <span class="n">recording</span> <span class="ow">in</span> <span class="n">lro_bin</span><span class="o">.</span><span class="n">recordings</span><span class="p">:</span>
+    <span class="n">metadata</span> <span class="o">=</span> <span class="n">recording</span><span class="o">.</span><span class="n">get_property</span><span class="p">(</span><span class="s2">&quot;metadata&quot;</span><span class="p">)</span> <span class="k">if</span> <span class="n">recording</span><span class="o">.</span><span class="n">has_property</span><span class="p">(</span><span class="s2">&quot;metadata&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="kc">None</span>
+    <span class="k">if</span> <span class="n">metadata</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Recording metadata: </span><span class="si">{</span><span class="n">metadata</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="advanced-custom-data-loading">
+<h2>9. Advanced: Custom Data Loading<a class="headerlink" href="#advanced-custom-data-loading" title="Link to this heading">#</a></h2>
+<p>For custom formats, you can create SpikeInterface Recording objects and pass them to <code class="docutils literal notranslate"><span class="pre">LongRecordingOrganizer</span></code>:</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">spikeinterface</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">si</span>
+
+<span class="c1"># Example: Create a recording from numpy array</span>
+<span class="c1"># (useful for custom formats or testing)</span>
+<span class="n">num_channels</span> <span class="o">=</span> <span class="mi">16</span>
+<span class="n">sampling_frequency</span> <span class="o">=</span> <span class="mi">1000</span>  <span class="c1"># Hz</span>
+<span class="n">duration</span> <span class="o">=</span> <span class="mi">60</span>  <span class="c1"># seconds</span>
+<span class="n">num_samples</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">sampling_frequency</span> <span class="o">*</span> <span class="n">duration</span><span class="p">)</span>
+
+<span class="c1"># Generate random data (replace with your actual data)</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="n">num_channels</span><span class="p">,</span> <span class="n">num_samples</span><span class="p">)</span>
+
+<span class="c1"># Create SpikeInterface recording</span>
+<span class="n">recording_custom</span> <span class="o">=</span> <span class="n">si</span><span class="o">.</span><span class="n">NumpyRecording</span><span class="p">(</span>
+    <span class="n">traces_list</span><span class="o">=</span><span class="p">[</span><span class="n">data</span><span class="p">],</span>
+    <span class="n">sampling_frequency</span><span class="o">=</span><span class="n">sampling_frequency</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="c1"># Set channel IDs</span>
+<span class="n">channel_ids</span> <span class="o">=</span> <span class="p">[</span><span class="sa">f</span><span class="s2">&quot;CH</span><span class="si">{</span><span class="n">i</span><span class="si">:</span><span class="s2">02d</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_channels</span><span class="p">)]</span>
+<span class="n">recording_custom</span> <span class="o">=</span> <span class="n">recording_custom</span><span class="o">.</span><span class="n">rename_channels</span><span class="p">(</span>
+    <span class="n">new_channel_ids</span><span class="o">=</span><span class="n">channel_ids</span>
+<span class="p">)</span>
+
+<span class="c1"># Use with LongRecordingOrganizer</span>
+<span class="n">lro_custom</span> <span class="o">=</span> <span class="n">core</span><span class="o">.</span><span class="n">LongRecordingOrganizer</span><span class="p">(</span>
+    <span class="n">base_folder</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">animal_id</span><span class="o">=</span><span class="n">animal_id</span><span class="p">,</span>
+    <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;si&quot;</span><span class="p">,</span>
+    <span class="n">si_recordings</span><span class="o">=</span><span class="p">[</span><span class="n">recording_custom</span><span class="p">],</span>
+<span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Custom recording created successfully!&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</section>
+<section id="summary">
+<h2>Summary<a class="headerlink" href="#summary" title="Link to this heading">#</a></h2>
+<p>In this tutorial, you learned:</p>
+<ol class="arabic simple">
+<li><p>How to load data from multiple formats (binary, SpikeInterface, MNE, NWB, etc.)</p></li>
+<li><p>How to inspect loaded data properties</p></li>
+<li><p>How to work with multiple recordings</p></li>
+<li><p>How to handle metadata and timing information</p></li>
+<li><p>How to create custom recordings for non-standard formats</p></li>
+</ol>
+</section>
+<section id="next-steps">
+<h2>Next Steps<a class="headerlink" href="#next-steps" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p><strong><a class="reference internal" href="basic_usage.html"><span class="std std-doc">Basic Usage Tutorial</span></a></strong>: Complete workflow from loading to visualization</p></li>
+<li><p><strong><a class="reference internal" href="../tutorials/windowed_analysis.html"><span class="std std-doc">Windowed Analysis Tutorial</span></a></strong>: Extract features from loaded data</p></li>
+<li><p><strong><a class="reference internal" href="../tutorials/spike_analysis.html"><span class="std std-doc">Spike Analysis Tutorial</span></a></strong>: Work with spike-sorted data</p></li>
+</ul>
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="basic_usage.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Basic Usage Tutorial</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="configuration.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Configuration and Tips</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#overview">Overview</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#setup">Setup</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#loading-binary-files">1. Loading Binary Files</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#binary-file-format-details">Binary File Format Details</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#loading-spikeinterface-recordings">2. Loading SpikeInterface Recordings</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#loading-mne-objects">3. Loading MNE Objects</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#loading-nwb-files">4. Loading NWB Files</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#loading-other-formats">5. Loading Other Formats</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neuroscope-neuralynx">Neuroscope/Neuralynx</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#open-ephys">Open Ephys</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#inspecting-loaded-data">6. Inspecting Loaded Data</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#working-with-multiple-recordings">7. Working with Multiple Recordings</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#metadata-and-time-information">8. Metadata and Time Information</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#advanced-custom-data-loading">9. Advanced: Custom Data Loading</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#summary">Summary</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#next-steps">Next Steps</a></li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/quickstart/data_loading.ipynb.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2025, Joseph Dong, Yongtaek Oh, Eric Marsh.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.16.1.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>

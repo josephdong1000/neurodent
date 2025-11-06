@@ -1,0 +1,871 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>AnimalOrganizer &#8212; Neurodent 0.2.3 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sphinx-design.min.css?v=95c83b7e" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../../_static/documentation_options.js?v=a47416a6"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/design-tabs.js?v=f930bc37"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'api/visualization/animal_organizer';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.16.1';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://josephdong1000.github.io/neurodent/_static/switcher.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = '0.2.3';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner =
+            false;
+        </script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="WindowAnalysisResult" href="window_analysis_result.html" />
+    <link rel="prev" title="Visualization Module" href="index.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">NeuRodent</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../installation/index.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../quickstart/index.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../tutorials/index.html">
+    Tutorials
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../examples/index.html">
+    Examples
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../index.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../contributing/index.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../license/index.html">
+    License
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+<div class="version-switcher__container dropdown pst-js-only">
+  <button id="pst-version-switcher-button-2"
+    type="button"
+    class="version-switcher__button btn btn-sm dropdown-toggle"
+    data-bs-toggle="dropdown"
+    aria-haspopup="listbox"
+    aria-controls="pst-version-switcher-list-2"
+    aria-label="Version switcher list"
+  >
+    Choose version  <!-- this text may get changed later by javascript -->
+    <span class="caret"></span>
+  </button>
+  <div id="pst-version-switcher-list-2"
+    class="version-switcher__menu dropdown-menu list-group-flush py-0"
+    role="listbox" aria-labelledby="pst-version-switcher-button-2">
+    <!-- dropdown will be populated by javascript on page load -->
+  </div>
+</div></div>
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/josephdong1000/neurodent" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-square-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://pypi.org/project/neurodent/" title="PyPI" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-python fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">PyPI</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../installation/index.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../quickstart/index.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../tutorials/index.html">
+    Tutorials
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../examples/index.html">
+    Examples
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../index.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../contributing/index.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../license/index.html">
+    License
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+<div class="version-switcher__container dropdown pst-js-only">
+  <button id="pst-version-switcher-button-3"
+    type="button"
+    class="version-switcher__button btn btn-sm dropdown-toggle"
+    data-bs-toggle="dropdown"
+    aria-haspopup="listbox"
+    aria-controls="pst-version-switcher-list-3"
+    aria-label="Version switcher list"
+  >
+    Choose version  <!-- this text may get changed later by javascript -->
+    <span class="caret"></span>
+  </button>
+  <div id="pst-version-switcher-list-3"
+    class="version-switcher__menu dropdown-menu list-group-flush py-0"
+    role="listbox" aria-labelledby="pst-version-switcher-button-3">
+    <!-- dropdown will be populated by javascript on page load -->
+  </div>
+</div></div>
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/josephdong1000/neurodent" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-square-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://pypi.org/project/neurodent/" title="PyPI" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-python fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">PyPI</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../core/index.html">Core Module</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../core/ddf_binary_metadata.html">DDFBinaryMetadata</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../core/long_recording_organizer.html">LongRecordingOrganizer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../core/long_recording_analyzer.html">LongRecordingAnalyzer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../core/fragment_analyzer.html">FragmentAnalyzer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../core/mountain_sort_analyzer.html">MountainSortAnalyzer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../core/frequency_domain_spike_detector.html">FrequencyDomainSpikeDetector</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../core/utils.html">Utilities</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="index.html">Visualization Module</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">AnimalOrganizer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="window_analysis_result.html">WindowAnalysisResult</a></li>
+<li class="toctree-l2"><a class="reference internal" href="spike_analysis_result.html">SpikeAnalysisResult</a></li>
+<li class="toctree-l2"><a class="reference internal" href="frequency_domain_spike_analysis_result.html">FrequencyDomainSpikeAnalysisResult</a></li>
+<li class="toctree-l2"><a class="reference internal" href="animal_plotter.html">AnimalPlotter</a></li>
+<li class="toctree-l2"><a class="reference internal" href="experiment_plotter.html">ExperimentPlotter</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="../constants.html">Constants</a></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../index.html" class="nav-link">API Reference</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="index.html" class="nav-link">Visualization Module</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">AnimalOrganizer</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="animalorganizer">
+<h1>AnimalOrganizer<a class="headerlink" href="#animalorganizer" title="Link to this heading">#</a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="neurodent.visualization.AnimalOrganizer">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neurodent.visualization.</span></span><span class="sig-name descname"><span class="pre">AnimalOrganizer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">base_folder_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">anim_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">day_sep</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Literal</span><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'nest'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'concat'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'base'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'noday'</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'concat'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">assume_from_number</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">skip_days</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">truncate</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lro_kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">{}</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../../_modules/neurodent/visualization/results.html#AnimalOrganizer"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.visualization.AnimalOrganizer" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">AnimalFeatureParser</span></code></p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>anim_id</strong> (<em>str</em>)</p></li>
+<li><p><strong>day_sep</strong> (<em>str</em><em> | </em><em>None</em>)</p></li>
+<li><p><strong>mode</strong> (<em>Literal</em><em>[</em><em>'nest'</em><em>, </em><em>'concat'</em><em>, </em><em>'base'</em><em>, </em><em>'noday'</em><em>]</em>)</p></li>
+<li><p><strong>skip_days</strong> (<em>list</em><em>[</em><em>str</em><em>]</em>)</p></li>
+<li><p><strong>truncate</strong> (<em>bool</em><em> | </em><em>int</em>)</p></li>
+<li><p><strong>lro_kwargs</strong> (<em>dict</em>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.visualization.AnimalOrganizer.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">base_folder_path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">anim_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">day_sep</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Literal</span><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'nest'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'concat'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'base'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'noday'</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'concat'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">assume_from_number</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">skip_days</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">truncate</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lro_kwargs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">{}</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../../_modules/neurodent/visualization/results.html#AnimalOrganizer.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.visualization.AnimalOrganizer.__init__" title="Link to this definition">#</a></dt>
+<dd><p>AnimalOrganizer is used to organize data from a single animal into a format that can be used for analysis.
+It is used to organize data from a single animal into a format that can be used for analysis.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>base_folder_path</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – The path to the base folder of the animal data.</p></li>
+<li><p><strong>anim_id</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>) – The ID of the animal. This should correspond to only one animal.</p></li>
+<li><p><strong>day_sep</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str,</span> <span class="pre">optional</span></code>) – Separator for day in folder name. Set to None or empty string to get all folders. Defaults to None.</p></li>
+<li><p><strong>mode</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">Literal[&quot;nest&quot;,</span> <span class="pre">&quot;concat&quot;,</span> <span class="pre">&quot;base&quot;,</span> <span class="pre">&quot;noday&quot;],</span> <span class="pre">optional</span></code>) – The mode of the AnimalOrganizer. Defaults to “concat”.
+File structure patterns (where * indicates search location):
+“nest”: base_folder_path / animal_id / <em>date_format</em> (looks for folders/files within animal_id subdirectories)
+“concat”: base_folder_path / <em>animal_id*date_format</em> (looks for folders/files with animal_id+date in name at base level)
+“base”: base_folder_path / * (looks for folders/files directly in base_folder_path)
+“noday”: base_folder_path / <em>animal_id</em> (same as concat but expects single unique match, no date filtering)</p></li>
+<li><p><strong>assume_from_number</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">bool,</span> <span class="pre">optional</span></code>) – Whether to assume the animal ID is a number. Defaults to False.</p></li>
+<li><p><strong>skip_days</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">list[str],</span> <span class="pre">optional</span></code>) – The days to skip. Defaults to [].</p></li>
+<li><p><strong>truncate</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">bool|int,</span> <span class="pre">optional</span></code>) – Whether to truncate the data. Defaults to False.</p></li>
+<li><p><strong>lro_kwargs</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">dict,</span> <span class="pre">optional</span></code>) – Keyword arguments for LongRecordingOrganizer. Defaults to {}.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.visualization.AnimalOrganizer.get_timeline_summary">
+<span class="sig-name descname"><span class="pre">get_timeline_summary</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">DataFrame</span></span></span><a class="reference internal" href="../../_modules/neurodent/visualization/results.html#AnimalOrganizer.get_timeline_summary"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.visualization.AnimalOrganizer.get_timeline_summary" title="Link to this definition">#</a></dt>
+<dd><p>Get timeline summary as a DataFrame for user inspection and debugging.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p><dl class="simple">
+<dt>Timeline information with columns:</dt><dd><ul class="simple">
+<li><p>lro_index: Index of the LRO</p></li>
+<li><p>start_time: Start datetime of the LRO</p></li>
+<li><p>end_time: End datetime of the LRO</p></li>
+<li><p>duration_s: Duration in seconds</p></li>
+<li><p>n_files: Number of files in the LRO</p></li>
+<li><p>folder_path: Base folder path</p></li>
+<li><p>animalday: Parsed animalday identifier</p></li>
+</ul>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>pd.DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.visualization.AnimalOrganizer.convert_colbins_to_rowbins">
+<span class="sig-name descname"><span class="pre">convert_colbins_to_rowbins</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">overwrite</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">multiprocess_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Literal</span><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'dask'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'serial'</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'serial'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/neurodent/visualization/results.html#AnimalOrganizer.convert_colbins_to_rowbins"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.visualization.AnimalOrganizer.convert_colbins_to_rowbins" title="Link to this definition">#</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>multiprocess_mode</strong> (<em>Literal</em><em>[</em><em>'dask'</em><em>, </em><em>'serial'</em><em>]</em>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.visualization.AnimalOrganizer.convert_rowbins_to_rec">
+<span class="sig-name descname"><span class="pre">convert_rowbins_to_rec</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">multiprocess_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Literal</span><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'dask'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'serial'</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'serial'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/neurodent/visualization/results.html#AnimalOrganizer.convert_rowbins_to_rec"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.visualization.AnimalOrganizer.convert_rowbins_to_rec" title="Link to this definition">#</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>multiprocess_mode</strong> (<em>Literal</em><em>[</em><em>'dask'</em><em>, </em><em>'serial'</em><em>]</em>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.visualization.AnimalOrganizer.cleanup_rec">
+<span class="sig-name descname"><span class="pre">cleanup_rec</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/neurodent/visualization/results.html#AnimalOrganizer.cleanup_rec"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.visualization.AnimalOrganizer.cleanup_rec" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.visualization.AnimalOrganizer.compute_bad_channels">
+<span class="sig-name descname"><span class="pre">compute_bad_channels</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lof_threshold</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">force_recompute</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/neurodent/visualization/results.html#AnimalOrganizer.compute_bad_channels"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.visualization.AnimalOrganizer.compute_bad_channels" title="Link to this definition">#</a></dt>
+<dd><p>Compute bad channels using LOF analysis for all recordings.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>lof_threshold</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">float,</span> <span class="pre">optional</span></code>) – Threshold for determining bad channels from LOF scores.
+If None, only computes/loads scores without setting bad_channel_names.</p></li>
+<li><p><strong>force_recompute</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">bool</span></code>) – Whether to recompute LOF scores even if they exist.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.visualization.AnimalOrganizer.apply_lof_threshold">
+<span class="sig-name descname"><span class="pre">apply_lof_threshold</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lof_threshold</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/neurodent/visualization/results.html#AnimalOrganizer.apply_lof_threshold"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.visualization.AnimalOrganizer.apply_lof_threshold" title="Link to this definition">#</a></dt>
+<dd><p>Apply threshold to existing LOF scores to determine bad channels for all recordings.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>lof_threshold</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code>) – Threshold for determining bad channels.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.visualization.AnimalOrganizer.get_all_lof_scores">
+<span class="sig-name descname"><span class="pre">get_all_lof_scores</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="../../_modules/neurodent/visualization/results.html#AnimalOrganizer.get_all_lof_scores"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.visualization.AnimalOrganizer.get_all_lof_scores" title="Link to this definition">#</a></dt>
+<dd><p>Get LOF scores for all recordings.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Dictionary mapping animal days to LOF score dictionaries.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>dict</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.visualization.AnimalOrganizer.compute_windowed_analysis">
+<span class="sig-name descname"><span class="pre">compute_windowed_analysis</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">features</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exclude</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">window_s</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">4</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">multiprocess_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Literal</span><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'dask'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'serial'</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'serial'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">suppress_short_interval_error</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">apply_notch_filter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="window_analysis_result.html#neurodent.visualization.WindowAnalysisResult" title="neurodent.visualization.results.WindowAnalysisResult"><span class="pre">WindowAnalysisResult</span></a></span></span><a class="reference internal" href="../../_modules/neurodent/visualization/results.html#AnimalOrganizer.compute_windowed_analysis"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.visualization.AnimalOrganizer.compute_windowed_analysis" title="Link to this definition">#</a></dt>
+<dd><p>Computes windowed analysis of animal recordings. The data is divided into windows (time bins), then features are extracted from each window. The result is
+formatted to a Dataframe and wrapped into a WindowAnalysisResult object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>features</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">list[str]</span></code>) – List of features to compute. See individual <code class="docutils literal notranslate"><span class="pre">compute_...()</span></code> functions for output format</p></li>
+<li><p><strong>exclude</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">list[str],</span> <span class="pre">optional</span></code>) – List of features to ignore. Will override the features parameter. Defaults to [].</p></li>
+<li><p><strong>window_s</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">int,</span> <span class="pre">optional</span></code>) – Length of each window in seconds. Note that some features break with very short window times. Defaults to 4.</p></li>
+<li><p><strong>suppress_short_interval_error</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">bool,</span> <span class="pre">optional</span></code>) – If True, suppress ValueError for short intervals between timestamps in resulting WindowAnalysisResult. Useful for aggregated WARs. Defaults to False.</p></li>
+<li><p><strong>apply_notch_filter</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">bool,</span> <span class="pre">optional</span></code>) – Whether to apply notch filtering to remove line noise. Uses constants.LINE_FREQ. Defaults to True.</p></li>
+<li><p><strong>multiprocess_mode</strong> (<em>Literal</em><em>[</em><em>'dask'</em><em>, </em><em>'serial'</em><em>]</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>AttributeError</strong> – If a feature’s <code class="docutils literal notranslate"><span class="pre">compute_...()</span></code> function was not implemented, this error will be raised.</p>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A WindowAnalysisResult object containing extracted features for all recordings</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="window_analysis_result.html#neurodent.visualization.WindowAnalysisResult" title="neurodent.visualization.WindowAnalysisResult">WindowAnalysisResult</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.visualization.AnimalOrganizer.compute_spike_analysis">
+<span class="sig-name descname"><span class="pre">compute_spike_analysis</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">multiprocess_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Literal</span><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'dask'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'serial'</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'serial'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="spike_analysis_result.html#neurodent.visualization.SpikeAnalysisResult" title="neurodent.visualization.SpikeAnalysisResult"><span class="pre">SpikeAnalysisResult</span></a><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/neurodent/visualization/results.html#AnimalOrganizer.compute_spike_analysis"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.visualization.AnimalOrganizer.compute_spike_analysis" title="Link to this definition">#</a></dt>
+<dd><p>Compute spike sorting on all long recordings and return a list of SpikeAnalysisResult objects</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>multiprocess_mode</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">Literal['dask',</span> <span class="pre">'serial']</span></code>) – Whether to use Dask for parallel processing. Defaults to ‘serial’.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>List of SpikeAnalysisResult objects. Each SpikeAnalysisResult object corresponds</dt><dd><p>to a LongRecording object, typically a different day or recording session.</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>list[<a class="reference internal" href="spike_analysis_result.html#neurodent.visualization.SpikeAnalysisResult" title="neurodent.visualization.SpikeAnalysisResult">SpikeAnalysisResult</a>]</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ImportError</strong> – If mountainsort5 is not available.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.visualization.AnimalOrganizer.compute_frequency_domain_spike_analysis">
+<span class="sig-name descname"><span class="pre">compute_frequency_domain_spike_analysis</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">detection_params</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_length</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">multiprocess_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Literal</span><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'dask'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'serial'</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'serial'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/neurodent/visualization/results.html#AnimalOrganizer.compute_frequency_domain_spike_analysis"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.visualization.AnimalOrganizer.compute_frequency_domain_spike_analysis" title="Link to this definition">#</a></dt>
+<dd><p>Compute frequency-domain spike detection on all long recordings.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>detection_params</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">dict,</span> <span class="pre">optional</span></code>) – Detection parameters. Uses defaults if None.</p></li>
+<li><p><strong>max_length</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">int,</span> <span class="pre">optional</span></code>) – Maximum length in samples to analyze per recording</p></li>
+<li><p><strong>multiprocess_mode</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">Literal[&quot;dask&quot;,</span> <span class="pre">&quot;serial&quot;]</span></code>) – Processing mode</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Results for each recording session</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>list[<a class="reference internal" href="frequency_domain_spike_analysis_result.html#neurodent.visualization.FrequencyDomainSpikeAnalysisResult" title="neurodent.visualization.FrequencyDomainSpikeAnalysisResult">FrequencyDomainSpikeAnalysisResult</a>]</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ImportError</strong> – If SpikeInterface is not available</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="index.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Visualization Module</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="window_analysis_result.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">WindowAnalysisResult</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.visualization.AnimalOrganizer"><code class="docutils literal notranslate"><span class="pre">AnimalOrganizer</span></code></a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.visualization.AnimalOrganizer.__init__"><code class="docutils literal notranslate"><span class="pre">AnimalOrganizer.__init__()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.visualization.AnimalOrganizer.get_timeline_summary"><code class="docutils literal notranslate"><span class="pre">AnimalOrganizer.get_timeline_summary()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.visualization.AnimalOrganizer.convert_colbins_to_rowbins"><code class="docutils literal notranslate"><span class="pre">AnimalOrganizer.convert_colbins_to_rowbins()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.visualization.AnimalOrganizer.convert_rowbins_to_rec"><code class="docutils literal notranslate"><span class="pre">AnimalOrganizer.convert_rowbins_to_rec()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.visualization.AnimalOrganizer.cleanup_rec"><code class="docutils literal notranslate"><span class="pre">AnimalOrganizer.cleanup_rec()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.visualization.AnimalOrganizer.compute_bad_channels"><code class="docutils literal notranslate"><span class="pre">AnimalOrganizer.compute_bad_channels()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.visualization.AnimalOrganizer.apply_lof_threshold"><code class="docutils literal notranslate"><span class="pre">AnimalOrganizer.apply_lof_threshold()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.visualization.AnimalOrganizer.get_all_lof_scores"><code class="docutils literal notranslate"><span class="pre">AnimalOrganizer.get_all_lof_scores()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.visualization.AnimalOrganizer.compute_windowed_analysis"><code class="docutils literal notranslate"><span class="pre">AnimalOrganizer.compute_windowed_analysis()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.visualization.AnimalOrganizer.compute_spike_analysis"><code class="docutils literal notranslate"><span class="pre">AnimalOrganizer.compute_spike_analysis()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.visualization.AnimalOrganizer.compute_frequency_domain_spike_analysis"><code class="docutils literal notranslate"><span class="pre">AnimalOrganizer.compute_frequency_domain_spike_analysis()</span></code></a></li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../_sources/api/visualization/animal_organizer.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2025, Joseph Dong, Yongtaek Oh, Eric Marsh.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.16.1.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>

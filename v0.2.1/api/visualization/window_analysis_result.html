@@ -1,0 +1,1431 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>WindowAnalysisResult &#8212; Neurodent 0.2.0 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sphinx-design.min.css?v=95c83b7e" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../../_static/documentation_options.js?v=938c9ccc"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/design-tabs.js?v=f930bc37"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'api/visualization/window_analysis_result';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.16.1';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://josephdong1000.github.io/neurodent/_static/switcher.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = '0.2.3';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner =
+            false;
+        </script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="SpikeAnalysisResult" href="spike_analysis_result.html" />
+    <link rel="prev" title="AnimalOrganizer" href="animal_organizer.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">NeuRodent</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../installation/index.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../quickstart/index.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../tutorials/index.html">
+    Tutorials
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../examples/index.html">
+    Examples
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../index.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../contributing/index.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../license/index.html">
+    License
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+<div class="version-switcher__container dropdown pst-js-only">
+  <button id="pst-version-switcher-button-2"
+    type="button"
+    class="version-switcher__button btn btn-sm dropdown-toggle"
+    data-bs-toggle="dropdown"
+    aria-haspopup="listbox"
+    aria-controls="pst-version-switcher-list-2"
+    aria-label="Version switcher list"
+  >
+    Choose version  <!-- this text may get changed later by javascript -->
+    <span class="caret"></span>
+  </button>
+  <div id="pst-version-switcher-list-2"
+    class="version-switcher__menu dropdown-menu list-group-flush py-0"
+    role="listbox" aria-labelledby="pst-version-switcher-button-2">
+    <!-- dropdown will be populated by javascript on page load -->
+  </div>
+</div></div>
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/josephdong1000/neurodent" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-square-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://pypi.org/project/neurodent/" title="PyPI" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-python fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">PyPI</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../installation/index.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../quickstart/index.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../tutorials/index.html">
+    Tutorials
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../examples/index.html">
+    Examples
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="../index.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../contributing/index.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../license/index.html">
+    License
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+<div class="version-switcher__container dropdown pst-js-only">
+  <button id="pst-version-switcher-button-3"
+    type="button"
+    class="version-switcher__button btn btn-sm dropdown-toggle"
+    data-bs-toggle="dropdown"
+    aria-haspopup="listbox"
+    aria-controls="pst-version-switcher-list-3"
+    aria-label="Version switcher list"
+  >
+    Choose version  <!-- this text may get changed later by javascript -->
+    <span class="caret"></span>
+  </button>
+  <div id="pst-version-switcher-list-3"
+    class="version-switcher__menu dropdown-menu list-group-flush py-0"
+    role="listbox" aria-labelledby="pst-version-switcher-button-3">
+    <!-- dropdown will be populated by javascript on page load -->
+  </div>
+</div></div>
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/josephdong1000/neurodent" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-square-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://pypi.org/project/neurodent/" title="PyPI" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-python fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">PyPI</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../core/index.html">Core Module</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="../core/ddf_binary_metadata.html">DDFBinaryMetadata</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../core/long_recording_organizer.html">LongRecordingOrganizer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../core/long_recording_analyzer.html">LongRecordingAnalyzer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../core/fragment_analyzer.html">FragmentAnalyzer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../core/mountain_sort_analyzer.html">MountainSortAnalyzer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../core/frequency_domain_spike_detector.html">FrequencyDomainSpikeDetector</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../core/utils.html">Utilities</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="index.html">Visualization Module</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="animal_organizer.html">AnimalOrganizer</a></li>
+<li class="toctree-l2 current active"><a class="current reference internal" href="#">WindowAnalysisResult</a></li>
+<li class="toctree-l2"><a class="reference internal" href="spike_analysis_result.html">SpikeAnalysisResult</a></li>
+<li class="toctree-l2"><a class="reference internal" href="frequency_domain_spike_analysis_result.html">FrequencyDomainSpikeAnalysisResult</a></li>
+<li class="toctree-l2"><a class="reference internal" href="animal_plotter.html">AnimalPlotter</a></li>
+<li class="toctree-l2"><a class="reference internal" href="experiment_plotter.html">ExperimentPlotter</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="../constants.html">Constants</a></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../index.html" class="nav-link">API Reference</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="index.html" class="nav-link">Visualization Module</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">WindowAnalysisResult</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="windowanalysisresult">
+<h1>WindowAnalysisResult<a class="headerlink" href="#windowanalysisresult" title="Link to this heading">#</a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="neurodent.visualization.WindowAnalysisResult">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neurodent.visualization.</span></span><span class="sig-name descname"><span class="pre">WindowAnalysisResult</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">result</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">animal_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">genotype</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">channel_names</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">assume_from_number</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bad_channels_dict</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">{}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">suppress_short_interval_error</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lof_scores_dict</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">dict</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">{}</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../../_modules/neurodent/visualization/results.html#WindowAnalysisResult"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.visualization.WindowAnalysisResult" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">AnimalFeatureParser</span></code></p>
+<p>Wrapper for output of windowed analysis. Has useful functions like group-wise and global averaging, filtering, and saving</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>result</strong> (<em>DataFrame</em>)</p></li>
+<li><p><strong>animal_id</strong> (<em>str</em>)</p></li>
+<li><p><strong>genotype</strong> (<em>str</em>)</p></li>
+<li><p><strong>channel_names</strong> (<em>list</em><em>[</em><em>str</em><em>]</em>)</p></li>
+<li><p><strong>bad_channels_dict</strong> (<em>dict</em><em>[</em><em>str</em><em>, </em><em>list</em><em>[</em><em>str</em><em>]</em><em>]</em>)</p></li>
+<li><p><strong>lof_scores_dict</strong> (<em>dict</em><em>[</em><em>str</em><em>, </em><em>dict</em><em>]</em>)</p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.visualization.WindowAnalysisResult.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">result</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">animal_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">genotype</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">channel_names</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">assume_from_number</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bad_channels_dict</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">{}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">suppress_short_interval_error</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lof_scores_dict</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">dict</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">{}</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../../_modules/neurodent/visualization/results.html#WindowAnalysisResult.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.visualization.WindowAnalysisResult.__init__" title="Link to this definition">#</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>result</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">pd.DataFrame</span></code>) – Result comes from AnimalOrganizer.compute_windowed_analysis()</p></li>
+<li><p><strong>animal_id</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str,</span> <span class="pre">optional</span></code>) – Identifier for the animal where result was computed from. Defaults to None.</p></li>
+<li><p><strong>genotype</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str,</span> <span class="pre">optional</span></code>) – Genotype of animal. Defaults to None.</p></li>
+<li><p><strong>channel_names</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">list[str],</span> <span class="pre">optional</span></code>) – List of channel names. Defaults to None.</p></li>
+<li><p><strong>assume_channels</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">bool,</span> <span class="pre">optional</span></code>) – If true, assumes channel names according to AnimalFeatureParser.DEFAULT_CHNUM_TO_NAME. Defaults to False.</p></li>
+<li><p><strong>bad_channels_dict</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">dict[str,</span> <span class="pre">list[str]],</span> <span class="pre">optional</span></code>) – Dictionary of channels to reject for each recording session. Defaults to {}.</p></li>
+<li><p><strong>suppress_short_interval_error</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">bool,</span> <span class="pre">optional</span></code>) – If True, suppress ValueError for short intervals between timestamps. Useful for aggregated WARs with large window sizes. Defaults to False.</p></li>
+<li><p><strong>lof_scores_dict</strong> (<em>dict</em><em>[</em><em>str</em><em>, </em><em>dict</em><em>]</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.visualization.WindowAnalysisResult.copy">
+<span class="sig-name descname"><span class="pre">copy</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/neurodent/visualization/results.html#WindowAnalysisResult.copy"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.visualization.WindowAnalysisResult.copy" title="Link to this definition">#</a></dt>
+<dd><p>Create a deep copy of the WindowAnalysisResult object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>A deep copy of the current instance with all attributes copied.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#neurodent.visualization.WindowAnalysisResult" title="neurodent.visualization.WindowAnalysisResult">WindowAnalysisResult</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.visualization.WindowAnalysisResult.reorder_and_pad_channels">
+<span class="sig-name descname"><span class="pre">reorder_and_pad_channels</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">target_channels</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_abbrevs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inplace</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">DataFrame</span></span></span><a class="reference internal" href="../../_modules/neurodent/visualization/results.html#WindowAnalysisResult.reorder_and_pad_channels"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.visualization.WindowAnalysisResult.reorder_and_pad_channels" title="Link to this definition">#</a></dt>
+<dd><p>Reorder and pad channels to match a target channel list.</p>
+<p>This method ensures that the data has a consistent channel order and structure
+by reordering existing channels and padding missing channels with NaNs.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>target_channels</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">list[str]</span></code>) – List of target channel names to match</p></li>
+<li><p><strong>use_abbrevs</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">bool,</span> <span class="pre">optional</span></code>) – If True, target channel names are read as channel abbreviations instead of channel names. Defaults to True.</p></li>
+<li><p><strong>inplace</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">bool,</span> <span class="pre">optional</span></code>) – If True, modify the result in place. Defaults to True.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>DataFrame with reordered and padded channels</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.visualization.WindowAnalysisResult.read_sars_spikes">
+<span class="sig-name descname"><span class="pre">read_sars_spikes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sars</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="spike_analysis_result.html#neurodent.visualization.SpikeAnalysisResult" title="neurodent.visualization.SpikeAnalysisResult"><span class="pre">SpikeAnalysisResult</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference internal" href="frequency_domain_spike_analysis_result.html#neurodent.visualization.FrequencyDomainSpikeAnalysisResult" title="neurodent.visualization.FrequencyDomainSpikeAnalysisResult"><span class="pre">FrequencyDomainSpikeAnalysisResult</span></a><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">read_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Literal</span><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'sa'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'mne'</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'sa'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inplace</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/neurodent/visualization/results.html#WindowAnalysisResult.read_sars_spikes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.visualization.WindowAnalysisResult.read_sars_spikes" title="Link to this definition">#</a></dt>
+<dd><p>Integrate spike analysis results into WAR by adding nspike/lognspike features.</p>
+<p>This method extracts spike timing information from spike detection results and bins
+them according to the WAR’s time windows, adding spike count features to each row.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>sars</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code>[SpikeAnalysisResult | FrequencyDomainSpikeAnalysisResult]</span>) – List of SpikeAnalysisResult or FrequencyDomainSpikeAnalysisResult objects.
+One result per recording session (animalday).</p></li>
+<li><p><strong>read_mode</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-data docutils literal notranslate"><span class="pre">Literal</span></code>[<code class="docutils literal notranslate"><span class="pre">'sa'</span></code>, <code class="docutils literal notranslate"><span class="pre">'mne'</span></code>]</span> (default: <code class="docutils literal notranslate"><span class="pre">'sa'</span></code>)) – Mode for extracting spike data:
+- “sa”: Read from SortingAnalyzer objects (result_sas attribute)
+- “mne”: Read from MNE RawArray objects (result_mne attribute)</p></li>
+<li><p><strong>inplace</strong> (default: <code class="docutils literal notranslate"><span class="pre">True</span></code>) – If True, modifies self.result and returns self.
+If False, returns a new WindowAnalysisResult.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>WAR object with added spike features (nspike, lognspike).</dt><dd><ul class="simple">
+<li><p>If inplace=True: returns self with modified result DataFrame</p></li>
+<li><p>If inplace=False: returns new WAR object with enhanced result DataFrame</p></li>
+</ul>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#neurodent.visualization.WindowAnalysisResult" title="neurodent.visualization.WindowAnalysisResult">WindowAnalysisResult</a></p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<ul class="simple">
+<li><p>The number of sars must match the number of unique animaldays in self.result</p></li>
+<li><p>Spikes are binned into time windows matching the existing WAR fragments</p></li>
+<li><p>nspike: array of spike counts per channel for each time window</p></li>
+<li><p>lognspike: log-transformed spike counts using core.log_transform()</p></li>
+</ul>
+<p class="rubric">Example</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># After computing WAR and spike detection</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">enhanced_war</span> <span class="o">=</span> <span class="n">war</span><span class="o">.</span><span class="n">read_sars_spikes</span><span class="p">(</span><span class="n">fdsar_list</span><span class="p">,</span> <span class="n">read_mode</span><span class="o">=</span><span class="s2">&quot;sa&quot;</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">enhanced_war</span><span class="o">.</span><span class="n">result</span><span class="p">[</span><span class="s1">&#39;nspike&#39;</span><span class="p">]</span>  <span class="c1"># Spike counts per channel per window</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.visualization.WindowAnalysisResult.read_mnes_spikes">
+<span class="sig-name descname"><span class="pre">read_mnes_spikes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">raws</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">RawArray</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inplace</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/neurodent/visualization/results.html#WindowAnalysisResult.read_mnes_spikes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.visualization.WindowAnalysisResult.read_mnes_spikes" title="Link to this definition">#</a></dt>
+<dd><p>Extract spike features from MNE RawArray objects with spike annotations.</p>
+<p>This method extracts spike timing from MNE annotations (where spikes are marked
+with channel-specific event labels) and bins them into WAR time windows.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>raws</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">RawArray</span></code>]</span>) – List of MNE RawArray objects with spike annotations. One per recording
+session (animalday). Each should have annotations with channel names
+as event labels (e.g., ‘LMot’, ‘RMot’, etc.).</p></li>
+<li><p><strong>inplace</strong> (default: <code class="docutils literal notranslate"><span class="pre">True</span></code>) – If True, modifies self.result and returns self.
+If False, returns a new WindowAnalysisResult.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>WAR object with added spike features (nspike, lognspike).</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#neurodent.visualization.WindowAnalysisResult" title="neurodent.visualization.WindowAnalysisResult">WindowAnalysisResult</a></p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<ul class="simple">
+<li><p>Expects MNE annotations with channel names as event descriptions</p></li>
+<li><p>Spike times are extracted from event onsets and binned to WAR windows</p></li>
+<li><p>Channels not found in annotations will have empty spike arrays</p></li>
+<li><p>Delegates to _read_from_spikes_all() for the actual binning logic</p></li>
+</ul>
+<p class="rubric">Example</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="c1"># From MNE spike annotations</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">enhanced_war</span> <span class="o">=</span> <span class="n">war</span><span class="o">.</span><span class="n">read_mnes_spikes</span><span class="p">([</span><span class="n">mne_raw1</span><span class="p">,</span> <span class="n">mne_raw2</span><span class="p">],</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.visualization.WindowAnalysisResult.get_info">
+<span class="sig-name descname"><span class="pre">get_info</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/neurodent/visualization/results.html#WindowAnalysisResult.get_info"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.visualization.WindowAnalysisResult.get_info" title="Link to this definition">#</a></dt>
+<dd><p>Returns a formatted string with basic information about the WindowAnalysisResult object</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.visualization.WindowAnalysisResult.get_result">
+<span class="sig-name descname"><span class="pre">get_result</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">features</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exclude</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">allow_missing</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/neurodent/visualization/results.html#WindowAnalysisResult.get_result"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.visualization.WindowAnalysisResult.get_result" title="Link to this definition">#</a></dt>
+<dd><p>Get windowed analysis result dataframe, with helpful filters</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>features</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">list[str]</span></code>) – List of features to get from result</p></li>
+<li><p><strong>exclude</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">list[str],</span> <span class="pre">optional</span></code>) – List of features to exclude from result; will override the features parameter. Defaults to [].</p></li>
+<li><p><strong>allow_missing</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">bool,</span> <span class="pre">optional</span></code>) – If True, will return all requested features as columns regardless if they exist in result. Defaults to False.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>DataFrame with features in columns and windows in rows</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.visualization.WindowAnalysisResult.get_groupavg_result">
+<span class="sig-name descname"><span class="pre">get_groupavg_result</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">features</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exclude</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">df</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">groupby</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'animalday'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/neurodent/visualization/results.html#WindowAnalysisResult.get_groupavg_result"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.visualization.WindowAnalysisResult.get_groupavg_result" title="Link to this definition">#</a></dt>
+<dd><p>Group result and average within groups. Preserves data structure and shape for each feature.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>features</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">list[str]</span></code>) – List of features to get from result</p></li>
+<li><p><strong>exclude</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">list[str],</span> <span class="pre">optional</span></code>) – List of features to exclude from result. Will override the features parameter. Defaults to [].</p></li>
+<li><p><strong>df</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">pd.DataFrame,</span> <span class="pre">optional</span></code>) – If not None, this function will use this dataframe instead of self.result. Defaults to None.</p></li>
+<li><p><strong>groupby</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str,</span> <span class="pre">optional</span></code>) – Feature or list of features to group by before averaging. Passed to the <code class="xref py py-obj docutils literal notranslate"><span class="pre">by</span></code> parameter in pd.DataFrame.groupby(). Defaults to “animalday”.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Result grouped by <code class="xref py py-obj docutils literal notranslate"><span class="pre">groupby</span></code> and averaged for each group.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.visualization.WindowAnalysisResult.get_grouprows_result">
+<span class="sig-name descname"><span class="pre">get_grouprows_result</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">features</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">exclude</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">[]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">df</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">multiindex</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">['animalday',</span> <span class="pre">'animal',</span> <span class="pre">'genotype']</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">include</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">['duration',</span> <span class="pre">'endfile']</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/neurodent/visualization/results.html#WindowAnalysisResult.get_grouprows_result"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.visualization.WindowAnalysisResult.get_grouprows_result" title="Link to this definition">#</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>features</strong> (<em>list</em><em>[</em><em>str</em><em>]</em>)</p></li>
+<li><p><strong>exclude</strong> (<em>list</em><em>[</em><em>str</em><em>]</em>)</p></li>
+<li><p><strong>df</strong> (<em>DataFrame</em><em> | </em><em>None</em>)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.visualization.WindowAnalysisResult.get_filter_logrms_range">
+<span class="sig-name descname"><span class="pre">get_filter_logrms_range</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">z_range</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">3</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/neurodent/visualization/results.html#WindowAnalysisResult.get_filter_logrms_range"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.visualization.WindowAnalysisResult.get_filter_logrms_range" title="Link to this definition">#</a></dt>
+<dd><p>Filter windows based on log(rms).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>df</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">pd.DataFrame,</span> <span class="pre">optional</span></code>) – If not None, this function will use this dataframe instead of self.result. Defaults to None.</p></li>
+<li><p><strong>z_range</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">float,</span> <span class="pre">optional</span></code>) – The z-score range to filter by. Values outside this range will be set to NaN.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Boolean array of shape (M fragments, N channels). True = keep window, False = remove window</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.visualization.WindowAnalysisResult.get_filter_high_rms">
+<span class="sig-name descname"><span class="pre">get_filter_high_rms</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_rms</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">500</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/neurodent/visualization/results.html#WindowAnalysisResult.get_filter_high_rms"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.visualization.WindowAnalysisResult.get_filter_high_rms" title="Link to this definition">#</a></dt>
+<dd><p>Filter windows based on rms.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>df</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">pd.DataFrame,</span> <span class="pre">optional</span></code>) – If not None, this function will use this dataframe instead of self.result. Defaults to None.</p></li>
+<li><p><strong>max_rms</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">float,</span> <span class="pre">optional</span></code>) – The maximum rms value to filter by. Values above this will be set to NaN.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Boolean array of shape (M fragments, N channels). True = keep window, False = remove window</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.visualization.WindowAnalysisResult.get_filter_low_rms">
+<span class="sig-name descname"><span class="pre">get_filter_low_rms</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_rms</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">30</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/neurodent/visualization/results.html#WindowAnalysisResult.get_filter_low_rms"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.visualization.WindowAnalysisResult.get_filter_low_rms" title="Link to this definition">#</a></dt>
+<dd><p>Filter windows based on rms.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>df</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">pd.DataFrame,</span> <span class="pre">optional</span></code>) – If not None, this function will use this dataframe instead of self.result. Defaults to None.</p></li>
+<li><p><strong>min_rms</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">float,</span> <span class="pre">optional</span></code>) – The minimum rms value to filter by. Values below this will be set to NaN.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Boolean array of shape (M fragments, N channels). True = keep window, False = remove window</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.visualization.WindowAnalysisResult.get_filter_high_beta">
+<span class="sig-name descname"><span class="pre">get_filter_high_beta</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_beta_prop</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.4</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/neurodent/visualization/results.html#WindowAnalysisResult.get_filter_high_beta"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.visualization.WindowAnalysisResult.get_filter_high_beta" title="Link to this definition">#</a></dt>
+<dd><p>Filter windows based on beta power.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>df</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">pd.DataFrame,</span> <span class="pre">optional</span></code>) – If not None, this function will use this dataframe instead of self.result. Defaults to None.</p></li>
+<li><p><strong>max_beta_prop</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">float,</span> <span class="pre">optional</span></code>) – The maximum beta power to filter by. Values above this will be set to NaN. Defaults to 0.4.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Boolean array of shape (M fragments, N channels). True = keep window, False = remove window</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.visualization.WindowAnalysisResult.get_filter_reject_channels">
+<span class="sig-name descname"><span class="pre">get_filter_reject_channels</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bad_channels</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_abbrevs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_bad_channels</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Literal</span><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'overwrite'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'union'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'union'</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/neurodent/visualization/results.html#WindowAnalysisResult.get_filter_reject_channels"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.visualization.WindowAnalysisResult.get_filter_reject_channels" title="Link to this definition">#</a></dt>
+<dd><p>Filter channels to reject.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>df</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">pd.DataFrame,</span> <span class="pre">optional</span></code>) – If not None, this function will use this dataframe instead of self.result. Defaults to None.</p></li>
+<li><p><strong>bad_channels</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">list[str]</span></code>) – List of channels to reject. Can be either full channel names or abbreviations.
+The method will automatically detect which format is being used. If None, no filtering is performed.</p></li>
+<li><p><strong>use_abbrevs</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">bool,</span> <span class="pre">optional</span></code>) – Override automatic detection. If True, channels are assumed to be channel abbreviations. If False, channels are assumed to be channel names.
+If None, channels are parsed to abbreviations and matched against self.channel_abbrevs.</p></li>
+<li><p><strong>save_bad_channels</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">Literal[&quot;overwrite&quot;,</span> <span class="pre">&quot;union&quot;,</span> <span class="pre">None],</span> <span class="pre">optional</span></code>) – How to save bad channels to self.bad_channels_dict.
+“overwrite”: Replace self.bad_channels_dict completely with bad channels applied to all sessions.
+“union”: Merge bad channels with existing self.bad_channels_dict for all sessions.
+None: Don’t save to self.bad_channels_dict. Defaults to “union”.
+Note: When using “overwrite” mode, the bad_channels parameter and bad_channels_dict parameter
+may conflict and overwrite each other’s bad channel definitions if both are provided.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Boolean array of shape (M fragments, N channels). True = keep window, False = remove window</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.visualization.WindowAnalysisResult.get_filter_reject_channels_by_recording_session">
+<span class="sig-name descname"><span class="pre">get_filter_reject_channels_by_recording_session</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bad_channels_dict</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_abbrevs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_bad_channels</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Literal</span><span class="p"><span class="pre">[</span></span><span class="s"><span class="pre">'overwrite'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="s"><span class="pre">'union'</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'union'</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/neurodent/visualization/results.html#WindowAnalysisResult.get_filter_reject_channels_by_recording_session"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.visualization.WindowAnalysisResult.get_filter_reject_channels_by_recording_session" title="Link to this definition">#</a></dt>
+<dd><p>Filter channels to reject for each recording session</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>df</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">pd.DataFrame,</span> <span class="pre">optional</span></code>) – If not None, this function will use this dataframe instead of self.result. Defaults to None.</p></li>
+<li><p><strong>bad_channels_dict</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">dict[str,</span> <span class="pre">list[str]]</span></code>) – Dictionary of list of channels to reject for each recording session.
+Can be either full channel names or abbreviations. The method will automatically detect which format is being used.
+If None, the method will use the bad_channels_dict passed to the constructor.</p></li>
+<li><p><strong>use_abbrevs</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">bool,</span> <span class="pre">optional</span></code>) – Override automatic detection. If True, channels are assumed to be channel abbreviations. If False, channels are assumed to be channel names.
+If None, channels are parsed to abbreviations and matched against self.channel_abbrevs.</p></li>
+<li><p><strong>save_bad_channels</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">Literal[&quot;overwrite&quot;,</span> <span class="pre">&quot;union&quot;,</span> <span class="pre">None],</span> <span class="pre">optional</span></code>) – How to save bad channels to self.bad_channels_dict.
+“overwrite”: Replace self.bad_channels_dict completely with bad_channels_dict.
+“union”: Merge bad_channels_dict with existing self.bad_channels_dict per session.
+None: Don’t save to self.bad_channels_dict. Defaults to “union”.
+Note: When using “overwrite” mode, the bad_channels parameter and bad_channels_dict parameter
+may conflict and overwrite each other’s bad channel definitions if both are provided.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Boolean array of shape (M fragments, N channels). True = keep window, False = remove window</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.visualization.WindowAnalysisResult.get_filter_morphological_smoothing">
+<span class="sig-name descname"><span class="pre">get_filter_morphological_smoothing</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filter_mask</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">smoothing_seconds</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span></span></span><a class="reference internal" href="../../_modules/neurodent/visualization/results.html#WindowAnalysisResult.get_filter_morphological_smoothing"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.visualization.WindowAnalysisResult.get_filter_morphological_smoothing" title="Link to this definition">#</a></dt>
+<dd><p>Apply morphological smoothing to a filter mask.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>filter_mask</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">np.ndarray</span></code>) – Input boolean mask of shape (n_windows, n_channels)</p></li>
+<li><p><strong>smoothing_seconds</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code>) – Time window in seconds for morphological operations</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Smoothed boolean mask</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.visualization.WindowAnalysisResult.filter_morphological_smoothing">
+<span class="sig-name descname"><span class="pre">filter_morphological_smoothing</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">smoothing_seconds</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#neurodent.visualization.WindowAnalysisResult" title="neurodent.visualization.results.WindowAnalysisResult"><span class="pre">WindowAnalysisResult</span></a></span></span><a class="reference internal" href="../../_modules/neurodent/visualization/results.html#WindowAnalysisResult.filter_morphological_smoothing"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.visualization.WindowAnalysisResult.filter_morphological_smoothing" title="Link to this definition">#</a></dt>
+<dd><p>Apply morphological smoothing to all data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>smoothing_seconds</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code>) – Time window in seconds for morphological operations</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>New filtered instance</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#neurodent.visualization.WindowAnalysisResult" title="neurodent.visualization.WindowAnalysisResult">WindowAnalysisResult</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.visualization.WindowAnalysisResult.filter_all">
+<span class="sig-name descname"><span class="pre">filter_all</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inplace</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_valid_channels</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">3</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filters</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">callable</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">morphological_smoothing_seconds</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/neurodent/visualization/results.html#WindowAnalysisResult.filter_all"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.visualization.WindowAnalysisResult.filter_all" title="Link to this definition">#</a></dt>
+<dd><p>Apply a list of filters to the data. Filtering should be performed before aggregation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>df</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">pd.DataFrame,</span> <span class="pre">optional</span></code>) – If not None, this function will use this dataframe instead of self.result. Defaults to None.</p></li>
+<li><p><strong>inplace</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">bool,</span> <span class="pre">optional</span></code>) – If True, modify the result in place. Defaults to True.</p></li>
+<li><p><strong>bad_channels</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">list[str],</span> <span class="pre">optional</span></code>) – List of channels to reject. Defaults to None.</p></li>
+<li><p><strong>min_valid_channels</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">int,</span> <span class="pre">optional</span></code>) – Minimum number of valid channels required per window. Defaults to 3.</p></li>
+<li><p><strong>filters</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">list[callable],</span> <span class="pre">optional</span></code>) – List of filter functions to apply. Each function should return a boolean mask.
+If None, uses default filters: [get_filter_logrms_range, get_filter_high_rms, get_filter_low_rms, get_filter_high_beta].
+Defaults to None.</p></li>
+<li><p><strong>morphological_smoothing_seconds</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">float,</span> <span class="pre">optional</span></code>) – If provided, apply morphological opening/closing to smooth the filter mask.
+This removes isolated false positives/negatives along the time axis for each channel independently.
+The value specifies the time window in seconds for the morphological operations. Defaults to None.</p></li>
+<li><p><strong>save_bad_channels</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">Literal[&quot;overwrite&quot;,</span> <span class="pre">&quot;union&quot;,</span> <span class="pre">None],</span> <span class="pre">optional</span></code>) – How to save bad channels to self.bad_channels_dict.
+This parameter is passed to the filtering functions. Defaults to “union”.
+Note: When using “overwrite” mode, the bad_channels parameter and bad_channels_dict parameter
+may conflict and overwrite each other’s bad channel definitions if both are provided.</p></li>
+<li><p><strong>**kwargs</strong> – Additional keyword arguments to pass to filter functions.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Filtered result</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#neurodent.visualization.WindowAnalysisResult" title="neurodent.visualization.WindowAnalysisResult">WindowAnalysisResult</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.visualization.WindowAnalysisResult.filter_logrms_range">
+<span class="sig-name descname"><span class="pre">filter_logrms_range</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">z_range</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">3</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#neurodent.visualization.WindowAnalysisResult" title="neurodent.visualization.results.WindowAnalysisResult"><span class="pre">WindowAnalysisResult</span></a></span></span><a class="reference internal" href="../../_modules/neurodent/visualization/results.html#WindowAnalysisResult.filter_logrms_range"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.visualization.WindowAnalysisResult.filter_logrms_range" title="Link to this definition">#</a></dt>
+<dd><p>Filter based on log(rms) z-score range.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>z_range</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code>) – Z-score range threshold. Defaults to 3.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>New filtered instance</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#neurodent.visualization.WindowAnalysisResult" title="neurodent.visualization.WindowAnalysisResult">WindowAnalysisResult</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.visualization.WindowAnalysisResult.filter_high_rms">
+<span class="sig-name descname"><span class="pre">filter_high_rms</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">max_rms</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">500</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#neurodent.visualization.WindowAnalysisResult" title="neurodent.visualization.results.WindowAnalysisResult"><span class="pre">WindowAnalysisResult</span></a></span></span><a class="reference internal" href="../../_modules/neurodent/visualization/results.html#WindowAnalysisResult.filter_high_rms"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.visualization.WindowAnalysisResult.filter_high_rms" title="Link to this definition">#</a></dt>
+<dd><p>Filter out windows with RMS above threshold.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>max_rms</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code>) – Maximum RMS threshold. Defaults to 500.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>New filtered instance</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#neurodent.visualization.WindowAnalysisResult" title="neurodent.visualization.WindowAnalysisResult">WindowAnalysisResult</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.visualization.WindowAnalysisResult.filter_low_rms">
+<span class="sig-name descname"><span class="pre">filter_low_rms</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">min_rms</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">50</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#neurodent.visualization.WindowAnalysisResult" title="neurodent.visualization.results.WindowAnalysisResult"><span class="pre">WindowAnalysisResult</span></a></span></span><a class="reference internal" href="../../_modules/neurodent/visualization/results.html#WindowAnalysisResult.filter_low_rms"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.visualization.WindowAnalysisResult.filter_low_rms" title="Link to this definition">#</a></dt>
+<dd><p>Filter out windows with RMS below threshold.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>min_rms</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code>) – Minimum RMS threshold. Defaults to 50.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>New filtered instance</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#neurodent.visualization.WindowAnalysisResult" title="neurodent.visualization.WindowAnalysisResult">WindowAnalysisResult</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.visualization.WindowAnalysisResult.filter_high_beta">
+<span class="sig-name descname"><span class="pre">filter_high_beta</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">max_beta_prop</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.4</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#neurodent.visualization.WindowAnalysisResult" title="neurodent.visualization.results.WindowAnalysisResult"><span class="pre">WindowAnalysisResult</span></a></span></span><a class="reference internal" href="../../_modules/neurodent/visualization/results.html#WindowAnalysisResult.filter_high_beta"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.visualization.WindowAnalysisResult.filter_high_beta" title="Link to this definition">#</a></dt>
+<dd><p>Filter out windows with high beta power.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>max_beta_prop</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code>) – Maximum beta power proportion. Defaults to 0.4.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>New filtered instance</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#neurodent.visualization.WindowAnalysisResult" title="neurodent.visualization.WindowAnalysisResult">WindowAnalysisResult</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.visualization.WindowAnalysisResult.filter_reject_channels">
+<span class="sig-name descname"><span class="pre">filter_reject_channels</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bad_channels</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_abbrevs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#neurodent.visualization.WindowAnalysisResult" title="neurodent.visualization.results.WindowAnalysisResult"><span class="pre">WindowAnalysisResult</span></a></span></span><a class="reference internal" href="../../_modules/neurodent/visualization/results.html#WindowAnalysisResult.filter_reject_channels"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.visualization.WindowAnalysisResult.filter_reject_channels" title="Link to this definition">#</a></dt>
+<dd><p>Filter out specified bad channels.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>bad_channels</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">list[str]</span></code>) – List of channel names to reject</p></li>
+<li><p><strong>use_abbrevs</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">bool,</span> <span class="pre">optional</span></code>) – Whether to use abbreviations. Defaults to None.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>New filtered instance</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#neurodent.visualization.WindowAnalysisResult" title="neurodent.visualization.WindowAnalysisResult">WindowAnalysisResult</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.visualization.WindowAnalysisResult.filter_reject_channels_by_session">
+<span class="sig-name descname"><span class="pre">filter_reject_channels_by_session</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bad_channels_dict</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_abbrevs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#neurodent.visualization.WindowAnalysisResult" title="neurodent.visualization.results.WindowAnalysisResult"><span class="pre">WindowAnalysisResult</span></a></span></span><a class="reference internal" href="../../_modules/neurodent/visualization/results.html#WindowAnalysisResult.filter_reject_channels_by_session"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.visualization.WindowAnalysisResult.filter_reject_channels_by_session" title="Link to this definition">#</a></dt>
+<dd><p>Filter out bad channels by recording session.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>bad_channels_dict</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">dict[str,</span> <span class="pre">list[str]],</span> <span class="pre">optional</span></code>) – Dictionary mapping recording session
+identifiers to lists of bad channel names to reject. Session identifiers are in the
+format “{animal_id} {genotype} {day}” (e.g., “A10 WT Apr-01-2023”). Channel names
+can be either full names (e.g., “Left Auditory”) or abbreviations (e.g., “LAud”).
+If None, uses the bad_channels_dict from the constructor. Defaults to None.</p></li>
+<li><p><strong>use_abbrevs</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">bool,</span> <span class="pre">optional</span></code>) – Override automatic channel name format detection. If True,
+channels are assumed to be abbreviations. If False, channels are assumed to be full
+names. If None, automatically detects format and converts to abbreviations for matching.
+Defaults to None.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>New filtered instance with bad channels masked as NaN for their</dt><dd><p>respective recording sessions</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#neurodent.visualization.WindowAnalysisResult" title="neurodent.visualization.WindowAnalysisResult">WindowAnalysisResult</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<p>Filter specific channels per session using abbreviations:
+&gt;&gt;&gt; bad_channels = {
+…     “A10 WT Apr-01-2023”: [“LAud”, “RMot”],  # Session 1: reject left auditory, right motor
+…     “A10 WT Apr-02-2023”: [“LVis”]           # Session 2: reject left visual only
+… }
+&gt;&gt;&gt; filtered_war = war.filter_reject_channels_by_session(bad_channels, use_abbrevs=True)</p>
+<p>Filter using full channel names:
+&gt;&gt;&gt; bad_channels = {
+…     “A12 KO May-15-2023”: [“Left Motor”, “Right Barrel”],
+…     “A12 KO May-16-2023”: [“Left Auditory”, “Left Visual”, “Right Motor”]
+… }
+&gt;&gt;&gt; filtered_war = war.filter_reject_channels_by_session(bad_channels, use_abbrevs=False)</p>
+<p>Auto-detect channel format (recommended):
+&gt;&gt;&gt; bad_channels = {
+…     “A15 WT Jun-10-2023”: [“LMot”, “RBar”],  # Will auto-detect as abbreviations
+…     “A15 WT Jun-11-2023”: [“LAud”]
+… }
+&gt;&gt;&gt; filtered_war = war.filter_reject_channels_by_session(bad_channels)</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<ul class="simple">
+<li><p>Session identifiers must exactly match the “animalday” values in the result DataFrame</p></li>
+<li><p>Available channel abbreviations: LAud, RAud, LVis, RVis, LHip, RHip, LBar, RBar, LMot, RMot</p></li>
+<li><p>Channel names are case-insensitive and support various formats (e.g., “left aud”, “Left Auditory”)</p></li>
+<li><p>If a session identifier is not found in bad_channels_dict, a warning is logged but processing continues</p></li>
+<li><p>If a channel name is not recognized, a warning is logged but other channels are still processed</p></li>
+</ul>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.visualization.WindowAnalysisResult.apply_filters">
+<span class="sig-name descname"><span class="pre">apply_filters</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filter_config</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_valid_channels</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">3</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">morphological_smoothing_seconds</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#neurodent.visualization.WindowAnalysisResult" title="neurodent.visualization.results.WindowAnalysisResult"><span class="pre">WindowAnalysisResult</span></a></span></span><a class="reference internal" href="../../_modules/neurodent/visualization/results.html#WindowAnalysisResult.apply_filters"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.visualization.WindowAnalysisResult.apply_filters" title="Link to this definition">#</a></dt>
+<dd><p>Apply multiple filters using configuration.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>filter_config</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">dict,</span> <span class="pre">optional</span></code>) – Dictionary of filter names and parameters.
+Available filters: ‘logrms_range’, ‘high_rms’, ‘low_rms’, ‘high_beta’,
+‘reject_channels’, ‘reject_channels_by_session’, ‘morphological_smoothing’</p></li>
+<li><p><strong>min_valid_channels</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code>) – Minimum valid channels per window. Defaults to 3.</p></li>
+<li><p><strong>morphological_smoothing_seconds</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">float,</span> <span class="pre">optional</span></code>) – Temporal smoothing window (deprecated, use config instead)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>New filtered instance</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference internal" href="#neurodent.visualization.WindowAnalysisResult" title="neurodent.visualization.WindowAnalysisResult">WindowAnalysisResult</a></p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">config</span> <span class="o">=</span> <span class="p">{</span>
+<span class="gp">... </span>    <span class="s1">&#39;logrms_range&#39;</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;z_range&#39;</span><span class="p">:</span> <span class="mi">3</span><span class="p">},</span>
+<span class="gp">... </span>    <span class="s1">&#39;high_rms&#39;</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;max_rms&#39;</span><span class="p">:</span> <span class="mi">500</span><span class="p">},</span>
+<span class="gp">... </span>    <span class="s1">&#39;reject_channels&#39;</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;bad_channels&#39;</span><span class="p">:</span> <span class="p">[</span><span class="s1">&#39;LMot&#39;</span><span class="p">,</span> <span class="s1">&#39;RMot&#39;</span><span class="p">]},</span>
+<span class="gp">... </span>    <span class="s1">&#39;morphological_smoothing&#39;</span><span class="p">:</span> <span class="p">{</span><span class="s1">&#39;smoothing_seconds&#39;</span><span class="p">:</span> <span class="mf">8.0</span><span class="p">}</span>
+<span class="gp">... </span><span class="p">}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">filtered_war</span> <span class="o">=</span> <span class="n">war</span><span class="o">.</span><span class="n">apply_filters</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.visualization.WindowAnalysisResult.save_pickle_and_json">
+<span class="sig-name descname"><span class="pre">save_pickle_and_json</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">folder</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">Path</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">make_folder</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">slugify_filename</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">save_abbrevs_as_chnames</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/neurodent/visualization/results.html#WindowAnalysisResult.save_pickle_and_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.visualization.WindowAnalysisResult.save_pickle_and_json" title="Link to this definition">#</a></dt>
+<dd><p>Archive window analysis result into the folder specified, as a pickle and json file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>folder</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span> <span class="pre">|</span> <span class="pre">Path</span></code>) – Destination folder to save results to</p></li>
+<li><p><strong>make_folder</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">bool,</span> <span class="pre">optional</span></code>) – If True, create the folder if it doesn’t exist. Defaults to True.</p></li>
+<li><p><strong>filename</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str,</span> <span class="pre">optional</span></code>) – Name of the file to save. Defaults to “war”.</p></li>
+<li><p><strong>slugify_filename</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">bool,</span> <span class="pre">optional</span></code>) – If True, slugify the filename (replace special characters). Defaults to False.</p></li>
+<li><p><strong>save_abbrevs_as_chnames</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">bool,</span> <span class="pre">optional</span></code>) – If True, save the channel abbreviations as the channel names in the json file. Defaults to False.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.visualization.WindowAnalysisResult.get_bad_channels_by_lof_threshold">
+<span class="sig-name descname"><span class="pre">get_bad_channels_by_lof_threshold</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">lof_threshold</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="../../_modules/neurodent/visualization/results.html#WindowAnalysisResult.get_bad_channels_by_lof_threshold"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.visualization.WindowAnalysisResult.get_bad_channels_by_lof_threshold" title="Link to this definition">#</a></dt>
+<dd><p>Apply LOF threshold directly to stored scores to get bad channels.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>lof_threshold</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code>) – Threshold for determining bad channels.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Dictionary mapping animal days to lists of bad channel names.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>dict</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.visualization.WindowAnalysisResult.get_lof_scores">
+<span class="sig-name descname"><span class="pre">get_lof_scores</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="../../_modules/neurodent/visualization/results.html#WindowAnalysisResult.get_lof_scores"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.visualization.WindowAnalysisResult.get_lof_scores" title="Link to this definition">#</a></dt>
+<dd><p>Get LOF scores from this WAR.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Dictionary mapping animal days to LOF score dictionaries.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>dict</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.visualization.WindowAnalysisResult.evaluate_lof_threshold_binary">
+<span class="sig-name descname"><span class="pre">evaluate_lof_threshold_binary</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ground_truth_bad_channels</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">threshold</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">evaluation_channels</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">tuple</span></span></span><a class="reference internal" href="../../_modules/neurodent/visualization/results.html#WindowAnalysisResult.evaluate_lof_threshold_binary"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.visualization.WindowAnalysisResult.evaluate_lof_threshold_binary" title="Link to this definition">#</a></dt>
+<dd><p>Evaluate single threshold against ground truth for binary classification.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ground_truth_bad_channels</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">dict</span></code> | <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></span> (default: <code class="docutils literal notranslate"><span class="pre">None</span></code>)) – Dict mapping animal-day to bad channel sets.
+If None, uses self.bad_channels_dict as ground truth.</p></li>
+<li><p><strong>threshold</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">float</span></code> | <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></span> (default: <code class="docutils literal notranslate"><span class="pre">None</span></code>)) – LOF threshold to test</p></li>
+<li><p><strong>evaluation_channels</strong> (<span class="sphinx_autodoc_typehints-type"><code class="xref py py-class docutils literal notranslate"><span class="pre">list</span></code>[<code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>] | <code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></span> (default: <code class="docutils literal notranslate"><span class="pre">None</span></code>)) – Subset of channels to include in evaluation. If none, uses all channels.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>(y_true_list, y_pred_list) for sklearn.metrics.f1_score</dt><dd><p>Each element represents one channel from one animal-day</p>
+</dd>
+</dl>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tuple</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.visualization.WindowAnalysisResult.load_pickle_and_json">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">load_pickle_and_json</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">folder_path</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">pickle_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">json_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/neurodent/visualization/results.html#WindowAnalysisResult.load_pickle_and_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.visualization.WindowAnalysisResult.load_pickle_and_json" title="Link to this definition">#</a></dt>
+<dd><p>Load WindowAnalysisResult from folder</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>folder_path</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str,</span> <span class="pre">optional</span></code>) – Path of folder containing .pkl and .json files. Defaults to None.</p></li>
+<li><p><strong>pickle_name</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str,</span> <span class="pre">optional</span></code>) – Name of the pickle file. Can be just the filename (e.g. “war.pkl”)
+or a path relative to folder_path (e.g. “subdir/war.pkl”). If None and folder_path is provided,
+expects exactly one .pkl file in folder_path. Defaults to None.</p></li>
+<li><p><strong>json_name</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">str,</span> <span class="pre">optional</span></code>) – Name of the JSON file. Can be just the filename (e.g. “war.json”)
+or a path relative to folder_path (e.g. “subdir/war.json”). If None and folder_path is provided,
+expects exactly one .json file in folder_path. Defaults to None.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>ValueError</strong> – folder_path does not exist</p></li>
+<li><p><strong>ValueError</strong> – Expected exactly one pickle and one json file in folder_path (when pickle_name/json_name not specified)</p></li>
+<li><p><strong>FileNotFoundError</strong> – Specified pickle_name or json_name not found</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>WindowAnalysisResult object</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>result</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.visualization.WindowAnalysisResult.aggregate_time_windows">
+<span class="sig-name descname"><span class="pre">aggregate_time_windows</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">groupby</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">['animalday',</span> <span class="pre">'isday']</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../../_modules/neurodent/visualization/results.html#WindowAnalysisResult.aggregate_time_windows"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.visualization.WindowAnalysisResult.aggregate_time_windows" title="Link to this definition">#</a></dt>
+<dd><p>Aggregate time windows into a single data point per groupby by averaging features. This reduces the number of rows in the result.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>groupby</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">list[str]</span> <span class="pre">|</span> <span class="pre">str,</span> <span class="pre">optional</span></code>) – Columns to group by. Defaults to [‘animalday’, ‘isday’], which groups by animalday (recording session) and isday (day/night).</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>ValueError</strong> – groupby must be from [‘animalday’, ‘isday’]</p></li>
+<li><p><strong>ValueError</strong> – Columns in groupby not found in result</p></li>
+<li><p><strong>ValueError</strong> – Columns in groupby are not constant in groups</p></li>
+</ul>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><span class="sphinx_autodoc_typehints-type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">None</span></code></span></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="neurodent.visualization.WindowAnalysisResult.add_unique_hash">
+<span class="sig-name descname"><span class="pre">add_unique_hash</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">nbytes</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/neurodent/visualization/results.html#WindowAnalysisResult.add_unique_hash"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neurodent.visualization.WindowAnalysisResult.add_unique_hash" title="Link to this definition">#</a></dt>
+<dd><p>Adds a hex hash to the animal ID to ensure uniqueness. This prevents collisions when, for example, multiple animals in ExperimentPlotter have the same animal ID.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>nbytes</strong> (<code class="xref py py-class docutils literal notranslate"><span class="pre">int,</span> <span class="pre">optional</span></code>) – Number of bytes to generate. This is passed directly to secrets.token_hex(). Defaults to None, which generates 16 hex characters (8 bytes).</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="animal_organizer.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">AnimalOrganizer</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="spike_analysis_result.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">SpikeAnalysisResult</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.visualization.WindowAnalysisResult"><code class="docutils literal notranslate"><span class="pre">WindowAnalysisResult</span></code></a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.visualization.WindowAnalysisResult.__init__"><code class="docutils literal notranslate"><span class="pre">WindowAnalysisResult.__init__()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.visualization.WindowAnalysisResult.copy"><code class="docutils literal notranslate"><span class="pre">WindowAnalysisResult.copy()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.visualization.WindowAnalysisResult.reorder_and_pad_channels"><code class="docutils literal notranslate"><span class="pre">WindowAnalysisResult.reorder_and_pad_channels()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.visualization.WindowAnalysisResult.read_sars_spikes"><code class="docutils literal notranslate"><span class="pre">WindowAnalysisResult.read_sars_spikes()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.visualization.WindowAnalysisResult.read_mnes_spikes"><code class="docutils literal notranslate"><span class="pre">WindowAnalysisResult.read_mnes_spikes()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.visualization.WindowAnalysisResult.get_info"><code class="docutils literal notranslate"><span class="pre">WindowAnalysisResult.get_info()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.visualization.WindowAnalysisResult.get_result"><code class="docutils literal notranslate"><span class="pre">WindowAnalysisResult.get_result()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.visualization.WindowAnalysisResult.get_groupavg_result"><code class="docutils literal notranslate"><span class="pre">WindowAnalysisResult.get_groupavg_result()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.visualization.WindowAnalysisResult.get_grouprows_result"><code class="docutils literal notranslate"><span class="pre">WindowAnalysisResult.get_grouprows_result()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.visualization.WindowAnalysisResult.get_filter_logrms_range"><code class="docutils literal notranslate"><span class="pre">WindowAnalysisResult.get_filter_logrms_range()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.visualization.WindowAnalysisResult.get_filter_high_rms"><code class="docutils literal notranslate"><span class="pre">WindowAnalysisResult.get_filter_high_rms()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.visualization.WindowAnalysisResult.get_filter_low_rms"><code class="docutils literal notranslate"><span class="pre">WindowAnalysisResult.get_filter_low_rms()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.visualization.WindowAnalysisResult.get_filter_high_beta"><code class="docutils literal notranslate"><span class="pre">WindowAnalysisResult.get_filter_high_beta()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.visualization.WindowAnalysisResult.get_filter_reject_channels"><code class="docutils literal notranslate"><span class="pre">WindowAnalysisResult.get_filter_reject_channels()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.visualization.WindowAnalysisResult.get_filter_reject_channels_by_recording_session"><code class="docutils literal notranslate"><span class="pre">WindowAnalysisResult.get_filter_reject_channels_by_recording_session()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.visualization.WindowAnalysisResult.get_filter_morphological_smoothing"><code class="docutils literal notranslate"><span class="pre">WindowAnalysisResult.get_filter_morphological_smoothing()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.visualization.WindowAnalysisResult.filter_morphological_smoothing"><code class="docutils literal notranslate"><span class="pre">WindowAnalysisResult.filter_morphological_smoothing()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.visualization.WindowAnalysisResult.filter_all"><code class="docutils literal notranslate"><span class="pre">WindowAnalysisResult.filter_all()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.visualization.WindowAnalysisResult.filter_logrms_range"><code class="docutils literal notranslate"><span class="pre">WindowAnalysisResult.filter_logrms_range()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.visualization.WindowAnalysisResult.filter_high_rms"><code class="docutils literal notranslate"><span class="pre">WindowAnalysisResult.filter_high_rms()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.visualization.WindowAnalysisResult.filter_low_rms"><code class="docutils literal notranslate"><span class="pre">WindowAnalysisResult.filter_low_rms()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.visualization.WindowAnalysisResult.filter_high_beta"><code class="docutils literal notranslate"><span class="pre">WindowAnalysisResult.filter_high_beta()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.visualization.WindowAnalysisResult.filter_reject_channels"><code class="docutils literal notranslate"><span class="pre">WindowAnalysisResult.filter_reject_channels()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.visualization.WindowAnalysisResult.filter_reject_channels_by_session"><code class="docutils literal notranslate"><span class="pre">WindowAnalysisResult.filter_reject_channels_by_session()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.visualization.WindowAnalysisResult.apply_filters"><code class="docutils literal notranslate"><span class="pre">WindowAnalysisResult.apply_filters()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.visualization.WindowAnalysisResult.save_pickle_and_json"><code class="docutils literal notranslate"><span class="pre">WindowAnalysisResult.save_pickle_and_json()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.visualization.WindowAnalysisResult.get_bad_channels_by_lof_threshold"><code class="docutils literal notranslate"><span class="pre">WindowAnalysisResult.get_bad_channels_by_lof_threshold()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.visualization.WindowAnalysisResult.get_lof_scores"><code class="docutils literal notranslate"><span class="pre">WindowAnalysisResult.get_lof_scores()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.visualization.WindowAnalysisResult.evaluate_lof_threshold_binary"><code class="docutils literal notranslate"><span class="pre">WindowAnalysisResult.evaluate_lof_threshold_binary()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.visualization.WindowAnalysisResult.load_pickle_and_json"><code class="docutils literal notranslate"><span class="pre">WindowAnalysisResult.load_pickle_and_json()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.visualization.WindowAnalysisResult.aggregate_time_windows"><code class="docutils literal notranslate"><span class="pre">WindowAnalysisResult.aggregate_time_windows()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#neurodent.visualization.WindowAnalysisResult.add_unique_hash"><code class="docutils literal notranslate"><span class="pre">WindowAnalysisResult.add_unique_hash()</span></code></a></li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../../_sources/api/visualization/window_analysis_result.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2025, Joseph Dong, Yongtaek Oh, Eric Marsh.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.16.1.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>

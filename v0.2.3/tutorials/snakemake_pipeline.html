@@ -1,0 +1,1051 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Running the Snakemake Pipeline &#8212; Neurodent 0.2.3 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/mystnb.8ecb98da25f57f5357bf6f572d296f466b2cfe2517ffebfabe82451661e28f02.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinx-design.min.css?v=95c83b7e" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../_static/documentation_options.js?v=a47416a6"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../_static/design-tabs.js?v=f930bc37"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'tutorials/snakemake_pipeline';</script>
+    <script>
+        DOCUMENTATION_OPTIONS.theme_version = '0.16.1';
+        DOCUMENTATION_OPTIONS.theme_switcher_json_url = 'https://josephdong1000.github.io/neurodent/_static/switcher.json';
+        DOCUMENTATION_OPTIONS.theme_switcher_version_match = '0.2.3';
+        DOCUMENTATION_OPTIONS.show_version_warning_banner =
+            false;
+        </script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Examples" href="../examples/index.html" />
+    <link rel="prev" title="Visualization Tutorial" href="visualization.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class=" navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+  
+    <p class="title logo__title">NeuRodent</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class=" navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../installation/index.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../quickstart/index.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="index.html">
+    Tutorials
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../examples/index.html">
+    Examples
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../api/index.html">
+    API Reference
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../contributing/index.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../license/index.html">
+    License
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+<div class="version-switcher__container dropdown pst-js-only">
+  <button id="pst-version-switcher-button-2"
+    type="button"
+    class="version-switcher__button btn btn-sm dropdown-toggle"
+    data-bs-toggle="dropdown"
+    aria-haspopup="listbox"
+    aria-controls="pst-version-switcher-list-2"
+    aria-label="Version switcher list"
+  >
+    Choose version  <!-- this text may get changed later by javascript -->
+    <span class="caret"></span>
+  </button>
+  <div id="pst-version-switcher-list-2"
+    class="version-switcher__menu dropdown-menu list-group-flush py-0"
+    role="listbox" aria-labelledby="pst-version-switcher-button-2">
+    <!-- dropdown will be populated by javascript on page load -->
+  </div>
+</div></div>
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/josephdong1000/neurodent" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-square-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://pypi.org/project/neurodent/" title="PyPI" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-python fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">PyPI</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../installation/index.html">
+    Installation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../quickstart/index.html">
+    Quickstart
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="index.html">
+    Tutorials
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../examples/index.html">
+    Examples
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../api/index.html">
+    API Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../contributing/index.html">
+    Contributing
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../license/index.html">
+    License
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+<div class="version-switcher__container dropdown pst-js-only">
+  <button id="pst-version-switcher-button-3"
+    type="button"
+    class="version-switcher__button btn btn-sm dropdown-toggle"
+    data-bs-toggle="dropdown"
+    aria-haspopup="listbox"
+    aria-controls="pst-version-switcher-list-3"
+    aria-label="Version switcher list"
+  >
+    Choose version  <!-- this text may get changed later by javascript -->
+    <span class="caret"></span>
+  </button>
+  <div id="pst-version-switcher-list-3"
+    class="version-switcher__menu dropdown-menu list-group-flush py-0"
+    role="listbox" aria-labelledby="pst-version-switcher-button-3">
+    <!-- dropdown will be populated by javascript on page load -->
+  </div>
+</div></div>
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/josephdong1000/neurodent" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-square-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://pypi.org/project/neurodent/" title="PyPI" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fab fa-python fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">PyPI</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="current nav bd-sidenav">
+<li class="toctree-l1"><a class="reference internal" href="windowed_analysis.html">Windowed Analysis Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="spike_analysis.html">Spike Analysis Tutorial</a></li>
+<li class="toctree-l1"><a class="reference internal" href="visualization.html">Visualization Tutorial</a></li>
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">Running the Snakemake Pipeline</a></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="index.html" class="nav-link">Tutorials</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">Running the Snakemake Pipeline</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section class="tex2jax_ignore mathjax_ignore" id="running-the-snakemake-pipeline">
+<h1>Running the Snakemake Pipeline<a class="headerlink" href="#running-the-snakemake-pipeline" title="Link to this heading">#</a></h1>
+<p>This tutorial covers how to use NeuRodent’s Snakemake pipeline for large-scale, reproducible EEG analysis workflows.</p>
+<section id="what-is-snakemake">
+<h2>What is Snakemake?<a class="headerlink" href="#what-is-snakemake" title="Link to this heading">#</a></h2>
+<p><a class="reference external" href="https://snakemake.readthedocs.io/">Snakemake</a> is a workflow management system that creates reproducible, scalable data analyses. Key features:</p>
+<ul class="simple">
+<li><p><strong>Automatic dependency tracking</strong>: Only recomputes what’s needed when data or parameters change</p></li>
+<li><p><strong>Parallel execution</strong>: Processes multiple samples simultaneously</p></li>
+<li><p><strong>Fault tolerance</strong>: Resumes from where it left off after failures</p></li>
+<li><p><strong>Resource management</strong>: Specify memory, CPU, and time requirements for each step</p></li>
+<li><p><strong>Cluster integration</strong>: Seamlessly scales from laptops to HPC clusters</p></li>
+</ul>
+</section>
+<section id="why-use-the-snakemake-pipeline">
+<h2>Why Use the Snakemake Pipeline?<a class="headerlink" href="#why-use-the-snakemake-pipeline" title="Link to this heading">#</a></h2>
+<p>For experiments with many animals and days of recordings, manual analysis becomes impractical. The NeuRodent pipeline automates:</p>
+<ol class="arabic simple">
+<li><p>Raw EEG data → Windowed Analysis Results (WARs)</p></li>
+<li><p>Quality filtering and artifact removal</p></li>
+<li><p>Diagnostic figure generation</p></li>
+<li><p>Statistical analyses and publication-ready plots</p></li>
+<li><p>All intermediate processing steps</p></li>
+</ol>
+</section>
+<section id="installation">
+<h2>Installation<a class="headerlink" href="#installation" title="Link to this heading">#</a></h2>
+<p>Ensure you have NeuRodent and Snakemake installed:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Install both with uv</span>
+uv<span class="w"> </span>add<span class="w"> </span>neurodent<span class="w"> </span>snakemake
+
+<span class="c1"># Or with pip</span>
+pip<span class="w"> </span>install<span class="w"> </span>neurodent<span class="w"> </span>snakemake
+</pre></div>
+</div>
+</section>
+<section id="pipeline-overview">
+<h2>Pipeline Overview<a class="headerlink" href="#pipeline-overview" title="Link to this heading">#</a></h2>
+<p>The pipeline processes data through multiple stages:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>Raw EEG Data
+    ↓
+WAR Generation (windowed features)
+    ↓
+Quality Filtering (remove bad days/genotypes)
+    ↓
+Standardization (channel ordering)
+    ↓
+Fragment Filtering (temporal artifacts)
+    ↓
+Channel Filtering (spatial artifacts)
+    ↓
+WAR Flattening (aggregate across time)
+    ↓
+Zeitgeber Analysis (circadian features)
+    ↓
+Statistical Figures &amp; Plots
+</pre></div>
+</div>
+<p>Each stage produces intermediate files that are automatically cached. If you modify parameters or data, Snakemake only reruns affected steps.</p>
+</section>
+<section id="configuration">
+<h2>Configuration<a class="headerlink" href="#configuration" title="Link to this heading">#</a></h2>
+<p>The pipeline requires two configuration files in the <code class="docutils literal notranslate"><span class="pre">config/</span></code> directory:</p>
+<section id="config-config-yaml-analysis-parameters">
+<h3>1. <code class="docutils literal notranslate"><span class="pre">config/config.yaml</span></code> - Analysis Parameters<a class="headerlink" href="#config-config-yaml-analysis-parameters" title="Link to this heading">#</a></h3>
+<p>This file defines paths, analysis settings, and computational resources:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="c1"># Core directories</span>
+<span class="nt">base_folder</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/path/to/neurodent/output&quot;</span>
+<span class="nt">data_parent_folder</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/path/to/raw/eeg/data&quot;</span>
+<span class="nt">temp_directory</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;/path/to/temp/storage&quot;</span>
+
+<span class="c1"># Sample configuration</span>
+<span class="nt">samples</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">samples_file</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;config/samples.json&quot;</span>
+<span class="w">  </span><span class="nt">quality_filter</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">exclude_unknown_genotypes</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+<span class="w">    </span><span class="nt">exclude_bad_animaldays</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+
+<span class="c1"># Analysis parameters</span>
+<span class="nt">analysis</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">war_generation</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;nest&quot;</span>
+<span class="w">    </span><span class="nt">lro_kwargs</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;bin&quot;</span>
+<span class="w">      </span><span class="nt">multiprocess_mode</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;dask&quot;</span>
+<span class="w">  </span>
+<span class="w">  </span><span class="nt">fragment_filter_config</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">logrms_range</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">z_range</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+<span class="w">    </span><span class="nt">high_beta</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">max_beta_prop</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">0.4</span>
+<span class="w">  </span>
+<span class="w">  </span><span class="nt">channel_filter_config</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">lof</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">reject_lof_threshold</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2.5</span>
+<span class="w">      </span><span class="nt">min_valid_channels</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+
+<span class="c1"># Resource requirements (adjust for your system)</span>
+<span class="nt">cluster</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">war_generation</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">time</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;3h&quot;</span>
+<span class="w">    </span><span class="nt">mem_mb</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">70_000</span>
+<span class="w">    </span><span class="nt">threads</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+</pre></div>
+</div>
+<p>Key parameters:</p>
+<ul class="simple">
+<li><p><strong>Paths</strong>: Set <code class="docutils literal notranslate"><span class="pre">base_folder</span></code>, <code class="docutils literal notranslate"><span class="pre">data_parent_folder</span></code>, and <code class="docutils literal notranslate"><span class="pre">temp_directory</span></code> for your system</p></li>
+<li><p><strong>Analysis</strong>: Configure filtering thresholds, detection parameters, etc.</p></li>
+<li><p><strong>Resources</strong>: Memory, time, and CPU requirements (used for cluster scheduling)</p></li>
+</ul>
+</section>
+<section id="config-samples-json-sample-metadata">
+<h3>2. <code class="docutils literal notranslate"><span class="pre">config/samples.json</span></code> - Sample Metadata<a class="headerlink" href="#config-samples-json-sample-metadata" title="Link to this heading">#</a></h3>
+<p>This file defines which animals to process and their experimental metadata:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;data_parent_folder&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/path/to/raw/eeg/data&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;data_folders_to_animal_ids&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;experiment1_cohort1&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;M1&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;M2&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;F1&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;F2&quot;</span><span class="p">],</span>
+<span class="w">    </span><span class="nt">&quot;experiment2_cohort2&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;M3&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;M4&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;F3&quot;</span><span class="p">]</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;GENOTYPE_ALIASES&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;MWT&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;M1&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;M3&quot;</span><span class="p">],</span>
+<span class="w">    </span><span class="nt">&quot;FWT&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;F1&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;F3&quot;</span><span class="p">],</span>
+<span class="w">    </span><span class="nt">&quot;MMut&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;M2&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;M4&quot;</span><span class="p">],</span>
+<span class="w">    </span><span class="nt">&quot;FMut&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;F2&quot;</span><span class="p">]</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;bad_channels&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;experiment1_cohort1 M1&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;M1 MWT Jan-08-2022&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;LHip&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;RHip&quot;</span><span class="p">]</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;bad_folder_animalday&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="s2">&quot;experiment1_cohort1 M2&quot;</span>
+<span class="w">  </span><span class="p">]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Key sections:</p>
+<ul class="simple">
+<li><p><strong>data_folders_to_animal_ids</strong>: Maps recording folders to animal IDs</p></li>
+<li><p><strong>GENOTYPE_ALIASES</strong>: Groups animals by genotype for statistical comparisons</p></li>
+<li><p><strong>bad_channels</strong>: Per-session bad channel lists for manual artifact rejection</p></li>
+<li><p><strong>bad_folder_animalday</strong>: Complete animals/days to exclude from analysis</p></li>
+</ul>
+</section>
+</section>
+<section id="running-the-pipeline">
+<h2>Running the Pipeline<a class="headerlink" href="#running-the-pipeline" title="Link to this heading">#</a></h2>
+<section id="basic-execution">
+<h3>Basic Execution<a class="headerlink" href="#basic-execution" title="Link to this heading">#</a></h3>
+<p>Run the pipeline on your local machine or compute node:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Dry run to preview what will execute</span>
+snakemake<span class="w"> </span>--dry-run
+
+<span class="c1"># Execute with 4 parallel jobs</span>
+snakemake<span class="w"> </span>--cores<span class="w"> </span><span class="m">4</span>
+
+<span class="c1"># Run a specific analysis stage</span>
+snakemake<span class="w"> </span>--cores<span class="w"> </span><span class="m">4</span><span class="w"> </span>results/wars_quality_filtered/
+
+<span class="c1"># Force rerun of a specific rule and downstream steps</span>
+snakemake<span class="w"> </span>--cores<span class="w"> </span><span class="m">4</span><span class="w"> </span>--forcerun<span class="w"> </span>war_generation
+</pre></div>
+</div>
+</section>
+<section id="useful-commands">
+<h3>Useful Commands<a class="headerlink" href="#useful-commands" title="Link to this heading">#</a></h3>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Visualize the workflow</span>
+snakemake<span class="w"> </span>--dag<span class="w"> </span><span class="p">|</span><span class="w"> </span>dot<span class="w"> </span>-Tpng<span class="w"> </span>&gt;<span class="w"> </span>dag.png
+snakemake<span class="w"> </span>--rulegraph<span class="w"> </span><span class="p">|</span><span class="w"> </span>dot<span class="w"> </span>-Tpng<span class="w"> </span>&gt;<span class="w"> </span>rulegraph.png
+
+<span class="c1"># Unlock directory after crash</span>
+snakemake<span class="w"> </span>--unlock
+
+<span class="c1"># Clean up specific outputs to rerun</span>
+snakemake<span class="w"> </span>--delete-all-output
+
+<span class="c1"># Show which files are missing</span>
+snakemake<span class="w"> </span>--summary
+</pre></div>
+</div>
+</section>
+<section id="monitoring-progress">
+<h3>Monitoring Progress<a class="headerlink" href="#monitoring-progress" title="Link to this heading">#</a></h3>
+<p>Check the <code class="docutils literal notranslate"><span class="pre">logs/</span></code> directory for detailed output from each rule:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># View real-time logs</span>
+tail<span class="w"> </span>-f<span class="w"> </span>logs/war_generation_*.log
+
+<span class="c1"># Check results directory</span>
+ls<span class="w"> </span>-lh<span class="w"> </span>results/
+</pre></div>
+</div>
+</section>
+</section>
+<section id="running-on-hpc-clusters">
+<h2>Running on HPC Clusters<a class="headerlink" href="#running-on-hpc-clusters" title="Link to this heading">#</a></h2>
+<p>For large-scale analyses, you can submit pipeline jobs to an HPC cluster scheduler. Snakemake supports multiple schedulers including SLURM, SGE, PBS, LSF, and others.</p>
+<section id="general-cluster-execution">
+<h3>General Cluster Execution<a class="headerlink" href="#general-cluster-execution" title="Link to this heading">#</a></h3>
+<p>Snakemake can interface with any job scheduler using profiles. The key is to:</p>
+<ol class="arabic simple">
+<li><p>Define resource requirements in <code class="docutils literal notranslate"><span class="pre">config.yaml</span></code> (time, memory, threads)</p></li>
+<li><p>Create a cluster profile for your scheduler</p></li>
+<li><p>Submit the pipeline using the profile</p></li>
+</ol>
+<p>Snakemake will automatically:</p>
+<ul class="simple">
+<li><p>Submit each rule as a separate job</p></li>
+<li><p>Manage job dependencies</p></li>
+<li><p>Monitor job status</p></li>
+<li><p>Resubmit failed jobs (with <code class="docutils literal notranslate"><span class="pre">restart-times</span></code>)</p></li>
+</ul>
+</section>
+<section id="example-slurm-scheduler">
+<h3>Example: SLURM Scheduler<a class="headerlink" href="#example-slurm-scheduler" title="Link to this heading">#</a></h3>
+<p>Here’s how to set up Snakemake with SLURM (adapt for your scheduler):</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create a SLURM profile (one-time setup)</span>
+mkdir<span class="w"> </span>-p<span class="w"> </span>~/.config/snakemake/slurm
+
+cat<span class="w"> </span>&gt;<span class="w"> </span>~/.config/snakemake/slurm/config.yaml<span class="w"> </span><span class="s">&lt;&lt; &#39;EOF&#39;</span>
+<span class="s">cluster: &quot;sbatch --time={cluster.time} --mem={cluster.mem_mb} --cpus-per-task={threads} --job-name={rule} --output=logs/{rule}_%j.out&quot;</span>
+<span class="s">jobs: 100</span>
+<span class="s">restart-times: 3</span>
+<span class="s">EOF</span>
+
+<span class="c1"># Submit pipeline</span>
+snakemake<span class="w"> </span>--profile<span class="w"> </span>slurm
+</pre></div>
+</div>
+<p>The pipeline reads resource requirements from your <code class="docutils literal notranslate"><span class="pre">config.yaml</span></code>:</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">cluster</span><span class="p">:</span>
+<span class="w">  </span><span class="nt">war_generation</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">time</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;3h&quot;</span>
+<span class="w">    </span><span class="nt">mem_mb</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">70_000</span>
+<span class="w">    </span><span class="nt">threads</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">10</span>
+</pre></div>
+</div>
+<p>And Snakemake translates these to scheduler-specific flags.</p>
+</section>
+<section id="monitoring-cluster-jobs">
+<h3>Monitoring Cluster Jobs<a class="headerlink" href="#monitoring-cluster-jobs" title="Link to this heading">#</a></h3>
+<p>For SLURM:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Check job queue</span>
+squeue<span class="w"> </span>-u<span class="w"> </span><span class="nv">$USER</span>
+
+<span class="c1"># View job details</span>
+sacct<span class="w"> </span>--format<span class="o">=</span>JobID,JobName,State,Elapsed,MaxRSS
+
+<span class="c1"># Monitor specific rule logs</span>
+tail<span class="w"> </span>-f<span class="w"> </span>logs/war_generation_*.out
+</pre></div>
+</div>
+<p>For SGE:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Check job queue</span>
+qstat<span class="w"> </span>-u<span class="w"> </span><span class="nv">$USER</span>
+
+<span class="c1"># View job details</span>
+qacct<span class="w"> </span>-j<span class="w"> </span>&lt;job_id&gt;
+</pre></div>
+</div>
+<p>For PBS:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Check job queue</span>
+qstat<span class="w"> </span>-u<span class="w"> </span><span class="nv">$USER</span>
+
+<span class="c1"># View job details</span>
+qstat<span class="w"> </span>-f<span class="w"> </span>&lt;job_id&gt;
+</pre></div>
+</div>
+</section>
+<section id="other-schedulers">
+<h3>Other Schedulers<a class="headerlink" href="#other-schedulers" title="Link to this heading">#</a></h3>
+<p>Snakemake supports many schedulers. See the <a class="reference external" href="https://snakemake.readthedocs.io/en/stable/executing/cluster.html">Snakemake cluster documentation</a> for:</p>
+<ul class="simple">
+<li><p><strong>SGE</strong> (Sun Grid Engine)</p></li>
+<li><p><strong>PBS/Torque</strong></p></li>
+<li><p><strong>LSF</strong> (Load Sharing Facility)</p></li>
+<li><p><strong>Cloud executors</strong> (Google Cloud, AWS, Azure)</p></li>
+</ul>
+<p>The general pattern is the same: create a profile with your scheduler’s submission command and resource mappings.</p>
+</section>
+</section>
+<section id="pipeline-outputs">
+<h2>Pipeline Outputs<a class="headerlink" href="#pipeline-outputs" title="Link to this heading">#</a></h2>
+<p>The pipeline creates a structured results directory:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>results/
+├── wars_quality_filtered/       # Initial WARs with quality filtering applied
+├── wars_standardized/            # Channel-reordered WARs
+├── wars_fragment_filtered/       # After temporal artifact removal
+├── wars_flattened_manual/        # Aggregated with manual channel filtering
+├── wars_flattened_lof/           # Aggregated with LOF channel filtering
+├── diagnostic_figures/           # Per-animal QC plots
+│   └── {animal}/
+│       ├── unfiltered/           # Pre-filtering diagnostics
+│       └── filtered/             # Post-filtering diagnostics
+├── wars_zeitgeber/               # Circadian time-aligned features
+├── zeitgeber_plots/              # Temporal heatmaps
+├── relfreq_plots/                # Feature distributions
+├── ep_figures/                   # Statistical group comparisons
+├── ep_heatmaps/                  # Connectivity matrices
+├── lof_evaluation/               # LOF threshold optimization
+└── filtering_comparison_plots/   # Manual vs LOF comparison
+
+logs/
+└── {rule}_*.log                  # Execution logs for each rule
+</pre></div>
+</div>
+<p>Key outputs:</p>
+<ul class="simple">
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">.pkl</span></code> files</strong>: Python pickled WARs with computed features</p></li>
+<li><p><strong><code class="docutils literal notranslate"><span class="pre">.json</span></code> files</strong>: Metadata and analysis parameters</p></li>
+<li><p><strong>Figures</strong>: PNG/PDF diagnostic and publication plots</p></li>
+<li><p><strong>CSV files</strong>: Exportable tabular data</p></li>
+</ul>
+</section>
+<section id="troubleshooting-best-practices">
+<h2>Troubleshooting &amp; Best Practices<a class="headerlink" href="#troubleshooting-best-practices" title="Link to this heading">#</a></h2>
+<section id="common-issues">
+<h3>Common Issues<a class="headerlink" href="#common-issues" title="Link to this heading">#</a></h3>
+<p><strong>Pipeline is locked:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>snakemake<span class="w"> </span>--unlock
+</pre></div>
+</div>
+<p><strong>Need to rerun everything:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>snakemake<span class="w"> </span>--forceall<span class="w"> </span>--cores<span class="w"> </span><span class="m">4</span>
+</pre></div>
+</div>
+<p><strong>Jobs failing due to insufficient memory:</strong>
+Increase memory in <code class="docutils literal notranslate"><span class="pre">config.yaml</span></code> under <code class="docutils literal notranslate"><span class="pre">cluster</span></code> section for the failing rule.</p>
+<p><strong>Want to test changes without full pipeline:</strong></p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Run just one rule</span>
+snakemake<span class="w"> </span>--cores<span class="w"> </span><span class="m">4</span><span class="w"> </span>war_generation
+
+<span class="c1"># Or target specific output</span>
+snakemake<span class="w"> </span>--cores<span class="w"> </span><span class="m">4</span><span class="w"> </span>results/wars_quality_filtered/animal1/
+</pre></div>
+</div>
+</section>
+<section id="best-practices">
+<h3>Best Practices<a class="headerlink" href="#best-practices" title="Link to this heading">#</a></h3>
+<ol class="arabic">
+<li><p><strong>Always dry-run first</strong> to preview execution:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>snakemake<span class="w"> </span>--dry-run
+</pre></div>
+</div>
+</li>
+<li><p><strong>Test on small subset</strong> before full dataset:</p>
+<ul class="simple">
+<li><p>Temporarily modify <code class="docutils literal notranslate"><span class="pre">samples.json</span></code> to include just 1-2 animals</p></li>
+<li><p>Run locally to verify parameters</p></li>
+<li><p>Expand to full dataset once validated</p></li>
+</ul>
+</li>
+<li><p><strong>Monitor resource usage</strong>:</p>
+<ul class="simple">
+<li><p>Check logs for memory errors</p></li>
+<li><p>Adjust <code class="docutils literal notranslate"><span class="pre">cluster</span></code> resources in <code class="docutils literal notranslate"><span class="pre">config.yaml</span></code> as needed</p></li>
+<li><p>Most rules should complete within their time limits</p></li>
+</ul>
+</li>
+<li><p><strong>Keep intermediate files</strong>:</p>
+<ul class="simple">
+<li><p>Don’t delete results directories - Snakemake uses them for caching</p></li>
+<li><p>If rerunning from scratch, use <code class="docutils literal notranslate"><span class="pre">--forceall</span></code> instead of deleting</p></li>
+</ul>
+</li>
+<li><p><strong>Version control your configs</strong>:</p>
+<ul class="simple">
+<li><p>Track <code class="docutils literal notranslate"><span class="pre">config/config.yaml</span></code> and <code class="docutils literal notranslate"><span class="pre">config/samples.json</span></code> in git</p></li>
+<li><p>Document parameter changes for reproducibility</p></li>
+</ul>
+</li>
+</ol>
+</section>
+</section>
+<section id="next-steps">
+<h2>Next Steps<a class="headerlink" href="#next-steps" title="Link to this heading">#</a></h2>
+<p>Now that you understand the Snakemake pipeline:</p>
+<ul class="simple">
+<li><p><strong>Explore outputs</strong>: Review diagnostic figures in <code class="docutils literal notranslate"><span class="pre">results/diagnostic_figures/</span></code> to assess data quality</p></li>
+<li><p><strong>Customize analysis</strong>: Modify parameters in <code class="docutils literal notranslate"><span class="pre">config/config.yaml</span></code> for your experimental needs</p></li>
+<li><p><strong>Interactive analysis</strong>: Load <code class="docutils literal notranslate"><span class="pre">.pkl</span></code> WAR files in Python for custom analyses</p></li>
+<li><p><strong>Learn more</strong>: Check out other tutorials:</p>
+<ul>
+<li><p><a class="reference internal" href="windowed_analysis.html"><span class="std std-doc">Windowed Analysis</span></a> - Understanding feature extraction</p></li>
+<li><p><a class="reference internal" href="visualization.html"><span class="std std-doc">Visualization</span></a> - Creating custom plots</p></li>
+<li><p><a class="reference internal" href="../quickstart/basic_usage.html"><span class="std std-doc">Basic Usage</span></a> - Interactive Python workflow</p></li>
+</ul>
+</li>
+</ul>
+</section>
+<section id="additional-resources">
+<h2>Additional Resources<a class="headerlink" href="#additional-resources" title="Link to this heading">#</a></h2>
+<ul class="simple">
+<li><p><a class="reference external" href="https://snakemake.readthedocs.io/">Snakemake Documentation</a></p></li>
+<li><p><a class="reference external" href="https://snakemake.readthedocs.io/en/stable/executing/cluster.html">Snakemake Cluster Execution</a></p></li>
+<li><p><a class="reference external" href="https://github.com/Snakemake-Profiles">Snakemake Profiles</a> - Community-maintained scheduler profiles</p></li>
+</ul>
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="visualization.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Visualization Tutorial</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="../examples/index.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">Examples</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#what-is-snakemake">What is Snakemake?</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#why-use-the-snakemake-pipeline">Why Use the Snakemake Pipeline?</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#installation">Installation</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#pipeline-overview">Pipeline Overview</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#configuration">Configuration</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#config-config-yaml-analysis-parameters">1. <code class="docutils literal notranslate"><span class="pre">config/config.yaml</span></code> - Analysis Parameters</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#config-samples-json-sample-metadata">2. <code class="docutils literal notranslate"><span class="pre">config/samples.json</span></code> - Sample Metadata</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#running-the-pipeline">Running the Pipeline</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#basic-execution">Basic Execution</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#useful-commands">Useful Commands</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#monitoring-progress">Monitoring Progress</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#running-on-hpc-clusters">Running on HPC Clusters</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#general-cluster-execution">General Cluster Execution</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#example-slurm-scheduler">Example: SLURM Scheduler</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#monitoring-cluster-jobs">Monitoring Cluster Jobs</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#other-schedulers">Other Schedulers</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#pipeline-outputs">Pipeline Outputs</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#troubleshooting-best-practices">Troubleshooting &amp; Best Practices</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#common-issues">Common Issues</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#best-practices">Best Practices</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#next-steps">Next Steps</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#additional-resources">Additional Resources</a></li>
+</ul>
+  </nav></div>
+
+  <div class="sidebar-secondary-item">
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/tutorials/snakemake_pipeline.ipynb.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="copyright">
+    
+      © Copyright 2025, Joseph Dong, Yongtaek Oh, Eric Marsh.
+      <br/>
+    
+  </p>
+</div>
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.1.3.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.16.1.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>
