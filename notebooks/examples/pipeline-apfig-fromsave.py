@@ -1,57 +1,71 @@
-import sys
-from pathlib import Path
 import logging
+import sys
+from multiprocessing import Pool
+from pathlib import Path
 
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.colors as colors
-import mne
+from tqdm import tqdm
 
-from pythoneeg import core
-from pythoneeg import visualization
-from pythoneeg import constants
+from neurodent import constants, core, visualization
 
-core.set_temp_directory('/scr1/users/dongjp')
+core.set_temp_directory("/scr1/users/dongjp")
 
-logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO, stream=sys.stdout, force=True)
+logging.basicConfig(
+    format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO, stream=sys.stdout, force=True
+)
 logger = logging.getLogger()
-# animal_ids = ['A5', 'A10', 'F22', 'G25', 'G26', 'N21', 'N22', 'N23', 'N24', 'N25']
-animal_ids = ['061322_Group10 M8, M10 M8', # normal
-              '062921_Cohort 3_AM3_AM5_CM9_BM6_CM5_CF2_IF5_BF3 BM6', # sparsely disconnected
-              '071321_Cohort 3_AM4_CF1_DF3_FF6 AM4', # normal
-              '081922_cohort10_group4_2mice_FMut_FHet FHET', # intermittently disconnected
-              '090122_group4_2mice_FMut_MMut FMUT' # very disconnected
-             ] 
 
-# /mnt/isilon/marsh_single_unit/PythonEEG Data Bins/Sox5/Dr. Lefebvre Project/061022_group 9 M1, M2, M3/group9_M2_Cage 3/061122_group9_M2_Cage 3_files0-24
-
-base_folder = Path('/mnt/isilon/marsh_single_unit/PythonEEG').resolve()
-save_folder = Path('/home/dongjp/Downloads/5-28 filtered').resolve()
+base_folder = Path("/mnt/isilon/marsh_single_unit/NeuRodent")
+load_folder = base_folder / "notebooks" / "tests" / "test-wars-sox5-7"
+save_folder = Path("/home/dongjp/Downloads/7-21 APfigs")
 if not save_folder.exists():
     save_folder.mkdir(parents=True, exist_ok=True)
 
-for animal_id in animal_ids:
+animal_ids = [p.name for p in load_folder.glob("*") if p.is_dir()]
+bad_animal_ids = [
+    "013122_cohort4_group7_2mice both_FHET FHET(2)",
+    "012322_cohort4_group6_3mice_FMUT___MMUT_MWT MHET",
+    "012322_cohort4_group6_3mice_FMUT___MMUT_MWT MMUT",
+    "011622_cohort4_group4_3mice_MMutOLD_FMUT_FMUT_FWT OLDMMT",
+    "011322_cohort4_group3_4mice_AllM_MT_WT_HET_WT M3",
+    "012322_cohort4_group6_3mice_FMUT___MMUT_MWT FHET",
+]
+animal_ids = [p for p in animal_ids if p not in bad_animal_ids]
 
-    # SECTION load in windowed analysis results
-    war = visualization.WindowAnalysisResult.load_pickle_and_json(base_folder / 'notebooks' / 'tests' / 'test-wars-full' / f'{animal_id}')
-    war.filter_all()
-    # !SECTION
 
-    # SECTION load into AP
+def plot_animal(animal_id):
+    logger.info(f"Plotting {animal_id}")
+    war = visualization.WindowAnalysisResult.load_pickle_and_json(load_folder / f"{animal_id}")
+    if war.genotype == "Unknown":
+        logger.info(f"Skipping {animal_id} because genotype is Unknown")
+        return None
+
     save_path = save_folder / animal_id
     if not save_path.exists():
         save_path.mkdir(parents=True)
-    ap = visualization.AnimalPlotter(war, save_fig=True, save_path=save_path / animal_id)
-    # !SECTION
 
-    # SECTION plot
-    ap.plot_coherecorr_spectral(figsize=(20, 5), score_type='z')
-    ap.plot_psd_histogram(figsize=(10, 4), avg_channels=True, plot_type='loglog')
-    ap.plot_psd_spectrogram(figsize=(20, 4), mode='none')
-    
-    del war
-    # !SECTION
+    # Plot before filtering
+    ap = visualization.AnimalPlotter(war, save_fig=True, save_path=save_path / f"{animal_id}")
+    ap.plot_coherecorr_spectral(figsize=(20, 5), score_type="z")
+    ap.plot_psd_histogram(figsize=(10, 4), avg_channels=True, plot_type="loglog")
+    ap.plot_psd_spectrogram(figsize=(20, 4), mode="none")
+
+    # Filter
+    war.reorder_and_pad_channels(["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"], use_abbrevs=True)
+    war.filter_all(morphological_smoothing_seconds=60)
+
+    # Plot after filtering
+    ap = visualization.AnimalPlotter(war, save_fig=True, save_path=save_path / f"{animal_id} zzz_filtered")
+
+    ap.plot_coherecorr_spectral(figsize=(20, 5), score_type="z")
+    ap.plot_psd_histogram(figsize=(10, 4), avg_channels=True, plot_type="loglog")
+    ap.plot_psd_spectrogram(figsize=(20, 4), mode="none")
+    return animal_id
+
+
+with Pool(10) as pool:
+    list(tqdm(pool.imap(plot_animal, animal_ids), total=len(animal_ids), desc="Processing animals"))
+
 
 """
-sbatch --mem 100G -c 4 -t 24:00:00 ./notebooks/examples/pipeline.sh ./notebooks/examples/pipeline-apfig-fromsave.py
+sbatch --mem 300G -c 11 -t 24:00:00 ./notebooks/examples/pipeline.sh ./notebooks/examples/pipeline-apfig-fromsave.py
 """

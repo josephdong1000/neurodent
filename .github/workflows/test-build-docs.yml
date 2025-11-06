@@ -1,0 +1,222 @@
+name: Test, Build Package, and Generate Documentation
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Test Package
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        os: ["ubuntu-latest", "macos-latest", "windows-latest"]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v6
+      with:
+        enable-cache: true
+        python-version: ${{ matrix.python-version }}
+
+    - name: macOS Configure compiler for isosplit6 build
+      if: runner.os == 'macOS'
+      run: |
+        echo "CC=gcc" >> $GITHUB_ENV
+        echo "CXX=g++" >> $GITHUB_ENV
+        echo "CXXFLAGS=-std=c++14 -I$(xcrun --show-sdk-path)/usr/include/c++/v1" >> $GITHUB_ENV
+        echo "LDFLAGS=-L$(xcrun --show-sdk-path)/usr/lib" >> $GITHUB_ENV
+        
+    - name: Install package and dependencies
+      run: |
+        uv sync --all-groups
+        echo "Python version: $(uv run python --version)"
+        echo "Installed packages:"
+        uv pip list
+
+    - name: macOS install isosplit6 and mountainsort5
+      if: runner.os == 'macOS'
+      run: |
+        uv pip install --reinstall --no-binary :all: isosplit6
+        uv pip install --reinstall mountainsort5
+        
+    - name: Test package import
+      run: |
+        uv run python -c "import neurodent; print('Package imports successfully')"
+        
+    - name: Run tests with coverage
+      run: |
+        uv run pytest tests/ --cov=neurodent --cov-report=xml --cov-report=term-missing -v
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v5
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        files: ./coverage.xml
+        flags: tests
+        name: codecov-${{ matrix.os }}-py${{ matrix.python-version }}
+        fail_ci_if_error: true
+        verbose: true
+
+  build-package:
+    name: Build Package
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install uv
+      uses: astral-sh/setup-uv@v6
+      with:
+        python-version: '3.10.8'
+        
+    - name: Build package
+      run: |
+        uv build
+        echo "Package built successfully!"
+        echo "Distribution files:"
+        ls -la dist/
+        echo "Package contents (wheel):"
+        unzip -l dist/*.whl | head -20
+        echo "Package contents (tar.gz):"
+        tar -tzf dist/*.tar.gz | head -20
+        
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: python-package
+        path: dist/
+        retention-days: 30
+
+  build-docs:
+    name: Build Documentation
+    runs-on: ubuntu-latest
+    # needs: test
+
+    steps:
+    - name: Checkout code with full history
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch all history for all tags and branches
+        fetch-tags: true  # Explicitly fetch tags
+
+    - name: Install pandoc (fast)
+      uses: pandoc/actions/setup@v1
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v6
+      with:
+        python-version: '3.10.8'
+
+    - name: Install package and documentation dependencies
+      run: |
+        uv sync --all-groups
+
+    - name: Fetch all refs for sphinx-multiversion
+      run: |
+        git fetch --all --tags
+        echo "Fetched all refs"
+
+    - name: Debug - Check git refs for sphinx-multiversion
+      run: |
+        echo "=== Git Tags ==="
+        git tag -l
+        echo ""
+        echo "=== Git Branches ==="
+        git branch -a
+        echo ""
+        echo "=== Current Branch ==="
+        git rev-parse --abbrev-ref HEAD
+        echo ""
+        echo "=== Tags matching v*.*.* pattern ==="
+        git tag -l "v*.*.*"
+        echo ""
+        echo "=== Check if docs/ exists in tags ==="
+        for tag in $(git tag -l "v*"); do
+          echo -n "Tag $tag: "
+          git ls-tree -r --name-only $tag | grep -q "^docs/" && echo "HAS docs/" || echo "NO docs/"
+        done
+        echo ""
+        echo "=== Remote refs ==="
+        git ls-remote --tags --heads origin
+
+    - name: Build multi-version documentation
+      run: |
+        echo "Building multi-version documentation with sphinx-multiversion..."
+        uv run sphinx-multiversion docs build/html
+        echo "Documentation built successfully!"
+        echo ""
+        echo "=== Build output structure ==="
+        ls -laR build/html/
+
+    - name: Generate version switcher JSON
+      run: |
+        echo "Generating switcher.json..."
+        uv run python docs/generate_switcher.py
+        echo "Copying switcher.json to _static folder for theme..."
+        mkdir -p build/html/_static
+        cp build/html/switcher.json build/html/_static/switcher.json
+
+    - name: Add root redirect and .nojekyll
+      run: |
+        echo "Adding root index.html redirect..."
+        cp docs/redirect_index.html build/html/index.html
+        echo "Adding .nojekyll to disable GitHub Pages Jekyll processing..."
+        touch build/html/.nojekyll
+        echo "Final build structure:"
+        ls -la build/html/
+
+    - name: Upload documentation artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: documentation
+        path: build/html/
+        retention-days: 30
+        include-hidden-files: true
+
+  deploy-docs:
+    name: Deploy Documentation
+    runs-on: ubuntu-latest
+    needs: build-docs
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+
+    # Permissions needed for GitHub Pages deployment
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+
+    steps:
+    - name: Download documentation artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: documentation
+        path: build/html
+
+    - name: Debug - List downloaded artifact contents
+      run: |
+        echo "=== Directory structure ==="
+        ls -laR build/html/
+        echo ""
+        echo "=== Verify .nojekyll exists ==="
+        ls -la build/html/.nojekyll
+
+    - name: Deploy to GitHub Pages
+      uses: peaceiris/actions-gh-pages@v4
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: build/html
+        publish_branch: gh-pages
+        force_orphan: true
+        user_name: 'github-actions[bot]'
+        user_email: 'github-actions[bot]@users.noreply.github.com'
+        commit_message: 'Deploy documentation for ${{ github.sha }}' 

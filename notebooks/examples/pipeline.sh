@@ -7,7 +7,7 @@ set -e
 module load Python/3.10.8-GCCcore-12.2.0.lua
 
 # Set working directory
-cd /mnt/isilon/marsh_single_unit/PythonEEG
+cd /mnt/isilon/marsh_single_unit/NeuRodent
 
 # Activate virtual environment
 if [ ! -f .venv/bin/activate ]; then
@@ -26,5 +26,6 @@ fi
 # Run the Python script with unbuffered output
 echo "Starting pipeline with script: $1"
 python -u "$1"
+# python -u -m cProfile -o profile.prof "$1"
 
 echo "Pipeline finished successfully."

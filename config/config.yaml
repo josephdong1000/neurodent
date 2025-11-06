@@ -1,0 +1,342 @@
+# NeuRodent Snakemake Pipeline Configuration
+# =====================================
+
+# Core directories and paths
+base_folder: "/mnt/isilon/marsh_single_unit/NeuRodent"
+data_parent_folder: "/mnt/isilon/marsh_single_unit/PythonEEG Data Bins/Sox5/Dr. Lefebvre Project"
+temp_directory: "/scr1/users/dongjp"
+
+# Sample configuration
+samples:
+  # Sample metadata file path
+  samples_file: "config/samples.json"
+  
+  # Quality filtering parameters
+  quality_filter:
+    exclude_unknown_genotypes: true
+    exclude_bad_animaldays: true
+
+# Analysis parameters
+analysis:
+  # WAR generation parameters
+  war_generation:
+    mode: "nest"
+    assume_from_number: true
+    skip_days: ["bad"]
+    lro_kwargs:
+      mode: "bin"
+      multiprocess_mode: "dask"
+      overwrite_rowbins: false
+
+  # Frequency domain spike detection parameters
+  frequency_domain_spike_detection:
+    # Default detection parameters
+    default_params:
+      bp: [3.0, 40.0]              # bandpass filter Hz [low, high]
+      notch: 60.0                  # notch filter Hz
+      notch_q: 30.0                # notch filter quality factor
+      freq_slices: [10.0, 20.0]    # STFT energy slices Hz [freq1, freq2, ...]
+      sneo_percentile: 99.99       # SNEO threshold percentile (higher = fewer detections)
+      cluster_gap_ms: 80.0         # minimum gap between spikes (ms)
+      search_ms: 160.0             # spike refinement search window (ms)
+      baseline_ms: 500.0           # baseline analysis window (ms)
+      k_sigma: 3.0                 # statistical significance threshold (sigma)
+      smooth_window: 7             # smoothing kernel size for spike refinement
+      vote_k: 2                    # minimum votes required across frequency bands
+      smooth_len: 5                # SNEO smoothing window length
+
+    # Parameter grid for systematic testing (optional)
+    parameter_grid:
+      - bp: [3, 40]
+        notch: 60
+        notch_q: 30
+        freq_slices: [10, 20]
+        sneo_percentile: 99.99
+        cluster_gap_ms: 80
+        label: "bp3-40_fs10-20_p99.99"
+      - bp: [3, 40]
+        notch: 60
+        notch_q: 30
+        freq_slices: [15, 20]
+        sneo_percentile: 99.99
+        cluster_gap_ms: 80
+        label: "bp3-40_fs15-20_p99.99"
+      - bp: [3, 40]
+        notch: 60
+        notch_q: 30
+        freq_slices: [15, 25]
+        sneo_percentile: 99.99
+        cluster_gap_ms: 80
+        label: "bp3-40_fs15-25_p99.99"
+
+    # Processing parameters
+    multiprocess_mode: "serial"    # "dask" or "serial"
+
+    # Visualization parameters
+    spike_averaged_traces:
+      tmin: -0.5                   # epoch start time (seconds)
+      tmax: 0.5                    # epoch end time (seconds)
+      baseline: null               # baseline correction period [tmin, tmax] or null
+      save_epochs: true            # whether to save epoch data (.fif files)
+      figure_format: "png"         # output format for plots
+      dpi: 300                     # figure resolution
+
+  # WAR standardization parameters (channel setup applied before filtering)
+  standardization:
+    channel_reorder: ["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"]
+    use_abbrevs: true
+    add_unique_hash: false  # Whether to add unique hash during standardization
+    unique_hash_length: 4   # Length of unique hash if enabled
+
+  # Fragment filtering configuration (temporal artifact removal)
+  fragment_filter_config:
+    logrms_range:
+      z_range: 3
+    high_rms:
+      max_rms: 500
+    low_rms:
+      min_rms: 50
+    high_beta:
+      max_beta_prop: 0.4
+    # morphological_smoothing:
+    #   smoothing_seconds: 300  # Uncomment to enable temporal smoothing
+
+  # Channel filtering configurations (spatial artifact removal)
+  channel_filter_config:
+    manual:
+      reject_channels_by_session: false  # Use per-session bad channels
+      reject_channels: ["LHip", "RHip"]  # List of channels to reject globally
+      min_valid_channels: 3
+    lof:
+      reject_lof_threshold: 2.5  # LOF threshold above which channels are considered bad
+      reject_channels: []  # List of channels to reject globally
+      min_valid_channels: 3
+
+  # Data aggregation parameters (applied after filtering)
+  aggregation:
+    groupby: ["animalday", "isday"]  # Time window grouping for aggregation
+
+  # Zeitgeber time processing parameters
+  zeitgeber:
+    features: ["logpsdband", "logrms", "zpcorr"]  # Features to extract for zeitgeber analysis
+    time_aggregation_minutes: 60  # Time window for aggregation (60 = hourly)
+
+  # Zeitgeber temporal plots parameters
+  zeitgeber_plots:
+    features: ["logpsdband", "logrms", "zpcorr"]  # Features to plot in temporal analysis
+    baseline_hours: 12  # Hours to use for baseline correction (first N hours)
+    figure_format: "png"  # Figure output format: png, tif, pdf, svg
+    data_format: "csv"    # Data export format: csv, pkl
+    dpi: 300             # Figure resolution
+    figsize: [10, 20]    # Figure size [width, height]
+
+  # Relative frequency distribution plots parameters
+  relfreq_plots:
+    features: ["nspike", "lognspike", "pcorr", "zpcorr", "cohere", "zcohere", "imcoh", "zimcoh", "logpsdfrac", "logpsdband", "psdband"]
+    figure_format: "png"  # Figure output format: png, tif, pdf, svg
+    data_format: "csv"    # Data export format: csv, pkl
+    dpi: 300             # Figure resolution
+
+  # ExperimentPlotter statistical figures parameters
+  ep_figures:
+    # features: ["pcorr", "zpcorr", "cohere", "zcohere", "logpsdfrac", "logpsdband", "psd", "normpsd", "nspike", "lognspike"]
+    features: ["nspike", "lognspike", "pcorr", "zpcorr"]
+    exclude_features: null  # Features to exclude from ExperimentPlotter
+    figure_format: "png"  # Figure output format: png, tif, pdf, svg
+    data_format: "csv"    # Data export format: csv, pkl
+    dpi: 300             # Figure resolution
+
+  # ExperimentPlotter heatmap parameters  
+  ep_heatmaps:
+    matrix_features: ["cohere", "imcoh", "zcohere", "zimcoh", "pcorr", "zpcorr"]
+    baseline_type: "sex_specific"  # "sex_specific" (e.g., MWT, FWT) or "global" (single baseline)
+    figure_format: "png"  # Figure output format: png, tif, pdf, svg
+    data_format: "pkl"    # Data export format: csv, pkl (heatmaps typically use pkl)
+    dpi: 300             # Figure resolution
+
+  # LOF accuracy evaluation parameters
+  lof_evaluation:
+    threshold_range:
+      min: 0.5            # Minimum LOF threshold to test
+      max: 4.0            # Maximum LOF threshold to test
+      step: 0.05           # Step size for threshold testing
+    # Subset of channels to evaluate (e.g., exclude hippocampal channels)
+    evaluation_channels: ["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"]
+    figure_format: "png"  # Figure output format: png, tif, pdf, svg
+    data_format: "csv"    # Data export format: csv, pkl
+    dpi: 300             # Figure resolution
+
+  # Filtering comparison parameters (manual vs LOF channel filtering)
+  filtering_comparison:
+    features_to_compare: ["rms", "logpsdband", "psdslope", "logpsdfrac", "logpsdtotal", "zpcorr", "zcohere", "zimcoh"]
+    plot_types: ["feature_scatter", "channel_impact", "animal_correlation"]
+    # NOTE these features below should be explored later
+    # baseline_type: "manual"  # Use manual filtering as baseline
+    # figure_format: "png"
+    # data_format: "csv"
+    # dpi: 300
+
+  # Figure generation parameters
+  figures:
+    coherecorr_spectral:
+      figsize: [20, 5]
+      score_type: "z"
+    
+    psd_histogram:
+      figsize: [10, 4]
+      avg_channels: true
+      plot_type: "loglog"
+    
+    psd_spectrogram:
+      figsize: [20, 4]
+      mode: "none"
+    
+    # Temporal heatmap parameters - configurable features with individual parameters
+    temporal_heatmaps:
+      features:
+        rms:
+          figsize: [10, 3]
+          cmap: "viridis"
+          norm_type: "fixed"
+          norm_params: 
+            vmin: 50
+            vmax: 300
+        psdslope:
+          figsize: [10, 3] 
+          cmap: "viridis"
+          norm_type: "fixed"
+          norm_params:
+            vmin: -3
+            vmax: 0
+        zpcorr:
+          figsize: [10, 3]
+          cmap: "RdBu_r"
+          norm_type: "centered"
+          norm_params:
+            halfrange: 1.5
+
+# SLURM cluster configuration
+cluster:
+  war_generation:
+    time: "3h"
+    mem_mb: 70_000
+    nodes: 1
+    threads: 10
+    interface: null
+
+  frequency_domain_spike_detection:
+    time: "2h"
+    mem_mb: 40_000
+    nodes: 1
+    threads: 8
+    interface: null
+
+  spike_averaged_traces:
+    time: "1h"
+    mem_mb: 20_000
+    nodes: 1
+    threads: 4
+    interface: null
+
+  war_quality_filter:
+    time: "2h"
+    mem_mb: 4_000
+    nodes: 1
+    threads: 1
+    interface: null
+
+  diagnostic_figures:
+    time: "2h"
+    mem_mb: 30_000
+    nodes: 1
+    threads: 4
+    interface: null
+
+  war_fragment_filter:
+    time: "2h"
+    mem_mb: 30_000
+    nodes: 1
+    threads: 1
+    interface: null
+
+  war_flattening:
+    time: "2h"
+    mem_mb: 30_000
+    nodes: 1
+    threads: 1
+    interface: null
+
+  war_zeitgeber:
+    time: "2h"
+    mem_mb: 300_000
+    nodes: 1
+    threads: 15
+    interface: null
+
+  relfreq_plots:
+    time: "2h"
+    mem_mb: 300_000
+    nodes: 1
+    threads: 15
+    interface: null
+
+  ep_figures:
+    time: "2h"
+    mem_mb: 10_000
+    nodes: 1
+    threads: 4
+    interface: null
+
+  ep_heatmaps:
+    time: "2h"
+    mem_mb: 10_000
+    nodes: 1
+    threads: 4
+    interface: null
+
+  zeitgeber_plots:
+    time: "2h"
+    mem_mb: 20_000
+    nodes: 1
+    threads: 4
+    interface: null
+
+  lof_evaluation:
+    time: "2h"
+    mem_mb: 10_000
+    nodes: 1
+    threads: 4
+    interface: null
+
+  notebook:
+    time: "1h"
+    mem_mb: 20_000
+    nodes: 1
+    threads: 4
+    interface: null
+
+  war_standardize:
+    time: "1h"
+    mem_mb: 20_000
+    nodes: 1
+    threads: 1
+    interface: null
+
+  war_channel_filtering:
+    time: "1h"
+    mem_mb: 20_000
+    nodes: 1
+    threads: 1
+    interface: null
+
+  filtering_comparison:
+    time: "1h"
+    mem_mb: 10_000
+    nodes: 1
+    threads: 4
+    interface: null
+
+# Logging configuration
+logging:
+  level: "DEBUG"
+  format: "%(asctime)s - %(levelname)s - %(message)s"

@@ -97,6 +97,7 @@
         ],
         "012322_cohort4_group6_3mice_FMUT___MMUT_MWT": [
             "FMUT",
+            "FHET",
             "MHET",
             "MMUT"
         ],
@@ -107,6 +108,7 @@
         "031021_cohort 2, group 3 and 4": [
             "#8 Cage 3A",
             "#8 Cage 1A",
+            "#2 Cage 2A",
             "#3 Cage 4A"
         ],
         "031122_cohort5_group1_2mice_FHET_MWT": [
@@ -188,5 +190,112 @@
             "M2",
             "M4"
         ]
+    },
+    "bad_channels": {
+        "010822_cohort4_group2_2mice_MWT_MHET M10": {
+            "M10 MWT Jan-08-2022": ["LHip", "RHip"],
+            "M10 MWT Jan-09-2022": ["LHip", "RHip"]
+        },
+        "010822_cohort4_group2_2mice_MWT_MHET M3": {
+            "M3 MHet Jan-08-2022": ["LMot", "RMot"],
+            "M3 MHet Jan-09-2022": ["LMot", "RMot"],
+            "M3 MHet Jan-10-2022": ["LMot", "RMot"]
+        },
+        "011322_cohort4_group3_4mice_AllM_MT_WT_HET_WT M4": {
+            "M4 MWT Jan-13-2022": ["LHip", "RHip"],
+            "M4 MWT Jan-14-2022": ["LHip", "RHip"],
+            "M4 MWT Jan-15-2022": ["LHip", "RHip"]
+        },
+        "012022_cohort4_group5_3mice__FWT_MMUT_FMUT FMUT": {
+            "FMUT FMut Jan-21-2022": ["LHip", "RHip"],
+            "FMUT FMut Jan-22-2022": ["LHip", "RHip"], 
+            "FMUT FMut Jan-23-2022": ["LHip", "RHip"]
+        },
+        "012022_cohort4_group5_3mice__FWT_MMUT_FMUT FWT": {
+            "FWT FWT Jan-20-2022": ["LHip", "RHip"],
+            "FWT FWT Jan-21-2022": ["LHip", "RHip"],
+            "FWT FWT Jan-22-2022": ["LHip", "RHip"],
+            "FWT FWT Jan-23-2022": ["LHip", "RHip"]
+        },
+        "012022_cohort4_group5_3mice__FWT_MMUT_FMUT MMUT": {
+            "MMUT MMut Jan-21-2022": ["LHip", "RHip"],
+            "MMUT MMut Jan-22-2022": ["LHip", "RHip"]
+        },
+        "012322_cohort4_group6_3mice_FMUT___MMUT_MWT FMUT": {
+            "FMUT FMut Jan-23-2022": ["LHip", "RHip"],
+            "FMUT FMut Jan-24-2022": ["LHip", "RHip"],
+            "FMUT FMut Jan-25-2022": ["LHip", "RHip"],
+            "FMUT FMut Jan-26-2022": ["LHip", "RHip"],
+            "FMUT FMut Jan-27-2022": ["LHip", "RHip"]
+        },
+        "013122_cohort4_group7_2mice both_FHET FHET(1)": {
+            "FHET(1) FHet Feb-01-2022": ["LHip", "RHip"],
+            "FHET(1) FHet Jan-31-2022": ["LHip", "RHip"]
+        },
+        "031021_cohort 2, group 3 and 4 #8 Cage 1A": {
+            "#8 Cage 1A FHet Mar-10-2021": ["LAud", "RAud"],
+            "#8 Cage 1A FHet Mar-11-2021": [],
+            "#8 Cage 1A FHet Mar-12-2021": []
+        },
+        "031021_cohort 2, group 3 and 4 #8 Cage 3A": {
+            "#8 Cage 3A MMut Mar-10-2021": [],
+            "#8 Cage 3A MMut Mar-11-2021": [],
+            "#8 Cage 3A MMut Mar-12-2021": ["LVis", "RVis"]
+        },
+        "031122_cohort5_group1_2mice_FHET_MWT F4": {
+            "F4 FHet Mar-11-2022": ["LHip", "RHip"],
+            "F4 FHet Mar-12-2022": ["LHip", "RHip"],
+            "F4 FHet Mar-13-2022": ["LHip", "RHip"],
+            "F4 FHet Mar-14-2022": ["LHip", "RHip"],
+            "F4 FHet Mar-15-2022": ["LHip", "RHip"],
+            "F4 FHet Mar-17-2022": ["LHip", "RHip"]
+        },
+        "031621_cohort 2 group 2 and group 5 F6": {
+            "F6 FHet Mar-16-2021": ["LAud"],
+            "F6 FHet Mar-17-2021": ["LAud"],
+            "F6 FHet Mar-18-2021": ["LAud"],
+            "F6 FHet Mar-19-2021": ["LAud"]
+        },
+        "011322_cohort4_group3_4mice_AllM_MT_WT_HET_WT M2": {
+            "M2 MWT Jan-14-2022": ["LBar", "LHip", "LVis", "RVis"],
+            "M2 MWT Jan-15-2022": ["LBar", "LHip", "LVis", "RVis"],
+            "M2 MWT Jan-16-2022": ["LBar", "LHip", "LVis", "RVis"]
+        },
+        "011322_cohort4_group3_4mice_AllM_MT_WT_HET_WT M8": {
+            "M8 MHet Jan-14-2022": ["LAud", "RAud", "RHip"],
+            "M8 MHet Jan-15-2022": ["LAud", "RAud", "RHip"],
+            "M8 MHet Jan-16-2022": ["LAud", "RAud", "RHip"]
+        },
+        "011622_cohort4_group4_3mice_MMutOLD_FMUT_FMUT_FWT FMUT(2)": {
+            "FMUT(2) FMut Jan-16-2022": ["LAud", "RAud", "RHip", "LHip"],
+            "FMUT(2) FMut Jan-17-2022": ["LAud", "RAud", "RHip", "LHip"],
+            "FMUT(2) FMut Jan-18-2022": ["LAud", "RAud", "RHip", "LHip"],
+            "FMUT(2) FMut Jan-19-2022": ["LAud", "RAud", "RHip", "LHip"]
+        },
+        "011622_cohort4_group4_3mice_MMutOLD_FMUT_FMUT_FWT FWT": {
+            "FWT FWT Jan-16-2022": ["LAud", "LHip", "LVis", "RAud", "RHip"],
+            "FWT FWT Jan-17-2022": ["LAud", "LHip", "LVis", "RAud", "RHip"],
+            "FWT FWT Jan-18-2022": ["LAud", "LHip", "LVis", "RAud", "RHip"],
+            "FWT FWT Jan-19-2022": ["LAud", "LHip", "LVis", "RAud", "RHip"]
+        },
+        "031122_cohort5_group1_2mice_FHET_MWT M2": {
+            "M2 MWT Mar-11-2022": ["LHip", "RHip", "RAud", "RMot"],
+            "M2 MWT Mar-12-2022": ["LHip", "RHip", "RAud", "RMot"],
+            "M2 MWT Mar-13-2022": ["LHip", "RHip", "RAud", "RMot"],
+            "M2 MWT Mar-14-2022": ["LHip", "RHip", "RAud", "RMot"],
+            "M2 MWT Mar-15-2022": ["LHip", "RHip", "RAud", "RMot"],
+            "M2 MWT Mar-17-2022": ["LHip", "RHip", "RAud", "RMot"]
+        },
+        "031722_cohort_6_group1_3mice_MMUT_MMUT_MWT MMUT(2)": {
+            "MMUT(2) MMut Mar-17-2022": ["LAud", "LHip", "RHip"],
+            "MMUT(2) MMut Mar-19-2022": ["LAud", "LHip", "RHip"],
+            "MMUT(2) MMut Mar-20-2022": ["LAud", "LHip", "RHip"],
+            "MMUT(2) MMut Mar-21-2022": ["LAud", "LHip", "RHip"]
+        },
+        "062122_group 10_2mice_F7Het_F9Mut F9": {
+            "F9 FMut Jun-21-2022": ["LAud", "RMot"],
+            "F9 FMut Jun-29-2022": ["LAud", "RMot"],
+            "F9 FMut Jun-30-2022": ["LAud", "RMot"]
+        }
     }
 }

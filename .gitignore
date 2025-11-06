@@ -4,6 +4,8 @@
 /bins/*
 
 **/test-*/*
+**/test-*.png
+**/test-*.xlsx
 **/wars-*/*
 **/sars-*/*
 !notebooks/tests/test-data/A10*
@@ -27,6 +29,7 @@ dist/
 *.pyc
 slurm-*.out
 **/pipeline-wars/*
+**/eeg_snippets*
 *.ps1
 *.prof
 
@@ -40,4 +43,15 @@ notebooks/tests/test_all_functions_Yong.ipynb
 *.gz
 .DS_Store
 *.dat
+.coverage
+.coverage.*
+coverage.xml
 
+site/
+logs/
+results/
+.snakemake_run_id
+CLAUDE.md
+
+docs/_build/
+**/generated/
