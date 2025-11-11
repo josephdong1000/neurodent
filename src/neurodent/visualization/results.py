@@ -1644,6 +1644,11 @@ class WindowAnalysisResult(AnimalFeatureParser):
         # Average all features across channels
         df_result = self._average_across_channels(df_result, features_to_average)
 
+        # Drop original band/matrix features (now that bands are extracted into separate columns)
+        # These are no longer needed and cannot be aggregated (contain dicts/arrays)
+        features_to_drop = band_features_in_data + matrix_features_in_data
+        df_result = df_result.drop(columns=features_to_drop, errors='ignore')
+
         return df_result
 
     def _extract_band_features(self, df: pd.DataFrame, feature_name: str, band_names: list[str]) -> pd.DataFrame:
