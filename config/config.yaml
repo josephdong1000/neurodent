@@ -118,13 +118,14 @@ analysis:
 
   # Zeitgeber time processing parameters
   zeitgeber:
-    features: ["logpsdband", "logrms", "zpcorr"]  # Features to extract for zeitgeber analysis
+    features: ["logpsdband", "logpsdfrac", "logrms", "zpcorr", "zcohere", "zimcoh"]  # Features to extract for zeitgeber analysis
     time_aggregation_minutes: 60  # Time window for aggregation (60 = hourly)
 
   # Zeitgeber temporal plots parameters
   zeitgeber_plots:
-    features: ["logpsdband", "logrms", "zpcorr"]  # Features to plot in temporal analysis
+    features: ["logpsdband", "logpsdfrac", "logrms", "zpcorr", "zcohere", "zimcoh"]  # Features to plot in temporal analysis
     baseline_hours: 12  # Hours to use for baseline correction (first N hours)
+    exclude_from_baseline: []  # Optional: features to exclude from baseline correction (e.g., ["logrms", "zcohere_delta"])
     figure_format: "png"  # Figure output format: png, tif, pdf, svg
     data_format: "csv"    # Data export format: csv, pkl
     dpi: 300             # Figure resolution

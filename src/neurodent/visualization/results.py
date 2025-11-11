@@ -1547,6 +1547,216 @@ class WindowAnalysisResult(AnimalFeatureParser):
         result_win = result_win.filter(features + multiindex + include)
         return result_win.set_index(multiindex)
 
+    def get_channel_averaged_result(
+        self,
+        features: list[str],
+        exclude: list[str] = [],
+        df: pd.DataFrame = None,
+    ) -> pd.DataFrame:
+        """Get windowed analysis result with features averaged across channels.
+
+        This method collapses the channel dimension for all requested features,
+        converting multi-channel data to scalar values per time window. It handles
+        three types of features differently:
+
+        1. **Linear features** (logrms, rms, etc.): Simple average across channels
+        2. **Band features** (logpsdband, logpsdfrac, etc.): Extracts each frequency
+           band (delta, theta, alpha, beta, gamma) and averages across channels.
+           Creates columns like: logpsdband_delta, logpsdband_theta, etc.
+        3. **Matrix features** (zcohere, zimcoh, cohere, imcoh): Extracts each
+           frequency band's connectivity matrix and averages the upper triangle
+           (excluding diagonal). Creates columns like: zcohere_delta, zcohere_theta, etc.
+
+        Args:
+            features (list[str]): List of feature names to extract and average.
+                Can include any combination of linear, band, or matrix features.
+            exclude (list[str], optional): List of features to exclude. Defaults to [].
+            df (pd.DataFrame, optional): If provided, use this dataframe instead of
+                self.result. Defaults to None.
+
+        Returns:
+            pd.DataFrame: DataFrame with all features averaged to scalars per time window.
+                - Non-feature columns (timestamp, animalday, etc.) are preserved
+                - Band features expanded to 5 columns per feature (one per frequency band)
+                - Matrix features expanded to 5 columns per feature (one per frequency band)
+                - All feature values are scalars (float)
+
+        Example:
+            >>> war = WindowAnalysisResult.load_pickle_and_json(folder_path, "war.pkl", "war_metadata.json")
+            >>> # Get channel-averaged zeitgeber features
+            >>> df = war.get_channel_averaged_result(["logpsdband", "zcohere", "logrms"])
+            >>> print(df.columns)
+            ['timestamp', 'animalday', 'genotype', 'logrms',
+             'logpsdband_delta', 'logpsdband_theta', 'logpsdband_alpha', 'logpsdband_beta', 'logpsdband_gamma',
+             'zcohere_delta', 'zcohere_theta', 'zcohere_alpha', 'zcohere_beta', 'zcohere_gamma']
+            >>> # All feature values are scalars
+            >>> df['logpsdband_delta'].iloc[0]  # Returns a single float
+
+        Note:
+            This method is designed for temporal analyses (like zeitgeber) where you want
+            to analyze feature trends over time without the channel dimension.
+            For analyses that need channel information, use get_result() instead.
+
+        See Also:
+            - get_result(): Get features with full channel information
+            - get_groupavg_result(): Average features across time windows (preserves channels)
+        """
+        from neurodent import constants
+
+        features = _sanitize_feature_request(features, exclude)
+        result_win = self.result if df is None else df
+
+        # Get the base result with requested features
+        df_result = result_win.loc[:, self._nonfeature_columns + features].copy()
+
+        # Classify features by type
+        BAND_NAMES = constants.BAND_NAMES
+        BAND_FEATURES = constants.BAND_FEATURES
+        MATRIX_FEATURES = constants.MATRIX_FEATURES
+        LINEAR_FEATURES = constants.LINEAR_FEATURES
+
+        band_features_in_data = [f for f in features if f in BAND_FEATURES]
+        matrix_features_in_data = [f for f in features if f in MATRIX_FEATURES]
+        simple_features_in_data = [f for f in features if f in LINEAR_FEATURES]
+
+        # Process band features - extract all 5 bands
+        for band_feature in band_features_in_data:
+            if band_feature in df_result.columns:
+                df_result = self._extract_band_features(df_result, band_feature, BAND_NAMES)
+
+        # Process matrix features - extract all 5 bands
+        for matrix_feature in matrix_features_in_data:
+            if matrix_feature in df_result.columns:
+                df_result = self._extract_matrix_features(df_result, matrix_feature, BAND_NAMES)
+
+        # Build list of features to average
+        features_to_average = []
+        features_to_average.extend(simple_features_in_data)
+
+        for band_feature in band_features_in_data:
+            for band in BAND_NAMES:
+                features_to_average.append(f"{band_feature}_{band}")
+
+        for matrix_feature in matrix_features_in_data:
+            for band in BAND_NAMES:
+                features_to_average.append(f"{matrix_feature}_{band}")
+
+        # Average all features across channels
+        df_result = self._average_across_channels(df_result, features_to_average)
+
+        return df_result
+
+    def _extract_band_features(self, df: pd.DataFrame, feature_name: str, band_names: list[str]) -> pd.DataFrame:
+        """Extract individual frequency bands from band features.
+
+        Band features (logpsdband, logpsdfrac, etc.) are stored as dicts with
+        band names as keys and channel arrays as values.
+
+        Args:
+            df: DataFrame containing the band feature
+            feature_name: Name of the band feature column
+            band_names: List of band names to extract
+
+        Returns:
+            DataFrame with new columns for each band (feature_name_bandname format)
+        """
+        import numpy as np
+
+        if feature_name not in df.columns:
+            return df
+
+        # Extract band features into separate columns
+        df_bands = pd.DataFrame(df[feature_name].tolist())
+
+        for band_name in df_bands.columns:
+            if band_name in band_names:
+                band_array = np.stack(df_bands[band_name].values)
+                # Store as list of arrays for subsequent averaging
+                df[f"{feature_name}_{band_name}"] = list(band_array)
+
+        return df
+
+    def _extract_matrix_features(self, df: pd.DataFrame, feature_name: str, band_names: list[str]) -> pd.DataFrame:
+        """Extract individual frequency bands from matrix features.
+
+        Matrix features (zcohere, zimcoh, cohere, imcoh) are stored as 3D arrays
+        with shape (n_channels, n_channels, n_bands).
+
+        Args:
+            df: DataFrame containing the matrix feature
+            feature_name: Name of the matrix feature column
+            band_names: List of band names to extract
+
+        Returns:
+            DataFrame with new columns for each band (feature_name_bandname format)
+        """
+        import numpy as np
+
+        if feature_name not in df.columns:
+            return df
+
+        # Extract each frequency band slice from the 3D matrix
+        for band_idx, band_name in enumerate(band_names):
+            band_matrices = []
+            for matrix_3d in df[feature_name]:
+                if isinstance(matrix_3d, np.ndarray) and matrix_3d.ndim == 3 and matrix_3d.shape[2] > band_idx:
+                    band_matrices.append(matrix_3d[:, :, band_idx])
+                elif isinstance(matrix_3d, np.ndarray) and matrix_3d.ndim == 2:
+                    # Handle 2D matrix case (e.g., pcorr, zpcorr which don't have band dimension)
+                    band_matrices.append(matrix_3d)
+                else:
+                    # Fallback for unexpected shapes
+                    band_matrices.append(np.full((8, 8), np.nan))  # Default 8x8 NaN matrix
+
+            df[f"{feature_name}_{band_name}"] = band_matrices
+
+        return df
+
+    def _average_across_channels(self, df: pd.DataFrame, features: list[str]) -> pd.DataFrame:
+        """Average features across channels to produce scalar values.
+
+        Handles two types of features:
+        - Vector features (1D arrays): Average across channels
+        - Matrix features (2D arrays): Average upper triangle (excluding diagonal)
+
+        Args:
+            df: DataFrame with features as columns
+            features: List of feature column names to average
+
+        Returns:
+            DataFrame with averaged features replacing original arrays
+        """
+        import numpy as np
+
+        for feature in features:
+            if feature not in df.columns:
+                continue
+
+            first_element = df[feature].iloc[0]
+
+            if isinstance(first_element, np.ndarray):
+                if first_element.ndim == 1:
+                    # Vector feature: average across channels
+                    feature_arrays = np.stack(df[feature].values)
+                    feature_avg = np.nanmean(feature_arrays, axis=1)
+                    df[feature] = feature_avg
+
+                elif first_element.ndim == 2:
+                    # Matrix feature: average upper triangle
+                    feature_avg = []
+                    for matrix in df[feature].values:
+                        upper_tri_indices = np.triu_indices_from(matrix, k=1)
+                        upper_tri_values = matrix[upper_tri_indices]
+                        avg_val = np.nanmean(upper_tri_values) if len(upper_tri_values) > 0 else np.nan
+                        feature_avg.append(avg_val)
+                    df[feature] = feature_avg
+
+            elif isinstance(first_element, (int, float, np.number)):
+                # Already a scalar, no averaging needed
+                pass
+
+        return df
+
     def get_filter_logrms_range(self, df: pd.DataFrame = None, z_range=3, **kwargs):
         """Filter windows based on log(rms).
 

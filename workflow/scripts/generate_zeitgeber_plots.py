@@ -53,18 +53,31 @@ def process_zeitgeber_data(df, config):
     
     # Get features from config
     zt_config = config["analysis"]["zeitgeber_plots"]
-    features = zt_config.get("features", ["logpsdband", "logrms", "zpcorr"])
     baseline_hours = zt_config.get("baseline_hours", 12)
-    
-    # Create baseline-corrected versions
-    for feature in features:
-        if feature in df.columns:
-            df[f"{feature}_nobase"] = (
-                df.groupby(["animal", "gene", "sex"])
-                .apply(lambda g: g[feature] - g.loc[(g["total_minutes"] <= baseline_hours * 60), feature].mean())
-                .reset_index(level=[0, 1, 2], drop=True)
-            )
-            logger.info(f"Created baseline-corrected version for {feature}")
+    exclude_from_baseline = zt_config.get("exclude_from_baseline", [])
+
+    # Automatically baseline-correct ALL numeric columns (flexible and extensible)
+    # Exclude: metadata columns, explicitly excluded features, and already baseline-corrected columns
+    metadata_cols = ["timestamp", "animal", "genotype", "hour", "minute", "total_minutes", "sex", "gene"]
+
+    features_to_baseline = [
+        col for col in df.columns
+        if col not in metadata_cols
+        and col not in exclude_from_baseline
+        and not col.endswith("_nobase")  # Don't baseline-correct already baseline-corrected columns
+        and pd.api.types.is_numeric_dtype(df[col])
+    ]
+
+    logger.info(f"Baseline-correcting {len(features_to_baseline)} features over first {baseline_hours} hours")
+
+    # Create baseline-corrected versions for all numeric features
+    for feature in features_to_baseline:
+        df[f"{feature}_nobase"] = (
+            df.groupby(["animal", "gene", "sex"])
+            .apply(lambda g: g[feature] - g.loc[(g["total_minutes"] <= baseline_hours * 60), feature].mean())
+            .reset_index(level=[0, 1, 2], drop=True)
+        )
+        logger.info(f"Created baseline-corrected version for {feature}")
     
     # Create a copy with shifted total_minutes for 48-hour view
     df2 = df.copy()
@@ -93,9 +106,9 @@ def process_zeitgeber_data(df, config):
 
 def create_zeitgeber_plots(df, output_dir, data_dir, zt_config):
     """Create zeitgeber temporal plots using seaborn objects"""
-    
+
     logger = logging.getLogger(__name__)
-    
+
     # Get format parameters from config
     figure_format = zt_config.get("figure_format", "png")
     data_format = zt_config.get("data_format", "csv")
@@ -106,7 +119,7 @@ def create_zeitgeber_plots(df, output_dir, data_dir, zt_config):
     feature_to_label = {
         'logrms': "Log(RMS)",
         'alphadelta': "Alpha/Delta ratio",
-        'delta': "Log Delta band power", 
+        'delta': "Log Delta band power",
         'alpha': "Log Alpha band power",
         'logpsdband': "Log Band Power",
         'zpcorr': "Z-transformed PCC",
@@ -117,6 +130,17 @@ def create_zeitgeber_plots(df, output_dir, data_dir, zt_config):
         'logpsdband_nobase': "Log Band Power - Baseline",
         'zpcorr_nobase': "Z-transformed PCC - Baseline",
     }
+
+    # Add band-specific labels for logpsdband and logpsdfrac
+    for band in ["delta", "theta", "alpha", "beta", "gamma"]:
+        feature_to_label[f"logpsdband_{band}"] = f"Log Power - {band.capitalize()} band"
+        feature_to_label[f"logpsdband_{band}_nobase"] = f"Log Power - {band.capitalize()} band - Baseline"
+        feature_to_label[f"logpsdfrac_{band}"] = f"Log Power Fraction - {band.capitalize()} band"
+        feature_to_label[f"logpsdfrac_{band}_nobase"] = f"Log Power Fraction - {band.capitalize()} band - Baseline"
+        feature_to_label[f"zcohere_{band}"] = f"Z-Coherence - {band.capitalize()} band"
+        feature_to_label[f"zcohere_{band}_nobase"] = f"Z-Coherence - {band.capitalize()} band - Baseline"
+        feature_to_label[f"zimcoh_{band}"] = f"Z-ImCoh - {band.capitalize()} band"
+        feature_to_label[f"zimcoh_{band}_nobase"] = f"Z-ImCoh - {band.capitalize()} band - Baseline"
     
     # Get available features from dataframe
     available_features = [col for col in df.columns 

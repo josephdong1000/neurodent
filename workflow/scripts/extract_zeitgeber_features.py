@@ -15,7 +15,6 @@ import sys
 from pathlib import Path
 from multiprocessing import Pool
 from tqdm import tqdm
-import numpy as np
 import pandas as pd
 
 from neurodent import visualization
@@ -25,13 +24,13 @@ logger = logging.getLogger(__name__)
 
 def load_war_for_zeitgeber(war_path_info):
     """
-    Load a fragment-filtered WAR and extract features for zeitgeber analysis
+    Load a fragment-filtered WAR and extract channel-averaged features for zeitgeber analysis
 
     Args:
         war_path_info: Tuple of (war_pkl_path, war_json_path, features_to_extract, animal_name)
 
     Returns:
-        pd.DataFrame: Processed dataframe with zeitgeber features, or None if failed
+        pd.DataFrame: Processed dataframe with channel-averaged zeitgeber features, or None if failed
     """
     war_pkl_path, war_json_path, features_to_extract, animal_name = war_path_info
 
@@ -45,8 +44,9 @@ def load_war_for_zeitgeber(war_path_info):
 
         # Channel standardization already done in fragment filtering step
 
-        # Extract features for zeitgeber analysis
-        df = war.get_result(features=features_to_extract)
+        # Extract features for zeitgeber analysis WITH CHANNEL AVERAGING
+        # This single method call replaces all the band extraction and averaging logic
+        df = war.get_channel_averaged_result(features=features_to_extract)
         df["animal"] = animal_name
 
         # Clean up memory
@@ -57,40 +57,6 @@ def load_war_for_zeitgeber(war_path_info):
     except Exception as e:
         logger.error(f"Failed to process {animal_name}: {str(e)}")
         raise
-
-
-def process_alphadelta_features(df):
-    """
-    Process logpsdband features to create alphadelta ratio
-    (Implementation from pipeline-alphadelta.py)
-    """
-    logger.info("Processing alphadelta features")
-
-    # Extract band features - exactly as in pipeline-alphadelta.py
-    df_bands = pd.DataFrame(df["logpsdband"].tolist())
-    alpha_array = np.stack(df_bands["alpha"].values)
-    delta_array = np.stack(df_bands["delta"].values)
-    df["alphadelta"] = (alpha_array / delta_array).tolist()
-    df["delta"] = (delta_array).tolist()  # Note: matches original with extra parentheses
-    df["alpha"] = (alpha_array).tolist()
-
-    return df
-
-
-def average_features_across_channels(df, features):
-    """
-    Average each feature across channels
-    (Implementation from pipeline-alphadelta.py)
-    """
-    logger.info("Averaging features across channels")
-
-    for feature in features:
-        if feature in df.columns:
-            feature_arrays = np.stack(df[feature].values)  # Shape: (time_points, channels)
-            feature_avg = np.nanmean(feature_arrays, axis=1)  # Average across channels
-            df[f"{feature}"] = feature_avg
-
-    return df
 
 
 def convert_to_zeitgeber_time(df):
@@ -194,37 +160,26 @@ def main():
 
     logger.info(f"Successfully processed {len(dfs)} WARs")
 
-    # Concatenate all dataframes
+    # Concatenate all dataframes (already channel-averaged by get_channel_averaged_result())
     df = pd.concat(dfs, ignore_index=True)
     logger.info(f"Combined dataframe shape: {df.shape}")
-
-    # Process alphadelta features if logpsdband is in features
-    if "logpsdband" in features_to_extract:
-        df = process_alphadelta_features(df)
-
-    # Define features to average across channels
-    features_to_average = []
-    if "logpsdband" in features_to_extract:
-        features_to_average.extend(["alphadelta", "delta", "alpha"])
-    if "logrms" in features_to_extract:
-        features_to_average.append("logrms")
-    if "zpcorr" in features_to_extract:
-        features_to_average.append("zpcorr")
-
-    # Average features across channels
-    df = average_features_across_channels(df, features_to_average)
 
     # Convert to zeitgeber time
     df = convert_to_zeitgeber_time(df)
 
-    # Select final columns (following alphadelta pipeline)
-    final_columns = ["timestamp", "animal", "genotype", "hour", "minute", "total_minutes"]
-    final_columns.extend(features_to_average)
+    # Identify feature columns (exclude metadata)
+    metadata_cols = ["timestamp", "animal", "genotype", "hour", "minute", "total_minutes"]
+    feature_cols = [col for col in df.columns if col not in metadata_cols]
+
+    logger.info(f"Found {len(feature_cols)} feature columns: {feature_cols[:10]}{'...' if len(feature_cols) > 10 else ''}")
+
+    # Select final columns
+    final_columns = metadata_cols + feature_cols
     df = df[final_columns]
 
     # Aggregate by time windows (following alphadelta pipeline)
     logger.info("Aggregating by time windows")
-    agg_dict = {feature: "mean" for feature in features_to_average}
+    agg_dict = {feature: "mean" for feature in feature_cols}
     df = df.groupby(["animal", "genotype", "total_minutes"]).agg(agg_dict).reset_index()
 
     logger.info(f"Final aggregated dataframe shape: {df.shape}")
