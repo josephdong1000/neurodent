@@ -28,6 +28,8 @@ rule make_fdsar_diagnostics:
         config=config,
         fdsar_dir="results/fdsars/{animal}",
     threads: config["cluster"]["spike_averaged_traces"]["threads"]
+    retries:
+        config["cluster"]["spike_averaged_traces"]["retries"]
     resources:
         time=config["cluster"]["spike_averaged_traces"]["time"],
         mem_mb=increment_memory(config["cluster"]["spike_averaged_traces"]["mem_mb"]),

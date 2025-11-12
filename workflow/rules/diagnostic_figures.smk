@@ -24,7 +24,8 @@ rule make_diagnostic_figures_unfiltered:
         samples_config=samples_config,
         config=config,
     threads: config["cluster"]["diagnostic_figures"]["threads"]
-    retries: 1
+    retries:
+        config["cluster"]["diagnostic_figures"]["retries"]
     resources:
         time=config["cluster"]["diagnostic_figures"]["time"],
         mem_mb=increment_memory(config["cluster"]["diagnostic_figures"]["mem_mb"]),
@@ -52,7 +53,8 @@ rule make_diagnostic_figures_filtered:
         samples_config=samples_config,
         config=config,
     threads: config["cluster"]["diagnostic_figures"]["threads"]
-    retries: 1
+    retries:
+        config["cluster"]["diagnostic_figures"]["retries"]
     resources:
         time=config["cluster"]["diagnostic_figures"]["time"],
         mem_mb=increment_memory(config["cluster"]["diagnostic_figures"]["mem_mb"]),

@@ -20,6 +20,8 @@ checkpoint war_fragment_filter:
         war_json="results/wars_fragment_filtered/{animal}/war.json",
     threads:
         config["cluster"]["war_fragment_filter"]["threads"]
+    retries:
+        config["cluster"]["war_fragment_filter"]["retries"]
     params:
         config=config,
         samples_config=samples_config,

@@ -19,6 +19,8 @@ rule war_standardize:
         war_pkl="results/wars_standardized/{animal}/war.pkl",
         war_json="results/wars_standardized/{animal}/war.json",
     threads: 1
+    retries:
+        config["cluster"]["war_standardize"]["retries"]
     params:
         config=config,
         samples_config=samples_config,

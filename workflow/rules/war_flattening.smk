@@ -18,6 +18,8 @@ checkpoint flatten_wars:
         war_pkl="results/wars_flattened/{animal}/war.pkl",
         war_json="results/wars_flattened/{animal}/war.json",
     threads: config["cluster"]["war_flattening"]["threads"]
+    retries:
+        config["cluster"]["war_flattening"]["retries"]
     params:
         samples_config=samples_config,
         config=config,
@@ -42,6 +44,8 @@ rule flatten_wars_manual:
         war_pkl="results/wars_flattened_manual/{animal}/war.pkl",
         war_json="results/wars_flattened_manual/{animal}/war.json",
     threads: config["cluster"]["war_flattening"]["threads"]
+    retries:
+        config["cluster"]["war_flattening"]["retries"]
     params:
         samples_config=samples_config,
         config=config,
@@ -66,6 +70,8 @@ rule flatten_wars_lof:
         war_pkl="results/wars_flattened_lof/{animal}/war.pkl",
         war_json="results/wars_flattened_lof/{animal}/war.json",
     threads: config["cluster"]["war_flattening"]["threads"]
+    retries:
+        config["cluster"]["war_flattening"]["retries"]
     params:
         samples_config=samples_config,
         config=config,

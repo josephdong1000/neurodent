@@ -26,7 +26,8 @@ rule generate_relfreq_plots:
         config=config,
     threads:
         config["cluster"]["relfreq_plots"]["threads"]
-    retries: 1
+    retries:
+        config["cluster"]["relfreq_plots"]["retries"]
     resources:
         time=config["cluster"]["relfreq_plots"]["time"],
         mem_mb=increment_memory(config["cluster"]["relfreq_plots"]["mem_mb"]),

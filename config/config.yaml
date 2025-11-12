@@ -224,6 +224,7 @@ cluster:
     nodes: 1
     threads: 10
     interface: null
+    retries: 2
 
   frequency_domain_spike_detection:
     time: "2h"
@@ -231,6 +232,7 @@ cluster:
     nodes: 1
     threads: 8
     interface: null
+    retries: 2
 
   spike_averaged_traces:
     time: "1h"
@@ -238,6 +240,7 @@ cluster:
     nodes: 1
     threads: 4
     interface: null
+    retries: 2
 
   war_quality_filter:
     time: "2h"
@@ -245,6 +248,7 @@ cluster:
     nodes: 1
     threads: 1
     interface: null
+    retries: 0
 
   diagnostic_figures:
     time: "2h"
@@ -252,6 +256,7 @@ cluster:
     nodes: 1
     threads: 4
     interface: null
+    retries: 1
 
   war_fragment_filter:
     time: "2h"
@@ -259,6 +264,7 @@ cluster:
     nodes: 1
     threads: 1
     interface: null
+    retries: 2
 
   war_flattening:
     time: "2h"
@@ -266,6 +272,7 @@ cluster:
     nodes: 1
     threads: 1
     interface: null
+    retries: 2
 
   war_zeitgeber:
     time: "2h"
@@ -273,6 +280,7 @@ cluster:
     nodes: 1
     threads: 15
     interface: null
+    retries: 0
 
   relfreq_plots:
     time: "2h"
@@ -280,6 +288,7 @@ cluster:
     nodes: 1
     threads: 15
     interface: null
+    retries: 1
 
   ep_figures:
     time: "2h"
@@ -287,6 +296,7 @@ cluster:
     nodes: 1
     threads: 4
     interface: null
+    retries: 0
 
   ep_heatmaps:
     time: "2h"
@@ -294,6 +304,7 @@ cluster:
     nodes: 1
     threads: 4
     interface: null
+    retries: 0
 
   zeitgeber_plots:
     time: "2h"
@@ -301,6 +312,7 @@ cluster:
     nodes: 1
     threads: 4
     interface: null
+    retries: 2
 
   lof_evaluation:
     time: "2h"
@@ -308,6 +320,7 @@ cluster:
     nodes: 1
     threads: 4
     interface: null
+    retries: 0
 
   notebook:
     time: "1h"
@@ -315,6 +328,7 @@ cluster:
     nodes: 1
     threads: 4
     interface: null
+    retries: 1
 
   war_standardize:
     time: "1h"
@@ -322,6 +336,7 @@ cluster:
     nodes: 1
     threads: 1
     interface: null
+    retries: 2
 
   war_channel_filtering:
     time: "1h"
@@ -329,6 +344,7 @@ cluster:
     nodes: 1
     threads: 1
     interface: null
+    retries: 2
 
   filtering_comparison:
     time: "1h"
@@ -336,6 +352,7 @@ cluster:
     nodes: 1
     threads: 4
     interface: null
+    retries: 0
 
 # Logging configuration
 logging:

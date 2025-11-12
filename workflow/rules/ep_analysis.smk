@@ -22,7 +22,8 @@ rule generate_ep_figures:
         config=config,
     threads:
         config["cluster"]["ep_figures"]["threads"]
-    retries: 0
+    retries:
+        config["cluster"]["ep_figures"]["retries"]
     resources:
         time=config["cluster"]["ep_figures"]["time"],
         mem_mb=increment_memory(config["cluster"]["ep_figures"]["mem_mb"]),
@@ -49,7 +50,8 @@ rule generate_ep_heatmaps:
         config=config,
     threads:
         config["cluster"]["ep_heatmaps"]["threads"]
-    retries: 0
+    retries:
+        config["cluster"]["ep_heatmaps"]["retries"]
     resources:
         time=config["cluster"]["ep_heatmaps"]["time"],
         mem_mb=increment_memory(config["cluster"]["ep_heatmaps"]["mem_mb"]),

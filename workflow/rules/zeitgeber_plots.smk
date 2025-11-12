@@ -21,6 +21,8 @@ rule generate_zeitgeber_plots:
         config=config,
     threads:
         config["cluster"]["zeitgeber_plots"]["threads"]
+    retries:
+        config["cluster"]["zeitgeber_plots"]["retries"]
     resources:
         time=config["cluster"]["zeitgeber_plots"]["time"],
         mem_mb=increment_memory(config["cluster"]["zeitgeber_plots"]["mem_mb"]),

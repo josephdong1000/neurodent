@@ -24,7 +24,8 @@ rule war_explorer_notebook:
         # Log file for notebook execution
         "logs/notebooks/war_data_explorer.log"
     threads: config["cluster"]["notebook"]["threads"]
-    retries: 1
+    retries:
+        config["cluster"]["notebook"]["retries"]
     params:
         # Pass configuration for resource allocation
         config=config,
