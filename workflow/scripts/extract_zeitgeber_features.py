@@ -167,22 +167,52 @@ def main():
     # Convert to zeitgeber time
     df = convert_to_zeitgeber_time(df)
 
-    # Identify feature columns (exclude metadata)
-    metadata_cols = ["timestamp", "animal", "genotype", "hour", "minute", "total_minutes"]
+    # Identify feature columns (exclude ALL metadata)
+    # Metadata comes from WAR._nonfeature_columns and zeitgeber-specific columns
+    metadata_cols = [
+        "timestamp",
+        "animal",
+        "genotype",  # Base identifiers
+        "animalday",
+        "day",
+        "duration",
+        "endfile",
+        "isday",  # WAR metadata columns
+        "hour",
+        "minute",
+        "total_minutes",  # Zeitgeber time columns
+    ]
     feature_cols = [col for col in df.columns if col not in metadata_cols]
 
-    logger.info(f"Found {len(feature_cols)} feature columns: {feature_cols[:10]}{'...' if len(feature_cols) > 10 else ''}")
+    logger.info(f"Total columns: {len(df.columns)}")
+    logger.info(f"Metadata columns ({len(metadata_cols)}): {metadata_cols}")
+    logger.info(f"Feature columns ({len(feature_cols)}): {feature_cols}")
 
-    # Select final columns
-    final_columns = metadata_cols + feature_cols
+    # Log column dtypes to catch any non-numeric issues
+    logger.info("Column dtypes before aggregation:")
+    for col in feature_cols:
+        if col in df.columns:
+            logger.info(f"  {col}: {df[col].dtype}")
+
+    # Select final columns (only keep those that exist in dataframe)
+    final_columns = [col for col in metadata_cols + feature_cols if col in df.columns]
     df = df[final_columns]
 
     # Aggregate by time windows (following alphadelta pipeline)
     logger.info("Aggregating by time windows")
     agg_dict = {feature: "mean" for feature in feature_cols}
-    df = df.groupby(["animal", "genotype", "total_minutes"]).agg(agg_dict).reset_index()
 
-    logger.info(f"Final aggregated dataframe shape: {df.shape}")
+    try:
+        df = df.groupby(["animal", "genotype", "total_minutes"]).agg(agg_dict).reset_index()
+        logger.info(f"✓ Aggregation successful! Aggregated dataframe shape: {df.shape}")
+    except Exception as e:
+        logger.error(f"✗ Aggregation failed with error: {str(e)}")
+        logger.error(f"Feature columns being aggregated: {feature_cols}")
+        logger.error("Sample values from first row:")
+        for col in feature_cols:
+            if col in df.columns:
+                logger.error(f"  {col}: {df[col].iloc[0]} (type: {type(df[col].iloc[0])})")
+        raise
 
     # Create output directory
     output_dir = Path(output_pkl).parent
