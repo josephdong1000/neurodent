@@ -11,7 +11,7 @@ class TestChannelAveraging:
     def test_extract_band_features(self, mock_war_with_bands):
         """Test that band features are properly extracted into separate columns"""
         war = mock_war_with_bands
-        df = war.get_windowed_result()
+        df = war.result.copy()
 
         # Call private method for testing
         df_extracted = war._extract_band_features(df, 'logpsdband', constants.BAND_NAMES)
@@ -31,7 +31,7 @@ class TestChannelAveraging:
     def test_extract_matrix_features(self, mock_war_with_matrices):
         """Test that matrix features are properly extracted into per-band columns"""
         war = mock_war_with_matrices
-        df = war.get_windowed_result()
+        df = war.result.copy()
 
         # Call private method for testing
         df_extracted = war._extract_matrix_features(df, 'zcohere', constants.BAND_NAMES)
@@ -51,7 +51,7 @@ class TestChannelAveraging:
     def test_average_across_channels_linear(self, mock_war_with_linear):
         """Test that linear features are averaged to scalars"""
         war = mock_war_with_linear
-        df = war.get_windowed_result()
+        df = war.result.copy()
 
         # Before averaging: logrms should be arrays
         assert isinstance(df['logrms'].iloc[0], np.ndarray)
@@ -66,7 +66,7 @@ class TestChannelAveraging:
     def test_average_across_channels_matrix(self, mock_war_with_simple_matrix):
         """Test that matrix features are averaged using upper triangle"""
         war = mock_war_with_simple_matrix
-        df = war.get_windowed_result()
+        df = war.result.copy()
 
         # Before averaging: zpcorr should be 2D arrays
         assert isinstance(df['zpcorr'].iloc[0], np.ndarray)
@@ -88,10 +88,12 @@ class TestChannelAveraging:
         df = war.get_channel_averaged_result(features=features)
 
         # Check that all expected columns exist
+        # Note: zpcorr is a 2D matrix feature, so it gets expanded into band columns
         expected_cols = [
-            'timestamp', 'genotype',  # Metadata
+            'timestamp', 'genotype', 'animalday',  # Metadata
             'logrms',  # Linear feature
-            'zpcorr',  # Matrix feature (non-banded)
+            # Matrix feature (non-banded) gets expanded to bands
+            'zpcorr_delta', 'zpcorr_theta', 'zpcorr_alpha', 'zpcorr_beta', 'zpcorr_gamma',
             # Band features expanded
             'logpsdband_delta', 'logpsdband_theta', 'logpsdband_alpha', 'logpsdband_beta', 'logpsdband_gamma',
             # Matrix band features expanded
@@ -103,7 +105,7 @@ class TestChannelAveraging:
             assert col in df.columns, f"Expected column {col} not found"
 
         # Check that all feature values are scalars
-        feature_cols = [col for col in df.columns if col not in ['timestamp', 'genotype']]
+        feature_cols = [col for col in df.columns if col not in ['timestamp', 'genotype', 'animalday']]
         for col in feature_cols:
             first_val = df[col].iloc[0]
             assert isinstance(first_val, (int, float, np.number)), \
@@ -131,48 +133,373 @@ class TestChannelAveraging:
         """Test that requesting missing features is handled gracefully"""
         war = mock_war_with_linear
 
-        # Request a feature that doesn't exist
-        features = ['logrms', 'nonexistent_feature']
+        # Request a feature that exists (logrms) and one that's not in the WAR (zpcorr)
+        # zpcorr is a valid feature name, but not present in mock_war_with_linear
+        features = ['logrms', 'zpcorr']
 
         # Should not raise an error, just skip the missing feature
         df = war.get_channel_averaged_result(features=features)
 
         assert 'logrms' in df.columns
-        assert 'nonexistent_feature' not in df.columns
+        # zpcorr bands should not be present since zpcorr wasn't in the data
+        assert 'zpcorr_delta' not in df.columns
+
+    def test_list_format_linear_features(self, mock_war_with_linear_lists):
+        """Test that linear features stored as lists are converted to arrays"""
+        war = mock_war_with_linear_lists
+        df = war.result.copy()
+
+        # Before averaging: logrms should be lists
+        assert isinstance(df['logrms'].iloc[0], list)
+
+        # Call channel averaging - should convert lists to arrays automatically
+        df_averaged = war.get_channel_averaged_result(features=['logrms'])
+
+        # After averaging: logrms should be scalars (not lists or arrays)
+        assert isinstance(df_averaged['logrms'].iloc[0], (int, float, np.number))
+        assert not isinstance(df_averaged['logrms'].iloc[0], (np.ndarray, list))
+
+    def test_list_format_matrix_features(self, mock_war_with_matrix_lists):
+        """Test that matrix features stored as lists are converted to arrays"""
+        war = mock_war_with_matrix_lists
+        df = war.result.copy()
+
+        # Before averaging: zpcorr should be lists (legacy format)
+        first_val = df['zpcorr'].iloc[0]
+        assert isinstance(first_val, list)
+
+        # Call channel averaging - should handle list format
+        df_averaged = war.get_channel_averaged_result(features=['zpcorr'])
+
+        # After averaging: all band columns should exist with scalars
+        for band in constants.BAND_NAMES:
+            col_name = f'zpcorr_{band}'
+            assert col_name in df_averaged.columns, f"Expected column {col_name}"
+            assert isinstance(df_averaged[col_name].iloc[0], (int, float, np.number))
+            assert not isinstance(df_averaged[col_name].iloc[0], (np.ndarray, list))
+
+    def test_dict_with_list_matrix_features(self, mock_war_with_matrix_dict_lists):
+        """Test that banded matrix features with dicts containing lists are handled (THE REAL BUG)"""
+        war = mock_war_with_matrix_dict_lists
+        df = war.result.copy()
+
+        # Before averaging: zcohere/zimcoh should be dicts with lists inside
+        first_zcohere = df['zcohere'].iloc[0]
+        first_zimcoh = df['zimcoh'].iloc[0]
+        assert isinstance(first_zcohere, dict)
+        assert isinstance(first_zimcoh, dict)
+        # Check that the values inside the dict are lists, not numpy arrays
+        assert isinstance(first_zcohere['delta'], list)
+        assert isinstance(first_zimcoh['delta'], list)
+
+        # Call channel averaging - should convert lists inside dicts to arrays
+        df_averaged = war.get_channel_averaged_result(features=['zcohere', 'zimcoh'])
+
+        # After averaging: all band columns should exist with non-NaN scalars
+        for band in constants.BAND_NAMES:
+            zcohere_col = f'zcohere_{band}'
+            zimcoh_col = f'zimcoh_{band}'
+
+            assert zcohere_col in df_averaged.columns, f"Expected column {zcohere_col}"
+            assert zimcoh_col in df_averaged.columns, f"Expected column {zimcoh_col}"
+
+            # Check values are scalars and NOT NaN (this was the bug!)
+            zcohere_val = df_averaged[zcohere_col].iloc[0]
+            zimcoh_val = df_averaged[zimcoh_col].iloc[0]
+
+            assert isinstance(zcohere_val, (int, float, np.number)), f"{zcohere_col} should be scalar"
+            assert isinstance(zimcoh_val, (int, float, np.number)), f"{zimcoh_col} should be scalar"
+            assert not isinstance(zcohere_val, (np.ndarray, list)), f"{zcohere_col} should not be array/list"
+            assert not isinstance(zimcoh_val, (np.ndarray, list)), f"{zimcoh_col} should not be array/list"
+
+            # Most importantly: values should NOT be NaN
+            assert not np.isnan(zcohere_val), f"{zcohere_col} should not be NaN"
+            assert not np.isnan(zimcoh_val), f"{zimcoh_col} should not be NaN"
 
 
 # Pytest fixtures to create mock WARs for testing
 @pytest.fixture
 def mock_war_with_bands():
     """Create a mock WAR with band features (logpsdband)"""
-    # TODO: Implement mock WAR creation
-    # This would require creating a minimal WindowAnalysisResult object
-    # with synthetic data for testing
-    pytest.skip("Mock WAR creation not yet implemented")
+    n_windows = 10
+    n_channels = 8
+
+    # Band features are stored as dicts: {'delta': array, 'theta': array, ...}
+    band_data = []
+    for i in range(n_windows):
+        band_dict = {
+            band: np.random.randn(n_channels) for band in constants.BAND_NAMES
+        }
+        band_data.append(band_dict)
+
+    data = {
+        'timestamp': pd.date_range('2025-01-01', periods=n_windows, freq='4s'),
+        'genotype': ['WT'] * n_windows,
+        'animalday': ['A001_1'] * n_windows,
+        'logpsdband': band_data,
+    }
+
+    df = pd.DataFrame(data)
+
+    war = visualization.WindowAnalysisResult(
+        result=df,
+        animal_id='A001',
+        genotype='WT',
+        channel_names=['LMot', 'RMot', 'LBar', 'RBar', 'LAud', 'RAud', 'LVis', 'RVis'],
+        assume_from_number=True,
+        bad_channels_dict={},
+        suppress_short_interval_error=True,
+        lof_scores_dict={}
+    )
+    return war
 
 
 @pytest.fixture
 def mock_war_with_matrices():
-    """Create a mock WAR with matrix band features (zcohere)"""
-    pytest.skip("Mock WAR creation not yet implemented")
+    """Create a mock WAR with matrix band features (zcohere as dict)"""
+    n_windows = 10
+    n_channels = 8
+
+    # Matrix band features are stored as dicts: {'delta': 2D_array, 'theta': 2D_array, ...}
+    matrix_data = []
+    for i in range(n_windows):
+        matrix_dict = {
+            band: np.random.randn(n_channels, n_channels) for band in constants.BAND_NAMES
+        }
+        matrix_data.append(matrix_dict)
+
+    data = {
+        'timestamp': pd.date_range('2025-01-01', periods=n_windows, freq='4s'),
+        'genotype': ['WT'] * n_windows,
+        'animalday': ['A001_1'] * n_windows,
+        'zcohere': matrix_data,
+    }
+
+    df = pd.DataFrame(data)
+
+    war = visualization.WindowAnalysisResult(
+        result=df,
+        animal_id='A001',
+        genotype='WT',
+        channel_names=['LMot', 'RMot', 'LBar', 'RBar', 'LAud', 'RAud', 'LVis', 'RVis'],
+        assume_from_number=True,
+        bad_channels_dict={},
+        suppress_short_interval_error=True,
+        lof_scores_dict={}
+    )
+    return war
 
 
 @pytest.fixture
 def mock_war_with_linear():
     """Create a mock WAR with linear features (logrms)"""
-    pytest.skip("Mock WAR creation not yet implemented")
+    n_windows = 10
+    n_channels = 8
+
+    data = {
+        'timestamp': pd.date_range('2025-01-01', periods=n_windows, freq='4s'),
+        'genotype': ['WT'] * n_windows,
+        'animalday': ['A001_1'] * n_windows,
+        'logrms': [np.random.randn(n_channels) for _ in range(n_windows)],
+    }
+
+    df = pd.DataFrame(data)
+
+    war = visualization.WindowAnalysisResult(
+        result=df,
+        animal_id='A001',
+        genotype='WT',
+        channel_names=['LMot', 'RMot', 'LBar', 'RBar', 'LAud', 'RAud', 'LVis', 'RVis'],
+        assume_from_number=True,
+        bad_channels_dict={},
+        suppress_short_interval_error=True,
+        lof_scores_dict={}
+    )
+    return war
 
 
 @pytest.fixture
 def mock_war_with_simple_matrix():
-    """Create a mock WAR with non-banded matrix features (zpcorr)"""
-    pytest.skip("Mock WAR creation not yet implemented")
+    """Create a mock WAR with non-banded matrix features (zpcorr as 2D array)"""
+    n_windows = 10
+    n_channels = 8
+
+    data = {
+        'timestamp': pd.date_range('2025-01-01', periods=n_windows, freq='4s'),
+        'genotype': ['WT'] * n_windows,
+        'animalday': ['A001_1'] * n_windows,
+        'zpcorr': [np.random.randn(n_channels, n_channels) for _ in range(n_windows)],
+    }
+
+    df = pd.DataFrame(data)
+
+    war = visualization.WindowAnalysisResult(
+        result=df,
+        animal_id='A001',
+        genotype='WT',
+        channel_names=['LMot', 'RMot', 'LBar', 'RBar', 'LAud', 'RAud', 'LVis', 'RVis'],
+        assume_from_number=True,
+        bad_channels_dict={},
+        suppress_short_interval_error=True,
+        lof_scores_dict={}
+    )
+    return war
 
 
 @pytest.fixture
 def mock_war_full():
     """Create a mock WAR with all feature types"""
-    pytest.skip("Mock WAR creation not yet implemented")
+    n_windows = 10
+    n_channels = 8
+
+    # Band features (dict format)
+    band_data = []
+    for i in range(n_windows):
+        band_dict = {
+            band: np.random.randn(n_channels) for band in constants.BAND_NAMES
+        }
+        band_data.append(band_dict)
+
+    # Matrix band features (dict format)
+    matrix_data_zcohere = []
+    matrix_data_zimcoh = []
+    for i in range(n_windows):
+        matrix_dict_zcohere = {
+            band: np.random.randn(n_channels, n_channels) for band in constants.BAND_NAMES
+        }
+        matrix_dict_zimcoh = {
+            band: np.random.randn(n_channels, n_channels) for band in constants.BAND_NAMES
+        }
+        matrix_data_zcohere.append(matrix_dict_zcohere)
+        matrix_data_zimcoh.append(matrix_dict_zimcoh)
+
+    data = {
+        'timestamp': pd.date_range('2025-01-01', periods=n_windows, freq='4s'),
+        'genotype': ['WT'] * n_windows,
+        'animalday': ['A001_1'] * n_windows,
+        'logrms': [np.random.randn(n_channels) for _ in range(n_windows)],
+        'logpsdband': band_data,
+        'zpcorr': [np.random.randn(n_channels, n_channels) for _ in range(n_windows)],
+        'zcohere': matrix_data_zcohere,
+        'zimcoh': matrix_data_zimcoh,
+    }
+
+    df = pd.DataFrame(data)
+
+    war = visualization.WindowAnalysisResult(
+        result=df,
+        animal_id='A001',
+        genotype='WT',
+        channel_names=['LMot', 'RMot', 'LBar', 'RBar', 'LAud', 'RAud', 'LVis', 'RVis'],
+        assume_from_number=True,
+        bad_channels_dict={},
+        suppress_short_interval_error=True,
+        lof_scores_dict={}
+    )
+    return war
+
+
+@pytest.fixture
+def mock_war_with_linear_lists():
+    """Create a mock WAR with linear features stored as lists (legacy format)"""
+    n_windows = 10
+    n_channels = 8
+
+    data = {
+        'timestamp': pd.date_range('2025-01-01', periods=n_windows, freq='4s'),
+        'genotype': ['WT'] * n_windows,
+        'animalday': ['A001_1'] * n_windows,
+        # Store as Python lists instead of numpy arrays (legacy format)
+        'logrms': [list(np.random.randn(n_channels)) for _ in range(n_windows)],
+    }
+
+    df = pd.DataFrame(data)
+
+    war = visualization.WindowAnalysisResult(
+        result=df,
+        animal_id='A001',
+        genotype='WT',
+        channel_names=['LMot', 'RMot', 'LBar', 'RBar', 'LAud', 'RAud', 'LVis', 'RVis'],
+        assume_from_number=True,
+        bad_channels_dict={},
+        suppress_short_interval_error=True,
+        lof_scores_dict={}
+    )
+    return war
+
+
+@pytest.fixture
+def mock_war_with_matrix_lists():
+    """Create a mock WAR with matrix features stored as nested lists (legacy format)"""
+    n_windows = 10
+    n_channels = 8
+
+    data = {
+        'timestamp': pd.date_range('2025-01-01', periods=n_windows, freq='4s'),
+        'genotype': ['WT'] * n_windows,
+        'animalday': ['A001_1'] * n_windows,
+        # Store as nested Python lists instead of numpy arrays (legacy format)
+        'zpcorr': [[list(row) for row in np.random.randn(n_channels, n_channels)] for _ in range(n_windows)],
+    }
+
+    df = pd.DataFrame(data)
+
+    war = visualization.WindowAnalysisResult(
+        result=df,
+        animal_id='A001',
+        genotype='WT',
+        channel_names=['LMot', 'RMot', 'LBar', 'RBar', 'LAud', 'RAud', 'LVis', 'RVis'],
+        assume_from_number=True,
+        bad_channels_dict={},
+        suppress_short_interval_error=True,
+        lof_scores_dict={}
+    )
+    return war
+
+
+@pytest.fixture
+def mock_war_with_matrix_dict_lists():
+    """Create a mock WAR with banded matrix features as dicts containing lists (real legacy format)"""
+    n_windows = 10
+    n_channels = 8
+
+    # Create matrix data as dicts with LISTS inside (not numpy arrays)
+    # This mimics the actual format in real WAR files that causes the bug
+    matrix_data_zcohere = []
+    matrix_data_zimcoh = []
+    for i in range(n_windows):
+        matrix_dict_zcohere = {
+            band: [[float(x) for x in row] for row in np.random.randn(n_channels, n_channels)]
+            for band in constants.BAND_NAMES
+        }
+        matrix_dict_zimcoh = {
+            band: [[float(x) for x in row] for row in np.random.randn(n_channels, n_channels)]
+            for band in constants.BAND_NAMES
+        }
+        matrix_data_zcohere.append(matrix_dict_zcohere)
+        matrix_data_zimcoh.append(matrix_dict_zimcoh)
+
+    data = {
+        'timestamp': pd.date_range('2025-01-01', periods=n_windows, freq='4s'),
+        'genotype': ['WT'] * n_windows,
+        'animalday': ['A001_1'] * n_windows,
+        'zcohere': matrix_data_zcohere,
+        'zimcoh': matrix_data_zimcoh,
+    }
+
+    df = pd.DataFrame(data)
+
+    war = visualization.WindowAnalysisResult(
+        result=df,
+        animal_id='A001',
+        genotype='WT',
+        channel_names=['LMot', 'RMot', 'LBar', 'RBar', 'LAud', 'RAud', 'LVis', 'RVis'],
+        assume_from_number=True,
+        bad_channels_dict={},
+        suppress_short_interval_error=True,
+        lof_scores_dict={}
+    )
+    return war
 
 
 class TestZeitgeberPipelineIntegration:
