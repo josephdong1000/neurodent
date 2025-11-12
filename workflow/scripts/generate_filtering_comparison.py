@@ -1053,12 +1053,10 @@ if __name__ == "__main__":
     if "snakemake" in globals():
         # Access snakemake safely since we know it exists
         snakemake_obj = globals()["snakemake"]
-        with open(snakemake_obj.log[0], "w") as f:
-            sys.stderr = sys.stdout = f
-            logging.basicConfig(
-                format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO, stream=sys.stdout, force=True
-            )
-            main()
+        logging.basicConfig(
+            format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO, stream=sys.stdout, force=True
+        )
+        main()
     else:
         # Running standalone - just setup basic logging
         logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)

@@ -426,9 +426,7 @@ def main():
 
 
 if __name__ == "__main__":
-    with open(snakemake.log[0], "w") as f:
-        sys.stderr = sys.stdout = f
-        logging.basicConfig(
-            format="%(asctime)s - %(levelname)s - %(message)s", level=logging.DEBUG, stream=sys.stdout, force=True
-        )
-        main()
+    logging.basicConfig(
+        format="%(asctime)s - %(levelname)s - %(message)s", level=logging.DEBUG, stream=sys.stdout, force=True
+    )
+    main()

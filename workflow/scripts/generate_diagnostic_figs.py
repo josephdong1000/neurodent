@@ -146,19 +146,17 @@ def generate_diagnostic_figures_for_animal(war, config, animal_folder, animal_id
 
 def main():
     global snakemake
-    with open(snakemake.log[0], "w") as f:
-        sys.stderr = sys.stdout = f
-        logging.basicConfig(
-            format="%(asctime)s - %(levelname)s - %(message)s",
-            level=logging.DEBUG,
-            stream=sys.stdout,
-            force=True,
-        )
+    logging.basicConfig(
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        level=logging.DEBUG,
+        stream=sys.stdout,
+        force=True,
+    )
 
-        logging.info("Diagnostic figures generation started")
-        war, config, animal_folder, animal_id, output_dir = load_war_and_config()
-        generate_diagnostic_figures_for_animal(war, config, animal_folder, animal_id, output_dir)
-        logging.info(f"Completed diagnostic figures for {animal_folder} {animal_id}")
+    logging.info("Diagnostic figures generation started")
+    war, config, animal_folder, animal_id, output_dir = load_war_and_config()
+    generate_diagnostic_figures_for_animal(war, config, animal_folder, animal_id, output_dir)
+    logging.info(f"Completed diagnostic figures for {animal_folder} {animal_id}")
 
 
 if __name__ == "__main__":

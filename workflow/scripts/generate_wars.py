@@ -116,42 +116,38 @@ def main():
     """Main execution function"""
     global snakemake
 
-    with open(snakemake.log[0], "w") as f:
-        sys.stderr = sys.stdout = f
+    logging.basicConfig(
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        level=logging.DEBUG,
+        stream=sys.stdout,
+        force=True,
+    )
 
-        # Set up logging to the redirected stdout
-        logging.basicConfig(
-            format="%(asctime)s - %(levelname)s - %(message)s",
-            level=logging.DEBUG,
-            stream=sys.stdout,
-            force=True,
-        )
+    logging.info("WAR generation script started successfully")
 
-        logging.info("WAR generation script started successfully")
+    # Load configuration
+    samples_config, config, animal_folder, animal_id = load_samples_and_config()
 
-        # Load configuration
-        samples_config, config, animal_folder, animal_id = load_samples_and_config()
+    # Generate WAR with integrated spike detection
+    war, fdsar_list = generate_war_for_animal(samples_config, config, animal_folder, animal_id)
 
-        # Generate WAR with integrated spike detection
-        war, fdsar_list = generate_war_for_animal(samples_config, config, animal_folder, animal_id)
+    # Save WAR (now includes nspike/lognspike features)
+    war.save_pickle_and_json(Path(snakemake.output.war_pkl).parent, filename="war", slugify_filename=False)
+    logging.info(f"Successfully saved WAR for {animal_folder} {animal_id}")
 
-        # Save WAR (now includes nspike/lognspike features)
-        war.save_pickle_and_json(Path(snakemake.output.war_pkl).parent, filename="war", slugify_filename=False)
-        logging.info(f"Successfully saved WAR for {animal_folder} {animal_id}")
+    # Save FDSAR results - each animalday gets its own subdirectory
+    fdsar_base_dir = Path(snakemake.output.fdsar_dir)
+    fdsar_base_dir.mkdir(parents=True, exist_ok=True)
 
-        # Save FDSAR results - each animalday gets its own subdirectory
-        fdsar_base_dir = Path(snakemake.output.fdsar_dir)
-        fdsar_base_dir.mkdir(parents=True, exist_ok=True)
+    for fdsar in fdsar_list:
+        # Create subdirectory for this animalday
+        animalday_dir = fdsar_base_dir / f"{fdsar.animal_id}-{fdsar.genotype}-{fdsar.animal_day}"
+        animalday_dir.mkdir(parents=True, exist_ok=True)
 
-        for fdsar in fdsar_list:
-            # Create subdirectory for this animalday
-            animalday_dir = fdsar_base_dir / f"{fdsar.animal_id}-{fdsar.genotype}-{fdsar.animal_day}"
-            animalday_dir.mkdir(parents=True, exist_ok=True)
+        fdsar.save_fif_and_json(animalday_dir, convert_to_mne=True, slugify_filebase=False, overwrite=True)
+        logging.info(f"Saved FDSAR for {fdsar.animal_id} {fdsar.animal_day} to {animalday_dir}")
 
-            fdsar.save_fif_and_json(animalday_dir, convert_to_mne=True, slugify_filebase=False, overwrite=True)
-            logging.info(f"Saved FDSAR for {fdsar.animal_id} {fdsar.animal_day} to {animalday_dir}")
-
-        logging.info(f"Successfully saved {len(fdsar_list)} FDSAR results to {fdsar_base_dir}")
+    logging.info(f"Successfully saved {len(fdsar_list)} FDSAR results to {fdsar_base_dir}")
 
 
 if __name__ == "__main__":

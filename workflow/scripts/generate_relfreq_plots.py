@@ -261,48 +261,44 @@ def create_relfreq_plots_for_feature(ep, feature, feature_label, output_dir, dat
 def main():
     """Main relative frequency plots generation function"""
     global snakemake
-    with open(snakemake.log[0], "w") as f:
-        sys.stderr = sys.stdout = f
-        logging.basicConfig(
-            format="%(asctime)s - %(levelname)s - %(message)s",
-            level=logging.INFO,
-            stream=sys.stdout,
-            force=True,
-        )
-        logger = logging.getLogger(__name__)
+    logging.basicConfig(
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        level=logging.INFO,
+        stream=sys.stdout,
+        force=True,
+    )
+    logger = logging.getLogger(__name__)
 
-        logger.info("Relative frequency plots generation started")
+    logger.info("Relative frequency plots generation started")
 
-        # Get parameters from snakemake
-        war_pkl_files = snakemake.input.war_pkl
-        war_json_files = snakemake.input.war_json
-        config = snakemake.params.config
+    # Get parameters from snakemake
+    war_pkl_files = snakemake.input.war_pkl
+    war_json_files = snakemake.input.war_json
+    config = snakemake.params.config
 
-        # Create output directories
-        output_dir = Path(snakemake.output.figure_dir)
-        data_dir = Path(snakemake.output.data_dir)
-        output_dir.mkdir(parents=True, exist_ok=True)
-        data_dir.mkdir(parents=True, exist_ok=True)
+    # Create output directories
+    output_dir = Path(snakemake.output.figure_dir)
+    data_dir = Path(snakemake.output.data_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    data_dir.mkdir(parents=True, exist_ok=True)
 
-        logger.info(f"Loading {len(war_pkl_files)} channel-filtered WARs")
+    logger.info(f"Loading {len(war_pkl_files)} channel-filtered WARs")
 
-        # Get number of threads for parallel loading
-        threads = snakemake.threads
-        logger.info(f"Using {threads} threads for parallel WAR loading")
+    # Get number of threads for parallel loading
+    threads = snakemake.threads
+    logger.info(f"Using {threads} threads for parallel WAR loading")
 
-        # Validate that PKL and JSON inputs match
-        if len(war_pkl_files) != len(war_json_files):
-            raise ValueError(
-                f"Mismatch between PKL files ({len(war_pkl_files)}) and JSON files ({len(war_json_files)})"
-            )
+    # Validate that PKL and JSON inputs match
+    if len(war_pkl_files) != len(war_json_files):
+        raise ValueError(f"Mismatch between PKL files ({len(war_pkl_files)}) and JSON files ({len(war_json_files)})")
 
-        # Prepare WAR information for parallel loading
-        war_infos = []
-        for pkl_file, json_file in zip(war_pkl_files, war_json_files):
-            pkl_path = Path(pkl_file)
-            json_path = Path(json_file)
-            animal_name = pkl_path.parent.name
-            war_infos.append((pkl_path, json_path, animal_name))
+    # Prepare WAR information for parallel loading
+    war_infos = []
+    for pkl_file, json_file in zip(war_pkl_files, war_json_files):
+        pkl_path = Path(pkl_file)
+        json_path = Path(json_file)
+        animal_name = pkl_path.parent.name
+        war_infos.append((pkl_path, json_path, animal_name))
 
         # Load WARs in parallel
         wars = []
@@ -322,49 +318,49 @@ def main():
                 if war is not None:
                     wars.append(war)
 
-        if not wars:
-            raise RuntimeError("No WARs were successfully loaded")
+    if not wars:
+        raise RuntimeError("No WARs were successfully loaded")
 
-        logger.info(f"Successfully loaded {len(wars)} WARs")
+    logger.info(f"Successfully loaded {len(wars)} WARs")
 
-        # Get relfreq configuration
-        relfreq_config = config["analysis"]["relfreq_plots"]
-        features = relfreq_config["features"]
+    # Get relfreq configuration
+    relfreq_config = config["analysis"]["relfreq_plots"]
+    features = relfreq_config["features"]
 
-        # Create genotype ordering
-        genotype_order = ["MWT", "MHet", "MMut", "FWT", "FHet", "FMut"]
-        plot_order = constants.DF_SORT_ORDER.copy()
-        plot_order["genotype"] = genotype_order
+    # Create genotype ordering
+    genotype_order = ["MWT", "MHet", "MMut", "FWT", "FHet", "FMut"]
+    plot_order = constants.DF_SORT_ORDER.copy()
+    plot_order["genotype"] = genotype_order
 
-        # Create ExperimentPlotter
-        logger.info("Creating ExperimentPlotter")
-        ep = visualization.ExperimentPlotter(wars=wars, exclude=None, plot_order=plot_order)
+    # Create ExperimentPlotter
+    logger.info("Creating ExperimentPlotter")
+    ep = visualization.ExperimentPlotter(wars=wars, exclude=None, plot_order=plot_order)
 
-        # Feature to label mapping
-        feature_to_label = {
-            "pcorr": "PCC",
-            "cohere": "|Coherency|",
-            "imcoh": "Imaginary Coherencey",
-            "zpcorr": "z(PCC)",
-            "zcohere": "z(|Coherencey|)",
-            "zimcoh": "z(Imaginary Coherencey)",
-            "logpsdfrac": "Log Percent Power",
-            "logpsdband": "Log Band Power",
-            "psdband": "Band Power ($\\mu V^2$)",
-            "nspike": "n_spike / t_window",
-            "lognspike": "Log(n_spike / t_window)",
-        }
+    # Feature to label mapping
+    feature_to_label = {
+        "pcorr": "PCC",
+        "cohere": "|Coherency|",
+        "imcoh": "Imaginary Coherencey",
+        "zpcorr": "z(PCC)",
+        "zcohere": "z(|Coherencey|)",
+        "zimcoh": "z(Imaginary Coherencey)",
+        "logpsdfrac": "Log Percent Power",
+        "logpsdband": "Log Band Power",
+        "psdband": "Band Power ($\\mu V^2$)",
+        "nspike": "n_spike / t_window",
+        "lognspike": "Log(n_spike / t_window)",
+    }
 
-        # Process each feature
-        for feature in features:
-            if feature in feature_to_label:
-                feature_label = feature_to_label[feature]
-            else:
-                feature_label = feature
+    # Process each feature
+    for feature in features:
+        if feature in feature_to_label:
+            feature_label = feature_to_label[feature]
+        else:
+            feature_label = feature
 
-            create_relfreq_plots_for_feature(ep, feature, feature_label, output_dir, data_dir, relfreq_config)
+        create_relfreq_plots_for_feature(ep, feature, feature_label, output_dir, data_dir, relfreq_config)
 
-        logger.info(f"Successfully generated relative frequency plots for {len(features)} features")
+    logger.info(f"Successfully generated relative frequency plots for {len(features)} features")
 
 
 if __name__ == "__main__":

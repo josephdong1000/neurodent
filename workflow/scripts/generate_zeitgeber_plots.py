@@ -203,44 +203,42 @@ def create_zeitgeber_plots(df, output_dir, data_dir, zt_config):
 def main():
     """Main zeitgeber plots generation function"""
     global snakemake
-    with open(snakemake.log[0], "w") as f:
-        sys.stderr = sys.stdout = f
-        logging.basicConfig(
-            format="%(asctime)s - %(levelname)s - %(message)s",
-            level=logging.INFO,
-            stream=sys.stdout,
-            force=True,
-        )
-        logger = logging.getLogger(__name__)
+    logging.basicConfig(
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        level=logging.INFO,
+        stream=sys.stdout,
+        force=True,
+    )
+    logger = logging.getLogger(__name__)
 
-        logger.info("Zeitgeber temporal plots generation started")
+    logger.info("Zeitgeber temporal plots generation started")
 
-        # Get parameters from snakemake
-        zeitgeber_file = snakemake.input.zeitgeber_features
-        config = snakemake.params.config
+    # Get parameters from snakemake
+    zeitgeber_file = snakemake.input.zeitgeber_features
+    config = snakemake.params.config
 
-        # Create output directories
-        output_dir = Path(snakemake.output.figure_dir)
-        data_dir = Path(snakemake.output.data_dir)
-        output_dir.mkdir(parents=True, exist_ok=True)
-        data_dir.mkdir(parents=True, exist_ok=True)
+    # Create output directories
+    output_dir = Path(snakemake.output.figure_dir)
+    data_dir = Path(snakemake.output.data_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    data_dir.mkdir(parents=True, exist_ok=True)
 
-        logger.info(f"Loading zeitgeber features from {zeitgeber_file}")
+    logger.info(f"Loading zeitgeber features from {zeitgeber_file}")
 
-        # Load zeitgeber features dataframe
-        df = pd.read_pickle(zeitgeber_file)
-        logger.info(f"Loaded zeitgeber data with shape: {df.shape}")
+    # Load zeitgeber features dataframe
+    df = pd.read_pickle(zeitgeber_file)
+    logger.info(f"Loaded zeitgeber data with shape: {df.shape}")
 
-        # Process data for temporal plotting
-        df_processed = process_zeitgeber_data(df, config)
+    # Process data for temporal plotting
+    df_processed = process_zeitgeber_data(df, config)
 
-        # Get zeitgeber plots configuration
-        zt_config = config["analysis"]["zeitgeber_plots"]
+    # Get zeitgeber plots configuration
+    zt_config = config["analysis"]["zeitgeber_plots"]
 
-        # Create zeitgeber temporal plots
-        create_zeitgeber_plots(df_processed, output_dir, data_dir, zt_config)
+    # Create zeitgeber temporal plots
+    create_zeitgeber_plots(df_processed, output_dir, data_dir, zt_config)
 
-        logger.info("Successfully generated zeitgeber temporal plots")
+    logger.info("Successfully generated zeitgeber temporal plots")
 
 
 if __name__ == "__main__":
