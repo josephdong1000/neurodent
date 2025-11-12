@@ -33,6 +33,7 @@ rule evaluate_lof_accuracy:
         mem_mb=increment_memory(config["cluster"]["lof_evaluation"]["mem_mb"]),
         nodes=config["cluster"]["lof_evaluation"]["nodes"],
     log:
-        "logs/lof_evaluation/evaluate_lof_accuracy.log",
+        stdout="logs/lof_evaluation/evaluate_lof_accuracy.stdout",
+        stderr="logs/lof_evaluation/evaluate_lof_accuracy.stderr",
     script:
         "../scripts/evaluate_lof_accuracy.py"

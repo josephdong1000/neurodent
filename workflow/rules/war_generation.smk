@@ -34,6 +34,7 @@ rule make_war:
         mem_mb=increment_memory(config["cluster"]["war_generation"]["mem_mb"]),
         nodes=config["cluster"]["war_generation"]["nodes"],
     log:
-        "logs/war_generation/{animal}.log",
+        stdout="logs/war_generation/{animal}.stdout",
+        stderr="logs/war_generation/{animal}.stderr",
     script:
         "../scripts/generate_wars.py"

@@ -35,6 +35,7 @@ rule make_fdsar_diagnostics:
         mem_mb=increment_memory(config["cluster"]["spike_averaged_traces"]["mem_mb"]),
         nodes=config["cluster"]["spike_averaged_traces"]["nodes"],
     log:
-        "logs/fdsar_diagnostics/{animal}.log",
+        stdout="logs/fdsar_diagnostics/{animal}.stdout",
+        stderr="logs/fdsar_diagnostics/{animal}.stderr",
     script:
         "../scripts/generate_fdsar_diagnostics.py"

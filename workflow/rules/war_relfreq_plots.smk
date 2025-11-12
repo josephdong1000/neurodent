@@ -33,6 +33,7 @@ rule generate_relfreq_plots:
         mem_mb=increment_memory(config["cluster"]["relfreq_plots"]["mem_mb"]),
         nodes=config["cluster"]["relfreq_plots"]["nodes"],
     log:
-        "logs/relfreq_plots/generate_relfreq_plots.log",
+        stdout="logs/relfreq_plots/generate_relfreq_plots.stdout",
+        stderr="logs/relfreq_plots/generate_relfreq_plots.stderr",
     script:
         "../scripts/generate_relfreq_plots.py"

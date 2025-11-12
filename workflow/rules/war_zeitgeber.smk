@@ -27,6 +27,7 @@ rule extract_zeitgeber_features:
         mem_mb=increment_memory(config["cluster"]["war_zeitgeber"]["mem_mb"]),
         nodes=config["cluster"]["war_zeitgeber"]["nodes"],
     log:
-        "logs/war_zeitgeber/extract_zeitgeber_features.log",
+        stdout="logs/war_zeitgeber/extract_zeitgeber_features.stdout",
+        stderr="logs/war_zeitgeber/extract_zeitgeber_features.stderr",
     script:
         "../scripts/extract_zeitgeber_features.py"

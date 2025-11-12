@@ -29,6 +29,7 @@ rule generate_filtering_comparison:
         mem_mb=increment_memory(config["cluster"]["filtering_comparison"]["mem_mb"]),
         nodes=config["cluster"]["filtering_comparison"]["nodes"],
     log:
-        "logs/filtering_comparison/generate_comparison.log",
+        stdout="logs/filtering_comparison/generate_comparison.stdout",
+        stderr="logs/filtering_comparison/generate_comparison.stderr",
     script:
         "../scripts/generate_filtering_comparison.py"
