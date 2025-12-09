@@ -28,11 +28,10 @@ import sys
 import glob
 from datetime import datetime
 from django.utils.text import slugify
-from snakemake.io import glob_wildcards
 
-# Verify snakemake is installed
+# Verify snakemake is installed before importing from it
 try:
-    import snakemake
+    from snakemake.io import glob_wildcards
 except ImportError:
     raise ImportError(
         "Snakemake is required for pipeline functionality.\n"
