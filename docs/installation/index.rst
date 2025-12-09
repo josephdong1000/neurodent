@@ -65,6 +65,48 @@ Then create a new project with NeuRodent:
 
 This creates a new directory, sets up a virtual environment, and installs NeuRodent—all in one go.
 
+Installing with Pipeline Support
+---------------------------------
+
+NeuRodent includes a Snakemake workflow for automated analysis pipelines. If you want to use this workflow, you'll need to install the optional pipeline dependencies:
+
+**Using pip:**
+
+.. code-block:: bash
+
+   pip install neurodent[pipeline]
+
+**Using uv:**
+
+.. code-block:: bash
+
+   uv add neurodent[pipeline]
+
+.. note::
+
+   The ``pipeline`` extra includes Snakemake and related dependencies needed for running the automated analysis workflow. If you only need the core NeuRodent library for Python-based analysis, the basic installation is sufficient.
+
+Development Installation
+------------------------
+
+If you want to contribute to NeuRodent or modify the source code, install it in editable mode:
+
+**Using uv (recommended):**
+
+.. code-block:: bash
+
+   git clone https://github.com/josephdong1000/neurodent
+   cd neurodent
+   uv sync --extra pipeline
+
+**Using pip:**
+
+.. code-block:: bash
+
+   git clone https://github.com/josephdong1000/neurodent
+   cd neurodent
+   pip install -e .[pipeline]
+
 Next Steps
 ----------
 
