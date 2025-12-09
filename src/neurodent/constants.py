@@ -148,3 +148,26 @@ WAVEFORM_PARAMS = {
     "freq_min": None,
     "freq_max": None,
 }
+
+# Okabe-Ito colorblind-friendly color palette
+# Reference: https://easystats.github.io/see/reference/scale_color_okabeito.html
+OKABE_ITO_COLORS = {
+    "black": "#000000",
+    "orange": "#E69F00",
+    "blue": "#0072B2",
+    "green": "#009E73",
+    "yellow": "#F5C710",
+    "lightblue": "#56B4E9",
+    "red": "#D55E00",
+    "purple": "#CC79A7",
+}
+
+# Convenience exports for backwards compatibility with okabeito package
+black = OKABE_ITO_COLORS["black"]
+orange = OKABE_ITO_COLORS["orange"]
+blue = OKABE_ITO_COLORS["blue"]
+green = OKABE_ITO_COLORS["green"]
+yellow = OKABE_ITO_COLORS["yellow"]
+lightblue = OKABE_ITO_COLORS["lightblue"]
+red = OKABE_ITO_COLORS["red"]
+purple = OKABE_ITO_COLORS["purple"]

@@ -13,11 +13,11 @@ A Python package for standardizing rodent EEG analysis and figure generation. Va
 
 NeuRodent can be installed via `pip`:
 
-```
+```bash
 pip install neurodent
 ```
 
-For more info, check out the [full installation guide](https://josephdong1000.github.io/neurodent/main/installation/index.html).
+For pipeline support, development setup, and other installation options, check out the [full installation guide](https://josephdong1000.github.io/neurodent/main/installation/index.html).
 
 ## Usage
 

@@ -28,7 +28,17 @@ import sys
 import glob
 from datetime import datetime
 from django.utils.text import slugify
-from snakemake.io import glob_wildcards
+
+# Verify snakemake is installed before importing from it
+try:
+    from snakemake.io import glob_wildcards
+except ImportError:
+    raise ImportError(
+        "Snakemake is required for pipeline functionality.\n"
+        "Install with either:\n"
+        "  pip install neurodent[pipeline]\n"
+        "  uv pip install neurodent[pipeline]\n"
+    )
 
 # Load samples config
 with open(samples_file, "r") as f:
