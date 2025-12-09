@@ -29,7 +29,6 @@ dependencies = [
     "matplotlib",
     "mne",
     "mne-connectivity",
-    # "cmasher", # this is not used directly but is a nice package
     "pandas",
     "spikeinterface",
     "probeinterface",
