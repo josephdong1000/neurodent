@@ -14,7 +14,29 @@ from ... import visualization as viz
 
 
 class AnimalPlotter(viz.AnimalFeatureParser):
-    def __init__(self, war: viz.WindowAnalysisResult, save_fig: bool = False, save_path: Path = None) -> None:
+    """Class for plotting results from an AnimalOrganizer/WindowAnalysisResult.
+
+    Args:
+        war (WindowAnalysisResult): The analysis results to plot.
+        save_fig (bool, optional): Whether to save figures to disk. Defaults to False.
+        save_path (Path, optional): Directory where figures will be saved. Defaults to None.
+
+    Attributes:
+        window_result (WindowAnalysisResult): The analysis results being plotted.
+        genotype (str): Genotype of the animal.
+        channel_names (list[str]): List of channel names.
+        n_channels (int): Number of channels.
+        channel_abbrevs (list[str]): Abbreviated channel names for plotting.
+        save_fig (bool): Whether to save figures to disk.
+        save_path (Path): Directory where figures will be saved.
+    """
+
+    def __init__(
+        self,
+        war: viz.WindowAnalysisResult,
+        save_fig: bool = False,
+        save_path: Path = None,
+    ) -> None:
         self.window_result = war
         self.genotype = war.genotype
         self.channel_names = war.channel_names
@@ -30,7 +52,9 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                 return v
         return ch_name
 
-    def plot_coherecorr_matrix(self, groupby="animalday", bands=None, figsize=None, cmap="viridis", **kwargs):
+    def plot_coherecorr_matrix(
+        self, groupby="animalday", bands=None, figsize=None, cmap="viridis", **kwargs
+    ):
         avg_result = self.__get_groupavg_coherecorr(groupby, **kwargs)
 
         if bands is None:
@@ -39,19 +63,32 @@ class AnimalPlotter(viz.AnimalFeatureParser):
             bands = [bands]
         n_row = avg_result.index.size
         # rowcount = 0
-        fig, ax = plt.subplots(n_row, len(bands), squeeze=False, figsize=figsize, **kwargs)
+        fig, ax = plt.subplots(
+            n_row, len(bands), squeeze=False, figsize=figsize, **kwargs
+        )
 
         normlist = [
-            matplotlib.colors.Normalize(vmin=0, vmax=np.max(np.concatenate(avg_result[band].values))) for band in bands
+            matplotlib.colors.Normalize(
+                vmin=0, vmax=np.max(np.concatenate(avg_result[band].values))
+            )
+            for band in bands
         ]
         for i, (_, row) in enumerate(avg_result.iterrows()):
             self._plot_coherecorr_matrixgroup(
-                row, bands, ax[i, :], show_bandname=i == 0, norm_list=normlist, cmap=cmap, **kwargs
+                row,
+                bands,
+                ax[i, :],
+                show_bandname=i == 0,
+                norm_list=normlist,
+                cmap=cmap,
+                **kwargs,
             )
             # rowcount += 1
         self._handle_figure(fig, title="coherecorr_matrix")
 
-    def plot_coherecorr_diff(self, groupby="isday", bands=None, figsize=None, cmap="bwr", **kwargs):
+    def plot_coherecorr_diff(
+        self, groupby="isday", bands=None, figsize=None, cmap="bwr", **kwargs
+    ):
         avg_result = self.__get_groupavg_coherecorr(groupby, **kwargs)
         avg_result = avg_result.drop("cohere", axis=1, errors="ignore")
         if len(avg_result.index) != 2:
@@ -70,7 +107,13 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         fig, ax = plt.subplots(1, len(bands), squeeze=False, figsize=figsize, **kwargs)
 
         self._plot_coherecorr_matrixgroup(
-            diff_result, bands, ax[0, :], show_bandname=True, center_cmap=True, cmap=cmap, **kwargs
+            diff_result,
+            bands,
+            ax[0, :],
+            show_bandname=True,
+            center_cmap=True,
+            cmap=cmap,
+            **kwargs,
         )
         self._handle_figure(fig, title="coherecorr_diff")
 
@@ -101,7 +144,9 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                 ax[i].xaxis.set_label_position("top")
 
             if show_channelname:
-                ax[i].set_xticks(range(self.n_channels), self.channel_abbrevs, rotation="vertical")
+                ax[i].set_xticks(
+                    range(self.n_channels), self.channel_abbrevs, rotation="vertical"
+                )
                 ax[i].set_yticks(range(self.n_channels), self.channel_abbrevs)
             else:
                 ax[i].set_xticks(range(self.n_channels), " ")
@@ -110,7 +155,9 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         ax[0].set_ylabel(rowname, rotation="horizontal", ha="right")
 
     def __get_groupavg_coherecorr(self, groupby="animalday", **kwargs):
-        avg_result = self.window_result.get_groupavg_result(constants.MATRIX_FEATURES.copy(), groupby=groupby)
+        avg_result = self.window_result.get_groupavg_result(
+            constants.MATRIX_FEATURES.copy(), groupby=groupby
+        )
         avg_coheresplit = pd.json_normalize(avg_result["cohere"]).set_index(
             avg_result.index
         )  # Split apart the cohere dictionaries
@@ -135,14 +182,20 @@ class AnimalPlotter(viz.AnimalFeatureParser):
             channels = np.arange(self.n_channels)
 
         # df_featgroups = self.window_result.get_grouped(features, groupby=groupby)
-        df_rowgroup = self.window_result.get_grouprows_result(features, multiindex=multiindex)
+        df_rowgroup = self.window_result.get_grouprows_result(
+            features, multiindex=multiindex
+        )
         for i, df_row in df_rowgroup.groupby(level=0):
             fig, ax = plt.subplots(
                 len(features),
                 1,
                 figsize=figsize,
                 sharex=True,
-                gridspec_kw={"height_ratios": [constants.FEATURE_PLOT_HEIGHT_RATIOS[x] for x in features]},
+                gridspec_kw={
+                    "height_ratios": [
+                        constants.FEATURE_PLOT_HEIGHT_RATIOS[x] for x in features
+                    ]
+                },
                 squeeze=False,
             )
             plt.subplots_adjust(hspace=0)
@@ -176,7 +229,9 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         show_channelname=True,
         **kwargs,
     ):
-        data_Z = self.__get_linear_feature(group=group, feature=feature, score_type=score_type)
+        data_Z = self.__get_linear_feature(
+            group=group, feature=feature, score_type=score_type
+        )
 
         data_t = group[duration_name]
         data_T = np.cumsum(data_t)
@@ -186,7 +241,9 @@ class AnimalPlotter(viz.AnimalFeatureParser):
             # 2D array (time, channels) - expand to 3D for consistent handling
             data_Z = np.expand_dims(data_Z, axis=-1)
         elif data_Z.ndim != 3:
-            raise ValueError(f"Expected 2D or 3D feature array, got {data_Z.ndim}D for feature '{feature}'")
+            raise ValueError(
+                f"Expected 2D or 3D feature array, got {data_Z.ndim}D for feature '{feature}'"
+            )
 
         if channels is None:
             channels = np.arange(data_Z.shape[1])
@@ -194,8 +251,12 @@ class AnimalPlotter(viz.AnimalFeatureParser):
 
         n_chan = data_Z.shape[1]
         n_feat = data_Z.shape[2]
-        chan_offset = np.linspace(0, channel_y_offset * n_chan, n_chan, endpoint=False).reshape((1, -1, 1))
-        feat_offset = np.linspace(0, feature_y_offset * n_chan * n_feat, n_feat, endpoint=False).reshape((1, 1, -1))
+        chan_offset = np.linspace(
+            0, channel_y_offset * n_chan, n_chan, endpoint=False
+        ).reshape((1, -1, 1))
+        feat_offset = np.linspace(
+            0, feature_y_offset * n_chan * n_feat, n_feat, endpoint=False
+        ).reshape((1, 1, -1))
         data_Z += chan_offset
         data_Z += feat_offset
         ytick_offset = feat_offset.squeeze() + np.mean(chan_offset.flatten())
@@ -203,7 +264,16 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         for i in range(n_feat):
             ax.plot(data_T, data_Z[:, :, i], c=f"C{i}", **kwargs)
         match feature:  # NOTE refactor this to use constants
-            case "rms" | "ampvar" | "psdtotal" | "nspike" | "logrms" | "logampvar" | "logpsdtotal" | "lognspike":
+            case (
+                "rms"
+                | "ampvar"
+                | "psdtotal"
+                | "nspike"
+                | "logrms"
+                | "logampvar"
+                | "logpsdtotal"
+                | "lognspike"
+            ):
                 ax.set_yticks([ytick_offset], [feature])
             case "psdslope":
                 ax.set_yticks(ytick_offset, ["psdslope", "psdintercept"])
@@ -213,11 +283,27 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                 raise ValueError(f"Invalid feature {feature}")
 
         if show_endfile:
-            self._plot_filediv_lines(group=group, ax=ax, duration_name=duration_name, endfile_name=endfile_name)
+            self._plot_filediv_lines(
+                group=group,
+                ax=ax,
+                duration_name=duration_name,
+                endfile_name=endfile_name,
+            )
 
-    def __get_linear_feature(self, group: pd.DataFrame, feature: str, score_type="z", triag=True):
+    def __get_linear_feature(
+        self, group: pd.DataFrame, feature: str, score_type="z", triag=True
+    ):
         match feature:  # NOTE refactor this to use constants
-            case "rms" | "ampvar" | "psdtotal" | "nspike" | "logrms" | "logampvar" | "logpsdtotal" | "lognspike":
+            case (
+                "rms"
+                | "ampvar"
+                | "psdtotal"
+                | "nspike"
+                | "logrms"
+                | "logampvar"
+                | "logpsdtotal"
+                | "lognspike"
+            ):
                 data_X = np.array(group[feature].to_list())
                 data_X = np.expand_dims(data_X, axis=-1)
             case "psdband" | "psdfrac" | "logpsdband" | "logpsdfrac":
@@ -249,7 +335,9 @@ class AnimalPlotter(viz.AnimalFeatureParser):
 
         return self._calculate_standard_data(data_X, mode=score_type, axis=0)
 
-    def _plot_filediv_lines(self, group: pd.DataFrame, ax: matplotlib.axes.Axes, duration_name, endfile_name):
+    def _plot_filediv_lines(
+        self, group: pd.DataFrame, ax: matplotlib.axes.Axes, duration_name, endfile_name
+    ):
         filedivs = self.__get_filediv_times(group, duration_name, endfile_name)
         for xpos in filedivs:
             ax.axvline(xpos, ls="--", c="black", lw=1)
@@ -258,7 +346,9 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         cumulative = group[duration_name].cumsum().shift(fill_value=0)
         # display( group[[endfile_name]].dropna().head())
         # display(cumulative.head())
-        filedivs = group[endfile_name].dropna() + cumulative[group[endfile_name].notna()]
+        filedivs = (
+            group[endfile_name].dropna() + cumulative[group[endfile_name].notna()]
+        )
         return filedivs.tolist()
 
     def _calculate_standard_data(self, X, mode="z", axis=0):
@@ -301,7 +391,9 @@ class AnimalPlotter(viz.AnimalFeatureParser):
             features = ["zcohere", "zpcorr"]
         # Use consolidated height ratios from constants (matrix features for spectral heatmaps)
 
-        df_rowgroup = self.window_result.get_grouprows_result(features, multiindex=multiindex)
+        df_rowgroup = self.window_result.get_grouprows_result(
+            features, multiindex=multiindex
+        )
         for feature in features:
             if feature not in df_rowgroup.columns:
                 warnings.warn(f"Feature {feature} not found in dataframe")
@@ -313,7 +405,11 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                 1,
                 figsize=figsize,
                 sharex=True,
-                gridspec_kw={"height_ratios": [constants.FEATURE_PLOT_HEIGHT_RATIOS[x] for x in features]},
+                gridspec_kw={
+                    "height_ratios": [
+                        constants.FEATURE_PLOT_HEIGHT_RATIOS[x] for x in features
+                    ]
+                },
                 squeeze=False,
             )
             plt.subplots_adjust(hspace=0)
@@ -349,7 +445,9 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         triag=True,
         **kwargs,
     ):
-        data_Z = self.__get_linear_feature(group=group, feature=feature, score_type=score_type)
+        data_Z = self.__get_linear_feature(
+            group=group, feature=feature, score_type=score_type
+        )
         std_dev = np.nanstd(data_Z.flatten())
 
         # data_flat = data_Z.reshape(data_Z.shape[0], -1).transpose()
@@ -363,14 +461,26 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         n_bands = len(constants.BAND_NAMES)
 
         for i in range(data_Z.shape[-1]):
-            extent = (0, data_Z.shape[0] * group["duration"].median(), i * n_ch, (i + 1) * n_ch)
+            extent = (
+                0,
+                data_Z.shape[0] * group["duration"].median(),
+                i * n_ch,
+                (i + 1) * n_ch,
+            )
             ax.imshow(
-                data_Z[:, :, i].transpose(), interpolation="none", aspect="auto", norm=norm, cmap=cmap, extent=extent
+                data_Z[:, :, i].transpose(),
+                interpolation="none",
+                aspect="auto",
+                norm=norm,
+                cmap=cmap,
+                extent=extent,
             )
 
         if show_featurename:
             if feature in ["cohere", "zcohere", "imcoh", "zimcoh"]:
-                ticks = n_ch * np.linspace(1 / 2, n_bands + 1 / 2, n_bands, endpoint=False)
+                ticks = n_ch * np.linspace(
+                    1 / 2, n_bands + 1 / 2, n_bands, endpoint=False
+                )
                 ax.set_yticks(ticks=ticks, labels=constants.BAND_NAMES)
                 for ypos in np.linspace(0, n_bands * n_ch, n_bands, endpoint=False):
                     ax.axhline(ypos, lw=1, ls="--", color="black")
@@ -380,7 +490,12 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                 raise ValueError(f"Unknown feature name {feature}")
 
         if show_endfile:
-            self._plot_filediv_lines(group=group, ax=ax, duration_name=duration_name, endfile_name=endfile_name)
+            self._plot_filediv_lines(
+                group=group,
+                ax=ax,
+                duration_name=duration_name,
+                endfile_name=endfile_name,
+            )
 
     def plot_psd_histogram(
         self,
@@ -395,7 +510,9 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         avg_result = self.window_result.get_groupavg_result(["psd"], groupby=groupby)
 
         n_col = avg_result.index.size
-        fig, ax = plt.subplots(1, n_col, squeeze=False, figsize=figsize, sharex=True, sharey=True, **kwargs)
+        fig, ax = plt.subplots(
+            1, n_col, squeeze=False, figsize=figsize, sharex=True, sharey=True, **kwargs
+        )
         plt.subplots_adjust(wspace=0)
         for i, (idx, row) in enumerate(avg_result.iterrows()):
             freqs = row["psd"][0]
@@ -417,7 +534,10 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                 case _:
                     raise ValueError(f"Invalid plot type {plot_type}")
 
-            frange = np.logical_and(freqs >= constants.FREQ_BAND_TOTAL[0], freqs <= constants.FREQ_BAND_TOTAL[1])
+            frange = np.logical_and(
+                freqs >= constants.FREQ_BAND_TOTAL[0],
+                freqs <= constants.FREQ_BAND_TOTAL[1],
+            )
             logf = np.log10(freqs[frange])
             logpsd = np.log10(psd[frange, :])
 
@@ -427,7 +547,9 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                 linfit[k, :] = [result.slope, result.intercept]
 
             for j, (m, b) in enumerate(linfit.tolist()):
-                ax[0, i].plot(freqs, 10 ** (b + m * np.log10(freqs)), c=f"C{j}", alpha=0.75)
+                ax[0, i].plot(
+                    freqs, 10 ** (b + m * np.log10(freqs)), c=f"C{j}", alpha=0.75
+                )
 
             ax[0, i].set_title(idx)
             ax[0, i].set_xlabel("Frequency (Hz)")
@@ -446,7 +568,9 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         cmap="magma",
         **kwargs,
     ):
-        df_rowgroup = self.window_result.get_grouprows_result(["psd"], multiindex=multiindex)
+        df_rowgroup = self.window_result.get_grouprows_result(
+            ["psd"], multiindex=multiindex
+        )
         for i, df_row in df_rowgroup.groupby(level=0):
             freqs = df_row.iloc[0]["psd"][0]
             psd = np.array([x[1] for x in df_row["psd"].tolist()])
@@ -456,14 +580,23 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                 case "median":
                     psd = np.nanmedian(psd, axis=-1).transpose()
                 case _:
-                    raise ValueError(f"Invalid statistic {center_stat}. Pick mean or median")
+                    raise ValueError(
+                        f"Invalid statistic {center_stat}. Pick mean or median"
+                    )
             psd = np.log10(psd)
             psd = self._calculate_standard_data(psd, mode=mode, axis=-1)
-            freq_mask = np.logical_and((freq_range[0] <= freqs), (freqs <= freq_range[1]))
+            freq_mask = np.logical_and(
+                (freq_range[0] <= freqs), (freqs <= freq_range[1])
+            )
             freqs = freqs[freq_mask]
             psd = psd[freq_mask, :]
 
-            extent = (0, psd.shape[1] * df_row["duration"].median(), np.min(freqs), np.max(freqs))
+            extent = (
+                0,
+                psd.shape[1] * df_row["duration"].median(),
+                np.min(freqs),
+                np.max(freqs),
+            )
             # print(psd.nanmin(), psd.nanmax())
             norm = matplotlib.colors.Normalize()
             # norm = matplotlib.colors.LogNorm()
@@ -472,7 +605,12 @@ class AnimalPlotter(viz.AnimalFeatureParser):
             fig, ax = plt.subplots(1, 1, figsize=figsize)
             # ax.pcolormesh(psd, )
             axim = ax.imshow(
-                np.flip(psd, axis=0), interpolation="none", aspect="auto", norm=norm, cmap=cmap, extent=extent
+                np.flip(psd, axis=0),
+                interpolation="none",
+                aspect="auto",
+                norm=norm,
+                cmap=cmap,
+                extent=extent,
             )
             cbar = fig.colorbar(axim, ax=ax)
             cbar.set_label(f"log(PSD) {mode}")
@@ -526,7 +664,9 @@ class AnimalPlotter(viz.AnimalFeatureParser):
 
         # Get data grouped by animalday
         df_rowgroup = self.window_result.get_grouprows_result(
-            features, multiindex=["animal", "genotype"], include=["duration", "endfile", "timestamp", "animalday"]
+            features,
+            multiindex=["animal", "genotype"],
+            include=["duration", "endfile", "timestamp", "animalday"],
         )
 
         for feature in features:
@@ -567,10 +707,16 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         for animalday, df_day in df_rowgroup.groupby(level=0):
             # Extract timestamps and convert to time of day (modulo 24h)
             timestamps = df_day["timestamp"]
-            time_of_day = timestamps.dt.hour + timestamps.dt.minute / 60.0 + timestamps.dt.second / 3600.0
+            time_of_day = (
+                timestamps.dt.hour
+                + timestamps.dt.minute / 60.0
+                + timestamps.dt.second / 3600.0
+            )
 
             # Get feature data and flatten across channels
-            feature_data = self.__get_linear_feature(group=df_day, feature=feature, score_type=score_type)
+            feature_data = self.__get_linear_feature(
+                group=df_day, feature=feature, score_type=score_type
+            )
 
             # Flatten across channels (take mean across channels)
             if feature_data.ndim > 2:
@@ -596,7 +742,9 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                 day_values = feature_data[day_mask]
 
                 # Bin the data by time of day
-                for j, (bin_start, bin_end) in enumerate(zip(time_bins[:-1], time_bins[1:])):
+                for j, (bin_start, bin_end) in enumerate(
+                    zip(time_bins[:-1], time_bins[1:])
+                ):
                     time_mask = (day_times >= bin_start) & (day_times < bin_end)
                     if np.any(time_mask):
                         heatmap_matrix[i, j] = np.nanmean(day_values[time_mask])
@@ -642,7 +790,9 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                 # Show every nth day if too many days
                 n = max(1, len(days) // 10)
                 ax.set_yticks(np.arange(0, len(days), n) + 0.5)
-                ax.set_yticklabels([days[i].strftime("%Y-%m-%d") for i in range(0, len(days), n)])
+                ax.set_yticklabels(
+                    [days[i].strftime("%Y-%m-%d") for i in range(0, len(days), n)]
+                )
 
             # Add grid
             ax.grid(True, alpha=0.3)
@@ -682,7 +832,11 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                 # Find which day row this corresponds to
                 if day in days:
                     day_idx = days.index(day)
-                    time_hour = timestamp.hour + timestamp.minute / 60.0 + timestamp.second / 3600.0
+                    time_hour = (
+                        timestamp.hour
+                        + timestamp.minute / 60.0
+                        + timestamp.second / 3600.0
+                    )
 
                     # Draw vertical line at this time point for this day
                     ax.axvline(
@@ -709,7 +863,11 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                     # Check if animalday changed from previous row
                     if prev_animalday is not None and animalday != prev_animalday:
                         day_idx = days.index(day)
-                        time_hour = timestamp.hour + timestamp.minute / 60.0 + timestamp.second / 3600.0
+                        time_hour = (
+                            timestamp.hour
+                            + timestamp.minute / 60.0
+                            + timestamp.second / 3600.0
+                        )
 
                         # Draw dotted white vertical line at animalday boundary
                         ax.axvline(
