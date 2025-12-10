@@ -36,9 +36,9 @@ extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
     "sphinx.ext.napoleon",
+    # "numpydoc",
     "sphinx.ext.viewcode",
     "sphinx.ext.intersphinx",
-    "sphinx_autodoc_typehints",
     "myst_nb",
     "sphinx_design",
     "sphinx_multiversion",
@@ -58,16 +58,21 @@ myst_enable_extensions = [
     "tasklist",
 ]
 
+# Numpydoc settings
+# numpydoc_show_class_members = False
+# numpydoc_show_inherited_class_members = False
+# numpydoc_class_members_toctree = False
+
 # Napoleon settings for Google/NumPy style docstrings
 napoleon_google_docstring = True
-napoleon_numpy_docstring = True
-napoleon_include_init_with_doc = True
+napoleon_numpy_docstring = False
+napoleon_include_init_with_doc = False
 napoleon_include_private_with_doc = False
 napoleon_include_special_with_doc = True
 napoleon_use_admonition_for_examples = False
 napoleon_use_admonition_for_notes = False
 napoleon_use_admonition_for_references = False
-napoleon_use_ivar = False
+napoleon_use_ivar = True
 napoleon_use_param = True
 napoleon_use_rtype = True
 napoleon_preprocess_types = True
@@ -91,7 +96,8 @@ autodoc_default_options = {
     "undoc-members": True,
     "exclude-members": "__weakref__",
 }
-autodoc_typehints = "description"
+autodoc_typehints = "signature"
+# autodoc_typehints = "description"
 autosummary_generate = True
 
 # Configure sphinx_autodoc_typehints to not link built-in types
@@ -236,5 +242,13 @@ man_pages = [(master_doc, project.lower(), f"{project} Documentation", [author],
 
 # -- Options for Texinfo output ----------------------------------------------
 texinfo_documents = [
-    (master_doc, project, f"{project} Documentation", author, project, project_info["description"], "Miscellaneous"),
+    (
+        master_doc,
+        project,
+        f"{project} Documentation",
+        author,
+        project,
+        project_info["description"],
+        "Miscellaneous",
+    ),
 ]
