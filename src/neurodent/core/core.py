@@ -1600,6 +1600,11 @@ class LongRecordingOrganizer:
 
         logging.info(f"Resampling recording from {current_rate} Hz to {target_rate} Hz using SpikeInterface")
 
+        dtype = recording.get_dtype()
+        if dtype == 'uint16':
+            logging.info(f"Data type is unsigned (uint16) and SpikeInterface can't process. Converting it to signed (int16)")
+            recording = spre.unsigned_to_signed(recording)
+
         # Use SpikeInterface resampling with margin to reduce edge effects
         resampled_recording = spre.resample(
             recording=recording,
