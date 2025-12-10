@@ -1601,7 +1601,13 @@ class LongRecordingOrganizer:
         logging.info(f"Resampling recording from {current_rate} Hz to {target_rate} Hz using SpikeInterface")
 
         dtype = recording.get_dtype()
-        if np.dtype(dtype).kind == 'u':
+        # Handle numpy types, strings. Avoid Mock objects
+        is_unsigned = False
+        if isinstance(dtype, (str, type, np.dtype)):
+            if np.dtype(dtype).kind == "u":
+                is_unsigned = True
+
+        if is_unsigned:
             logging.info(f"Data type is unsigned ({dtype}) and SpikeInterface can't process. Converting it to signed")
             recording = spre.unsigned_to_signed(recording)
 
