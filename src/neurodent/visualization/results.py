@@ -33,7 +33,9 @@ from ..core.utils import parse_chname_to_abbrev
 
 class AnimalFeatureParser:
     # REVIEW make this a utility function and refactor across codebase?
-    def _average_feature(self, df: pd.DataFrame, colname: str, weightsname: str | None = "duration"):
+    def _average_feature(
+        self, df: pd.DataFrame, colname: str, weightsname: str | None = "duration"
+    ):
         column = df[colname]
         if weightsname is None or weightsname not in df.columns:
             weights = np.ones(column.size)
@@ -59,7 +61,16 @@ class AnimalFeatureParser:
                 col_agg = np.array(column.tolist())
                 avg = core.nanaverage(col_agg, axis=0, weights=weights)
 
-            case "cohere" | "zcohere" | "imcoh" | "zimcoh" | "psdband" | "psdfrac" | "logpsdband" | "logpsdfrac":
+            case (
+                "cohere"
+                | "zcohere"
+                | "imcoh"
+                | "zimcoh"
+                | "psdband"
+                | "psdfrac"
+                | "logpsdband"
+                | "logpsdfrac"
+            ):
                 keys = colitem.keys()
                 avg = {}
                 for k in keys:
@@ -78,6 +89,37 @@ class AnimalFeatureParser:
 
 
 class AnimalOrganizer(AnimalFeatureParser):
+    """
+    AnimalOrganizer is used to organize data from a single animal into a format that can be used for analysis.
+    It is used to organize data from a single animal into a format that can be used for analysis.
+
+    Args:
+        base_folder_path (str): The path to the base folder of the animal data.
+        anim_id (str): The ID of the animal. This should correspond to only one animal.
+        day_sep (str, optional): Separator for day in folder name. Set to None or empty string to get all folders. Defaults to None.
+        mode (Literal["nest", "concat", "base", "noday"], optional): The mode of the AnimalOrganizer. Defaults to "concat".
+            * "nest": base_folder_path / animal_id / \*date_format\* (looks for folders/files within animal_id subdirectories)
+            * "concat": base_folder_path / \*animal_id\*date_format\* (looks for folders/files with animal_id+date in name at base level)
+            * "base": base_folder_path / \* (looks for folders/files directly in base_folder_path)
+            * "noday": base_folder_path / \*animal_id\* (same as concat but expects single unique match, no date filtering)
+        assume_from_number (bool, optional): Whether to assume the animal ID is a number. Defaults to False.
+        skip_days (list[str], optional): The days to skip. Defaults to [].
+        truncate (bool | int, optional): Whether to truncate the data. Defaults to False.
+        lro_kwargs (dict, optional): Keyword arguments for LongRecordingOrganizer. Defaults to {}.
+
+    Attributes:
+        base_folder_path (Path): The path to the base folder of the animal data.
+        anim_id (str): The ID of the animal.
+        day_sep (str): Separator for day in folder name.
+        read_mode (str): The mode of the AnimalOrganizer.
+        assume_from_number (bool): Whether to assume the animal ID is a number.
+        bin_folder_pattern (Path): The glob pattern used to find binary folders.
+        unique_animaldays (list[str]): List of unique animal days found.
+        animaldays (list[str]): List of unique animal days (alias).
+        genotype (str): Genotype of the animal.
+        long_analyzers (list[LongRecordingAnalyzer]): List of LongRecordingAnalyzer instances, one per unique animal day.
+    """
+
     def __init__(
         self,
         base_folder_path,
@@ -89,25 +131,6 @@ class AnimalOrganizer(AnimalFeatureParser):
         truncate: bool | int = False,
         lro_kwargs: dict = {},
     ) -> None:
-        """
-        AnimalOrganizer is used to organize data from a single animal into a format that can be used for analysis.
-        It is used to organize data from a single animal into a format that can be used for analysis.
-
-        Args:
-            base_folder_path (str): The path to the base folder of the animal data.
-            anim_id (str): The ID of the animal. This should correspond to only one animal.
-            day_sep (str, optional): Separator for day in folder name. Set to None or empty string to get all folders. Defaults to None.
-            mode (Literal["nest", "concat", "base", "noday"], optional): The mode of the AnimalOrganizer. Defaults to "concat".
-                File structure patterns (where * indicates search location):
-                "nest": base_folder_path / animal_id / *date_format* (looks for folders/files within animal_id subdirectories)
-                "concat": base_folder_path / *animal_id*date_format* (looks for folders/files with animal_id+date in name at base level)
-                "base": base_folder_path / * (looks for folders/files directly in base_folder_path)
-                "noday": base_folder_path / *animal_id* (same as concat but expects single unique match, no date filtering)
-            assume_from_number (bool, optional): Whether to assume the animal ID is a number. Defaults to False.
-            skip_days (list[str], optional): The days to skip. Defaults to [].
-            truncate (bool|int, optional): Whether to truncate the data. Defaults to False.
-            lro_kwargs (dict, optional): Keyword arguments for LongRecordingOrganizer. Defaults to {}.
-        """
 
         self.base_folder_path = Path(base_folder_path)
         self.anim_id = anim_id
@@ -118,7 +141,9 @@ class AnimalOrganizer(AnimalFeatureParser):
 
         match mode:
             case "nest":
-                self.bin_folder_pattern = self.base_folder_path / f"*{self.anim_id}*" / "*"
+                self.bin_folder_pattern = (
+                    self.base_folder_path / f"*{self.anim_id}*" / "*"
+                )
             case "concat" | "noday":
                 self.bin_folder_pattern = self.base_folder_path / f"*{self.anim_id}*"
                 # self.bin_folder_pat = self.base_folder_path / f"*{self.anim_id}*{self.date_format}*"
@@ -138,27 +163,42 @@ class AnimalOrganizer(AnimalFeatureParser):
 
         if before_filter_count > after_filter_count:
             filtered_count = before_filter_count - after_filter_count
-            logging.info(f"Filtered out {filtered_count} non-directory items (files) from glob results")
+            logging.info(
+                f"Filtered out {filtered_count} non-directory items (files) from glob results"
+            )
 
         # if mode != 'noday':
         #     self.__bin_folders = [x for x in self.__bin_folders if datetime.strptime(Path(x).name, self.date_format)]
         truncate = core.utils.parse_truncate(truncate)
         if truncate:
-            warnings.warn(f"AnimalOrganizer will be truncated to the first {truncate} LongRecordings")
+            warnings.warn(
+                f"AnimalOrganizer will be truncated to the first {truncate} LongRecordings"
+            )
             self._bin_folders = self._bin_folders[:truncate]
-        self._bin_folders = [x for x in self._bin_folders if not any(y in x for y in skip_days)]
+        self._bin_folders = [
+            x for x in self._bin_folders if not any(y in x for y in skip_days)
+        ]
         self.bin_folder_names = [Path(x).name for x in self._bin_folders]
         logging.info(f"bin_folder_pattern: {self.bin_folder_pattern}")
         logging.info(f"self._bin_folders: {self._bin_folders}")
         logging.info(f"self.bin_folder_names: {self.bin_folder_names}")
 
         if mode == "noday" and len(self._bin_folders) > 1:
-            raise ValueError(f"Animal ID '{self.anim_id}' is not unique, found: {', '.join(self._bin_folders)}")
+            raise ValueError(
+                f"Animal ID '{self.anim_id}' is not unique, found: {', '.join(self._bin_folders)}"
+            )
         elif len(self._bin_folders) == 0:
-            raise ValueError(f"No directories found for animal ID {self.anim_id} (pattern: {self.bin_folder_pattern})")
+            raise ValueError(
+                f"No directories found for animal ID {self.anim_id} (pattern: {self.bin_folder_pattern})"
+            )
 
         self._animalday_dicts = [
-            core.parse_path_to_animalday(e, animal_param=self.animal_param, day_sep=self.day_sep, mode=self.read_mode)
+            core.parse_path_to_animalday(
+                e,
+                animal_param=self.animal_param,
+                day_sep=self.day_sep,
+                mode=self.read_mode,
+            )
             for e in self._bin_folders
         ]
 
@@ -179,10 +219,14 @@ class AnimalOrganizer(AnimalFeatureParser):
         for animalday, folders in animalday_to_folders.items():
             if len(folders) > 1:
                 overlapping_days += 1
-                logging.info(f"Merging {len(folders)} folders for {animalday}: {[Path(f).name for f in folders]}")
+                logging.info(
+                    f"Merging {len(folders)} folders for {animalday}: {[Path(f).name for f in folders]}"
+                )
 
         if overlapping_days > 0:
-            logging.info(f"Found {overlapping_days} animaldays with overlapping folders")
+            logging.info(
+                f"Found {overlapping_days} animaldays with overlapping folders"
+            )
 
         # Update animaldays to reflect unique days (not total folders)
         self.animaldays = self.unique_animaldays
@@ -195,7 +239,9 @@ class AnimalOrganizer(AnimalFeatureParser):
         logging.info(f"self.genotype: {self.genotype}")
 
         self.long_analyzers: list[core.LongRecordingAnalyzer] = []
-        logging.debug(f"Creating {len(self.unique_animaldays)} LongRecordings (one per unique animalday)")
+        logging.debug(
+            f"Creating {len(self.unique_animaldays)} LongRecordings (one per unique animalday)"
+        )
 
         # Process manual_datetimes if provided in lro_kwargs
         if "manual_datetimes" in lro_kwargs:
@@ -204,7 +250,9 @@ class AnimalOrganizer(AnimalFeatureParser):
             base_lro_kwargs["manual_datetimes"] = datetime(2000, 1, 1, 0, 0, 0)
 
             self._processed_timestamps = self._process_all_timestamps(
-                lro_kwargs["manual_datetimes"], self._animalday_folder_groups, base_lro_kwargs
+                lro_kwargs["manual_datetimes"],
+                self._animalday_folder_groups,
+                base_lro_kwargs,
             )
             # Remove from lro_kwargs since we'll handle it manually
             lro_kwargs = base_lro_kwargs
@@ -242,20 +290,28 @@ class AnimalOrganizer(AnimalFeatureParser):
 
         elif callable(input_spec):
             try:
-                logging.debug(f"Executing user timestamp function on folder: {folder_path}")
+                logging.debug(
+                    f"Executing user timestamp function on folder: {folder_path}"
+                )
                 result = input_spec(folder_path)
                 # Recursively process the result (functions can return datetime or list)
                 return self._resolve_timestamp_input(result, folder_path)
             except Exception as e:
-                logging.error(f"User timestamp function failed on folder '{folder_path}': {e}")
-                raise Exception(f"User timestamp function failed on folder '{folder_path}': {e}") from e
+                logging.error(
+                    f"User timestamp function failed on folder '{folder_path}': {e}"
+                )
+                raise Exception(
+                    f"User timestamp function failed on folder '{folder_path}': {e}"
+                ) from e
 
         else:
             raise TypeError(
                 f"Invalid timestamp input type: {type(input_spec)}. Expected: datetime, List[datetime], or Callable"
             )
 
-    def _find_folder_by_name(self, folder_name: str, animalday_to_folders: dict) -> Path:
+    def _find_folder_by_name(
+        self, folder_name: str, animalday_to_folders: dict
+    ) -> Path:
         """Find folder path by name in the animalday groups."""
         for animalday, folders in animalday_to_folders.items():
             for folder in folders:
@@ -266,7 +322,9 @@ class AnimalOrganizer(AnimalFeatureParser):
         for folders in animalday_to_folders.values():
             available_names.extend([Path(f).name for f in folders])
 
-        raise ValueError(f"Folder name '{folder_name}' not found. Available folders: {available_names}")
+        raise ValueError(
+            f"Folder name '{folder_name}' not found. Available folders: {available_names}"
+        )
 
     def _compute_global_timeline(
         self, base_datetime: datetime, animalday_to_folders: dict, base_lro_kwargs: dict
@@ -306,10 +364,14 @@ class AnimalOrganizer(AnimalFeatureParser):
                 folder_lro_pairs = []
                 for folder in folders:
                     try:
-                        temp_lro = core.LongRecordingOrganizer(folder, **base_lro_kwargs)
+                        temp_lro = core.LongRecordingOrganizer(
+                            folder, **base_lro_kwargs
+                        )
                         folder_lro_pairs.append((folder, temp_lro))
                     except Exception as e:
-                        logging.warning(f"Failed to create temp LRO for duration estimation in {folder}: {e}")
+                        logging.warning(
+                            f"Failed to create temp LRO for duration estimation in {folder}: {e}"
+                        )
                         # Use folder order as fallback
                         folder_lro_pairs.append((folder, None))
 
@@ -331,7 +393,9 @@ class AnimalOrganizer(AnimalFeatureParser):
                 else 0.0
             )
             folder_durations[folder] = duration
-            logging.debug(f"Folder {Path(folder).name}: estimated duration = {duration:.1f}s")
+            logging.debug(
+                f"Folder {Path(folder).name}: estimated duration = {duration:.1f}s"
+            )
 
         # Step 3: Compute continuous start times
         result = {}
@@ -345,7 +409,9 @@ class AnimalOrganizer(AnimalFeatureParser):
             duration = folder_durations[folder]
             current_start_time = current_start_time + timedelta(seconds=duration)
 
-            logging.debug(f"Timeline: {folder_name} starts at {result[folder_name]}, duration {duration:.1f}s")
+            logging.debug(
+                f"Timeline: {folder_name} starts at {result[folder_name]}, duration {duration:.1f}s"
+            )
 
         total_timeline_duration = sum(folder_durations.values())
         logging.info(
@@ -354,7 +420,9 @@ class AnimalOrganizer(AnimalFeatureParser):
 
         return result
 
-    def _process_all_timestamps(self, manual_datetimes, animalday_to_folders: dict, base_lro_kwargs: dict) -> dict:
+    def _process_all_timestamps(
+        self, manual_datetimes, animalday_to_folders: dict, base_lro_kwargs: dict
+    ) -> dict:
         """
         Process the top-level manual_datetimes input and return folder_name -> resolved_timestamps mapping.
 
@@ -371,15 +439,23 @@ class AnimalOrganizer(AnimalFeatureParser):
             logging.info("Processing per-folder timestamp specification")
             resolved = {}
             for folder_name, folder_spec in manual_datetimes.items():
-                folder_path = self._find_folder_by_name(folder_name, animalday_to_folders)
-                resolved[folder_name] = self._resolve_timestamp_input(folder_spec, folder_path)
-                logging.debug(f"Resolved timestamps for {folder_name}: {resolved[folder_name]}")
+                folder_path = self._find_folder_by_name(
+                    folder_name, animalday_to_folders
+                )
+                resolved[folder_name] = self._resolve_timestamp_input(
+                    folder_spec, folder_path
+                )
+                logging.debug(
+                    f"Resolved timestamps for {folder_name}: {resolved[folder_name]}"
+                )
             return resolved
 
         elif isinstance(manual_datetimes, datetime):
             # Global timeline - compute contiguous spacing
             logging.info(f"Processing global timeline starting at {manual_datetimes}")
-            return self._compute_global_timeline(manual_datetimes, animalday_to_folders, base_lro_kwargs)
+            return self._compute_global_timeline(
+                manual_datetimes, animalday_to_folders, base_lro_kwargs
+            )
 
         else:
             # Function or list at top level - apply to all folders
@@ -388,11 +464,17 @@ class AnimalOrganizer(AnimalFeatureParser):
             for animalday, folders in animalday_to_folders.items():
                 for folder in folders:
                     folder_name = Path(folder).name
-                    resolved[folder_name] = self._resolve_timestamp_input(manual_datetimes, Path(folder))
-                    logging.debug(f"Resolved timestamps for {folder_name}: {resolved[folder_name]}")
+                    resolved[folder_name] = self._resolve_timestamp_input(
+                        manual_datetimes, Path(folder)
+                    )
+                    logging.debug(
+                        f"Resolved timestamps for {folder_name}: {resolved[folder_name]}"
+                    )
             return resolved
 
-    def _get_lro_kwargs_for_folder(self, folder_path: str, base_lro_kwargs: dict) -> dict:
+    def _get_lro_kwargs_for_folder(
+        self, folder_path: str, base_lro_kwargs: dict
+    ) -> dict:
         """
         Get the appropriate lro_kwargs for a specific folder, including processed timestamps if available.
 
@@ -411,11 +493,15 @@ class AnimalOrganizer(AnimalFeatureParser):
             # Add the processed timestamps for this folder
             kwargs = base_lro_kwargs.copy()
             kwargs["manual_datetimes"] = self._processed_timestamps[folder_name]
-            logging.debug(f"Using processed timestamps for folder {folder_name}: {kwargs['manual_datetimes']}")
+            logging.debug(
+                f"Using processed timestamps for folder {folder_name}: {kwargs['manual_datetimes']}"
+            )
             return kwargs
         else:
             # No processed timestamps for this folder - use base kwargs
-            logging.debug(f"No processed timestamps for folder {folder_name}, using base kwargs")
+            logging.debug(
+                f"No processed timestamps for folder {folder_name}, using base kwargs"
+            )
             return base_lro_kwargs
 
     def _log_timeline_summary(self):
@@ -431,9 +517,15 @@ class AnimalOrganizer(AnimalFeatureParser):
                     start_time = self._get_lro_start_time(lro)
                     end_time = self._get_lro_end_time(lro)
                     duration = (
-                        lro.LongRecording.get_duration() if hasattr(lro, "LongRecording") and lro.LongRecording else 0
+                        lro.LongRecording.get_duration()
+                        if hasattr(lro, "LongRecording") and lro.LongRecording
+                        else 0
                     )
-                    n_files = len(lro.file_durations) if hasattr(lro, "file_durations") and lro.file_durations else 1
+                    n_files = (
+                        len(lro.file_durations)
+                        if hasattr(lro, "file_durations") and lro.file_durations
+                        else 1
+                    )
                     folder_path = getattr(lro, "base_folder_path", "unknown")
 
                     lines.append(
@@ -487,9 +579,15 @@ class AnimalOrganizer(AnimalFeatureParser):
                 start_time = self._get_lro_start_time(lro)
                 end_time = self._get_lro_end_time(lro)
                 duration = (
-                    lro.LongRecording.get_duration() if hasattr(lro, "LongRecording") and lro.LongRecording else 0
+                    lro.LongRecording.get_duration()
+                    if hasattr(lro, "LongRecording") and lro.LongRecording
+                    else 0
                 )
-                n_files = len(lro.file_durations) if hasattr(lro, "file_durations") and lro.file_durations else 1
+                n_files = (
+                    len(lro.file_durations)
+                    if hasattr(lro, "file_durations") and lro.file_durations
+                    else 1
+                )
                 folder_path = getattr(lro, "base_folder_path", "unknown")
 
                 timeline_data.append(
@@ -500,7 +598,11 @@ class AnimalOrganizer(AnimalFeatureParser):
                         "duration_s": duration,
                         "n_files": n_files,
                         "folder_path": str(folder_path),
-                        "folder_name": Path(folder_path).name if folder_path != "unknown" else "unknown",
+                        "folder_name": (
+                            Path(folder_path).name
+                            if folder_path != "unknown"
+                            else "unknown"
+                        ),
                         "animalday": getattr(
                             lro, "_animalday", "unknown"
                         ),  # This might not exist, but useful if it does
@@ -535,17 +637,23 @@ class AnimalOrganizer(AnimalFeatureParser):
                 lro = core.LongRecordingOrganizer(folders[0], **folder_kwargs)
             else:
                 # Multiple folders - create individual LROs then sort and merge
-                logging.info(f"Creating individual LROs for {len(folders)} folders for {animalday}")
+                logging.info(
+                    f"Creating individual LROs for {len(folders)} folders for {animalday}"
+                )
 
                 # Create individual LROs first, each with their own processed timestamps
                 folder_lro_pairs = []
                 for folder in folders:
                     folder_kwargs = self._get_lro_kwargs_for_folder(folder, lro_kwargs)
-                    individual_lro = core.LongRecordingOrganizer(folder, **folder_kwargs)
+                    individual_lro = core.LongRecordingOrganizer(
+                        folder, **folder_kwargs
+                    )
                     folder_lro_pairs.append((folder, individual_lro))
 
                 # Sort by median time using constructed LROs
-                sorted_folder_lro_pairs = self._sort_lros_by_median_time(folder_lro_pairs)
+                sorted_folder_lro_pairs = self._sort_lros_by_median_time(
+                    folder_lro_pairs
+                )
 
                 # Debug logging to show the order of LROs being merged
                 logging.info("LRO merge order for overlapping animalday:")
@@ -564,7 +672,9 @@ class AnimalOrganizer(AnimalFeatureParser):
                     logging.info(f"  {i + 1}. {folder_name} (duration: {duration_str})")
 
                 # Merge all LROs into the first one (in temporal order)
-                merged_lro = sorted_folder_lro_pairs[0][1]  # Get the LRO from first tuple
+                merged_lro = sorted_folder_lro_pairs[0][
+                    1
+                ]  # Get the LRO from first tuple
                 logging.info(f"Base LRO: {Path(sorted_folder_lro_pairs[0][0]).name}")
 
                 for i, (folder, lro) in enumerate(sorted_folder_lro_pairs[1:], 1):
@@ -573,7 +683,9 @@ class AnimalOrganizer(AnimalFeatureParser):
                     merged_lro.merge(lro)
 
                 lro = merged_lro
-                logging.info(f"Successfully merged {len(sorted_folder_lro_pairs)} LROs for {animalday}")
+                logging.info(
+                    f"Successfully merged {len(sorted_folder_lro_pairs)} LROs for {animalday}"
+                )
 
             self.long_recordings.append(lro)
 
@@ -582,7 +694,9 @@ class AnimalOrganizer(AnimalFeatureParser):
 
         channel_names = [x.channel_names for x in self.long_recordings]
         if len(set([" ".join(x) for x in channel_names])) > 1:
-            warnings.warn(f"Inconsistent channel names in long_recordings: {channel_names}")
+            warnings.warn(
+                f"Inconsistent channel names in long_recordings: {channel_names}"
+            )
         self.channel_names = channel_names[0]
         self.bad_channels_dict = {}
 
@@ -620,7 +734,9 @@ class AnimalOrganizer(AnimalFeatureParser):
                 # Get median timestamp from constituent recordings within the LRO
                 if hasattr(lro, "file_end_datetimes") and lro.file_end_datetimes:
                     try:
-                        valid_timestamps = [ts for ts in lro.file_end_datetimes if ts is not None]
+                        valid_timestamps = [
+                            ts for ts in lro.file_end_datetimes if ts is not None
+                        ]
                     except TypeError:
                         valid_timestamps = []
 
@@ -644,9 +760,13 @@ class AnimalOrganizer(AnimalFeatureParser):
                             f"LRO {Path(folder_path).name}: {n_timestamps} recordings, median timestamp: {median_timestamp}"
                         )
                     else:
-                        raise ValueError(f"No file_end_datetimes available in LRO {Path(folder_path).name}, cannot determine temporal order")
+                        raise ValueError(
+                            f"No file_end_datetimes available in LRO {Path(folder_path).name}, cannot determine temporal order"
+                        )
                 else:
-                    raise ValueError(f"No file_end_datetimes available in LRO {Path(folder_path).name}, cannot determine temporal order")
+                    raise ValueError(
+                        f"No file_end_datetimes available in LRO {Path(folder_path).name}, cannot determine temporal order"
+                    )
 
                 folder_lro_times.append((folder_path, lro, median_time_seconds))
 
@@ -656,12 +776,16 @@ class AnimalOrganizer(AnimalFeatureParser):
 
         # Sort by median time
         sorted_folder_lro_times = sorted(folder_lro_times, key=lambda x: x[2])
-        sorted_folder_lro_pairs = [(folder, lro) for folder, lro, _ in sorted_folder_lro_times]
+        sorted_folder_lro_pairs = [
+            (folder, lro) for folder, lro, _ in sorted_folder_lro_times
+        ]
 
         # Log the sorting for debugging
         if len(folder_lro_pairs) > 1:
             logging.info("LRO temporal sorting details:")
-            for i, (folder, lro, median_time_seconds) in enumerate(sorted_folder_lro_times):
+            for i, (folder, lro, median_time_seconds) in enumerate(
+                sorted_folder_lro_times
+            ):
                 folder_name = Path(folder).name
 
                 # Convert back to datetime for readable logging
@@ -676,7 +800,9 @@ class AnimalOrganizer(AnimalFeatureParser):
                 # Handle mock objects gracefully for duration
                 try:
                     duration = (
-                        lro.LongRecording.get_duration() if hasattr(lro, "LongRecording") and lro.LongRecording else 0
+                        lro.LongRecording.get_duration()
+                        if hasattr(lro, "LongRecording") and lro.LongRecording
+                        else 0
                     )
                     duration_str = f"{float(duration):.1f}s"
                 except (TypeError, ValueError):
@@ -707,11 +833,19 @@ class AnimalOrganizer(AnimalFeatureParser):
 
         return sorted_folder_lro_pairs
 
-    def convert_colbins_to_rowbins(self, overwrite=False, multiprocess_mode: Literal["dask", "serial"] = "serial"):
-        for lrec in tqdm(self.long_recordings, desc="Converting column bins to row bins"):
-            lrec.convert_colbins_to_rowbins(overwrite=overwrite, multiprocess_mode=multiprocess_mode)
+    def convert_colbins_to_rowbins(
+        self, overwrite=False, multiprocess_mode: Literal["dask", "serial"] = "serial"
+    ):
+        for lrec in tqdm(
+            self.long_recordings, desc="Converting column bins to row bins"
+        ):
+            lrec.convert_colbins_to_rowbins(
+                overwrite=overwrite, multiprocess_mode=multiprocess_mode
+            )
 
-    def convert_rowbins_to_rec(self, multiprocess_mode: Literal["dask", "serial"] = "serial"):
+    def convert_rowbins_to_rec(
+        self, multiprocess_mode: Literal["dask", "serial"] = "serial"
+    ):
         for lrec in tqdm(self.long_recordings, desc="Converting row bins to recs"):
             lrec.convert_rowbins_to_rec(multiprocess_mode=multiprocess_mode)
 
@@ -719,7 +853,9 @@ class AnimalOrganizer(AnimalFeatureParser):
         for lrec in self.long_recordings:
             lrec.cleanup_rec()
 
-    def compute_bad_channels(self, lof_threshold: float = None, force_recompute: bool = False):
+    def compute_bad_channels(
+        self, lof_threshold: float = None, force_recompute: bool = False
+    ):
         """Compute bad channels using LOF analysis for all recordings.
 
         Args:
@@ -731,8 +867,12 @@ class AnimalOrganizer(AnimalFeatureParser):
             f"Computing bad channels for {len(self.long_recordings)} recordings with threshold={lof_threshold}"
         )
         for i, lrec in enumerate(self.long_recordings):
-            logging.debug(f"Computing bad channels for recording {i}: {self.animaldays[i]}")
-            lrec.compute_bad_channels(lof_threshold=lof_threshold, force_recompute=force_recompute)
+            logging.debug(
+                f"Computing bad channels for recording {i}: {self.animaldays[i]}"
+            )
+            lrec.compute_bad_channels(
+                lof_threshold=lof_threshold, force_recompute=force_recompute
+            )
             logging.debug(
                 f"Recording {i} LOF scores computed: {hasattr(lrec, 'lof_scores') and lrec.lof_scores is not None}"
             )
@@ -740,7 +880,8 @@ class AnimalOrganizer(AnimalFeatureParser):
         # Update bad channels dict if threshold was applied
         if lof_threshold is not None:
             self.bad_channels_dict = {
-                animalday: lrec.bad_channel_names for animalday, lrec in zip(self.animaldays, self.long_recordings)
+                animalday: lrec.bad_channel_names
+                for animalday, lrec in zip(self.animaldays, self.long_recordings)
             }
 
     def apply_lof_threshold(self, lof_threshold: float):
@@ -753,7 +894,8 @@ class AnimalOrganizer(AnimalFeatureParser):
             lrec.apply_lof_threshold(lof_threshold)
 
         self.bad_channels_dict = {
-            animalday: lrec.bad_channel_names for animalday, lrec in zip(self.animaldays, self.long_recordings)
+            animalday: lrec.bad_channel_names
+            for animalday, lrec in zip(self.animaldays, self.long_recordings)
         }
 
     def get_all_lof_scores(self) -> dict:
@@ -762,7 +904,10 @@ class AnimalOrganizer(AnimalFeatureParser):
         Returns:
             dict: Dictionary mapping animal days to LOF score dictionaries.
         """
-        return {animalday: lrec.get_lof_scores() for animalday, lrec in zip(self.animaldays, self.long_recordings)}
+        return {
+            animalday: lrec.get_lof_scores()
+            for animalday, lrec in zip(self.animaldays, self.long_recordings)
+        }
 
     def compute_windowed_analysis(
         self,
@@ -795,9 +940,13 @@ class AnimalOrganizer(AnimalFeatureParser):
         dataframes = []
         for lrec in self.long_recordings:  # Iterate over all long recordings
             logging.info(f"Computing windowed analysis for {lrec.base_folder_path}")
-            lan = core.LongRecordingAnalyzer(lrec, fragment_len_s=window_s, apply_notch_filter=apply_notch_filter)
+            lan = core.LongRecordingAnalyzer(
+                lrec, fragment_len_s=window_s, apply_notch_filter=apply_notch_filter
+            )
             if lan.n_fragments == 0:
-                logging.warning(f"No fragments found for {lrec.base_folder_path}. Skipping.")
+                logging.warning(
+                    f"No fragments found for {lrec.base_folder_path}. Skipping."
+                )
                 continue
 
             logging.debug(f"Processing {lan.n_fragments} fragments")
@@ -809,23 +958,35 @@ class AnimalOrganizer(AnimalFeatureParser):
 
                     n_fragments_war = max(lan.n_fragments - 1, 1)
                     first_fragment = lan.get_fragment_np(0)
-                    np_fragments = np.empty((n_fragments_war,) + first_fragment.shape, dtype=first_fragment.dtype)
+                    np_fragments = np.empty(
+                        (n_fragments_war,) + first_fragment.shape,
+                        dtype=first_fragment.dtype,
+                    )
                     logging.debug(f"np_fragments.shape: {np_fragments.shape}")
                     for idx in range(n_fragments_war):
                         np_fragments[idx] = lan.get_fragment_np(idx)
 
                     # Cache fragments to zarr
-                    tmppath, _ = core.utils.cache_fragments_to_zarr(np_fragments, n_fragments_war)
+                    tmppath, _ = core.utils.cache_fragments_to_zarr(
+                        np_fragments, n_fragments_war
+                    )
                     del np_fragments
 
                     logging.debug("Processing metadata serially")
-                    metadatas = [self._process_fragment_metadata(idx, lan, window_s) for idx in range(n_fragments_war)]
+                    metadatas = [
+                        self._process_fragment_metadata(idx, lan, window_s)
+                        for idx in range(n_fragments_war)
+                    ]
                     meta_df = pd.DataFrame(metadatas)
 
                     logging.debug("Processing features in parallel")
-                    np_fragments_reconstruct = da.from_zarr(tmppath, chunks=("auto", -1, -1))
+                    np_fragments_reconstruct = da.from_zarr(
+                        tmppath, chunks=("auto", -1, -1)
+                    )
                     logging.debug(f"Dask array shape: {np_fragments_reconstruct.shape}")
-                    logging.debug(f"Dask array chunks: {np_fragments_reconstruct.chunks}")
+                    logging.debug(
+                        f"Dask array chunks: {np_fragments_reconstruct.chunks}"
+                    )
 
                     # Create delayed tasks for each fragment using efficient dependency resolution
                     feature_values = [
@@ -845,7 +1006,9 @@ class AnimalOrganizer(AnimalFeatureParser):
 
                         shutil.rmtree(tmppath)
                     except (OSError, FileNotFoundError) as e:
-                        logging.warning(f"Failed to remove temporary directory {tmppath}: {e}")
+                        logging.warning(
+                            f"Failed to remove temporary directory {tmppath}: {e}"
+                        )
 
                     logging.debug("Combining metadata and feature values")
                     feat_df = pd.DataFrame(feature_values)
@@ -854,8 +1017,16 @@ class AnimalOrganizer(AnimalFeatureParser):
                 case _:
                     logging.debug("Processing serially")
                     lan_df = []
-                    for idx in tqdm(range(lan.n_fragments), desc="Processing rows", miniters=miniters):
-                        lan_df.append(self._process_fragment_serial(idx, features, lan, window_s, kwargs))
+                    for idx in tqdm(
+                        range(lan.n_fragments),
+                        desc="Processing rows",
+                        miniters=miniters,
+                    ):
+                        lan_df.append(
+                            self._process_fragment_serial(
+                                idx, features, lan, window_s, kwargs
+                            )
+                        )
 
             lan_df = pd.DataFrame(lan_df)
 
@@ -881,7 +1052,9 @@ class AnimalOrganizer(AnimalFeatureParser):
                     "lof_scores": lrec.lof_scores.tolist(),
                     "channel_names": lrec.channel_names,
                 }
-                logging.info(f"Added LOF scores for {animalday}: {len(lrec.lof_scores)} channels")
+                logging.info(
+                    f"Added LOF scores for {animalday}: {len(lrec.lof_scores)} channels"
+                )
 
         logging.info(f"Total LOF scores collected: {len(lof_scores_dict)} animal days")
 
@@ -898,7 +1071,9 @@ class AnimalOrganizer(AnimalFeatureParser):
 
         return self.window_analysis_result
 
-    def compute_spike_analysis(self, multiprocess_mode: Literal["dask", "serial"] = "serial") -> list["SpikeAnalysisResult"]:
+    def compute_spike_analysis(
+        self, multiprocess_mode: Literal["dask", "serial"] = "serial"
+    ) -> list["SpikeAnalysisResult"]:
         """Compute spike sorting on all long recordings and return a list of SpikeAnalysisResult objects
 
         Args:
@@ -913,7 +1088,9 @@ class AnimalOrganizer(AnimalFeatureParser):
         """
         # Check if mountainsort5 is available
         if not MOUNTAINSORT_AVAILABLE:
-            raise ImportError("Spike analysis requires mountainsort5. Install it with: pip install mountainsort5")
+            raise ImportError(
+                "Spike analysis requires mountainsort5. Install it with: pip install mountainsort5"
+            )
         sars = []
         lrec_sorts = []
         lrec_recs = []
@@ -962,7 +1139,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         self,
         detection_params: dict = None,
         max_length: int = None,
-        multiprocess_mode: Literal["dask", "serial"] = "serial"
+        multiprocess_mode: Literal["dask", "serial"] = "serial",
     ):
         """
         Compute frequency-domain spike detection on all long recordings.
@@ -984,7 +1161,9 @@ class AnimalOrganizer(AnimalFeatureParser):
         fdsar_list = []
         recs = [lrec.LongRecording for lrec in self.long_recordings]
 
-        logging.info(f"Running frequency-domain spike detection on {len(recs)} recordings")
+        logging.info(
+            f"Running frequency-domain spike detection on {len(recs)} recordings"
+        )
         logging.info(f"Detection parameters: {detection_params}")
 
         for i, rec in enumerate(recs):
@@ -999,7 +1178,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                         rec,
                         detection_params=detection_params,
                         max_length=max_length,
-                        multiprocess_mode=multiprocess_mode
+                        multiprocess_mode=multiprocess_mode,
                     )
                 )
 
@@ -1020,7 +1199,9 @@ class AnimalOrganizer(AnimalFeatureParser):
 
                 # Log results
                 total_spikes = sum(len(spikes) for spikes in spike_indices_per_channel)
-                logging.info(f"Recording {i+1}/{len(recs)}: Detected {total_spikes} spikes across {len(spike_indices_per_channel)} channels")
+                logging.info(
+                    f"Recording {i+1}/{len(recs)}: Detected {total_spikes} spikes across {len(spike_indices_per_channel)} channels"
+                )
 
             except Exception as e:
                 logging.error(f"Error processing recording {i+1}/{len(recs)}: {e}")
@@ -1029,20 +1210,29 @@ class AnimalOrganizer(AnimalFeatureParser):
         # Store results for later access
         self.frequency_domain_spike_analysis_results = fdsar_list
 
-        logging.info(f"Completed frequency-domain spike detection. Total recordings processed: {len(fdsar_list)}")
+        logging.info(
+            f"Completed frequency-domain spike detection. Total recordings processed: {len(fdsar_list)}"
+        )
         return fdsar_list
 
-    def _process_fragment_serial(self, idx, features, lan: core.LongRecordingAnalyzer, window_s, kwargs: dict):
+    def _process_fragment_serial(
+        self, idx, features, lan: core.LongRecordingAnalyzer, window_s, kwargs: dict
+    ):
         row = self._process_fragment_metadata(idx, lan, window_s)
         row.update(self._process_fragment_features(idx, features, lan, kwargs))
         return row
 
-    def _process_fragment_metadata(self, idx, lan: core.LongRecordingAnalyzer, window_s):
+    def _process_fragment_metadata(
+        self, idx, lan: core.LongRecordingAnalyzer, window_s
+    ):
         row = {}
 
         lan_folder = lan.LongRecording.base_folder_path
         animalday_dict = core.parse_path_to_animalday(
-            lan_folder, animal_param=self.animal_param, day_sep=self.day_sep, mode=self.read_mode
+            lan_folder,
+            animal_param=self.animal_param,
+            day_sep=self.day_sep,
+            mode=self.read_mode,
         )
         row["animalday"] = animalday_dict["animalday"]
         row["animal"] = animalday_dict["animal"]
@@ -1057,7 +1247,9 @@ class AnimalOrganizer(AnimalFeatureParser):
 
         return row
 
-    def _process_fragment_features(self, idx, features, lan: core.LongRecordingAnalyzer, kwargs: dict):
+    def _process_fragment_features(
+        self, idx, features, lan: core.LongRecordingAnalyzer, kwargs: dict
+    ):
         row = {}
         for feat in features:
             func = getattr(lan, f"compute_{feat}")
@@ -1101,6 +1293,24 @@ def _sanitize_feature_request(features: list[str], exclude: list[str] = []):
 class WindowAnalysisResult(AnimalFeatureParser):
     """
     Wrapper for output of windowed analysis. Has useful functions like group-wise and global averaging, filtering, and saving
+
+    Args:
+        result (pd.DataFrame): Result comes from AnimalOrganizer.compute_windowed_analysis()
+        animal_id (str, optional): Identifier for the animal where result was computed from. Defaults to None.
+        genotype (str, optional): Genotype of animal. Defaults to None.
+        channel_names (list[str], optional): List of channel names. Defaults to None.
+        assume_channels (bool, optional): If true, assumes channel names according to AnimalFeatureParser.DEFAULT_CHNUM_TO_NAME. Defaults to False.
+        bad_channels_dict (dict[str, list[str]], optional): Dictionary of channels to reject for each recording session. Defaults to {}.
+        suppress_short_interval_error (bool, optional): If True, suppress ValueError for short intervals between timestamps. Useful for aggregated WARs with large window sizes. Defaults to False.
+
+    Attributes:
+        result (pd.DataFrame): DataFrame containing the windowed analysis results.
+        animal_id (str): Identifier for the animal.
+        genotype (str): Genotype of the animal.
+        channel_names (list[str]): List of channel names.
+        channel_abbrevs (list[str]): Abbreviated channel names.
+        bad_channels_dict (dict): Dictionary mapping sessions to bad channel names.
+        lof_scores_dict (dict): Dictionary of LOF scores for outage detection.
     """
 
     def __init__(
@@ -1114,16 +1324,6 @@ class WindowAnalysisResult(AnimalFeatureParser):
         suppress_short_interval_error=False,
         lof_scores_dict: dict[str, dict] = {},
     ) -> None:
-        """
-        Args:
-            result (pd.DataFrame): Result comes from AnimalOrganizer.compute_windowed_analysis()
-            animal_id (str, optional): Identifier for the animal where result was computed from. Defaults to None.
-            genotype (str, optional): Genotype of animal. Defaults to None.
-            channel_names (list[str], optional): List of channel names. Defaults to None.
-            assume_channels (bool, optional): If true, assumes channel names according to AnimalFeatureParser.DEFAULT_CHNUM_TO_NAME. Defaults to False.
-            bad_channels_dict (dict[str, list[str]], optional): Dictionary of channels to reject for each recording session. Defaults to {}.
-            suppress_short_interval_error (bool, optional): If True, suppress ValueError for short intervals between timestamps. Useful for aggregated WARs with large window sizes. Defaults to False.
-        """
         self.result = result
         self.animal_id = animal_id
         self.genotype = genotype
@@ -1152,7 +1352,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
             result=self.result.copy(deep=True),
             animal_id=self.animal_id,
             genotype=self.genotype,
-            channel_names=self.channel_names.copy() if self.channel_names is not None else None,
+            channel_names=(
+                self.channel_names.copy() if self.channel_names is not None else None
+            ),
             assume_from_number=self.assume_from_number,
             bad_channels_dict=copy.deepcopy(self.bad_channels_dict),
             suppress_short_interval_error=self.suppress_short_interval_error,
@@ -1168,7 +1370,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
         # Check if timestamps are sorted and sort if needed
         if "timestamp" in self.result.columns:
             if not self.result["timestamp"].is_monotonic_increasing:
-                warnings.warn("Timestamps are not sorted. Sorting result DataFrame by timestamp.")
+                warnings.warn(
+                    "Timestamps are not sorted. Sorting result DataFrame by timestamp."
+                )
                 self.result = self.result.sort_values("timestamp")
 
         # Check for unusually short intervals between timestamps
@@ -1189,7 +1393,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     f"that are shorter than the median duration of {median_duration:.1f}s"
                 )
 
-                if pct_short > 1.0 and not self.suppress_short_interval_error:  # More than 1% of intervals are short
+                if (
+                    pct_short > 1.0 and not self.suppress_short_interval_error
+                ):  # More than 1% of intervals are short
                     raise ValueError(warning_msg)
                 elif not self.suppress_short_interval_error:
                     warnings.warn(warning_msg)
@@ -1203,12 +1409,17 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     f"Animal ID mismatch: result has {unique_animals[0]}, but self.animal_id is {self.animal_id}"
                 )
 
-        self._feature_columns = [x for x in self.result.columns if x in constants.FEATURES]
-        self._nonfeature_columns = [x for x in self.result.columns if x not in constants.FEATURES]
+        self._feature_columns = [
+            x for x in self.result.columns if x in constants.FEATURES
+        ]
+        self._nonfeature_columns = [
+            x for x in self.result.columns if x not in constants.FEATURES
+        ]
         self.animaldays = self.result.loc[:, "animalday"].unique()
 
         self.channel_abbrevs = [
-            core.parse_chname_to_abbrev(x, assume_from_number=self.assume_from_number) for x in self.channel_names
+            core.parse_chname_to_abbrev(x, assume_from_number=self.assume_from_number)
+            for x in self.channel_names
         ]
 
     def reorder_and_pad_channels(
@@ -1228,7 +1439,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
         """
         duplicates = [ch for ch in target_channels if target_channels.count(ch) > 1]
         if duplicates:
-            raise ValueError(f"Target channels must be unique. Found duplicates: {duplicates}")
+            raise ValueError(
+                f"Target channels must be unique. Found duplicates: {duplicates}"
+            )
 
         result = self.result.copy()
 
@@ -1243,7 +1456,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
         for feature in self._feature_columns:
             match feature:
-                case _ if feature in constants.LINEAR_FEATURES + constants.BAND_FEATURES:
+                case _ if (
+                    feature in constants.LINEAR_FEATURES + constants.BAND_FEATURES
+                ):
                     if feature in constants.BAND_FEATURES:
                         df_bands = pd.DataFrame(result[feature].tolist())
                         vals = np.array(df_bands.values.tolist())
@@ -1252,7 +1467,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     else:
                         vals = np.array(result[feature].tolist())
 
-                    new_vals = np.full((vals.shape[0], len(target_channels), *vals.shape[2:]), np.nan)  # dubious
+                    new_vals = np.full(
+                        (vals.shape[0], len(target_channels), *vals.shape[2:]), np.nan
+                    )  # dubious
 
                     for i, ch in enumerate(channel_names):
                         if ch in channel_map:
@@ -1273,7 +1490,10 @@ class WindowAnalysisResult(AnimalFeatureParser):
                         vals = np.array(result[feature].tolist())
 
                     logging.debug(f"vals.shape: {vals.shape}")
-                    new_shape = list(vals.shape[:-2]) + [len(target_channels), len(target_channels)]
+                    new_shape = list(vals.shape[:-2]) + [
+                        len(target_channels),
+                        len(target_channels),
+                    ]
                     new_vals = np.full(new_shape, np.nan)
 
                     # Map original channels to target channels
@@ -1281,7 +1501,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
                         if ch1 in channel_map:
                             for j, ch2 in enumerate(channel_names):
                                 if ch2 in channel_map:
-                                    new_vals[..., channel_map[ch1], channel_map[ch2]] = vals[..., i, j]
+                                    new_vals[
+                                        ..., channel_map[ch1], channel_map[ch2]
+                                    ] = vals[..., i, j]
 
                     if feature in ["cohere", "zcohere", "imcoh", "zimcoh"]:
                         result[feature] = [dict(zip(keys, vals)) for vals in new_vals]
@@ -1291,13 +1513,17 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 case _ if feature in constants.HIST_FEATURES:
                     coords = np.array([x[0] for x in result[feature].tolist()])
                     vals = np.array([x[1] for x in result[feature].tolist()])
-                    new_vals = np.full((*vals.shape[0:-1], len(target_channels)), np.nan)
+                    new_vals = np.full(
+                        (*vals.shape[0:-1], len(target_channels)), np.nan
+                    )
 
                     for i, ch in enumerate(channel_names):
                         if ch in channel_map:
                             new_vals[:, ..., channel_map[ch]] = vals[:, ..., i]
 
-                    result[feature] = [(coords[i], new_vals[i]) for i in range(len(coords))]
+                    result[feature] = [
+                        (coords[i], new_vals[i]) for i in range(len(coords))
+                    ]
 
                 case _:
                     raise ValueError(f"Invalid feature: {feature}")
@@ -1319,7 +1545,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         self,
         sars: list[Union["SpikeAnalysisResult", "FrequencyDomainSpikeAnalysisResult"]],
         read_mode: Literal["sa", "mne"] = "sa",
-        inplace=True
+        inplace=True,
     ):
         """
         Integrate spike analysis results into WAR by adding nspike/lognspike features.
@@ -1360,8 +1586,12 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     for i, sa in enumerate(sar.result_sas):  # for each channel
                         spike_times = []
                         for unit in sa.sorting.get_unit_ids():  # Flatten units
-                            spike_times.extend(sa.sorting.get_unit_spike_train(unit_id=unit).tolist())
-                        spike_times = np.array(spike_times) / sa.sorting.get_sampling_frequency()
+                            spike_times.extend(
+                                sa.sorting.get_unit_spike_train(unit_id=unit).tolist()
+                            )
+                        spike_times = (
+                            np.array(spike_times) / sa.sorting.get_sampling_frequency()
+                        )
                         spikes_channel.append(spike_times)
                     spikes_all.append(spikes_channel)
                 return self._read_from_spikes_all(spikes_all, inplace=inplace)
@@ -1451,15 +1681,21 @@ class WindowAnalysisResult(AnimalFeatureParser):
         animaldays = grouped.groups.keys()
         logging.debug(f"Animal days: {animaldays}")
         spike_counts = dict(zip(animaldays, spikes_all))
-        spike_counts = grouped.apply(lambda x: _bin_spike_df(x, spikes_channel=spike_counts[x.name]))
+        spike_counts = grouped.apply(
+            lambda x: _bin_spike_df(x, spikes_channel=spike_counts[x.name])
+        )
         spike_counts: pd.Series = spike_counts.explode()
 
         if spike_counts.size != self.result.shape[0]:
-            logging.warning(f"Spike counts size {spike_counts.size} does not match result size {self.result.shape[0]}")
+            logging.warning(
+                f"Spike counts size {spike_counts.size} does not match result size {self.result.shape[0]}"
+            )
 
         result = self.result.copy()
         result["nspike"] = spike_counts.tolist()
-        result["lognspike"] = list(core.log_transform(np.stack(result["nspike"].tolist(), axis=0)))
+        result["lognspike"] = list(
+            core.log_transform(np.stack(result["nspike"].tolist(), axis=0))
+        )
         if inplace:
             self.result = result
             return self
@@ -1480,11 +1716,15 @@ class WindowAnalysisResult(AnimalFeatureParser):
         info.append(
             f"genotype: {self.result['genotype'].unique()[0] if 'genotype' in self.result.columns else self.genotype}"
         )
-        info.append(f"channel_names: {', '.join(self.channel_names) if self.channel_names else 'None'}")
+        info.append(
+            f"channel_names: {', '.join(self.channel_names) if self.channel_names else 'None'}"
+        )
 
         return "\n".join(info)
 
-    def get_result(self, features: list[str], exclude: list[str] = [], allow_missing=False):
+    def get_result(
+        self, features: list[str], exclude: list[str] = [], allow_missing=False
+    ):
         """Get windowed analysis result dataframe, with helpful filters
 
         Args:
@@ -1502,7 +1742,11 @@ class WindowAnalysisResult(AnimalFeatureParser):
             return self.result.reindex(columns=self._nonfeature_columns + features)
 
     def get_groupavg_result(
-        self, features: list[str], exclude: list[str] = [], df: pd.DataFrame = None, groupby="animalday"
+        self,
+        features: list[str],
+        exclude: list[str] = [],
+        df: pd.DataFrame = None,
+        groupby="animalday",
     ):
         """Group result and average within groups. Preserves data structure and shape for each feature.
 
@@ -1515,13 +1759,17 @@ class WindowAnalysisResult(AnimalFeatureParser):
         Returns:
             pd.DataFrame: Result grouped by `groupby` and averaged for each group.
         """
-        result_grouped, result_validcols = self.__get_groups(features=features, exclude=exclude, df=df, groupby=groupby)
+        result_grouped, result_validcols = self.__get_groups(
+            features=features, exclude=exclude, df=df, groupby=groupby
+        )
         features = _sanitize_feature_request(features, exclude)
 
         avg_results = []
         for f in features:
             if f in result_validcols:
-                avg_result_col = result_grouped.apply(self._average_feature, f, "duration", include_groups=False)
+                avg_result_col = result_grouped.apply(
+                    self._average_feature, f, "duration", include_groups=False
+                )
                 avg_result_col.name = f
                 avg_results.append(avg_result_col)
             else:
@@ -1529,7 +1777,13 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
         return pd.concat(avg_results, axis=1)
 
-    def __get_groups(self, features: list[str], exclude: list[str] = [], df: pd.DataFrame = None, groupby="animalday"):
+    def __get_groups(
+        self,
+        features: list[str],
+        exclude: list[str] = [],
+        df: pd.DataFrame = None,
+        groupby="animalday",
+    ):
         features = _sanitize_feature_request(features, exclude)
         result_win = self.result if df is None else df
         return result_win.groupby(groupby), result_win.columns
@@ -1612,7 +1866,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
         out[np_rms < min_rms] = False
         return out
 
-    def get_filter_high_beta(self, df: pd.DataFrame = None, max_beta_prop=0.4, **kwargs):
+    def get_filter_high_beta(
+        self, df: pd.DataFrame = None, max_beta_prop=0.4, **kwargs
+    ):
         """Filter windows based on beta power.
 
         Args:
@@ -1632,7 +1888,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
             np_total = np.array(result["psdtotal"].tolist())
             np_prop = np_beta / np_total
         else:
-            raise ValueError("psdfrac or psdband+psdtotal required for beta power filtering")
+            raise ValueError(
+                "psdfrac or psdband+psdtotal required for beta power filtering"
+            )
 
         out = np.full(np_prop.shape, True)
         out[np_prop > max_beta_prop] = False
@@ -1673,11 +1931,16 @@ class WindowAnalysisResult(AnimalFeatureParser):
             return mask
 
         channel_targets = (
-            self.channel_abbrevs if use_abbrevs or use_abbrevs is None else self.channel_names
+            self.channel_abbrevs
+            if use_abbrevs or use_abbrevs is None
+            else self.channel_names
         )  # Match to appropriate target
         if use_abbrevs is None:  # Match channels as abbreviations
             bad_channels = [
-                core.parse_chname_to_abbrev(ch, assume_from_number=self.assume_from_number) for ch in bad_channels
+                core.parse_chname_to_abbrev(
+                    ch, assume_from_number=self.assume_from_number
+                )
+                for ch in bad_channels
             ]
 
         # Match channels to channel_targets
@@ -1697,20 +1960,27 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 bad_channels.copy()
                 if use_abbrevs is False
                 else [
-                    core.parse_chname_to_abbrev(ch, assume_from_number=self.assume_from_number) for ch in bad_channels
+                    core.parse_chname_to_abbrev(
+                        ch, assume_from_number=self.assume_from_number
+                    )
+                    for ch in bad_channels
                 ]
             )
 
             if save_bad_channels == "overwrite":
                 # Replace entire dict with bad channels applied to all sessions
-                self.bad_channels_dict = {animalday: channels_to_save.copy() for animalday in animaldays}
+                self.bad_channels_dict = {
+                    animalday: channels_to_save.copy() for animalday in animaldays
+                }
             elif save_bad_channels == "union":
                 # Merge with existing bad channels for all sessions
                 updated_dict = self.bad_channels_dict.copy()
                 for animalday in animaldays:
                     if animalday in updated_dict:
                         # Union of existing and new channels
-                        updated_dict[animalday] = list(set(updated_dict[animalday]) | set(channels_to_save))
+                        updated_dict[animalday] = list(
+                            set(updated_dict[animalday]) | set(channels_to_save)
+                        )
                     else:
                         updated_dict[animalday] = channels_to_save.copy()
                 self.bad_channels_dict = updated_dict
@@ -1762,10 +2032,17 @@ class WindowAnalysisResult(AnimalFeatureParser):
             else:
                 bad_channels = []
 
-            channel_targets = self.channel_abbrevs if use_abbrevs or use_abbrevs is None else self.channel_names
+            channel_targets = (
+                self.channel_abbrevs
+                if use_abbrevs or use_abbrevs is None
+                else self.channel_names
+            )
             if use_abbrevs is None:
                 bad_channels = [
-                    core.parse_chname_to_abbrev(ch, assume_from_number=self.assume_from_number) for ch in bad_channels
+                    core.parse_chname_to_abbrev(
+                        ch, assume_from_number=self.assume_from_number
+                    )
+                    for ch in bad_channels
                 ]
 
             # Get indices for this recording session
@@ -1777,7 +2054,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     ch_idx = channel_targets.index(ch)
                     mask[session_indices, ch_idx] = False
                 else:
-                    logging.warning(f"Channel {ch} not found in {channel_targets} for session {animalday}")
+                    logging.warning(
+                        f"Channel {ch} not found in {channel_targets} for session {animalday}"
+                    )
 
         # Save bad channels to self.bad_channels_dict if requested
         if save_bad_channels is not None and bad_channels_dict is not None:
@@ -1789,7 +2068,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 for animalday, channels in bad_channels_dict.items():
                     if animalday in updated_dict:
                         # Union of existing and new channels
-                        updated_dict[animalday] = list(set(updated_dict[animalday]) | set(channels))
+                        updated_dict[animalday] = list(
+                            set(updated_dict[animalday]) | set(channels)
+                        )
                     else:
                         updated_dict[animalday] = channels.copy()
                 self.bad_channels_dict = updated_dict
@@ -1809,7 +2090,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
             np.ndarray: Smoothed boolean mask
         """
         if "duration" not in self.result.columns:
-            raise ValueError("Cannot calculate window duration - 'duration' column missing")
+            raise ValueError(
+                "Cannot calculate window duration - 'duration' column missing"
+            )
 
         window_duration = self.result["duration"].median()
         structure_size = max(1, int(smoothing_seconds / window_duration))
@@ -1821,14 +2104,20 @@ class WindowAnalysisResult(AnimalFeatureParser):
         for ch_idx in range(filter_mask.shape[1]):
             channel_mask = filter_mask[:, ch_idx]
             # Opening removes small isolated artifacts
-            channel_mask = binary_opening(channel_mask, structure=np.ones(structure_size))
+            channel_mask = binary_opening(
+                channel_mask, structure=np.ones(structure_size)
+            )
             # Closing fills small gaps in valid data
-            channel_mask = binary_closing(channel_mask, structure=np.ones(structure_size))
+            channel_mask = binary_closing(
+                channel_mask, structure=np.ones(structure_size)
+            )
             smoothed_mask[:, ch_idx] = channel_mask
 
         return smoothed_mask
 
-    def filter_morphological_smoothing(self, smoothing_seconds: float) -> "WindowAnalysisResult":
+    def filter_morphological_smoothing(
+        self, smoothing_seconds: float
+    ) -> "WindowAnalysisResult":
         """Apply morphological smoothing to all data.
 
         Args:
@@ -1839,7 +2128,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
         """
         # Start with all-True mask and smooth it
         base_mask = np.ones((len(self.result), len(self.channel_names)), dtype=bool)
-        smoothed_mask = self.get_filter_morphological_smoothing(base_mask, smoothing_seconds)
+        smoothed_mask = self.get_filter_morphological_smoothing(
+            base_mask, smoothing_seconds
+        )
         return self._create_filtered_copy(smoothed_mask)
 
     def filter_all(
@@ -1898,16 +2189,22 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
         # Apply all filters
         filt_bool_all = np.prod(np.stack(filt_bools, axis=-1), axis=-1).astype(bool)
-        logging.debug(f"filt_bool_all.shape: {filt_bool_all.shape}")  # (windows, channels)
+        logging.debug(
+            f"filt_bool_all.shape: {filt_bool_all.shape}"
+        )  # (windows, channels)
 
         # Apply morphological smoothing if requested
         if morphological_smoothing_seconds is not None:
             if "duration" not in self.result.columns:
-                raise ValueError("Cannot calculate window duration - 'duration' column missing from result dataframe")
+                raise ValueError(
+                    "Cannot calculate window duration - 'duration' column missing from result dataframe"
+                )
             window_duration = self.result["duration"].median()
 
             # Calculate number of windows for the smoothing
-            structure_size = max(1, int(morphological_smoothing_seconds / window_duration))
+            structure_size = max(
+                1, int(morphological_smoothing_seconds / window_duration)
+            )
 
             if structure_size > 1:
                 logging.info(
@@ -1918,17 +2215,27 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 for ch_idx in range(filt_bool_all.shape[1]):
                     channel_mask = filt_bool_all[:, ch_idx]
                     # Opening removes small isolated artifacts
-                    channel_mask = binary_opening(channel_mask, structure=np.ones(structure_size))
+                    channel_mask = binary_opening(
+                        channel_mask, structure=np.ones(structure_size)
+                    )
                     # Closing fills small gaps in valid data
-                    channel_mask = binary_closing(channel_mask, structure=np.ones(structure_size))
+                    channel_mask = binary_closing(
+                        channel_mask, structure=np.ones(structure_size)
+                    )
                     filt_bool_all[:, ch_idx] = channel_mask
             else:
-                logging.info("Skipping morphological smoothing - structure size would be 1 (no effect)")
+                logging.info(
+                    "Skipping morphological smoothing - structure size would be 1 (no effect)"
+                )
 
         # Filter windows based on number of valid channels
         valid_channels_per_window = np.sum(filt_bool_all, axis=1)  # axis 1 = channel
-        window_mask = valid_channels_per_window >= min_valid_channels  # True if window has enough valid channels
-        filt_bool_all = filt_bool_all & window_mask[:, np.newaxis]  # Apply window mask to all channels
+        window_mask = (
+            valid_channels_per_window >= min_valid_channels
+        )  # True if window has enough valid channels
+        filt_bool_all = (
+            filt_bool_all & window_mask[:, np.newaxis]
+        )  # Apply window mask to all channels
 
         filtered_result = self._apply_filter(filt_bool_all)
         if inplace:
@@ -2014,7 +2321,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
         mask = self.get_filter_high_beta(max_beta_prop=max_beta_prop)
         return self._create_filtered_copy(mask)
 
-    def filter_reject_channels(self, bad_channels: list[str], use_abbrevs: bool = None) -> "WindowAnalysisResult":
+    def filter_reject_channels(
+        self, bad_channels: list[str], use_abbrevs: bool = None
+    ) -> "WindowAnalysisResult":
         """Filter out specified bad channels.
 
         Args:
@@ -2024,7 +2333,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
         Returns:
             WindowAnalysisResult: New filtered instance
         """
-        mask = self.get_filter_reject_channels(bad_channels=bad_channels, use_abbrevs=use_abbrevs)
+        mask = self.get_filter_reject_channels(
+            bad_channels=bad_channels, use_abbrevs=use_abbrevs
+        )
         return self._create_filtered_copy(mask)
 
     def filter_reject_channels_by_session(
@@ -2082,7 +2393,10 @@ class WindowAnalysisResult(AnimalFeatureParser):
         return self._create_filtered_copy(mask)
 
     def apply_filters(
-        self, filter_config: dict = None, min_valid_channels: int = 3, morphological_smoothing_seconds: float = None
+        self,
+        filter_config: dict = None,
+        min_valid_channels: int = 3,
+        morphological_smoothing_seconds: float = None,
     ) -> "WindowAnalysisResult":
         """Apply multiple filters using configuration.
 
@@ -2139,13 +2453,17 @@ class WindowAnalysisResult(AnimalFeatureParser):
             filter_func = filter_methods[filter_name]
             filt_bool = filter_func(**filter_params)
             filt_bools.append(filt_bool)
-            logging.info(f"{filter_name}: filtered {filt_bool.size - np.count_nonzero(filt_bool)}/{filt_bool.size}")
+            logging.info(
+                f"{filter_name}: filtered {filt_bool.size - np.count_nonzero(filt_bool)}/{filt_bool.size}"
+            )
 
         # Combine all filter masks
         if filt_bools:
             filt_bool_all = np.prod(np.stack(filt_bools, axis=-1), axis=-1).astype(bool)
         else:
-            filt_bool_all = np.ones((len(self.result), len(self.channel_names)), dtype=bool)
+            filt_bool_all = np.ones(
+                (len(self.result), len(self.channel_names)), dtype=bool
+            )
 
         # Apply morphological smoothing if requested (either from config or parameter)
         if morphological_params or morphological_smoothing_seconds is not None:
@@ -2154,7 +2472,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
             else:
                 smoothing_seconds = morphological_smoothing_seconds
 
-            filt_bool_all = self.get_filter_morphological_smoothing(filt_bool_all, smoothing_seconds)
+            filt_bool_all = self.get_filter_morphological_smoothing(
+                filt_bool_all, smoothing_seconds
+            )
             logging.info(f"Applied morphological smoothing: {smoothing_seconds}s")
 
         # Filter windows based on minimum valid channels
@@ -2173,7 +2493,16 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 continue
             logging.info(f"Filtering {feat}")
             match feat:  # NOTE refactor this to use constants
-                case "rms" | "ampvar" | "psdtotal" | "nspike" | "logrms" | "logampvar" | "logpsdtotal" | "lognspike":
+                case (
+                    "rms"
+                    | "ampvar"
+                    | "psdtotal"
+                    | "nspike"
+                    | "logrms"
+                    | "logampvar"
+                    | "logpsdtotal"
+                    | "lognspike"
+                ):
                     vals = np.array(result[feat].tolist())
                     # Convert to float to allow NaN assignment for integer features
                     if vals.dtype.kind in ("i", "u"):  # integer types
@@ -2261,8 +2590,12 @@ class WindowAnalysisResult(AnimalFeatureParser):
         json_dict = {
             "animal_id": self.animal_id,
             "genotype": self.genotype,
-            "channel_names": self.channel_abbrevs if save_abbrevs_as_chnames else self.channel_names,
-            "assume_from_number": False if save_abbrevs_as_chnames else self.assume_from_number,
+            "channel_names": (
+                self.channel_abbrevs if save_abbrevs_as_chnames else self.channel_names
+            ),
+            "assume_from_number": (
+                False if save_abbrevs_as_chnames else self.assume_from_number
+            ),
             "bad_channels_dict": self.bad_channels_dict,
             "suppress_short_interval_error": self.suppress_short_interval_error,
             "lof_scores_dict": self.lof_scores_dict.copy(),
@@ -2282,7 +2615,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
             dict: Dictionary mapping animal days to lists of bad channel names.
         """
         if not hasattr(self, "lof_scores_dict") or not self.lof_scores_dict:
-            raise ValueError("LOF scores not available in this WAR. Compute LOF scores first.")
+            raise ValueError(
+                "LOF scores not available in this WAR. Compute LOF scores first."
+            )
 
         bad_channels_dict = {}
         for animalday, lof_data in self.lof_scores_dict.items():
@@ -2305,7 +2640,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
             dict: Dictionary mapping animal days to LOF score dictionaries.
         """
         if not hasattr(self, "lof_scores_dict") or not self.lof_scores_dict:
-            raise ValueError("LOF scores not available in this WAR. Compute LOF scores first.")
+            raise ValueError(
+                "LOF scores not available in this WAR. Compute LOF scores first."
+            )
 
         result = {}
         for animalday, lof_data in self.lof_scores_dict.items():
@@ -2319,7 +2656,10 @@ class WindowAnalysisResult(AnimalFeatureParser):
         return result
 
     def evaluate_lof_threshold_binary(
-        self, ground_truth_bad_channels: dict = None, threshold: float = None, evaluation_channels: list[str] = None
+        self,
+        ground_truth_bad_channels: dict = None,
+        threshold: float = None,
+        evaluation_channels: list[str] = None,
     ) -> tuple:
         """Evaluate single threshold against ground truth for binary classification.
 
@@ -2334,7 +2674,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
                    Each element represents one channel from one animal-day
         """
         if not hasattr(self, "lof_scores_dict") or not self.lof_scores_dict:
-            raise ValueError("LOF scores not available in this WAR. Run compute_bad_channels() first.")
+            raise ValueError(
+                "LOF scores not available in this WAR. Run compute_bad_channels() first."
+            )
 
         if threshold is None:
             raise ValueError("threshold parameter is required")
@@ -2357,14 +2699,18 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
                 # Only use bad channel keys that have corresponding LOF data
                 ground_truth_bad_channels = {
-                    key: value for key, value in self.bad_channels_dict.items() if key in lof_keys
+                    key: value
+                    for key, value in self.bad_channels_dict.items()
+                    if key in lof_keys
                 }
 
                 logging.info(
                     f"Using filtered bad_channels_dict as ground truth with {len(ground_truth_bad_channels)} animal-day sessions"
                 )
             else:
-                raise ValueError("No ground truth provided and self.bad_channels_dict is empty.")
+                raise ValueError(
+                    "No ground truth provided and self.bad_channels_dict is empty."
+                )
 
         # Get all channels if no subset specified
         if evaluation_channels is None:
@@ -2374,11 +2720,15 @@ class WindowAnalysisResult(AnimalFeatureParser):
         y_pred_list = []
 
         # Debug: Log what we're working with
-        logging.debug(f"evaluate_lof_threshold_binary: evaluation_channels = {evaluation_channels}")
+        logging.debug(
+            f"evaluate_lof_threshold_binary: evaluation_channels = {evaluation_channels}"
+        )
         logging.debug(
             f"evaluate_lof_threshold_binary: ground_truth_bad_channels keys = {list(ground_truth_bad_channels.keys())}"
         )
-        logging.debug(f"evaluate_lof_threshold_binary: lof_scores_dict keys = {list(self.lof_scores_dict.keys())}")
+        logging.debug(
+            f"evaluate_lof_threshold_binary: lof_scores_dict keys = {list(self.lof_scores_dict.keys())}"
+        )
 
         # Iterate through each animal-day and evaluate channels
         for animalday, lof_data in self.lof_scores_dict.items():
@@ -2395,7 +2745,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
             # Debug: Log details for this animal-day
             logging.debug(f"Processing {animalday}: channel_names = {channel_names}")
-            logging.debug(f"Processing {animalday}: animalday_bad_channels = {animalday_bad_channels}")
+            logging.debug(
+                f"Processing {animalday}: animalday_bad_channels = {animalday_bad_channels}"
+            )
             logging.debug(f"Processing {animalday}: scores shape = {scores.shape}")
 
             # Evaluate each channel in the evaluation subset
@@ -2403,14 +2755,16 @@ class WindowAnalysisResult(AnimalFeatureParser):
             for i, channel in enumerate(channel_names):
                 if (
                     channel in evaluation_channels
-                    or parse_chname_to_abbrev(channel, strict_matching=False) in evaluation_channels
+                    or parse_chname_to_abbrev(channel, strict_matching=False)
+                    in evaluation_channels
                 ):
                     channels_processed += 1
 
                     # Ground truth: 1 if channel is marked as bad, 0 otherwise
                     is_bad_channel = (
                         channel in animalday_bad_channels
-                        or parse_chname_to_abbrev(channel, strict_matching=False) in animalday_bad_channels
+                        or parse_chname_to_abbrev(channel, strict_matching=False)
+                        in animalday_bad_channels
                     )
                     # if is_bad_channel and channel not in animalday_bad_channels:
                     #     logging.debug(f"Mapped full channel '{channel}' -> '{parse_chname_to_abbrev(channel, strict_matching=False)}' found in bad channels")
@@ -2432,7 +2786,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
                             f"TRUE POSITIVE CANDIDATE: {channel} mapped to bad channel in: {animalday_bad_channels}"
                         )
                     if y_pred == 1:
-                        logging.info(f"LOF PREDICTION: {channel} has score {scores[i]:.3f} > threshold {threshold}")
+                        logging.info(
+                            f"LOF PREDICTION: {channel} has score {scores[i]:.3f} > threshold {threshold}"
+                        )
 
             logging.debug(f"Processed {channels_processed} channels for {animalday}")
 
@@ -2477,7 +2833,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
             else:
                 pkl_files = list(folder_path.glob("*.pkl"))
                 if len(pkl_files) != 1:
-                    raise ValueError(f"Expected exactly one pickle file in {folder_path}, found {len(pkl_files)}")
+                    raise ValueError(
+                        f"Expected exactly one pickle file in {folder_path}, found {len(pkl_files)}"
+                    )
                 df_pickle_path = pkl_files[0]
 
             if json_name is not None:
@@ -2493,7 +2851,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
             else:
                 json_files = list(folder_path.glob("*.json"))
                 if len(json_files) != 1:
-                    raise ValueError(f"Expected exactly one json file in {folder_path}, found {len(json_files)}")
+                    raise ValueError(
+                        f"Expected exactly one json file in {folder_path}, found {len(json_files)}"
+                    )
                 json_path = json_files[0]
         else:
             if pickle_name is None or json_name is None:
@@ -2515,7 +2875,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
             metadata = json.load(f)
         return cls(data, **metadata)
 
-    def aggregate_time_windows(self, groupby: list[str] | str = ["animalday", "isday"]) -> None:
+    def aggregate_time_windows(
+        self, groupby: list[str] | str = ["animalday", "isday"]
+    ) -> None:
         """Aggregate time windows into a single data point per groupby by averaging features. This reduces the number of rows in the result.
 
         Args:
@@ -2529,9 +2891,13 @@ class WindowAnalysisResult(AnimalFeatureParser):
         if isinstance(groupby, str):
             groupby = [groupby]
         if not all(col in ["animalday", "isday"] for col in groupby):
-            raise ValueError(f"groupby must be from ['animalday', 'isday']. Got {groupby}")
+            raise ValueError(
+                f"groupby must be from ['animalday', 'isday']. Got {groupby}"
+            )
         if not all(col in self.result.columns for col in groupby):
-            raise ValueError(f"Columns {groupby} not found in result. Columns: {self.result.columns.tolist()}")
+            raise ValueError(
+                f"Columns {groupby} not found in result. Columns: {self.result.columns.tolist()}"
+            )
 
         features = [f for f in constants.FEATURES if f in self.result.columns]
         logging.debug(f"Aggregating {features}")
@@ -2550,7 +2916,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 is_constant = result_grouped[col].nunique() == 1
                 if not is_constant.all():
                     non_constant_groups = is_constant[~is_constant].index.tolist()
-                    raise ValueError(f"Column {col} is not constant in groups: {non_constant_groups}")
+                    raise ValueError(
+                        f"Column {col} is not constant in groups: {non_constant_groups}"
+                    )
                 agg_dict[col] = lambda df, col=col: df[col].iloc[0]
 
         if "duration" in self.result.columns:
@@ -2563,13 +2931,23 @@ class WindowAnalysisResult(AnimalFeatureParser):
             agg_dict["timestamp"] = lambda df: df["timestamp"].iloc[0]
 
         for feat in features:
-            agg_dict[feat] = lambda df, feat=feat: self._average_feature(df, feat, "duration")
+            agg_dict[feat] = lambda df, feat=feat: self._average_feature(
+                df, feat, "duration"
+            )
 
         aggregated_df = result_grouped.apply(
-            lambda df: pd.Series({col: agg_dict[col](df) for col in self.result.columns if col not in groupby})
+            lambda df: pd.Series(
+                {
+                    col: agg_dict[col](df)
+                    for col in self.result.columns
+                    if col not in groupby
+                }
+            )
         )
 
-        self.result = aggregated_df.reset_index(drop=False)  # Keep animalday/isday as a column
+        self.result = aggregated_df.reset_index(
+            drop=False
+        )  # Keep animalday/isday as a column
 
         self.suppress_short_interval_error = True
         logging.info("Setting suppress_short_interval_error to True")
@@ -2589,13 +2967,17 @@ class WindowAnalysisResult(AnimalFeatureParser):
         if "animal" in self.result.columns:
             self.result["animal"] = new_animal_id
         if "animalday" in self.result.columns:
-            self.result["animalday"] = self.result["animalday"].str.replace(self.animal_id, new_animal_id)
+            self.result["animalday"] = self.result["animalday"].str.replace(
+                self.animal_id, new_animal_id
+            )
         self.animal_id = new_animal_id
 
         self.__update_instance_vars()
 
 
-def bin_spike_times(spike_times: list[float], fragment_durations: list[float]) -> list[int]:
+def bin_spike_times(
+    spike_times: list[float], fragment_durations: list[float]
+) -> list[int]:
     """Bin spike times into counts based on fragment durations.
 
     Args:
@@ -2626,6 +3008,32 @@ def _bin_spike_df(df: pd.DataFrame, spikes_channel: list[list[float]]) -> np.nda
 
 
 class SpikeAnalysisResult(AnimalFeatureParser):
+    """
+    Class for handling spike analysis results.
+
+    Args:
+        result_sas (list[si.SortingAnalyzer]): Result comes from AnimalOrganizer.compute_spike_analysis(). Each SortingAnalyzer is a single channel.
+        result_mne (mne.io.RawArray, optional): MNE RawArray containing the spike data.
+        animal_id (str, optional): Identifier for the animal where result was computed from. Defaults to None.
+        genotype (str, optional): Genotype of animal. Defaults to None.
+        animal_day (str, optional): Animal day identifier. Defaults to None.
+        bin_folder_name (str, optional): Name of binary folder. Defaults to None.
+        metadata (DDFBinaryMetadata, optional): Metadata object. Defaults to None.
+        channel_names (list[str], optional): List of channel names. Defaults to None.
+        assume_from_number (bool, optional): If true, assumes channel names according to AnimalFeatureParser.DEFAULT_CHNUM_TO_NAME. Defaults to False.
+
+    Attributes:
+        result_sas (list[si.SortingAnalyzer]): List of SortingAnalyzer objects, one per channel.
+        result_mne (mne.io.RawArray): MNE RawArray representation of spike data.
+        animal_id (str): Identifier for the animal.
+        genotype (str): Genotype of the animal.
+        animal_day (str): Animal day identifier.
+        bin_folder_name (str): Name of the source binary folder.
+        metadata (DDFBinaryMetadata): Metadata associated with the recording.
+        channel_names (list[str]): List of channel names.
+        channel_abbrevs (list[str]): Abbreviated channel names.
+    """
+
     def __init__(
         self,
         result_sas: list[si.SortingAnalyzer],
@@ -2638,14 +3046,6 @@ class SpikeAnalysisResult(AnimalFeatureParser):
         channel_names: list[str] = None,
         assume_from_number=False,
     ) -> None:
-        """
-        Args:
-            result (list[si.SortingAnalyzer]): Result comes from AnimalOrganizer.compute_spike_analysis(). Each SortingAnalyzer is a single channel.
-            animal_id (str, optional): Identifier for the animal where result was computed from. Defaults to None.
-            genotype (str, optional): Genotype of animal. Defaults to None.
-            channel_names (list[str], optional): List of channel names. Defaults to None.
-            assume_channels (bool, optional): If true, assumes channel names according to AnimalFeatureParser.DEFAULT_CHNUM_TO_NAME. Defaults to False.
-        """
         self.result_sas = result_sas
         self.result_mne = result_mne
         if (result_mne is None) == (result_sas is None):
@@ -2658,7 +3058,8 @@ class SpikeAnalysisResult(AnimalFeatureParser):
         self.channel_names = channel_names
         self.assume_from_number = assume_from_number
         self.channel_abbrevs = [
-            core.parse_chname_to_abbrev(x, assume_from_number=assume_from_number) for x in self.channel_names
+            core.parse_chname_to_abbrev(x, assume_from_number=assume_from_number)
+            for x in self.channel_names
         ]
 
         logging.info(f"Channel names: \t{self.channel_names}")
@@ -2666,7 +3067,9 @@ class SpikeAnalysisResult(AnimalFeatureParser):
 
     def convert_to_mne(self, chunk_len: float = 60, save_raw=True) -> mne.io.RawArray:
         if self.result_mne is None:
-            result_mne = SpikeAnalysisResult.convert_sas_to_mne(self.result_sas, chunk_len)
+            result_mne = SpikeAnalysisResult.convert_sas_to_mne(
+                self.result_sas, chunk_len
+            )
             if save_raw:
                 self.result_mne = result_mne
             else:
@@ -2699,7 +3102,9 @@ class SpikeAnalysisResult(AnimalFeatureParser):
                     warnings.warn("No SortingAnalyzers found, skipping saving")
                     return
             else:
-                raise ValueError("No MNE RawArray found, and convert_to_mne is False. Run convert_to_mne() first.")
+                raise ValueError(
+                    "No MNE RawArray found, and convert_to_mne is False. Run convert_to_mne() first."
+                )
         else:
             result_mne = self.result_mne
 
@@ -2708,7 +3113,9 @@ class SpikeAnalysisResult(AnimalFeatureParser):
             folder.mkdir(parents=True, exist_ok=True)
 
         if slugify_filebase:
-            filebase = folder / slugify(f"{self.animal_id}-{self.genotype}-{self.animal_day}")
+            filebase = folder / slugify(
+                f"{self.animal_id}-{self.genotype}-{self.animal_day}"
+            )
         else:
             filebase = folder / f"{self.animal_id}-{self.genotype}-{self.animal_day}"
         filebase = str(filebase)
@@ -2730,8 +3137,12 @@ class SpikeAnalysisResult(AnimalFeatureParser):
             "animal_day": self.animal_day,
             "bin_folder_name": self.bin_folder_name,
             "metadata": self.metadata.metadata_path,
-            "channel_names": self.channel_abbrevs if save_abbrevs_as_chnames else self.channel_names,
-            "assume_from_number": False if save_abbrevs_as_chnames else self.assume_from_number,
+            "channel_names": (
+                self.channel_abbrevs if save_abbrevs_as_chnames else self.channel_names
+            ),
+            "assume_from_number": (
+                False if save_abbrevs_as_chnames else self.assume_from_number
+            ),
         }
         with open(filebase + ".json", "w") as f:
             json.dump(json_dict, f, indent=2)
@@ -2759,7 +3170,9 @@ class SpikeAnalysisResult(AnimalFeatureParser):
         return cls(**data)
 
     @staticmethod
-    def convert_sas_to_mne(sas: list[si.SortingAnalyzer], chunk_len: float = 60) -> mne.io.RawArray:
+    def convert_sas_to_mne(
+        sas: list[si.SortingAnalyzer], chunk_len: float = 60
+    ) -> mne.io.RawArray:
         """Convert a list of SortingAnalyzers to a MNE RawArray.
 
         Args:
@@ -2775,7 +3188,9 @@ class SpikeAnalysisResult(AnimalFeatureParser):
         # Check that all SortingAnalyzers have the same sampling frequency
         sfreqs = [sa.recording.get_sampling_frequency() for sa in sas]
         if not all(sf == sfreqs[0] for sf in sfreqs):
-            raise ValueError(f"All SortingAnalyzers must have the same sampling frequency. Got frequencies: {sfreqs}")
+            raise ValueError(
+                f"All SortingAnalyzers must have the same sampling frequency. Got frequencies: {sfreqs}"
+            )
 
         # Preallocate data array
         total_frames = int(sas[0].recording.get_duration() * sfreqs[0])
