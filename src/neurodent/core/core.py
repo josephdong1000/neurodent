@@ -355,7 +355,10 @@ class LongRecordingOrganizer:
             overwrite_rowbins (bool, optional): If True, overwrite existing row-major binary files. Defaults to False.
             multiprocess_mode (Literal['dask', 'serial'], optional): Processing mode for parallel operations. Defaults to 'serial'.
             extract_func (Callable, optional): Function to extract data when using 'si' or 'mne' mode. Required for those modes.
-            input_type (Literal['folder', 'file', 'files'], optional): Type of input to load. Defaults to 'folder'.
+            input_type (Literal['folder', 'file', 'files'], optional): Type of input processing. Defaults to 'folder'.
+                - 'folder': Passes base_folder_path directly to extract_func.
+                - 'file': Finds a single file matching file_pattern in base_folder_path.
+                - 'files': Finds multiple files matching file_pattern in base_folder_path, processes each, and concatenates.
             file_pattern (str, optional): Pattern to match files when using 'file' or 'files' input type. Defaults to '*'.
             manual_datetimes (datetime | list[datetime], optional): Manual timestamps for the recording.
                 For 'bin' mode: if datetime, used as global start/end time; if list, one timestamp per file.
