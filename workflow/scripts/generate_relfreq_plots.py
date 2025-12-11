@@ -28,8 +28,8 @@ matplotlib.use("Agg")  # Non-interactive backend
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
-from okabeito import blue, green, orange, purple, red
 
+from neurodent.constants import blue, green, orange, purple, red
 from neurodent import visualization, constants
 
 logger = logging.getLogger(__name__)

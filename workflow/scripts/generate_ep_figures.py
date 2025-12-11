@@ -23,8 +23,9 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 import seaborn.objects as so
-from okabeito import black, blue, green, lightblue, orange, purple, red, yellow
 from seaborn import axes_style
+
+from neurodent.constants import black, blue, green, lightblue, orange, purple, red, yellow
 
 from neurodent import visualization, constants
 

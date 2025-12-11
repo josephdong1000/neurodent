@@ -17,7 +17,6 @@ from dask_jobqueue import SLURMCluster
 import matplotlib as mpl
 import seaborn as sns
 import seaborn.objects as so
-from okabeito import black, blue, green, lightblue, orange, purple, red, yellow
 from seaborn import axes_style
 
 from neurodent import constants, core, visualization

@@ -1,10 +1,13 @@
 from typing import Literal
 
 import numpy as np
+
 try:
     import spikeinterface.core as si
     import spikeinterface.preprocessing as spre
-except Exception:  # pragma: no cover - optional at import time for tests not using spikeinterface
+except (
+    Exception
+):  # pragma: no cover - optional at import time for tests not using spikeinterface
     si = None
     spre = None
 try:
@@ -24,7 +27,30 @@ from .analyze_frag import FragmentAnalyzer
 
 
 class LongRecordingAnalyzer:
-    def __init__(self, longrecording: core.LongRecordingOrganizer, fragment_len_s=10, apply_notch_filter=True) -> None:
+    """Class for analyzing LongRecordings by breaking them into smaller time windows (fragments).
+
+    Args:
+        longrecording (LongRecordingOrganizer): The LongRecordingOrganizer instance to analyze.
+        fragment_len_s (int, optional): Length of adjacent windows in seconds. Defaults to 10.
+        apply_notch_filter (bool, optional): Whether to apply notch filter (constants.LINE_FREQ) to loaded fragments. Defaults to True.
+
+    Attributes:
+        LongRecording (LongRecordingOrganizer): The LongRecordingOrganizer instance being analyzed.
+        fragment_len_s (int): Length of each analysis fragment/window in seconds.
+        n_fragments (int): Total number of fragments in the recording.
+        channel_names (list[str]): List of channel names.
+        n_channels (int): Number of channels.
+        mult_to_uV (float): Multiplier to convert raw data to microvolts.
+        f_s (int): Sampling frequency in Hz.
+        apply_notch_filter (bool): Whether notch filtering is applied to fragments.
+    """
+
+    def __init__(
+        self,
+        longrecording: core.LongRecordingOrganizer,
+        fragment_len_s=10,
+        apply_notch_filter=True,
+    ) -> None:
         assert isinstance(longrecording, core.LongRecordingOrganizer)
 
         self.LongRecording = longrecording
@@ -47,12 +73,12 @@ class LongRecordingAnalyzer:
         """
         if si is None:
             raise ImportError("spikeinterface is required for get_fragment_rec")
-        
+
         rec = self.LongRecording.get_fragment(self.fragment_len_s, index)
-        
+
         if self.apply_notch_filter and spre is not None:
             rec = spre.notch_filter(rec, freq=constants.LINE_FREQ)
-        
+
         return rec
 
     def get_fragment_np(self, index, recobj=None) -> np.ndarray:
@@ -129,7 +155,9 @@ class LongRecordingAnalyzer:
         rec = self.get_fragment_np(index)
         return FragmentAnalyzer.compute_logampvar(rec=rec, **kwargs)
 
-    def compute_psd(self, index, welch_bin_t=1, notch_filter=True, multitaper=False, **kwargs):
+    def compute_psd(
+        self, index, welch_bin_t=1, notch_filter=True, multitaper=False, **kwargs
+    ):
         """Compute PSD (power spectral density)
 
         Args:
@@ -146,11 +174,18 @@ class LongRecordingAnalyzer:
         rec = self.get_fragment_np(index)
 
         f, psd = FragmentAnalyzer.compute_psd(
-            rec=rec, f_s=self.f_s, welch_bin_t=welch_bin_t, notch_filter=notch_filter, multitaper=multitaper, **kwargs
+            rec=rec,
+            f_s=self.f_s,
+            welch_bin_t=welch_bin_t,
+            notch_filter=notch_filter,
+            multitaper=multitaper,
+            **kwargs,
         )
 
         if index == self.n_fragments - 1 and self.n_fragments > 1:
-            f_prev, _ = self.compute_psd(index - 1, welch_bin_t, notch_filter, multitaper)
+            f_prev, _ = self.compute_psd(
+                index - 1, welch_bin_t, notch_filter, multitaper
+            )
             psd = Akima1DInterpolator(f, psd, axis=0, extrapolate=True)(f_prev)
             f = f_prev
 
@@ -359,7 +394,10 @@ class LongRecordingAnalyzer:
         """
         frag_len_idx = round(self.fragment_len_s * self.f_s)
         startidx = frag_len_idx * index
-        endidx = min(frag_len_idx * (index + 1), self.LongRecording.LongRecording.get_num_frames())
+        endidx = min(
+            frag_len_idx * (index + 1),
+            self.LongRecording.LongRecording.get_num_frames(),
+        )
         return (startidx / self.f_s, endidx / self.f_s)
 
     def compute_cohere(
@@ -390,37 +428,45 @@ class LongRecordingAnalyzer:
 
     def compute_zcohere(self, index, z_epsilon: float = 1e-6, **kwargs) -> np.ndarray:
         """Compute the Fisher z-transformed coherence of the signal.
-        
+
         Args:
             index (int): Index of time window
             z_epsilon (float): Small value to prevent arctanh(1) = inf. Values are clipped to [-1+z_epsilon, 1-z_epsilon]
             **kwargs: Additional arguments passed to compute_zcohere
         """
         rec = self.get_fragment_np(index)
-        return FragmentAnalyzer.compute_zcohere(rec=rec, f_s=self.f_s, z_epsilon=z_epsilon, **kwargs)
+        return FragmentAnalyzer.compute_zcohere(
+            rec=rec, f_s=self.f_s, z_epsilon=z_epsilon, **kwargs
+        )
 
     def compute_imcoh(self, index, **kwargs) -> np.ndarray:
         rec = self.get_fragment_np(index)
         return FragmentAnalyzer.compute_imcoh(rec=rec, f_s=self.f_s, **kwargs)
-    
+
     def compute_zimcoh(self, index, z_epsilon: float = 1e-6, **kwargs) -> np.ndarray:
         rec = self.get_fragment_np(index)
-        return FragmentAnalyzer.compute_zimcoh(rec=rec, f_s=self.f_s, z_epsilon=z_epsilon, **kwargs)
+        return FragmentAnalyzer.compute_zimcoh(
+            rec=rec, f_s=self.f_s, z_epsilon=z_epsilon, **kwargs
+        )
 
     def compute_pcorr(self, index, lower_triag=False, **kwargs) -> np.ndarray:
         rec = self.get_fragment_np(index)
-        return FragmentAnalyzer.compute_pcorr(rec=rec, f_s=self.f_s, lower_triag=lower_triag, **kwargs)
+        return FragmentAnalyzer.compute_pcorr(
+            rec=rec, f_s=self.f_s, lower_triag=lower_triag, **kwargs
+        )
 
     def compute_zpcorr(self, index, z_epsilon: float = 1e-6, **kwargs) -> np.ndarray:
         """Compute the Fisher z-transformed Pearson correlation coefficient of the signal.
-        
+
         Args:
             index (int): Index of time window
             z_epsilon (float): Small value to prevent arctanh(1) = inf. Values are clipped to [-1+z_epsilon, 1-z_epsilon]
             **kwargs: Additional arguments passed to compute_zpcorr
         """
         rec = self.get_fragment_np(index)
-        return FragmentAnalyzer.compute_zpcorr(rec=rec, f_s=self.f_s, z_epsilon=z_epsilon, **kwargs)
+        return FragmentAnalyzer.compute_zpcorr(
+            rec=rec, f_s=self.f_s, z_epsilon=z_epsilon, **kwargs
+        )
 
     def compute_nspike(self, index, **kwargs):
         rec = self.get_fragment_np(index)

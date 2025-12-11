@@ -16,6 +16,7 @@ from ... import core
 from ... import visualization as viz
 from ... import constants
 
+
 class ExperimentPlotter:
     """
     A class for creating various plots from a list of multiple experimental datasets.
@@ -23,33 +24,45 @@ class ExperimentPlotter:
     This class provides methods for creating different types of plots (boxplot, violin plot,
     scatter plot, etc.) from experimental data with consistent data processing and styling.
 
-    Plot Ordering
-    -------------
-    The class automatically sorts data according to predefined plot orders for columns like
-    'channel', 'genotype', 'sex', 'isday', and 'band'. Users can customize this ordering
-    during initialization::
+    Plot Ordering:
+        The class automatically sorts data according to predefined plot orders for columns like
+        'channel', 'genotype', 'sex', 'isday', and 'band'. Users can customize this ordering
+        during initialization::
 
-        plotter = ExperimentPlotter(wars, plot_order={'channel': ['LMot', 'RMot', ...]})
+            plotter = ExperimentPlotter(wars, plot_order={'channel': ['LMot', 'RMot', ...]})
 
-    The default plot orders are defined in constants.DF_SORT_ORDER.
+        The default plot orders are defined in constants.DF_SORT_ORDER.
 
-    Validation and Warnings
-    -----------------------
-    The class automatically validates plot order against the processed DataFrame during plotting
-    and raises warnings for any mismatches. Use validate_plot_order() to explicitly validate::
+    Validation and Warnings:
+        The class automatically validates plot order against the processed DataFrame during plotting
+        and raises warnings for any mismatches. Use validate_plot_order() to explicitly validate::
 
-        plotter.validate_plot_order(df)
+            plotter.validate_plot_order(df)
 
-    Examples
-    --------
-    Customize plot ordering during initialization::
+    Example:
+        Customize plot ordering during initialization::
 
-        custom_order = {
-            'channel': ['LMot', 'RMot', 'LBar', 'RBar'],  # Only include specific channels
-            'genotype': ['WT', 'KO'],  # Standard order
-            'sex': ['Female', 'Male']  # Custom order
-        }
-        plotter = ExperimentPlotter(wars, plot_order=custom_order)
+            custom_order = {
+                'channel': ['LMot', 'RMot', 'LBar', 'RBar'],  # Only include specific channels
+                'genotype': ['WT', 'KO'],  # Standard order
+                'sex': ['Female', 'Male']  # Custom order
+            }
+            plotter = ExperimentPlotter(wars, plot_order=custom_order)
+
+    Args:
+        wars (WindowAnalysisResult | list[WindowAnalysisResult]): Single WindowAnalysisResult or list of WindowAnalysisResult objects
+        features (list[str], optional): List of features to extract. If None, defaults to ['all']
+        exclude (list[str], optional): List of features to exclude from extraction
+        use_abbreviations (bool, optional): Whether to use abbreviations for channel names
+        plot_order (dict, optional): Dictionary mapping column names to the order of values for plotting. If None, uses constants.DF_SORT_ORDER.
+
+    Attributes:
+        results (list[WindowAnalysisResult]): List of analysis results being plotted.
+        channel_names (list[list[str]]): List of channel names for each result.
+        channel_to_idx (list[dict]): Mapping of channel names to indices for each result.
+        all_channel_names (list[str]): Union of all channel names across results.
+        df_wars (list[pd.DataFrame]): List of dataframes for each result.
+        concat_df_wars (pd.DataFrame): Concatenated dataframe of all results.
     """
 
     def __init__(
@@ -60,23 +73,6 @@ class ExperimentPlotter:
         use_abbreviations: bool = True,
         plot_order: dict = None,
     ):
-        """
-        Initialize plotter with WindowAnalysisResult object(s).
-
-        Parameters
-        ----------
-        wars : WindowAnalysisResult or list[WindowAnalysisResult]
-            Single WindowAnalysisResult or list of WindowAnalysisResult objects
-        features : list[str], optional
-            List of features to extract. If None, defaults to ['all']
-        exclude : list[str], optional
-            List of features to exclude from extraction
-        use_abbreviations : bool, optional
-            Whether to use abbreviations for channel names
-        plot_order : dict, optional
-            Dictionary mapping column names to the order of values for plotting.
-            If None, uses constants.DF_SORT_ORDER.
-        """
         features = features if features else ["all"]
 
         if not isinstance(wars, list):
@@ -90,8 +86,12 @@ class ExperimentPlotter:
             self.channel_names = [war.channel_abbrevs for war in wars]
         else:
             self.channel_names = [war.channel_names for war in wars]
-        self.channel_to_idx = [{e: i for i, e in enumerate(chnames)} for chnames in self.channel_names]
-        self.all_channel_names = sorted(list(set([name for chnames in self.channel_names for name in chnames])))
+        self.channel_to_idx = [
+            {e: i for i, e in enumerate(chnames)} for chnames in self.channel_names
+        ]
+        self.all_channel_names = sorted(
+            list(set([name for chnames in self.channel_names for name in chnames]))
+        )
 
         # Check for inhomogeneous channel numbers/names
         if len(set(len(channels) for channels in self.channel_names)) > 1:
@@ -123,7 +123,9 @@ class ExperimentPlotter:
         df_wars = []
         for war in wars:
             try:
-                dftemp = war.get_result(features=features, exclude=exclude, allow_missing=False)
+                dftemp = war.get_result(
+                    features=features, exclude=exclude, allow_missing=False
+                )
                 df_wars.append(dftemp)
             except KeyError as e:
                 logging.error(
@@ -137,7 +139,9 @@ class ExperimentPlotter:
         )  # TODO this raises a warning about df wars having columns that are none I think
         self.stats = None
 
-        self._plot_order = plot_order if plot_order is not None else constants.DF_SORT_ORDER.copy()
+        self._plot_order = (
+            plot_order if plot_order is not None else constants.DF_SORT_ORDER.copy()
+        )
 
     def validate_plot_order(self, df: pd.DataFrame, raise_errors: bool = False) -> dict:
         """
@@ -158,7 +162,9 @@ class ExperimentPlotter:
         validation_results = {}
 
         # Only validate columns that exist in the DataFrame
-        columns_to_validate = [col for col in self._plot_order.keys() if col in df.columns]
+        columns_to_validate = [
+            col for col in self._plot_order.keys() if col in df.columns
+        ]
 
         for col in columns_to_validate:
             categories = self._plot_order[col]
@@ -290,7 +296,9 @@ class ExperimentPlotter:
                 raise ValueError(f"'{feature}' feature not found in {war}")
 
             match feature:
-                case _ if feature in constants.LINEAR_FEATURES + constants.BAND_FEATURES:
+                case _ if (
+                    feature in constants.LINEAR_FEATURES + constants.BAND_FEATURES
+                ):
                     if feature in constants.BAND_FEATURES:
                         df_bands = pd.DataFrame(df_war[feature].tolist())
                         vals = np.array(df_bands.values.tolist())
@@ -304,7 +312,11 @@ class ExperimentPlotter:
                         vals = {"average": vals.tolist()}
                     else:
                         logging.debug(f"vals.shape: {vals.shape}")
-                        vals = {ch: vals[:, ch_to_idx[ch]].tolist() for ch in channels if ch in ch_names}
+                        vals = {
+                            ch: vals[:, ch_to_idx[ch]].tolist()
+                            for ch in channels
+                            if ch in ch_names
+                        }
                     vals = df_war[groupby].to_dict("list") | vals
 
                 case "pcorr" | "zpcorr":
@@ -313,7 +325,9 @@ class ExperimentPlotter:
                         # Get lower triangular elements (excluding diagonal)
                         tril_indices = np.tril_indices(vals.shape[1], k=-1)
                         # Take mean across pairs
-                        vals = np.nanmean(vals[:, tril_indices[0], tril_indices[1]], axis=-1)
+                        vals = np.nanmean(
+                            vals[:, tril_indices[0], tril_indices[1]], axis=-1
+                        )
                         logging.debug(f"vals.shape: {vals.shape}")
                         vals = {"average": vals.tolist()}
                     else:
@@ -328,7 +342,9 @@ class ExperimentPlotter:
 
                     if collapse_channels:
                         tril_indices = np.tril_indices(vals.shape[1], k=-1)
-                        vals = np.nanmean(vals[:, :, tril_indices[0], tril_indices[1]], axis=-1)
+                        vals = np.nanmean(
+                            vals[:, :, tril_indices[0], tril_indices[1]], axis=-1
+                        )
                         logging.debug(f"vals.shape: {vals.shape}")
                         vals = {"average": vals.tolist()}
                     else:
@@ -344,7 +360,14 @@ class ExperimentPlotter:
                     psd_data = df_war[feature].tolist()
 
                     freq_vals = np.array(
-                        [item[0] if isinstance(item, tuple) and len(item) == 2 else item for item in psd_data]
+                        [
+                            (
+                                item[0]
+                                if isinstance(item, tuple) and len(item) == 2
+                                else item
+                            )
+                            for item in psd_data
+                        ]
                     )
                     n_unique_freq_vals = np.unique(freq_vals, axis=0).shape[0]
                     if n_unique_freq_vals > 1:
@@ -353,11 +376,20 @@ class ExperimentPlotter:
                         )
 
                     psd_vals = np.array(
-                        [item[1] if isinstance(item, tuple) and len(item) == 2 else item for item in psd_data]
+                        [
+                            (
+                                item[1]
+                                if isinstance(item, tuple) and len(item) == 2
+                                else item
+                            )
+                            for item in psd_data
+                        ]
                     )
                     psd_vals = psd_vals.transpose((0, 2, 1))
 
-                    logging.debug(f"freq_vals.shape: {freq_vals.shape}, psd_vals.shape: {psd_vals.shape}")
+                    logging.debug(
+                        f"freq_vals.shape: {freq_vals.shape}, psd_vals.shape: {psd_vals.shape}"
+                    )
 
                     # freq_vals.shape: (8, 501), psd_vals.shape: (8, 10, 501)
                     if collapse_channels:
@@ -365,15 +397,21 @@ class ExperimentPlotter:
                         logging.debug(f"psd_vals.shape: {psd_vals.shape}")  # (8, 501)
                         psd_vals = {"average": psd_vals.tolist()}
                     else:
-                        logging.debug(f"psd_vals.shape: {psd_vals.shape}")  # (8, 10, 501)
+                        logging.debug(
+                            f"psd_vals.shape: {psd_vals.shape}"
+                        )  # (8, 10, 501)
                         psd_vals = {
-                            ch: psd_vals[:, ch_to_idx[ch], :].tolist() for ch in channels if ch in ch_names
+                            ch: psd_vals[:, ch_to_idx[ch], :].tolist()
+                            for ch in channels
+                            if ch in ch_names
                         }  # (8, 10, 501)
                     psd_vals = psd_vals | {"freq": freq_vals.tolist()}
                     vals = df_war[groupby].to_dict("list") | psd_vals
 
                 case _:
-                    raise ValueError(f"{feature} is not supported in _pull_timeseries_dataframe")
+                    raise ValueError(
+                        f"{feature} is not supported in _pull_timeseries_dataframe"
+                    )
 
             df_feature = pd.DataFrame.from_dict(vals, orient="columns")
             dataframes.append(df_feature)
@@ -385,7 +423,12 @@ class ExperimentPlotter:
         else:
             melt_groupby = groupby
         feature_cols = [col for col in df.columns if col not in melt_groupby]
-        df = df.melt(id_vars=melt_groupby, value_vars=feature_cols, var_name="channel", value_name=feature)
+        df = df.melt(
+            id_vars=melt_groupby,
+            value_vars=feature_cols,
+            var_name="channel",
+            value_name=feature,
+        )
 
         if feature == "psd":
             df = df.explode(["psd", "freq"])
@@ -394,9 +437,18 @@ class ExperimentPlotter:
             if df[feature].isna().any():
                 logging.warning(f"{feature} contains NaNs")
                 df = df[df[feature].notna()]
-            df[feature] = df[feature].apply(lambda x: x[0])  # get slope from [slope, intercept]
-        elif feature in constants.BAND_FEATURES + ["cohere", "zcohere", "imcoh", "zimcoh"]:
-            df[feature] = df[feature].apply(lambda x: list(zip(x, constants.BAND_NAMES)))
+            df[feature] = df[feature].apply(
+                lambda x: x[0]
+            )  # get slope from [slope, intercept]
+        elif feature in constants.BAND_FEATURES + [
+            "cohere",
+            "zcohere",
+            "imcoh",
+            "zimcoh",
+        ]:
+            df[feature] = df[feature].apply(
+                lambda x: list(zip(x, constants.BAND_NAMES))
+            )
             df = df.explode(feature)
             df[[feature, "band"]] = pd.DataFrame(df[feature].tolist(), index=df.index)
 
@@ -435,7 +487,9 @@ class ExperimentPlotter:
         x: str = None,
         col: str = None,
         hue: str = None,
-        kind: Literal["box", "boxen", "violin", "strip", "swarm", "bar", "point"] = "box",
+        kind: Literal[
+            "box", "boxen", "violin", "strip", "swarm", "bar", "point"
+        ] = "box",
         catplot_params: dict = None,
         channels: str | list[str] = "all",
         collapse_channels: bool = False,
@@ -457,7 +511,9 @@ class ExperimentPlotter:
             )
 
         if df is None:
-            df = self.pull_timeseries_dataframe(feature, groupby, channels, collapse_channels, average_groupby)
+            df = self.pull_timeseries_dataframe(
+                feature, groupby, channels, collapse_channels, average_groupby
+            )
 
         if isinstance(groupby, str):
             groupby = [groupby]
@@ -486,7 +542,10 @@ class ExperimentPlotter:
         for param_name in ["x", "col", "hue"]:
             if default_params[param_name] == feature:
                 raise ValueError(f"'{param_name}' cannot be the same as 'feature'")
-            if default_params[param_name] is not None and default_params[param_name] not in df.columns:
+            if (
+                default_params[param_name] is not None
+                and default_params[param_name] not in df.columns
+            ):
                 raise ValueError(
                     f"Parameter '{param_name}={default_params[param_name]}' not found in dataframe columns: {df.columns.tolist()}"
                 )
@@ -512,7 +571,11 @@ class ExperimentPlotter:
         for ax in g.axes.flat:
             ax.yaxis.grid(True, linestyle="--", which="major", color="grey", alpha=0.25)
 
-        groupby_test = [default_params[x] for x in ["x", "col", "hue"] if default_params[x] is not None]
+        groupby_test = [
+            default_params[x]
+            for x in ["x", "col", "hue"]
+            if default_params[x] is not None
+        ]
         match norm_test:
             case None:
                 pass
@@ -536,21 +599,33 @@ class ExperimentPlotter:
                 ax = g.facet_axis(i, j)
                 match stat_pairs:
                     case "all":
-                        items = core.utils._get_groupby_keys(df, [default_params["x"], default_params["hue"]])
+                        items = core.utils._get_groupby_keys(
+                            df, [default_params["x"], default_params["hue"]]
+                        )
                         pairs = core.utils._get_pairwise_combinations(items)
                     case "x":
                         items_x = core.utils._get_groupby_keys(df, default_params["x"])
                         pairs_x = core.utils._get_pairwise_combinations(items_x)
-                        items_hue = core.utils._get_groupby_keys(df, default_params["hue"])
+                        items_hue = core.utils._get_groupby_keys(
+                            df, default_params["hue"]
+                        )
                         pairs = [
-                            ((pair[0], hue_item), (pair[1], hue_item)) for hue_item in items_hue for pair in pairs_x
+                            ((pair[0], hue_item), (pair[1], hue_item))
+                            for hue_item in items_hue
+                            for pair in pairs_x
                         ]
                         logging.debug(f"pairs: {pairs}")
                     case "hue":
-                        items_hue = core.utils._get_groupby_keys(df, default_params["hue"])
+                        items_hue = core.utils._get_groupby_keys(
+                            df, default_params["hue"]
+                        )
                         pairs_hue = core.utils._get_pairwise_combinations(items_hue)
                         items_x = core.utils._get_groupby_keys(df, default_params["x"])
-                        pairs = [((x_item, pair[0]), (x_item, pair[1])) for x_item in items_x for pair in pairs_hue]
+                        pairs = [
+                            ((x_item, pair[0]), (x_item, pair[1]))
+                            for x_item in items_x
+                            for pair in pairs_hue
+                        ]
                         logging.debug(f"pairs: {pairs}")
                     case list():
                         pairs = stat_pairs
@@ -563,7 +638,9 @@ class ExperimentPlotter:
 
                 annot_params["data"] = annot_params["data"].dropna()
                 annotator = Annotator(ax, pairs, verbose=0, **annot_params)
-                annotator.configure(test=stat_test, text_format="star", loc="inside", verbose=1)
+                annotator.configure(
+                    test=stat_test, text_format="star", loc="inside", verbose=1
+                )
                 annotator.apply_test(nan_policy="omit")
                 annotator.annotate()
 
@@ -578,7 +655,9 @@ class ExperimentPlotter:
         df: pd.DataFrame = None,
         col: str = None,
         row: str = None,
-        channels: str | list[str] = "all",  # REVIEW this might not be needed, since all channels should be visualized
+        channels: (
+            str | list[str]
+        ) = "all",  # REVIEW this might not be needed, since all channels should be visualized
         collapse_channels: bool = False,  # REVIEW Unable to plot a single cell, this parameter is not needed, if needed just use a catplot
         average_groupby: bool = False,  # REVIEW average groupby might be a redundant parameter, since matrix plotting already averages
         cmap: str = "RdBu_r",
@@ -588,7 +667,7 @@ class ExperimentPlotter:
     ):
         """
         Create a 2D feature plot.
-        
+
         Parameters:
         -----------
         cmap : str, default="RdBu_r"
@@ -607,7 +686,9 @@ class ExperimentPlotter:
             groupby = [groupby]
 
         if df is None:
-            df = self.pull_timeseries_dataframe(feature, groupby, channels, collapse_channels, average_groupby)
+            df = self.pull_timeseries_dataframe(
+                feature, groupby, channels, collapse_channels, average_groupby
+            )
 
         # Create FacetGrid
         facet_vars = {
@@ -625,7 +706,10 @@ class ExperimentPlotter:
         for param_name in ["col", "row"]:
             if facet_vars[param_name] == feature:
                 raise ValueError(f"'{param_name}' cannot be the same as 'feature'")
-            if facet_vars[param_name] is not None and facet_vars[param_name] not in df.columns:
+            if (
+                facet_vars[param_name] is not None
+                and facet_vars[param_name] not in df.columns
+            ):
                 raise ValueError(
                     f"Parameter '{param_name}={facet_vars[param_name]}' not found in dataframe columns: {df.columns.tolist()}"
                 )
@@ -633,7 +717,9 @@ class ExperimentPlotter:
         g = sns.FacetGrid(df, **facet_vars)
 
         # Map the plotting function
-        g.map_dataframe(self._plot_matrix, feature=feature, color_palette=cmap, norm=norm)
+        g.map_dataframe(
+            self._plot_matrix, feature=feature, color_palette=cmap, norm=norm
+        )
 
         # Adjust layout
         plt.tight_layout()
@@ -661,8 +747,12 @@ class ExperimentPlotter:
 
         if df is None:
             pull_params = self._get_default_pull_timeseries_params()
-            pull_params.update({k: v for k, v in kwargs.items() if k in pull_params.keys()})
-            df = self.pull_timeseries_dataframe(feature=feature, groupby=groupby, **pull_params)
+            pull_params.update(
+                {k: v for k, v in kwargs.items() if k in pull_params.keys()}
+            )
+            df = self.pull_timeseries_dataframe(
+                feature=feature, groupby=groupby, **pull_params
+            )
 
         # Among the variables present, there are a few that need modification
         # First modify groupby subtracting facetvars
@@ -676,7 +766,9 @@ class ExperimentPlotter:
         subfacet_groupby = groupby.copy()
         for facet_var in facet_vars:
             if facet_var not in groupby:
-                raise ValueError(f"Facet variable {facet_var} must be present in groupby")
+                raise ValueError(
+                    f"Facet variable {facet_var} must be present in groupby"
+                )
             subfacet_groupby.remove(facet_var)
 
         # Then iterate over the dataframe facet_Vars unique groupby keys, passing them to plot_heatmap and building a list of facetgrids
@@ -684,7 +776,9 @@ class ExperimentPlotter:
         for name, group in df.groupby(
             facet_vars, sort=False
         ):  # TODO not related to here, but look at everywhere else that groupby is performed and consider if you should change it to sort=False
-            g = self.plot_heatmap(feature=feature, groupby=subfacet_groupby, df=group, **kwargs)
+            g = self.plot_heatmap(
+                feature=feature, groupby=subfacet_groupby, df=group, **kwargs
+            )
 
             # Create title from facet variable values
             if isinstance(name, tuple):
@@ -754,7 +848,9 @@ class ExperimentPlotter:
             groupby = [groupby]
 
         if df is None:
-            df = self.pull_timeseries_dataframe(feature, groupby, channels, collapse_channels, average_groupby)
+            df = self.pull_timeseries_dataframe(
+                feature, groupby, channels, collapse_channels, average_groupby
+            )
 
         facet_vars = {
             "col": groupby[0] if len(groupby) > 0 else None,
@@ -771,7 +867,10 @@ class ExperimentPlotter:
         for param_name in ["col", "row"]:
             if facet_vars[param_name] == feature:
                 raise ValueError(f"'{param_name}' cannot be the same as 'feature'")
-            if facet_vars[param_name] is not None and facet_vars[param_name] not in df.columns:
+            if (
+                facet_vars[param_name] is not None
+                and facet_vars[param_name] not in df.columns
+            ):
                 raise ValueError(
                     f"Parameter '{param_name}={facet_vars[param_name]}' not found in dataframe columns: {df.columns.tolist()}"
                 )
@@ -795,8 +894,10 @@ class ExperimentPlotter:
         g = sns.FacetGrid(df, **facet_vars)
 
         # Map the plotting function
-        g.map_dataframe(self._plot_matrix, feature=feature, color_palette=cmap, norm=norm)
-        
+        g.map_dataframe(
+            self._plot_matrix, feature=feature, color_palette=cmap, norm=norm
+        )
+
         # Adjust layout
         plt.tight_layout()
 
@@ -807,9 +908,9 @@ class ExperimentPlotter:
         feature: str,
         groupby: str | list[str],
         facet_vars: str | list[str],
-        baseline_key: str
-        | bool
-        | tuple[str, ...],  # NOTE these keys and groupbys only apply to the subfacets not the overall groupby
+        baseline_key: (
+            str | bool | tuple[str, ...]
+        ),  # NOTE these keys and groupbys only apply to the subfacets not the overall groupby
         baseline_groupby: str | list[str] = None,
         operation: Literal["subtract", "divide"] = "subtract",
         remove_baseline: bool = False,
@@ -823,8 +924,12 @@ class ExperimentPlotter:
 
         if df is None:
             pull_params = self._get_default_pull_timeseries_params()
-            pull_params.update({k: v for k, v in kwargs.items() if k in pull_params.keys()})
-            df = self.pull_timeseries_dataframe(feature=feature, groupby=groupby, **pull_params)
+            pull_params.update(
+                {k: v for k, v in kwargs.items() if k in pull_params.keys()}
+            )
+            df = self.pull_timeseries_dataframe(
+                feature=feature, groupby=groupby, **pull_params
+            )
 
         # Among the variables present, there are a few that need modification
         # First modify groupby subtracting facetvars
@@ -838,7 +943,9 @@ class ExperimentPlotter:
         subfacet_groupby = groupby.copy()
         for facet_var in facet_vars:
             if facet_var not in groupby:
-                raise ValueError(f"Facet variable {facet_var} must be present in groupby")
+                raise ValueError(
+                    f"Facet variable {facet_var} must be present in groupby"
+                )
             subfacet_groupby.remove(facet_var)
 
         # Then iterate over the dataframe facet_Vars unique groupby keys, passing them to plot_heatmap and building a list of facetgrids
@@ -890,13 +997,17 @@ class ExperimentPlotter:
         if feature in constants.MATRIX_FEATURES and not collapse_channels:
             raise ValueError("To plot matrix features, collapse_channels must be True")
         if feature in constants.HIST_FEATURES:
-            raise ValueError(f"'{feature}' is a histogram feature and is not supported in plot_qqplot")
+            raise ValueError(
+                f"'{feature}' is a histogram feature and is not supported in plot_qqplot"
+            )
 
         if isinstance(groupby, str):
             groupby = [groupby]
 
         if df is None:
-            df = self.pull_timeseries_dataframe(feature, groupby, channels, collapse_channels, average_groupby=False)
+            df = self.pull_timeseries_dataframe(
+                feature, groupby, channels, collapse_channels, average_groupby=False
+            )
 
         # Create FacetGrid
         facet_vars = {
@@ -914,7 +1025,10 @@ class ExperimentPlotter:
         for param_name in ["col", "row"]:
             if facet_vars[param_name] == feature:
                 raise ValueError(f"'{param_name}' cannot be the same as 'feature'")
-            if facet_vars[param_name] is not None and facet_vars[param_name] not in df.columns:
+            if (
+                facet_vars[param_name] is not None
+                and facet_vars[param_name] not in df.columns
+            ):
                 raise ValueError(
                     f"Parameter '{param_name}={facet_vars[param_name]}' not found in dataframe columns: {df.columns.tolist()}"
                 )
@@ -928,7 +1042,9 @@ class ExperimentPlotter:
 
         return g
 
-    def _plot_qqplot(self, data: pd.DataFrame, feature: str, log: bool = False, **kwargs):
+    def _plot_qqplot(
+        self, data: pd.DataFrame, feature: str, log: bool = False, **kwargs
+    ):
         x = data[feature]
         if log:
             x = np.log(x)
@@ -942,13 +1058,17 @@ class ExperimentPlotter:
         Run a Kolmogorov-Smirnov test for normality on the feature data.
         This is not recommended as the test is sensitive to large values.
         """
-        return df.groupby(groupby)[feature].apply(lambda x: stats.kstest(x, cdf="norm", nan_policy="omit"))
+        return df.groupby(groupby)[feature].apply(
+            lambda x: stats.kstest(x, cdf="norm", nan_policy="omit")
+        )
 
     def _run_normaltest(self, df: pd.DataFrame, feature: str, groupby: str | list[str]):
         """
         Run a D'Agostino-Pearson normality test on the feature data.
         """
-        return df.groupby(groupby)[feature].apply(lambda x: stats.normaltest(x, nan_policy="omit"))
+        return df.groupby(groupby)[feature].apply(
+            lambda x: stats.normaltest(x, nan_policy="omit")
+        )
 
 
 def df_normalize_baseline(
@@ -986,7 +1106,9 @@ def df_normalize_baseline(
     all_groupby_cols = list(set(groupby + baseline_groupby))
     missing_cols = [col for col in all_groupby_cols if col not in df.columns]
     if missing_cols:
-        raise ValueError(f"Groupby columns not found in data: {missing_cols}. Available columns: {df.columns.tolist()}")
+        raise ValueError(
+            f"Groupby columns not found in data: {missing_cols}. Available columns: {df.columns.tolist()}"
+        )
 
     # Check for NaN values in groupby columns
     nan_cols = []
@@ -1027,25 +1149,37 @@ def df_normalize_baseline(
         )
 
     if remaining_groupby:
-        baseline_means = df_base.groupby(remaining_groupby)[feature].apply(core.utils.nanmean_series_of_np)
-        df_merge = df.merge(baseline_means, how="left", on=remaining_groupby, suffixes=("", "_baseline"))
+        baseline_means = df_base.groupby(remaining_groupby)[feature].apply(
+            core.utils.nanmean_series_of_np
+        )
+        df_merge = df.merge(
+            baseline_means, how="left", on=remaining_groupby, suffixes=("", "_baseline")
+        )
     else:
         baseline_means = df_base.groupby(baseline_groupby)[feature].apply(
             core.utils.nanmean_series_of_np
         )  # Global baseline
         assert len(baseline_means) == 1
-        df_merge = df.assign(**{f"{feature}_baseline": [baseline_means.iloc[0] for _ in range(len(df))]})
+        df_merge = df.assign(
+            **{f"{feature}_baseline": [baseline_means.iloc[0] for _ in range(len(df))]}
+        )
 
     if remove_baseline:
-        df_merge = df_merge.loc[~(df_merge[baseline_groupby] == baseline_key).all(axis=1)]
+        df_merge = df_merge.loc[
+            ~(df_merge[baseline_groupby] == baseline_key).all(axis=1)
+        ]
         if df_merge.empty:
             raise ValueError(f"No rows found for {groupby} != {baseline_key}")
 
     # Normalize the feature
     if operation == "subtract":
-        df_merge[feature] = df_merge[feature].subtract(df_merge[f"{feature}_baseline"], fill_value=0)
+        df_merge[feature] = df_merge[feature].subtract(
+            df_merge[f"{feature}_baseline"], fill_value=0
+        )
     elif operation == "divide":
-        df_merge[feature] = df_merge[feature].divide(df_merge[f"{feature}_baseline"], fill_value=0)
+        df_merge[feature] = df_merge[feature].divide(
+            df_merge[f"{feature}_baseline"], fill_value=0
+        )
     else:
         raise ValueError(f"Invalid operation: {operation}")
 

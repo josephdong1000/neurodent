@@ -12,7 +12,9 @@ from typing import Callable, Literal, Union
 
 try:
     import dask
-except Exception:  # pragma: no cover - optional at import time for tests that don't use dask
+except (
+    Exception
+):  # pragma: no cover - optional at import time for tests that don't use dask
     dask = None
 import mne
 import numpy as np
@@ -23,7 +25,9 @@ try:
     import spikeinterface.extractors as se
     import spikeinterface.preprocessing as spre
     import spikeinterface.widgets as sw
-except Exception:  # pragma: no cover - optional at import time for tests not using spikeinterface
+except (
+    Exception
+):  # pragma: no cover - optional at import time for tests not using spikeinterface
     si = None
     se = None
     spre = None
@@ -74,7 +78,9 @@ class DDFBinaryMetadata:
         if metadata_path is not None:
             self._init_from_path(metadata_path)
         else:
-            self._init_from_params(n_channels, f_s, dt_end, channel_names, V_units, mult_to_uV)
+            self._init_from_params(
+                n_channels, f_s, dt_end, channel_names, V_units, mult_to_uV
+            )
 
     def _init_from_path(self, metadata_path):
         self.metadata_path = metadata_path
@@ -94,13 +100,19 @@ class DDFBinaryMetadata:
             self.dt_end = datetime.fromisoformat(self.__getsinglecolval("LastEdit"))
         else:
             self.dt_end = None
-            logging.warning("No LastEdit column provided in metadata. dt_end set to None")
+            logging.warning(
+                "No LastEdit column provided in metadata. dt_end set to None"
+            )
 
         self.channel_names = self.metadata_df["ProbeInfo"].tolist()
 
-    def _init_from_params(self, n_channels, f_s, dt_end, channel_names, V_units=None, mult_to_uV=None):
+    def _init_from_params(
+        self, n_channels, f_s, dt_end, channel_names, V_units=None, mult_to_uV=None
+    ):
         if None in (n_channels, f_s, channel_names):
-            raise ValueError("All parameters must be provided when not using metadata_path")
+            raise ValueError(
+                "All parameters must be provided when not using metadata_path"
+            )
 
         self.metadata_path = None
         self.metadata_df = None
@@ -180,13 +192,17 @@ class DDFBinaryMetadata:
         """
         old_f_s = self.f_s
         self.f_s = new_f_s
-        logging.info(f"Updated DDFBinaryMetadata sampling rate from {old_f_s} Hz to {new_f_s} Hz")
+        logging.info(
+            f"Updated DDFBinaryMetadata sampling rate from {old_f_s} Hz to {new_f_s} Hz"
+        )
 
 
 def convert_ddfcolbin_to_ddfrowbin(rowdir_path, colbin_path, metadata, save_gzip=True):
     # TODO consider renaming this function to something more descriptive, like convert_colbin_to_rowbin
     # Also don't use the rowdir_path parameter, since this is outside the scope of the function. See utils.convert_colpath_to_rowpath
-    assert isinstance(metadata, DDFBinaryMetadata), "Metadata needs to be of type DDFBinaryMetadata"
+    assert isinstance(
+        metadata, DDFBinaryMetadata
+    ), "Metadata needs to be of type DDFBinaryMetadata"
 
     tempbin = np.fromfile(colbin_path, dtype=metadata.precision)
     tempbin = np.reshape(tempbin, (-1, metadata.n_channels), order="F")
@@ -218,7 +234,9 @@ def convert_ddfrowbin_to_si(bin_rowmajor_path, metadata):
     """
     if se is None:
         raise ImportError("SpikeInterface is required for convert_ddfrowbin_to_si")
-    assert isinstance(metadata, DDFBinaryMetadata), "Metadata needs to be of type DDFBinaryMetadata"
+    assert isinstance(
+        metadata, DDFBinaryMetadata
+    ), "Metadata needs to be of type DDFBinaryMetadata"
 
     bin_rowmajor_path = Path(bin_rowmajor_path)
     params = {
@@ -257,7 +275,9 @@ def convert_ddfrowbin_to_si(bin_rowmajor_path, metadata):
         temppath = None
 
     if rec.sampling_frequency != constants.GLOBAL_SAMPLING_RATE:
-        warnings.warn(f"Sampling rate {rec.sampling_frequency} Hz != {constants.GLOBAL_SAMPLING_RATE} Hz. Resampling")
+        warnings.warn(
+            f"Sampling rate {rec.sampling_frequency} Hz != {constants.GLOBAL_SAMPLING_RATE} Hz. Resampling"
+        )
         rec = spre.resample(rec, constants.GLOBAL_SAMPLING_RATE)
         # Update metadata to reflect the new sampling rate
         metadata.update_sampling_rate(constants.GLOBAL_SAMPLING_RATE)
@@ -284,8 +304,12 @@ def _convert_ddfrowbin_to_si_no_resample(bin_rowmajor_path, metadata):
             - str or None: Path to temporary file if created, None otherwise.
     """
     if se is None:
-        raise ImportError("SpikeInterface is required for _convert_ddfrowbin_to_si_no_resample")
-    assert isinstance(metadata, DDFBinaryMetadata), "Metadata needs to be of type DDFBinaryMetadata"
+        raise ImportError(
+            "SpikeInterface is required for _convert_ddfrowbin_to_si_no_resample"
+        )
+    assert isinstance(
+        metadata, DDFBinaryMetadata
+    ), "Metadata needs to be of type DDFBinaryMetadata"
 
     bin_rowmajor_path = Path(bin_rowmajor_path)
     params = {
@@ -330,6 +354,42 @@ def _convert_ddfrowbin_to_si_no_resample(bin_rowmajor_path, metadata):
 
 
 class LongRecordingOrganizer:
+    """
+    Construct a long recording from binary files or EDF files.
+
+    Args:
+        base_folder_path (str): Path to the base folder containing the data files.
+        mode (Literal['bin', 'si', 'mne', None], optional): Mode to load data in. Defaults to 'bin'.
+        truncate (bool | int, optional): If True, truncate data to first 10 files. If an integer, truncate data to the first n files. Defaults to False.
+        cache_policy (Literal['auto', 'always', 'force_regenerate'], optional): Cache policy for intermediate files. Defaults to 'auto'.
+        multiprocess_mode (Literal['dask', 'serial'], optional): Processing mode for parallel operations. Defaults to 'serial'.
+        extract_func (Callable, optional): Function to extract data when using 'si' or 'mne' mode. Required for those modes.
+        input_type (Literal['folder', 'file', 'files'], optional): Type of input processing. Defaults to 'folder'.
+            * 'folder': Passes base_folder_path directly to extract_func.
+            * 'file': Finds a single file matching file_pattern in base_folder_path.
+            * 'files': Finds multiple files matching file_pattern in base_folder_path, processes each, and concatenates.
+        file_pattern (str, optional): Pattern to match files when using 'file' or 'files' input type. Defaults to '*'.
+        manual_datetimes (datetime | list[datetime] | Callable, optional): Manually provided start times for the files. If None (default), times are inferred from file modification times.
+            * For 'bin' mode: if datetime, used as global start/end time; if list, one timestamp per file.
+            * For 'si'/'mne' modes: if datetime, used as start/end of entire recording; if list, one per input file.
+            * If Callable, must accept a Path and return a datetime.
+        datetimes_are_start (bool, optional): If True (default), manual_datetimes are start times. If False, they are end times.
+        n_jobs (int, optional): Number of parallel jobs to use for data loading. Defaults to 1 for safety. Set to -1 for automatic parallel detection, or >1 for specific job count.
+        **kwargs: Additional arguments passed to the data loading functions.
+
+    Attributes:
+        LongRecording (si.BaseRecording): The SpikeInterface recording object containing the concatenated data.
+        meta (DDFBinaryMetadata): Metadata object associated with the recording.
+        channel_names (list[str]): List of channel names.
+        file_durations (list[float]): Duration of each individual file in seconds.
+        cumulative_file_durations (list[float]): Cumulative duration timestamps for file boundaries.
+        temppaths (list[str]): Paths to temporary files created during processing.
+        bad_channel_names (list[str]): List of channels identified as bad/noisy.
+
+    Raises:
+        ValueError: If no data files are found, if the folder contains mixed file types, or if manual time parameters are invalid.
+    """
+
     def __init__(
         self,
         base_folder_path,
@@ -337,7 +397,9 @@ class LongRecordingOrganizer:
         truncate: Union[bool, int] = False,
         cache_policy: Literal["auto", "always", "force_regenerate"] = "auto",
         multiprocess_mode: Literal["dask", "serial"] = "serial",
-        extract_func: Union[Callable[..., "si.BaseRecording"], Callable[..., mne.io.Raw]] = None,
+        extract_func: Union[
+            Callable[..., "si.BaseRecording"], Callable[..., mne.io.Raw]
+        ] = None,
         input_type: Literal["folder", "file", "files"] = "folder",
         file_pattern: str = None,
         manual_datetimes: datetime | list[datetime] = None,
@@ -345,38 +407,14 @@ class LongRecordingOrganizer:
         n_jobs: int = 1,
         **kwargs,
     ):
-        """Construct a long recording from binary files or EDF files.
-
-        Args:
-            base_folder_path (str): Path to the base folder containing the data files.
-            mode (Literal['bin', 'si', 'mne', None]): Mode to load data in. Defaults to 'bin'.
-            truncate (Union[bool, int], optional): If True, truncate data to first 10 files.
-                If an integer, truncate data to the first n files. Defaults to False.
-            overwrite_rowbins (bool, optional): If True, overwrite existing row-major binary files. Defaults to False.
-            multiprocess_mode (Literal['dask', 'serial'], optional): Processing mode for parallel operations. Defaults to 'serial'.
-            extract_func (Callable, optional): Function to extract data when using 'si' or 'mne' mode. Required for those modes.
-            input_type (Literal['folder', 'file', 'files'], optional): Type of input to load. Defaults to 'folder'.
-            file_pattern (str, optional): Pattern to match files when using 'file' or 'files' input type. Defaults to '*'.
-            manual_datetimes (datetime | list[datetime], optional): Manual timestamps for the recording.
-                For 'bin' mode: if datetime, used as global start/end time; if list, one timestamp per file.
-                For 'si'/'mne' modes: if datetime, used as start/end of entire recording; if list, one per input file.
-            datetimes_are_start (bool, optional): If True, manual_datetimes are treated as start times.
-                If False, treated as end times. Defaults to True.
-            n_jobs (int, optional): Number of jobs for MNE resampling operations. Defaults to 1 for safety.
-                Set to -1 for automatic parallel detection, or >1 for specific job count.
-            **kwargs: Additional arguments passed to the data loading functions.
-
-        Raises:
-            ValueError: If no data files are found, if the folder contains mixed file types,
-                or if manual time parameters are invalid.
-        """
-
         self.base_folder_path = Path(base_folder_path)
 
         self.n_truncate = parse_truncate(truncate)
         self.truncate = True if self.n_truncate > 0 else False
         if self.truncate:
-            warnings.warn(f"LongRecording will be truncated to the first {self.n_truncate} files")
+            warnings.warn(
+                f"LongRecording will be truncated to the first {self.n_truncate} files"
+            )
 
         # Store manual time parameters for validation
         self.manual_datetimes = manual_datetimes
@@ -414,7 +452,9 @@ class LongRecordingOrganizer:
         mode: Literal["bin", "si", "mne", None] = "bin",
         cache_policy: Literal["auto", "always", "force_regenerate"] = "auto",
         multiprocess_mode: Literal["dask", "serial"] = "serial",
-        extract_func: Union[Callable[..., "si.BaseRecording"], Callable[..., mne.io.Raw]] = None,
+        extract_func: Union[
+            Callable[..., "si.BaseRecording"], Callable[..., mne.io.Raw]
+        ] = None,
         input_type: Literal["folder", "file", "files"] = "folder",
         file_pattern: str = None,
         **kwargs,
@@ -512,7 +552,9 @@ class LongRecordingOrganizer:
             f"Before prune: {len(self.colbins)} colbins, {len(self.rowbins)} rowbins, {len(self.metas)} metas"
         )
         self.__prune_empty_files()
-        logging.debug(f"After prune: {len(self.colbins)} colbins, {len(self.rowbins)} rowbins, {len(self.metas)} metas")
+        logging.debug(
+            f"After prune: {len(self.colbins)} colbins, {len(self.rowbins)} rowbins, {len(self.metas)} metas"
+        )
         if len(self.colbins) != len(self.metas):
             logging.warning("Number of column-major and metadata files do not match")
 
@@ -521,18 +563,28 @@ class LongRecordingOrganizer:
             # if metadata file is empty, remove it and the corresponding column-major and row-major files
             if meta.metadata_df.empty:
                 searchstr = Path(meta.metadata_path).name.replace("_Meta", "")
-                self.colbins = [x for x in self.colbins if searchstr + "_ColMajor.bin" not in x]
-                self.rowbins = [x for x in self.rowbins if searchstr + "_RowMajor.npy.gz" not in x]
+                self.colbins = [
+                    x for x in self.colbins if searchstr + "_ColMajor.bin" not in x
+                ]
+                self.rowbins = [
+                    x for x in self.rowbins if searchstr + "_RowMajor.npy.gz" not in x
+                ]
                 self.metas = [x for x in self.metas if searchstr + "_Meta.csv" not in x]
 
         # if truncate is True, truncate the lists
         if self.truncate:
             self.colbins = self._truncate_file_list(self.colbins)
             self.rowbins = self._truncate_file_list(
-                self.rowbins, ref_list=[x.replace("_ColMajor.bin", "_RowMajor.npy.gz") for x in self.colbins]
+                self.rowbins,
+                ref_list=[
+                    x.replace("_ColMajor.bin", "_RowMajor.npy.gz") for x in self.colbins
+                ],
             )
             self.metas = self._truncate_file_list(
-                self.metas, ref_list=[x.replace("_ColMajor.bin", "_Meta.csv") for x in self.colbins]
+                self.metas,
+                ref_list=[
+                    x.replace("_ColMajor.bin", "_Meta.csv") for x in self.colbins
+                ],
             )
 
     def __prune_empty_files(self):
@@ -543,7 +595,9 @@ class LongRecordingOrganizer:
                 name = Path(e).name.replace("_ColMajor.bin", "")
                 logging.debug(f"Removing {name}")
                 self.colbins.remove(e)
-                self.rowbins = [x for x in self.rowbins if name + "_RowMajor.npy.gz" not in x]
+                self.rowbins = [
+                    x for x in self.rowbins if name + "_RowMajor.npy.gz" not in x
+                ]
                 self.metas = [x for x in self.metas if name + "_Meta.csv" not in x]
         # remove None values
         self.colbins = [x for x in self.colbins if x is not None]
@@ -552,9 +606,13 @@ class LongRecordingOrganizer:
 
     def __check_colbins_rowbins_metas_folders_exist(self):
         if not self.colbin_folder_path.exists():
-            raise FileNotFoundError(f"Column-major binary files folder not found: {self.colbin_folder_path}")
+            raise FileNotFoundError(
+                f"Column-major binary files folder not found: {self.colbin_folder_path}"
+            )
         if not self.rowbin_folder_path.exists():
-            logging.warning(f"Row-major binary files folder not found: {self.rowbin_folder_path}")
+            logging.warning(
+                f"Row-major binary files folder not found: {self.rowbin_folder_path}"
+            )
         if not self.metas:
             raise FileNotFoundError(f"Metadata files folder not found: {self.metas}")
 
@@ -562,7 +620,9 @@ class LongRecordingOrganizer:
         if not self.colbins:
             raise ValueError("No column-major binary files found")
         if not self.rowbins:
-            warnings.warn("No row-major binary files found. Convert with convert_colbins_to_rowbins()")
+            warnings.warn(
+                "No row-major binary files found. Convert with convert_colbins_to_rowbins()"
+            )
         if not self.metas:
             raise ValueError("No metadata files found")
 
@@ -572,7 +632,11 @@ class LongRecordingOrganizer:
         attributes = ["n_channels", "precision", "V_units", "channel_names"]
         for attr in attributes:
             if not all([getattr(meta0, attr) == getattr(x, attr) for x in metadatas]):
-                unequal_values = [getattr(x, attr) for x in metadatas if getattr(x, attr) != getattr(meta0, attr)]
+                unequal_values = [
+                    getattr(x, attr)
+                    for x in metadatas
+                    if getattr(x, attr) != getattr(meta0, attr)
+                ]
                 logging.error(
                     f"Inconsistent {attr} values across metadata files: {getattr(meta0, attr)} != {unequal_values}"
                 )
@@ -586,12 +650,18 @@ class LongRecordingOrganizer:
         cache_policy: Literal["auto", "always", "force_regenerate"] = "auto",
     ):
         self.prepare_colbins_rowbins_metas()
-        self.convert_colbins_to_rowbins(overwrite=overwrite_rowbins, multiprocess_mode=multiprocess_mode)
-        self.convert_rowbins_to_rec(multiprocess_mode=multiprocess_mode, cache_policy=cache_policy)
+        self.convert_colbins_to_rowbins(
+            overwrite=overwrite_rowbins, multiprocess_mode=multiprocess_mode
+        )
+        self.convert_rowbins_to_rec(
+            multiprocess_mode=multiprocess_mode, cache_policy=cache_policy
+        )
         # Now that file_durations are available, finalize timestamps
         self.finalize_file_timestamps()
 
-    def convert_colbins_to_rowbins(self, overwrite=False, multiprocess_mode: Literal["dask", "serial"] = "serial"):
+    def convert_colbins_to_rowbins(
+        self, overwrite=False, multiprocess_mode: Literal["dask", "serial"] = "serial"
+    ):
         """
         Convert column-major binary files to row-major binary files, and save them in the rowbin_folder_path.
 
@@ -605,15 +675,23 @@ class LongRecordingOrganizer:
         # else, read them (they exist) or make them (they don't exist)
         # there is no error condition, and rowbins will be recreated regardless of choice
 
-        logging.info(f"Converting {len(self.colbins)} column-major binary files to row-major format")
+        logging.info(
+            f"Converting {len(self.colbins)} column-major binary files to row-major format"
+        )
         if overwrite:
             logging.info("Overwrite flag set - regenerating all row-major files")
         else:
-            logging.info("Overwrite flag not set - only generating missing row-major files")
+            logging.info(
+                "Overwrite flag not set - only generating missing row-major files"
+            )
 
         delayed = []
         for i, e in enumerate(self.colbins):
-            if convert_colpath_to_rowpath(self.rowbin_folder_path, e, aspath=False) not in self.rowbins or overwrite:
+            if (
+                convert_colpath_to_rowpath(self.rowbin_folder_path, e, aspath=False)
+                not in self.rowbins
+                or overwrite
+            ):
                 logging.info(f"Converting {e}")
                 match multiprocess_mode:
                     case "dask":
@@ -623,9 +701,13 @@ class LongRecordingOrganizer:
                             )
                         )
                     case "serial":
-                        convert_ddfcolbin_to_ddfrowbin(self.rowbin_folder_path, e, self.meta, save_gzip=True)
+                        convert_ddfcolbin_to_ddfrowbin(
+                            self.rowbin_folder_path, e, self.meta, save_gzip=True
+                        )
                     case _:
-                        raise ValueError(f"Invalid multiprocess_mode: {multiprocess_mode}")
+                        raise ValueError(
+                            f"Invalid multiprocess_mode: {multiprocess_mode}"
+                        )
 
         if multiprocess_mode == "dask":
             # Run all conversions in parallel
@@ -669,7 +751,14 @@ class LongRecordingOrganizer:
                 # Compute all conversions in parallel
                 delayed_results = []
                 for i, e in enumerate(self.rowbins):
-                    delayed_results.append((i, dask.delayed(_convert_ddfrowbin_to_si_no_resample)(e, self.meta)))
+                    delayed_results.append(
+                        (
+                            i,
+                            dask.delayed(_convert_ddfrowbin_to_si_no_resample)(
+                                e, self.meta
+                            ),
+                        )
+                    )
                 computed_results = dask.compute(*delayed_results)
 
                 # Reconstruct results in the correct order
@@ -679,7 +768,10 @@ class LongRecordingOrganizer:
                 logging.info(f"self.rowbins: {[Path(x).name for x in self.rowbins]}")
 
             case "serial":
-                results = [_convert_ddfrowbin_to_si_no_resample(e, self.meta) for e in self.rowbins]
+                results = [
+                    _convert_ddfrowbin_to_si_no_resample(e, self.meta)
+                    for e in self.rowbins
+                ]
             case _:
                 raise ValueError(f"Invalid multiprocess_mode: {multiprocess_mode}")
 
@@ -695,15 +787,23 @@ class LongRecordingOrganizer:
             self.cumulative_file_durations.append(t_cumulative)
 
         if not recs:
-            raise ValueError("No recordings generated. Check that all row-major files are present and readable.")
+            raise ValueError(
+                "No recordings generated. Check that all row-major files are present and readable."
+            )
         elif len(recs) < len(self.rowbins):
-            logging.warning(f"Only {len(recs)} recordings generated. Some row-major files may be missing.")
+            logging.warning(
+                f"Only {len(recs)} recordings generated. Some row-major files may be missing."
+            )
 
         # Concatenate recordings first
-        concatenated_recording = si.concatenate_recordings(recs).rename_channels(self.channel_names)
+        concatenated_recording = si.concatenate_recordings(recs).rename_channels(
+            self.channel_names
+        )
 
         # Apply unified resampling to the concatenated recording
-        self.LongRecording: "si.BaseRecording" = self._apply_resampling(concatenated_recording)
+        self.LongRecording: "si.BaseRecording" = self._apply_resampling(
+            concatenated_recording
+        )
 
         # Debug logging for critical recording features
         logging.info(f"LongRecording created: {self}")
@@ -748,7 +848,9 @@ class LongRecordingOrganizer:
             ValueError: If no files are found for the given ``file_pattern`` or ``input_type`` is invalid.
         """
         if si is None:
-            raise ImportError("SpikeInterface is required for convert_file_with_si_to_recording")
+            raise ImportError(
+                "SpikeInterface is required for convert_file_with_si_to_recording"
+            )
         # Early validation and file discovery
         if input_type == "folder":
             # For single folder, validate that timestamps are provided
@@ -763,7 +865,9 @@ class LongRecordingOrganizer:
             if len(datafiles) == 0:
                 raise ValueError(f"No files found matching pattern: {file_pattern}")
             elif len(datafiles) > 1:
-                warnings.warn(f"Multiple files found matching pattern: {file_pattern}. Using first file.")
+                warnings.warn(
+                    f"Multiple files found matching pattern: {file_pattern}. Using first file."
+                )
             datafile = datafiles[0]
             rec: "si.BaseRecording" = extract_func(datafile, **kwargs)
             n_processed_files = 1
@@ -775,7 +879,9 @@ class LongRecordingOrganizer:
             # Validate timestamps early before slow processing
             self._validate_timestamps_for_mode("si", len(datafiles))
             datafiles.sort()  # FIXME sort by index, or some other logic. Files may be out of order otherwise, messing up isday calculation
-            recs: list["si.BaseRecording"] = [extract_func(x, **kwargs) for x in datafiles]
+            recs: list["si.BaseRecording"] = [
+                extract_func(x, **kwargs) for x in datafiles
+            ]
             rec = si.concatenate_recordings(recs)
             n_processed_files = len(datafiles)
         else:
@@ -788,7 +894,9 @@ class LongRecordingOrganizer:
         self.LongRecording = self._apply_resampling(rec)
 
         # For SI mode, don't use confusing DEFAULT_DAY if we have manual timestamps
-        dt_end = None if self.manual_datetimes is not None else None  # Will be set by finalize_file_timestamps
+        dt_end = (
+            None if self.manual_datetimes is not None else None
+        )  # Will be set by finalize_file_timestamps
 
         self.meta = DDFBinaryMetadata(
             None,
@@ -819,7 +927,15 @@ class LongRecordingOrganizer:
         logging.debug(f"LongRecording created via SI: {self}")
 
     def _load_and_process_mne_data(
-        self, extract_func, input_type, datafolder, datafile, datafiles, n_jobs, metadata_to_update=None, **kwargs
+        self,
+        extract_func,
+        input_type,
+        datafolder,
+        datafile,
+        datafiles,
+        n_jobs,
+        metadata_to_update=None,
+        **kwargs,
     ) -> mne.io.Raw:
         """Helper method to load and process MNE data from various input types."""
         # Load data based on input type
@@ -852,8 +968,15 @@ class LongRecordingOrganizer:
         # Use optimal resampling method with power-of-2 padding for speed
         original_sfreq = raw.info["sfreq"]
         if original_sfreq != constants.GLOBAL_SAMPLING_RATE:
-            logging.info(f"Resampling from {original_sfreq} to {constants.GLOBAL_SAMPLING_RATE}")
-            raw = raw.resample(constants.GLOBAL_SAMPLING_RATE, n_jobs=effective_n_jobs, npad="auto", method="fft")
+            logging.info(
+                f"Resampling from {original_sfreq} to {constants.GLOBAL_SAMPLING_RATE}"
+            )
+            raw = raw.resample(
+                constants.GLOBAL_SAMPLING_RATE,
+                n_jobs=effective_n_jobs,
+                npad="auto",
+                method="fft",
+            )
 
             # Update metadata to reflect the new sampling rate
             if metadata_to_update is not None:
@@ -933,7 +1056,9 @@ class LongRecordingOrganizer:
             logging.info("Cache policy 'force_regenerate': ignoring any existing cache")
         else:
             # Check if both data and metadata cache files exist and are valid
-            data_cache_valid = should_use_cache_unified(fname, source_paths, cache_policy)
+            data_cache_valid = should_use_cache_unified(
+                fname, source_paths, cache_policy
+            )
             meta_cache_valid = meta_fname.exists() if data_cache_valid else False
 
             # Handle cache validation based on policy
@@ -951,9 +1076,13 @@ class LongRecordingOrganizer:
                 elif cache_policy == "auto":
                     # 'auto' policy: log and regenerate if cache missing/invalid
                     if not data_cache_valid:
-                        logging.info(f"Intermediate file {fname} missing or outdated, regenerating")
+                        logging.info(
+                            f"Intermediate file {fname} missing or outdated, regenerating"
+                        )
                     if not meta_cache_valid:
-                        logging.info(f"Metadata sidecar {meta_fname} missing, regenerating")
+                        logging.info(
+                            f"Metadata sidecar {meta_fname} missing, regenerating"
+                        )
                     use_cache = False
                 else:
                     use_cache = False
@@ -967,7 +1096,9 @@ class LongRecordingOrganizer:
                 # Load metadata from sidecar file
                 try:
                     metadata = DDFBinaryMetadata.from_json(meta_fname)
-                    logging.info(f"Loaded cached metadata: {metadata.n_channels} channels, {metadata.f_s} Hz")
+                    logging.info(
+                        f"Loaded cached metadata: {metadata.n_channels} channels, {metadata.f_s} Hz"
+                    )
                 except Exception as e:
                     if cache_policy == "always":
                         # 'always' policy: raise error if metadata invalid
@@ -977,8 +1108,12 @@ class LongRecordingOrganizer:
                         raise
                     elif cache_policy == "auto":
                         # 'auto' policy: log and regenerate if metadata invalid
-                        logging.info(f"Failed to load cached metadata from {meta_fname}: {e}")
-                        logging.info("Regenerating intermediate files due to invalid metadata")
+                        logging.info(
+                            f"Failed to load cached metadata from {meta_fname}: {e}"
+                        )
+                        logging.info(
+                            "Regenerating intermediate files due to invalid metadata"
+                        )
                         use_cache = False
 
         if use_cache:
@@ -1034,14 +1169,22 @@ class LongRecordingOrganizer:
                 V_units=unit_str,
                 mult_to_uV=mult_to_uv,
             )
-            logging.info(f"Created metadata from raw: {metadata.n_channels} channels, {metadata.f_s} Hz")
+            logging.info(
+                f"Created metadata from raw: {metadata.n_channels} channels, {metadata.f_s} Hz"
+            )
             if unit_str and mult_to_uv:
-                logging.info(f"Extracted unit information: {unit_str} (mult_to_uV = {mult_to_uv})")
+                logging.info(
+                    f"Extracted unit information: {unit_str} (mult_to_uV = {mult_to_uv})"
+                )
             else:
-                logging.warning("No unit information could be extracted from MNE Raw object")
+                logging.warning(
+                    "No unit information could be extracted from MNE Raw object"
+                )
 
             # Load data without resampling (resampling will be applied after intermediate file loading)
-            raw = self._load_mne_data_no_resample(extract_func, input_type, datafolder, datafile, datafiles, **kwargs)
+            raw = self._load_mne_data_no_resample(
+                extract_func, input_type, datafolder, datafile, datafiles, **kwargs
+            )
 
             # Create the intermediate file
             if intermediate == "edf":
@@ -1119,7 +1262,9 @@ class LongRecordingOrganizer:
             sampling rates, and other DDFBinaryMetadata fields across cache hits.
         """
         if se is None:
-            raise ImportError("SpikeInterface is required for convert_file_with_mne_to_recording")
+            raise ImportError(
+                "SpikeInterface is required for convert_file_with_mne_to_recording"
+            )
         # Early validation and file discovery
         if input_type == "folder":
             self._validate_timestamps_for_mode("mne", 1)
@@ -1135,7 +1280,9 @@ class LongRecordingOrganizer:
             if len(datafiles) == 0:
                 raise ValueError(f"No files found matching pattern: {file_pattern}")
             elif len(datafiles) > 1:
-                warnings.warn(f"Multiple files found matching pattern: {file_pattern}. Using first file.")
+                warnings.warn(
+                    f"Multiple files found matching pattern: {file_pattern}. Using first file."
+                )
             datafile = datafiles[0]
             datafolder = None
             source_paths = [datafile]
@@ -1161,7 +1308,9 @@ class LongRecordingOrganizer:
 
         # Determine intermediate file path
         intermediate_name = (
-            f"{self.base_folder_path.name}_mne-to-rec" if intermediate_name is None else intermediate_name
+            f"{self.base_folder_path.name}_mne-to-rec"
+            if intermediate_name is None
+            else intermediate_name
         )
         fname = self.base_folder_path / f"{intermediate_name}.{intermediate}"
 
@@ -1250,9 +1399,9 @@ class LongRecordingOrganizer:
         Raises:
             ValueError: If timestamp mapper is not initialized (only available in 'bin' mode)
         """
-        return TimestampMapper(self.file_end_datetimes, self.file_durations).get_fragment_timestamp(
-            fragment_idx, fragment_len_s
-        )
+        return TimestampMapper(
+            self.file_end_datetimes, self.file_durations
+        ).get_fragment_timestamp(fragment_idx, fragment_len_s)
 
     def __fragidx_to_startendind(self, fragment_len_s, fragment_idx):
         """Convert fragment index to start and end sample indices.
@@ -1266,7 +1415,9 @@ class LongRecordingOrganizer:
         """
         frag_len_idx = self.__time_to_idx(fragment_len_s)
         startidx = frag_len_idx * fragment_idx
-        endidx = min(frag_len_idx * (fragment_idx + 1), self.LongRecording.get_num_frames())
+        endidx = min(
+            frag_len_idx * (fragment_idx + 1), self.LongRecording.get_num_frames()
+        )
         return startidx, endidx
 
     def convert_to_mne(self) -> mne.io.RawArray:
@@ -1275,17 +1426,24 @@ class LongRecordingOrganizer:
         Returns:
             mne.io.RawArray: The converted MNE RawArray
         """
-        data = self.LongRecording.get_traces(return_scaled=True)  # This gets data in (n_samples, n_channels) format
+        data = self.LongRecording.get_traces(
+            return_scaled=True
+        )  # This gets data in (n_samples, n_channels) format
         data = data.T  # Convert to (n_channels, n_samples) format for MNE
 
         info = mne.create_info(
-            ch_names=self.channel_names, sfreq=self.LongRecording.get_sampling_frequency(), ch_types="eeg"
+            ch_names=self.channel_names,
+            sfreq=self.LongRecording.get_sampling_frequency(),
+            ch_types="eeg",
         )
 
         return mne.io.RawArray(data=data, info=info)
 
     def compute_bad_channels(
-        self, lof_threshold: float = None, limit_memory: bool = True, force_recompute: bool = False
+        self,
+        lof_threshold: float = None,
+        limit_memory: bool = True,
+        force_recompute: bool = False,
     ):
         """Compute bad channels using LOF analysis with unified score storage.
 
@@ -1296,7 +1454,11 @@ class LongRecordingOrganizer:
             force_recompute (bool): Whether to recompute LOF scores even if they exist.
         """
         # Check if LOF scores already exist and are current
-        if not force_recompute and hasattr(self, "lof_scores") and self.lof_scores is not None:
+        if (
+            not force_recompute
+            and hasattr(self, "lof_scores")
+            and self.lof_scores is not None
+        ):
             logging.info("Using existing LOF scores")
         else:
             # Compute new LOF scores
@@ -1329,7 +1491,9 @@ class LongRecordingOrganizer:
             rec_np = rec.get_traces(return_scaled=True)  # (n_samples, n_channels)
 
             if rec_np is None or rec_np.size == 0:
-                logging.error("Failed to get traces from recording - data is None or empty")
+                logging.error(
+                    "Failed to get traces from recording - data is None or empty"
+                )
                 raise ValueError("Recording traces are None or empty")
             logging.debug(f"Got recording shape: {rec_np.shape}")
 
@@ -1380,11 +1544,17 @@ class LongRecordingOrganizer:
             lof_threshold (float): Threshold for determining bad channels.
         """
         if not hasattr(self, "lof_scores") or self.lof_scores is None:
-            raise ValueError("LOF scores not available. Run compute_bad_channels() first.")
+            raise ValueError(
+                "LOF scores not available. Run compute_bad_channels() first."
+            )
 
         is_inlier = self.lof_scores < lof_threshold
-        self.bad_channel_names = [self.channel_names[i] for i in np.where(~is_inlier)[0]]
-        logging.info(f"Applied threshold {lof_threshold}: bad_channel_names = {self.bad_channel_names}")
+        self.bad_channel_names = [
+            self.channel_names[i] for i in np.where(~is_inlier)[0]
+        ]
+        logging.info(
+            f"Applied threshold {lof_threshold}: bad_channel_names = {self.bad_channel_names}"
+        )
 
     def get_lof_scores(self) -> dict:
         """Get LOF scores with channel names.
@@ -1393,7 +1563,9 @@ class LongRecordingOrganizer:
             dict: Dictionary mapping channel names to LOF scores.
         """
         if not hasattr(self, "lof_scores") or self.lof_scores is None:
-            raise ValueError("LOF scores not available. Run compute_bad_channels() first.")
+            raise ValueError(
+                "LOF scores not available. Run compute_bad_channels() first."
+            )
 
         return dict(zip(self.channel_names, self.lof_scores))
 
@@ -1401,7 +1573,9 @@ class LongRecordingOrganizer:
         """Validate that manual time parameters are correctly specified."""
         if self.manual_datetimes is not None:
             if not isinstance(self.manual_datetimes, (datetime, list, tuple)):
-                raise ValueError("manual_datetimes must be a datetime object or list of datetime objects")
+                raise ValueError(
+                    "manual_datetimes must be a datetime object or list of datetime objects"
+                )
 
     def _validate_timestamps_for_mode(self, mode: str, expected_n_files: int = None):
         """Validate that manual timestamps are provided when required for specific modes.
@@ -1415,7 +1589,9 @@ class LongRecordingOrganizer:
         """
         if mode in ["si", "mne"]:
             if self.manual_datetimes is None:
-                raise ValueError(f"manual_datetimes must be provided for {mode} mode when no CSV metadata is available")
+                raise ValueError(
+                    f"manual_datetimes must be provided for {mode} mode when no CSV metadata is available"
+                )
 
             # If list provided and expected files known, validate length
             if expected_n_files is not None and isinstance(self.manual_datetimes, list):
@@ -1425,7 +1601,9 @@ class LongRecordingOrganizer:
                         f"number of input files ({expected_n_files}) for {mode} mode"
                     )
 
-    def _compute_manual_file_datetimes(self, n_files: int, durations: list[float]) -> list[datetime]:
+    def _compute_manual_file_datetimes(
+        self, n_files: int, durations: list[float]
+    ) -> list[datetime]:
         """Compute file end datetimes based on manual time specifications.
 
         Args:
@@ -1485,7 +1663,9 @@ class LongRecordingOrganizer:
                     file_end_datetimes.append(current_time)
                 return file_end_datetimes
 
-    def _validate_file_contiguity(self, file_end_datetimes: list[datetime], durations: list[float]):
+    def _validate_file_contiguity(
+        self, file_end_datetimes: list[datetime], durations: list[float]
+    ):
         """Check that files are contiguous in time and warn if they're not.
 
         Args:
@@ -1522,20 +1702,28 @@ class LongRecordingOrganizer:
         if not hasattr(self, "file_durations") or not self.file_durations:
             return  # No file durations available yet
 
-        manual_file_datetimes = self._compute_manual_file_datetimes(len(self.file_durations), self.file_durations)
+        manual_file_datetimes = self._compute_manual_file_datetimes(
+            len(self.file_durations), self.file_durations
+        )
 
         if manual_file_datetimes is not None:
             self.file_end_datetimes = manual_file_datetimes
-            logging.info(f"Using manual timestamps: {len(manual_file_datetimes)} file end times specified")
+            logging.info(
+                f"Using manual timestamps: {len(manual_file_datetimes)} file end times specified"
+            )
         else:
             # Check if CSV times are sufficient (only for bin mode)
             if hasattr(self, "file_end_datetimes") and self.file_end_datetimes:
                 if all(x is None for x in self.file_end_datetimes):
-                    raise ValueError("No dates found in any metadata object and no manual times specified!")
+                    raise ValueError(
+                        "No dates found in any metadata object and no manual times specified!"
+                    )
                 logging.info("Using CSV metadata timestamps")
             else:
                 # For si/mne modes, manual timestamps are required
-                raise ValueError("manual_datetimes must be provided when no CSV metadata is available!")
+                raise ValueError(
+                    "manual_datetimes must be provided when no CSV metadata is available!"
+                )
 
     def __str__(self):
         """Return a string representation of critical long recording features."""
@@ -1546,11 +1734,17 @@ class LongRecordingOrganizer:
         sampling_freq = self.LongRecording.get_sampling_frequency()
         total_duration = self.LongRecording.get_duration()
 
-        n_files = len(self.file_durations) if hasattr(self, "file_durations") and self.file_durations else 1
+        n_files = (
+            len(self.file_durations)
+            if hasattr(self, "file_durations") and self.file_durations
+            else 1
+        )
 
         timestamp_info = "No timestamps"
         if hasattr(self, "file_end_datetimes") and self.file_end_datetimes:
-            timestamp_coverage = len([x for x in self.file_end_datetimes if x is not None])
+            timestamp_coverage = len(
+                [x for x in self.file_end_datetimes if x is not None]
+            )
             timestamp_info = f"{timestamp_coverage}/{len(self.file_end_datetimes)} files have timestamps"
 
         channel_info = "No channels"
@@ -1595,10 +1789,25 @@ class LongRecordingOrganizer:
         target_rate = constants.GLOBAL_SAMPLING_RATE
 
         if current_rate == target_rate:
-            logging.info(f"Recording already at target sampling rate ({target_rate} Hz), no resampling needed")
+            logging.info(
+                f"Recording already at target sampling rate ({target_rate} Hz), no resampling needed"
+            )
             return recording
 
-        logging.info(f"Resampling recording from {current_rate} Hz to {target_rate} Hz using SpikeInterface")
+        logging.info(
+            f"Resampling recording from {current_rate} Hz to {target_rate} Hz using SpikeInterface"
+        )
+
+        dtype = recording.get_dtype()
+        # Handle numpy types, strings. Avoid Mock objects
+        is_unsigned = False
+        if isinstance(dtype, (str, type, np.dtype)):
+            if np.dtype(dtype).kind == "u":
+                is_unsigned = True
+
+        if is_unsigned:
+            logging.info(f"Data type is unsigned ({dtype}) and SpikeInterface can't process. Converting it to signed")
+            recording = spre.unsigned_to_signed(recording)
 
         # Use SpikeInterface resampling with margin to reduce edge effects
         resampled_recording = spre.resample(
@@ -1633,8 +1842,12 @@ class LongRecordingOrganizer:
         self._validate_merge_compatibility(other_lro)
 
         # Concatenate recordings using SpikeInterface
-        logging.info(f"Merging LRO {other_lro.base_folder_path} into {self.base_folder_path}")
-        self.LongRecording = si.concatenate_recordings([self.LongRecording, other_lro.LongRecording])
+        logging.info(
+            f"Merging LRO {other_lro.base_folder_path} into {self.base_folder_path}"
+        )
+        self.LongRecording = si.concatenate_recordings(
+            [self.LongRecording, other_lro.LongRecording]
+        )
 
         # Update metadata after merge
         self._update_metadata_after_merge(other_lro)

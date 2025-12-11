@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "neurodent"
-version = "0.2.3"
+version = "0.2.4"
 description = "Rodent EEG analysis tools"
 readme = "README.md"
 license = "MIT"
@@ -29,7 +29,6 @@ dependencies = [
     "matplotlib",
     "mne",
     "mne-connectivity",
-    # "cmasher", # this is not used directly but is a nice package
     "pandas",
     "spikeinterface",
     "probeinterface",
@@ -41,13 +40,10 @@ dependencies = [
     "statannotations",
     "statsmodels",
     "django",
-    "okabeito", # this could be just a line in constants
     "openpyxl",
     "appnope",
     "zarr>=2.18.3",
     "scikit-learn>=1.7.2",
-    "snakemake>=7.32.4",
-    "pulp==2.7.0 ; python_full_version < '3.11'",
 ]
 requires-python = ">=3.10"
 keywords = [
@@ -58,6 +54,16 @@ keywords = [
     "pipeline",
     "PythonEEG",
     "PyEEG",
+]
+
+[project.optional-dependencies]
+pipeline = [
+    "snakemake>=7.32.4",
+    "pulp==2.7.0 ; python_full_version < '3.11'",
+]
+all = [
+    "snakemake>=7.32.4",
+    "pulp==2.7.0 ; python_full_version < '3.11'",
 ]
 
 [project.urls]
@@ -80,7 +86,6 @@ dev = [
     "faker>=18.0.0",
     # Documentation
     "sphinx>=7.0.0",
-    "sphinx-autodoc-typehints>=1.25.0",
     "ipykernel>=6.0.0",
     "pandoc>=2.0.0",
     "sphinx-autobuild>=2024.10.3",

@@ -182,3 +182,108 @@ class TestConstants:
         expected_keys = ["notch_freq", "common_ref", "scale", "whiten", "freq_min", "freq_max"]
         for key in expected_keys:
             assert key in constants.WAVEFORM_PARAMS
+
+
+class TestOkabeItoColors:
+    """Test Okabe-Ito colorblind-friendly color palette."""
+
+    def test_okabe_ito_colors_exists(self):
+        """Test that OKABE_ITO_COLORS dictionary exists."""
+        assert hasattr(constants, "OKABE_ITO_COLORS")
+        assert isinstance(constants.OKABE_ITO_COLORS, dict)
+
+    def test_okabe_ito_colors_count(self):
+        """Test that the palette has exactly 8 colors."""
+        assert len(constants.OKABE_ITO_COLORS) == 8
+
+    def test_okabe_ito_colors_keys(self):
+        """Test that all expected color names are present."""
+        expected_colors = ["black", "orange", "blue", "green", "yellow", "lightblue", "red", "purple"]
+        assert set(constants.OKABE_ITO_COLORS.keys()) == set(expected_colors)
+
+    def test_okabe_ito_colors_values(self):
+        """Test that color values match the reference Okabe-Ito palette."""
+        expected_values = {
+            "black": "#000000",
+            "orange": "#E69F00",
+            "blue": "#0072B2",
+            "green": "#009E73",
+            "yellow": "#F5C710",
+            "lightblue": "#56B4E9",
+            "red": "#D55E00",
+            "purple": "#CC79A7",
+        }
+        for color_name, expected_hex in expected_values.items():
+            assert constants.OKABE_ITO_COLORS[color_name] == expected_hex
+
+    def test_okabe_ito_colors_format(self):
+        """Test that all colors are valid hex color strings."""
+        for color_name, hex_value in constants.OKABE_ITO_COLORS.items():
+            # Should be a string
+            assert isinstance(hex_value, str)
+            # Should start with #
+            assert hex_value.startswith("#")
+            # Should be 7 characters long (#RRGGBB)
+            assert len(hex_value) == 7
+            # Should be valid hex (0-9, A-F)
+            assert all(c in "0123456789ABCDEFabcdef#" for c in hex_value)
+
+    def test_individual_color_variables_exist(self):
+        """Test that individual color variables are exported."""
+        color_vars = ["black", "orange", "blue", "green", "yellow", "lightblue", "red", "purple"]
+        for color_name in color_vars:
+            assert hasattr(constants, color_name)
+
+    def test_individual_color_variables_values(self):
+        """Test that individual color variables match dictionary values."""
+        assert constants.black == constants.OKABE_ITO_COLORS["black"]
+        assert constants.orange == constants.OKABE_ITO_COLORS["orange"]
+        assert constants.blue == constants.OKABE_ITO_COLORS["blue"]
+        assert constants.green == constants.OKABE_ITO_COLORS["green"]
+        assert constants.yellow == constants.OKABE_ITO_COLORS["yellow"]
+        assert constants.lightblue == constants.OKABE_ITO_COLORS["lightblue"]
+        assert constants.red == constants.OKABE_ITO_COLORS["red"]
+        assert constants.purple == constants.OKABE_ITO_COLORS["purple"]
+
+    def test_colors_are_strings(self):
+        """Test that individual color variables are strings, not other types."""
+        assert isinstance(constants.black, str)
+        assert isinstance(constants.orange, str)
+        assert isinstance(constants.blue, str)
+        assert isinstance(constants.green, str)
+        assert isinstance(constants.yellow, str)
+        assert isinstance(constants.lightblue, str)
+        assert isinstance(constants.red, str)
+        assert isinstance(constants.purple, str)
+
+    def test_colors_not_in_top_level_package(self):
+        """Test that colors are NOT exported at package top level."""
+        import neurodent
+
+        # Colors should NOT be available at neurodent.blue
+        assert not hasattr(neurodent, "blue")
+        assert not hasattr(neurodent, "red")
+        assert not hasattr(neurodent, "OKABE_ITO_COLORS")
+
+    def test_colors_matplotlib_compatible(self):
+        """Test that colors work with matplotlib."""
+        import matplotlib.colors as mcolors
+
+        # All colors should be valid matplotlib color specifications
+        for color_name, hex_value in constants.OKABE_ITO_COLORS.items():
+            assert mcolors.is_color_like(hex_value)
+
+    def test_backward_compatibility_import(self):
+        """Test that the import style is backward compatible with okabeito package."""
+        # This import pattern should work (replacing 'from okabeito import ...')
+        from neurodent.constants import black, blue, green, lightblue, orange, purple, red, yellow
+
+        # Verify they're the correct values (should match the palette in constants.py)
+        assert black == "#000000"
+        assert orange == "#E69F00"
+        assert blue == "#0072B2"
+        assert green == "#009E73"
+        assert yellow == "#F5C710"
+        assert lightblue == "#56B4E9"
+        assert red == "#D55E00"
+        assert purple == "#CC79A7"
