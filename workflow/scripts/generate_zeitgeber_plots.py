@@ -26,82 +26,8 @@ import seaborn.objects as so
 import seaborn as sns
 from seaborn import axes_style
 
-
-def process_zeitgeber_data(df, config):
-    """Process zeitgeber dataframe for temporal plotting.
-    
-    Based on the alphadelta example processing pipeline.
-    
-    Args:
-        df (pd.DataFrame): Input zeitgeber features dataframe
-        config (dict): Configuration dictionary
-        
-    Returns:
-        pd.DataFrame: Processed dataframe ready for plotting
-    """
-    logger = logging.getLogger(__name__)
-    logger.info("Processing zeitgeber data for temporal analysis")
-    
-    # Reset index and create categorical columns
-    df = df.reset_index(drop=False)
-    df["sex"] = df["genotype"].str[0]
-    df["sex"] = df["sex"].map({"F": "Female", "M": "Male"})
-    df["gene"] = df["genotype"].str[1:]
-    
-    # Adjust time for ZT format (subtract 6 hours and wrap to 24h)
-    df['total_minutes'] = (df['total_minutes'] - 6 * 60) % 1440
-    
-    # Get features from config
-    zt_config = config["analysis"]["zeitgeber_plots"]
-    baseline_hours = zt_config.get("baseline_hours", 12)
-    exclude_from_baseline = zt_config.get("exclude_from_baseline", [])
-
-    # Automatically baseline-correct ALL numeric columns (flexible and extensible)
-    # Exclude: metadata columns, explicitly excluded features, and already baseline-corrected columns
-    metadata_cols = ["timestamp", "animal", "genotype", "hour", "minute", "total_minutes", "sex", "gene"]
-
-    features_to_baseline = [
-        col for col in df.columns
-        if col not in metadata_cols
-        and col not in exclude_from_baseline
-        and not col.endswith("_nobase")  # Don't baseline-correct already baseline-corrected columns
-        and pd.api.types.is_numeric_dtype(df[col])
-    ]
-
-    logger.info(f"Baseline-correcting {len(features_to_baseline)} features over first {baseline_hours} hours")
-
-    # Create baseline-corrected versions for all numeric features
-    for feature in features_to_baseline:
-        df[f"{feature}_nobase"] = (
-            df.groupby(["animal", "gene", "sex"])
-            .apply(lambda g: g[feature] - g.loc[(g["total_minutes"] <= baseline_hours * 60), feature].mean())
-            .reset_index(level=[0, 1, 2], drop=True)
-        )
-        logger.info(f"Created baseline-corrected version for {feature}")
-    
-    # Create a copy with shifted total_minutes for 48-hour view
-    df2 = df.copy()
-    df2['total_minutes'] = df2['total_minutes'] + 1440
-    
-    # Concatenate original and shifted dataframes
-    df = pd.concat([df, df2], ignore_index=True)
-    
-    # Create ordering for consistent plotting
-    genotype_order = {'WT': 0, 'Het': 1, 'Mut': 2}
-    df['genotype_order'] = df['gene'].map(genotype_order)
-    
-    sex_order = {'Male': 0, 'Female': 1}
-    df['sex_order'] = df['sex'].map(sex_order)
-    
-    # Sort by sex first, then genotype
-    df = df.sort_values(['sex_order', 'genotype_order'])
-    
-    # Drop the temporary ordering columns
-    df = df.drop(['genotype_order', 'sex_order'], axis=1)
-    
-    logger.info(f"Processed data for {df['animal'].nunique()} unique animals")
-    
-    return df
+# Import the new zeitgeber module
+from neurodent.analysis import zeitgeber
 
 
 def create_zeitgeber_plots(df, output_dir, data_dir, zt_config):
@@ -229,8 +155,8 @@ def main():
     df = pd.read_pickle(zeitgeber_file)
     logger.info(f"Loaded zeitgeber data with shape: {df.shape}")
 
-    # Process data for temporal plotting
-    df_processed = process_zeitgeber_data(df, config)
+    # Process data for temporal plotting using new module
+    df_processed = zeitgeber.process_zeitgeber_data(df, config)
 
     # Get zeitgeber plots configuration
     zt_config = config["analysis"]["zeitgeber_plots"]

@@ -17,63 +17,10 @@ from multiprocessing import Pool
 from tqdm import tqdm
 import pandas as pd
 
-from neurodent import visualization
+# Import the new zeitgeber module
+from neurodent.analysis import zeitgeber
 
 logger = logging.getLogger(__name__)
-
-
-def load_war_for_zeitgeber(war_path_info):
-    """
-    Load a fragment-filtered WAR and extract channel-averaged features for zeitgeber analysis
-
-    Args:
-        war_path_info: Tuple of (war_pkl_path, war_json_path, features_to_extract, animal_name)
-
-    Returns:
-        pd.DataFrame: Processed dataframe with channel-averaged zeitgeber features, or None if failed
-    """
-    war_pkl_path, war_json_path, features_to_extract, animal_name = war_path_info
-
-    try:
-        logger.info(f"Loading {animal_name}")
-
-        # Load fragment-filtered WAR using explicit PKL and JSON paths
-        war = visualization.WindowAnalysisResult.load_pickle_and_json(
-            folder_path=war_pkl_path.parent, pickle_name=war_pkl_path.name, json_name=war_json_path.name
-        )
-
-        # Channel standardization already done in fragment filtering step
-
-        # Extract features for zeitgeber analysis WITH CHANNEL AVERAGING
-        # This single method call replaces all the band extraction and averaging logic
-        df = war.get_channel_averaged_result(features=features_to_extract)
-        df["animal"] = animal_name
-
-        # Clean up memory
-        del war
-
-        return df
-
-    except Exception as e:
-        logger.error(f"Failed to process {animal_name}: {str(e)}")
-        raise
-
-
-def convert_to_zeitgeber_time(df):
-    """
-    Convert timestamps to zeitgeber time representation
-    (Implementation from pipeline-alphadelta.py)
-    """
-    logger.info("Converting to zeitgeber time")
-
-    # Extract hour and minute from timestamp
-    df["hour"] = df["timestamp"].dt.hour.copy()
-    df["minute"] = df["timestamp"].dt.minute.copy()
-
-    # Create total_minutes representation (rounded to nearest hour)
-    df["total_minutes"] = 60 * (round((df["hour"] * 60 + df["minute"]) / 60) % 24)
-
-    return df
 
 
 def main():
@@ -140,8 +87,9 @@ def main():
     dfs = []
     if threads > 1:
         with Pool(threads) as pool:
+            # Use the new module function
             for df in tqdm(
-                pool.imap(load_war_for_zeitgeber, war_infos),
+                pool.imap(zeitgeber.load_war_for_zeitgeber, war_infos),
                 total=len(war_infos),
                 desc="Loading WARs for zeitgeber analysis",
             ):
@@ -150,7 +98,7 @@ def main():
     else:
         # Single-threaded processing
         for war_info in tqdm(war_infos, desc="Loading WARs for zeitgeber analysis"):
-            df = load_war_for_zeitgeber(war_info)
+            df = zeitgeber.load_war_for_zeitgeber(war_info)
             if df is not None:
                 dfs.append(df)
 
@@ -164,11 +112,10 @@ def main():
     df = pd.concat(dfs, ignore_index=True)
     logger.info(f"Combined dataframe shape: {df.shape}")
 
-    # Convert to zeitgeber time
-    df = convert_to_zeitgeber_time(df)
+    # Convert to zeitgeber time using new module
+    df = zeitgeber.convert_to_zeitgeber_time(df)
 
     # Identify feature columns (exclude ALL metadata)
-    # Metadata comes from WAR._nonfeature_columns and zeitgeber-specific columns
     metadata_cols = [
         "timestamp",
         "animal",
