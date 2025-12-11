@@ -8,6 +8,7 @@ import tempfile
 import time
 import warnings
 from datetime import datetime, timedelta
+from ..constants import BAND_NAMES
 from pathlib import Path
 from typing import Literal, Union
 
@@ -1801,6 +1802,304 @@ class WindowAnalysisResult(AnimalFeatureParser):
         result_win = result_win.filter(features + multiindex + include)
         return result_win.set_index(multiindex)
 
+<<<<<<< Updated upstream
+=======
+    def get_channel_averaged_result(
+        self,
+        features: list[str],
+        exclude: list[str] = [],
+        df: pd.DataFrame = None,
+    ) -> pd.DataFrame:
+        """Get windowed analysis result with features averaged across channels.
+
+        This method collapses the channel dimension for all requested features,
+        converting multi-channel data to scalar values per time window. It handles
+        three types of features differently:
+
+        1. **Linear features** (logrms, rms, etc.): Simple average across channels
+        2. **Band features** (logpsdband, logpsdfrac, etc.): Extracts each frequency
+           band (delta, theta, alpha, beta, gamma) and averages across channels.
+           Creates columns like: logpsdband_delta, logpsdband_theta, etc.
+        3. **Matrix features** (zcohere, zimcoh, cohere, imcoh): Extracts each
+           frequency band's connectivity matrix and averages the upper triangle
+           (excluding diagonal). Creates columns like: zcohere_delta, zcohere_theta, etc.
+
+        Args:
+            features (list[str]): List of feature names to extract and average.
+                Can include any combination of linear, band, or matrix features.
+            exclude (list[str], optional): List of features to exclude. Defaults to [].
+            df (pd.DataFrame, optional): If provided, use this dataframe instead of
+                self.result. Defaults to None.
+
+        Returns:
+            pd.DataFrame: DataFrame with all features averaged to scalars per time window.
+                - Non-feature columns (timestamp, animalday, etc.) are preserved
+                - Band features expanded to 5 columns per feature (one per frequency band)
+                - Matrix features expanded to 5 columns per feature (one per frequency band)
+                - All feature values are scalars (float)
+
+        Example:
+            >>> war = WindowAnalysisResult.load_pickle_and_json(folder_path, "war.pkl", "war_metadata.json")
+            >>> # Get channel-averaged zeitgeber features
+            >>> df = war.get_channel_averaged_result(["logpsdband", "zcohere", "logrms"])
+            >>> print(df.columns)
+            ['timestamp', 'animalday', 'genotype', 'logrms',
+             'logpsdband_delta', 'logpsdband_theta', 'logpsdband_alpha', 'logpsdband_beta', 'logpsdband_gamma',
+             'zcohere_delta', 'zcohere_theta', 'zcohere_alpha', 'zcohere_beta', 'zcohere_gamma']
+            >>> # All feature values are scalars
+            >>> df['logpsdband_delta'].iloc[0]  # Returns a single float
+
+        Note:
+            This method is designed for temporal analyses (like zeitgeber) where you want
+            to analyze feature trends over time without the channel dimension.
+            For analyses that need channel information, use get_result() instead.
+
+        See Also:
+            - get_result(): Get features with full channel information
+            - get_groupavg_result(): Average features across time windows (preserves channels)
+        """
+        from neurodent import constants
+
+        features = _sanitize_feature_request(features, exclude)
+        result_win = self.result if df is None else df
+
+        # Filter to only features that exist in the dataframe
+        available_features = [f for f in features if f in result_win.columns]
+
+        # Get the base result with requested features
+        df_result = result_win.loc[:, self._nonfeature_columns + available_features].copy()
+
+        # Classify features by type
+        BAND_NAMES = constants.BAND_NAMES
+        BAND_FEATURES = constants.BAND_FEATURES
+        MATRIX_FEATURES = constants.MATRIX_FEATURES
+        LINEAR_FEATURES = constants.LINEAR_FEATURES
+
+        # Separate banded vs non-banded matrix features
+        BANDED_MATRIX_FEATURES = ['cohere', 'zcohere', 'imcoh', 'zimcoh']  # Have frequency bands
+        SIMPLE_MATRIX_FEATURES = ['pcorr', 'zpcorr']  # No bands, just single correlation matrix
+
+        band_features_in_data = [f for f in available_features if f in BAND_FEATURES]
+        banded_matrix_features_in_data = [f for f in available_features if f in BANDED_MATRIX_FEATURES]
+        simple_matrix_features_in_data = [f for f in available_features if f in SIMPLE_MATRIX_FEATURES]
+        simple_features_in_data = [f for f in available_features if f in LINEAR_FEATURES]
+
+        # Process band features - extract all 5 bands
+        for band_feature in band_features_in_data:
+            if band_feature in df_result.columns:
+                df_result = self._extract_band_features(df_result, band_feature, BAND_NAMES)
+
+        # Process banded matrix features - extract all 5 bands
+        for matrix_feature in banded_matrix_features_in_data:
+            if matrix_feature in df_result.columns:
+                df_result = self._extract_matrix_features(df_result, matrix_feature, BAND_NAMES)
+
+        # Build list of features to average
+        features_to_average = []
+        features_to_average.extend(simple_features_in_data)
+        features_to_average.extend(simple_matrix_features_in_data)  # zpcorr, pcorr (no bands)
+
+        for band_feature in band_features_in_data:
+            for band in BAND_NAMES:
+                features_to_average.append(f"{band_feature}_{band}")
+
+        for matrix_feature in banded_matrix_features_in_data:
+            for band in BAND_NAMES:
+                features_to_average.append(f"{matrix_feature}_{band}")
+
+        # Average all features across channels
+        df_result = self._average_across_channels(df_result, features_to_average)
+
+        # Drop original band/banded-matrix features (now that bands are extracted into separate columns)
+        # These are no longer needed and cannot be aggregated (contain dicts/arrays)
+        features_to_drop = band_features_in_data + banded_matrix_features_in_data
+        df_result = df_result.drop(columns=features_to_drop, errors='ignore')
+
+        return df_result
+
+    def _extract_band_features(self, df: pd.DataFrame, feature_name: str, band_names: list[str]) -> pd.DataFrame:
+        """Extract individual frequency bands from band features.
+
+        Band features (logpsdband, logpsdfrac, etc.) are stored as dicts with
+        band names as keys and channel arrays as values.
+
+        Args:
+            df: DataFrame containing the band feature
+            feature_name: Name of the band feature column
+            band_names: List of band names to extract
+
+        Returns:
+            DataFrame with new columns for each band (feature_name_bandname format)
+        """
+        import numpy as np
+
+        if feature_name not in df.columns:
+            return df
+
+        # Extract band features into separate columns
+        df_bands = pd.DataFrame(df[feature_name].tolist())
+
+        for band_name in df_bands.columns:
+            if band_name in band_names:
+                band_array = np.stack(df_bands[band_name].values)
+                # Store as list of arrays for subsequent averaging
+                df[f"{feature_name}_{band_name}"] = list(band_array)
+
+        return df
+
+    def _extract_matrix_features(self, df: pd.DataFrame, feature_name: str, band_names: list[str]) -> pd.DataFrame:
+        """Extract individual frequency bands from matrix features.
+
+        Matrix features come in two formats:
+        - Dict format (zcohere, zimcoh, cohere, imcoh): {'delta': matrix_2d, 'theta': matrix_2d, ...}
+        - Array format (pcorr, zpcorr): 2D matrix (n_channels, n_channels) with no band dimension
+
+        Args:
+            df: DataFrame containing the matrix feature
+            feature_name: Name of the matrix feature column
+            band_names: List of band names to extract
+
+        Returns:
+            DataFrame with new columns for each band (feature_name_bandname format)
+        """
+        import numpy as np
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        if feature_name not in df.columns:
+            return df
+
+        # Check first element to determine storage format
+        first_element = df[feature_name].iloc[0]
+
+        if isinstance(first_element, dict):
+            for band_name in band_names:
+                band_matrices = []
+                for matrix_dict in df[feature_name]:
+                    if isinstance(matrix_dict, dict) and band_name in matrix_dict:
+                        matrix = matrix_dict[band_name]
+                        # Convert list to numpy array if needed (legacy format)
+                        if isinstance(matrix, list):
+                            matrix = np.array(matrix)
+
+                        if isinstance(matrix, np.ndarray) and matrix.ndim == 2:
+                            band_matrices.append(matrix)
+                        else:
+                            logger.warning(
+                                f"Expected 2D matrix for {feature_name}[{band_name}], "
+                                f"got {type(matrix)} with shape {getattr(matrix, 'shape', 'N/A')}"
+                            )
+                            band_matrices.append(np.full((8, 8), np.nan))
+                    else:
+                        logger.warning(f"Missing band {band_name} in {feature_name} dictionary")
+                        band_matrices.append(np.full((8, 8), np.nan))
+
+                df[f"{feature_name}_{band_name}"] = band_matrices
+
+        elif isinstance(first_element, (np.ndarray, list)):
+            if isinstance(first_element, list):
+                first_element = np.array(first_element)
+
+            if first_element.ndim == 2:
+                for band_name in band_names:
+                    band_matrices = []
+                    for matrix_2d in df[feature_name]:
+                        if isinstance(matrix_2d, list):
+                            matrix_2d = np.array(matrix_2d)
+
+                        if isinstance(matrix_2d, np.ndarray) and matrix_2d.ndim == 2:
+                            band_matrices.append(matrix_2d)
+                        else:
+                            logger.warning(
+                                f"Expected 2D matrix for {feature_name}, "
+                                f"got {type(matrix_2d)} with shape {getattr(matrix_2d, 'shape', 'N/A')}"
+                            )
+                            band_matrices.append(np.full((8, 8), np.nan))
+
+                    df[f"{feature_name}_{band_name}"] = band_matrices
+            else:
+                raise ValueError(
+                    f"Matrix feature {feature_name} has wrong dimensionality: {first_element.ndim}D. Expected 2D."
+                )
+
+        else:
+            raise ValueError(
+                f"Unexpected format for matrix feature {feature_name}: {type(first_element)}. "
+                f"Expected dict, 2D array, or list"
+            )
+
+        return df
+
+    def _average_across_channels(self, df: pd.DataFrame, features: list[str]) -> pd.DataFrame:
+        """Average features across channels to produce scalar values.
+
+        Handles two types of features:
+        - Vector features (1D arrays): Average across channels
+        - Matrix features (2D arrays): Average upper triangle (excluding diagonal)
+
+        Args:
+            df: DataFrame with features as columns
+            features: List of feature column names to average
+
+        Returns:
+            DataFrame with averaged features replacing original arrays
+        """
+        import numpy as np
+
+        for feature in features:
+            if feature not in df.columns:
+                continue
+
+            first_element = df[feature].iloc[0]
+
+            if isinstance(first_element, (np.ndarray, list)):
+                if isinstance(first_element, list):
+                    first_element = np.array(first_element)
+
+                if first_element.ndim == 1:
+                    feature_arrays = np.array([np.array(x) if isinstance(x, list) else x for x in df[feature].values])
+                    feature_avg = np.nanmean(feature_arrays, axis=1)
+                    df[feature] = feature_avg
+
+                elif first_element.ndim == 2:
+                    import logging
+                    logger = logging.getLogger(__name__)
+
+                    feature_avg = []
+                    for matrix in df[feature].values:
+                        if isinstance(matrix, list):
+                            matrix = np.array(matrix)
+
+                        # Validate matrix shape
+                        if matrix.ndim != 2:
+                            logger.warning(f"Expected 2D matrix for {feature}, got {matrix.ndim}D: {matrix.shape}")
+                            feature_avg.append(np.nan)
+                            continue
+
+                        if matrix.shape[0] == 0 or matrix.shape[1] == 0:
+                            logger.warning(f"Empty matrix for {feature}: shape {matrix.shape}")
+                            feature_avg.append(np.nan)
+                            continue
+
+                        upper_tri_indices = np.triu_indices_from(matrix, k=1)
+                        upper_tri_values = matrix[upper_tri_indices]
+
+                        if len(upper_tri_values) == 0:
+                            logger.warning(f"No upper triangle values for {feature}: matrix shape {matrix.shape}")
+                            avg_val = np.nan
+                        else:
+                            avg_val = np.nanmean(upper_tri_values)
+
+                        feature_avg.append(avg_val)
+                    df[feature] = feature_avg
+
+            elif isinstance(first_element, (int, float, np.number)):
+                pass
+
+        return df
+
+>>>>>>> Stashed changes
     def get_filter_logrms_range(self, df: pd.DataFrame = None, z_range=3, **kwargs):
         """Filter windows based on log(rms).
 
