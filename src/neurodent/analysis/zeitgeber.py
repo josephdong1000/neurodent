@@ -12,6 +12,7 @@ from .. import visualization
 
 logger = logging.getLogger(__name__)
 
+
 def load_war_for_zeitgeber(war_path_info):
     """
     Load a fragment-filtered WAR and extract channel-averaged features for zeitgeber analysis.
@@ -31,9 +32,11 @@ def load_war_for_zeitgeber(war_path_info):
 
     try:
         logger.info(f"Loading {animal_name}")
-        
+
         war = visualization.WindowAnalysisResult.load_pickle_and_json(
-            folder_path=war_pkl_path.parent, pickle_name=war_pkl_path.name, json_name=war_json_path.name
+            folder_path=war_pkl_path.parent,
+            pickle_name=war_pkl_path.name,
+            json_name=war_json_path.name,
         )
 
         df = war.get_channel_averaged_result(features=features_to_extract)
@@ -45,90 +48,167 @@ def load_war_for_zeitgeber(war_path_info):
         logger.error(f"Failed to process {animal_name}: {str(e)}")
         raise
 
-def convert_to_zeitgeber_time(df):
+
+def add_zeitgeber_time_columns(df, interval_minutes=60):
     """
-    Convert timestamps to zeitgeber time representation.
+    Convert timestamps to zeitgeber time representation with specified binning interval.
 
     Args:
         df (pd.DataFrame): DataFrame containing a 'timestamp' column.
                            - 'timestamp': datetime64[ns] series representing the absolute time.
+        interval_minutes (int, optional): Binning interval in minutes. Defaults to 60.
+                                          Must evenly divide 1440 (24 hours).
 
     Returns:
         pd.DataFrame: DataFrame with added time columns:
                       - 'hour' (int): Hour of the day (0-23).
                       - 'minute' (int): Minute of the hour (0-59).
-                      - 'total_minutes' (int): Time of day in minutes from midnight (0-1440).
+                      - 'total_minutes' (int): Time of day in minutes from midnight (0-1440),
+                                               binned to the nearest 'interval_minutes'.
+
+    Raises:
+        ValueError: If interval_minutes does not evenly divide 24 hours (1440 minutes).
     """
     if df is None or df.empty:
         return df
-        
-    logger.info("Converting to zeitgeber time")
+
+    if 1440 % interval_minutes != 0:
+        raise ValueError(
+            f"interval_minutes ({interval_minutes}) must evenly divide 24 hours (1440 minutes)."
+        )
+
+    logger.info(f"Adding binned zeitgeber time columns with {interval_minutes}min bins")
 
     df["hour"] = df["timestamp"].dt.hour.copy()
     df["minute"] = df["timestamp"].dt.minute.copy()
-    
-    # Total minutes (0-1440)
-    df["total_minutes"] = 60 * (round((df["hour"] * 60 + df["minute"]) / 60) % 24)
+
+    # Calculate raw minutes from midnight
+    raw_minutes = df["hour"] * 60 + df["minute"]
+
+    # Bin to the nearest interval
+    binned_minutes = interval_minutes * (np.round(raw_minutes / interval_minutes))
+
+    # Modulo 1440 to handle wraparound (e.g., 23:59 rounding up to 24:00 -> 0:00)
+    df["total_minutes"] = binned_minutes % 1440
 
     return df
 
-def baseline_correct_features(df, baseline_hours=12, exclude_from_baseline=None):
+
+def subtract_zeitgeber_baseline(
+    df, baseline_hours=12, baseline_window=None, exclude_from_baseline=None
+):
     """
-    Apply baseline correction to numeric features in the dataframe.
+    Subtract baseline from numeric features in the dataframe.
+
+    Baseline is calculated as the mean value within a specified window of time (ZT).
+    Requires 'total_minutes' column to be present (usually added by add_zeitgeber_time_columns).
 
     Args:
-        df (pd.DataFrame): Input dataframe containing feature columns and 'total_minutes'.
-                           Required format:
-                           - 'total_minutes' (numeric): Time of day in minutes.
-                           - 'animal', 'genotype', 'sex' (optional): Used for grouping if present.
-                           - Feature columns (numeric): Columns to be baseline corrected.
-        baseline_hours (int, optional): Number of hours from start of day (ZT0) to use as baseline. Defaults to 12.
-        exclude_from_baseline (list[str], optional): List of column names to exclude from baseline correction. Defaults to None.
+        df (pd.DataFrame): DataFrame containing features and 'total_minutes'.
+        baseline_hours (int, optional): Number of hours from start of ZT0 to use as baseline.
+                                        Defaults to 12. Ignored if baseline_window is set.
+        baseline_window (tuple or str, optional): Explicit window for baseline.
+                                                 - tuple: (start_hour, end_hour)
+                                                 - "day": (0, 12)
+                                                 - "night": (12, 24)
+                                                 Overrides baseline_hours. Defaults to None.
+        exclude_from_baseline (list[str], optional): Columns to exclude. Defaults to None.
 
     Returns:
-        pd.DataFrame: DataFrame with new columns suffixed with '_nobase', containing baseline-corrected values.
-                      Formula: value - mean(value where total_minutes <= baseline_hours * 60)
+        pd.DataFrame: DataFrame with new columns per feature: '{feature}_nobase'
+                      representing the baseline-corrected values.
     """
+    if df.empty:
+        return df
+
     if exclude_from_baseline is None:
         exclude_from_baseline = []
 
-    metadata_cols = ["timestamp", "animal", "genotype", "hour", "minute", "total_minutes", "sex", "gene"]
-    
-    features_to_baseline = [
-        col for col in df.columns
-        if col not in metadata_cols
-        and col not in exclude_from_baseline
-        and not col.endswith("_nobase")
-        and pd.api.types.is_numeric_dtype(df[col])
+    # Determine baseline window start/end in MINUTES
+    if baseline_window is not None:
+        if isinstance(baseline_window, str):
+            if baseline_window == "day":
+                start_min, end_min = 0, 12 * 60
+            elif baseline_window == "night":
+                start_min, end_min = 12 * 60, 24 * 60
+            else:
+                raise ValueError(f"Unknown baseline_window alias: {baseline_window}")
+        elif isinstance(baseline_window, (tuple, list)) and len(baseline_window) == 2:
+            start_min, end_min = baseline_window[0] * 60, baseline_window[1] * 60
+        else:
+            raise ValueError(
+                "baseline_window must be 'day', 'night', or a (start, end) tuple."
+            )
+
+        logger.info(
+            f"Using explicit baseline window: {baseline_window} ({start_min}-{end_min} min)"
+        )
+    else:
+        # Default behavior: 0 to baseline_hours
+        start_min, end_min = 0, baseline_hours * 60
+        logger.info(
+            f"Using default baseline: first {baseline_hours} hours ({start_min}-{end_min} min)"
+        )
+
+    # Identify numeric columns for correction
+    numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+    # Exclude non-feature columns
+    skip_cols = [
+        "hour",
+        "minute",
+        "total_minutes",
+        "animal_idx",
+        "day_idx",
+        "epoch_idx",
+    ] + exclude_from_baseline
+
+    features_to_correct = [
+        c for c in numeric_cols if c not in skip_cols and not c.endswith("_nobase")
     ]
 
-    logger.info(f"Baseline-correcting {len(features_to_baseline)} features using first {baseline_hours} hours")
+    # Grouping for consistent baseline calculation
+    group_cols = [c for c in ["animal", "sex", "gene"] if c in df.columns]
 
     result_df = df.copy()
-    group_cols = [c for c in ["animal", "gene", "sex"] if c in df.columns]
 
-    for feature in features_to_baseline:
+    for feature in features_to_correct:
+        # Calculate baseline mean
         if group_cols:
-            def calc_baseline(g):
-                # Calculate baseline from data <= baseline_hours
-                baseline_data = g.loc[g["total_minutes"] <= baseline_hours * 60, feature]
-                if len(baseline_data) > 0:
-                    return g[feature] - baseline_data.mean()
-                else:
-                    return g[feature] * np.nan 
-            
-            result_df[f"{feature}_nobase"] = result_df.groupby(group_cols).apply(calc_baseline).reset_index(level=list(range(len(group_cols))), drop=True)
+            # Calculate baseline mean per group
+            def get_group_mean(g):
+                vals = g.loc[
+                    g["total_minutes"].between(start_min, end_min, inclusive="left"),
+                    feature,
+                ]
+                return vals.mean() if not vals.empty else np.nan
+
+            group_means = result_df.groupby(group_cols).apply(get_group_mean)
+
+            # Map means back to the DataFrame
+            # Note: set_index matches rows to the group index
+            aligned_means = result_df.set_index(group_cols).index.map(group_means)
+
+            result_df[f"{feature}_nobase"] = result_df[feature] - np.array(
+                aligned_means
+            )
+
         else:
-            baseline_data = df.loc[df["total_minutes"] <= baseline_hours * 60, feature]
-            if len(baseline_data) > 0:
-                 baseline_mean = baseline_data.mean()
-                 result_df[f"{feature}_nobase"] = df[feature] - baseline_mean
+            # Global baseline if no grouping columns
+            baseline_data = df.loc[
+                df["total_minutes"].between(start_min, end_min, inclusive="left"),
+                feature,
+            ]
+            if not baseline_data.empty:
+                mean_val = baseline_data.mean()
+                result_df[f"{feature}_nobase"] = result_df[feature] - mean_val
             else:
-                 result_df[f"{feature}_nobase"] = np.nan
-        
-        logger.debug(f"Created baseline-corrected version for {feature}")
-        
+                logger.warning(
+                    f"No data found in baseline window for feature {feature}"
+                )
+                result_df[f"{feature}_nobase"] = np.nan
+
     return result_df
+
 
 def prepare_plot_data(df, shift_for_48h=True, perform_zt_shift=False):
     """
@@ -144,100 +224,145 @@ def prepare_plot_data(df, shift_for_48h=True, perform_zt_shift=False):
         perform_zt_shift (bool, optional): If True, shifts 'total_minutes' by -6 hours (Clock -> ZT conversion). Defaults to False.
 
     Returns:
-        pd.DataFrame: Processed dataframe ready for plotting. 
+        pd.DataFrame: Processed dataframe ready for plotting.
                       Adds 'sex', 'gene', and temporary sorting columns if applicable.
     """
     df = df.copy()
-    
+
     # Metadata enrichment
     if "genotype" in df.columns and "sex" not in df.columns:
         df["sex"] = df["genotype"].str[0].map({"F": "Female", "M": "Male"})
-        
+
     if "genotype" in df.columns and "gene" not in df.columns:
-        df["gene"] = df["genotype"].str[1:]
-        
+        df["gene"] = df["genotype"].str[2:]
+
     # Align to ZT standard if requested (Clock -> ZT)
     if perform_zt_shift and "total_minutes" in df.columns:
-         df['total_minutes'] = (df['total_minutes'] - 6 * 60) % 1440
-    
+        df["total_minutes"] = (df["total_minutes"] - 6 * 60) % 1440
+
     if shift_for_48h:
         df2 = df.copy()
-        df2['total_minutes'] = df2['total_minutes'] + 1440
+        df2["total_minutes"] = df2["total_minutes"] + 1440
         df = pd.concat([df, df2], ignore_index=True)
-    
+
     # Sorting
     sort_cols = []
     if "gene" in df.columns:
-        genotype_order = {'WT': 0, 'Het': 1, 'Mut': 2}
-        df['genotype_order'] = df['gene'].map(genotype_order).fillna(99)
-        sort_cols.append('genotype_order')
-        
+        genotype_order = {"WT": 0, "Het": 1, "Mut": 2}
+        df["genotype_order"] = df["gene"].map(genotype_order).fillna(99)
+        sort_cols.append("genotype_order")
+
     if "sex" in df.columns:
-        sex_order = {'Male': 0, 'Female': 1}
-        df['sex_order'] = df['sex'].map(sex_order).fillna(99)
+        sex_order = {"Male": 0, "Female": 1}
+        df["sex_order"] = df["sex"].map(sex_order).fillna(99)
         # Sort by sex first
-        sort_cols.insert(0, 'sex_order')
-    
+        sort_cols.insert(0, "sex_order")
+
     if sort_cols:
         df = df.sort_values(sort_cols).drop(columns=sort_cols)
-        
+
     return df
 
-def process_zeitgeber_data(df, config=None, baseline_hours=12, exclude_from_baseline=None):
+
+def enrich_genotype_metadata(df):
+    """
+    Extract 'sex' and 'gene' from 'genotype' column if present.
+
+    Assumes format like 'M_WT', 'F_Het'.
+
+    Args:
+        df (pd.DataFrame): DataFrame potentially containing 'genotype'.
+
+    Returns:
+        pd.DataFrame: DataFrame with added 'sex' and 'gene' columns.
+    """
+    if "genotype" in df.columns:
+        if "sex" not in df.columns:
+            df["sex"] = df["genotype"].str[0].map({"F": "Female", "M": "Male"})
+        if "gene" not in df.columns:
+            df["gene"] = df["genotype"].str[2:]
+    return df
+
+
+def shift_to_zeitgeber_reference(df, shift_hours=6):
+    """
+    Shift 'total_minutes' to start at ZT0.
+
+    Typically, the experimental clock starts at a certain time (e.g. 6:00 AM).
+    ZT0 corresponds to "Lights On" which is often 6:00 AM.
+    So Clock 6:00 -> ZT 0.
+
+    Formula: (total_minutes - shift_hours * 60) % 1440
+
+    Args:
+        df (pd.DataFrame): DataFrame with 'total_minutes'.
+        shift_hours (int, float): Diff between Clock 0:00 and ZT0 in hours.
+                                  Defaults to 6 (so 06:00 -> Z0).
+    Returns:
+        pd.DataFrame: DataFrame with shifted 'total_minutes'.
+    """
+    if "total_minutes" in df.columns:
+        df["total_minutes"] = (df["total_minutes"] - int(shift_hours * 60)) % 1440
+    return df
+
+
+def run_zeitgeber_pipeline(
+    df,
+    baseline_hours=12,
+    baseline_window=None,
+    exclude_from_baseline=None,
+    interval_minutes=60,
+    zeitgeber_shift_hours=6,
+):
     """
     Main orchestration function for processing zeitgeber data.
 
-    Performs the following steps:
-    1. Enrichment of metadata (sex, gene) from genotype.
-    2. Conversion to ZT (shifting total_minutes by -6h).
-    3. Baseline correction of numeric features.
-    4. Preparation for plotting (sorting, 48h duplication).
+    Steps:
+    1. Enrich metadata (sex, gene).
+    2. Shift to Zeitgeber Time (ZT) reference.
+    3. Subtract baseline.
+    4. Prepare for plotting (48h expansion).
 
     Args:
-        df (pd.DataFrame): Input zeitgeber features dataframe.
-                           Required columns:
-                           - 'timestamp' (datetime64): For initial ZT conversion if needed.
-                           - 'total_minutes' (int/float): For processing.
-                           - 'genotype' (str, optional): e.g. 'M_WT', 'F_Mut'.
-        config (dict, optional): Configuration dictionary. Can override baseline settings. Defaults to None.
-        baseline_hours (int, optional): Hours to use for baseline correction. Defaults to 12.
-        exclude_from_baseline (list[str], optional): Columns to exclude from baseline correction. Defaults to None.
+        df (pd.DataFrame): Input dataframe with 'total_minutes', 'genotype'.
+        baseline_hours (int): Baseline duration from ZT0. Default 12.
+        baseline_window (tuple|str): Explicit baseline window. Override.
+        exclude_from_baseline (list): Columns to skip.
+        interval_minutes (int): Binning interval. Ensure data is correctly binned if this is passed.
+                                Note: This function doesn't re-bin, just passes it if needed
+                                (though here it's mostly for signature compatibility).
+        zeitgeber_shift_hours (int): Shift applied to align Clock Time to ZT. Default 6.
 
     Returns:
-        pd.DataFrame: Processed dataframe ready for plotting.
+        pd.DataFrame: Fully processed dataframe.
     """
-    logger.info("Processing zeitgeber data for temporal analysis")
-    
-    if config and "analysis" in config and "zeitgeber_plots" in config["analysis"]:
-        zt_config = config["analysis"]["zeitgeber_plots"]
-        baseline_hours = zt_config.get("baseline_hours", baseline_hours)
-        exclude_from_baseline = zt_config.get("exclude_from_baseline", exclude_from_baseline)
-        
-    df_processed = df.copy()
-    
-    # 1. Enrich (Sex/Gene) for proper grouping in baseline correction
-    if "genotype" in df_processed.columns:
-        if "sex" not in df_processed.columns:
-             df_processed["sex"] = df_processed["genotype"].str[0].map({"F": "Female", "M": "Male"})
-        if "gene" not in df_processed.columns:
-             df_processed["gene"] = df_processed["genotype"].str[1:]
+    logger.info("Running zeitgeber analysis pipeline...")
 
-    # 2. Shift to ZT for baseline logic (assuming baseline is first 12h of ZT)
-    if "total_minutes" in df_processed.columns:
-         df_processed['total_minutes'] = (df_processed['total_minutes'] - 6 * 60) % 1440
-         
-    # 3. Baseline Correction
-    df_processed = baseline_correct_features(
-        df_processed, 
-        baseline_hours=baseline_hours, 
-        exclude_from_baseline=exclude_from_baseline
+    df_processed = df.copy()
+
+    # 1. Enrich Metadata
+    df_processed = enrich_genotype_metadata(df_processed)
+
+    # 2. Shift to ZT
+    df_processed = shift_to_zeitgeber_reference(
+        df_processed, shift_hours=zeitgeber_shift_hours
     )
-    
+
+    # 3. Baseline Subtraction
+    df_processed = subtract_zeitgeber_baseline(
+        df_processed,
+        baseline_hours=baseline_hours,
+        baseline_window=baseline_window,
+        exclude_from_baseline=exclude_from_baseline,
+    )
+
     # 4. Prepare for Plotting (48h expansion + sorting)
     # Note: we already shifted to ZT, so perform_zt_shift=False
-    df_final = prepare_plot_data(df_processed, shift_for_48h=True, perform_zt_shift=False)
-    
+    df_final = prepare_plot_data(
+        df_processed, shift_for_48h=True, perform_zt_shift=False
+    )
+
     if "animal" in df_final.columns:
         logger.info(f"Processed data for {df_final['animal'].nunique()} unique animals")
-        
+
     return df_final

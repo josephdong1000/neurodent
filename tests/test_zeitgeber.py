@@ -1,128 +1,324 @@
-
 import pytest
 import pandas as pd
 import numpy as np
 import datetime
 from neurodent.analysis import zeitgeber
 
+
 # Sample data fixtures
 @pytest.fixture
 def sample_features_df():
     # Create a synthetic dataframe with some features
     # 2 animals, 2 genotypes, 24 hours of data
-    
+
     data = []
     animals = ["anim1", "anim2"]
     genotypes = ["M_WT", "F_KO"]
-    
+
     start_time = datetime.datetime(2023, 1, 1, 0, 0)
-    
+
     for i, (anim, geno) in enumerate(zip(animals, genotypes)):
         for hour in range(24):
             # Clock time: 0-23
             timestamp = start_time + datetime.timedelta(hours=hour)
-            
+
             # Simple feature: sine wave peaking at noon (12:00)
-            # Clock 12:00 = ZT6. 
+            # Clock 12:00 = ZT6.
             # Let's make it peak at ZT12 (18:00 clock)
-            
+
             # Value 1: constant
             val1 = 10.0
-            
+
             # Value 2: varying
             val2 = 10.0 + 5.0 * np.sin(2 * np.pi * hour / 24)
-            
+
             # Add some NaN values specifically for anim2 at 2am (120 min)
             if anim == "anim2" and hour == 2:
                 val1 = np.nan
                 val2 = np.nan
-                
-            data.append({
-                "timestamp": timestamp,
-                "animal": anim,
-                "genotype": geno,
-                "feature_const": val1,
-                "feature_wave": val2
-            })
-            
+
+            data.append(
+                {
+                    "timestamp": timestamp,
+                    "animal": anim,
+                    "genotype": geno,
+                    "feature_const": val1,
+                    "feature_wave": val2,
+                }
+            )
+
     return pd.DataFrame(data)
 
-def test_convert_to_zeitgeber_time(sample_features_df):
-    df = zeitgeber.convert_to_zeitgeber_time(sample_features_df)
-    
+
+def test_add_zeitgeber_time_columns(sample_features_df):
+    df = zeitgeber.add_zeitgeber_time_columns(sample_features_df)
+
     assert "total_minutes" in df.columns
     assert "hour" in df.columns
     assert "minute" in df.columns
-    
+
     # Check conversion
     # 00:00 -> 0 min
     row0 = df[df["timestamp"].dt.hour == 0].iloc[0]
     assert row0["total_minutes"] == 0
-    
+
     # 02:00 -> 120 min
     row2 = df[df["timestamp"].dt.hour == 2].iloc[0]
     assert row2["total_minutes"] == 120
 
-def test_baseline_correct_features(sample_features_df):
+
+def test_subtract_zeitgeber_baseline(sample_features_df):
     # First add ZT time
-    df = zeitgeber.convert_to_zeitgeber_time(sample_features_df)
-    
+    df = zeitgeber.add_zeitgeber_time_columns(sample_features_df)
+
     # Shift to ZT (ZT0 = 6am = 360 min)
     df["total_minutes"] = (df["total_minutes"] - 360) % 1440
-    
+
     # Baseline: first 12 hours (ZT0-ZT12)
     # ZT0-12 corresponds to Clock 6:00-18:00
-    
-    processed = zeitgeber.baseline_correct_features(df, baseline_hours=12)
-    
+
+    processed = zeitgeber.subtract_zeitgeber_baseline(df, baseline_hours=12)
+
     assert "feature_const_nobase" in processed.columns
     assert "feature_wave_nobase" in processed.columns
-    
+
     # For feature_const (value 10), baseline should be 10, so nobase should be 0 (ignoring NaNs)
     # We need to check non-NaN values
     valid_rows = processed.dropna()
     assert np.allclose(valid_rows["feature_const_nobase"], 0.0)
 
+
 def test_prepare_plot_data(sample_features_df):
-    df = zeitgeber.convert_to_zeitgeber_time(sample_features_df)
-    
+    df = zeitgeber.add_zeitgeber_time_columns(sample_features_df)
+
     # Test with ZT shift
     # Clock 00:00 (0 min) -> ZT18 (1080 min)
     # Clock 06:00 (360 min) -> ZT0 (0 min)
-    
-    processed = zeitgeber.prepare_plot_data(df, shift_for_48h=False, perform_zt_shift=True)
-    
+
+    processed = zeitgeber.prepare_plot_data(
+        df, shift_for_48h=False, perform_zt_shift=True
+    )
+
     row_6am = processed[processed["timestamp"].dt.hour == 6].iloc[0]
     assert row_6am["total_minutes"] == 0
-    
+
     row_0am = processed[processed["timestamp"].dt.hour == 0].iloc[0]
-    assert row_0am["total_minutes"] == 1080 # 18 * 60
+    assert row_0am["total_minutes"] == 1080  # 18 * 60
+
 
 def test_nan_handling_legacy_issue(sample_features_df):
     """
     Test specifically for the issue found in debug_zeitgeber_nans.py
     where specific timepoints might have NaNs.
     """
-    df = zeitgeber.convert_to_zeitgeber_time(sample_features_df)
-    
+    df = zeitgeber.add_zeitgeber_time_columns(sample_features_df)
+
     # Check anim2 at 2am (120 min)
     anim2_2am = df[(df["animal"] == "anim2") & (df["total_minutes"] == 120)]
     assert len(anim2_2am) == 1
     assert np.isnan(anim2_2am.iloc[0]["feature_const"])
-    
+
     # Ensure processing doesn't crash with NaNs
-    processed = zeitgeber.process_zeitgeber_data(df)
-    
+    processed = zeitgeber.run_zeitgeber_pipeline(df)
+
     # The NaN should propagate or be handled gracefully
-    anim2_processed_row = processed[(processed["animal"] == "anim2") & (processed["total_minutes"] == (120 - 360)%1440)]
+    anim2_processed_row = processed[
+        (processed["animal"] == "anim2")
+        & (processed["total_minutes"] == (120 - 360) % 1440)
+    ]
     # Note: process_zeitgeber_data does 48h expansion, so we might find 2 rows
     # And ZT shift: 2am (120) - 6am (360) = -240 = 1200 (ZT20)
-    
+
     # Check ZT20
-    zt20_rows = processed[(processed["animal"] == "anim2") & (processed["total_minutes"] == 1200)]
+    zt20_rows = processed[
+        (processed["animal"] == "anim2") & (processed["total_minutes"] == 1200)
+    ]
     assert len(zt20_rows) >= 1
-    
+
     # Should still satisfy processing requirements (metadata added, etc)
     assert "sex" in processed.columns
     assert "gene" in processed.columns
 
+
+def test_grouped_baseline_correction():
+    # Create data for 2 animals with different baselines
+    # Animal 1: Baseline 10
+    # Animal 2: Baseline 20
+
+    rows = []
+    # ZT0-ZT12 (0-720 min) is baseline
+    for minute in range(0, 1440, 60):
+        # Animal 1
+        rows.append(
+            {
+                "total_minutes": minute,
+                "animal": "anim1",
+                "val": 10.0 if minute <= 720 else 15.0,  # Jump to 15 after baseline
+            }
+        )
+        # Animal 2
+        rows.append(
+            {
+                "total_minutes": minute,
+                "animal": "anim2",
+                "val": 20.0 if minute <= 720 else 25.0,  # Jump to 25 after baseline
+            }
+        )
+
+    df = pd.DataFrame(rows)
+
+    # Baseline correct using 12 hours
+    processed = zeitgeber.subtract_zeitgeber_baseline(df, baseline_hours=12)
+
+    # Check animal 1 results
+    a1 = processed[processed["animal"] == "anim1"]
+    # Baseline period should be 0 (10-10)
+    assert np.allclose(a1[a1["total_minutes"] <= 720]["val_nobase"], 0.0)
+    # Post-baseline should be 5 (15-10)
+    assert np.allclose(a1[a1["total_minutes"] > 720]["val_nobase"], 5.0)
+
+    # Check animal 2 results
+    a2 = processed[processed["animal"] == "anim2"]
+    # Baseline period should be 0 (20-20)
+    assert np.allclose(a2[a2["total_minutes"] <= 720]["val_nobase"], 0.0)
+    # Post-baseline should be 5 (25-20)
+    assert np.allclose(a2[a2["total_minutes"] > 720]["val_nobase"], 5.0)
+
+
+def test_baseline_exclusions():
+    # Create simple dataframe
+    df = pd.DataFrame(
+        {
+            "total_minutes": [0, 600, 1200],  # ZT0, ZT10, ZT20
+            "animal": ["a", "a", "a"],
+            "feature_inc": [10, 10, 20],  # Should be corrected
+            "feature_excl": [100, 100, 200],  # Should be excluded
+        }
+    )
+
+    processed = zeitgeber.subtract_zeitgeber_baseline(
+        df, baseline_hours=12, exclude_from_baseline=["feature_excl"]
+    )
+
+    # Check included feature
+    assert "feature_inc_nobase" in processed.columns
+    # Baseline (0, 600) is 10. val at 1200 is 20. 20-10=10.
+    assert processed.iloc[2]["feature_inc_nobase"] == 10.0
+
+    # Check excluded feature
+    assert "feature_excl_nobase" not in processed.columns
+
+
+def test_full_pipeline_via_run_zeitgeber_pipeline(sample_features_df):
+    # Rename of test_metadata_enrichment_and_sort
+    df = sample_features_df.copy()
+    # Ensure no pre-existing metadata to test enrichment
+    if "sex" in df.columns:
+        del df["sex"]
+    if "gene" in df.columns:
+        del df["gene"]
+
+    # We need to ensure total_minutes exists before pipeline if we haven't stripped it
+    # But sample_features_df creates a Raw DF? No, looking at lines 9-50, it makes cols:
+    # timestamp, animal, genotype, feature_const, feature_wave.
+    # It DOES NOT calculate total_minutes.
+    # So we MUST call add_zeitgeber_time_columns first for the pipeline to work,
+    # OR the pipeline should handle it.
+    # Our run_zeitgeber_pipeline docstring says: "Required columns: ... - 'total_minutes'"
+    # So we must call add_zeitgeber_time_columns first.
+
+    df = zeitgeber.add_zeitgeber_time_columns(df)
+
+    processed = zeitgeber.run_zeitgeber_pipeline(df)
+
+    # 1. Check Metadata Enrichment
+    assert "sex" in processed.columns
+    assert "gene" in processed.columns
+    assert processed.iloc[0]["sex"] == "Male"
+    assert processed.iloc[0]["gene"] == "WT"
+
+    # Check ZT Shift (Clock 0 -> ZT 18 (-6h) = 1080 min)
+    # mock_zt_dataframe already has total_minutes from add_zeitgeber_time_columns (0 at 00:00).
+    # Processed should have total_minutes=1080 (and 2520 due to 48h duplicate).
+    assert 1080 in processed["total_minutes"].values
+
+    # Check Baseline Subtraction
+    assert "feature_const_nobase" in processed.columns
+
+
+def test_variable_intervals():
+    # Test custom interval binning
+    rows = []
+    start_time = datetime.datetime(2023, 1, 1, 0, 0)
+    for minute in range(0, 120, 10):  # 0, 10, ... 110
+        rows.append({"timestamp": start_time + datetime.timedelta(minutes=minute)})
+    df = pd.DataFrame(rows)
+
+    # 1. Default (60 min)
+    res_60 = zeitgeber.add_zeitgeber_time_columns(df.copy(), interval_minutes=60)
+    assert res_60.iloc[1]["total_minutes"] == 0  # 10 min
+    assert res_60.iloc[5]["total_minutes"] == 60  # 50 min
+
+    # 2. 30 min interval
+    res_30 = zeitgeber.add_zeitgeber_time_columns(df.copy(), interval_minutes=30)
+    assert res_30.iloc[1]["total_minutes"] == 0  # 10 min
+    assert res_30.iloc[2]["total_minutes"] == 30  # 20 min
+
+    # 3. Edge Cases
+    # 1 min interval (Valid)
+    res_1 = zeitgeber.add_zeitgeber_time_columns(df.copy(), interval_minutes=1)
+    assert res_1.iloc[1]["total_minutes"] == 10
+
+    # 1440 min interval (Valid - 24h bin)
+    res_1440 = zeitgeber.add_zeitgeber_time_columns(df.copy(), interval_minutes=1440)
+    assert res_1440.iloc[5]["total_minutes"] == 0  # 50 min -> 0
+
+    # 720 min interval (Valid - 12h bin)
+    res_720 = zeitgeber.add_zeitgeber_time_columns(df.copy(), interval_minutes=720)
+    assert res_720.iloc[5]["total_minutes"] == 0
+
+    # 4. Invalid Intervals (Primes and non-divisors)
+    primes_and_oddities = [7, 11, 13, 17, 19, 23, 29, 31, 100, 500]
+    for p in primes_and_oddities:
+        if 1440 % p != 0:
+            with pytest.raises(ValueError):
+                zeitgeber.add_zeitgeber_time_columns(df.copy(), interval_minutes=p)
+
+
+def test_flexible_baseline_windows():
+    # Construct data covering 24 hours (ZT0-ZT24)
+    # ZT0-6: 10
+    # ZT6-12: 20
+    # ZT12-18: 30
+    # ZT18-24: 40
+
+    rows = []
+    for h in range(24):  # hours 0-23
+        val = 10.0
+        if h >= 6:
+            val = 20.0
+        if h >= 12:
+            val = 30.0
+        if h >= 18:
+            val = 40.0
+
+        rows.append({"total_minutes": h * 60, "val": val, "animal": "anim1"})
+    df = pd.DataFrame(rows)
+
+    # 1. Custom Range (ZT6-12) => Mean=20
+    res_range = zeitgeber.subtract_zeitgeber_baseline(df, baseline_window=(6, 12))
+    assert np.isclose(
+        res_range[res_range["total_minutes"] == 360].iloc[0]["val_nobase"], 0.0
+    )
+
+    # 2. "day" alias (ZT0-12) => Mean=15
+    res_day = zeitgeber.subtract_zeitgeber_baseline(df, baseline_window="day")
+    assert np.isclose(
+        res_day[res_day["total_minutes"] == 0].iloc[0]["val_nobase"], -5.0
+    )
+
+    # 3. "night" alias (ZT12-24) => Mean=35
+    res_night = zeitgeber.subtract_zeitgeber_baseline(df, baseline_window="night")
+    assert np.isclose(
+        res_night[res_night["total_minutes"] == 720].iloc[0]["val_nobase"], -5.0
+    )
