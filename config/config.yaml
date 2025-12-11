@@ -45,30 +45,6 @@ analysis:
       vote_k: 2                    # minimum votes required across frequency bands
       smooth_len: 5                # SNEO smoothing window length
 
-    # Parameter grid for systematic testing (optional)
-    parameter_grid:
-      - bp: [3, 40]
-        notch: 60
-        notch_q: 30
-        freq_slices: [10, 20]
-        sneo_percentile: 99.99
-        cluster_gap_ms: 80
-        label: "bp3-40_fs10-20_p99.99"
-      - bp: [3, 40]
-        notch: 60
-        notch_q: 30
-        freq_slices: [15, 20]
-        sneo_percentile: 99.99
-        cluster_gap_ms: 80
-        label: "bp3-40_fs15-20_p99.99"
-      - bp: [3, 40]
-        notch: 60
-        notch_q: 30
-        freq_slices: [15, 25]
-        sneo_percentile: 99.99
-        cluster_gap_ms: 80
-        label: "bp3-40_fs15-25_p99.99"
-
     # Processing parameters
     multiprocess_mode: "serial"    # "dask" or "serial"
 
