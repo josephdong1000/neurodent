@@ -55,16 +55,17 @@ def add_zeitgeber_time_columns(df, interval_minutes=60):
 
     Args:
         df (pd.DataFrame): DataFrame containing a 'timestamp' column.
-                           - 'timestamp': datetime64[ns] series representing the absolute time.
+            Required columns:
+            * 'timestamp': datetime64[ns] series representing the absolute time.
         interval_minutes (int, optional): Binning interval in minutes. Defaults to 60.
-                                          Must evenly divide 1440 (24 hours).
+            Must evenly divide 1440 (24 hours).
 
     Returns:
         pd.DataFrame: DataFrame with added time columns:
-                      - 'hour' (int): Hour of the day (0-23).
-                      - 'minute' (int): Minute of the hour (0-59).
-                      - 'total_minutes' (int): Time of day in minutes from midnight (0-1440),
-                                               binned to the nearest 'interval_minutes'.
+            * 'hour' (int): Hour of the day (0-23).
+            * 'minute' (int): Minute of the hour (0-59).
+            * 'total_minutes' (int): Time of day in minutes from midnight (0-1440),
+              binned to the nearest 'interval_minutes'.
 
     Raises:
         ValueError: If interval_minutes does not evenly divide 24 hours (1440 minutes).
@@ -106,17 +107,17 @@ def subtract_zeitgeber_baseline(
     Args:
         df (pd.DataFrame): DataFrame containing features and 'total_minutes'.
         baseline_hours (int, optional): Number of hours from start of ZT0 to use as baseline.
-                                        Defaults to 12. Ignored if baseline_window is set.
-        baseline_window (tuple or str, optional): Explicit window for baseline.
-                                                 - tuple: (start_hour, end_hour)
-                                                 - "day": (0, 12)
-                                                 - "night": (12, 24)
-                                                 Overrides baseline_hours. Defaults to None.
+            Defaults to 12. Ignored if baseline_window is set.
+        baseline_window (tuple | str, optional): Explicit window for baseline.
+            Overrides baseline_hours. Defaults to None. Options:
+            * tuple: (start_hour, end_hour)
+            * "day": (0, 12)
+            * "night": (12, 24)
         exclude_from_baseline (list[str], optional): Columns to exclude. Defaults to None.
 
     Returns:
         pd.DataFrame: DataFrame with new columns per feature: '{feature}_nobase'
-                      representing the baseline-corrected values.
+            representing the baseline-corrected values.
     """
     if df.empty:
         return df
@@ -216,16 +217,18 @@ def prepare_plot_data(df, shift_for_48h=True, perform_zt_shift=False):
 
     Args:
         df (pd.DataFrame): Input dataframe.
-                           Expected format:
-                           - 'genotype' (str, optional): Strain info (e.g., 'M_WT', 'F_Mut').
-                               Used to derive 'sex' and 'gene' if not present.
-                           - 'total_minutes' (numeric): Time of day in minutes.
-        shift_for_48h (bool, optional): If True, duplicates data shifted by 24h (1440 min) to create a 48h view. Defaults to True.
-        perform_zt_shift (bool, optional): If True, shifts 'total_minutes' by -6 hours (Clock -> ZT conversion). Defaults to False.
+            Expected format:
+            * 'genotype' (str, optional): Strain info (e.g., 'M_WT', 'F_Mut').
+              Used to derive 'sex' and 'gene' if not present.
+            * 'total_minutes' (numeric): Time of day in minutes.
+        shift_for_48h (bool, optional): If True, duplicates data shifted by 24h (1440 min)
+            to create a 48h view. Defaults to True.
+        perform_zt_shift (bool, optional): If True, shifts 'total_minutes' by -6 hours
+            (Clock -> ZT conversion). Defaults to False.
 
     Returns:
         pd.DataFrame: Processed dataframe ready for plotting.
-                      Adds 'sex', 'gene', and temporary sorting columns if applicable.
+            Adds 'sex', 'gene', and temporary sorting columns if applicable.
     """
     df = df.copy()
 
@@ -317,7 +320,7 @@ def run_zeitgeber_pipeline(
     """
     Main orchestration function for processing zeitgeber data.
 
-    Steps:
+    The pipeline performs the following steps:
     1. Enrich metadata (sex, gene).
     2. Shift to Zeitgeber Time (ZT) reference.
     3. Subtract baseline.
@@ -326,11 +329,11 @@ def run_zeitgeber_pipeline(
     Args:
         df (pd.DataFrame): Input dataframe with 'total_minutes', 'genotype'.
         baseline_hours (int): Baseline duration from ZT0. Default 12.
-        baseline_window (tuple|str): Explicit baseline window. Override.
+        baseline_window (tuple | str): Explicit baseline window. Override.
         exclude_from_baseline (list): Columns to skip.
         interval_minutes (int): Binning interval. Ensure data is correctly binned if this is passed.
-                                Note: This function doesn't re-bin, just passes it if needed
-                                (though here it's mostly for signature compatibility).
+            Note: This function doesn't re-bin, just passes it if needed
+            (though here it's mostly for signature compatibility).
         zeitgeber_shift_hours (int): Shift applied to align Clock Time to ZT. Default 6.
 
     Returns:
