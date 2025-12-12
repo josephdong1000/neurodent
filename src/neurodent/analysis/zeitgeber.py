@@ -83,10 +83,7 @@ def add_zeitgeber_time_columns(df, interval_minutes=60):
     df["hour"] = df["timestamp"].dt.hour.copy()
     df["minute"] = df["timestamp"].dt.minute.copy()
 
-    # Calculate raw minutes from midnight
     raw_minutes = df["hour"] * 60 + df["minute"]
-
-    # Bin to the nearest interval
     binned_minutes = interval_minutes * (np.round(raw_minutes / interval_minutes))
 
     # Modulo 1440 to handle wraparound (e.g., 23:59 rounding up to 24:00 -> 0:00)
@@ -125,7 +122,6 @@ def subtract_zeitgeber_baseline(
     if exclude_from_baseline is None:
         exclude_from_baseline = []
 
-    # Determine baseline window start/end in MINUTES
     if baseline_window is not None:
         if isinstance(baseline_window, str):
             if baseline_window == "day":
@@ -145,15 +141,12 @@ def subtract_zeitgeber_baseline(
             f"Using explicit baseline window: {baseline_window} ({start_min}-{end_min} min)"
         )
     else:
-        # Default behavior: 0 to baseline_hours
         start_min, end_min = 0, baseline_hours * 60
         logger.info(
             f"Using default baseline: first {baseline_hours} hours ({start_min}-{end_min} min)"
         )
 
-    # Identify numeric columns for correction
     numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-    # Exclude non-feature columns
     skip_cols = [
         "hour",
         "minute",
@@ -167,15 +160,13 @@ def subtract_zeitgeber_baseline(
         c for c in numeric_cols if c not in skip_cols and not c.endswith("_nobase")
     ]
 
-    # Grouping for consistent baseline calculation
     group_cols = [c for c in ["animal", "sex", "gene"] if c in df.columns]
 
     result_df = df.copy()
 
     for feature in features_to_correct:
-        # Calculate baseline mean
         if group_cols:
-            # Calculate baseline mean per group
+
             def get_group_mean(g):
                 vals = g.loc[
                     g["total_minutes"].between(start_min, end_min, inclusive="left"),
@@ -185,7 +176,6 @@ def subtract_zeitgeber_baseline(
 
             group_means = result_df.groupby(group_cols).apply(get_group_mean)
 
-            # Map means back to the DataFrame
             # Note: set_index matches rows to the group index
             aligned_means = result_df.set_index(group_cols).index.map(group_means)
 
@@ -194,7 +184,6 @@ def subtract_zeitgeber_baseline(
             )
 
         else:
-            # Global baseline if no grouping columns
             baseline_data = df.loc[
                 df["total_minutes"].between(start_min, end_min, inclusive="left"),
                 feature,
@@ -232,14 +221,12 @@ def prepare_plot_data(df, shift_for_48h=True, perform_zt_shift=False):
     """
     df = df.copy()
 
-    # Metadata enrichment
     if "genotype" in df.columns and "sex" not in df.columns:
         df["sex"] = df["genotype"].str[0].map({"F": "Female", "M": "Male"})
 
     if "genotype" in df.columns and "gene" not in df.columns:
         df["gene"] = df["genotype"].str[2:]
 
-    # Align to ZT standard if requested (Clock -> ZT)
     if perform_zt_shift and "total_minutes" in df.columns:
         df["total_minutes"] = (df["total_minutes"] - 6 * 60) % 1440
 
@@ -248,7 +235,6 @@ def prepare_plot_data(df, shift_for_48h=True, perform_zt_shift=False):
         df2["total_minutes"] = df2["total_minutes"] + 1440
         df = pd.concat([df, df2], ignore_index=True)
 
-    # Sorting
     sort_cols = []
     if "gene" in df.columns:
         genotype_order = {"WT": 0, "Het": 1, "Mut": 2}
@@ -267,23 +253,59 @@ def prepare_plot_data(df, shift_for_48h=True, perform_zt_shift=False):
     return df
 
 
-def enrich_genotype_metadata(df):
+def enrich_genotype_metadata(df, genotype_pattern=None, sex_mapper=None):
     """
     Extract 'sex' and 'gene' from 'genotype' column if present.
 
-    Assumes format like 'M_WT', 'F_Het'.
+    Supports custom regex pattern extraction. Defaults to standard 'M_WT' format if no pattern provided.
 
     Args:
         df (pd.DataFrame): DataFrame potentially containing 'genotype'.
+        genotype_pattern (str, optional): Regex pattern with named groups to extract metadata.
+            Example: r"(?P<sex>[MF])_(?P<gene>.+)"
+            If None, uses default logic: index 0 is Sex, index 2+ is Gene.
+        sex_mapper (dict, optional): Dictionary to map extracted sex abbreviations to full names.
+            Defaults to {"M": "Male", "F": "Female", "m": "Male", "f": "Female"}.
+            Pass an empty dict to disable mapping.
 
     Returns:
-        pd.DataFrame: DataFrame with added 'sex' and 'gene' columns.
+        pd.DataFrame: DataFrame with added 'sex' and 'gene' columns (if extraction succeeds).
     """
+    if sex_mapper is None:
+        sex_mapper = {"M": "Male", "F": "Female", "m": "Male", "f": "Female"}
+
     if "genotype" in df.columns:
-        if "sex" not in df.columns:
-            df["sex"] = df["genotype"].str[0].map({"F": "Female", "M": "Male"})
-        if "gene" not in df.columns:
-            df["gene"] = df["genotype"].str[2:]
+        if df.empty:
+            # If empty, just return (or ensure columns if needed contextually,
+            # but usually empty in = empty out without side effects is fine,
+            # though tests might expect columns. Let's create columns to be safe).
+            for col in ["sex", "gene"]:
+                if col not in df.columns:
+                    df[col] = pd.Series([], dtype=object)
+            return df
+
+        # Ensure genotype is string for .str accessor
+        if not pd.api.types.is_string_dtype(df["genotype"]):
+            df["genotype"] = df["genotype"].astype(str)
+
+        if genotype_pattern:
+            logger.info(f"Extracting metadata with pattern: {genotype_pattern}")
+            extracted = df["genotype"].str.extract(genotype_pattern)
+            for col in extracted.columns:
+                if col not in df.columns:
+                    df[col] = extracted[col]
+
+            if "sex" in df.columns and sex_mapper:
+                mask = df["sex"].isin(sex_mapper.keys())
+                if mask.any():
+                    df.loc[mask, "sex"] = df.loc[mask, "sex"].map(sex_mapper)
+
+        else:
+            # Default Strategy (M_WT)
+            if "sex" not in df.columns:
+                df["sex"] = df["genotype"].str[0].map({"F": "Female", "M": "Male"})
+            if "gene" not in df.columns:
+                df["gene"] = df["genotype"].str[2:]
     return df
 
 
@@ -316,6 +338,8 @@ def run_zeitgeber_pipeline(
     exclude_from_baseline=None,
     interval_minutes=60,
     zeitgeber_shift_hours=6,
+    genotype_pattern=None,
+    sex_mapper=None,
 ):
     """
     Main orchestration function for processing zeitgeber data.
@@ -335,6 +359,8 @@ def run_zeitgeber_pipeline(
             Note: This function doesn't re-bin, just passes it if needed
             (though here it's mostly for signature compatibility).
         zeitgeber_shift_hours (int): Shift applied to align Clock Time to ZT. Default 6.
+        genotype_pattern (str, optional): Regex pattern for metadata extraction. See `enrich_genotype_metadata`.
+        sex_mapper (dict, optional): Mapper for sex abbreviations. See `enrich_genotype_metadata`.
 
     Returns:
         pd.DataFrame: Fully processed dataframe.
@@ -344,7 +370,9 @@ def run_zeitgeber_pipeline(
     df_processed = df.copy()
 
     # 1. Enrich Metadata
-    df_processed = enrich_genotype_metadata(df_processed)
+    df_processed = enrich_genotype_metadata(
+        df_processed, genotype_pattern=genotype_pattern, sex_mapper=sex_mapper
+    )
 
     # 2. Shift to ZT
     df_processed = shift_to_zeitgeber_reference(
