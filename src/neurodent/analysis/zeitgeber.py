@@ -146,6 +146,10 @@ def subtract_zeitgeber_baseline(
             f"Using default baseline: first {baseline_hours} hours ({start_min}-{end_min} min)"
         )
 
+    if "total_minutes" not in df.columns:
+        logger.warning("Skipping baseline subtraction: 'total_minutes' not found.")
+        return df
+
     numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
     skip_cols = [
         "hour",
@@ -230,7 +234,7 @@ def prepare_plot_data(df, shift_for_48h=True, perform_zt_shift=False):
     if perform_zt_shift and "total_minutes" in df.columns:
         df["total_minutes"] = (df["total_minutes"] - 6 * 60) % 1440
 
-    if shift_for_48h:
+    if shift_for_48h and "total_minutes" in df.columns:
         df2 = df.copy()
         df2["total_minutes"] = df2["total_minutes"] + 1440
         df = pd.concat([df, df2], ignore_index=True)
@@ -397,3 +401,86 @@ def run_zeitgeber_pipeline(
         logger.info(f"Processed data for {df_final['animal'].nunique()} unique animals")
 
     return df_final
+
+
+class ZeitgeberAnalysisResult:
+    """
+    Proxy wrapper for WindowAnalysisResult that applies Zeitgeber processing on the fly.
+
+    Duck-types WindowAnalysisResult to be compatible with ExperimentPlotter and AnimalPlotter,
+    intercepting data retrieval methods to inject the ZT pipeline.
+
+    Args:
+        war (WindowAnalysisResult): The implementation-specific analysis result object.
+        **pipeline_config: Keywords arguments passed to `run_zeitgeber_pipeline`.
+    """
+
+    def __init__(self, war, **pipeline_config):
+        self.war = war
+        self.config = pipeline_config
+
+    def __getattr__(self, name):
+        """Delegate attribute access to the underlying WAR object."""
+        return getattr(self.war, name)
+
+    def _apply_pipeline(self, df):
+        """Helper to apply ZT pipeline to a dataframe."""
+        if df.empty:
+            return df
+
+        # Ensure total_minutes exists (requires 'timestamp')
+        if "total_minutes" not in df.columns:
+            # Try to add it if timestamp exists
+            if "timestamp" in df.columns:
+                # Use interval from config if present, else default
+                interval = self.config.get("interval_minutes", 60)
+                df = add_zeitgeber_time_columns(df, interval_minutes=interval)
+
+        return run_zeitgeber_pipeline(df, **self.config)
+
+    def get_result(self, *args, **kwargs):
+        """Intercepts get_result and applies ZT pipeline."""
+        df = self.war.get_result(*args, **kwargs)
+        return self._apply_pipeline(df)
+
+    def get_grouprows_result(self, *args, **kwargs):
+        """Intercepts get_grouprows_result and applies ZT pipeline."""
+        df = self.war.get_grouprows_result(*args, **kwargs)
+        return self._apply_pipeline(df)
+
+    def get_groupavg_result(self, *args, **kwargs):
+        """Intercepts get_groupavg_result and applies ZT pipeline."""
+        # NOTE: get_groupavg_result returns a dataframe with MultiIndex or index that might
+        # complicate things if metadata columns needed for pipeline (like genotype)
+        # are now part of the index.
+        # However, run_zeitgeber_pipeline expects columns.
+        # Ideally, we process on raw data (get_result) or row-grouped (get_grouprows).
+        # Averaged results might LOSE time info needed for ZT shifting if averaged over time?
+        # If averaging over time, ZT pipeline doesn't make sense post-hoc.
+        # But AnimalPlotter calls this. Let's see if it works.
+        # If it's just animal level feature averages, we might not be able to timeline shift.
+        # Usually ZT analysis is for time-series.
+
+        # If this is being called, we assume the user knows what they are doing OR
+        # the result still contains time info (e.g. grouped by animalday + hour).
+        df = self.war.get_groupavg_result(*args, **kwargs)
+
+        # If it's a completely aggregated result (no time), the pipeline might skip ZT shifting
+        # but still run baseline subtraction if 'total_minutes' is preserved?
+        # Unlikely 'total_minutes' is preserved in a generic group-avg unless grouped by it.
+
+        # For now, we attempt to run it. If it fails due to missing cols,
+        # logic in pipeline should be robust (checks `if "total_minutes" in df.columns`).
+        return self._apply_pipeline(df)
+
+    def get_channel_averaged_result(self, *args, **kwargs):
+        """Intercepts get_channel_averaged_result and applies ZT pipeline."""
+        # This was part of the original plan, though maybe not strict WAR protocol.
+        # Good to have if WAR supports it.
+        if hasattr(self.war, "get_channel_averaged_result"):
+            df = self.war.get_channel_averaged_result(*args, **kwargs)
+            return self._apply_pipeline(df)
+        else:
+            raise NotImplementedError(
+                "Underlying WAR does not support get_channel_averaged_result"
+            )
