@@ -13,7 +13,38 @@ from .. import visualization
 logger = logging.getLogger(__name__)
 
 
-def load_war_for_zeitgeber(war_path_info):
+def get_expanded_feature_names(base_features):
+    """
+    Expand base feature names into their full column names (e.g. bands, matrix features).
+    
+    Uses neurodent.constants to determine expansion rules.
+
+    Args:
+        base_features (list[str]): List of base feature names (e.g. ['logpsdband', 'rms']).
+
+    Returns:
+        list[str]: List of expanded column names.
+    """
+    from .. import constants
+    
+    expanded_features = []
+    
+    for feature in base_features:
+        if feature in constants.BAND_FEATURES or feature in constants.MATRIX_FEATURES:
+            # Expand into per-band features
+            for band in constants.BAND_NAMES:
+                expanded_features.append(f"{feature}_{band}")
+        elif feature in constants.LINEAR_FEATURES or feature in constants.HIST_FEATURES:
+            # Keep as is
+            expanded_features.append(feature)
+        else:
+            # Unknown feature type, assume it's a single column
+            expanded_features.append(feature)
+            
+    return expanded_features
+
+
+def _load_war_for_zeitgeber(war_path_info):
     """
     Load a fragment-filtered WAR and extract channel-averaged features for zeitgeber analysis.
 
@@ -23,12 +54,13 @@ def load_war_for_zeitgeber(war_path_info):
             - war_json_path (Path): Path to the WAR JSON metadata file.
             - features_to_extract (list[str]): List of features to extract.
             - animal_name (str): Identifier for the animal.
+            - pipeline_config (dict): Configuration for the zeitgeber pipeline.
 
     Returns:
         pd.DataFrame: DataFrame containing channel-averaged features and animal identifier.
                       The DataFrame will have columns for each extracted feature and an 'animal' column.
     """
-    war_pkl_path, war_json_path, features_to_extract, animal_name = war_path_info
+    war_pkl_path, war_json_path, features_to_extract, animal_name, pipeline_config = war_path_info
 
     try:
         logger.info(f"Loading {animal_name}")
@@ -38,10 +70,14 @@ def load_war_for_zeitgeber(war_path_info):
             pickle_name=war_pkl_path.name,
             json_name=war_json_path.name,
         )
+        
+        # Wrap with ZeitgeberAnalysisResult to apply pipeline on the fly
+        zar = ZeitgeberAnalysisResult(war, **pipeline_config)
 
-        df = war.get_channel_averaged_result(features=features_to_extract)
+        df = zar.get_channel_averaged_result(features=features_to_extract)
         df["animal"] = animal_name
         del war
+        del zar
         return df
 
     except Exception as e:
@@ -344,6 +380,7 @@ def run_zeitgeber_pipeline(
     zeitgeber_shift_hours=6,
     genotype_pattern=None,
     sex_mapper=None,
+    shift_for_48h=True,
 ):
     """
     Main orchestration function for processing zeitgeber data.
@@ -365,6 +402,7 @@ def run_zeitgeber_pipeline(
         zeitgeber_shift_hours (int): Shift applied to align Clock Time to ZT. Default 6.
         genotype_pattern (str, optional): Regex pattern for metadata extraction. See `enrich_genotype_metadata`.
         sex_mapper (dict, optional): Mapper for sex abbreviations. See `enrich_genotype_metadata`.
+        shift_for_48h (bool, optional): Whether to duplicate data for 48h plotting. Defaults to True.
 
     Returns:
         pd.DataFrame: Fully processed dataframe.
@@ -394,7 +432,7 @@ def run_zeitgeber_pipeline(
     # 4. Prepare for Plotting (48h expansion + sorting)
     # Note: we already shifted to ZT, so perform_zt_shift=False
     df_final = prepare_plot_data(
-        df_processed, shift_for_48h=True, perform_zt_shift=False
+        df_processed, shift_for_48h=shift_for_48h, perform_zt_shift=False
     )
 
     if "animal" in df_final.columns:
@@ -450,33 +488,14 @@ class ZeitgeberAnalysisResult:
 
     def get_groupavg_result(self, *args, **kwargs):
         """Intercepts get_groupavg_result and applies ZT pipeline."""
-        # NOTE: get_groupavg_result returns a dataframe with MultiIndex or index that might
-        # complicate things if metadata columns needed for pipeline (like genotype)
-        # are now part of the index.
-        # However, run_zeitgeber_pipeline expects columns.
-        # Ideally, we process on raw data (get_result) or row-grouped (get_grouprows).
-        # Averaged results might LOSE time info needed for ZT shifting if averaged over time?
-        # If averaging over time, ZT pipeline doesn't make sense post-hoc.
-        # But AnimalPlotter calls this. Let's see if it works.
-        # If it's just animal level feature averages, we might not be able to timeline shift.
-        # Usually ZT analysis is for time-series.
-
-        # If this is being called, we assume the user knows what they are doing OR
-        # the result still contains time info (e.g. grouped by animalday + hour).
+        # Note: If aggregation removes time information (timestamp/total_minutes),
+        # the ZT pipeline will gracefully skip time-dependent steps like shifting
+        # and baseline subtraction.
         df = self.war.get_groupavg_result(*args, **kwargs)
-
-        # If it's a completely aggregated result (no time), the pipeline might skip ZT shifting
-        # but still run baseline subtraction if 'total_minutes' is preserved?
-        # Unlikely 'total_minutes' is preserved in a generic group-avg unless grouped by it.
-
-        # For now, we attempt to run it. If it fails due to missing cols,
-        # logic in pipeline should be robust (checks `if "total_minutes" in df.columns`).
         return self._apply_pipeline(df)
 
     def get_channel_averaged_result(self, *args, **kwargs):
         """Intercepts get_channel_averaged_result and applies ZT pipeline."""
-        # This was part of the original plan, though maybe not strict WAR protocol.
-        # Good to have if WAR supports it.
         if hasattr(self.war, "get_channel_averaged_result"):
             df = self.war.get_channel_averaged_result(*args, **kwargs)
             return self._apply_pipeline(df)
@@ -484,3 +503,4 @@ class ZeitgeberAnalysisResult:
             raise NotImplementedError(
                 "Underlying WAR does not support get_channel_averaged_result"
             )
+

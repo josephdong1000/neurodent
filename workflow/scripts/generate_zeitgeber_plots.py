@@ -26,51 +26,54 @@ import seaborn.objects as so
 import seaborn as sns
 from seaborn import axes_style
 
-# Import the new zeitgeber module
-from neurodent.analysis import zeitgeber
+# Import neurodent modules
+from neurodent.core import zeitgeber
+from neurodent.visualization.plotting import ZeitgeberPlotter
+from neurodent import constants
 
 
-def create_zeitgeber_plots(df, output_dir, data_dir, zt_config):
-    """Create zeitgeber temporal plots using seaborn objects"""
+logger = logging.getLogger(__name__)
 
-    logger = logging.getLogger(__name__)
 
-    # Get format parameters from config
+def load_data(file_path):
+    """
+    Load zeitgeber features dataframe.
+    
+    Args:
+        file_path (Path or str): Path to the pickle file.
+        
+    Returns:
+        pd.DataFrame: Loaded dataframe.
+    """
+    logger.info(f"Loading zeitgeber features from {file_path}")
+    df = pd.read_pickle(file_path)
+    logger.info(f"Loaded zeitgeber data with shape: {df.shape}")
+    return df
+
+
+def generate_plots(df, output_dir, data_dir, zt_config):
+    """
+    Generate all zeitgeber plots configured.
+    
+    Args:
+        df (pd.DataFrame): Processed dataframe.
+        output_dir (Path): Directory for figures.
+        data_dir (Path): Directory for data exports.
+        zt_config (dict): Configuration dictionary.
+    """
+    # Get format parameters
     figure_format = zt_config.get("figure_format", "png")
     data_format = zt_config.get("data_format", "csv")
     dpi = zt_config.get("dpi", 300)
     figsize = zt_config.get("figsize", [20, 20])
     
-    # Feature to label mapping
-    feature_to_label = {
-        'logrms': "Log(RMS)",
-        'alphadelta': "Alpha/Delta ratio",
-        'delta': "Log Delta band power",
-        'alpha': "Log Alpha band power",
-        'logpsdband': "Log Band Power",
-        'zpcorr': "Z-transformed PCC",
-        'logrms_nobase': "Log(RMS) - Baseline",
-        'alphadelta_nobase': "Alpha/Delta ratio - Baseline",
-        'delta_nobase': "Log Delta band power - Baseline",
-        'alpha_nobase': "Log Alpha band power - Baseline",
-        'logpsdband_nobase': "Log Band Power - Baseline",
-        'zpcorr_nobase': "Z-transformed PCC - Baseline",
-    }
-
-    # Add band-specific labels for logpsdband and logpsdfrac
-    for band in ["delta", "theta", "alpha", "beta", "gamma"]:
-        feature_to_label[f"logpsdband_{band}"] = f"Log Power - {band.capitalize()} band"
-        feature_to_label[f"logpsdband_{band}_nobase"] = f"Log Power - {band.capitalize()} band - Baseline"
-        feature_to_label[f"logpsdfrac_{band}"] = f"Log Power Fraction - {band.capitalize()} band"
-        feature_to_label[f"logpsdfrac_{band}_nobase"] = f"Log Power Fraction - {band.capitalize()} band - Baseline"
-        feature_to_label[f"zcohere_{band}"] = f"Z-Coherence - {band.capitalize()} band"
-        feature_to_label[f"zcohere_{band}_nobase"] = f"Z-Coherence - {band.capitalize()} band - Baseline"
-        feature_to_label[f"zimcoh_{band}"] = f"Z-ImCoh - {band.capitalize()} band"
-        feature_to_label[f"zimcoh_{band}_nobase"] = f"Z-ImCoh - {band.capitalize()} band - Baseline"
+    # Instantiate plotter with dataframe
+    plotter = ZeitgeberPlotter(df)
     
-    # Get available features from dataframe
+    # Get available features from dataframe (using plotter's label map for valid features)
+    feature_labels = plotter.get_feature_labels()
     available_features = [col for col in df.columns 
-                         if col in feature_to_label or col.endswith('_nobase')]
+                          if col in feature_labels or col.endswith('_nobase')]
     
     logger.info(f"Creating zeitgeber plots for {len(available_features)} features")
     
@@ -84,88 +87,56 @@ def create_zeitgeber_plots(df, output_dir, data_dir, zt_config):
     animal_counts = df.groupby(['gene', 'sex'])['animal'].nunique()
     logger.info(f"Animal counts by genotype and sex:\n{animal_counts}")
     
+    # Generate all plots
     for i, feature in enumerate(available_features):
         logger.info(f"Creating zeitgeber plot for {feature}")
+        output_path = output_dir / f"{i:02d}_{feature}.{figure_format}"
         
-        try:
-            p = (
-                so.Plot(df, x="total_minutes", y=feature, color="gene")
-                .facet(col="sex", row="gene")
-                .add(so.Line(linewidth=2), so.Agg())
-                .add(so.Dot(), so.Agg())
-                .add(so.Band(), so.Est())
-                .layout(size=(1, 1))
-                .theme(axes_style("ticks") | sns.plotting_context("poster"))
-                .label(y=feature_to_label.get(feature, feature))
-            )
-            
-            fig = mpl.figure.Figure(figsize=figsize)
-            p.on(fig).plot()
-            
-            # Add ZT formatting and day/night shading
-            for ax in fig.axes:
-                # Shade night periods (12-24h and 36-48h)
-                ax.axvspan(xmin=12 * 60, xmax=24 * 60, alpha=0.1, color='grey')
-                ax.axvspan(xmin=36 * 60, xmax=48 * 60, alpha=0.1, color='grey')
-                
-                # Set ticks every 6 hours
-                ax.set_xticks(np.arange(0, 49 * 60, 6 * 60))
-                new_labels = [(x/60) % 24 for x in ax.get_xticks()]
-                ax.set_xticklabels([f"{x:.0f}" for x in new_labels])
-                ax.set_xlabel("ZT")
-            
-            fig.tight_layout()
-            fig.savefig(output_dir / f"{i:02d}_{feature}.{figure_format}", 
-                       bbox_inches="tight", dpi=dpi)
-            plt.close(fig)
-            
-            logger.info(f"Successfully created zeitgeber plot for {feature}")
-            
-        except Exception as e:
-            logger.error(f"Failed to create zeitgeber plot for {feature}: {str(e)}")
-            raise
+        # Use plotter instance
+        plotter.plot_feature(feature, output_path, figsize, dpi)
+
 
 
 def main():
     """Main zeitgeber plots generation function"""
+    # Global snakemake object is injected by Snakemake execution
     global snakemake
-    logging.basicConfig(
-        format="%(asctime)s - %(levelname)s - %(message)s",
-        level=logging.INFO,
-        stream=sys.stdout,
-        force=True,
-    )
-    logger = logging.getLogger(__name__)
-
+    
     logger.info("Zeitgeber temporal plots generation started")
 
-    # Get parameters from snakemake
+    # Get inputs and config
     zeitgeber_file = snakemake.input.zeitgeber_features
     config = snakemake.params.config
-
+    
     # Create output directories
     output_dir = Path(snakemake.output.figure_dir)
     data_dir = Path(snakemake.output.data_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     data_dir.mkdir(parents=True, exist_ok=True)
 
-    logger.info(f"Loading zeitgeber features from {zeitgeber_file}")
+    # 1. Load Data
+    df = load_data(zeitgeber_file)
 
-    # Load zeitgeber features dataframe
-    df = pd.read_pickle(zeitgeber_file)
-    logger.info(f"Loaded zeitgeber data with shape: {df.shape}")
+    # 2. Process Data (48h expansion)
+    # Note: Data is already ZT-shifted and baseline-subtracted by extract_zeitgeber_features.py
+    df_processed = zeitgeber.ZeitgeberAnalysisResult.prepare_plot_data(
+        df, 
+        shift_for_48h=True, 
+        perform_zt_shift=False
+    )
 
-    # Process data for temporal plotting using new module
-    df_processed = zeitgeber.process_zeitgeber_data(df, config)
-
-    # Get zeitgeber plots configuration
+    # 3. Generate Plots
     zt_config = config["analysis"]["zeitgeber_plots"]
-
-    # Create zeitgeber temporal plots
-    create_zeitgeber_plots(df_processed, output_dir, data_dir, zt_config)
+    generate_plots(df_processed, output_dir, data_dir, zt_config)
 
     logger.info("Successfully generated zeitgeber temporal plots")
 
 
 if __name__ == "__main__":
+    logging.basicConfig(
+        format="%(asctime)s - %(levelname)s - %(message)s",
+        level=logging.INFO,
+        stream=sys.stdout,
+        force=True,
+    )
     main()

@@ -28,6 +28,14 @@ from .utils import (
     log_transform,
     get_cache_status_message,
     should_use_cache_unified,
+    get_feature_label,
+)
+
+from .zeitgeber import (
+    ZeitgeberAnalysisResult,
+    run_zeitgeber_pipeline,
+    get_expanded_feature_names,
+    prepare_plot_data,
 )
 
 from . import utils
@@ -43,6 +51,7 @@ __all__: list[str] = [
     "FragmentAnalyzer",
     "MountainSortAnalyzer",
     "FrequencyDomainSpikeDetector",
+    "ZeitgeberAnalysisResult",
     # Essential utilities
     "get_temp_directory",
     "set_temp_directory",
@@ -53,6 +62,10 @@ __all__: list[str] = [
     "log_transform",
     "get_cache_status_message",
     "should_use_cache_unified",
+    "get_expanded_feature_names",
+    "prepare_plot_data",
+    "run_zeitgeber_pipeline",
+    "get_feature_label",
     # === INTERNAL/ADVANCED ===
     "utils",  # Access via core.utils.function_name for internal functions
 ]

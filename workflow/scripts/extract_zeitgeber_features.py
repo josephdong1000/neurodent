@@ -18,7 +18,8 @@ from tqdm import tqdm
 import pandas as pd
 
 # Import the new zeitgeber module
-from neurodent.analysis import zeitgeber
+from neurodent.core import get_expanded_feature_names
+from neurodent.core.zeitgeber import _load_war_for_zeitgeber
 
 logger = logging.getLogger(__name__)
 
@@ -78,10 +79,16 @@ def main():
 
     # Prepare war information for processing
     war_infos = []
+    # Configure pipeline for extraction:
+    # - shift_for_48h=False: We want canonical features here, not plotting data
+    # - interval_minutes: Ensure it matches what we want for aggregation
+    pipeline_config = zeitgeber_params.copy()
+    pipeline_config["shift_for_48h"] = False
+    
     for animal_name in sorted(pkl_animal_set):
         pkl_path = pkl_animals[animal_name]
         json_path = json_animals[animal_name]
-        war_infos.append((pkl_path, json_path, features_to_extract, animal_name))
+        war_infos.append((pkl_path, json_path, features_to_extract, animal_name, pipeline_config))
 
     # Process WARs to extract features (parallel processing)
     dfs = []
@@ -89,7 +96,7 @@ def main():
         with Pool(threads) as pool:
             # Use the new module function
             for df in tqdm(
-                pool.imap(zeitgeber.load_war_for_zeitgeber, war_infos),
+                pool.imap(_load_war_for_zeitgeber, war_infos),
                 total=len(war_infos),
                 desc="Loading WARs for zeitgeber analysis",
             ):
@@ -98,7 +105,7 @@ def main():
     else:
         # Single-threaded processing
         for war_info in tqdm(war_infos, desc="Loading WARs for zeitgeber analysis"):
-            df = zeitgeber.load_war_for_zeitgeber(war_info)
+            df = _load_war_for_zeitgeber(war_info)
             if df is not None:
                 dfs.append(df)
 
@@ -112,24 +119,22 @@ def main():
     df = pd.concat(dfs, ignore_index=True)
     logger.info(f"Combined dataframe shape: {df.shape}")
 
-    # Convert to zeitgeber time using new module
-    df = zeitgeber.convert_to_zeitgeber_time(df)
-
-    # Identify feature columns (exclude ALL metadata)
-    metadata_cols = [
-        "timestamp",
-        "animal",
-        "genotype",  # Base identifiers
-        "animalday",
-        "day",
-        "duration",
-        "endfile",
-        "isday",  # WAR metadata columns
-        "hour",
-        "minute",
-        "total_minutes",  # Zeitgeber time columns
-    ]
-    feature_cols = [col for col in df.columns if col not in metadata_cols]
+    # Identify feature columns using new helper
+    # Get base features from config
+    features_to_extract = config["analysis"]["zeitgeber_features"]["features"]
+    
+    # Expand features (e.g. logpsdband -> logpsdband_delta, etc.)
+    expanded_features = get_expanded_feature_names(features_to_extract)
+    
+    # Also include baseline-subtracted versions
+    expanded_features_nobase = [f"{f}_nobase" for f in expanded_features]
+    
+    # Combine and intersect with actual dataframe columns
+    expected_features = set(expanded_features + expanded_features_nobase)
+    feature_cols = [col for col in df.columns if col in expected_features]
+    
+    # Identify metadata columns as everything else
+    metadata_cols = [col for col in df.columns if col not in feature_cols]
 
     logger.info(f"Total columns: {len(df.columns)}")
     logger.info(f"Metadata columns ({len(metadata_cols)}): {metadata_cols}")
@@ -147,16 +152,29 @@ def main():
 
     # Aggregate by time windows (following alphadelta pipeline)
     logger.info("Aggregating by time windows")
-    agg_dict = {feature: "mean" for feature in feature_cols}
+    
+    # Only aggregate numeric feature columns (double check)
+    numeric_feature_cols = df[feature_cols].select_dtypes(include=[int, float]).columns.tolist()
+    agg_dict = {feature: "mean" for feature in numeric_feature_cols}
 
     try:
-        df = df.groupby(["animal", "genotype", "total_minutes"]).agg(agg_dict).reset_index()
+        # Group by all metadata columns present (except those that vary per row like timestamp/minute if we are binning)
+        # We want to group by: animal, genotype, sex, gene, total_minutes
+        # And potentially other static metadata.
+        # However, 'total_minutes' is the binning key.
+        
+        # Define grouping columns based on what's available and what should be grouped
+        # We want to keep animal-level metadata and the time bin.
+        potential_group_cols = ["animal", "genotype", "sex", "gene", "total_minutes"]
+        group_cols = [c for c in potential_group_cols if c in df.columns]
+        
+        df = df.groupby(group_cols).agg(agg_dict).reset_index()
         logger.info(f"✓ Aggregation successful! Aggregated dataframe shape: {df.shape}")
     except Exception as e:
         logger.error(f"✗ Aggregation failed with error: {str(e)}")
-        logger.error(f"Feature columns being aggregated: {feature_cols}")
+        logger.error(f"Feature columns being aggregated: {numeric_feature_cols}")
         logger.error("Sample values from first row:")
-        for col in feature_cols:
+        for col in numeric_feature_cols:
             if col in df.columns:
                 logger.error(f"  {col}: {df[col].iloc[0]} (type: {type(df[col].iloc[0])})")
         raise

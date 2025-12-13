@@ -2,7 +2,7 @@ import pytest
 import pandas as pd
 import numpy as np
 import datetime
-from neurodent.analysis import zeitgeber
+from neurodent.core import zeitgeber
 
 
 # Sample data fixtures

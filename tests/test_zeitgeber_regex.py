@@ -1,7 +1,7 @@
 import pytest
 import pandas as pd
 import numpy as np
-from neurodent.analysis import zeitgeber
+from neurodent.core import zeitgeber
 
 
 def test_enrich_metadata_legacy_fallback():
