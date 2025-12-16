@@ -62,9 +62,11 @@ def test_plot_single_feature(mock_close, mock_fig, mock_plot, tmp_path):
     # Verify figure creation
     mock_fig.assert_called_with(figsize=[10, 10])
     
-    # Verify savefig
+    # Verify savefig was called with the output path
     mock_fig.return_value.savefig.assert_called()
-    assert str(output_path) in str(mock_fig.return_value.savefig.call_args)
+    call_args = mock_fig.return_value.savefig.call_args
+    # The first positional argument should be the output path
+    assert call_args[0][0] == output_path
 
 
 def test_get_feature_label_utility():
