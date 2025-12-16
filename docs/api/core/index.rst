@@ -12,15 +12,7 @@ The core module provides the fundamental classes for loading, organizing, and an
 Classes
 -------
 
-.. autosummary::
-   :nosignatures:
-
-   DDFBinaryMetadata
-   LongRecordingOrganizer
-   LongRecordingAnalyzer
-   FragmentAnalyzer
-   MountainSortAnalyzer
-   FrequencyDomainSpikeDetector
+.. include:: _summary.rst
 
 .. toctree::
    :maxdepth: 1

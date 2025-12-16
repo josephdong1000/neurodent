@@ -12,15 +12,7 @@ The visualization module provides classes for organizing analysis results and cr
 Classes
 -------
 
-.. autosummary::
-   :nosignatures:
-
-   AnimalOrganizer
-   WindowAnalysisResult
-   SpikeAnalysisResult
-   FrequencyDomainSpikeAnalysisResult
-   AnimalPlotter
-   ExperimentPlotter
+.. include:: _summary.rst
 
 .. toctree::
    :maxdepth: 1
