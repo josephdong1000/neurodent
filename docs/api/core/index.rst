@@ -21,6 +21,7 @@ Classes
    FragmentAnalyzer
    MountainSortAnalyzer
    FrequencyDomainSpikeDetector
+   ZeitgeberAnalysisResult
 
 .. toctree::
    :maxdepth: 1
@@ -32,4 +33,5 @@ Classes
    fragment_analyzer
    mountain_sort_analyzer
    frequency_domain_spike_detector
+   zeitgeber
    utils
