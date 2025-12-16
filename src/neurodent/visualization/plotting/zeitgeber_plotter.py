@@ -100,41 +100,6 @@ class ZeitgeberPlotter:
         
         return df
 
-    @classmethod
-    def get_feature_labels(cls):
-        """
-        Generate mapping of feature names to display labels.
-        
-        DEPRECATED: Use neurodent.core.get_feature_label() instead.
-        
-        Returns:
-            dict: Mapping of feature name -> label.
-        """
-        import warnings
-        warnings.warn(
-            "ZeitgeberPlotter.get_feature_labels() is deprecated. "
-            "Use neurodent.core.get_feature_label() instead.",
-            DeprecationWarning,
-            stacklevel=2
-        )
-        # Build dict for backward compatibility
-        feature_to_label = {}
-        
-        # Add base features
-        for feature, label in constants.FEATURE_LABELS.items():
-            feature_to_label[feature] = label
-            feature_to_label[f"{feature}_nobase"] = f"{label} - Baseline"
-        
-        # Add band-specific labels
-        for base in constants.BAND_FEATURES + constants.MATRIX_FEATURES:
-            base_label = constants.FEATURE_LABELS.get(base, base)
-            for band in constants.BAND_NAMES:
-                band_cap = band.capitalize()
-                feature_to_label[f"{base}_{band}"] = f"{base_label} ({band_cap})"
-                feature_to_label[f"{base}_{band}_nobase"] = f"{base_label} ({band_cap}) - Baseline"
-        
-        return feature_to_label
-
     def plot_feature(self, feature, output_path, figsize, dpi=300):
         """
         Create and save a zeitgeber plot for a single feature.

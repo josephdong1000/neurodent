@@ -5,27 +5,6 @@ from unittest.mock import MagicMock, patch
 from neurodent.visualization.plotting import ZeitgeberPlotter
 from neurodent import constants
 
-def test_get_feature_labels_logic():
-    """Verify that feature labels are generated correctly using constants."""
-    # Create simple instance (df not needed for this internal method check if we access via class or instance)
-    # The method is private _generate_feature_labels but called in __init__
-    
-    # Call class method directly
-    labels = ZeitgeberPlotter.get_feature_labels()
-    
-    # Check base labels are present
-    assert labels['logrms'] == "Log(RMS)"
-    
-    # Check that band-specific labels are generated
-    for band in constants.BAND_NAMES:
-        band_cap = band.capitalize()
-        expected = f"Log Band Power ({band_cap})"
-        assert labels[f"logpsdband_{band}"] == expected
-        
-    # Ensure no band expansions in base (random check)
-    # The keys should be present
-    assert "logpsdband_delta" in labels
-
 @patch("neurodent.visualization.plotting.zeitgeber_plotter.so.Plot")
 @patch("neurodent.visualization.plotting.zeitgeber_plotter.mpl.figure.Figure")
 @patch("neurodent.visualization.plotting.zeitgeber_plotter.plt.close")
