@@ -70,10 +70,11 @@ def generate_plots(df, output_dir, data_dir, zt_config):
     # Instantiate plotter with dataframe
     plotter = ZeitgeberPlotter(df)
     
-    # Get available features from dataframe (using plotter's label map for valid features)
-    feature_labels = plotter.get_feature_labels()
+    # Identify feature columns (numeric columns excluding metadata)
+    metadata_cols = ['animal', 'genotype', 'sex', 'gene', 'total_minutes', 'hour', 'minute',
+                     'genotype_order', 'sex_order', 'timestamp']
     available_features = [col for col in df.columns 
-                          if col in feature_labels or col.endswith('_nobase')]
+                          if col not in metadata_cols and pd.api.types.is_numeric_dtype(df[col])]
     
     logger.info(f"Creating zeitgeber plots for {len(available_features)} features")
     
@@ -119,7 +120,10 @@ def main():
 
     # 2. Process Data (48h expansion)
     # Note: Data is already ZT-shifted and baseline-subtracted by extract_zeitgeber_features.py
-    df_processed = zeitgeber.ZeitgeberAnalysisResult.prepare_plot_data(
+    
+    # 2. Process Data (48h expansion)
+    # Note: Data is already ZT-shifted and baseline-subtracted by extract_zeitgeber_features.py
+    df_processed = zeitgeber.prepare_plot_data(
         df, 
         shift_for_48h=True, 
         perform_zt_shift=False
@@ -128,7 +132,7 @@ def main():
     # 3. Generate Plots
     zt_config = config["analysis"]["zeitgeber_plots"]
     generate_plots(df_processed, output_dir, data_dir, zt_config)
-
+    
     logger.info("Successfully generated zeitgeber temporal plots")
 
 
