@@ -21,7 +21,6 @@ Classes
    FrequencyDomainSpikeAnalysisResult
    AnimalPlotter
    ExperimentPlotter
-   ZeitgeberPlotter
 
 .. toctree::
    :maxdepth: 1
