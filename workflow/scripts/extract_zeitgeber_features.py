@@ -19,6 +19,7 @@ import numpy as np
 import pandas as pd
 
 from neurodent import visualization
+from neurodent.workflow import setup_snakemake_logging
 
 logger = logging.getLogger(__name__)
 
@@ -241,6 +242,5 @@ def main():
 
 
 if __name__ == "__main__":
-    from neurodent.workflow import setup_snakemake_logging
     logger = setup_snakemake_logging(snakemake)
     main()

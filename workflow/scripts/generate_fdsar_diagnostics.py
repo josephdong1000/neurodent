@@ -17,6 +17,7 @@ import warnings
 from pathlib import Path
 
 from neurodent.visualization.frequency_domain_results import FrequencyDomainSpikeAnalysisResult
+from neurodent.workflow import setup_snakemake_logging
 
 
 def load_fdsar_results(fdsar_base_dir: Path):
@@ -113,7 +114,6 @@ def main():
     """Main execution function"""
     global snakemake
 
-    from neurodent.workflow import setup_snakemake_logging
     logger = setup_snakemake_logging(snakemake)
 
     logger.info("FDSAR diagnostics script started")

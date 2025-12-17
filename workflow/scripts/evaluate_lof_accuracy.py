@@ -20,6 +20,7 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import f1_score, precision_score, recall_score
 
 from neurodent import visualization, core
+from neurodent.workflow import setup_snakemake_logging
 
 
 def get_ground_truth_bad_channels(samples_config, animal_folder, animal_id):
@@ -426,6 +427,5 @@ def main():
 
 
 if __name__ == "__main__":
-    from neurodent.workflow import setup_snakemake_logging
     logger = setup_snakemake_logging(snakemake)
     main()

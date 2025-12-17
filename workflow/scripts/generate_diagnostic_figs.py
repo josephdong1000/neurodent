@@ -20,6 +20,7 @@ import matplotlib
 matplotlib.use("Agg")  # Non-interactive backend
 
 from neurodent import visualization
+from neurodent.workflow import setup_snakemake_logging
 
 
 def create_norm_from_config(norm_config):
@@ -147,7 +148,6 @@ def generate_diagnostic_figures_for_animal(war, config, animal_folder, animal_id
 def main():
     global snakemake
 
-    from neurodent.workflow import setup_snakemake_logging
     logger = setup_snakemake_logging(snakemake)
 
     logger.info("Diagnostic figures generation started")
