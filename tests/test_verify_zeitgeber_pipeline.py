@@ -16,7 +16,7 @@ def test_verify_pipeline():
 
     # Mock Data Creation
     # Create 48 hours of data for 2 animals
-    dates = pd.date_range("2023-01-01 00:00", periods=48, freq="1H")
+    dates = pd.date_range("2023-01-01 00:00", periods=48, freq="1h")
     
     data = []
     for animal in ["A1", "A2"]:

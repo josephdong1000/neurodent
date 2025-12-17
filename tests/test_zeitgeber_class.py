@@ -33,7 +33,7 @@ class MockWAR:
 @pytest.fixture
 def mock_war_data():
     # Create valid initial data with timestamps
-    dates = pd.date_range("2023-01-01 06:00", periods=5, freq="1H")  # 6am to 10am
+    dates = pd.date_range("2023-01-01 06:00", periods=5, freq="1h")  # 6am to 10am
     df = pd.DataFrame(
         {
             "timestamp": dates,

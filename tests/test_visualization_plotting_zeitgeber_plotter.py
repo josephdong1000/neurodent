@@ -95,9 +95,9 @@ def test_zeitgeber_plotter_from_zars():
         "feature1": [4.0, 5.0, 6.0]
     })
     
-    # Mock prepare_plot_data to avoid full pipeline
-    with patch.object(zeitgeber, "prepare_plot_data") as mock_prep:
-        mock_prep.side_effect = lambda df, **kwargs: df  # Return df as-is
+    # Mock transform_time_axis to avoid full pipeline
+    with patch.object(zeitgeber, "transform_time_axis") as mock_transform:
+        mock_transform.side_effect = lambda df, **kwargs: df  # Return df as-is
         
         plotter = ZeitgeberPlotter([mock_zar1, mock_zar2], features=["feature1"])
         
@@ -105,8 +105,8 @@ def test_zeitgeber_plotter_from_zars():
         assert "animal" in plotter.df.columns
         assert set(plotter.df["animal"].unique()) == {"Animal1", "Animal2"}
         
-        # Verify prepare_plot_data was called
-        mock_prep.assert_called_once()
+        # Verify transform_time_axis was called
+        mock_transform.assert_called_once()
 
 
 def test_zeitgeber_plotter_from_dataframe():
@@ -123,7 +123,6 @@ def test_zeitgeber_plotter_from_dataframe():
     # Should store df directly
     pd.testing.assert_frame_equal(plotter.df, df)
 
-
 def test_zeitgeber_plotter_invalid_input():
     """Test ZeitgeberPlotter raises on invalid input."""
     with pytest.raises(ValueError, match="must be a DataFrame or list"):
@@ -132,3 +131,21 @@ def test_zeitgeber_plotter_invalid_input():
     with pytest.raises(ValueError, match="cannot be empty"):
         ZeitgeberPlotter([])
 
+
+def test_no_circular_import_with_transform_time_axis():
+    """Test that importing transform_time_axis from zeitgeber_plotter works without circular import."""
+    # This test verifies the lazy import pattern works correctly.
+    # If there were a circular import, this would fail at import time.
+    from neurodent.visualization.plotting.zeitgeber_plotter import ZeitgeberPlotter
+    from neurodent.core.zeitgeber import transform_time_axis
+    
+    # Create a simple DF and run the function to ensure it's callable
+    df = pd.DataFrame({
+        "total_minutes": [0, 60, 120],
+        "genotype": ["M_WT", "M_WT", "M_WT"],
+        "feature": [1, 2, 3],
+    })
+    
+    result = transform_time_axis(df, time_range=(0, 24))
+    assert len(result) == 3
+    assert "sex" in result.columns

@@ -88,15 +88,15 @@ def test_subtract_zeitgeber_baseline(sample_features_df):
     assert np.allclose(valid_rows["feature_const_nobase"], 0.0)
 
 
-def test_prepare_plot_data(sample_features_df):
+def test_transform_time_axis(sample_features_df):
     df = zeitgeber.add_zeitgeber_time_columns(sample_features_df)
 
-    # Test with ZT shift
+    # Test with ZT shift (-6 hours)
     # Clock 00:00 (0 min) -> ZT18 (1080 min)
     # Clock 06:00 (360 min) -> ZT0 (0 min)
 
-    processed = zeitgeber.prepare_plot_data(
-        df, shift_for_48h=False, perform_zt_shift=True
+    processed = zeitgeber.transform_time_axis(
+        df, time_range=(0, 24), shift=-6
     )
 
     row_6am = processed[processed["timestamp"].dt.hour == 6].iloc[0]
@@ -104,6 +104,53 @@ def test_prepare_plot_data(sample_features_df):
 
     row_0am = processed[processed["timestamp"].dt.hour == 0].iloc[0]
     assert row_0am["total_minutes"] == 1080  # 18 * 60
+
+
+def test_transform_time_axis_edge_cases():
+    """Test edge cases for transform_time_axis."""
+    # Create simple test data
+    df = pd.DataFrame({
+        "total_minutes": [0, 360, 720, 1080],  # 0, 6, 12, 18 hours
+        "genotype": ["M_WT", "M_WT", "F_KO", "F_KO"],
+        "value": [1, 2, 3, 4],
+    })
+
+    # Test 1: Invalid time_range (start >= end)
+    with pytest.raises(ValueError, match="must be less than end"):
+        zeitgeber.transform_time_axis(df, time_range=(24, 24))
+    
+    with pytest.raises(ValueError, match="must be less than end"):
+        zeitgeber.transform_time_axis(df, time_range=(48, 24))
+
+    # Test 2: Positive shift (moves times later)
+    result = zeitgeber.transform_time_axis(df, time_range=(0, 24), shift=6)
+    # 0:00 + 6h = 6:00 (360 min)
+    assert result.iloc[0]["total_minutes"] == 360
+    # 18:00 + 6h = 24:00 = 0:00 (wraps around)
+    assert result[result["value"] == 4].iloc[0]["total_minutes"] == 0
+
+    # Test 3: 48h expansion (default)
+    result_48h = zeitgeber.transform_time_axis(df, time_range=(0, 48), shift=0)
+    # Should have 2x the rows (duplicated for 24-48h)
+    assert len(result_48h) == 2 * len(df)
+    # Should have values > 1440 for the duplicated portion
+    assert result_48h["total_minutes"].max() >= 1440
+
+    # Test 4: 72h expansion
+    result_72h = zeitgeber.transform_time_axis(df, time_range=(0, 72), shift=0)
+    assert len(result_72h) == 2 * len(df)  # Still only one duplication cycle
+    assert result_72h["total_minutes"].max() >= 1440
+
+    # Test 5: No expansion (0-24)
+    result_24h = zeitgeber.transform_time_axis(df, time_range=(0, 24), shift=0)
+    assert len(result_24h) == len(df)
+    assert result_24h["total_minutes"].max() < 1440
+
+    # Test 6: Metadata enrichment
+    assert "sex" in result_24h.columns
+    assert "gene" in result_24h.columns
+    assert result_24h.iloc[0]["sex"] == "Male"
+    assert result_24h.iloc[0]["gene"] == "WT"
 
 
 def test_nan_handling_legacy_issue(sample_features_df):
@@ -322,3 +369,89 @@ def test_flexible_baseline_windows():
     assert np.isclose(
         res_night[res_night["total_minutes"] == 720].iloc[0]["val_nobase"], -5.0
     )
+
+
+def test_get_expanded_feature_names():
+    """Test get_expanded_feature_names with various feature types."""
+    from neurodent import constants
+    
+    # Test 1: Band features expand to per-band columns
+    band_features = ["psdband", "logpsdband"]
+    expanded = zeitgeber.get_expanded_feature_names(band_features)
+    
+    # Should have len(band_features) * len(BAND_NAMES) items
+    expected_count = len(band_features) * len(constants.BAND_NAMES)
+    assert len(expanded) == expected_count
+    
+    # Check specific expansions
+    assert "psdband_delta" in expanded
+    assert "psdband_theta" in expanded
+    assert "logpsdband_gamma" in expanded
+    
+    # Test 2: Matrix features expand to per-band columns
+    matrix_features = ["cohere", "zcohere"]
+    expanded_matrix = zeitgeber.get_expanded_feature_names(matrix_features)
+    assert "cohere_delta" in expanded_matrix
+    assert "zcohere_theta" in expanded_matrix
+    
+    # Test 3: Linear features stay as-is
+    linear_features = ["rms", "ampvar", "psdtotal"]
+    expanded_linear = zeitgeber.get_expanded_feature_names(linear_features)
+    assert expanded_linear == linear_features
+    
+    # Test 4: Mixed feature types
+    mixed = ["rms", "psdband", "cohere"]
+    expanded_mixed = zeitgeber.get_expanded_feature_names(mixed)
+    
+    # rms stays as-is (1), psdband expands (5), cohere expands (5) = 11
+    assert "rms" in expanded_mixed
+    assert "psdband_delta" in expanded_mixed
+    assert "cohere_gamma" in expanded_mixed
+    
+    # Test 5: Unknown features pass through
+    unknown = ["my_custom_feature"]
+    expanded_unknown = zeitgeber.get_expanded_feature_names(unknown)
+    assert expanded_unknown == ["my_custom_feature"]
+
+
+def test_add_zeitgeber_time_columns_empty_df():
+    """Test add_zeitgeber_time_columns with empty/None dataframe."""
+    # Empty dataframe
+    empty_df = pd.DataFrame()
+    result = zeitgeber.add_zeitgeber_time_columns(empty_df)
+    assert result.empty
+    
+    # None dataframe
+    result_none = zeitgeber.add_zeitgeber_time_columns(None)
+    assert result_none is None
+
+
+def test_subtract_baseline_no_group_cols():
+    """Test baseline subtraction without grouping columns (no animal/sex/gene)."""
+    df = pd.DataFrame({
+        "total_minutes": [0, 360, 720, 1080],
+        "feature": [10.0, 10.0, 20.0, 20.0],
+    })
+    
+    # Baseline first 12 hours: mean of [10, 10, 20] = 13.33
+    result = zeitgeber.subtract_zeitgeber_baseline(df, baseline_hours=12)
+    
+    assert "feature_nobase" in result.columns
+    # Values should be corrected by the global baseline mean
+    assert not result["feature_nobase"].isna().all()
+
+
+def test_subtract_baseline_empty_window():
+    """Test baseline subtraction when baseline window has no data."""
+    df = pd.DataFrame({
+        "total_minutes": [720, 1080, 1320],  # All after ZT12
+        "animal": ["a", "a", "a"],
+        "feature": [10.0, 20.0, 30.0],
+    })
+    
+    # Baseline window ZT0-6 (0-360 min) - no data in this range
+    result = zeitgeber.subtract_zeitgeber_baseline(df, baseline_window=(0, 6))
+    
+    # Should have NaN for nobase column since no baseline data
+    assert "feature_nobase" in result.columns
+    assert result["feature_nobase"].isna().all()
