@@ -1,3 +1,47 @@
+"""**Constants** used throughout NeuRodent.
+
+This module centralizes all configuration values, feature definitions, and lookup tables
+used by the :mod:`neurodent.core` and :mod:`neurodent.visualization` modules.
+
+**Quick Reference:**
+
+.. code-block:: python
+
+    from neurodent import constants
+
+    # Frequency bands (Hz ranges)
+    constants.FREQ_BANDS
+    # {'delta': (1, 4), 'theta': (4, 8), 'alpha': (8, 13), 'beta': (13, 25), 'gamma': (25, 40)}
+
+    # Available features
+    constants.LINEAR_FEATURES   # ['rms', 'ampvar', 'psdtotal', 'psdslope', 'nspike', ...]
+    constants.BAND_FEATURES     # ['psdband', 'psdfrac', 'logpsdband', 'logpsdfrac']
+    constants.MATRIX_FEATURES   # ['cohere', 'zcohere', 'imcoh', 'zimcoh', 'pcorr', 'zpcorr']
+
+    # Global settings
+    constants.GLOBAL_SAMPLING_RATE  # 1000 Hz
+    constants.LINE_FREQ             # 60 Hz (for notch filter)
+
+    # Colorblind-friendly colors
+    constants.OKABE_ITO_COLORS["blue"]   # '#0072B2'
+    constants.OKABE_ITO_COLORS["orange"] # '#E69F00'
+
+**Customization:**
+
+To override defaults, import and modify before running analysis:
+
+.. code-block:: python
+
+    from neurodent.constants import config
+    config.GLOBAL_SAMPLING_RATE = 500  # If your data is 500 Hz
+
+**See Also:**
+
+- :doc:`/quickstart/configuration` - Full customization guide
+- :mod:`neurodent.constants.analysis` - Feature and frequency definitions
+- :mod:`neurodent.constants.config` - Sampling and sorting parameters
+"""
+
 # Re-export everything for backward compatibility
 from .mappings import (
     DEFAULT_ID_TO_LR,

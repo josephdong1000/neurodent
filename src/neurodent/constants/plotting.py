@@ -1,13 +1,16 @@
+"""Plotting style constants.
+
+Includes color palettes and figure layout settings.
+"""
+
 FEATURE_PLOT_HEIGHT_RATIOS = {
-    # Linear features (across channels or channels x bands)
-    "rms": 1, 
+    "rms": 1,
     "ampvar": 1,
     "psdtotal": 1,
     "psdslope": 2,
     "psdband": 5,
     "psdfrac": 5,
     "nspike": 1,
-    # Matrix features (heatmaps of flattened matrices for spectral analysis)
     "cohere": 5,
     "zcohere": 5,
     "imcoh": 5,
@@ -15,9 +18,8 @@ FEATURE_PLOT_HEIGHT_RATIOS = {
     "pcorr": 1,
     "zpcorr": 1,
 }
+"""Height ratios for multi-feature subplot layouts."""
 
-# Okabe-Ito colorblind-friendly color palette
-# Reference: https://easystats.github.io/see/reference/scale_color_okabeito.html
 OKABE_ITO_COLORS = {
     "black": "#000000",
     "orange": "#E69F00",
@@ -28,5 +30,7 @@ OKABE_ITO_COLORS = {
     "red": "#D55E00",
     "purple": "#CC79A7",
 }
+"""Okabe-Ito colorblind-friendly palette.
 
-
+Reference: https://easystats.github.io/see/reference/scale_color_okabeito.html
+"""
