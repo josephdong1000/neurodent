@@ -10,9 +10,7 @@ Input: FDSAR results directory (contains .fif and .json files)
 Output: Spike-averaged plots and epoch .fif files
 """
 
-import json
 import logging
-import sys
 import warnings
 from pathlib import Path
 

@@ -12,7 +12,6 @@ Output: F-score vs threshold analysis with CSV results and plot
 """
 
 import logging
-import sys
 from pathlib import Path
 import numpy as np
 import pandas as pd

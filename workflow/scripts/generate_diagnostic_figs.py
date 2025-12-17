@@ -10,9 +10,7 @@ Input: WAR pickle and JSON files
 Output: Directory containing diagnostic figure PNG files
 """
 
-import sys
 import logging
-import traceback
 from pathlib import Path
 
 import matplotlib

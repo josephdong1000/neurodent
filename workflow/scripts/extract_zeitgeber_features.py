@@ -11,7 +11,6 @@ Based on: notebooks/examples/pipeline-alphadelta.py
 """
 
 import logging
-import sys
 from pathlib import Path
 from multiprocessing import Pool
 from tqdm import tqdm
