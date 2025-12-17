@@ -214,7 +214,9 @@ def subtract_zeitgeber_baseline(
                 ]
                 return vals.mean() if not vals.empty else np.nan
 
-            group_means = result_df.groupby(group_cols).apply(get_group_mean)
+            group_means = result_df.groupby(group_cols).apply(
+                get_group_mean, include_groups=False
+            )
 
             # Note: set_index matches rows to the group index
             aligned_means = result_df.set_index(group_cols).index.map(group_means)
