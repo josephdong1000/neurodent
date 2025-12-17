@@ -442,10 +442,10 @@ def test_subtract_baseline_no_group_cols():
 
 
 def test_subtract_baseline_empty_window():
-    """Test baseline subtraction when baseline window has no data."""
+    """Test baseline subtraction when baseline window has no data (ungrouped)."""
     df = pd.DataFrame({
         "total_minutes": [720, 1080, 1320],  # All after ZT12
-        "animal": ["a", "a", "a"],
+        # No group columns (animal/sex/gene) - tests the ungrouped branch
         "feature": [10.0, 20.0, 30.0],
     })
     
@@ -455,3 +455,149 @@ def test_subtract_baseline_empty_window():
     # Should have NaN for nobase column since no baseline data
     assert "feature_nobase" in result.columns
     assert result["feature_nobase"].isna().all()
+
+
+def test_subtract_baseline_empty_df():
+    """Test baseline subtraction with empty dataframe."""
+    empty_df = pd.DataFrame({"total_minutes": [], "feature": []})
+    result = zeitgeber.subtract_zeitgeber_baseline(empty_df)
+    assert result.empty
+
+
+def test_subtract_baseline_invalid_window_string():
+    """Test baseline subtraction with invalid window alias."""
+    df = pd.DataFrame({
+        "total_minutes": [0, 60, 120],
+        "feature": [1, 2, 3],
+    })
+    
+    with pytest.raises(ValueError, match="Unknown baseline_window alias"):
+        zeitgeber.subtract_zeitgeber_baseline(df, baseline_window="invalid")
+
+
+def test_subtract_baseline_invalid_window_type():
+    """Test baseline subtraction with invalid window type."""
+    df = pd.DataFrame({
+        "total_minutes": [0, 60, 120],
+        "feature": [1, 2, 3],
+    })
+    
+    with pytest.raises(ValueError, match="must be 'day', 'night', or a"):
+        zeitgeber.subtract_zeitgeber_baseline(df, baseline_window=123)
+
+
+def test_enrich_genotype_metadata_empty_df():
+    """Test enrich_genotype_metadata with empty dataframe."""
+    empty_df = pd.DataFrame({"genotype": []})
+    result = zeitgeber.enrich_genotype_metadata(empty_df)
+    assert "sex" in result.columns
+    assert "gene" in result.columns
+    assert len(result) == 0
+
+
+def test_enrich_genotype_metadata_non_string():
+    """Test enrich_genotype_metadata when genotype is not string type."""
+    df = pd.DataFrame({
+        "genotype": [123, 456],  # Non-string genotypes
+    })
+    result = zeitgeber.enrich_genotype_metadata(df)
+    # Should convert to string and still work
+    assert "sex" in result.columns
+
+
+def test_zar_get_grouprows_result():
+    """Test ZeitgeberAnalysisResult.get_grouprows_result."""
+    from unittest.mock import MagicMock
+    
+    mock_war = MagicMock()
+    mock_war.get_grouprows_result.return_value = pd.DataFrame({
+        "timestamp": pd.date_range("2023-01-01 06:00", periods=3, freq="1h"),
+        "genotype": ["M_WT", "M_WT", "M_WT"],
+        "feature": [1, 2, 3],
+    })
+    
+    zar = zeitgeber.ZeitgeberAnalysisResult(mock_war, baseline_hours=2)
+    result = zar.get_grouprows_result()
+    
+    assert "total_minutes" in result.columns
+    assert "sex" in result.columns
+    mock_war.get_grouprows_result.assert_called_once()
+
+
+def test_zar_get_groupavg_result():
+    """Test ZeitgeberAnalysisResult.get_groupavg_result."""
+    from unittest.mock import MagicMock
+    
+    mock_war = MagicMock()
+    mock_war.get_groupavg_result.return_value = pd.DataFrame({
+        "timestamp": pd.date_range("2023-01-01 06:00", periods=3, freq="1h"),
+        "genotype": ["M_WT", "M_WT", "M_WT"],
+        "feature": [1, 2, 3],
+    })
+    
+    zar = zeitgeber.ZeitgeberAnalysisResult(mock_war, baseline_hours=2)
+    result = zar.get_groupavg_result()
+    
+    assert "total_minutes" in result.columns
+    mock_war.get_groupavg_result.assert_called_once()
+
+
+def test_zar_empty_df():
+    """Test ZeitgeberAnalysisResult with empty dataframe."""
+    from unittest.mock import MagicMock
+    
+    mock_war = MagicMock()
+    mock_war.get_result.return_value = pd.DataFrame()
+    
+    zar = zeitgeber.ZeitgeberAnalysisResult(mock_war)
+    result = zar.get_result()
+    
+    assert result.empty
+
+
+def test_enrich_genotype_with_pattern_and_sex_mapper():
+    """Test enrich_genotype_metadata with custom pattern and sex mapper."""
+    df = pd.DataFrame({
+        "genotype": ["WT-M", "KO-F", "Het-M"],
+    })
+    
+    # Pattern that extracts gene and sex
+    pattern = r"(?P<gene>\w+)-(?P<sex>[MF])"
+    sex_mapper = {"M": "Male", "F": "Female"}
+    
+    result = zeitgeber.enrich_genotype_metadata(
+        df, 
+        genotype_pattern=pattern,
+        sex_mapper=sex_mapper
+    )
+    
+    # Verify extraction worked
+    assert "gene" in result.columns
+    assert "sex" in result.columns
+    assert result.iloc[0]["gene"] == "WT"
+    assert result.iloc[0]["sex"] == "Male"
+    assert result.iloc[1]["sex"] == "Female"
+
+
+def test_baseline_grouped_empty_window(caplog):
+    """Test baseline subtraction with grouped data and empty baseline window."""
+    import logging
+    
+    # Data where baseline window (0-360) has no data for group "b"
+    df = pd.DataFrame({
+        "total_minutes": [0, 60, 720, 780],  # a has data in baseline, b does not
+        "animal": ["a", "a", "b", "b"],
+        "feature": [10.0, 10.0, 20.0, 20.0],
+    })
+    
+    with caplog.at_level(logging.WARNING):
+        result = zeitgeber.subtract_zeitgeber_baseline(df, baseline_window=(0, 6))
+    
+    # Group "a" should have valid baseline subtraction
+    a_rows = result[result["animal"] == "a"]
+    assert not a_rows["feature_nobase"].isna().all()
+    
+    # Group "b" baseline was calculated from time 720-780 which is outside 0-360
+    # So group "b" should have NaN for nobase
+    b_rows = result[result["animal"] == "b"]
+    assert b_rows["feature_nobase"].isna().all()
