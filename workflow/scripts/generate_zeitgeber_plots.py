@@ -123,10 +123,10 @@ def main():
     
     # 2. Process Data (48h expansion)
     # Note: Data is already ZT-shifted and baseline-subtracted by extract_zeitgeber_features.py
-    df_processed = zeitgeber.prepare_plot_data(
+    df_processed = zeitgeber.transform_time_axis(
         df, 
-        shift_for_48h=True, 
-        perform_zt_shift=False
+        time_range=(0, 48), 
+        shift=0
     )
 
     # 3. Generate Plots

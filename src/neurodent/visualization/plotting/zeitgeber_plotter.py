@@ -95,8 +95,8 @@ class ZeitgeberPlotter:
             df = df.groupby(group_cols).agg(agg_dict).reset_index()
         
         # 48h expansion for plotting (lazy import to avoid circular dependency)
-        from neurodent.core.zeitgeber import prepare_plot_data
-        df = prepare_plot_data(df, shift_for_48h=True)
+        from neurodent.core.zeitgeber import transform_time_axis
+        df = transform_time_axis(df, time_range=(0, 48))
         
         return df
 

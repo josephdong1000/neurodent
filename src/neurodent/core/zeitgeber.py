@@ -240,25 +240,37 @@ def subtract_zeitgeber_baseline(
     return result_df
 
 
-def prepare_plot_data(df, shift_for_48h=True, perform_zt_shift=False):
+def transform_time_axis(df, time_range=(0, 48), shift=0):
     """
-    Prepare data for plotting: enrichment, sorting, and optional 48h view duplication.
+    Transform time axis for plotting: enrichment, sorting, and time range expansion.
 
     Args:
         df (pd.DataFrame): Input dataframe.
             Expected format:
             * 'genotype' (str, optional): Strain info (e.g., 'M_WT', 'F_Mut').
               Used to derive 'sex' and 'gene' if not present.
-            * 'total_minutes' (numeric): Time of day in minutes.
-        shift_for_48h (bool, optional): If True, duplicates data shifted by 24h (1440 min)
-            to create a 48h view. Defaults to True.
-        perform_zt_shift (bool, optional): If True, shifts 'total_minutes' by -6 hours
-            (Clock -> ZT conversion). Defaults to False.
+            * 'total_minutes' (numeric): Time of day in minutes (0-1440).
+        time_range (tuple, optional): Hours to display as (start_hr, end_hr). Defaults to (0, 48).
+            Any range is valid as long as start < end. If end > 24, the function
+            duplicates data to fill the extended range (e.g., (0, 48) repeats 0-24h
+            as 24-48h, (0, 72) would repeat twice, etc.).
+        shift (float, optional): Hours to shift the time axis. Defaults to 0.
+            - **Negative shift** moves times earlier: a data point at 6:00 with shift=-6
+              becomes 0:00. Use this when your data starts at clock time 6:00 but you
+              want it to appear at hour 0 on the plot.
+            - **Positive shift** moves times later: a data point at 0:00 with shift=6
+              becomes 6:00.
+            - Common use: shift=-6 aligns "lights on at 6am" to hour 0 (Zeitgeber Time).
 
     Returns:
         pd.DataFrame: Processed dataframe ready for plotting.
             Adds 'sex', 'gene', and temporary sorting columns if applicable.
+
+    Raises:
+        ValueError: If time_range[0] >= time_range[1].
     """
+    if time_range[0] >= time_range[1]:
+        raise ValueError(f"time_range start ({time_range[0]}) must be less than end ({time_range[1]})")
     df = df.copy()
 
     if "genotype" in df.columns and "sex" not in df.columns:
@@ -267,10 +279,12 @@ def prepare_plot_data(df, shift_for_48h=True, perform_zt_shift=False):
     if "genotype" in df.columns and "gene" not in df.columns:
         df["gene"] = df["genotype"].str[2:]
 
-    if perform_zt_shift and "total_minutes" in df.columns:
-        df["total_minutes"] = (df["total_minutes"] - 6 * 60) % 1440
+    # Apply time shift
+    if shift != 0 and "total_minutes" in df.columns:
+        df["total_minutes"] = (df["total_minutes"] + shift * 60) % 1440
 
-    if shift_for_48h and "total_minutes" in df.columns:
+    # Duplicate for 48h view if time_range extends beyond 24h
+    if time_range[1] > 24 and "total_minutes" in df.columns:
         df2 = df.copy()
         df2["total_minutes"] = df2["total_minutes"] + 1440
         df = pd.concat([df, df2], ignore_index=True)
@@ -429,10 +443,11 @@ def run_zeitgeber_pipeline(
         exclude_from_baseline=exclude_from_baseline,
     )
 
-    # 4. Prepare for Plotting (48h expansion + sorting)
-    # Note: we already shifted to ZT, so perform_zt_shift=False
-    df_final = prepare_plot_data(
-        df_processed, shift_for_48h=shift_for_48h, perform_zt_shift=False
+    # 4. Transform time axis for plotting (48h expansion + sorting)
+    # Note: we already shifted to ZT, so shift=0
+    time_range = (0, 48) if shift_for_48h else (0, 24)
+    df_final = transform_time_axis(
+        df_processed, time_range=time_range, shift=0
     )
 
     if "animal" in df_final.columns:

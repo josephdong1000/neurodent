@@ -35,7 +35,7 @@ from .zeitgeber import (
     ZeitgeberAnalysisResult,
     run_zeitgeber_pipeline,
     get_expanded_feature_names,
-    prepare_plot_data,
+    transform_time_axis,
 )
 
 from . import utils
@@ -63,7 +63,7 @@ __all__: list[str] = [
     "get_cache_status_message",
     "should_use_cache_unified",
     "get_expanded_feature_names",
-    "prepare_plot_data",
+    "transform_time_axis",
     "run_zeitgeber_pipeline",
     "get_feature_label",
     # === INTERNAL/ADVANCED ===

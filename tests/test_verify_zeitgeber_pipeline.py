@@ -3,7 +3,7 @@ import numpy as np
 import logging
 from neurodent.core import (
     ZeitgeberAnalysisResult,
-    prepare_plot_data,
+    transform_time_axis,
     get_expanded_feature_names
 )
 
@@ -96,11 +96,11 @@ def test_verify_pipeline():
     # --- Mimic generate_zeitgeber_plots.py logic ---
     logger.info("--- Testing Plotting Logic ---")
 
-    # Prepare plot data (48h expansion)
-    df_plot = prepare_plot_data(
+    # Transform time axis (48h expansion)
+    df_plot = transform_time_axis(
         df_agg, 
-        shift_for_48h=True, 
-        perform_zt_shift=False
+        time_range=(0, 48), 
+        shift=0
     )
     
     # Verify Metadata Helpers
