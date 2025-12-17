@@ -113,36 +113,28 @@ def main():
     """Main execution function"""
     global snakemake
 
-    with open(snakemake.log[0], "w") as f:
-        sys.stderr = sys.stdout = f
+    from neurodent.workflow import setup_snakemake_logging
+    logger = setup_snakemake_logging(snakemake)
 
-        # Set up logging to the redirected stdout
-        logging.basicConfig(
-            format="%(asctime)s - %(levelname)s - %(message)s",
-            level=logging.DEBUG,
-            stream=sys.stdout,
-            force=True,
-        )
+    logger.info("FDSAR diagnostics script started")
 
-        logging.info("FDSAR diagnostics script started")
+    # Load FDSAR results
+    fdsar_dir = Path(snakemake.params.fdsar_dir)
+    output_dir = Path(snakemake.output.diagnostics_dir)
 
-        # Load FDSAR results
-        fdsar_dir = Path(snakemake.params.fdsar_dir)
-        output_dir = Path(snakemake.output.diagnostics_dir)
+    logger.info(f"Loading FDSAR results from: {fdsar_dir}")
+    fdsar_list = load_fdsar_results(fdsar_dir)
 
-        logging.info(f"Loading FDSAR results from: {fdsar_dir}")
-        fdsar_list = load_fdsar_results(fdsar_dir)
+    if not fdsar_list:
+        logger.warning("No FDSAR results found, creating empty output directory")
+        output_dir.mkdir(parents=True, exist_ok=True)
+        return
 
-        if not fdsar_list:
-            logging.warning("No FDSAR results found, creating empty output directory")
-            output_dir.mkdir(parents=True, exist_ok=True)
-            return
+    # Generate diagnostics
+    logger.info(f"Generating diagnostics to: {output_dir}")
+    generate_diagnostics(fdsar_list, output_dir)
 
-        # Generate diagnostics
-        logging.info(f"Generating diagnostics to: {output_dir}")
-        generate_diagnostics(fdsar_list, output_dir)
-
-        logging.info("FDSAR diagnostics generation completed successfully")
+    logger.info("FDSAR diagnostics generation completed successfully")
 
 
 if __name__ == "__main__":

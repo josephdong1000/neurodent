@@ -10,9 +10,7 @@ Input: Flattened WAR pickle and JSON files from all animals
 Output: Heatmap matrix files (TIF) and CSV data exports
 """
 
-import sys
 import logging
-import traceback
 from pathlib import Path
 
 import matplotlib
@@ -22,6 +20,7 @@ matplotlib.use("Agg")  # Non-interactive backend
 import matplotlib.colors as colors
 
 from neurodent import visualization, constants
+from neurodent.workflow import setup_snakemake_logging, load_wars
 
 
 def generate_regular_heatmaps(ep, features, output_dir, data_dir, ep_config):
@@ -170,71 +169,55 @@ def generate_difference_heatmaps(wars, features, output_dir, config):
 def main():
     """Main EP heatmaps generation function"""
     global snakemake
-    with open(snakemake.log[0], "w") as f:
-        sys.stderr = sys.stdout = f
-        logging.basicConfig(
-            format="%(asctime)s - %(levelname)s - %(message)s",
-            level=logging.INFO,
-            stream=sys.stdout,
-            force=True,
-        )
-        logger = logging.getLogger(__name__)
 
-        logger.info("EP heatmap generation started")
+    logger = setup_snakemake_logging(snakemake)
+    logger.info("EP heatmap generation started")
 
-        # Get parameters from snakemake
-        war_pkl_files = snakemake.input.war_pkl
-        war_json_files = snakemake.input.war_json
-        config = snakemake.params.config
+    # Get parameters from snakemake
+    war_pkl_files = snakemake.input.war_pkl
+    war_json_files = snakemake.input.war_json
+    config = snakemake.params.config
 
-        # Create output directories
-        output_dir = Path(snakemake.output.heatmap_dir)
-        data_dir = Path(snakemake.output.heatmap_data_dir)
-        output_dir.mkdir(parents=True, exist_ok=True)
-        data_dir.mkdir(parents=True, exist_ok=True)
+    # Create output directories
+    output_dir = Path(snakemake.output.heatmap_dir)
+    data_dir = Path(snakemake.output.heatmap_data_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    data_dir.mkdir(parents=True, exist_ok=True)
 
-        logger.info(f"Loading {len(war_pkl_files)} flattened WARs")
+    logger.info(f"Loading {len(war_pkl_files)} flattened WARs")
 
-        # Load WARs - let failures be visible rather than silently continuing
-        wars = []
-        for pkl_file, json_file in zip(war_pkl_files, war_json_files):
-            war = visualization.WindowAnalysisResult.load_pickle_and_json(
-                folder_path=Path(pkl_file).parent, pickle_name=Path(pkl_file).name, json_name=Path(json_file).name
-            )
+    # Load WARs using the workflow utility
+    wars = load_wars(war_pkl_files, war_json_files)
+    for war in wars:
+        logger.info(f"Loaded WAR for {war.animal_id} ({war.genotype})")
 
-            wars.append(war)
-            logger.info(f"Loaded WAR for {war.animal_id} ({war.genotype})")
+    logger.info(f"Successfully loaded {len(wars)} WARs")
 
-        if not wars:
-            raise RuntimeError("No WARs were successfully loaded")
+    # Get EP heatmap configuration
+    ep_config = config["analysis"]["ep_heatmaps"]
+    features = ep_config["matrix_features"]
 
-        logger.info(f"Successfully loaded {len(wars)} WARs")
+    # Create genotype ordering
+    genotype_order = ["MWT", "MHet", "MMut", "FWT", "FHet", "FMut"]
+    plot_order = constants.DF_SORT_ORDER.copy()
+    plot_order["genotype"] = genotype_order
 
-        # Get EP heatmap configuration
-        ep_config = config["analysis"]["ep_heatmaps"]
-        features = ep_config["matrix_features"]
+    # Create ExperimentPlotter for regular heatmaps
+    logger.info("Creating ExperimentPlotter for regular heatmaps")
+    ep = visualization.ExperimentPlotter(
+        wars=wars,
+        plot_order=plot_order,
+    )
 
-        # Create genotype ordering
-        genotype_order = ["MWT", "MHet", "MMut", "FWT", "FHet", "FMut"]
-        plot_order = constants.DF_SORT_ORDER.copy()
-        plot_order["genotype"] = genotype_order
+    # Generate regular heatmaps
+    logger.info("Generating regular heatmaps")
+    generate_regular_heatmaps(ep, features, output_dir, data_dir, ep_config)
 
-        # Create ExperimentPlotter for regular heatmaps
-        logger.info("Creating ExperimentPlotter for regular heatmaps")
-        ep = visualization.ExperimentPlotter(
-            wars=wars,
-            plot_order=plot_order,
-        )
+    # Generate difference heatmaps
+    logger.info("Generating difference heatmaps")
+    generate_difference_heatmaps(wars, features, output_dir, config)
 
-        # Generate regular heatmaps
-        logger.info("Generating regular heatmaps")
-        generate_regular_heatmaps(ep, features, output_dir, data_dir, ep_config)
-
-        # Generate difference heatmaps
-        logger.info("Generating difference heatmaps")
-        generate_difference_heatmaps(wars, features, output_dir, config)
-
-        logger.info(f"Successfully generated EP heatmaps for {len(features)} features")
+    logger.info(f"Successfully generated EP heatmaps for {len(features)} features")
 
 
 if __name__ == "__main__":
