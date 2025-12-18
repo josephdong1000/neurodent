@@ -11,6 +11,7 @@ from .core import (
     DDFBinaryMetadata,
     convert_ddfcolbin_to_ddfrowbin,
     convert_ddfrowbin_to_si,
+    split_recording,
 )
 from .analysis import LongRecordingAnalyzer
 from .analyze_frag import FragmentAnalyzer
@@ -39,6 +40,7 @@ __all__: list[str] = [
     "DDFBinaryMetadata",
     "convert_ddfcolbin_to_ddfrowbin",
     "convert_ddfrowbin_to_si",
+    "split_recording",
     "LongRecordingAnalyzer",
     "FragmentAnalyzer",
     "MountainSortAnalyzer",
