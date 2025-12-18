@@ -129,7 +129,7 @@ intersphinx_disabled_reftypes = ["*"]
 
 # MyST-NB configuration (replaces nbsphinx)
 nb_execution_mode = "auto"  # Execute notebooks during build to generate figures
-nb_execution_allow_errors = False
+nb_execution_allow_errors = False  # Stop at first error (shows successful cells before failure)
 nb_execution_timeout = 600  # 10 minutes timeout for notebook execution
 
 # Enable MyST extensions for notebooks
