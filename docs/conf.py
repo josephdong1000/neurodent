@@ -128,7 +128,7 @@ intersphinx_cache_limit = 5  # days - cache inventories
 intersphinx_disabled_reftypes = ["*"]
 
 # MyST-NB configuration (replaces nbsphinx)
-nb_execution_mode = "off"  # Don't execute notebooks during build
+nb_execution_mode = "auto"  # Execute notebooks during build to generate figures
 nb_execution_allow_errors = False
 nb_execution_timeout = 600  # 10 minutes timeout for notebook execution
 
