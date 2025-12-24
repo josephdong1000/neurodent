@@ -10,9 +10,7 @@ Input: WAR pickle and JSON files
 Output: Directory containing diagnostic figure PNG files
 """
 
-import sys
 import logging
-import traceback
 from pathlib import Path
 
 import matplotlib
@@ -20,6 +18,7 @@ import matplotlib
 matplotlib.use("Agg")  # Non-interactive backend
 
 from neurodent import visualization
+from neurodent.workflow import setup_snakemake_logging
 
 
 def create_norm_from_config(norm_config):
@@ -146,17 +145,12 @@ def generate_diagnostic_figures_for_animal(war, config, animal_folder, animal_id
 
 def main():
     global snakemake
-    logging.basicConfig(
-        format="%(asctime)s - %(levelname)s - %(message)s",
-        level=logging.DEBUG,
-        stream=sys.stdout,
-        force=True,
-    )
+    logger = setup_snakemake_logging(snakemake)
 
-    logging.info("Diagnostic figures generation started")
+    logger.info("Diagnostic figures generation started")
     war, config, animal_folder, animal_id, output_dir = load_war_and_config()
     generate_diagnostic_figures_for_animal(war, config, animal_folder, animal_id, output_dir)
-    logging.info(f"Completed diagnostic figures for {animal_folder} {animal_id}")
+    logger.info(f"Completed diagnostic figures for {animal_folder} {animal_id}")
 
 
 if __name__ == "__main__":

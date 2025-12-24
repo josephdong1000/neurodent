@@ -11,7 +11,6 @@ Output: Comparison plots and statistical analysis
 """
 
 import logging
-import sys
 from pathlib import Path
 import pandas as pd
 import numpy as np
@@ -21,6 +20,7 @@ from scipy import stats
 from sklearn.metrics import mean_squared_error
 
 from neurodent import visualization, constants
+from neurodent.workflow import setup_snakemake_logging
 
 
 def load_wars_from_paths(war_paths, label):
@@ -975,6 +975,8 @@ def main():
     """Main comparison analysis function"""
     global snakemake
 
+    setup_snakemake_logging(snakemake)
+
     # Get parameters from snakemake
     manual_war_paths = snakemake.input.manual_wars
     lof_war_paths = snakemake.input.lof_wars
@@ -1049,16 +1051,4 @@ def main():
 
 
 if __name__ == "__main__":
-    # Check if running under Snakemake (snakemake object will be injected)
-    if "snakemake" in globals():
-        # Access snakemake safely since we know it exists
-        snakemake_obj = globals()["snakemake"]
-        logging.basicConfig(
-            format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO, stream=sys.stdout, force=True
-        )
-        main()
-    else:
-        # Running standalone - just setup basic logging
-        logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO)
-        print("This script is designed to be run by Snakemake.")
-        print("The 'snakemake' object with input/output paths is not available in standalone mode.")
+    main()

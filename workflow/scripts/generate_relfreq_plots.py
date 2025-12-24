@@ -15,7 +15,6 @@ Input: Channel-filtered WAR pickle and JSON files from all animals
 Output: Relative frequency distribution plots (histograms) and CSV data exports
 """
 
-import sys
 import logging
 from pathlib import Path
 from multiprocessing import Pool
@@ -28,6 +27,7 @@ matplotlib.use("Agg")  # Non-interactive backend
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
+from neurodent.workflow import setup_snakemake_logging
 
 from neurodent.constants import blue, green, orange, purple, red
 from neurodent import visualization, constants
@@ -261,14 +261,7 @@ def create_relfreq_plots_for_feature(ep, feature, feature_label, output_dir, dat
 def main():
     """Main relative frequency plots generation function"""
     global snakemake
-    logging.basicConfig(
-        format="%(asctime)s - %(levelname)s - %(message)s",
-        level=logging.INFO,
-        stream=sys.stdout,
-        force=True,
-    )
-    logger = logging.getLogger(__name__)
-
+    logger = setup_snakemake_logging(snakemake)
     logger.info("Relative frequency plots generation started")
 
     # Get parameters from snakemake
@@ -290,7 +283,9 @@ def main():
 
     # Validate that PKL and JSON inputs match
     if len(war_pkl_files) != len(war_json_files):
-        raise ValueError(f"Mismatch between PKL files ({len(war_pkl_files)}) and JSON files ({len(war_json_files)})")
+        raise ValueError(
+            f"Mismatch between PKL files ({len(war_pkl_files)}) and JSON files ({len(war_json_files)})"
+        )
 
     # Prepare WAR information for parallel loading
     war_infos = []
@@ -300,23 +295,23 @@ def main():
         animal_name = pkl_path.parent.name
         war_infos.append((pkl_path, json_path, animal_name))
 
-        # Load WARs in parallel
-        wars = []
-        if threads > 1:
-            with Pool(threads) as pool:
-                for war in tqdm(
-                    pool.imap(load_war_for_relfreq, war_infos),
-                    total=len(war_infos),
-                    desc="Loading WARs for relative frequency plots",
-                ):
-                    if war is not None:
-                        wars.append(war)
-        else:
-            # Single-threaded loading
-            for war_info in tqdm(war_infos, desc="Loading WARs for relative frequency plots"):
-                war = load_war_for_relfreq(war_info)
+    # Load WARs in parallel
+    wars = []
+    if threads > 1:
+        with Pool(threads) as pool:
+            for war in tqdm(
+                pool.imap(load_war_for_relfreq, war_infos),
+                total=len(war_infos),
+                desc="Loading WARs for relative frequency plots",
+            ):
                 if war is not None:
                     wars.append(war)
+    else:
+        # Single-threaded loading
+        for war_info in tqdm(war_infos, desc="Loading WARs for relative frequency plots"):
+            war = load_war_for_relfreq(war_info)
+            if war is not None:
+                wars.append(war)
 
     if not wars:
         raise RuntimeError("No WARs were successfully loaded")

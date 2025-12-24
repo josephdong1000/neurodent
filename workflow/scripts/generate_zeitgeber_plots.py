@@ -10,9 +10,7 @@ Input: Zeitgeber features pickle file from all animals
 Output: Temporal figure files and processed data exports
 """
 
-import sys
 import logging
-import traceback
 from pathlib import Path
 
 import matplotlib
@@ -30,6 +28,8 @@ from seaborn import axes_style
 from neurodent.core import zeitgeber
 from neurodent.visualization.plotting import ZeitgeberPlotter
 from neurodent import constants
+from neurodent.workflow import setup_snakemake_logging
+
 
 
 logger = logging.getLogger(__name__)
@@ -102,13 +102,14 @@ def main():
     """Main zeitgeber plots generation function"""
     # Global snakemake object is injected by Snakemake execution
     global snakemake
-    
+
+    setup_snakemake_logging(snakemake)
     logger.info("Zeitgeber temporal plots generation started")
 
     # Get inputs and config
     zeitgeber_file = snakemake.input.zeitgeber_features
     config = snakemake.params.config
-    
+
     # Create output directories
     output_dir = Path(snakemake.output.figure_dir)
     data_dir = Path(snakemake.output.data_dir)
@@ -120,27 +121,18 @@ def main():
 
     # 2. Process Data (48h expansion)
     # Note: Data is already ZT-shifted and baseline-subtracted by extract_zeitgeber_features.py
-    
-    # 2. Process Data (48h expansion)
-    # Note: Data is already ZT-shifted and baseline-subtracted by extract_zeitgeber_features.py
     df_processed = zeitgeber.transform_time_axis(
-        df, 
-        time_range=(0, 48), 
+        df,
+        time_range=(0, 48),
         shift=0
     )
 
     # 3. Generate Plots
     zt_config = config["analysis"]["zeitgeber_plots"]
     generate_plots(df_processed, output_dir, data_dir, zt_config)
-    
+
     logger.info("Successfully generated zeitgeber temporal plots")
 
 
 if __name__ == "__main__":
-    logging.basicConfig(
-        format="%(asctime)s - %(levelname)s - %(message)s",
-        level=logging.INFO,
-        stream=sys.stdout,
-        force=True,
-    )
     main()

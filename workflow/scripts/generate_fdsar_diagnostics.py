@@ -10,13 +10,12 @@ Input: FDSAR results directory (contains .fif and .json files)
 Output: Spike-averaged plots and epoch .fif files
 """
 
-import json
 import logging
-import sys
 import warnings
 from pathlib import Path
 
 from neurodent.visualization.frequency_domain_results import FrequencyDomainSpikeAnalysisResult
+from neurodent.workflow import setup_snakemake_logging
 
 
 def load_fdsar_results(fdsar_base_dir: Path):
@@ -113,32 +112,27 @@ def main():
     """Main execution function"""
     global snakemake
 
-    logging.basicConfig(
-        format="%(asctime)s - %(levelname)s - %(message)s",
-        level=logging.DEBUG,
-        stream=sys.stdout,
-        force=True,
-    )
+    logger = setup_snakemake_logging(snakemake)
 
-    logging.info("FDSAR diagnostics script started")
+    logger.info("FDSAR diagnostics script started")
 
     # Load FDSAR results
     fdsar_dir = Path(snakemake.params.fdsar_dir)
     output_dir = Path(snakemake.output.diagnostics_dir)
 
-    logging.info(f"Loading FDSAR results from: {fdsar_dir}")
+    logger.info(f"Loading FDSAR results from: {fdsar_dir}")
     fdsar_list = load_fdsar_results(fdsar_dir)
 
     if not fdsar_list:
-        logging.warning("No FDSAR results found, creating empty output directory")
+        logger.warning("No FDSAR results found, creating empty output directory")
         output_dir.mkdir(parents=True, exist_ok=True)
         return
 
     # Generate diagnostics
-    logging.info(f"Generating diagnostics to: {output_dir}")
+    logger.info(f"Generating diagnostics to: {output_dir}")
     generate_diagnostics(fdsar_list, output_dir)
 
-    logging.info("FDSAR diagnostics generation completed successfully")
+    logger.info("FDSAR diagnostics generation completed successfully")
 
 
 if __name__ == "__main__":

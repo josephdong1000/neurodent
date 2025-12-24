@@ -11,7 +11,6 @@ Based on: notebooks/examples/pipeline-alphadelta.py
 """
 
 import logging
-import sys
 from pathlib import Path
 from multiprocessing import Pool
 from tqdm import tqdm
@@ -20,6 +19,7 @@ import pandas as pd
 # Import the new zeitgeber module
 from neurodent.core import get_expanded_feature_names
 from neurodent.core.zeitgeber import _load_war_for_zeitgeber
+from neurodent.workflow import setup_snakemake_logging
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +27,8 @@ logger = logging.getLogger(__name__)
 def main():
     """Main zeitgeber feature extraction function"""
     global snakemake
+
+    setup_snakemake_logging(snakemake)
 
     # Get parameters from snakemake
     input_war_pkls = snakemake.input.war_pkl
@@ -191,7 +193,4 @@ def main():
 
 
 if __name__ == "__main__":
-    logging.basicConfig(
-        format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO, stream=sys.stdout, force=True
-    )
     main()

@@ -10,9 +10,6 @@ Input: Flattened WAR pickle and JSON files from all animals
 Output: Statistical figure files (TIF) and CSV data exports
 """
 
-import sys
-import logging
-import traceback
 from pathlib import Path
 
 import matplotlib
@@ -28,6 +25,7 @@ from seaborn import axes_style
 from neurodent.constants import black, blue, green, lightblue, orange, purple, red, yellow
 
 from neurodent import visualization, constants
+from neurodent.workflow import setup_snakemake_logging, load_wars
 
 
 def process_feature_dataframe(df, feature):
@@ -230,14 +228,7 @@ def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
 def main():
     """Main EP figures generation function"""
     global snakemake
-    logging.basicConfig(
-        format="%(asctime)s - %(levelname)s - %(message)s",
-        level=logging.INFO,
-        stream=sys.stdout,
-        force=True,
-    )
-    logger = logging.getLogger(__name__)
-
+    logger = setup_snakemake_logging(snakemake)
     logger.info("EP statistical figures generation started")
 
     # Get parameters from snakemake
@@ -253,18 +244,10 @@ def main():
 
     logger.info(f"Loading {len(war_pkl_files)} flattened WARs")
 
-    # Load WARs - let failures be visible rather than silently continuing
-    wars = []
-    for pkl_file, json_file in zip(war_pkl_files, war_json_files):
-        war = visualization.WindowAnalysisResult.load_pickle_and_json(
-            folder_path=Path(pkl_file).parent, pickle_name=Path(pkl_file).name, json_name=Path(json_file).name
-        )
-
-        wars.append(war)
+    # Load WARs using the workflow utility
+    wars = load_wars(war_pkl_files, war_json_files)
+    for war in wars:
         logger.info(f"Loaded WAR for {war.animal_id} ({war.genotype})")
-
-    if not wars:
-        raise RuntimeError("No WARs were successfully loaded")
 
     logger.info(f"Successfully loaded {len(wars)} WARs")
 
@@ -307,7 +290,6 @@ def main():
             feature_label = feature
 
         create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
-
     logger.info(f"Successfully generated EP statistical figures for {len(features)} features")
 
 
