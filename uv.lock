@@ -2385,13 +2385,6 @@ all = [
     { name = "snakemake", version = "7.32.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "snakemake", version = "9.13.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
 ]
-pipeline = [
-    { name = "pulp", version = "2.7.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "snakemake", version = "7.32.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "snakemake", version = "9.13.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-]
-
-[package.dev-dependencies]
 dev = [
     { name = "factory-boy" },
     { name = "faker" },
@@ -2402,6 +2395,7 @@ dev = [
     { name = "nbstripout" },
     { name = "pandoc" },
     { name = "pre-commit" },
+    { name = "pulp", version = "2.7.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "pydata-sphinx-theme" },
     { name = "pytest" },
     { name = "pytest-benchmark" },
@@ -2410,6 +2404,8 @@ dev = [
     { name = "pytest-json-report" },
     { name = "pytest-mock" },
     { name = "pytest-xdist" },
+    { name = "snakemake", version = "7.32.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "snakemake", version = "9.13.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "snakeviz" },
     { name = "sphinx" },
     { name = "sphinx-autobuild", version = "2024.10.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
@@ -2418,6 +2414,11 @@ dev = [
     { name = "sphinx-multiversion" },
     { name = "tomli" },
 ]
+pipeline = [
+    { name = "pulp", version = "2.7.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "snakemake", version = "7.32.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "snakemake", version = "9.13.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+]
 
 [package.metadata]
 requires-dist = [
@@ -2425,54 +2426,50 @@ requires-dist = [
     { name = "dask", extras = ["distributed"] },
     { name = "dask-jobqueue" },
     { name = "django" },
+    { name = "factory-boy", marker = "extra == 'dev'", specifier = ">=3.2.0" },
+    { name = "faker", marker = "extra == 'dev'", specifier = ">=18.0.0" },
+    { name = "ipykernel", marker = "extra == 'dev'", specifier = ">=6.0.0" },
+    { name = "jupyterlab", marker = "extra == 'dev'", specifier = ">=4.4.10" },
+    { name = "jupytext", marker = "extra == 'dev'", specifier = ">=1.18.1" },
     { name = "matplotlib" },
     { name = "mne" },
     { name = "mne-connectivity" },
+    { name = "myst-nb", marker = "extra == 'dev'", specifier = ">=1.3.0" },
+    { name = "nbstripout", marker = "extra == 'dev'", specifier = ">=0.8.2" },
+    { name = "neurodent", extras = ["pipeline"], marker = "extra == 'all'" },
+    { name = "neurodent", extras = ["pipeline"], marker = "extra == 'dev'" },
     { name = "numpy" },
     { name = "openpyxl" },
     { name = "pandas" },
+    { name = "pandoc", marker = "extra == 'dev'", specifier = ">=2.0.0" },
+    { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=4.5.1" },
     { name = "probeinterface" },
-    { name = "pulp", marker = "python_full_version < '3.11' and extra == 'all'", specifier = "==2.7.0" },
     { name = "pulp", marker = "python_full_version < '3.11' and extra == 'pipeline'", specifier = "==2.7.0" },
     { name = "pyarrow" },
+    { name = "pydata-sphinx-theme", marker = "extra == 'dev'", specifier = ">=0.16.1" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
+    { name = "pytest-benchmark", marker = "extra == 'dev'", specifier = ">=4.0.0" },
+    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0.0" },
+    { name = "pytest-html", marker = "extra == 'dev'", specifier = ">=3.1.0" },
+    { name = "pytest-json-report", marker = "extra == 'dev'", specifier = ">=1.5.0" },
+    { name = "pytest-mock", marker = "extra == 'dev'", specifier = ">=3.10.0" },
+    { name = "pytest-xdist", marker = "extra == 'dev'", specifier = ">=3.0.0" },
     { name = "scikit-learn", specifier = ">=1.7.2" },
     { name = "scipy" },
     { name = "seaborn" },
-    { name = "snakemake", marker = "extra == 'all'", specifier = ">=7.32.4" },
     { name = "snakemake", marker = "extra == 'pipeline'", specifier = ">=7.32.4" },
+    { name = "snakeviz", marker = "extra == 'dev'" },
+    { name = "sphinx", marker = "extra == 'dev'", specifier = ">=7.0.0" },
+    { name = "sphinx-autobuild", marker = "extra == 'dev'", specifier = ">=2024.10.3" },
+    { name = "sphinx-design", marker = "extra == 'dev'", specifier = ">=0.6.1" },
+    { name = "sphinx-multiversion", marker = "extra == 'dev'", specifier = ">=0.2.4" },
     { name = "spikeinterface" },
     { name = "statannotations" },
     { name = "statsmodels" },
+    { name = "tomli", marker = "extra == 'dev'", specifier = ">=2.3.0" },
     { name = "zarr", specifier = ">=2.18.3" },
 ]
-provides-extras = ["pipeline", "all"]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "factory-boy", specifier = ">=3.2.0" },
-    { name = "faker", specifier = ">=18.0.0" },
-    { name = "ipykernel", specifier = ">=6.0.0" },
-    { name = "jupyterlab", specifier = ">=4.4.10" },
-    { name = "jupytext", specifier = ">=1.18.1" },
-    { name = "myst-nb", specifier = ">=1.3.0" },
-    { name = "nbstripout", specifier = ">=0.8.2" },
-    { name = "pandoc", specifier = ">=2.0.0" },
-    { name = "pre-commit", specifier = ">=4.5.1" },
-    { name = "pydata-sphinx-theme", specifier = ">=0.16.1" },
-    { name = "pytest", specifier = ">=7.0.0" },
-    { name = "pytest-benchmark", specifier = ">=4.0.0" },
-    { name = "pytest-cov", specifier = ">=4.0.0" },
-    { name = "pytest-html", specifier = ">=3.1.0" },
-    { name = "pytest-json-report", specifier = ">=1.5.0" },
-    { name = "pytest-mock", specifier = ">=3.10.0" },
-    { name = "pytest-xdist", specifier = ">=3.0.0" },
-    { name = "snakeviz" },
-    { name = "sphinx", specifier = ">=7.0.0" },
-    { name = "sphinx-autobuild", specifier = ">=2024.10.3" },
-    { name = "sphinx-design", specifier = ">=0.6.1" },
-    { name = "sphinx-multiversion", specifier = ">=0.2.4" },
-    { name = "tomli", specifier = ">=2.3.0" },
-]
+provides-extras = ["pipeline", "all", "dev"]
 
 [[package]]
 name = "nodeenv"
