@@ -86,6 +86,33 @@ NeuRodent includes a Snakemake workflow for automated analysis pipelines. If you
 
    The ``pipeline`` extra includes Snakemake and related dependencies needed for running the automated analysis workflow. If you only need the core NeuRodent library for Python-based analysis, the basic installation is sufficient.
 
+Installation Extras Summary
+---------------------------
+
+NeuRodent provides optional dependency groups for different use cases:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 80
+
+   * - Extra
+     - Description
+   * - ``[pipeline]``
+     - Snakemake and dependencies for running automated analysis workflows.
+   * - ``[dev]``
+     - Development tools (testing, docs, linting, pre-commit hooks) plus all pipeline dependencies. Use this for contributing to NeuRodent.
+   * - ``[all]``
+     - Installs all optional runtime dependencies.
+
+Install any extra with:
+
+.. code-block:: bash
+
+   pip install neurodent[extra_name]
+   # or with uv:
+   uv add neurodent[extra_name]
+
+
 Development Installation
 ------------------------
 
