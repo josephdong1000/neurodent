@@ -601,3 +601,34 @@ def test_baseline_grouped_empty_window(caplog):
     # So group "b" should have NaN for nobase
     b_rows = result[result["animal"] == "b"]
     assert b_rows["feature_nobase"].isna().all()
+
+
+def test_zar_ignores_extra_config_kwargs():
+    """Test that ZeitgeberAnalysisResult ignores unknown config kwargs.
+    
+    Regression test for: run_zeitgeber_pipeline() got an unexpected keyword argument 'features'
+    """
+    from unittest.mock import MagicMock
+    
+    mock_war = MagicMock()
+    mock_war.get_result.return_value = pd.DataFrame({
+        "timestamp": pd.date_range("2023-01-01 06:00", periods=3, freq="1h"),
+        "genotype": ["M_WT", "M_WT", "M_WT"],
+        "feature": [1, 2, 3],
+    })
+    
+    # Pass extra kwargs that are NOT valid for run_zeitgeber_pipeline
+    zar = zeitgeber.ZeitgeberAnalysisResult(
+        mock_war,
+        features=['logpsdband'],  # Invalid - should be ignored
+        unknown_key=42,           # Invalid - should be ignored
+        baseline_hours=2,         # Valid - should be used
+    )
+    
+    # Should not raise TypeError about unexpected keyword argument
+    result = zar.get_result()
+    
+    # Verify pipeline was applied (has sex/gene columns from enrichment)
+    assert "sex" in result.columns
+    assert "total_minutes" in result.columns
+

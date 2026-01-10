@@ -4,6 +4,7 @@ Zeitgeber Time (ZT) Analysis Module
 This module provides functionality for processing and analyzing data in Zeitgeber Time (ZT).
 """
 
+import inspect
 import logging
 import pandas as pd
 import numpy as np
@@ -491,7 +492,12 @@ class ZeitgeberAnalysisResult:
                 interval = self.config.get("interval_minutes", 60)
                 df = add_zeitgeber_time_columns(df, interval_minutes=interval)
 
-        return run_zeitgeber_pipeline(df, **self.config)
+        # Filter config to only include valid kwargs for run_zeitgeber_pipeline
+        sig = inspect.signature(run_zeitgeber_pipeline)
+        valid_kwargs = {p for p in sig.parameters if p != 'df'}
+        filtered_config = {k: v for k, v in self.config.items() if k in valid_kwargs}
+
+        return run_zeitgeber_pipeline(df, **filtered_config)
 
     def get_result(self, *args, **kwargs):
         """Intercepts get_result and applies ZT pipeline."""
