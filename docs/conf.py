@@ -194,7 +194,7 @@ html_static_path = ["_static"]
 
 html_theme_options = {
     "github_url": "https://github.com/josephdong1000/neurodent",
-    "show_nav_level": 2,
+    "show_nav_level": 3,
     "navigation_depth": 4,
     "show_toc_level": 2,
     "navbar_align": "left",
