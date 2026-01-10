@@ -89,23 +89,7 @@ NeuRodent includes a Snakemake workflow for automated analysis pipelines. If you
 Development Installation
 ------------------------
 
-If you want to contribute to NeuRodent or modify the source code, install it in editable mode:
-
-**Using uv (recommended):**
-
-.. code-block:: bash
-
-   git clone https://github.com/josephdong1000/neurodent
-   cd neurodent
-   uv sync --extra pipeline
-
-**Using pip:**
-
-.. code-block:: bash
-
-   git clone https://github.com/josephdong1000/neurodent
-   cd neurodent
-   pip install -e .[pipeline]
+If you want to contribute to NeuRodent or modify the source code, please see our :doc:`Contributing Guide <../contributing/index>`.
 
 Next Steps
 ----------
