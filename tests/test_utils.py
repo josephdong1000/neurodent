@@ -1757,6 +1757,28 @@ class TestParseChnameToAbbrev:
         assert utils.parse_chname_to_abbrev("left auditory") == "LAud"  # if "auditory" contains "aud"
         assert utils.parse_chname_to_abbrev("right visual") == "RVis"  # if "visual" contains "vis"
 
+    def test_warning_deduplication(self):
+        """Test that assume_from_number warnings are deduplicated."""
+        import warnings
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("once")
+
+            # First call - triggers warning
+            utils.parse_chname_to_abbrev("channel_9", assume_from_number=True)
+
+            # Second call (same args) - no new warning record if deduplicated
+            utils.parse_chname_to_abbrev("channel_9", assume_from_number=True)
+
+            relevant_warnings = [x for x in w if "Assuming alias from number" in str(x.message)]
+            assert len(relevant_warnings) == 1
+
+            # Third call (different args) - new warning due to different message
+            utils.parse_chname_to_abbrev("channel_10", assume_from_number=True)
+
+            relevant_warnings = [x for x in w if "Assuming alias from number" in str(x.message)]
+            assert len(relevant_warnings) == 2
+
 
 class TestLogTransform:
     """Test log_transform function."""

@@ -997,7 +997,9 @@ class AnimalOrganizer(AnimalFeatureParser):
                     ]
 
                     # Compute features in parallel
-                    feature_values = dask.compute(*feature_values)
+                    with warnings.catch_warnings():
+                        warnings.filterwarnings("once", message=".*Spectrum estimate will be unreliable.*", category=RuntimeWarning)
+                        feature_values = dask.compute(*feature_values)
 
                     # Clean up temp directory after processing
                     logging.debug("Cleaning up temp directory")
@@ -1017,16 +1019,18 @@ class AnimalOrganizer(AnimalFeatureParser):
                 case _:
                     logging.debug("Processing serially")
                     lan_df = []
-                    for idx in tqdm(
-                        range(lan.n_fragments),
-                        desc="Processing rows",
-                        miniters=miniters,
-                    ):
-                        lan_df.append(
-                            self._process_fragment_serial(
-                                idx, features, lan, window_s, kwargs
+                    with warnings.catch_warnings():
+                        warnings.filterwarnings("once", message=".*Spectrum estimate will be unreliable.*", category=RuntimeWarning)
+                        for idx in tqdm(
+                            range(lan.n_fragments),
+                            desc="Processing rows",
+                            miniters=miniters,
+                        ):
+                            lan_df.append(
+                                self._process_fragment_serial(
+                                    idx, features, lan, window_s, kwargs
+                                )
                             )
-                        )
 
             lan_df = pd.DataFrame(lan_df)
 

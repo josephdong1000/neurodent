@@ -412,21 +412,23 @@ class FragmentAnalyzer:
         if spectral_connectivity_epochs is None:
             raise ImportError("mne_connectivity is required for connectivity computations")
         try:
-            con = spectral_connectivity_epochs(
-                rec_mne,
-                # freqs=f,
-                method="cohy",
-                # average=True,
-                faverage=True,
-                mode=mode,
-                fmin=constants.FREQ_MINS,
-                fmax=constants.FREQ_MAXS,
-                sfreq=f_s,
-                cwt_freqs=f,
-                cwt_n_cycles=n_cycles,
-                mt_bandwidth=mt_bandwidth,
-                verbose=False,
-            )
+            with warnings.catch_warnings():
+                warnings.filterwarnings("once", message=".*Spectrum estimate will be unreliable.*", category=RuntimeWarning)
+                con = spectral_connectivity_epochs(
+                    rec_mne,
+                    # freqs=f,
+                    method="cohy",
+                    # average=True,
+                    faverage=True,
+                    mode=mode,
+                    fmin=constants.FREQ_MINS,
+                    fmax=constants.FREQ_MAXS,
+                    sfreq=f_s,
+                    cwt_freqs=f,
+                    cwt_n_cycles=n_cycles,
+                    mt_bandwidth=mt_bandwidth,
+                    verbose=False,
+                )
         except MemoryError as e:
             raise MemoryError(
                 "Out of memory. Use a larger freq_res parameter, a smaller n_cycles_max parameter, or a larger downsamp_q parameter"
