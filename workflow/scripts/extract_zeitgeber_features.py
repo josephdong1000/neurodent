@@ -121,9 +121,6 @@ def main():
     df = pd.concat(dfs, ignore_index=True)
     logger.info(f"Combined dataframe shape: {df.shape}")
 
-    # Identify feature columns using new helper
-    # Get base features from config
-    features_to_extract = config["analysis"]["zeitgeber_features"]["features"]
     
     # Expand features (e.g. logpsdband -> logpsdband_delta, etc.)
     expanded_features = get_expanded_feature_names(features_to_extract)
