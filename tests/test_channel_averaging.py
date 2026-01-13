@@ -28,13 +28,13 @@ class TestChannelAveraging:
         assert isinstance(first_val, np.ndarray)
         assert first_val.ndim == 1  # Vector across channels
 
-    def test_extract_matrix_features(self, mock_war_with_matrices):
-        """Test that matrix features are properly extracted into per-band columns"""
+    def test_extract_banded_matrix_features(self, mock_war_with_matrices):
+        """Test that banded matrix features are properly extracted into per-band columns"""
         war = mock_war_with_matrices
         df = war.result.copy()
 
         # Call private method for testing
-        df_extracted = war._extract_matrix_features(df, 'zcohere', constants.BAND_NAMES)
+        df_extracted = war._extract_banded_matrix_features(df, 'zcohere', constants.BAND_NAMES)
 
         # Check that band columns were created
         assert 'zcohere_delta' in df_extracted.columns
@@ -79,6 +79,25 @@ class TestChannelAveraging:
         assert isinstance(df_averaged['zpcorr'].iloc[0], (int, float, np.number))
         assert not isinstance(df_averaged['zpcorr'].iloc[0], np.ndarray)
 
+    def test_simple_matrix_features_not_expanded(self, mock_war_with_simple_matrix):
+        """Test that simple matrix features (pcorr, zpcorr) are NOT expanded into bands"""
+        war = mock_war_with_simple_matrix
+
+        # Request zpcorr (a simple matrix feature)
+        df = war.get_channel_averaged_result(features=['zpcorr'])
+
+        # zpcorr should remain as 'zpcorr', NOT expanded into 'zpcorr_delta', etc.
+        assert 'zpcorr' in df.columns, "Simple matrix feature should remain as single column"
+        
+        # Should NOT have band-expanded columns
+        for band in constants.BAND_NAMES:
+            assert f'zpcorr_{band}' not in df.columns, \
+                f"Simple matrix feature should NOT be expanded into {band} band"
+
+        # Value should be a scalar (upper triangle mean)
+        assert isinstance(df['zpcorr'].iloc[0], (int, float, np.number))
+        assert not isinstance(df['zpcorr'].iloc[0], np.ndarray)
+
     def test_get_channel_averaged_result_integration(self, mock_war_full):
         """Integration test: full pipeline from WAR to channel-averaged dataframe"""
         war = mock_war_full
@@ -88,15 +107,14 @@ class TestChannelAveraging:
         df = war.get_channel_averaged_result(features=features)
 
         # Check that all expected columns exist
-        # Note: zpcorr is a 2D matrix feature, so it gets expanded into band columns
+        # Note: zpcorr is a SIMPLE matrix feature (no bands), so it stays as 'zpcorr' (not expanded)
         expected_cols = [
             'timestamp', 'genotype', 'animalday',  # Metadata
             'logrms',  # Linear feature
-            # Matrix feature (non-banded) gets expanded to bands
-            'zpcorr_delta', 'zpcorr_theta', 'zpcorr_alpha', 'zpcorr_beta', 'zpcorr_gamma',
+            'zpcorr',  # Simple matrix feature (no bands - just averaged directly)
             # Band features expanded
             'logpsdband_delta', 'logpsdband_theta', 'logpsdband_alpha', 'logpsdband_beta', 'logpsdband_gamma',
-            # Matrix band features expanded
+            # Banded matrix features expanded
             'zcohere_delta', 'zcohere_theta', 'zcohere_alpha', 'zcohere_beta', 'zcohere_gamma',
             'zimcoh_delta', 'zimcoh_theta', 'zimcoh_alpha', 'zimcoh_beta', 'zimcoh_gamma',
         ]
@@ -159,8 +177,8 @@ class TestChannelAveraging:
         assert isinstance(df_averaged['logrms'].iloc[0], (int, float, np.number))
         assert not isinstance(df_averaged['logrms'].iloc[0], (np.ndarray, list))
 
-    def test_list_format_matrix_features(self, mock_war_with_matrix_lists):
-        """Test that matrix features stored as lists are converted to arrays"""
+    def test_list_format_simple_matrix_features(self, mock_war_with_matrix_lists):
+        """Test that simple matrix features stored as lists are converted to arrays and averaged"""
         war = mock_war_with_matrix_lists
         df = war.result.copy()
 
@@ -169,14 +187,14 @@ class TestChannelAveraging:
         assert isinstance(first_val, list)
 
         # Call channel averaging - should handle list format
+        # zpcorr is a SIMPLE matrix feature (no bands), so it should NOT be expanded
         df_averaged = war.get_channel_averaged_result(features=['zpcorr'])
 
-        # After averaging: all band columns should exist with scalars
-        for band in constants.BAND_NAMES:
-            col_name = f'zpcorr_{band}'
-            assert col_name in df_averaged.columns, f"Expected column {col_name}"
-            assert isinstance(df_averaged[col_name].iloc[0], (int, float, np.number))
-            assert not isinstance(df_averaged[col_name].iloc[0], (np.ndarray, list))
+        # After averaging: zpcorr should be a scalar (NOT expanded into bands)
+        assert 'zpcorr' in df_averaged.columns, "zpcorr should remain as a single column"
+        assert 'zpcorr_delta' not in df_averaged.columns, "zpcorr should NOT be expanded into bands"
+        assert isinstance(df_averaged['zpcorr'].iloc[0], (int, float, np.number))
+        assert not isinstance(df_averaged['zpcorr'].iloc[0], (np.ndarray, list))
 
     def test_dict_with_list_matrix_features(self, mock_war_with_matrix_dict_lists):
         """Test that banded matrix features with dicts containing lists are handled (THE REAL BUG)"""
