@@ -81,6 +81,14 @@ LINEAR_FEATURES = [
 ]
 BAND_FEATURES = ["psdband", "psdfrac"] + ["logpsdband", "logpsdfrac"]
 MATRIX_FEATURES = ["cohere", "zcohere", "imcoh", "zimcoh", "pcorr", "zpcorr"]
+"""All matrix-shaped features (channel x channel connectivity measures)."""
+
+BANDED_MATRIX_FEATURES = ["cohere", "zcohere", "imcoh", "zimcoh"]
+"""Matrix features with frequency band dimension (stored as dict with band keys)."""
+
+SIMPLE_MATRIX_FEATURES = ["pcorr", "zpcorr"]
+"""Matrix features without frequency bands (single 2D correlation matrix)."""
+
 HIST_FEATURES = ["psd"]
 FEATURES = LINEAR_FEATURES + BAND_FEATURES + MATRIX_FEATURES + HIST_FEATURES
 WAR_FEATURES = [f for f in FEATURES if "nspike" not in f]

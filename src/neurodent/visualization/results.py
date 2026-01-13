@@ -1867,43 +1867,40 @@ class WindowAnalysisResult(AnimalFeatureParser):
         df_result = result_win.loc[:, self._nonfeature_columns + available_features].copy()
 
         # Classify features by type
-        BAND_NAMES = constants.BAND_NAMES
-        BAND_FEATURES = constants.BAND_FEATURES
-        MATRIX_FEATURES = constants.MATRIX_FEATURES
-        LINEAR_FEATURES = constants.LINEAR_FEATURES
-
-        band_features_in_data = [f for f in available_features if f in BAND_FEATURES]
-        matrix_features_in_data = [f for f in available_features if f in MATRIX_FEATURES]
-        simple_features_in_data = [f for f in available_features if f in LINEAR_FEATURES]
+        band_features_in_data = [f for f in available_features if f in constants.BAND_FEATURES]
+        banded_matrix_features_in_data = [f for f in available_features if f in constants.BANDED_MATRIX_FEATURES]
+        simple_matrix_features_in_data = [f for f in available_features if f in constants.SIMPLE_MATRIX_FEATURES]
+        simple_features_in_data = [f for f in available_features if f in constants.LINEAR_FEATURES]
 
         # Process band features - extract all 5 bands
         for band_feature in band_features_in_data:
             if band_feature in df_result.columns:
-                df_result = self._extract_band_features(df_result, band_feature, BAND_NAMES)
+                df_result = self._extract_band_features(df_result, band_feature, constants.BAND_NAMES)
 
-        # Process matrix features - extract all 5 bands
-        for matrix_feature in matrix_features_in_data:
+        # Process banded matrix features - extract all 5 bands
+        for matrix_feature in banded_matrix_features_in_data:
             if matrix_feature in df_result.columns:
-                df_result = self._extract_matrix_features(df_result, matrix_feature, BAND_NAMES)
+                df_result = self._extract_banded_matrix_features(df_result, matrix_feature, constants.BAND_NAMES)
 
         # Build list of features to average
         features_to_average = []
         features_to_average.extend(simple_features_in_data)
+        features_to_average.extend(simple_matrix_features_in_data)  # pcorr, zpcorr (no bands)
 
         for band_feature in band_features_in_data:
-            for band in BAND_NAMES:
+            for band in constants.BAND_NAMES:
                 features_to_average.append(f"{band_feature}_{band}")
 
-        for matrix_feature in matrix_features_in_data:
-            for band in BAND_NAMES:
+        for matrix_feature in banded_matrix_features_in_data:
+            for band in constants.BAND_NAMES:
                 features_to_average.append(f"{matrix_feature}_{band}")
 
         # Average all features across channels
         df_result = self._average_across_channels(df_result, features_to_average)
 
-        # Drop original band/matrix features (now that bands are extracted into separate columns)
+        # Drop original band/banded-matrix features (now that bands are extracted into separate columns)
         # These are no longer needed and cannot be aggregated (contain dicts/arrays)
-        features_to_drop = band_features_in_data + matrix_features_in_data
+        features_to_drop = band_features_in_data + banded_matrix_features_in_data
         df_result = df_result.drop(columns=features_to_drop, errors='ignore')
 
         return df_result
@@ -1938,16 +1935,18 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
         return df
 
-    def _extract_matrix_features(self, df: pd.DataFrame, feature_name: str, band_names: list[str]) -> pd.DataFrame:
-        """Extract individual frequency bands from matrix features.
+    def _extract_banded_matrix_features(self, df: pd.DataFrame, feature_name: str, band_names: list[str]) -> pd.DataFrame:
+        """Extract individual frequency bands from banded matrix features.
 
-        Matrix features come in two formats:
-        - Dict format (zcohere, zimcoh, cohere, imcoh): {'delta': matrix_2d, 'theta': matrix_2d, ...}
-        - Array format (pcorr, zpcorr): 2D matrix (n_channels, n_channels) with no band dimension
+        This method handles banded matrix features (cohere, zcohere, imcoh, zimcoh)
+        which are stored as dicts with band names as keys mapping to 2D matrices.
+
+        Note: Simple matrix features (pcorr, zpcorr) should NOT be processed by this
+        method - they are single 2D matrices without frequency band structure.
 
         Args:
-            df: DataFrame containing the matrix feature
-            feature_name: Name of the matrix feature column
+            df: DataFrame containing the banded matrix feature
+            feature_name: Name of the banded matrix feature column
             band_names: List of band names to extract
 
         Returns:
@@ -2016,8 +2015,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
         else:
             raise ValueError(
-                f"Unexpected format for matrix feature {feature_name}: {type(first_element)}. "
-                f"Expected dict, 2D array, or list"
+                f"Banded matrix feature {feature_name} has unexpected format: {type(first_element)}. "
+                f"Expected dict with band keys. If this is a simple matrix feature (pcorr, zpcorr), "
+                f"it should not be processed by this method."
             )
 
         return df
