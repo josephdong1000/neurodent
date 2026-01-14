@@ -234,6 +234,64 @@ class TestChannelAveraging:
             assert not np.isnan(zcohere_val), f"{zcohere_col} should not be NaN"
             assert not np.isnan(zimcoh_val), f"{zimcoh_col} should not be NaN"
 
+    def test_banded_matrix_as_2d_array_raises(self, mock_war_with_banded_matrix_as_2d_array):
+        """Test that a 2D array for a banded feature raises ValueError (avoiding silent failure)"""
+        war = mock_war_with_banded_matrix_as_2d_array
+
+        # Requesting zcohere (stored as 2D array) should now raise ValueError
+        with pytest.raises(ValueError, match="is stored as a 2D array, but is defined as a banded feature"):
+            war.get_channel_averaged_result(features=["zcohere"])
+
+    def test_banded_matrix_as_3d_array_success(self, mock_war_with_banded_matrix_as_3d_array):
+        """Test that a 3D array (Bands, Ch, Ch) is correctly extracted into bands"""
+        war = mock_war_with_banded_matrix_as_3d_array
+
+        # Request zcohere (stored as 3D array)
+        df_averaged = war.get_channel_averaged_result(features=["zcohere"])
+
+        # It should have expanded it to all bands by indexing the first dimension
+        for band in constants.BAND_NAMES:
+            col = f"zcohere_{band}"
+            assert col in df_averaged.columns
+            val = df_averaged[col].iloc[0]
+            assert isinstance(val, (int, float, np.number))
+            assert not np.isnan(val)
+
+    def test_extract_band_features_non_dict_raises(self, mock_war_with_linear):
+        """Test that _extract_band_features raises ValueError for non-dict features"""
+        war = mock_war_with_linear
+        df = war.result.copy()
+        
+        # logrms is a linear feature (array), not a dict. Calling _extract_band_features should fail.
+        with pytest.raises(ValueError, match="Band feature logrms must be a dictionary"):
+            war._extract_band_features(df, 'logrms', constants.BAND_NAMES)
+
+    def test_average_across_channels_inconsistent_shapes_raises(self, mock_war_with_linear):
+        """Test that _average_across_channels raises ValueError for inconsistent array shapes"""
+        war = mock_war_with_linear
+        df = war.result.copy()
+        
+        # Corrupt one row to have a different shape
+        original_shape = df['logrms'].iloc[0].shape
+        df.at[df.index[1], 'logrms'] = np.random.randn(original_shape[0] + 2)  # Different length
+        
+        # Should raise ValueError about inconsistent channel counts
+        with pytest.raises(ValueError, match="inconsistent channel counts"):
+            war._average_across_channels(df, ['logrms'])
+
+    def test_3d_array_band_count_validation(self, mock_war_with_banded_matrix_as_3d_array):
+        """Test that 3D array extraction validates band count matches"""
+        war = mock_war_with_banded_matrix_as_3d_array
+        df = war.result.copy()
+        
+        # Corrupt first element to have wrong number of bands
+        wrong_bands = np.random.randn(3, 8, 8)  # Only 3 bands, should be 5
+        df.at[df.index[0], 'zcohere'] = wrong_bands
+        
+        # Should raise ValueError about band count mismatch
+        with pytest.raises(ValueError, match="has 3 bands, but 5 were expected"):
+            war._extract_banded_matrix_features(df, 'zcohere', constants.BAND_NAMES)
+
 
 # Pytest fixtures to create mock WARs for testing
 @pytest.fixture
@@ -516,6 +574,65 @@ def mock_war_with_matrix_dict_lists():
         bad_channels_dict={},
         suppress_short_interval_error=True,
         lof_scores_dict={}
+    )
+    return war
+
+
+@pytest.fixture
+def mock_war_with_banded_matrix_as_2d_array():
+    """Create a mock WAR where a banded feature (zcohere) is stored as a 2D array directly (now an error)"""
+    n_windows = 10
+    n_channels = 8
+
+    data = {
+        "timestamp": pd.date_range("2025-01-01", periods=n_windows, freq="4s"),
+        "genotype": ["WT"] * n_windows,
+        "animalday": ["A001_1"] * n_windows,
+        # zcohere is in BANDED_MATRIX_FEATURES, storing as 2D should fail
+        "zcohere": [np.random.randn(n_channels, n_channels) for _ in range(n_windows)],
+    }
+
+    df = pd.DataFrame(data)
+
+    war = visualization.WindowAnalysisResult(
+        result=df,
+        animal_id="A001",
+        genotype="WT",
+        channel_names=["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"],
+        assume_from_number=True,
+        bad_channels_dict={},
+        suppress_short_interval_error=True,
+        lof_scores_dict={},
+    )
+    return war
+
+
+@pytest.fixture
+def mock_war_with_banded_matrix_as_3d_array():
+    """Create a mock WAR where a banded feature (zcohere) is stored as 3D array (Bands, Ch, Ch)"""
+    n_windows = 10
+    n_channels = 8
+    n_bands = len(constants.BAND_NAMES)
+
+    data = {
+        "timestamp": pd.date_range("2025-01-01", periods=n_windows, freq="4s"),
+        "genotype": ["WT"] * n_windows,
+        "animalday": ["A001_1"] * n_windows,
+        # zcohere as 3D array: (Bands, Channels, Channels)
+        "zcohere": [np.random.randn(n_bands, n_channels, n_channels) for _ in range(n_windows)],
+    }
+
+    df = pd.DataFrame(data)
+
+    war = visualization.WindowAnalysisResult(
+        result=df,
+        animal_id="A001",
+        genotype="WT",
+        channel_names=["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"],
+        assume_from_number=True,
+        bad_channels_dict={},
+        suppress_short_interval_error=True,
+        lof_scores_dict={},
     )
     return war
 
