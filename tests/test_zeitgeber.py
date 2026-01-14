@@ -388,30 +388,53 @@ def test_get_expanded_feature_names():
     assert "psdband_theta" in expanded
     assert "logpsdband_gamma" in expanded
     
-    # Test 2: Matrix features expand to per-band columns
-    matrix_features = ["cohere", "zcohere"]
-    expanded_matrix = zeitgeber.get_expanded_feature_names(matrix_features)
-    assert "cohere_delta" in expanded_matrix
-    assert "zcohere_theta" in expanded_matrix
+    # Test 2: BANDED matrix features (cohere, zcohere, imcoh, zimcoh) expand to per-band columns
+    banded_matrix_features = ["cohere", "zcohere", "imcoh", "zimcoh"]
+    expanded_banded = zeitgeber.get_expanded_feature_names(banded_matrix_features)
+    assert "cohere_delta" in expanded_banded
+    assert "zcohere_theta" in expanded_banded
+    assert "imcoh_alpha" in expanded_banded
+    assert "zimcoh_gamma" in expanded_banded
+    # Should NOT contain the base name without band suffix
+    assert "cohere" not in expanded_banded
+    assert "zcohere" not in expanded_banded
     
-    # Test 3: Linear features stay as-is
+    # Test 3: SIMPLE matrix features (pcorr, zpcorr) should NOT expand - stay as single column
+    simple_matrix_features = ["pcorr", "zpcorr"]
+    expanded_simple = zeitgeber.get_expanded_feature_names(simple_matrix_features)
+    # Should keep as-is (no band expansion)
+    assert expanded_simple == ["pcorr", "zpcorr"]
+    # Should NOT have band-expanded versions
+    assert "pcorr_delta" not in expanded_simple
+    assert "zpcorr_theta" not in expanded_simple
+    
+    # Test 4: Linear features stay as-is
     linear_features = ["rms", "ampvar", "psdtotal"]
     expanded_linear = zeitgeber.get_expanded_feature_names(linear_features)
     assert expanded_linear == linear_features
     
-    # Test 4: Mixed feature types
-    mixed = ["rms", "psdband", "cohere"]
+    # Test 5: Mixed feature types including both banded and simple matrix features
+    mixed = ["rms", "psdband", "cohere", "zpcorr"]
     expanded_mixed = zeitgeber.get_expanded_feature_names(mixed)
     
-    # rms stays as-is (1), psdband expands (5), cohere expands (5) = 11
+    # rms stays as-is (1), psdband expands (5), cohere expands (5), zpcorr stays as-is (1) = 12
+    assert len(expanded_mixed) == 12
     assert "rms" in expanded_mixed
     assert "psdband_delta" in expanded_mixed
     assert "cohere_gamma" in expanded_mixed
+    assert "zpcorr" in expanded_mixed  # Simple matrix feature - NOT expanded
+    assert "zpcorr_delta" not in expanded_mixed  # Should NOT be expanded
     
-    # Test 5: Unknown features pass through
+    # Test 6: Unknown features pass through
     unknown = ["my_custom_feature"]
     expanded_unknown = zeitgeber.get_expanded_feature_names(unknown)
     assert expanded_unknown == ["my_custom_feature"]
+    
+    # Test 7: Verify constants are correctly defined
+    assert "pcorr" in constants.SIMPLE_MATRIX_FEATURES
+    assert "zpcorr" in constants.SIMPLE_MATRIX_FEATURES
+    assert "cohere" in constants.BANDED_MATRIX_FEATURES
+    assert "zcohere" in constants.BANDED_MATRIX_FEATURES
 
 
 def test_add_zeitgeber_time_columns_empty_df():
