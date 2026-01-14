@@ -7,4 +7,3 @@
    FrequencyDomainSpikeAnalysisResult
    AnimalPlotter
    ExperimentPlotter
-   ZeitgeberPlotter

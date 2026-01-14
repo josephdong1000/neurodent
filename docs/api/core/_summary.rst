@@ -7,4 +7,3 @@
    FragmentAnalyzer
    MountainSortAnalyzer
    FrequencyDomainSpikeDetector
-   ZeitgeberAnalysisResult
