@@ -9,7 +9,10 @@ import time
 import warnings
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Literal, Union
+from typing import Literal, Union, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .frequency_domain_results import FrequencyDomainSpikeAnalysisResult
 
 import dask
 import dask.array as da
@@ -1924,18 +1927,40 @@ class WindowAnalysisResult(AnimalFeatureParser):
             DataFrame with new columns for each band (feature_name_bandname format)
         """
         import numpy as np
+        import logging
+        logger = logging.getLogger(__name__)
 
         if feature_name not in df.columns:
             return df
 
-        # Extract band features into separate columns
-        df_bands = pd.DataFrame(df[feature_name].tolist())
+        # Determine number of windows and channels from first element
+        first_element = df[feature_name].iloc[0]
+        if not isinstance(first_element, dict):
+             raise ValueError(
+                f"Band feature {feature_name} must be a dictionary of bands. "
+                f"Got {type(first_element)}. If this is a linear feature, fix constants."
+            )
 
-        for band_name in df_bands.columns:
-            if band_name in band_names:
-                band_array = np.stack(df_bands[band_name].values)
-                # Store as list of arrays for subsequent averaging
-                df[f"{feature_name}_{band_name}"] = list(band_array)
+        # Pre-allocate columns for all expected bands to ensure consistency
+        for band_name in band_names:
+            band_values = []
+            for i, row_dict in enumerate(df[feature_name]):
+                if not isinstance(row_dict, dict):
+                    logger.warning(f"Row {i} of {feature_name} is not a dict. Using NaNs.")
+                    band_values.append(np.full(len(self.channel_names), np.nan))
+                    continue
+
+                if band_name in row_dict:
+                    val = row_dict[band_name]
+                    if isinstance(val, list):
+                        val = np.array(val)
+                    band_values.append(val)
+                else:
+                    logger.warning(f"Band {band_name} missing in {feature_name} at row {i}")
+                    band_values.append(np.full(len(self.channel_names), np.nan))
+
+            # Store as list of arrays/values
+            df[f"{feature_name}_{band_name}"] = band_values
 
         return df
 
@@ -1984,10 +2009,10 @@ class WindowAnalysisResult(AnimalFeatureParser):
                                 f"Expected 2D matrix for {feature_name}[{band_name}], "
                                 f"got {type(matrix)} with shape {getattr(matrix, 'shape', 'N/A')}"
                             )
-                            band_matrices.append(np.full((8, 8), np.nan))
+                            band_matrices.append(np.full((len(self.channel_names), len(self.channel_names)), np.nan))
                     else:
                         logger.warning(f"Missing band {band_name} in {feature_name} dictionary")
-                        band_matrices.append(np.full((8, 8), np.nan))
+                        band_matrices.append(np.full((len(self.channel_names), len(self.channel_names)), np.nan))
 
                 df[f"{feature_name}_{band_name}"] = band_matrices
 
@@ -1995,32 +2020,53 @@ class WindowAnalysisResult(AnimalFeatureParser):
             if isinstance(first_element, list):
                 first_element = np.array(first_element)
 
-            if first_element.ndim == 2:
-                for band_name in band_names:
-                    band_matrices = []
-                    for matrix_2d in df[feature_name]:
-                        if isinstance(matrix_2d, list):
-                            matrix_2d = np.array(matrix_2d)
+            if first_element.ndim == 3:
+                # 3D Array format: (Bands, Ch, Ch)
+                # Verify band count matches
+                if first_element.shape[0] != len(band_names):
+                    raise ValueError(
+                        f"Matrix feature {feature_name} has {first_element.shape[0]} bands, "
+                        f"but {len(band_names)} were expected ({band_names})."
+                    )
 
-                        if isinstance(matrix_2d, np.ndarray) and matrix_2d.ndim == 2:
-                            band_matrices.append(matrix_2d)
+                for i, band_name in enumerate(band_names):
+                    band_matrices = []
+                    for matrix_3d in df[feature_name]:
+                        if isinstance(matrix_3d, list):
+                            matrix_3d = np.array(matrix_3d)
+
+                        if isinstance(matrix_3d, np.ndarray) and matrix_3d.ndim == 3:
+                            if matrix_3d.shape[0] == len(band_names):
+                                band_matrices.append(matrix_3d[i, :, :])
+                            else:
+                                raise ValueError(
+                                    f"Band count mismatch for {feature_name}: "
+                                    f"array has {matrix_3d.shape[0]} bands, expected {len(band_names)}."
+                                )
                         else:
-                            logger.warning(
-                                f"Expected 2D matrix for {feature_name}, "
-                                f"got {type(matrix_2d)} with shape {getattr(matrix_2d, 'shape', 'N/A')}"
+                            raise ValueError(
+                                f"Expected 3D matrix for {feature_name}, "
+                                f"got {type(matrix_3d)} with shape {getattr(matrix_3d, 'shape', 'N/A')}"
                             )
-                            band_matrices.append(np.full((8, 8), np.nan))
 
                     df[f"{feature_name}_{band_name}"] = band_matrices
+
+            elif first_element.ndim == 2:
+                raise ValueError(
+                    f"Matrix feature {feature_name} is stored as a 2D array, but is defined as a "
+                    f"banded feature. Expected a dictionary with band keys or a 3D array (Bands, Ch, Ch). "
+                    f"If this feature should not have bands, add it to SIMPLE_MATRIX_FEATURES in constants."
+                )
             else:
                 raise ValueError(
-                    f"Matrix feature {feature_name} has wrong dimensionality: {first_element.ndim}D. Expected 2D."
+                    f"Matrix feature {feature_name} has wrong dimensionality: {first_element.ndim}D. "
+                    f"Expected 3D (Bands, Ch, Ch) or dict."
                 )
 
         else:
             raise ValueError(
                 f"Banded matrix feature {feature_name} has unexpected format: {type(first_element)}. "
-                f"Expected dict with band keys. If this is a simple matrix feature (pcorr, zpcorr), "
+                f"Expected dict with band keys or 3D array. If this is a simple matrix feature (pcorr, zpcorr), "
                 f"it should not be processed by this method."
             )
 
@@ -2053,11 +2099,27 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     first_element = np.array(first_element)
 
                 if first_element.ndim == 1:
-                    feature_arrays = np.array([np.array(x) if isinstance(x, list) else x for x in df[feature].values])
-                    feature_avg = np.nanmean(feature_arrays, axis=1)
+                    # Vector features: Mean across channels
+                    # We use a robust approach to handle potential list formats or shape drifts
+                    feature_values = df[feature].values
+                    
+                    # Check if we can use vectorized approach (faster)
+                    try:
+                        # This will fail efficiently if shapes don't match
+                        feature_arrays = np.vstack(feature_values)
+                        feature_avg = np.nanmean(feature_arrays, axis=1)
+                    except ValueError as e:
+                        raise ValueError(
+                            f"Feature {feature} has inconsistent channel counts across windows. "
+                            f"All windows must have the same number of channels. "
+                            f"This likely indicates data corruption during feature extraction. "
+                            f"Original error: {e}"
+                        ) from e
+                    
                     df[feature] = feature_avg
 
                 elif first_element.ndim == 2:
+                    # Matrix features: Mean of upper triangle
                     import logging
                     logger = logging.getLogger(__name__)
 
@@ -2067,26 +2129,29 @@ class WindowAnalysisResult(AnimalFeatureParser):
                             matrix = np.array(matrix)
 
                         # Validate matrix shape
-                        if matrix.ndim != 2:
-                            logger.warning(f"Expected 2D matrix for {feature}, got {matrix.ndim}D: {matrix.shape}")
+                        if not isinstance(matrix, np.ndarray) or matrix.ndim != 2:
+                            logger.warning(
+                                f"Expected 2D matrix for {feature}, "
+                                f"got {type(matrix)} with ndim {getattr(matrix, 'ndim', 'N/A')}"
+                            )
                             feature_avg.append(np.nan)
                             continue
 
-                        if matrix.shape[0] == 0 or matrix.shape[1] == 0:
-                            logger.warning(f"Empty matrix for {feature}: shape {matrix.shape}")
-                            feature_avg.append(np.nan)
+                        if matrix.shape[0] < 2 or matrix.shape[1] < 2:
+                            # Can't get upper triangle (excluding diag) from 1x1 or smaller
+                            feature_avg.append(np.nanmean(matrix) if matrix.size > 0 else np.nan)
                             continue
 
                         upper_tri_indices = np.triu_indices_from(matrix, k=1)
                         upper_tri_values = matrix[upper_tri_indices]
 
                         if len(upper_tri_values) == 0:
-                            logger.warning(f"No upper triangle values for {feature}: matrix shape {matrix.shape}")
-                            avg_val = np.nan
+                            avg_val = np.nanmean(matrix) if matrix.size > 0 else np.nan
                         else:
                             avg_val = np.nanmean(upper_tri_values)
-
+                        
                         feature_avg.append(avg_val)
+
                     df[feature] = feature_avg
 
             elif isinstance(first_element, (int, float, np.number)):
