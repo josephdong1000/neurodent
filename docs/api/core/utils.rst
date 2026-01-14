@@ -10,5 +10,6 @@ Functions
 
 .. automodule:: neurodent.core.utils
    :members:
+   :exclude-members: __init__
    :undoc-members:
    :show-inheritance:

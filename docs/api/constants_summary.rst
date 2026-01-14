@@ -1,8 +1,0 @@
-.. autosummary::
-   :nosignatures:
-
-   FREQ_BANDS
-   FEATURE_LABELS
-   LINEAR_FEATURES
-   BAND_FEATURES
-   MATRIX_FEATURES

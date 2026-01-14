@@ -23,8 +23,6 @@ import seaborn as sns
 import seaborn.objects as so
 from seaborn import axes_style
 
-from neurodent.constants import black, blue, green, lightblue, orange, purple, red, yellow
-
 from neurodent import visualization, constants
 from neurodent.workflow import setup_snakemake_logging, load_wars
 

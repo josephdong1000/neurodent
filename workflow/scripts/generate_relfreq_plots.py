@@ -36,7 +36,7 @@ import psutil
 import seaborn as sns
 from neurodent.workflow import setup_snakemake_logging
 
-from neurodent.constants import blue, green, orange, purple, red
+from neurodent.constants import OKABE_ITO_COLORS
 from neurodent import visualization, constants
 
 logger = logging.getLogger(__name__)
@@ -298,7 +298,13 @@ def create_relfreq_plots_from_df(df_weighted, feature, feature_label, output_dir
             feature_label=feature_label,
             hue="band",
             hue_order=constants.BAND_NAMES,
-            palette=[blue, orange, red, green, purple],
+            palette=[
+                OKABE_ITO_COLORS["blue"],
+                OKABE_ITO_COLORS["orange"],
+                OKABE_ITO_COLORS["red"],
+                OKABE_ITO_COLORS["green"],
+                OKABE_ITO_COLORS["purple"],
+            ],
             log_scale=False,
             output_path=output_dir / f"{feature}_relfreq_byband.{figure_format}",
             dpi=dpi,
