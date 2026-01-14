@@ -1,3 +1,5 @@
+.. currentmodule:: neurodent.core
+
 .. autosummary::
    :nosignatures:
 

@@ -1,3 +1,5 @@
+.. currentmodule:: neurodent.visualization
+
 .. autosummary::
    :nosignatures:
 
