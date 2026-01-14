@@ -10,6 +10,7 @@ Input: Flattened WAR pickle and JSON files from all animals
 Output: Statistical figure files (TIF) and CSV data exports
 """
 
+import logging
 from pathlib import Path
 
 import matplotlib
