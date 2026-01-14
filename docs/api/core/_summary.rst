@@ -1,3 +1,5 @@
+.. currentmodule:: neurodent.core
+
 .. autosummary::
    :nosignatures:
 
@@ -7,4 +9,3 @@
    FragmentAnalyzer
    MountainSortAnalyzer
    FrequencyDomainSpikeDetector
-   ZeitgeberAnalysisResult

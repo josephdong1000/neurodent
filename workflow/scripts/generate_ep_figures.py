@@ -25,8 +25,6 @@ import seaborn as sns
 import seaborn.objects as so
 from seaborn import axes_style
 
-from neurodent.constants import black, blue, green, lightblue, orange, purple, red, yellow
-
 from neurodent import visualization, constants
 
 

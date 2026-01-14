@@ -228,34 +228,6 @@ class TestOkabeItoColors:
             # Should be valid hex (0-9, A-F)
             assert all(c in "0123456789ABCDEFabcdef#" for c in hex_value)
 
-    def test_individual_color_variables_exist(self):
-        """Test that individual color variables are exported."""
-        color_vars = ["black", "orange", "blue", "green", "yellow", "lightblue", "red", "purple"]
-        for color_name in color_vars:
-            assert hasattr(constants, color_name)
-
-    def test_individual_color_variables_values(self):
-        """Test that individual color variables match dictionary values."""
-        assert constants.black == constants.OKABE_ITO_COLORS["black"]
-        assert constants.orange == constants.OKABE_ITO_COLORS["orange"]
-        assert constants.blue == constants.OKABE_ITO_COLORS["blue"]
-        assert constants.green == constants.OKABE_ITO_COLORS["green"]
-        assert constants.yellow == constants.OKABE_ITO_COLORS["yellow"]
-        assert constants.lightblue == constants.OKABE_ITO_COLORS["lightblue"]
-        assert constants.red == constants.OKABE_ITO_COLORS["red"]
-        assert constants.purple == constants.OKABE_ITO_COLORS["purple"]
-
-    def test_colors_are_strings(self):
-        """Test that individual color variables are strings, not other types."""
-        assert isinstance(constants.black, str)
-        assert isinstance(constants.orange, str)
-        assert isinstance(constants.blue, str)
-        assert isinstance(constants.green, str)
-        assert isinstance(constants.yellow, str)
-        assert isinstance(constants.lightblue, str)
-        assert isinstance(constants.red, str)
-        assert isinstance(constants.purple, str)
-
     def test_colors_not_in_top_level_package(self):
         """Test that colors are NOT exported at package top level."""
         import neurodent
@@ -273,17 +245,15 @@ class TestOkabeItoColors:
         for color_name, hex_value in constants.OKABE_ITO_COLORS.items():
             assert mcolors.is_color_like(hex_value)
 
-    def test_backward_compatibility_import(self):
-        """Test that the import style is backward compatible with okabeito package."""
-        # This import pattern should work (replacing 'from okabeito import ...')
-        from neurodent.constants import black, blue, green, lightblue, orange, purple, red, yellow
+    def test_use_dictionary_for_colors(self):
+        """Test that colors can be accessed via OKABE_ITO_COLORS dictionary."""
+        # Preferred access pattern
+        assert constants.OKABE_ITO_COLORS["black"] == "#000000"
+        assert constants.OKABE_ITO_COLORS["orange"] == "#E69F00"
+        assert constants.OKABE_ITO_COLORS["blue"] == "#0072B2"
+        assert constants.OKABE_ITO_COLORS["green"] == "#009E73"
+        assert constants.OKABE_ITO_COLORS["yellow"] == "#F5C710"
+        assert constants.OKABE_ITO_COLORS["lightblue"] == "#56B4E9"
+        assert constants.OKABE_ITO_COLORS["red"] == "#D55E00"
+        assert constants.OKABE_ITO_COLORS["purple"] == "#CC79A7"
 
-        # Verify they're the correct values (should match the palette in constants.py)
-        assert black == "#000000"
-        assert orange == "#E69F00"
-        assert blue == "#0072B2"
-        assert green == "#009E73"
-        assert yellow == "#F5C710"
-        assert lightblue == "#56B4E9"
-        assert red == "#D55E00"
-        assert purple == "#CC79A7"
