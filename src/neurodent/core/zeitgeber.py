@@ -19,9 +19,12 @@ def get_expanded_feature_names(base_features):
     Expand base feature names into their full column names (e.g. bands, matrix features).
     
     Uses neurodent.constants to determine expansion rules.
+    
+    - BAND_FEATURES and BANDED_MATRIX_FEATURES get expanded to per-band columns (e.g. zcohere_delta)
+    - SIMPLE_MATRIX_FEATURES, LINEAR_FEATURES, and HIST_FEATURES remain as single columns (e.g. zpcorr)
 
     Args:
-        base_features (list[str]): List of base feature names (e.g. ['logpsdband', 'rms']).
+        base_features (list[str]): List of base feature names (e.g. ['logpsdband', 'rms', 'zpcorr']).
 
     Returns:
         list[str]: List of expanded column names.
@@ -31,10 +34,13 @@ def get_expanded_feature_names(base_features):
     expanded_features = []
     
     for feature in base_features:
-        if feature in constants.BAND_FEATURES or feature in constants.MATRIX_FEATURES:
-            # Expand into per-band features
+        if feature in constants.BAND_FEATURES or feature in constants.BANDED_MATRIX_FEATURES:
+            # Expand into per-band features (e.g. zcohere -> zcohere_delta, zcohere_theta, ...)
             for band in constants.BAND_NAMES:
                 expanded_features.append(f"{feature}_{band}")
+        elif feature in constants.SIMPLE_MATRIX_FEATURES:
+            # Simple matrix features are NOT banded - keep as single column (e.g. zpcorr, pcorr)
+            expanded_features.append(feature)
         elif feature in constants.LINEAR_FEATURES or feature in constants.HIST_FEATURES:
             # Keep as is
             expanded_features.append(feature)
