@@ -49,6 +49,50 @@ def log_memory_usage(logger, label=""):
     logger.info(f"Memory usage{' (' + label + ')' if label else ''}: {mem_mb:.1f} MB")
 
 
+# Use constants for banded features - imported from neurodent.constants at top of file
+# BANDED_FEATURES: Features that have per-band columns (e.g. cohere_delta, cohere_theta)
+# These are constants.BAND_FEATURES + constants.BANDED_MATRIX_FEATURES
+
+
+def melt_banded_feature(df, feature):
+    """
+    Melt banded feature columns from wide to long format.
+    
+    Converts columns like 'cohere_delta', 'cohere_theta', etc. into
+    a single 'cohere' column with a 'band' column indicating the band.
+    
+    Args:
+        df: DataFrame with banded feature columns (e.g. cohere_delta, cohere_theta)
+        feature: Base feature name (e.g. 'cohere')
+    
+    Returns:
+        DataFrame in long format with 'band' column and single feature column
+    """
+    # Identify band-specific columns using constants
+    band_cols = [f"{feature}_{band}" for band in constants.BAND_NAMES if f"{feature}_{band}" in df.columns]
+    
+    if not band_cols:
+        # No band columns found, return as-is
+        return df
+    
+    # Identify metadata columns (everything that's not a band-specific feature column)
+    metadata_cols = [col for col in df.columns if col not in band_cols]
+    
+    # Melt the band columns into long format
+    df_melted = df.melt(
+        id_vars=metadata_cols,
+        value_vars=band_cols,
+        var_name='band_col',
+        value_name=feature
+    )
+    
+    # Extract band name from column name (e.g. 'cohere_delta' -> 'delta')
+    df_melted['band'] = df_melted['band_col'].str.replace(f"{feature}_", "", regex=False)
+    df_melted = df_melted.drop(columns=['band_col'])
+    
+    return df_melted
+
+
 def extract_feature_from_war(args):
     """
     Worker function: Load WAR, extract feature data, return small DataFrame only.
@@ -226,10 +270,11 @@ def create_relfreq_plots_from_df(df_weighted, feature, feature_label, output_dir
     dpi = relfreq_config.get("dpi", 300)
     
     # Create relative frequency distribution plots
-    if feature in ["logpsdfrac", "logpsdband", "psdband", "cohere", "zcohere", "imcoh", "zimcoh"]:
+    # Check if this is a banded feature using constants
+    banded_features = set(constants.BAND_FEATURES) | set(constants.BANDED_MATRIX_FEATURES)
+    if feature in banded_features:
         # For band features, create per-band plots
-        bands = ["delta", "theta", "alpha", "beta", "gamma"]
-        for band in bands:
+        for band in constants.BAND_NAMES:
             df_band = df_weighted[df_weighted["band"] == band]
             if len(df_band) == 0:
                 logger.warning(f"No data for {feature} band {band}")
@@ -252,7 +297,7 @@ def create_relfreq_plots_from_df(df_weighted, feature, feature_label, output_dir
             feature=feature,
             feature_label=feature_label,
             hue="band",
-            hue_order=["delta", "theta", "alpha", "beta", "gamma"],
+            hue_order=constants.BAND_NAMES,
             palette=[blue, orange, red, green, purple],
             log_scale=False,
             output_path=output_dir / f"{feature}_relfreq_byband.{figure_format}",
@@ -378,6 +423,14 @@ def main():
         
         logger.info(f"Combined DataFrame shape: {combined_df.shape}")
         log_memory_usage(logger, f"after concat {feature}")
+        
+        # For banded features (BAND_FEATURES + BANDED_MATRIX_FEATURES), melt from wide to long format
+        # SIMPLE_MATRIX_FEATURES (pcorr, zpcorr) are NOT banded and don't need melting
+        banded_features = set(constants.BAND_FEATURES) | set(constants.BANDED_MATRIX_FEATURES)
+        if feature in banded_features:
+            logger.info(f"Melting banded feature {feature} from wide to long format")
+            combined_df = melt_banded_feature(combined_df, feature)
+            logger.info(f"After melt, DataFrame shape: {combined_df.shape}")
         
         # Process dataframe (add sex, gene columns)
         df_processed = process_feature_dataframe(combined_df)
