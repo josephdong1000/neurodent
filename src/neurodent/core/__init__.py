@@ -57,7 +57,18 @@ from .analysis import LongRecordingAnalyzer
 from .analyze_frag import FragmentAnalyzer
 from .analyze_sort import MountainSortAnalyzer
 from .frequency_domain_spike_detection import FrequencyDomainSpikeDetector
-from .utils import get_temp_directory
+from .utils import (
+    get_temp_directory,
+    set_temp_directory,
+    parse_path_to_animalday,
+    validate_timestamps,
+    nanaverage,
+    parse_chname_to_abbrev,
+    log_transform,
+    should_use_cache_unified,
+    get_cache_status_message,
+)
+from . import utils
 
 __all__ = [
     # Data loading
@@ -72,4 +83,13 @@ __all__ = [
     "convert_ddfcolbin_to_ddfrowbin",
     "convert_ddfrowbin_to_si",
     "get_temp_directory",
+    "parse_path_to_animalday",
+    "validate_timestamps",
+    "nanaverage",
+    "parse_chname_to_abbrev",
+    "log_transform",
+    "set_temp_directory",
+    "utils",
+    "should_use_cache_unified",
+    "get_cache_status_message",
 ]
