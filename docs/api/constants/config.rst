@@ -7,4 +7,5 @@ Global settings for sampling rates, spike sorting, and waveform processing.
 
 .. automodule:: neurodent.constants.config
    :members:
+   :exclude-members: __init__
    :undoc-members:
