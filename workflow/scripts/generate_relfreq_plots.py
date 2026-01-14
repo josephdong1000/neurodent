@@ -13,9 +13,14 @@ similar to the zeitgeber feature extraction pipeline.
 
 Input: Channel-filtered WAR pickle and JSON files from all animals
 Output: Relative frequency distribution plots (histograms) and CSV data exports
+
+Memory Optimization: Uses streaming parallel extraction - workers extract features
+from WARs and return small DataFrames, avoiding loading all WARs into memory.
 """
 
+import gc
 import logging
+import os
 from pathlib import Path
 from multiprocessing import Pool
 from tqdm import tqdm
@@ -26,6 +31,8 @@ matplotlib.use("Agg")  # Non-interactive backend
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+import psutil
 import seaborn as sns
 from neurodent.workflow import setup_snakemake_logging
 
@@ -35,31 +42,60 @@ from neurodent import visualization, constants
 logger = logging.getLogger(__name__)
 
 
-def load_war_for_relfreq(war_path_info):
-    """
-    Load a channel-filtered WAR for relative frequency plotting
+def log_memory_usage(logger, label=""):
+    """Log current process memory usage in MB"""
+    process = psutil.Process(os.getpid())
+    mem_mb = process.memory_info().rss / 1024 / 1024
+    logger.info(f"Memory usage{' (' + label + ')' if label else ''}: {mem_mb:.1f} MB")
 
+
+def extract_feature_from_war(args):
+    """
+    Worker function: Load WAR, extract feature data, return small DataFrame only.
+    
+    WAR is garbage collected when function returns, keeping only the extracted data.
+    
     Args:
-        war_path_info: Tuple of (war_pkl_path, war_json_path, animal_name)
-
+        args: Tuple of (war_path_info, feature, collapse_channels)
+            war_path_info: Tuple of (war_pkl_path, war_json_path, animal_name)
+            feature: Feature name to extract
+            collapse_channels: Whether to average across channels
+    
     Returns:
-        visualization.WindowAnalysisResult: Loaded WAR object
+        pd.DataFrame: Small DataFrame with just the extracted feature data
     """
+    war_path_info, feature, collapse_channels = args
     war_pkl_path, war_json_path, animal_name = war_path_info
-
+    
     try:
-        logger.info(f"Loading {animal_name}")
-
-        # Load channel-filtered WAR using explicit PKL and JSON paths
+        # Load WAR
         war = visualization.WindowAnalysisResult.load_pickle_and_json(
-            folder_path=war_pkl_path.parent, pickle_name=war_pkl_path.name, json_name=war_json_path.name
+            folder_path=war_pkl_path.parent, 
+            pickle_name=war_pkl_path.name, 
+            json_name=war_json_path.name
         )
-
-        logger.info(f"Loaded WAR for {war.animal_id} ({war.genotype})")
-        return war
-
+        
+        # Extract just the feature data using channel averaging
+        if collapse_channels:
+            df = war.get_channel_averaged_result(features=[feature])
+        else:
+            df = war.get_windowed_result(features=[feature])
+        
+        # Add metadata columns
+        df['animal'] = war.animal_id
+        df['genotype'] = war.genotype
+        # Note: 'animalday' column should already exist in df from get_channel_averaged_result
+        # if it was present in war.result. No need to add it separately.
+        
+        # Ensure isday column exists
+        if 'isday' not in df.columns and hasattr(war, 'result') and 'isday' in war.result.columns:
+            df['isday'] = war.result['isday'].values[:len(df)]
+        
+        # WAR will be garbage collected after return - only small DF sent back
+        return df
+        
     except Exception as e:
-        logger.error(f"Failed to load {animal_name}: {str(e)}")
+        logger.error(f"Failed to extract {feature} from {animal_name}: {str(e)}")
         raise
 
 
@@ -72,6 +108,8 @@ def process_feature_dataframe(df):
     Returns:
         pd.DataFrame: Processed dataframe with sex and gene columns
     """
+    df = df.copy()
+    
     # Add categorical columns based on genotype
     df["sex"] = df["genotype"].map(
         lambda x: "Male" if x in ["MWT", "MHet", "MMut"] else "Female" if x in ["FWT", "FHet", "FMut"] else None
@@ -149,7 +187,7 @@ def create_relfreq_plot(df, feature, feature_label, hue, hue_order, palette, log
 
     # Compute bins once across entire dataset to ensure consistency across and within plots
     bins = np.histogram_bin_edges(df[feature].dropna(), bins="auto").tolist()
-    logger.info(f"\tBins: {bins}")
+    logger.info(f"\tBins: {len(bins)} bins")
 
     g = sns.FacetGrid(
         df,
@@ -178,84 +216,63 @@ def create_relfreq_plot(df, feature, feature_label, hue, hue_order, palette, log
     plt.close()
 
 
-def create_relfreq_plots_for_feature(ep, feature, feature_label, output_dir, data_dir, relfreq_config):
-    """Create relative frequency plots for a specific feature"""
-
+def create_relfreq_plots_from_df(df_weighted, feature, feature_label, output_dir, relfreq_config):
+    """Create relative frequency plots for a specific feature from pre-extracted DataFrame"""
+    
     logger = logging.getLogger(__name__)
-    logger.info(f"Processing feature: {feature}")
-
+    
     # Get format parameters from config
     figure_format = relfreq_config.get("figure_format", "png")
-    data_format = relfreq_config.get("data_format", "csv")
     dpi = relfreq_config.get("dpi", 300)
-
-    try:
-        # Pull raw timeseries data without averaging (key difference from EP plots)
-        df_raw = ep.pull_timeseries_dataframe(
-            feature=feature, groupby=["animal", "genotype", "isday"], collapse_channels=True, average_groupby=False
-        )
-
-        # Process raw dataframe (adds sex and gene columns)
-        df_processed = process_feature_dataframe(df_raw)
-
-        # Add weights for equal animal contribution to histogram
-        df_weighted = add_animal_weights(df_processed)
-
-        # Save data in configured format
-        if data_format == "csv":
-            df_weighted.to_csv(data_dir / f"{feature}_relfreq.csv", index=False)
-        else:  # default to pkl
-            df_weighted.to_pickle(data_dir / f"{feature}_relfreq.pkl")
-
-        # Create relative frequency distribution plots
-        if feature in ["logpsdfrac", "logpsdband", "psdband", "cohere", "zcohere", "imcoh", "zimcoh"]:
-            # For band features, create per-band plots
-            bands = ["delta", "theta", "alpha", "beta", "gamma"]
-            for band in bands:
-                df_band = df_weighted[df_weighted["band"] == band]
-                create_relfreq_plot(
-                    df=df_band,
-                    feature=feature,
-                    feature_label=f"{feature_label} ({band})",
-                    hue="gene",
-                    hue_order=["WT", "Het", "Mut"],
-                    palette=["blue", "blueviolet", "red"],
-                    log_scale=False,
-                    output_path=output_dir / f"{feature}_relfreq_{band}.{figure_format}",
-                    dpi=dpi,
-                )
-
-            # Also create combined band comparison plot
+    
+    # Create relative frequency distribution plots
+    if feature in ["logpsdfrac", "logpsdband", "psdband", "cohere", "zcohere", "imcoh", "zimcoh"]:
+        # For band features, create per-band plots
+        bands = ["delta", "theta", "alpha", "beta", "gamma"]
+        for band in bands:
+            df_band = df_weighted[df_weighted["band"] == band]
+            if len(df_band) == 0:
+                logger.warning(f"No data for {feature} band {band}")
+                continue
             create_relfreq_plot(
-                df=df_weighted,
+                df=df_band,
                 feature=feature,
-                feature_label=feature_label,
-                hue="band",
-                hue_order=["delta", "theta", "alpha", "beta", "gamma"],
-                palette=[blue, orange, red, green, purple],
-                log_scale=False,
-                output_path=output_dir / f"{feature}_relfreq_byband.{figure_format}",
-                dpi=dpi,
-            )
-        else:
-            # For non-band features, single plot
-            create_relfreq_plot(
-                df=df_weighted,
-                feature=feature,
-                feature_label=feature_label,
+                feature_label=f"{feature_label} ({band})",
                 hue="gene",
                 hue_order=["WT", "Het", "Mut"],
                 palette=["blue", "blueviolet", "red"],
                 log_scale=False,
-                output_path=output_dir / f"{feature}_relfreq.{figure_format}",
+                output_path=output_dir / f"{feature}_relfreq_{band}.{figure_format}",
                 dpi=dpi,
             )
 
-        logger.info(f"Successfully processed feature: {feature}")
+        # Also create combined band comparison plot
+        create_relfreq_plot(
+            df=df_weighted,
+            feature=feature,
+            feature_label=feature_label,
+            hue="band",
+            hue_order=["delta", "theta", "alpha", "beta", "gamma"],
+            palette=[blue, orange, red, green, purple],
+            log_scale=False,
+            output_path=output_dir / f"{feature}_relfreq_byband.{figure_format}",
+            dpi=dpi,
+        )
+    else:
+        # For non-band features, single plot
+        create_relfreq_plot(
+            df=df_weighted,
+            feature=feature,
+            feature_label=feature_label,
+            hue="gene",
+            hue_order=["WT", "Het", "Mut"],
+            palette=["blue", "blueviolet", "red"],
+            log_scale=False,
+            output_path=output_dir / f"{feature}_relfreq.{figure_format}",
+            dpi=dpi,
+        )
 
-    except Exception as e:
-        logger.error(f"Failed to process feature {feature}: {str(e)}")
-        raise
+    logger.info(f"Successfully created plots for feature: {feature}")
 
 
 def main():
@@ -263,6 +280,7 @@ def main():
     global snakemake
     logger = setup_snakemake_logging(snakemake)
     logger.info("Relative frequency plots generation started")
+    log_memory_usage(logger, "startup")
 
     # Get parameters from snakemake
     war_pkl_files = snakemake.input.war_pkl
@@ -275,11 +293,11 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
     data_dir.mkdir(parents=True, exist_ok=True)
 
-    logger.info(f"Loading {len(war_pkl_files)} channel-filtered WARs")
+    logger.info(f"Processing {len(war_pkl_files)} channel-filtered WARs")
 
-    # Get number of threads for parallel loading
+    # Get number of threads for parallel extraction
     threads = snakemake.threads
-    logger.info(f"Using {threads} threads for parallel WAR loading")
+    logger.info(f"Using {threads} threads for parallel feature extraction")
 
     # Validate that PKL and JSON inputs match
     if len(war_pkl_files) != len(war_json_files):
@@ -287,7 +305,7 @@ def main():
             f"Mismatch between PKL files ({len(war_pkl_files)}) and JSON files ({len(war_json_files)})"
         )
 
-    # Prepare WAR information for parallel loading
+    # Prepare WAR information for parallel extraction
     war_infos = []
     for pkl_file, json_file in zip(war_pkl_files, war_json_files):
         pkl_path = Path(pkl_file)
@@ -295,41 +313,10 @@ def main():
         animal_name = pkl_path.parent.name
         war_infos.append((pkl_path, json_path, animal_name))
 
-    # Load WARs in parallel
-    wars = []
-    if threads > 1:
-        with Pool(threads) as pool:
-            for war in tqdm(
-                pool.imap(load_war_for_relfreq, war_infos),
-                total=len(war_infos),
-                desc="Loading WARs for relative frequency plots",
-            ):
-                if war is not None:
-                    wars.append(war)
-    else:
-        # Single-threaded loading
-        for war_info in tqdm(war_infos, desc="Loading WARs for relative frequency plots"):
-            war = load_war_for_relfreq(war_info)
-            if war is not None:
-                wars.append(war)
-
-    if not wars:
-        raise RuntimeError("No WARs were successfully loaded")
-
-    logger.info(f"Successfully loaded {len(wars)} WARs")
-
     # Get relfreq configuration
     relfreq_config = config["analysis"]["relfreq_plots"]
     features = relfreq_config["features"]
-
-    # Create genotype ordering
-    genotype_order = ["MWT", "MHet", "MMut", "FWT", "FHet", "FMut"]
-    plot_order = constants.DF_SORT_ORDER.copy()
-    plot_order["genotype"] = genotype_order
-
-    # Create ExperimentPlotter
-    logger.info("Creating ExperimentPlotter")
-    ep = visualization.ExperimentPlotter(wars=wars, exclude=None, plot_order=plot_order)
+    data_format = relfreq_config.get("data_format", "csv")
 
     # Feature to label mapping
     feature_to_label = {
@@ -346,15 +333,81 @@ def main():
         "lognspike": "Log(n_spike / t_window)",
     }
 
-    # Process each feature
+    logger.info(f"Will process {len(features)} features: {features}")
+    log_memory_usage(logger, "before feature loop")
+
+    # Process each feature using streaming parallel extraction
     for feature in features:
-        if feature in feature_to_label:
-            feature_label = feature_to_label[feature]
+        logger.info(f"=== Processing feature: {feature} ===")
+        log_memory_usage(logger, f"start {feature}")
+        
+        feature_label = feature_to_label.get(feature, feature)
+        
+        # Prepare extraction arguments
+        args = [(info, feature, True) for info in war_infos]  # True = collapse_channels
+        
+        # Parallel extraction - workers extract and return small DataFrames
+        dfs = []
+        if threads > 1:
+            with Pool(threads) as pool:
+                for df in tqdm(
+                    pool.imap(extract_feature_from_war, args),
+                    total=len(args),
+                    desc=f"Extracting {feature}",
+                ):
+                    if df is not None:
+                        dfs.append(df)
         else:
-            feature_label = feature
+            # Single-threaded extraction
+            for arg in tqdm(args, desc=f"Extracting {feature}"):
+                df = extract_feature_from_war(arg)
+                if df is not None:
+                    dfs.append(df)
+        
+        if not dfs:
+            logger.warning(f"No data extracted for feature {feature}, skipping")
+            continue
+        
+        logger.info(f"Extracted {len(dfs)} DataFrames for {feature}")
+        log_memory_usage(logger, f"after extraction {feature}")
+        
+        # Combine all DataFrames
+        combined_df = pd.concat(dfs, ignore_index=True)
+        del dfs  # Free memory
+        gc.collect()
+        
+        logger.info(f"Combined DataFrame shape: {combined_df.shape}")
+        log_memory_usage(logger, f"after concat {feature}")
+        
+        # Process dataframe (add sex, gene columns)
+        df_processed = process_feature_dataframe(combined_df)
+        del combined_df
+        gc.collect()
+        
+        # Add weights for equal animal contribution
+        df_weighted = add_animal_weights(df_processed)
+        del df_processed
+        gc.collect()
+        
+        log_memory_usage(logger, f"after processing {feature}")
+        
+        # Save data in configured format
+        if data_format == "csv":
+            df_weighted.to_csv(data_dir / f"{feature}_relfreq.csv", index=False)
+        else:  # default to pkl
+            df_weighted.to_pickle(data_dir / f"{feature}_relfreq.pkl")
+        
+        # Create plots
+        create_relfreq_plots_from_df(df_weighted, feature, feature_label, output_dir, relfreq_config)
+        
+        # Free memory before next feature
+        del df_weighted
+        gc.collect()
+        
+        log_memory_usage(logger, f"end {feature}")
+        logger.info(f"=== Completed feature: {feature} ===\n")
 
-        create_relfreq_plots_for_feature(ep, feature, feature_label, output_dir, data_dir, relfreq_config)
-
+    log_memory_usage(logger, "finished")
     logger.info(f"Successfully generated relative frequency plots for {len(features)} features")
 
 
