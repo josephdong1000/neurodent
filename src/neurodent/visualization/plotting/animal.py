@@ -653,7 +653,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
             - matplotlib.colors.Normalize(vmin=0, vmax=1)  # Fixed range
             - matplotlib.colors.CenteredNorm(vcenter=0)  # Auto-detect range around 0
             - matplotlib.colors.LogNorm()  # Logarithmic scale
-        **kwargs
+        \\**kwargs
             Additional arguments passed to matplotlib
         """
         if features is None:

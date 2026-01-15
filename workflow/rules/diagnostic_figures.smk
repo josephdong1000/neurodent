@@ -24,13 +24,15 @@ rule make_diagnostic_figures_unfiltered:
         samples_config=samples_config,
         config=config,
     threads: config["cluster"]["diagnostic_figures"]["threads"]
-    retries: 1
+    retries:
+        config["cluster"]["diagnostic_figures"]["retries"]
     resources:
         time=config["cluster"]["diagnostic_figures"]["time"],
         mem_mb=increment_memory(config["cluster"]["diagnostic_figures"]["mem_mb"]),
         nodes=config["cluster"]["diagnostic_figures"]["nodes"],
     log:
-        "logs/diagnostic_figures/{animal}_unfiltered.log",
+        stdout="logs/diagnostic_figures/{animal}_unfiltered.stdout",
+        stderr="logs/diagnostic_figures/{animal}_unfiltered.stderr",
     script:
         "../scripts/generate_diagnostic_figs.py"
 
@@ -52,12 +54,14 @@ rule make_diagnostic_figures_filtered:
         samples_config=samples_config,
         config=config,
     threads: config["cluster"]["diagnostic_figures"]["threads"]
-    retries: 1
+    retries:
+        config["cluster"]["diagnostic_figures"]["retries"]
     resources:
         time=config["cluster"]["diagnostic_figures"]["time"],
         mem_mb=increment_memory(config["cluster"]["diagnostic_figures"]["mem_mb"]),
         nodes=config["cluster"]["diagnostic_figures"]["nodes"],
     log:
-        "logs/diagnostic_figures/{animal}_filtered.log",
+        stdout="logs/diagnostic_figures/{animal}_filtered.stdout",
+        stderr="logs/diagnostic_figures/{animal}_filtered.stderr",
     script:
         "../scripts/generate_diagnostic_figs.py"

@@ -10,20 +10,21 @@ Input: Fragment-filtered WARs (temporal artifacts already removed)
 Output: Channel-filtered WARs ready for flattening
 """
 
-import logging
-import sys
 from pathlib import Path
 
 from neurodent import visualization
+from neurodent.workflow import setup_snakemake_logging
 
 
 def main():
     """Main channel filtering function for single animal (1-to-1 operation)"""
     global snakemake
 
+    logger = setup_snakemake_logging(snakemake)
+
     # Get parameters from snakemake
-    logging.debug(f"snakemake.input.war_pkl: {snakemake.input.war_pkl}")
-    logging.debug(f"snakemake.input.war_json: {snakemake.input.war_json}")
+    logger.debug(f"snakemake.input.war_pkl: {snakemake.input.war_pkl}")
+    logger.debug(f"snakemake.input.war_json: {snakemake.input.war_json}")
 
     # Handle both string and list inputs
     war_pkl_path = snakemake.input.war_pkl[0] if isinstance(snakemake.input.war_pkl, list) else snakemake.input.war_pkl
@@ -45,13 +46,13 @@ def main():
     animal_name = snakemake.wildcards.animal
     animal_key = f"{animal_folder} {animal_id}"
 
-    logging.info(f"Processing animal: {animal_name}")
-    logging.info(f"Animal key: {animal_key}")
-    logging.info(f"Channel filter type: {filter_type}")
+    logger.info(f"Processing animal: {animal_name}")
+    logger.info(f"Animal key: {animal_key}")
+    logger.info(f"Channel filter type: {filter_type}")
 
     try:
         # Load the fragment-filtered WAR
-        logging.info(f"Loading fragment-filtered WAR from: {input_war_dir}")
+        logger.info(f"Loading fragment-filtered WAR from: {input_war_dir}")
         war = visualization.WindowAnalysisResult.load_pickle_and_json(
             folder_path=input_war_dir, pickle_name=war_pkl_name, json_name=war_json_name
         )
@@ -64,7 +65,7 @@ def main():
         # read in bad channels -- both pipelines
         channel_filter_config = config["analysis"]["channel_filter_config"][filter_type].copy()
         bad_channels = channel_filter_config.get("reject_channels", [])
-        logging.info(f"{filter_type} - Reject channels: {bad_channels}")
+        logger.info(f"{filter_type} - Reject channels: {bad_channels}")
         filter_config["reject_channels"] = {"bad_channels": bad_channels}
 
         if filter_type == "manual":
@@ -74,48 +75,43 @@ def main():
             if reject_channels_by_session:
                 samples_bad_channels = samples_config.get("bad_channels", {})
                 bad_channels_dict_manual = samples_bad_channels.get(animal_key, {})
-                logging.info(f"{filter_type} - Reject channels by session: {bad_channels_dict_manual}")
+                logger.info(f"{filter_type} - Reject channels by session: {bad_channels_dict_manual}")
                 filter_config["reject_channels_by_session"] = {"bad_channels_dict": bad_channels_dict_manual}
 
             min_valid_channels = channel_filter_config["min_valid_channels"]
-            logging.info(f"{filter_type} - Minimum valid channels: {min_valid_channels}")
+            logger.info(f"{filter_type} - Minimum valid channels: {min_valid_channels}")
 
         elif filter_type == "lof":
             # apply lof-based channel filtering -- lof only
             lof_threshold = channel_filter_config["reject_lof_threshold"]
-            logging.debug(f"LOF threshold: {lof_threshold}")
-            logging.debug(f"LOF scores dict: {war.lof_scores_dict}")
+            logger.debug(f"LOF threshold: {lof_threshold}")
+            logger.debug(f"LOF scores dict: {war.lof_scores_dict}")
 
             bad_channels_dict_lof = war.get_bad_channels_by_lof_threshold(lof_threshold)
-            logging.info(f"{filter_type} - Reject channels by LOF threshold: {bad_channels_dict_lof}")
+            logger.info(f"{filter_type} - Reject channels by LOF threshold: {bad_channels_dict_lof}")
             filter_config["reject_channels_by_session"] = {"bad_channels_dict": bad_channels_dict_lof}
 
             min_valid_channels = channel_filter_config["min_valid_channels"]
-            logging.info(f"{filter_type} - Minimum valid channels: {min_valid_channels}")
+            logger.info(f"{filter_type} - Minimum valid channels: {min_valid_channels}")
 
         # Apply filters
         war = war.apply_filters(
             filter_config=filter_config,
             min_valid_channels=min_valid_channels,
         )
-        logging.info(f"{filter_type} - Applied channel filtering")
+        logger.info(f"{filter_type} - Applied channel filtering")
 
         # Save channel-filtered WAR as both pickle and json
         war.save_pickle_and_json(Path(output_war_pkl).parent)
 
-        logging.info(f"Successfully channel-filtered ({filter_type}) and saved {animal_name}")
+        logger.info(f"Successfully channel-filtered ({filter_type}) and saved {animal_name}")
 
     except Exception as e:
-        logging.error(f"Failed to process {animal_name}: {str(e)}")
+        logger.error(f"Failed to process {animal_name}: {str(e)}")
         raise
 
-    logging.info(f"WAR channel filtering ({filter_type}) script completed successfully")
+    logger.info(f"WAR channel filtering ({filter_type}) script completed successfully")
 
 
 if __name__ == "__main__":
-    with open(snakemake.log[0], "w") as f:
-        sys.stderr = sys.stdout = f
-        logging.basicConfig(
-            format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO, stream=sys.stdout, force=True
-        )
-        main()
+    main()

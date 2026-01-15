@@ -18,6 +18,8 @@ rule war_channel_filter_manual:
         war_pkl="results/wars_channel_filtered_manual/{animal}/war.pkl",
         war_json="results/wars_channel_filtered_manual/{animal}/war.json",
     threads: 1
+    retries:
+        config["cluster"]["war_channel_filtering"]["retries"]
     params:
         config=config,
         samples_config=samples_config,
@@ -29,7 +31,8 @@ rule war_channel_filter_manual:
         mem_mb=increment_memory(config["cluster"]["war_channel_filtering"]["mem_mb"]),
         nodes=config["cluster"]["war_channel_filtering"]["nodes"],
     log:
-        "logs/war_channel_filtering/{animal}_manual.log",
+        stdout="logs/war_channel_filtering/{animal}_manual.stdout",
+        stderr="logs/war_channel_filtering/{animal}_manual.stderr",
     script:
         "../scripts/filter_wars_channels.py"
 
@@ -45,6 +48,8 @@ rule war_channel_filter_lof:
         war_pkl="results/wars_channel_filtered_lof/{animal}/war.pkl",
         war_json="results/wars_channel_filtered_lof/{animal}/war.json",
     threads: 1
+    retries:
+        config["cluster"]["war_channel_filtering"]["retries"]
     params:
         config=config,
         samples_config=samples_config,
@@ -56,7 +61,8 @@ rule war_channel_filter_lof:
         mem_mb=increment_memory(config["cluster"]["war_channel_filtering"]["mem_mb"]),
         nodes=config["cluster"]["war_channel_filtering"]["nodes"],
     log:
-        "logs/war_channel_filtering/{animal}_lof.log",
+        stdout="logs/war_channel_filtering/{animal}_lof.stdout",
+        stderr="logs/war_channel_filtering/{animal}_lof.stderr",
     script:
         "../scripts/filter_wars_channels.py"
 

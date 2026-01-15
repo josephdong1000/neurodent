@@ -13,20 +13,21 @@ Input: Quality-filtered WARs (genotype/bad animal filtering already applied)
 Output: Standardized WARs ready for fragment filtering
 """
 
-import logging
-import sys
 from pathlib import Path
 
 from neurodent import visualization
+from neurodent.workflow import setup_snakemake_logging
 
 
 def main():
     """Main standardization function for single animal (1-to-1 operation)"""
     global snakemake
 
+    logger = setup_snakemake_logging(snakemake)
+
     # Get parameters from snakemake
-    logging.debug(f"snakemake.input.war_pkl: {snakemake.input.war_pkl}")
-    logging.debug(f"snakemake.input.war_json: {snakemake.input.war_json}")
+    logger.debug(f"snakemake.input.war_pkl: {snakemake.input.war_pkl}")
+    logger.debug(f"snakemake.input.war_json: {snakemake.input.war_json}")
 
     # Handle both string and list inputs
     war_pkl_path = snakemake.input.war_pkl[0] if isinstance(snakemake.input.war_pkl, list) else snakemake.input.war_pkl
@@ -57,46 +58,41 @@ def main():
     add_unique_hash = standardization_params.get("add_unique_hash", False)
     unique_hash_length = standardization_params.get("unique_hash_length", 4)
 
-    logging.info(f"Processing animal: {animal_name}")
-    logging.info(f"Animal key: {animal_key}")
-    logging.info(f"Channel reorder: {channel_reorder}")
-    logging.info(f"Use abbreviations: {use_abbrevs}")
-    logging.info(f"Add unique hash: {add_unique_hash}")
+    logger.info(f"Processing animal: {animal_name}")
+    logger.info(f"Animal key: {animal_key}")
+    logger.info(f"Channel reorder: {channel_reorder}")
+    logger.info(f"Use abbreviations: {use_abbrevs}")
+    logger.info(f"Add unique hash: {add_unique_hash}")
     if add_unique_hash:
-        logging.info(f"Unique hash length: {unique_hash_length}")
+        logger.info(f"Unique hash length: {unique_hash_length}")
 
     try:
         # Load the quality-filtered WAR
-        logging.info(f"Loading WAR from: {input_war_dir}")
+        logger.info(f"Loading WAR from: {input_war_dir}")
         war = visualization.WindowAnalysisResult.load_pickle_and_json(
             folder_path=input_war_dir, pickle_name=war_pkl_name, json_name=war_json_name
         )
 
         # Apply channel standardization for all downstream steps
-        logging.info("Applying channel reordering and padding")
+        logger.info("Applying channel reordering and padding")
         war.reorder_and_pad_channels(channel_reorder, use_abbrevs=use_abbrevs)
 
         # Add unique hash if requested
         if add_unique_hash:
-            logging.info(f"Adding unique hash with length {unique_hash_length}")
+            logger.info(f"Adding unique hash with length {unique_hash_length}")
             war.add_unique_hash(unique_hash_length)
 
         # Save preprocessed WAR as both pickle and json
         war.save_pickle_and_json(Path(output_war_pkl).parent)
 
-        logging.info(f"Successfully standardized and saved {animal_name}")
+        logger.info(f"Successfully standardized and saved {animal_name}")
 
     except Exception as e:
-        logging.error(f"Failed to standardize {animal_name}: {str(e)}")
+        logger.error(f"Failed to standardize {animal_name}: {str(e)}")
         raise
 
-    logging.info("WAR standardization script completed successfully")
+    logger.info("WAR standardization script completed successfully")
 
 
 if __name__ == "__main__":
-    with open(snakemake.log[0], "w") as f:
-        sys.stderr = sys.stdout = f
-        logging.basicConfig(
-            format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO, stream=sys.stdout, force=True
-        )
-        main()
+    main()

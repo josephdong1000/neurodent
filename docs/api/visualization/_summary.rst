@@ -1,3 +1,5 @@
+.. currentmodule:: neurodent.visualization
+
 .. autosummary::
    :nosignatures:
 
@@ -7,4 +9,3 @@
    FrequencyDomainSpikeAnalysisResult
    AnimalPlotter
    ExperimentPlotter
-   ZeitgeberPlotter

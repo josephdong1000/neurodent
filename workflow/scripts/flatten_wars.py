@@ -11,17 +11,17 @@ Input: Filtered WARs (filtering and channel reordering already applied)
 Output: Individual aggregated WARs saved as pickle and json in wars_flattened/
 """
 
-import logging
-import sys
 from pathlib import Path
-import json
 
 from neurodent import visualization
+from neurodent.workflow import setup_snakemake_logging
 
 
 def main():
     """Main flattening function for single animal (1-to-1 operation)"""
     global snakemake
+
+    logger = setup_snakemake_logging(snakemake)
 
     # Get parameters from snakemake
     input_war_dir = Path(snakemake.input.war_pkl).parent
@@ -35,12 +35,12 @@ def main():
 
     # Get groupby parameters from config
     groupby_params = config["analysis"]["aggregation"]["groupby"]
-    logging.info(f"Processing animal: {animal_name}")
-    logging.info(f"Using groupby parameters: {groupby_params}")
+    logger.info(f"Processing animal: {animal_name}")
+    logger.info(f"Using groupby parameters: {groupby_params}")
 
     try:
         # Load the filtered WAR
-        logging.info(f"Loading WAR from: {input_war_dir}")
+        logger.info(f"Loading WAR from: {input_war_dir}")
         war = visualization.WindowAnalysisResult.load_pickle_and_json(
             folder_path=input_war_dir, pickle_name=war_pkl_name, json_name=war_json_name
         )
@@ -51,19 +51,14 @@ def main():
         # Save aggregated WAR as both pickle and json
         war.save_pickle_and_json(Path(output_war_pkl).parent)
 
-        logging.info(f"Successfully aggregated and saved {animal_name}")
+        logger.info(f"Successfully aggregated and saved {animal_name}")
 
     except Exception as e:
-        logging.error(f"Failed to process {animal_name}: {str(e)}")
+        logger.error(f"Failed to process {animal_name}: {str(e)}")
         raise
 
-    logging.info("WAR flattening script completed successfully")
+    logger.info("WAR flattening script completed successfully")
 
 
 if __name__ == "__main__":
-    with open(snakemake.log[0], "w") as f:
-        sys.stderr = sys.stdout = f
-        logging.basicConfig(
-            format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO, stream=sys.stdout, force=True
-        )
-        main()
+    main()

@@ -18,7 +18,8 @@ rule extract_zeitgeber_features:
         zeitgeber_features="results/wars_zeitgeber/zeitgeber_features.pkl",
     threads:
         config["cluster"]["war_zeitgeber"]["threads"]
-    retries: 1
+    retries:
+        config["cluster"]["war_zeitgeber"]["retries"]
     params:
         config=config,
     resources:
@@ -26,6 +27,7 @@ rule extract_zeitgeber_features:
         mem_mb=increment_memory(config["cluster"]["war_zeitgeber"]["mem_mb"]),
         nodes=config["cluster"]["war_zeitgeber"]["nodes"],
     log:
-        "logs/war_zeitgeber/extract_zeitgeber_features.log",
+        stdout="logs/war_zeitgeber/extract_zeitgeber_features.stdout",
+        stderr="logs/war_zeitgeber/extract_zeitgeber_features.stderr",
     script:
         "../scripts/extract_zeitgeber_features.py"
