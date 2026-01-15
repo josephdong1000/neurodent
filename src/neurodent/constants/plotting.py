@@ -34,3 +34,4 @@ OKABE_ITO_COLORS = {
 
 Reference: https://easystats.github.io/see/reference/scale_color_okabeito.html
 """
+

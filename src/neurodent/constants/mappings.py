@@ -70,3 +70,32 @@ DATEPARSER_PATTERNS_TO_REMOVE = [
 
 DEFAULT_DAY = datetime(2000, 1, 1)
 """Fallback date when parsing fails."""
+
+FEATURE_LABELS = {
+    # Linear features
+    "rms": "RMS",
+    "logrms": "Log(RMS)",
+    "ampvar": "Amplitude Variance",
+    "logampvar": "Log(Amplitude Variance)",
+    "psdtotal": "Total PSD",
+    "logpsdtotal": "Log(Total PSD)",
+    "psdslope": "PSD Slope",
+    "nspike": "Spike Count",
+    "lognspike": "Log(Spike Count)",
+    # Band features (base names - bands appended dynamically)
+    "psdband": "Band Power",
+    "logpsdband": "Log Band Power",
+    "psdfrac": "Power Fraction",
+    "logpsdfrac": "Log Power Fraction",
+    # Matrix features (base names - bands appended dynamically)
+    "cohere": "Coherence",
+    "zcohere": "Z-Coherence",
+    "imcoh": "Imaginary Coherence",
+    "zimcoh": "Z-Imaginary Coherence",
+    "pcorr": "Pearson Correlation",
+    "zpcorr": "Z-Pearson Correlation",
+    # Derived/composite features
+    "alphadelta": "Alpha/Delta Ratio",
+}
+"""Canonical display labels for features."""
+

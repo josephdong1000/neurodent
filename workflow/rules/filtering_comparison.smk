@@ -22,12 +22,14 @@ rule generate_filtering_comparison:
         config=config,
         samples_config=samples_config,
     threads: config["cluster"]["filtering_comparison"]["threads"]
-    retries: 0
+    retries:
+        config["cluster"]["filtering_comparison"]["retries"]
     resources:
         time=config["cluster"]["filtering_comparison"]["time"],
         mem_mb=increment_memory(config["cluster"]["filtering_comparison"]["mem_mb"]),
         nodes=config["cluster"]["filtering_comparison"]["nodes"],
     log:
-        "logs/filtering_comparison/generate_comparison.log",
+        stdout="logs/filtering_comparison/generate_comparison.stdout",
+        stderr="logs/filtering_comparison/generate_comparison.stderr",
     script:
         "../scripts/generate_filtering_comparison.py"

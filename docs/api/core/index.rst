@@ -21,4 +21,5 @@ Classes
    fragment_analyzer
    mountain_sort_analyzer
    frequency_domain_spike_detector
+   zeitgeber
    utils

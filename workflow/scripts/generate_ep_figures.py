@@ -10,9 +10,7 @@ Input: Flattened WAR pickle and JSON files from all animals
 Output: Statistical figure files (TIF) and CSV data exports
 """
 
-import sys
 import logging
-import traceback
 from pathlib import Path
 
 import matplotlib
@@ -26,6 +24,7 @@ import seaborn.objects as so
 from seaborn import axes_style
 
 from neurodent import visualization, constants
+from neurodent.workflow import setup_snakemake_logging, load_wars
 
 
 def process_feature_dataframe(df, feature):
@@ -228,87 +227,69 @@ def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
 def main():
     """Main EP figures generation function"""
     global snakemake
-    with open(snakemake.log[0], "w") as f:
-        sys.stderr = sys.stdout = f
-        logging.basicConfig(
-            format="%(asctime)s - %(levelname)s - %(message)s",
-            level=logging.INFO,
-            stream=sys.stdout,
-            force=True,
-        )
-        logger = logging.getLogger(__name__)
+    logger = setup_snakemake_logging(snakemake)
+    logger.info("EP statistical figures generation started")
 
-        logger.info("EP statistical figures generation started")
+    # Get parameters from snakemake
+    war_pkl_files = snakemake.input.war_pkl
+    war_json_files = snakemake.input.war_json
+    config = snakemake.params.config
 
-        # Get parameters from snakemake
-        war_pkl_files = snakemake.input.war_pkl
-        war_json_files = snakemake.input.war_json
-        config = snakemake.params.config
+    # Create output directories
+    output_dir = Path(snakemake.output.figure_dir)
+    data_dir = Path(snakemake.output.data_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    data_dir.mkdir(parents=True, exist_ok=True)
 
-        # Create output directories
-        output_dir = Path(snakemake.output.figure_dir)
-        data_dir = Path(snakemake.output.data_dir)
-        output_dir.mkdir(parents=True, exist_ok=True)
-        data_dir.mkdir(parents=True, exist_ok=True)
+    logger.info(f"Loading {len(war_pkl_files)} flattened WARs")
 
-        logger.info(f"Loading {len(war_pkl_files)} flattened WARs")
+    # Load WARs using the workflow utility
+    wars = load_wars(war_pkl_files, war_json_files)
+    for war in wars:
+        logger.info(f"Loaded WAR for {war.animal_id} ({war.genotype})")
 
-        # Load WARs - let failures be visible rather than silently continuing
-        wars = []
-        for pkl_file, json_file in zip(war_pkl_files, war_json_files):
-            war = visualization.WindowAnalysisResult.load_pickle_and_json(
-                folder_path=Path(pkl_file).parent, pickle_name=Path(pkl_file).name, json_name=Path(json_file).name
-            )
+    logger.info(f"Successfully loaded {len(wars)} WARs")
 
-            wars.append(war)
-            logger.info(f"Loaded WAR for {war.animal_id} ({war.genotype})")
+    # Get EP configuration
+    ep_config = config["analysis"]["ep_figures"]
+    features = ep_config["features"]
+    exclude_features = ep_config.get("exclude_features", [])
 
-        if not wars:
-            raise RuntimeError("No WARs were successfully loaded")
+    # Create genotype ordering
+    genotype_order = ["MWT", "MHet", "MMut", "FWT", "FHet", "FMut"]
+    plot_order = constants.DF_SORT_ORDER.copy()
+    plot_order["genotype"] = genotype_order
 
-        logger.info(f"Successfully loaded {len(wars)} WARs")
+    # Create ExperimentPlotter
+    logger.info("Creating ExperimentPlotter")
+    ep = visualization.ExperimentPlotter(wars=wars, exclude=exclude_features, plot_order=plot_order)
 
-        # Get EP configuration
-        ep_config = config["analysis"]["ep_figures"]
-        features = ep_config["features"]
-        exclude_features = ep_config.get("exclude_features", [])
+    # Feature to label mapping
+    feature_to_label = {
+        "pcorr": "PCC",
+        "cohere": "|Coherency|",
+        "imcoh": "Imaginary Coherencey",
+        "zpcorr": "z(PCC)",
+        "zcohere": "z(|Coherencey|)",
+        "zimcoh": "z(Imaginary Coherencey)",
+        "logpsdfrac": "Log Percent Power",
+        "logpsdband": "Log Band Power",
+        "psdband": "Band Power ($\\mu V^2$)",
+        "psd": "PSD ($\\mu V^2/Hz$)",
+        "normpsd": "Normalized PSD",
+        "nspike": "n_spike / t_window",
+        "lognspike": "Log(n_spike / t_window)",
+    }
 
-        # Create genotype ordering
-        genotype_order = ["MWT", "MHet", "MMut", "FWT", "FHet", "FMut"]
-        plot_order = constants.DF_SORT_ORDER.copy()
-        plot_order["genotype"] = genotype_order
+    # Process each feature
+    for feature in features:
+        if feature in feature_to_label:
+            feature_label = feature_to_label[feature]
+        else:
+            feature_label = feature
 
-        # Create ExperimentPlotter
-        logger.info("Creating ExperimentPlotter")
-        ep = visualization.ExperimentPlotter(wars=wars, exclude=exclude_features, plot_order=plot_order)
-
-        # Feature to label mapping
-        feature_to_label = {
-            "pcorr": "PCC",
-            "cohere": "|Coherency|",
-            "imcoh": "Imaginary Coherencey",
-            "zpcorr": "z(PCC)",
-            "zcohere": "z(|Coherencey|)",
-            "zimcoh": "z(Imaginary Coherencey)",
-            "logpsdfrac": "Log Percent Power",
-            "logpsdband": "Log Band Power",
-            "psdband": "Band Power ($\\mu V^2$)",
-            "psd": "PSD ($\\mu V^2/Hz$)",
-            "normpsd": "Normalized PSD",
-            "nspike": "n_spike / t_window",
-            "lognspike": "Log(n_spike / t_window)",
-        }
-
-        # Process each feature
-        for feature in features:
-            if feature in feature_to_label:
-                feature_label = feature_to_label[feature]
-            else:
-                feature_label = feature
-
-            create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
-
-        logger.info(f"Successfully generated EP statistical figures for {len(features)} features")
+        create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
+    logger.info(f"Successfully generated EP statistical figures for {len(features)} features")
 
 
 if __name__ == "__main__":

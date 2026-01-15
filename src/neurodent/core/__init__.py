@@ -66,7 +66,15 @@ from .utils import (
     parse_chname_to_abbrev,
     log_transform,
     should_use_cache_unified,
+    get_feature_label,
     get_cache_status_message,
+)
+
+from .zeitgeber import (
+    ZeitgeberAnalysisResult,
+    run_zeitgeber_pipeline,
+    get_expanded_feature_names,
+    transform_time_axis,
 )
 from . import utils
 
@@ -79,17 +87,22 @@ __all__ = [
     "FragmentAnalyzer",
     "MountainSortAnalyzer",
     "FrequencyDomainSpikeDetector",
+    "ZeitgeberAnalysisResult",
+    "run_zeitgeber_pipeline",
+    "get_expanded_feature_names",
+    "transform_time_axis",
     # Utilities
     "convert_ddfcolbin_to_ddfrowbin",
     "convert_ddfrowbin_to_si",
     "get_temp_directory",
+    "set_temp_directory",
     "parse_path_to_animalday",
     "validate_timestamps",
     "nanaverage",
     "parse_chname_to_abbrev",
     "log_transform",
-    "set_temp_directory",
-    "utils",
-    "should_use_cache_unified",
+    "get_feature_label",
     "get_cache_status_message",
+    "should_use_cache_unified",
+    "utils",
 ]

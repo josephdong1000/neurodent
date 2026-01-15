@@ -18,9 +18,11 @@ checkpoint war_quality_filter:
     output:
         directory("results/wars_quality_filtered/{animal}"),
     log:
-        "logs/war_quality_filter/{animal}.log",
+        stdout="logs/war_quality_filter/{animal}.stdout",
+        stderr="logs/war_quality_filter/{animal}.stderr",
     threads: config["cluster"]["war_quality_filter"]["threads"]
-    retries: 0
+    retries:
+        config["cluster"]["war_quality_filter"]["retries"]
     resources:
         time=config["cluster"]["war_quality_filter"]["time"],
         mem_mb=increment_memory(config["cluster"]["war_quality_filter"]["mem_mb"]),

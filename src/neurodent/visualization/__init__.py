@@ -48,6 +48,7 @@ from .results import (
 from .plotting import (
     AnimalPlotter,
     ExperimentPlotter,
+    ZeitgeberPlotter,
 )
 from .frequency_domain_results import FrequencyDomainSpikeAnalysisResult
 
@@ -59,4 +60,5 @@ __all__ = [
     "FrequencyDomainSpikeAnalysisResult",
     "AnimalPlotter",
     "ExperimentPlotter",
+    "ZeitgeberPlotter",
 ]

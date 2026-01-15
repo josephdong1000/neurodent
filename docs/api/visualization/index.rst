@@ -21,3 +21,4 @@ Classes
    frequency_domain_spike_analysis_result
    animal_plotter
    experiment_plotter
+   zeitgeber_plotter

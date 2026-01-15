@@ -17,6 +17,13 @@ BAND_FEATURES = ["psdband", "psdfrac"] + ["logpsdband", "logpsdfrac"]
 MATRIX_FEATURES = ["cohere", "zcohere", "imcoh", "zimcoh", "pcorr", "zpcorr"]
 """List of connectivity/matrix feature names (channel pairs)."""
 
+BANDED_MATRIX_FEATURES = ["cohere", "zcohere", "imcoh", "zimcoh"]
+"""Matrix features with frequency band dimension (stored as dict with band keys)."""
+
+SIMPLE_MATRIX_FEATURES = ["pcorr", "zpcorr"]
+"""Matrix features without frequency bands (single 2D correlation matrix)."""
+
+
 HIST_FEATURES = ["psd"]
 """List of histogram/spectral feature names."""
 
