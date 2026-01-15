@@ -1002,6 +1002,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                     # Compute features in parallel
                     with warnings.catch_warnings():
                         warnings.filterwarnings("once", message=".*Spectrum estimate will be unreliable.*", category=RuntimeWarning)
+                        warnings.filterwarnings("once", message=".*does not match name aliases.*", category=UserWarning)
                         feature_values = dask.compute(*feature_values)
 
                     # Clean up temp directory after processing
@@ -1024,6 +1025,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                     lan_df = []
                     with warnings.catch_warnings():
                         warnings.filterwarnings("once", message=".*Spectrum estimate will be unreliable.*", category=RuntimeWarning)
+                        warnings.filterwarnings("once", message=".*does not match name aliases.*", category=UserWarning)
                         for idx in tqdm(
                             range(lan.n_fragments),
                             desc="Processing rows",
@@ -1424,10 +1426,12 @@ class WindowAnalysisResult(AnimalFeatureParser):
         ]
         self.animaldays = self.result.loc[:, "animalday"].unique()
 
-        self.channel_abbrevs = [
-            core.parse_chname_to_abbrev(x, assume_from_number=self.assume_from_number)
-            for x in self.channel_names
-        ]
+        with warnings.catch_warnings():
+            warnings.filterwarnings("once", message=".*does not match name aliases.*", category=UserWarning)
+            self.channel_abbrevs = [
+                core.parse_chname_to_abbrev(x, assume_from_number=self.assume_from_number)
+                for x in self.channel_names
+            ]
 
     def reorder_and_pad_channels(
         self, target_channels: list[str], use_abbrevs: bool = True, inplace: bool = True
@@ -3415,10 +3419,12 @@ class SpikeAnalysisResult(AnimalFeatureParser):
         self.metadata = metadata
         self.channel_names = channel_names
         self.assume_from_number = assume_from_number
-        self.channel_abbrevs = [
-            core.parse_chname_to_abbrev(x, assume_from_number=assume_from_number)
-            for x in self.channel_names
-        ]
+        with warnings.catch_warnings():
+            warnings.filterwarnings("once", message=".*does not match name aliases.*", category=UserWarning)
+            self.channel_abbrevs = [
+                core.parse_chname_to_abbrev(x, assume_from_number=assume_from_number)
+                for x in self.channel_names
+            ]
 
         logging.info(f"Channel names: \t{self.channel_names}")
         logging.info(f"Channel abbreviations: \t{self.channel_abbrevs}")

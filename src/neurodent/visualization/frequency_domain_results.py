@@ -84,14 +84,16 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
 
         if channel_names:
             self.channel_abbrevs = []
-            for x in self.channel_names:
-                try:
-                    abbrev = core.parse_chname_to_abbrev(x, assume_from_number=assume_from_number)
-                    self.channel_abbrevs.append(abbrev)
-                except (ValueError, AttributeError):
-                    # If parsing fails, use the original channel name
-                    logging.warning(f"Failed to parse channel name {x}, using original name")
-                    self.channel_abbrevs.append(x)
+            with warnings.catch_warnings():
+                warnings.filterwarnings("once", message=".*does not match name aliases.*", category=UserWarning)
+                for x in self.channel_names:
+                    try:
+                        abbrev = core.parse_chname_to_abbrev(x, assume_from_number=assume_from_number)
+                        self.channel_abbrevs.append(abbrev)
+                    except (ValueError, AttributeError):
+                        # If parsing fails, use the original channel name
+                        logging.warning(f"Failed to parse channel name {x}, using original name")
+                        self.channel_abbrevs.append(x)
         else:
             self.channel_abbrevs = []
 
