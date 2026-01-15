@@ -63,7 +63,7 @@ Then create a new project with NeuRodent:
    cd yourprojectname
    uv add neurodent
 
-This creates a new directory, sets up a virtual environment, and installs NeuRodent—all in one go.
+This creates a new directory, sets up a virtual environment, and installs NeuRodent.
 
 Next Steps
 ----------
