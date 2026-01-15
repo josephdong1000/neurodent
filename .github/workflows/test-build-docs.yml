@@ -186,7 +186,7 @@ jobs:
   deploy-docs:
     name: Deploy Documentation
     runs-on: ubuntu-latest
-    needs: build-docs
+    needs: [build-docs, test]
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
 
     # Permissions needed for GitHub Pages deployment
