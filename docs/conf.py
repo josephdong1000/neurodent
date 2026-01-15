@@ -130,6 +130,7 @@ intersphinx_disabled_reftypes = ["*"]
 nb_execution_mode = "auto"  # Execute notebooks during build to generate figures
 nb_execution_allow_errors = False  # Stop at first error (shows successful cells before failure)
 nb_execution_timeout = 600  # 10 minutes timeout for notebook execution
+nb_merge_streams = True  # Consolidate stderr to help warning deduplication
 
 # Enable MyST extensions for notebooks
 myst_url_schemes = ["http", "https", "mailto"]
