@@ -783,8 +783,9 @@ def parse_chname_to_abbrev(channel_name: str, assume_from_number=False, strict_m
         chname = _get_key_from_match_values(channel_name, constants.CHNAME_ALIASES, strict_matching)
     except ValueError as e:
         if assume_from_number:
+            logging.debug(f"Channel '{channel_name}' does not match name aliases. Attempting to assume from number.")
             warnings.warn(
-                f"{channel_name} does not match name aliases. Assuming alias from number in channel name.",
+                "One or more channels do not match name aliases. Assuming alias from number in channel name.",
                 UserWarning,
                 stacklevel=2
             )
