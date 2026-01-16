@@ -1000,10 +1000,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                     ]
 
                     # Compute features in parallel
-                    with warnings.catch_warnings():
-                        warnings.filterwarnings("once", message=".*Spectrum estimate will be unreliable.*", category=RuntimeWarning)
-                        warnings.filterwarnings("once", message=".*does not match name aliases.*", category=UserWarning)
-                        feature_values = dask.compute(*feature_values)
+                    feature_values = dask.compute(*feature_values)
 
                     # Clean up temp directory after processing
                     logging.debug("Cleaning up temp directory")
@@ -1023,19 +1020,16 @@ class AnimalOrganizer(AnimalFeatureParser):
                 case _:
                     logging.debug("Processing serially")
                     lan_df = []
-                    with warnings.catch_warnings():
-                        warnings.filterwarnings("once", message=".*Spectrum estimate will be unreliable.*", category=RuntimeWarning)
-                        warnings.filterwarnings("once", message=".*does not match name aliases.*", category=UserWarning)
-                        for idx in tqdm(
-                            range(lan.n_fragments),
-                            desc="Processing rows",
-                            miniters=miniters,
-                        ):
-                            lan_df.append(
-                                self._process_fragment_serial(
-                                    idx, features, lan, window_s, kwargs
-                                )
+                    for idx in tqdm(
+                        range(lan.n_fragments),
+                        desc="Processing rows",
+                        miniters=miniters,
+                    ):
+                        lan_df.append(
+                            self._process_fragment_serial(
+                                idx, features, lan, window_s, kwargs
                             )
+                        )
 
             lan_df = pd.DataFrame(lan_df)
 
@@ -1426,12 +1420,10 @@ class WindowAnalysisResult(AnimalFeatureParser):
         ]
         self.animaldays = self.result.loc[:, "animalday"].unique()
 
-        with warnings.catch_warnings():
-            warnings.filterwarnings("once", message=".*does not match name aliases.*", category=UserWarning)
-            self.channel_abbrevs = [
-                core.parse_chname_to_abbrev(x, assume_from_number=self.assume_from_number)
-                for x in self.channel_names
-            ]
+        self.channel_abbrevs = [
+            core.parse_chname_to_abbrev(x, assume_from_number=self.assume_from_number)
+            for x in self.channel_names
+        ]
 
     def reorder_and_pad_channels(
         self, target_channels: list[str], use_abbrevs: bool = True, inplace: bool = True
