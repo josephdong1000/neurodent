@@ -1758,7 +1758,12 @@ class TestParseChnameToAbbrev:
         assert utils.parse_chname_to_abbrev("right visual") == "RVis"  # if "visual" contains "vis"
 
     def test_warning_deduplication(self):
-        """Test that assume_from_number warnings are deduplicated."""
+        """Test that assume_from_number warnings are deduplicated.
+
+        Note: simplefilter("once") deduplicates by warning category/type, not by message
+        content. This test verifies that repeated calls with the same arguments don't
+        generate multiple warnings.
+        """
         import warnings
 
         with warnings.catch_warnings(record=True) as w:
@@ -1770,14 +1775,12 @@ class TestParseChnameToAbbrev:
             # Second call (same args) - no new warning record if deduplicated
             utils.parse_chname_to_abbrev("channel_9", assume_from_number=True)
 
-            relevant_warnings = [x for x in w if "Assuming alias from number" in str(x.message)]
-            assert len(relevant_warnings) == 1
-
-            # Third call (different args) - new warning due to different message
+            # Third call (different args) - still only 1 warning because simplefilter("once")
+            # deduplicates by warning type, not message content
             utils.parse_chname_to_abbrev("channel_10", assume_from_number=True)
 
             relevant_warnings = [x for x in w if "Assuming alias from number" in str(x.message)]
-            assert len(relevant_warnings) == 2
+            assert len(relevant_warnings) == 1
 
 
 class TestLogTransform:

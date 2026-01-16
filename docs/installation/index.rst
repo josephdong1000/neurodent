@@ -1,166 +1,33 @@
 Installation
 ============
 
-Prerequisites
--------------
+Get NeuRodent installed and ready for EEG analysis.
 
-NeuRodent requires Python 3.10 or higher. If you don't have Python installed, visit `python.org <https://www.python.org/downloads/>`_ to download and install it.
+.. list-table::
+   :widths: 30 70
+   :header-rows: 1
 
-To check if Python is installed on your system, open a terminal (Command Prompt on Windows, Terminal on macOS/Linux) and run:
+   * - Guide
+     - Description
+   * - :doc:`quickstart`
+     - Install NeuRodent with pip or uv
+   * - :doc:`extras`
+     - Optional dependency groups (pipeline, dev, all)
+   * - :doc:`pipeline`
+     - Snakemake workflow and SLURM cluster configuration
 
-.. code-block:: bash
+.. toctree::
+   :maxdepth: 1
+   :hidden:
 
-   python --version
-
-Quick Installation
-------------------
-
-Install NeuRodent using pip:
-
-.. code-block:: bash
-
-   pip install neurodent
-
-.. note::
-
-   **New to Python?** Pip is Python's package installer that comes bundled with Python. Open your terminal and copy-paste the command above, then press Enter. This will automatically download and install NeuRodent and all its dependencies.
-
-Verifying Installation
-----------------------
-
-To verify that NeuRodent is installed correctly, open a Python interpreter by typing ``python`` in your terminal, then try importing ``neurodent``:
-
-.. code-block:: python
-
-   import neurodent
-   print(neurodent.__version__)
-
-If this runs without errors, you're ready to start using NeuRodent!
-
-Installing with ``uv``
------------------------------------
-
-Though not required, we recommend using `uv <https://docs.astral.sh/uv/getting-started/>`_, a Python package and project manager that's faster than pip and handles virtual environments automatically.
-
-.. tip::
-
-   **Why use uv?** uv is an all-in-one tool that simplifies Python development by handling:
-   
-   - **Virtual environment creation and management** - Automatically creates isolated environments for each project
-   - **Package management** - Installs and manages dependencies faster than pip
-   - **Python version management** - Can install and switch between different Python versions
-   - **Dependency resolution** - Ensures all packages work together without conflicts
-   
-   Learn more about uv's features `here <https://docs.astral.sh/uv/getting-started/features/>`_.
-
-First, install uv by following the instructions at `docs.astral.sh/uv <https://docs.astral.sh/uv/getting-started/installation/>`_.
-
-Then create a new project with NeuRodent:
-
-.. code-block:: bash
-
-   uv init yourprojectname
-   cd yourprojectname
-   uv add neurodent
-
-This creates a new directory, sets up a virtual environment, and installs NeuRodent—all in one go.
-
-Installing with Pipeline Support
----------------------------------
-
-NeuRodent includes a Snakemake workflow for automated analysis pipelines. If you want to use this workflow, you'll need to install the optional pipeline dependencies:
-
-**Using pip:**
-
-.. code-block:: bash
-
-   pip install neurodent[pipeline]
-
-**Using uv:**
-
-.. code-block:: bash
-
-   uv add neurodent[pipeline]
-
-.. note::
-
-   The ``pipeline`` extra includes Snakemake and related dependencies needed for running the automated analysis workflow. If you only need the core NeuRodent library for Python-based analysis, the basic installation is sufficient.
-
-SLURM Cluster Configuration
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-If you're running the Snakemake workflow on a SLURM cluster, the setup depends on your Snakemake version.
-
-**Snakemake 7.x (Python 3.10)**
-
-Use a `Snakemake SLURM profile <https://github.com/Snakemake-Profiles/slurm>`_ generated with cookiecutter.
-
-**Recommended log path setting:** To place SLURM job logs alongside Snakemake logs (making debugging easier), update your profile's ``CookieCutter.py``:
-
-.. code-block:: python
-
-   # ~/.config/snakemake/your-profile/CookieCutter.py
-   def get_cluster_logpath() -> str:
-       return "logs/%r/slurm_%j"  # puts slurm_{jobid}.{out,err} in logs/<rule>/
-
-Run the workflow with:
-
-.. code-block:: bash
-
-   snakemake --profile your-profile
-
-**Snakemake 8+ (Python 3.11+)**
-
-Snakemake 8 uses a native `SLURM executor plugin <https://snakemake.github.io/snakemake-plugin-catalog/plugins/executor/slurm.html>`_ instead of cookiecutter profiles.
-
-Install the plugin:
-
-.. code-block:: bash
-
-   pip install snakemake-executor-plugin-slurm
-
-Run the workflow with the ``--executor`` flag:
-
-.. code-block:: bash
-
-   snakemake --executor slurm --default-resources --jobs 30
-
-The native plugin automatically:
-
-- Deletes SLURM log files for successful jobs (reduces clutter)
-- Preserves logs for failed jobs for 10 days
-- Uses ``--slurm-logdir`` to customize log location
-
-To customize log directory, add to your profile:
-
-.. code-block:: yaml
-
-   # ~/.config/snakemake/your-profile/config.yaml
-   executor: slurm
-   slurm-logdir: "logs/slurm"
-
-See the `plugin documentation <https://snakemake.github.io/snakemake-plugin-catalog/plugins/executor/slurm.html>`_ for full configuration options.
+   quickstart
+   extras
+   pipeline
 
 Development Installation
 ------------------------
 
-If you want to contribute to NeuRodent or modify the source code, install it in editable mode:
-
-**Using uv (recommended):**
-
-.. code-block:: bash
-
-   git clone https://github.com/josephdong1000/neurodent
-   cd neurodent
-   uv sync --extra pipeline
-
-**Using pip:**
-
-.. code-block:: bash
-
-   git clone https://github.com/josephdong1000/neurodent
-   cd neurodent
-   pip install -e .[pipeline]
+If you want to contribute to NeuRodent or modify the source code, please see our :doc:`Contributing Guide <../contributing/index>`.
 
 Next Steps
 ----------
