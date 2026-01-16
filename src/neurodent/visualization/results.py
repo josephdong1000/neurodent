@@ -3411,12 +3411,10 @@ class SpikeAnalysisResult(AnimalFeatureParser):
         self.metadata = metadata
         self.channel_names = channel_names
         self.assume_from_number = assume_from_number
-        with warnings.catch_warnings():
-            warnings.filterwarnings("once", message=".*does not match name aliases.*", category=UserWarning)
-            self.channel_abbrevs = [
-                core.parse_chname_to_abbrev(x, assume_from_number=assume_from_number)
-                for x in self.channel_names
-            ]
+        self.channel_abbrevs = [
+            core.parse_chname_to_abbrev(x, assume_from_number=assume_from_number)
+            for x in self.channel_names
+        ]
 
         logging.info(f"Channel names: \t{self.channel_names}")
         logging.info(f"Channel abbreviations: \t{self.channel_abbrevs}")
