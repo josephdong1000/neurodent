@@ -11,108 +11,24 @@ Based on: notebooks/examples/pipeline-alphadelta.py
 """
 
 import logging
-import sys
 from pathlib import Path
 from multiprocessing import Pool
 from tqdm import tqdm
-import numpy as np
 import pandas as pd
 
-from neurodent import visualization
+# Import the new zeitgeber module
+from neurodent.core import get_expanded_feature_names
+from neurodent.core.zeitgeber import _load_war_for_zeitgeber
+from neurodent.workflow import setup_snakemake_logging
 
 logger = logging.getLogger(__name__)
-
-
-def load_war_for_zeitgeber(war_path_info):
-    """
-    Load a fragment-filtered WAR and extract features for zeitgeber analysis
-
-    Args:
-        war_path_info: Tuple of (war_pkl_path, war_json_path, features_to_extract, animal_name)
-
-    Returns:
-        pd.DataFrame: Processed dataframe with zeitgeber features, or None if failed
-    """
-    war_pkl_path, war_json_path, features_to_extract, animal_name = war_path_info
-
-    try:
-        logger.info(f"Loading {animal_name}")
-
-        # Load fragment-filtered WAR using explicit PKL and JSON paths
-        war = visualization.WindowAnalysisResult.load_pickle_and_json(
-            folder_path=war_pkl_path.parent, pickle_name=war_pkl_path.name, json_name=war_json_path.name
-        )
-
-        # Channel standardization already done in fragment filtering step
-
-        # Extract features for zeitgeber analysis
-        df = war.get_result(features=features_to_extract)
-        df["animal"] = animal_name
-
-        # Clean up memory
-        del war
-
-        return df
-
-    except Exception as e:
-        logger.error(f"Failed to process {animal_name}: {str(e)}")
-        raise
-
-
-def process_alphadelta_features(df):
-    """
-    Process logpsdband features to create alphadelta ratio
-    (Implementation from pipeline-alphadelta.py)
-    """
-    logger.info("Processing alphadelta features")
-
-    # Extract band features - exactly as in pipeline-alphadelta.py
-    df_bands = pd.DataFrame(df["logpsdband"].tolist())
-    alpha_array = np.stack(df_bands["alpha"].values)
-    delta_array = np.stack(df_bands["delta"].values)
-    df["alphadelta"] = (alpha_array / delta_array).tolist()
-    df["delta"] = (delta_array).tolist()  # Note: matches original with extra parentheses
-    df["alpha"] = (alpha_array).tolist()
-
-    return df
-
-
-def average_features_across_channels(df, features):
-    """
-    Average each feature across channels
-    (Implementation from pipeline-alphadelta.py)
-    """
-    logger.info("Averaging features across channels")
-
-    for feature in features:
-        if feature in df.columns:
-            feature_arrays = np.stack(df[feature].values)  # Shape: (time_points, channels)
-            feature_avg = np.nanmean(feature_arrays, axis=1)  # Average across channels
-            df[f"{feature}"] = feature_avg
-
-    return df
-
-
-def convert_to_zeitgeber_time(df):
-    """
-    Convert timestamps to zeitgeber time representation
-    (Implementation from pipeline-alphadelta.py)
-    """
-    logger.info("Converting to zeitgeber time")
-
-    # Extract hour and minute from timestamp
-    df["hour"] = df["timestamp"].dt.hour.copy()
-    df["minute"] = df["timestamp"].dt.minute.copy()
-
-    # Create total_minutes representation (rounded to nearest hour)
-    df["total_minutes"] = 60 * (round((df["hour"] * 60 + df["minute"]) / 60) % 24)
-
-    return df
 
 
 def main():
     """Main zeitgeber feature extraction function"""
     global snakemake
+
+    setup_snakemake_logging(snakemake)
 
     # Get parameters from snakemake
     input_war_pkls = snakemake.input.war_pkl
@@ -165,17 +81,24 @@ def main():
 
     # Prepare war information for processing
     war_infos = []
+    # Configure pipeline for extraction:
+    # - shift_for_48h=False: We want canonical features here, not plotting data
+    # - interval_minutes: Ensure it matches what we want for aggregation
+    pipeline_config = zeitgeber_params.copy()
+    pipeline_config["shift_for_48h"] = False
+    
     for animal_name in sorted(pkl_animal_set):
         pkl_path = pkl_animals[animal_name]
         json_path = json_animals[animal_name]
-        war_infos.append((pkl_path, json_path, features_to_extract, animal_name))
+        war_infos.append((pkl_path, json_path, features_to_extract, animal_name, pipeline_config))
 
     # Process WARs to extract features (parallel processing)
     dfs = []
     if threads > 1:
         with Pool(threads) as pool:
+            # Use the new module function
             for df in tqdm(
-                pool.imap(load_war_for_zeitgeber, war_infos),
+                pool.imap(_load_war_for_zeitgeber, war_infos),
                 total=len(war_infos),
                 desc="Loading WARs for zeitgeber analysis",
             ):
@@ -184,7 +107,7 @@ def main():
     else:
         # Single-threaded processing
         for war_info in tqdm(war_infos, desc="Loading WARs for zeitgeber analysis"):
-            df = load_war_for_zeitgeber(war_info)
+            df = _load_war_for_zeitgeber(war_info)
             if df is not None:
                 dfs.append(df)
 
@@ -194,40 +117,66 @@ def main():
 
     logger.info(f"Successfully processed {len(dfs)} WARs")
 
-    # Concatenate all dataframes
+    # Concatenate all dataframes (already channel-averaged by get_channel_averaged_result())
     df = pd.concat(dfs, ignore_index=True)
     logger.info(f"Combined dataframe shape: {df.shape}")
 
-    # Process alphadelta features if logpsdband is in features
-    if "logpsdband" in features_to_extract:
-        df = process_alphadelta_features(df)
+    
+    # Expand features (e.g. logpsdband -> logpsdband_delta, etc.)
+    expanded_features = get_expanded_feature_names(features_to_extract)
+    
+    # Also include baseline-subtracted versions
+    expanded_features_nobase = [f"{f}_nobase" for f in expanded_features]
+    
+    # Combine and intersect with actual dataframe columns
+    expected_features = set(expanded_features + expanded_features_nobase)
+    feature_cols = [col for col in df.columns if col in expected_features]
+    
+    # Identify metadata columns as everything else
+    metadata_cols = [col for col in df.columns if col not in feature_cols]
 
-    # Define features to average across channels
-    features_to_average = []
-    if "logpsdband" in features_to_extract:
-        features_to_average.extend(["alphadelta", "delta", "alpha"])
-    if "logrms" in features_to_extract:
-        features_to_average.append("logrms")
-    if "zpcorr" in features_to_extract:
-        features_to_average.append("zpcorr")
+    logger.info(f"Total columns: {len(df.columns)}")
+    logger.info(f"Metadata columns ({len(metadata_cols)}): {metadata_cols}")
+    logger.info(f"Feature columns ({len(feature_cols)}): {feature_cols}")
 
-    # Average features across channels
-    df = average_features_across_channels(df, features_to_average)
+    # Log column dtypes to catch any non-numeric issues
+    logger.info("Column dtypes before aggregation:")
+    for col in feature_cols:
+        if col in df.columns:
+            logger.info(f"  {col}: {df[col].dtype}")
 
-    # Convert to zeitgeber time
-    df = convert_to_zeitgeber_time(df)
-
-    # Select final columns (following alphadelta pipeline)
-    final_columns = ["timestamp", "animal", "genotype", "hour", "minute", "total_minutes"]
-    final_columns.extend(features_to_average)
+    # Select final columns (only keep those that exist in dataframe)
+    final_columns = [col for col in metadata_cols + feature_cols if col in df.columns]
     df = df[final_columns]
 
     # Aggregate by time windows (following alphadelta pipeline)
     logger.info("Aggregating by time windows")
-    agg_dict = {feature: "mean" for feature in features_to_average}
-    df = df.groupby(["animal", "genotype", "total_minutes"]).agg(agg_dict).reset_index()
+    
+    # Only aggregate numeric feature columns (double check)
+    numeric_feature_cols = df[feature_cols].select_dtypes(include=[int, float]).columns.tolist()
+    agg_dict = {feature: "mean" for feature in numeric_feature_cols}
 
-    logger.info(f"Final aggregated dataframe shape: {df.shape}")
+    try:
+        # Group by all metadata columns present (except those that vary per row like timestamp/minute if we are binning)
+        # We want to group by: animal, genotype, sex, gene, total_minutes
+        # And potentially other static metadata.
+        # However, 'total_minutes' is the binning key.
+        
+        # Define grouping columns based on what's available and what should be grouped
+        # We want to keep animal-level metadata and the time bin.
+        potential_group_cols = ["animal", "genotype", "sex", "gene", "total_minutes"]
+        group_cols = [c for c in potential_group_cols if c in df.columns]
+        
+        df = df.groupby(group_cols).agg(agg_dict).reset_index()
+        logger.info(f"✓ Aggregation successful! Aggregated dataframe shape: {df.shape}")
+    except Exception as e:
+        logger.error(f"✗ Aggregation failed with error: {str(e)}")
+        logger.error(f"Feature columns being aggregated: {numeric_feature_cols}")
+        logger.error("Sample values from first row:")
+        for col in numeric_feature_cols:
+            if col in df.columns:
+                logger.error(f"  {col}: {df[col].iloc[0]} (type: {type(df[col].iloc[0])})")
+        raise
 
     # Create output directory
     output_dir = Path(output_pkl).parent
@@ -241,9 +190,4 @@ def main():
 
 
 if __name__ == "__main__":
-    with open(snakemake.log[0], "w") as f:
-        sys.stderr = sys.stdout = f
-        logging.basicConfig(
-            format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO, stream=sys.stdout, force=True
-        )
-        main()
+    main()

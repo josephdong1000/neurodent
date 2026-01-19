@@ -317,6 +317,60 @@ def parse_truncate(truncate: int | bool) -> int:
         raise ValueError(f"Invalid truncate value: {truncate}")
 
 
+def get_feature_label(feature_name: str) -> str:
+    """
+    Convert a feature column name to a human-readable label.
+    
+    Handles:
+    - Base features: "rms" -> "RMS"
+    - Banded features: "logpsdband_delta" -> "Log Band Power - Delta"
+    - Baseline-subtracted: "logrms_nobase" -> "Log(RMS) - Baseline"
+    
+    Args:
+        feature_name: Column name (e.g., "logpsdband_delta_nobase")
+    
+    Returns:
+        Human-readable label. Falls back to the original name if not found.
+    
+    Examples:
+        >>> get_feature_label("logpsdband_delta")
+        'Log Band Power (Delta)'
+        >>> get_feature_label("alphadelta")
+        'Alpha/Delta Ratio'
+        >>> get_feature_label("logrms_nobase")
+        'Log(RMS) - Baseline'
+    """
+    # Check for _nobase suffix
+    is_baseline_subtracted = feature_name.endswith("_nobase")
+    if is_baseline_subtracted:
+        feature_name = feature_name[:-7]  # Remove "_nobase"
+    
+    # Check for band suffix (only for banded/matrix features)
+    band_name = None
+    base_feature = feature_name
+    
+    # Only check for band suffix if the base is a known banded feature
+    for band in constants.BAND_NAMES:
+        if feature_name.endswith(f"_{band}"):
+            potential_base = feature_name[: -(len(band) + 1)]
+            if potential_base in constants.BAND_FEATURES or potential_base in constants.MATRIX_FEATURES:
+                base_feature = potential_base
+                band_name = band
+                break
+    
+    # Look up base label
+    base_label = constants.FEATURE_LABELS.get(base_feature, feature_name)
+    
+    # Build final label
+    label = base_label
+    if band_name:
+        label = f"{label} ({band_name.capitalize()})"
+    if is_baseline_subtracted:
+        label = f"{label} - Baseline"
+    
+    return label
+
+
 def nanaverage(A: np.ndarray, weights: np.ndarray, axis: int = -1) -> np.ndarray:
     """
     Compute weighted average of an array, ignoring NaN values.
@@ -729,7 +783,12 @@ def parse_chname_to_abbrev(channel_name: str, assume_from_number=False, strict_m
         chname = _get_key_from_match_values(channel_name, constants.CHNAME_ALIASES, strict_matching)
     except ValueError as e:
         if assume_from_number:
-            logging.warning(f"{channel_name} does not match name aliases. Assuming alias from number in channel name.")
+            logging.debug(f"Channel '{channel_name}' does not match name aliases. Attempting to assume from number.")
+            warnings.warn(
+                "One or more channels do not match name aliases. Assuming alias from number in channel name.",
+                UserWarning,
+                stacklevel=2
+            )
             nums = re.findall(r"\d+", channel_name)
 
             if not nums:

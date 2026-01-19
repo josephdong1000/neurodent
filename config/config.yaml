@@ -45,30 +45,6 @@ analysis:
       vote_k: 2                    # minimum votes required across frequency bands
       smooth_len: 5                # SNEO smoothing window length
 
-    # Parameter grid for systematic testing (optional)
-    parameter_grid:
-      - bp: [3, 40]
-        notch: 60
-        notch_q: 30
-        freq_slices: [10, 20]
-        sneo_percentile: 99.99
-        cluster_gap_ms: 80
-        label: "bp3-40_fs10-20_p99.99"
-      - bp: [3, 40]
-        notch: 60
-        notch_q: 30
-        freq_slices: [15, 20]
-        sneo_percentile: 99.99
-        cluster_gap_ms: 80
-        label: "bp3-40_fs15-20_p99.99"
-      - bp: [3, 40]
-        notch: 60
-        notch_q: 30
-        freq_slices: [15, 25]
-        sneo_percentile: 99.99
-        cluster_gap_ms: 80
-        label: "bp3-40_fs15-25_p99.99"
-
     # Processing parameters
     multiprocess_mode: "serial"    # "dask" or "serial"
 
@@ -118,13 +94,14 @@ analysis:
 
   # Zeitgeber time processing parameters
   zeitgeber:
-    features: ["logpsdband", "logrms", "zpcorr"]  # Features to extract for zeitgeber analysis
+    features: ["logpsdband", "logpsdfrac", "logrms", "zpcorr", "zcohere", "zimcoh"]  # Features to extract for zeitgeber analysis
     time_aggregation_minutes: 60  # Time window for aggregation (60 = hourly)
 
   # Zeitgeber temporal plots parameters
   zeitgeber_plots:
-    features: ["logpsdband", "logrms", "zpcorr"]  # Features to plot in temporal analysis
+    features: ["logpsdband", "logpsdfrac", "logrms", "zpcorr", "zcohere", "zimcoh"]  # Features to plot in temporal analysis
     baseline_hours: 12  # Hours to use for baseline correction (first N hours)
+    exclude_from_baseline: []  # Optional: features to exclude from baseline correction (e.g., ["logrms", "zcohere_delta"])
     figure_format: "png"  # Figure output format: png, tif, pdf, svg
     data_format: "csv"    # Data export format: csv, pkl
     dpi: 300             # Figure resolution
@@ -223,6 +200,7 @@ cluster:
     nodes: 1
     threads: 10
     interface: null
+    retries: 2
 
   frequency_domain_spike_detection:
     time: "2h"
@@ -230,6 +208,7 @@ cluster:
     nodes: 1
     threads: 8
     interface: null
+    retries: 2
 
   spike_averaged_traces:
     time: "1h"
@@ -237,6 +216,7 @@ cluster:
     nodes: 1
     threads: 4
     interface: null
+    retries: 2
 
   war_quality_filter:
     time: "2h"
@@ -244,6 +224,7 @@ cluster:
     nodes: 1
     threads: 1
     interface: null
+    retries: 0
 
   diagnostic_figures:
     time: "2h"
@@ -251,6 +232,7 @@ cluster:
     nodes: 1
     threads: 4
     interface: null
+    retries: 1
 
   war_fragment_filter:
     time: "2h"
@@ -258,6 +240,7 @@ cluster:
     nodes: 1
     threads: 1
     interface: null
+    retries: 2
 
   war_flattening:
     time: "2h"
@@ -265,6 +248,7 @@ cluster:
     nodes: 1
     threads: 1
     interface: null
+    retries: 2
 
   war_zeitgeber:
     time: "2h"
@@ -272,6 +256,7 @@ cluster:
     nodes: 1
     threads: 15
     interface: null
+    retries: 0
 
   relfreq_plots:
     time: "2h"
@@ -279,6 +264,7 @@ cluster:
     nodes: 1
     threads: 15
     interface: null
+    retries: 1
 
   ep_figures:
     time: "2h"
@@ -286,6 +272,7 @@ cluster:
     nodes: 1
     threads: 4
     interface: null
+    retries: 0
 
   ep_heatmaps:
     time: "2h"
@@ -293,6 +280,7 @@ cluster:
     nodes: 1
     threads: 4
     interface: null
+    retries: 0
 
   zeitgeber_plots:
     time: "2h"
@@ -300,6 +288,7 @@ cluster:
     nodes: 1
     threads: 4
     interface: null
+    retries: 2
 
   lof_evaluation:
     time: "2h"
@@ -307,6 +296,7 @@ cluster:
     nodes: 1
     threads: 4
     interface: null
+    retries: 0
 
   notebook:
     time: "1h"
@@ -314,6 +304,7 @@ cluster:
     nodes: 1
     threads: 4
     interface: null
+    retries: 1
 
   war_standardize:
     time: "1h"
@@ -321,6 +312,7 @@ cluster:
     nodes: 1
     threads: 1
     interface: null
+    retries: 2
 
   war_channel_filtering:
     time: "1h"
@@ -328,6 +320,7 @@ cluster:
     nodes: 1
     threads: 1
     interface: null
+    retries: 2
 
   filtering_comparison:
     time: "1h"
@@ -335,6 +328,7 @@ cluster:
     nodes: 1
     threads: 4
     interface: null
+    retries: 0
 
 # Logging configuration
 logging:

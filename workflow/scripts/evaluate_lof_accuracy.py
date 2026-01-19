@@ -12,7 +12,6 @@ Output: F-score vs threshold analysis with CSV results and plot
 """
 
 import logging
-import sys
 from pathlib import Path
 import numpy as np
 import pandas as pd
@@ -20,6 +19,7 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import f1_score, precision_score, recall_score
 
 from neurodent import visualization, core
+from neurodent.workflow import setup_snakemake_logging
 
 
 def get_ground_truth_bad_channels(samples_config, animal_folder, animal_id):
@@ -333,6 +333,9 @@ def main():
 
     # Get parameters from snakemake
     global snakemake
+
+    setup_snakemake_logging(snakemake)
+
     war_pkl_files = snakemake.input.war_pkls
     war_json_files = snakemake.input.war_jsons
     samples_config = snakemake.params.samples_config
@@ -426,9 +429,4 @@ def main():
 
 
 if __name__ == "__main__":
-    with open(snakemake.log[0], "w") as f:
-        sys.stderr = sys.stdout = f
-        logging.basicConfig(
-            format="%(asctime)s - %(levelname)s - %(message)s", level=logging.DEBUG, stream=sys.stdout, force=True
-        )
-        main()
+    main()

@@ -26,12 +26,14 @@ rule evaluate_lof_accuracy:
         animal_id_map=lambda wildcards: {animal: get_animal_id(type('', (), {'animal': animal})) for animal in ANIMALS},
     threads:
         config["cluster"]["lof_evaluation"]["threads"]
-    retries: 0
+    retries:
+        config["cluster"]["lof_evaluation"]["retries"]
     resources:
         time=config["cluster"]["lof_evaluation"]["time"],
         mem_mb=increment_memory(config["cluster"]["lof_evaluation"]["mem_mb"]),
         nodes=config["cluster"]["lof_evaluation"]["nodes"],
     log:
-        "logs/lof_evaluation/evaluate_lof_accuracy.log",
+        stdout="logs/lof_evaluation/evaluate_lof_accuracy.stdout",
+        stderr="logs/lof_evaluation/evaluate_lof_accuracy.stderr",
     script:
         "../scripts/evaluate_lof_accuracy.py"

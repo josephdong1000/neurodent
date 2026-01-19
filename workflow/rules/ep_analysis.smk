@@ -22,13 +22,15 @@ rule generate_ep_figures:
         config=config,
     threads:
         config["cluster"]["ep_figures"]["threads"]
-    retries: 0
+    retries:
+        config["cluster"]["ep_figures"]["retries"]
     resources:
         time=config["cluster"]["ep_figures"]["time"],
         mem_mb=increment_memory(config["cluster"]["ep_figures"]["mem_mb"]),
         nodes=config["cluster"]["ep_figures"]["nodes"],
     log:
-        "logs/ep_analysis/generate_ep_figures.log",
+        stdout="logs/ep_analysis/generate_ep_figures.stdout",
+        stderr="logs/ep_analysis/generate_ep_figures.stderr",
     script:
         "../scripts/generate_ep_figures.py"
 
@@ -49,12 +51,14 @@ rule generate_ep_heatmaps:
         config=config,
     threads:
         config["cluster"]["ep_heatmaps"]["threads"]
-    retries: 0
+    retries:
+        config["cluster"]["ep_heatmaps"]["retries"]
     resources:
         time=config["cluster"]["ep_heatmaps"]["time"],
         mem_mb=increment_memory(config["cluster"]["ep_heatmaps"]["mem_mb"]),
         nodes=config["cluster"]["ep_heatmaps"]["nodes"],
     log:
-        "logs/ep_analysis/generate_ep_heatmaps.log",
+        stdout="logs/ep_analysis/generate_ep_heatmaps.stdout",
+        stderr="logs/ep_analysis/generate_ep_heatmaps.stderr",
     script:
         "../scripts/generate_ep_heatmaps.py"

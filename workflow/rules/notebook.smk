@@ -21,10 +21,11 @@ rule war_explorer_notebook:
         # Executed notebook with embedded outputs
         notebook="results/notebooks/war_data_explorer.ipynb"
     log:
-        # Log file for notebook execution
-        "logs/notebooks/war_data_explorer.log"
+        stdout="logs/notebooks/war_data_explorer.stdout",
+        stderr="logs/notebooks/war_data_explorer.stderr"
     threads: config["cluster"]["notebook"]["threads"]
-    retries: 1
+    retries:
+        config["cluster"]["notebook"]["retries"]
     params:
         # Pass configuration for resource allocation
         config=config,

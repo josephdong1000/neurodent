@@ -27,11 +27,14 @@ rule make_war:
         samples_config=samples_config,
         config=config,
     threads: config["cluster"]["war_generation"]["threads"]
+    retries:
+        config["cluster"]["war_generation"]["retries"]
     resources:
         time=config["cluster"]["war_generation"]["time"],
         mem_mb=increment_memory(config["cluster"]["war_generation"]["mem_mb"]),
         nodes=config["cluster"]["war_generation"]["nodes"],
     log:
-        "logs/war_generation/{animal}.log",
+        stdout="logs/war_generation/{animal}.stdout",
+        stderr="logs/war_generation/{animal}.stderr",
     script:
         "../scripts/generate_wars.py"
