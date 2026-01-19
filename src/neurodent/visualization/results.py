@@ -1262,6 +1262,276 @@ class AnimalOrganizer(AnimalFeatureParser):
                 raise AttributeError(f"Invalid function {func}")
         return row
 
+    @classmethod
+    def from_lros(
+        cls,
+        lros: list[core.LongRecordingOrganizer],
+        animal_id: str,
+        genotype: str = "Unknown",
+        assume_from_number: bool = False,
+    ) -> "AnimalOrganizer":
+        """
+        Create an AnimalOrganizer from an existing list of LongRecordingOrganizer objects.
+
+        This factory method bypasses the normal folder discovery logic and creates
+        an AnimalOrganizer directly from pre-existing LROs. Useful for creating
+        child AOs after splitting multi-animal recordings.
+
+        Args:
+            lros (list[LongRecordingOrganizer]): List of LRO instances to wrap.
+            animal_id (str): Animal identifier for this organizer.
+            genotype (str, optional): Genotype string. Defaults to "Unknown".
+            assume_from_number (bool, optional): Whether to assume channel aliases
+                from numbers. Defaults to False.
+
+        Returns:
+            AnimalOrganizer: A new AnimalOrganizer instance wrapping the provided LROs.
+
+        Raises:
+            ValueError: If lros is empty or channel names are inconsistent.
+
+        Example:
+            >>> # After splitting a multi-animal recording
+            >>> splits = parent_lro.split({"AnimalA": ["Ch0", "Ch1"]})
+            >>> child_lros = [splits["AnimalA"] for _ in parent_ao.long_recordings]
+            >>> child_ao = AnimalOrganizer.from_lros(child_lros, animal_id="AnimalA")
+        """
+        if not lros:
+            raise ValueError("Cannot create AnimalOrganizer from empty LRO list")
+
+        # Create instance without calling __init__
+        ao = object.__new__(cls)
+
+        # Core attributes
+        ao.long_recordings = lros
+        ao.anim_id = animal_id
+        ao.animal_id = animal_id
+        ao.genotype = genotype
+        ao.assume_from_number = assume_from_number
+
+        # Validate and reconcile channel names across all LROs
+        ao.channel_names = cls._validate_channel_names(lros)
+
+        # Generate animaldays from LROs
+        ao.unique_animaldays = []
+        ao.animaldays = []
+        for i, lro in enumerate(lros):
+            if hasattr(lro, "base_folder_path") and lro.base_folder_path:
+                animalday = f"{animal_id}_{Path(lro.base_folder_path).name}"
+            else:
+                animalday = f"{animal_id}_day{i}"
+            ao.unique_animaldays.append(animalday)
+            ao.animaldays.append(animalday)
+
+        # Initialize default attributes for factory-created instances
+        cls._init_factory_defaults(ao, animal_id, lros)
+
+        logging.info(
+            f"Created AnimalOrganizer from {len(lros)} LROs for animal '{animal_id}'"
+        )
+
+        return ao
+
+    @staticmethod
+    def _validate_channel_names(lros: list[core.LongRecordingOrganizer]) -> list[str]:
+        """
+        Validate that all LROs have consistent channel names.
+
+        If channel names are the same but in different order, the first LRO's
+        order is used as reference.
+
+        Args:
+            lros: List of LROs to validate.
+
+        Returns:
+            list[str]: The canonical channel names.
+
+        Raises:
+            ValueError: If LROs have different channel sets.
+        """
+        if not lros:
+            return []
+
+        first_names = lros[0].channel_names if lros[0].channel_names else []
+        if not first_names:
+            return []
+
+        reference_set = set(first_names)
+
+        for i, lro in enumerate(lros[1:], start=1):
+            current_names = lro.channel_names if lro.channel_names else []
+            current_set = set(current_names)
+
+            if current_set != reference_set:
+                missing = reference_set - current_set
+                extra = current_set - reference_set
+                raise ValueError(
+                    f"LRO {i} has inconsistent channel names. "
+                    f"Missing: {missing}, Extra: {extra}"
+                )
+
+            # If same channels but different order, log a warning
+            if current_names != first_names:
+                logging.warning(
+                    f"LRO {i} has channels in different order, using reference order"
+                )
+
+        return first_names
+
+    @staticmethod
+    def _init_factory_defaults(
+        ao: "AnimalOrganizer", animal_id: str, lros: list[core.LongRecordingOrganizer]
+    ) -> None:
+        """
+        Initialize attribute values for factory-created instances.
+
+        Derives values from the provided LROs where possible instead of
+        leaving attributes empty.
+
+        Args:
+            ao: The AnimalOrganizer instance to initialize.
+            animal_id: The animal identifier.
+            lros: The LROs to derive metadata from.
+        """
+        # Derive folder metadata from LROs where available
+        ao._bin_folders = [
+            str(lro.base_folder_path)
+            for lro in lros
+            if hasattr(lro, "base_folder_path") and lro.base_folder_path
+        ]
+        ao.bin_folder_names = [
+            Path(lro.base_folder_path).name
+            for lro in lros
+            if hasattr(lro, "base_folder_path") and lro.base_folder_path
+        ]
+
+        # Set base_folder_path to common parent if all LROs share one
+        if ao._bin_folders:
+            parents = [Path(f).parent for f in ao._bin_folders]
+            if len(set(parents)) == 1:
+                ao.base_folder_path = parents[0]
+            else:
+                ao.base_folder_path = None  # No common parent
+        else:
+            ao.base_folder_path = None
+
+        # Standard attributes
+        ao.animal_param = [animal_id]
+        ao.day_sep = None
+        ao.read_mode = "base"
+
+        # Internal cache - not derivable, but private
+        ao._animalday_dicts = []
+        ao._animalday_folder_groups = {}
+        ao._processed_timestamps = None
+
+        # These are output containers, start empty
+        ao.bad_channels_dict = {}
+        ao.features_df = pd.DataFrame()
+        ao.features_avg_df = pd.DataFrame()
+
+
+    def split(
+        self,
+        groups: dict[str, list[str]],
+        persist_base: Union[str, Path] = None,
+        format: Literal["zarr", "binary"] = "zarr",
+    ) -> dict[str, "AnimalOrganizer"]:
+        """
+        Split this multi-animal AnimalOrganizer into per-animal AnimalOrganizers.
+
+        For each group (animal), this method:
+        1. Iterates over all LROs in this AnimalOrganizer
+        2. Calls LRO.split() on each to extract the specified channels
+        3. Optionally persists each split LRO to disk
+        4. Creates a new AnimalOrganizer for each group
+
+        This enables processing of joint-animal recordings where multiple animals
+        are recorded on different channels of the same files.
+
+        Args:
+            groups (dict[str, list[str]]): Dictionary mapping group names (animal IDs)
+                to lists of channel names. Example:
+                {"AnimalA": ["Ch0", "Ch1", "Ch2", "Ch3"],
+                 "AnimalB": ["Ch4", "Ch5", "Ch6", "Ch7"]}
+            persist_base (Union[str, Path], optional): Base directory for persisting
+                split recordings. If None, LROs remain in-memory. Structure:
+                persist_base/
+                    AnimalA/
+                        day1.zarr
+                        day2.zarr
+                    AnimalB/
+                        ...
+            format (Literal["zarr", "binary"], optional): Format for persisted
+                recordings. Defaults to "zarr".
+
+        Returns:
+            dict[str, AnimalOrganizer]: Dictionary mapping group names to new
+                AnimalOrganizer instances.
+
+        Raises:
+            ValueError: If requested channels are not found in recordings.
+
+        Example:
+            >>> ao = AnimalOrganizer("/path/to/joint_data", "combined")
+            >>> splits = ao.split(
+            ...     groups={"MouseA": ["Ch0", "Ch1"], "MouseB": ["Ch2", "Ch3"]},
+            ...     persist_base="/output/split_data",
+            ... )
+            >>> war_a = splits["MouseA"].compute_windowed_analysis(["all"])
+            >>> war_b = splits["MouseB"].compute_windowed_analysis(["all"])
+        """
+        if not self.long_recordings:
+            raise ValueError("No recordings loaded to split")
+
+        if persist_base is not None:
+            persist_base = Path(persist_base)
+            persist_base.mkdir(parents=True, exist_ok=True)
+
+        result = {}
+
+        for group_name, channels in groups.items():
+            logging.info(
+                f"Splitting group '{group_name}' with {len(channels)} channels "
+                f"across {len(self.long_recordings)} days"
+            )
+
+            child_lros = []
+            for i, lro in enumerate(self.long_recordings):
+                # Split this day's LRO
+                day_splits = lro.split({group_name: channels})
+                child_lro = day_splits[group_name]
+
+                # Persist if requested
+                if persist_base is not None:
+                    # Determine day folder name
+                    if hasattr(lro, "base_folder_path") and lro.base_folder_path:
+                        day_name = Path(lro.base_folder_path).name
+                    else:
+                        day_name = f"day{i}"
+
+                    output_dir = persist_base / group_name / day_name
+                    child_lro.persist(output_dir, format=format)
+                    logging.debug(f"Persisted {group_name}/{day_name} to {output_dir}")
+
+                child_lros.append(child_lro)
+
+            # Create AnimalOrganizer from the split LROs
+            child_ao = AnimalOrganizer.from_lros(
+                lros=child_lros,
+                animal_id=group_name,
+                genotype=self.genotype,
+                assume_from_number=self.assume_from_number,
+            )
+
+            result[group_name] = child_ao
+            logging.info(
+                f"Created AnimalOrganizer for '{group_name}' with "
+                f"{len(child_lros)} days, {len(channels)} channels"
+            )
+
+        return result
+
 
 def _sanitize_feature_request(features: list[str], exclude: list[str] = []):
     """
