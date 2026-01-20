@@ -19,12 +19,22 @@ analysis:
   # WAR generation parameters
   war_generation:
     mode: "nest"
+    day_sep: null  # Separator character for parsing animal/day from folder names
     assume_from_number: true
     skip_days: ["bad"]
     lro_kwargs:
       mode: "bin"
       multiprocess_mode: "dask"
       overwrite_rowbins: false
+
+  # Joint recording splitting parameters
+  split_recordings:
+    mode: "nest"
+    day_sep: null
+    assume_from_number: true
+    lro_kwargs:
+      mode: "bin"
+    output_format: "zarr"  # zarr or binary
 
   # Frequency domain spike detection parameters
   frequency_domain_spike_detection:

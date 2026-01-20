@@ -11,8 +11,7 @@ Usage (via Snakemake):
     - snakemake.params.session: Session folder name
     - snakemake.params.joint_config: Channel mapping dict
     - snakemake.params.data_parent: Parent data folder
-    - snakemake.params.ao_mode: AnimalOrganizer mode
-    - snakemake.params.lro_kwargs: LRO initialization kwargs
+    - snakemake.params.split_config: AO/LRO configuration dict
     - snakemake.output[0]: Output directory
 """
 
@@ -32,8 +31,7 @@ def main():
     session = snakemake.params.session
     joint_config = snakemake.params.joint_config
     data_parent = snakemake.params.data_parent
-    ao_mode = snakemake.params.ao_mode
-    lro_kwargs = snakemake.params.lro_kwargs
+    split_config = snakemake.params.split_config
     output_base = Path(snakemake.output[0])
     
     logger.info(f"Splitting joint session: {session}")
@@ -53,18 +51,21 @@ def main():
     ao = AnimalOrganizer(
         base_folder_path=session_folder,
         anim_id="joint",
-        mode=ao_mode,
-        lro_kwargs=lro_kwargs,
+        mode=split_config["mode"],
+        day_sep=split_config.get("day_sep"),
+        assume_from_number=split_config.get("assume_from_number", True),
+        lro_kwargs=split_config.get("lro_kwargs", {}),
     )
     
     logger.info(f"Loaded {len(ao.long_recordings)} days of recordings")
     logger.info(f"Channels: {ao.channel_names}")
     
     # Split by channel groups
+    output_format = split_config.get("output_format", "zarr")
     splits = ao.split(
         groups=joint_config,
         persist_base=output_base,
-        format="zarr",
+        format=output_format,
     )
     
     logger.info(f"Split into {len(splits)} animals:")

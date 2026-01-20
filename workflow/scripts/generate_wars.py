@@ -73,6 +73,7 @@ def generate_war_for_animal(samples_config, config, animal_folder, animal_id, lo
                 data_parent_folder / animal_folder,
                 animal_id,
                 mode=analysis_config["mode"],
+                day_sep=analysis_config.get("day_sep"),
                 assume_from_number=analysis_config["assume_from_number"],
                 skip_days=analysis_config["skip_days"],
                 lro_kwargs=lro_kwargs,

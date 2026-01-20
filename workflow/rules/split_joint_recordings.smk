@@ -46,8 +46,7 @@ rule split_joint_recordings:
         session=lambda wc: wc.session,
         joint_config=lambda wc: samples_config["joint_sessions"][wc.session],
         data_parent=samples_config["data_parent_folder"],
-        ao_mode=config["analysis"]["war_generation"].get("mode", "nest"),
-        lro_kwargs=config["analysis"]["war_generation"].get("lro_kwargs", {}),
+        split_config=config["analysis"]["split_recordings"],
     threads: config["cluster"]["split_joint_recordings"]["threads"]
     resources:
         time=config["cluster"]["split_joint_recordings"]["time"],
