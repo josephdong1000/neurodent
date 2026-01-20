@@ -21,11 +21,14 @@ rule generate_zeitgeber_plots:
         config=config,
     threads:
         config["cluster"]["zeitgeber_plots"]["threads"]
+    retries:
+        config["cluster"]["zeitgeber_plots"]["retries"]
     resources:
         time=config["cluster"]["zeitgeber_plots"]["time"],
         mem_mb=increment_memory(config["cluster"]["zeitgeber_plots"]["mem_mb"]),
         nodes=config["cluster"]["zeitgeber_plots"]["nodes"],
     log:
-        "logs/zeitgeber_analysis/generate_zeitgeber_plots.log",
+        stdout="logs/zeitgeber_analysis/generate_zeitgeber_plots.stdout",
+        stderr="logs/zeitgeber_analysis/generate_zeitgeber_plots.stderr",
     script:
         "../scripts/generate_zeitgeber_plots.py"

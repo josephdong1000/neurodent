@@ -8,24 +8,33 @@ Modules
 
 Core Module
 ~~~~~~~~~~~
-The core module provides the fundamental classes for loading, organizing, and analyzing EEG data.
+
+.. automodule:: neurodent.core
+   :no-members:
+   :no-index:
 
 .. currentmodule:: neurodent.core
 .. include:: core/_summary.rst
 
 Visualization Module
 ~~~~~~~~~~~~~~~~~~~~
-The visualization module provides classes for organizing analysis results and creating plots.
+
+.. automodule:: neurodent.visualization
+   :no-members:
+   :no-index:
 
 .. currentmodule:: neurodent.visualization
 .. include:: visualization/_summary.rst
 
 Constants
 ~~~~~~~~~
-This module defines constants used throughout NeuRodent for feature names, frequency bands, and other configuration values.
+
+.. automodule:: neurodent.constants
+   :no-members:
+   :no-index:
 
 .. currentmodule:: neurodent.constants
-.. include:: constants_summary.rst
+.. include:: constants/_summary.rst
 
 .. toctree::
    :maxdepth: 2
@@ -33,4 +42,4 @@ This module defines constants used throughout NeuRodent for feature names, frequ
 
    core/index
    visualization/index
-   constants
+   constants/index

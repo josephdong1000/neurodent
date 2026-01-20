@@ -1,64 +1,40 @@
 Contributing
 ============
 
-We welcome contributions to NeuRodent! This guide will help you get started with developing and contributing to the project.
+We welcome contributions to NeuRodent! This guide will help you get started.
 
-Development Setup
------------------
+.. toctree::
+   :maxdepth: 1
+   :hidden:
 
-We recommend using `uv <https://docs.astral.sh/uv/>`_ for managing the development environment:
+   setup
+   testing
+
+Quick Start
+-----------
 
 .. code-block:: bash
 
-   # Clone the repository
    git clone https://github.com/josephdong1000/neurodent.git
    cd neurodent
+   make setup  # Requires uv
 
-   # Install with development dependencies
-   uv sync --all-groups
+.. grid:: 2
 
-Running Tests
--------------
+   .. grid-item-card:: :octicon:`tools` Setup Guide
+      :link: setup
+      :link-type: doc
 
-To run the test suite:
+      Environment setup, prerequisites, pre-commit hooks, and Makefile commands.
 
-.. code-block:: bash
+   .. grid-item-card:: :octicon:`beaker` Testing & Development
+      :link: testing
+      :link-type: doc
 
-   uv run pytest
-
-To run tests with coverage:
-
-.. code-block:: bash
-
-   uv run pytest --cov=neurodent
-
-Building Documentation
-----------------------
-
-To build the documentation locally:
-
-.. code-block:: bash
-
-   uv run sphinx-build -b html docs docs/_build/html
-
-For live-reloading during development:
-
-.. code-block:: bash
-
-   uv run sphinx-autobuild docs docs/_build/html
-
-Code Style
-----------
-
-We follow standard Python code style conventions:
-
-- Use `ruff` for code formatting and linting
-- Follow PEP 8 guidelines
-- Add type hints where appropriate
-- Write docstrings in NumPy style
+      Running tests, building documentation, and code style guidelines.
 
 Pull Request Process
----------------------
+--------------------
 
 1. Fork the repository and create a new branch for your feature or bug fix
 2. Make your changes and add tests if applicable
@@ -68,4 +44,4 @@ Pull Request Process
 Questions?
 ----------
 
-If you have questions about contributing, please open an issue on the `GitHub repository <https://github.com/josephdong1000/neurodent>`_.
+If you have questions, please open an issue on the `GitHub repository <https://github.com/josephdong1000/neurodent>`_.

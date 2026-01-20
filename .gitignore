@@ -54,4 +54,5 @@ results/
 CLAUDE.md
 
 docs/_build/
+docs/quickstart/output/
 **/generated/

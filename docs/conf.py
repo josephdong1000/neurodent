@@ -92,7 +92,6 @@ napoleon_attr_annotations = True
 autodoc_default_options = {
     "members": True,
     "member-order": "bysource",
-    "special-members": "__init__",
     "undoc-members": True,
     "exclude-members": "__weakref__",
 }
@@ -128,9 +127,10 @@ intersphinx_cache_limit = 5  # days - cache inventories
 intersphinx_disabled_reftypes = ["*"]
 
 # MyST-NB configuration (replaces nbsphinx)
-nb_execution_mode = "off"  # Don't execute notebooks during build
-nb_execution_allow_errors = False
+nb_execution_mode = "auto"  # Execute notebooks during build to generate figures
+nb_execution_allow_errors = False  # Stop at first error (shows successful cells before failure)
 nb_execution_timeout = 600  # 10 minutes timeout for notebook execution
+nb_merge_streams = True  # Consolidate stderr to help warning deduplication
 
 # Enable MyST extensions for notebooks
 myst_url_schemes = ["http", "https", "mailto"]
@@ -194,7 +194,7 @@ html_static_path = ["_static"]
 
 html_theme_options = {
     "github_url": "https://github.com/josephdong1000/neurodent",
-    "show_nav_level": 2,
+    "show_nav_level": 3,
     "navigation_depth": 4,
     "show_toc_level": 2,
     "navbar_align": "left",

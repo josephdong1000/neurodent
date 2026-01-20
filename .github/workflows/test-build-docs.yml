@@ -37,7 +37,7 @@ jobs:
         
     - name: Install package and dependencies
       run: |
-        uv sync --all-groups
+        uv sync --all-extras
         echo "Python version: $(uv run python --version)"
         echo "Installed packages:"
         uv pip list
@@ -119,7 +119,7 @@ jobs:
 
     - name: Install package and documentation dependencies
       run: |
-        uv sync --all-groups
+        uv sync --all-extras
 
     - name: Fetch all refs for sphinx-multiversion
       run: |
@@ -186,7 +186,7 @@ jobs:
   deploy-docs:
     name: Deploy Documentation
     runs-on: ubuntu-latest
-    needs: build-docs
+    needs: [build-docs, test]
     if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
 
     # Permissions needed for GitHub Pages deployment
