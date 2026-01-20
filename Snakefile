@@ -59,9 +59,34 @@ for folder, animals in samples_config["data_folders_to_animal_ids"].items():
         ANIMAL_TO_FOLDER_MAP[slugified_name] = (folder, animal)
         SLUGIFIED_TO_ORIGINAL[slugified_name] = combined_name
 
+# Build mapping for animals from joint sessions
+# These animals will have their data read from split output folders
+JOINT_ANIMAL_TO_SESSION = {}  # Maps slugified animal name -> (session, original_animal_id)
+
+for session, animals_dict in samples_config.get("joint_sessions", {}).items():
+    for animal_id in animals_dict.keys():
+        combined_name = f"{session} {animal_id}"
+        slugified_name = slugify(combined_name, allow_unicode=True)
+        
+        JOINT_ANIMAL_TO_SESSION[slugified_name] = (session, animal_id)
+        
+        # Also add to ANIMALS list if not already present
+        if slugified_name not in ANIMALS:
+            ANIMALS.append(slugified_name)
+            ANIMAL_TO_FOLDER_MAP[slugified_name] = (session, animal_id)
+            SLUGIFIED_TO_ORIGINAL[slugified_name] = combined_name
+
 
 def get_animal_folder(wildcards):
-    """Get the data folder for an animal from the combined name"""
+    """Get the data folder for an animal from the combined name.
+    
+    For animals from joint sessions, returns the split output folder.
+    For regular animals, returns the original data folder.
+    """
+    # Check if this animal comes from a joint session
+    if wildcards.animal in JOINT_ANIMAL_TO_SESSION:
+        session, animal_id = JOINT_ANIMAL_TO_SESSION[wildcards.animal]
+        return f"results/split_recordings/{session}/{animal_id}"
     return ANIMAL_TO_FOLDER_MAP[wildcards.animal][0]
 
 
@@ -206,6 +231,7 @@ include: "workflow/rules/ep_analysis.smk"
 include: "workflow/rules/lof_evaluation.smk"
 include: "workflow/rules/filtering_comparison.smk"
 include: "workflow/rules/notebook.smk"
+include: "workflow/rules/split_joint_recordings.smk"
 
 
 rule all:

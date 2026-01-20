@@ -61,13 +61,21 @@ def generate_war_for_animal(samples_config, config, animal_folder, animal_id, lo
 
             # Create AnimalOrganizer
             analysis_config = config["analysis"]["war_generation"]
+            
+            # Check if this is a split recording (saved as zarr)
+            # Split recordings need mode="si" to use load_extractor for zarr
+            lro_kwargs = dict(analysis_config.get("lro_kwargs", {}))
+            if snakemake.params.is_split_recording:
+                lro_kwargs["mode"] = "si"  # Override to read zarr via load_extractor
+                logger.info(f"Detected split recording, using mode='si' for zarr loading")
+            
             ao = visualization.AnimalOrganizer(
                 data_parent_folder / animal_folder,
                 animal_id,
                 mode=analysis_config["mode"],
                 assume_from_number=analysis_config["assume_from_number"],
                 skip_days=analysis_config["skip_days"],
-                lro_kwargs=analysis_config["lro_kwargs"],
+                lro_kwargs=lro_kwargs,
             )
 
             # Compute bad channels

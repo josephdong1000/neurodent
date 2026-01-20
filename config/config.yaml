@@ -200,6 +200,14 @@ cluster:
     interface: null
     retries: 2
 
+  split_joint_recordings:
+    time: "3h"
+    mem_mb: 70_000
+    nodes: 1
+    threads: 4
+    interface: null
+    retries: 2
+
   frequency_domain_spike_detection:
     time: "2h"
     mem_mb: 40_000
