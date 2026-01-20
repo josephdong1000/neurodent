@@ -273,7 +273,7 @@ rule dag:
 # Configuration validation
 # FIXME better to define in a json/yaml schema
 def validate_config():
-    required_keys = ["base_folder", "data_parent_folder", "temp_directory"]
+    required_keys = ["temp_directory"]  # base_folder and data_parent_folder now in samples.json
     for key in required_keys:
         if key not in config:
             raise ValueError(f"Missing required config key: {key}")

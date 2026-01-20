@@ -35,7 +35,6 @@ def generate_war_for_animal(samples_config, config, animal_folder, animal_id, lo
     """Generate WAR for a specific animal"""
 
     # Set up paths and parameters
-    base_folder = Path(config["base_folder"])
     data_parent_folder = Path(samples_config["data_parent_folder"])
 
     # Set temp directory
