@@ -15,6 +15,7 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.colors import TwoSlopeNorm
 import seaborn as sns
 from scipy import stats
 from sklearn.metrics import mean_squared_error
@@ -644,7 +645,6 @@ def generate_channel_impact_analysis(manual_ep, lof_ep, features, output_dir, ha
         logging.info("Step 5: Creating three versions of the heatmap")
 
         # Create three versions: absolute differences, z-score-like, and log2 fold-change
-        from matplotlib.colors import TwoSlopeNorm
 
         versions = [
             ("absolute", "Absolute Differences (LOF - Manual)", group_diff),
