@@ -132,6 +132,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         assume_from_number=False,
         skip_days: list[str] = [],
         truncate: bool | int = False,
+        file_pattern: str | None = None,
         lro_kwargs: dict = {},
     ) -> None:
 
@@ -141,6 +142,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         self.day_sep = day_sep
         self.read_mode = mode
         self.assume_from_number = assume_from_number
+        self.file_pattern = file_pattern
 
         match mode:
             case "nest":
@@ -157,11 +159,19 @@ class AnimalOrganizer(AnimalFeatureParser):
             case _:
                 raise ValueError(f"Invalid mode: {mode}")
 
+        if self.file_pattern:
+            self.bin_folder_pattern = self.bin_folder_pattern / self.file_pattern
+
         self._bin_folders = glob.glob(str(self.bin_folder_pattern))
 
-        # Filter to only include directories (LongRecordingOrganizer expects folder paths)
+        # Filter to only include directories (unless searching for files)
         before_filter_count = len(self._bin_folders)
-        self._bin_folders = [x for x in self._bin_folders if Path(x).is_dir()]
+        if self.file_pattern:
+            # If file_pattern provided, filter for files
+            self._bin_folders = [x for x in self._bin_folders if Path(x).is_file()]
+        else:
+            # Default behavior: filter for directories
+            self._bin_folders = [x for x in self._bin_folders if Path(x).is_dir()]
         after_filter_count = len(self._bin_folders)
 
         if before_filter_count > after_filter_count:
@@ -633,20 +643,28 @@ class AnimalOrganizer(AnimalFeatureParser):
         """Create LongRecordingOrganizer instances for each unique animalday."""
         # Create one LRO per unique animalday (not per folder)
         self.long_recordings: list[core.LongRecordingOrganizer] = []
-        for animalday, folders in self._animalday_folder_groups.items():
-            if len(folders) == 1:
+        for animalday, items in self._animalday_folder_groups.items():
+            # If we are in file_pattern mode, pass all files at once to LRO
+            if self.file_pattern:
+                logging.info(f"Passing {len(items)} files to single LRO for {animalday}")
+                folder_kwargs = self._get_lro_kwargs_for_folder(items[0], lro_kwargs)
+                lro = core.LongRecordingOrganizer(items, **folder_kwargs)
+                self.long_recordings.append(lro)
+                continue
+
+            if len(items) == 1:
                 # Single folder - use processed timestamps if available
-                folder_kwargs = self._get_lro_kwargs_for_folder(folders[0], lro_kwargs)
-                lro = core.LongRecordingOrganizer(folders[0], **folder_kwargs)
+                folder_kwargs = self._get_lro_kwargs_for_folder(items[0], lro_kwargs)
+                lro = core.LongRecordingOrganizer(items[0], **folder_kwargs)
             else:
                 # Multiple folders - create individual LROs then sort and merge
                 logging.info(
-                    f"Creating individual LROs for {len(folders)} folders for {animalday}"
+                    f"Creating individual LROs for {len(items)} folders for {animalday}"
                 )
 
                 # Create individual LROs first, each with their own processed timestamps
                 folder_lro_pairs = []
-                for folder in folders:
+                for folder in items:
                     folder_kwargs = self._get_lro_kwargs_for_folder(folder, lro_kwargs)
                     individual_lro = core.LongRecordingOrganizer(
                         folder, **folder_kwargs

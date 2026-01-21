@@ -1,0 +1,20 @@
+{
+    "data_parent_folder": "/mnt/isilon/marsh_single_unit/PythonEEG Data/AP3B2/Intan recordings/",
+    "GENOTYPE_ALIASES": {
+        "HOMO": [
+            "AP3B2homo-240-M"
+        ],
+        "WT": [
+            "AP3B2wt-241-M"
+        ]
+    },
+    "data_folders_to_animal_ids": {
+        "PortA-AP3B2homo-240-M-PortB-AP3B2wt-241-M-standardEEG 11-27-25_251127_153905": [
+            "AP3B2homo-240-M",
+            "AP3B2wt-241-M"
+        ]
+    },
+    "bad_channels": {},
+    "bad_folder_animalday": [],
+    "joint_sessions": {}
+}

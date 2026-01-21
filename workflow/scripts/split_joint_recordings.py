@@ -52,6 +52,7 @@ def main():
         base_folder_path=session_folder,
         anim_id="joint",
         mode=split_config["mode"],
+        file_pattern=split_config.get("file_pattern"),
         day_sep=split_config.get("day_sep"),
         assume_from_number=split_config.get("assume_from_number", True),
         lro_kwargs=split_config.get("lro_kwargs", {}),

@@ -446,7 +446,7 @@ class LongRecordingOrganizer:
 
     def __init__(
         self,
-        base_folder_path,
+        base_folder_path: Union[str, Path, list[str]],
         mode: Literal["bin", "si", "mne", None] = "bin",
         truncate: Union[bool, int] = False,
         cache_policy: Literal["auto", "always", "force_regenerate"] = "auto",
@@ -462,7 +462,14 @@ class LongRecordingOrganizer:
         recording: "si.BaseRecording" = None,
         **kwargs,
     ):
-        self.base_folder_path = Path(base_folder_path) if base_folder_path else None
+        if isinstance(base_folder_path, list):
+            self.data_files = [str(x) for x in base_folder_path]
+            self.base_folder_path = Path(self.data_files[0]).parent if self.data_files else None
+            input_type = "files"
+            file_pattern = "*" # Not used when data_files is present
+        else:
+            self.base_folder_path = Path(base_folder_path) if base_folder_path else None
+            self.data_files = None
 
         self.n_truncate = parse_truncate(truncate)
         self.truncate = True if self.n_truncate > 0 else False
@@ -965,7 +972,11 @@ class LongRecordingOrganizer:
             rec: "si.BaseRecording" = extract_func(datafile, **kwargs)
             n_processed_files = 1
         elif input_type == "files":
-            datafiles = [str(x) for x in self.base_folder_path.glob(file_pattern)]
+            if hasattr(self, "data_files") and self.data_files is not None:
+                datafiles = self.data_files
+            else:
+                datafiles = [str(x) for x in self.base_folder_path.glob(file_pattern)]
+            
             if len(datafiles) == 0:
                 raise ValueError(f"No files found matching pattern: {file_pattern}")
             datafiles = self._truncate_file_list(datafiles)
@@ -1391,7 +1402,11 @@ class LongRecordingOrganizer:
             n_processed_files = 1
 
         elif input_type == "files":
-            datafiles = list(self.base_folder_path.glob(file_pattern))
+            if hasattr(self, "data_files") and self.data_files is not None:
+                datafiles = [Path(x) for x in self.data_files]
+            else:
+                datafiles = list(self.base_folder_path.glob(file_pattern))
+            
             if len(datafiles) == 0:
                 raise ValueError(f"No files found matching pattern: {file_pattern}")
             datafiles = self._truncate_file_list(datafiles)

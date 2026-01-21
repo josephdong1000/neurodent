@@ -18,14 +18,15 @@ samples:
 analysis:
   # WAR generation parameters
   war_generation:
-    mode: "nest"
-    day_sep: null  # Separator character for parsing animal/day from folder names
+    mode: "concat"
+    file_pattern: "*.nwb"
+    day_sep: null
     assume_from_number: true
     skip_days: ["bad"]
     lro_kwargs:
-      mode: "bin"
+      mode: "si"
       multiprocess_mode: "dask"
-      overwrite_rowbins: false
+      overwrite_rowbins: false # REVIEW function of this parameter when mode is not "bin"
 
   # Joint recording splitting parameters
   split_recordings:
@@ -33,7 +34,7 @@ analysis:
     day_sep: null
     assume_from_number: true
     lro_kwargs:
-      mode: "bin"
+      mode: "si"
     output_format: "zarr"  # zarr or binary
 
   # Frequency domain spike detection parameters
