@@ -7,6 +7,7 @@ import re
 import tempfile
 import time
 import warnings
+import dateutil.parser
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Literal, Union, TYPE_CHECKING
@@ -264,7 +265,7 @@ class AnimalOrganizer(AnimalFeatureParser):
             base_lro_kwargs = lro_kwargs.copy()
             base_lro_kwargs["manual_datetimes"] = datetime(2000, 1, 1, 0, 0, 0)
 
-            self._processed_timestamps = self._process_all_timestamps(
+            self._processed_timestamps = self._process_manual_datetimes(
                 lro_kwargs["manual_datetimes"],
                 self._animalday_folder_groups,
                 base_lro_kwargs,
@@ -282,7 +283,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         Recursively resolve any timestamp input type to concrete datetime(s).
 
         Args:
-            input_spec: datetime, List[datetime], or Callable returning either
+            input_spec: datetime, str, List[datetime], or Callable returning either
             folder_path: Path to folder for function execution context
 
         Returns:
@@ -294,6 +295,9 @@ class AnimalOrganizer(AnimalFeatureParser):
         """
         if isinstance(input_spec, datetime):
             return input_spec
+
+        elif isinstance(input_spec, str):
+            return dateutil.parser.parse(input_spec)
 
         elif isinstance(input_spec, list):
             # Validate that all items are datetime objects
@@ -340,6 +344,16 @@ class AnimalOrganizer(AnimalFeatureParser):
         raise ValueError(
             f"Folder name '{folder_name}' not found. Available folders: {available_names}"
         )
+
+    def _get_folders_for_animal(
+        self, animal_id: str, animalday_to_folders: dict
+    ) -> list:
+        """Find all folder paths belonging to a specific animal ID."""
+        matching_folders = []
+        for animalday, folders in animalday_to_folders.items():
+            if animalday.startswith(animal_id):
+                matching_folders.extend(folders)
+        return matching_folders
 
     def _compute_global_timeline(
         self, base_datetime: datetime, animalday_to_folders: dict, base_lro_kwargs: dict
@@ -412,30 +426,32 @@ class AnimalOrganizer(AnimalFeatureParser):
                 f"Folder {Path(folder).name}: estimated duration = {duration:.1f}s"
             )
 
-        # Step 3: Compute continuous start times
+        # Step 3: Compute start times (forward from start or backward from end)
+        datetimes_are_start = base_lro_kwargs.get("datetimes_are_start", True)
         result = {}
-        current_start_time = base_datetime
 
-        for folder in ordered_folders:
-            folder_name = Path(folder).name
-            result[folder_name] = current_start_time
+        if datetimes_are_start:
+            current_start_time = base_datetime
+            for folder in ordered_folders:
+                folder_name = Path(folder).name
+                result[folder_name] = current_start_time
+                current_start_time = current_start_time + timedelta(seconds=folder_durations[folder])
+        else:
+            # Work backwards from end time
+            current_end_time = base_datetime
+            for folder in reversed(ordered_folders):
+                folder_name = Path(folder).name
+                duration = folder_durations[folder]
+                start_time = current_end_time - timedelta(seconds=duration)
+                result[folder_name] = start_time
+                current_end_time = start_time
 
-            # Move to next start time (current start + duration)
-            duration = folder_durations[folder]
-            current_start_time = current_start_time + timedelta(seconds=duration)
-
-            logging.debug(
-                f"Timeline: {folder_name} starts at {result[folder_name]}, duration {duration:.1f}s"
-            )
-
-        total_timeline_duration = sum(folder_durations.values())
-        logging.info(
-            f"Continuous timeline computed: {len(result)} folders, total duration {total_timeline_duration:.1f}s"
-        )
+        total_duration = sum(folder_durations.values())
+        logging.info(f"Timeline computed: {len(result)} folders, total duration {total_duration:.1f}s")
 
         return result
 
-    def _process_all_timestamps(
+    def _process_manual_datetimes(
         self, manual_datetimes, animalday_to_folders: dict, base_lro_kwargs: dict
     ) -> dict:
         """
@@ -450,42 +466,55 @@ class AnimalOrganizer(AnimalFeatureParser):
             dict: Mapping of folder_name -> Union[datetime, List[datetime]]
         """
         if isinstance(manual_datetimes, dict):
-            # Per-folder specification
-            logging.info("Processing per-folder timestamp specification")
-            resolved = {}
-            for folder_name, folder_spec in manual_datetimes.items():
-                folder_path = self._find_folder_by_name(
-                    folder_name, animalday_to_folders
-                )
-                resolved[folder_name] = self._resolve_timestamp_input(
-                    folder_spec, folder_path
-                )
-                logging.debug(
-                    f"Resolved timestamps for {folder_name}: {resolved[folder_name]}"
-                )
-            return resolved
+            logging.info("Processing dict-based manual datetimes")
+            out = {}
+            
+            for key, spec in manual_datetimes.items():
+                animal_folders = self._get_folders_for_animal(key, animalday_to_folders)
+                
+                if not animal_folders:
+                    raise ValueError(
+                        f"manual_datetimes key '{key}' does not match any animal ID. "
+                        f"Available animals: {list(set(ad.split()[0] for ad in animalday_to_folders.keys()))}"
+                    )
+                
+                logging.info(f"Key '{key}' matched as animal ID with {len(animal_folders)} folders")
+                
+                if isinstance(spec, list):
+                    if len(spec) != len(animal_folders):
+                        raise ValueError(
+                            f"manual_datetimes list for animal '{key}' has {len(spec)} entries "
+                            f"but animal has {len(animal_folders)} folders"
+                        )
+                    for folder_path, ts in zip(animal_folders, spec):
+                        out[Path(folder_path).name] = self._resolve_timestamp_input(ts, Path(folder_path))
+                else:
+                    resolved_dt = self._resolve_timestamp_input(spec, Path(animal_folders[0]))
+                    sorted_folders = sorted(animal_folders, key=lambda f: Path(f).stem)
+                    animalday_dict = {Path(f).name: [f] for f in sorted_folders}
+                    animal_timeline = self._compute_global_timeline(
+                        resolved_dt, animalday_dict, base_lro_kwargs
+                    )
+                    out.update(animal_timeline)
+            
+            return out
 
         elif isinstance(manual_datetimes, datetime):
-            # Global timeline - compute contiguous spacing
-            logging.info(f"Processing global timeline starting at {manual_datetimes}")
+            logging.info(f"Processing global manual datetimes starting at {manual_datetimes}")
             return self._compute_global_timeline(
                 manual_datetimes, animalday_to_folders, base_lro_kwargs
             )
 
         else:
-            # Function or list at top level - apply to all folders
-            logging.info("Processing timestamp input for all folders")
-            resolved = {}
+            logging.info("Processing manual datetimes input for all folders")
+            out = {}
             for animalday, folders in animalday_to_folders.items():
                 for folder in folders:
                     folder_name = Path(folder).name
-                    resolved[folder_name] = self._resolve_timestamp_input(
+                    out[folder_name] = self._resolve_timestamp_input(
                         manual_datetimes, Path(folder)
                     )
-                    logging.debug(
-                        f"Resolved timestamps for {folder_name}: {resolved[folder_name]}"
-                    )
-            return resolved
+            return out
 
     def _get_lro_kwargs_for_folder(
         self, folder_path: str, base_lro_kwargs: dict

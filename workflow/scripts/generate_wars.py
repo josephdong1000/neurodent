@@ -69,6 +69,11 @@ def generate_war_for_animal(samples_config, config, animal_folder, animal_id, lo
                 lro_kwargs["mode"] = "si"  # Override to read zarr via load_extractor
                 logger.info(f"Detected split recording, using mode='si' for zarr loading")
             
+            # Use built-in AnimalOrganizer timestamp resolution if manual_datetimes in JSON
+            if "manual_datetimes" in samples_config:
+                lro_kwargs["manual_datetimes"] = samples_config["manual_datetimes"]
+                logger.info("Passing manual_datetimes from JSON to AnimalOrganizer")
+            
             ao = visualization.AnimalOrganizer(
                 data_parent_folder / animal_folder,
                 animal_id,

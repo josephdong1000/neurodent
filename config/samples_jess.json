@@ -16,5 +16,9 @@
     },
     "bad_channels": {},
     "bad_folder_animalday": [],
-    "joint_sessions": {}
+    "joint_sessions": {},
+    "manual_datetimes": {
+        "AP3B2homo-240-M": "2025-11-27 15:39:05",
+        "AP3B2wt-241-M": "2025-11-27 15:39:05"
+    }
 }
