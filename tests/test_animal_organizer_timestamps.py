@@ -607,6 +607,64 @@ class TestAnimalOrganizerTimestampHandling:
             ao._resolve_timestamp_input(invalid_list, test_folder)
         assert "All items in timestamp list must be datetime objects" in str(exc_info.value)
 
+    @patch("glob.glob")
+    def test_datetimes_are_start_end_time_support(self, mock_glob):
+        """Test that datetimes_are_start=False computes timeline backwards from end time."""
+        mock_glob.return_value = [str(self.folder1), str(self.folder2), str(self.folder3)]
+
+        def create_mock_lro_with_duration(duration_seconds):
+            mock_lro = Mock()
+            mock_lro.channel_names = ["LMot", "RMot", "LAud"]
+            mock_lro.meta = Mock(f_s=1000, n_channels=3)
+            mock_lro.file_durations = [duration_seconds]
+            mock_recording = Mock()
+            mock_recording.get_duration.return_value = duration_seconds
+            mock_lro.LongRecording = mock_recording
+            mock_lro.file_end_datetimes = [None]
+            return mock_lro
+
+        folder_durations = {
+            str(self.folder1): 3600.0,  # 1 hour
+            str(self.folder2): 1800.0,  # 30 minutes
+            str(self.folder3): 7200.0,  # 2 hours
+        }
+
+        with patch.object(core, "LongRecordingOrganizer") as mock_lro_class:
+
+            def mock_lro_side_effect(*args, **kwargs):
+                folder_path = str(args[0])
+                duration = folder_durations.get(folder_path, 3600.0)
+                return create_mock_lro_with_duration(duration)
+
+            mock_lro_class.side_effect = mock_lro_side_effect
+
+            # Global END time (not start)
+            global_end = datetime(2023, 1, 15, 14, 30, 0)
+
+            ao = results.AnimalOrganizer(
+                base_folder_path=str(self.base_path),
+                anim_id=self.animal_id,
+                mode="concat",
+                lro_kwargs={
+                    "manual_datetimes": global_end,
+                    "datetimes_are_start": False,
+                },
+            )
+
+            assert len(ao._processed_timestamps) == 3
+
+            # With datetimes_are_start=False, should work backwards
+            # Total duration = 3600 + 1800 + 7200 = 12600s = 3.5 hours
+            # So first folder should start at 14:30 - 3.5 hours = 11:00
+            total_duration = sum(folder_durations.values())
+            expected_first_start = global_end - timedelta(seconds=total_duration)
+
+            sorted_folders = sorted(ao._processed_timestamps.keys())
+            first_folder_start = ao._processed_timestamps[sorted_folders[0]]
+            assert first_folder_start == expected_first_start, (
+                f"First folder start mismatch: expected {expected_first_start}, got {first_folder_start}"
+            )
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
