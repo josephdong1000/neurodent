@@ -134,6 +134,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         truncate: bool | int = False,
         file_pattern: str | None = None,
         lro_kwargs: dict = {},
+        day_parse_kwargs: dict = {},
     ) -> None:
 
         self.base_folder_path = Path(base_folder_path)
@@ -211,6 +212,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                 animal_param=self.animal_param,
                 day_sep=self.day_sep,
                 mode=self.read_mode,
+                **day_parse_kwargs,
             )
             for e in self._bin_folders
         ]

@@ -56,6 +56,7 @@ def main():
         day_sep=split_config.get("day_sep"),
         assume_from_number=split_config.get("assume_from_number", True),
         lro_kwargs=split_config.get("lro_kwargs", {}),
+        day_parse_kwargs=split_config.get("day_parse_kwargs", {}),
     )
     
     logger.info(f"Loaded {len(ao.long_recordings)} days of recordings")

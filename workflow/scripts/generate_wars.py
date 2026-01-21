@@ -78,6 +78,7 @@ def generate_war_for_animal(samples_config, config, animal_folder, animal_id, lo
                 assume_from_number=analysis_config["assume_from_number"],
                 skip_days=analysis_config["skip_days"],
                 lro_kwargs=lro_kwargs,
+                day_parse_kwargs=analysis_config.get("day_parse_kwargs", {}),
             )
 
             # Compute bad channels

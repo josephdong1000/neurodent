@@ -23,6 +23,9 @@ analysis:
     day_sep: null
     assume_from_number: true
     skip_days: ["bad"]
+    day_parse_kwargs:
+      date_patterns:
+        - ["\\d{6}", "%y%m%d"]
     lro_kwargs:
       mode: "si"
       multiprocess_mode: "dask"
