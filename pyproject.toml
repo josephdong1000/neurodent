@@ -30,7 +30,7 @@ dependencies = [
     "mne",
     "mne-connectivity",
     "pandas",
-    "spikeinterface",
+    "spikeinterface[extractors]",
     "probeinterface",
     "scipy",
     "dask[distributed]",
@@ -92,6 +92,7 @@ dev = [
     "jupyterlab>=4.4.10",
     "pre-commit>=4.5.1",
     "nbstripout>=0.8.2",
+    "ruff>=0.14.13",
 ]
 
 [project.urls]
