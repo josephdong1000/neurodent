@@ -466,36 +466,44 @@ class AnimalOrganizer(AnimalFeatureParser):
             dict: Mapping of folder_name -> Union[datetime, List[datetime]]
         """
         if isinstance(manual_datetimes, dict):
-            logging.info("Processing dict-based manual datetimes")
+            # Direct lookup: keys are expected to be animal IDs
+            spec = manual_datetimes.get(self.animal_id)
+            
+            if spec is None:
+                raise ValueError(
+                    f"manual_datetimes dictionary was provided in the config, but no entry was found for animal ID '{self.animal_id}'. "
+                    f"Available keys in config: {list(manual_datetimes.keys())}"
+                )
+
+            logging.info(f"Processing manual datetimes for animal '{self.animal_id}'")
             out = {}
             
-            for key, spec in manual_datetimes.items():
-                animal_folders = self._get_folders_for_animal(key, animalday_to_folders)
-                
-                if not animal_folders:
+            # Find folders for this animal to apply the spec
+            animal_folders = self._get_folders_for_animal(self.animal_id, animalday_to_folders)
+            
+            if not animal_folders:
+                raise ValueError(
+                    f"Manual timestamps were provided for animal ID '{self.animal_id}' in the config, "
+                    f"but no data folders starting with this ID were found in the data path. "
+                    f"Check for typos or naming mismatches between config keys and folder names."
+                )
+
+            if isinstance(spec, list):
+                if len(spec) != len(animal_folders):
                     raise ValueError(
-                        f"manual_datetimes key '{key}' does not match any animal ID. "
-                        f"Available animals: {list(set(ad.split()[0] for ad in animalday_to_folders.keys()))}"
+                        f"manual_datetimes list for animal '{self.animal_id}' has {len(spec)} entries "
+                        f"but animal has {len(animal_folders)} folders"
                     )
-                
-                logging.info(f"Key '{key}' matched as animal ID with {len(animal_folders)} folders")
-                
-                if isinstance(spec, list):
-                    if len(spec) != len(animal_folders):
-                        raise ValueError(
-                            f"manual_datetimes list for animal '{key}' has {len(spec)} entries "
-                            f"but animal has {len(animal_folders)} folders"
-                        )
-                    for folder_path, ts in zip(animal_folders, spec):
-                        out[Path(folder_path).name] = self._resolve_timestamp_input(ts, Path(folder_path))
-                else:
-                    resolved_dt = self._resolve_timestamp_input(spec, Path(animal_folders[0]))
-                    sorted_folders = sorted(animal_folders, key=lambda f: Path(f).stem)
-                    animalday_dict = {Path(f).name: [f] for f in sorted_folders}
-                    animal_timeline = self._compute_global_timeline(
-                        resolved_dt, animalday_dict, base_lro_kwargs
-                    )
-                    out.update(animal_timeline)
+                for folder_path, ts in zip(animal_folders, spec):
+                    out[Path(folder_path).name] = self._resolve_timestamp_input(ts, Path(folder_path))
+            else:
+                resolved_dt = self._resolve_timestamp_input(spec, Path(animal_folders[0]))
+                sorted_folders = sorted(animal_folders, key=lambda f: Path(f).stem)
+                animalday_dict = {Path(f).name: [f] for f in sorted_folders}
+                animal_timeline = self._compute_global_timeline(
+                    resolved_dt, animalday_dict, base_lro_kwargs
+                )
+                out.update(animal_timeline)
             
             return out
 
