@@ -2224,6 +2224,15 @@ class LongRecordingOrganizer:
                     )
                 self.labels[key] = value
 
+        # Merge file timestamps and durations
+        if hasattr(self, "file_end_datetimes") and hasattr(other_lro, "file_end_datetimes"):
+            if self.file_end_datetimes and other_lro.file_end_datetimes:
+                 self.file_end_datetimes.extend(other_lro.file_end_datetimes)
+
+        if hasattr(self, "file_durations") and hasattr(other_lro, "file_durations"):
+            if self.file_durations and other_lro.file_durations:
+                self.file_durations.extend(other_lro.file_durations)
+
         # Note: Channel names, sampling rate, etc. should already be validated as identical
 
     def __repr__(self):
