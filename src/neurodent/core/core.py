@@ -420,7 +420,7 @@ class LongRecordingOrganizer:
         truncate (bool | int, optional): If True, truncate data to first 10 files. If an integer, truncate data to the first n files. Defaults to False.
         cache_policy (Literal['auto', 'always', 'force_regenerate'], optional): Cache policy for intermediate files. Defaults to 'auto'.
         multiprocess_mode (Literal['dask', 'serial'], optional): Processing mode for parallel operations. Defaults to 'serial'.
-        extract_func (Callable, optional): Function to extract data when using 'si' or 'mne' mode. Required for those modes.
+        extract_func (Literal[Callable, str], optional): Function to extract data when using 'si' or 'mne' mode. Required for those modes.
         input_type (Literal['folder', 'file', 'files'], optional): Type of input processing. Defaults to 'folder'.
         file_pattern (str, optional): Pattern to match files when using 'file' or 'files' input type.
         manual_datetimes (datetime | list[datetime] | Callable, optional): Manually provided timestamps.
@@ -452,7 +452,7 @@ class LongRecordingOrganizer:
         cache_policy: Literal["auto", "always", "force_regenerate"] = "auto",
         multiprocess_mode: Literal["dask", "serial"] = "serial",
         extract_func: Union[
-            Callable[..., "si.BaseRecording"], Callable[..., mne.io.Raw]
+            Callable[..., "si.BaseRecording"], Callable[..., mne.io.Raw], str
         ] = None,
         input_type: Literal["folder", "file", "files"] = "folder",
         file_pattern: str = None,
@@ -546,7 +546,7 @@ class LongRecordingOrganizer:
         cache_policy: Literal["auto", "always", "force_regenerate"] = "auto",
         multiprocess_mode: Literal["dask", "serial"] = "serial",
         extract_func: Union[
-            Callable[..., "si.BaseRecording"], Callable[..., mne.io.Raw]
+            Callable[..., "si.BaseRecording"], Callable[..., mne.io.Raw], str
         ] = None,
         input_type: Literal["folder", "file", "files"] = "folder",
         file_pattern: str = None,
@@ -562,13 +562,20 @@ class LongRecordingOrganizer:
             )
         elif mode == "si":
             # Data pipeline using SpikeInterface
-            if extract_func is None:
+            if si is None:
+                raise ImportError("SpikeInterface is required for mode='si'")
+
+            if isinstance(extract_func, str):
+                # Resolve from se (extractors) or si (core)
+                func_name = extract_func
+                extract_func = getattr(se, func_name, getattr(si, func_name, None))
+                if extract_func is None:
+                    raise ValueError(f"Could not resolve SpikeInterface extractor: {func_name}")
+            elif extract_func is None:
                 # Default to generic load_extractor if not provided, allowing loading of SI folders
-                if si is None:
-                    raise ImportError("SpikeInterface is required for mode='si'")
                 extract_func = si.load_extractor
 
-            # EDF file pipeline (or generic SI folder)
+            # SI file pipeline 
             self.convert_file_with_si_to_recording(
                 extract_func=extract_func,
                 input_type=input_type,
@@ -578,6 +585,13 @@ class LongRecordingOrganizer:
             )
         elif mode == "mne":
             # MNE file pipeline
+            if isinstance(extract_func, str):
+                # Resolve from mne.io
+                func_name = extract_func
+                extract_func = getattr(mne.io, func_name, None)
+                if extract_func is None:
+                    raise ValueError(f"Could not resolve MNE extractor: {func_name}")
+
             self.convert_file_with_mne_to_recording(
                 extract_func=extract_func,
                 input_type=input_type,
@@ -947,6 +961,9 @@ class LongRecordingOrganizer:
         Raises:
             ValueError: If no files are found for the given ``file_pattern`` or ``input_type`` is invalid.
         """
+        # Filter out binary-mode-only kwargs that aren't relevant for SI extract functions
+        binary_only_kwargs = ["overwrite_rowbins"]
+        kwargs = {k: v for k, v in kwargs.items() if k not in binary_only_kwargs}
         if si is None:
             raise ImportError(
                 "SpikeInterface is required for convert_file_with_si_to_recording"
@@ -1374,6 +1391,10 @@ class LongRecordingOrganizer:
             Both files must exist for cache to be used. Metadata preserves channel names, original
             sampling rates, and other DDFBinaryMetadata fields across cache hits.
         """
+        # Filter out binary-mode-only kwargs that aren't relevant for MNE extract functions
+        binary_only_kwargs = ["overwrite_rowbins"]
+        kwargs = {k: v for k, v in kwargs.items() if k not in binary_only_kwargs}
+
         if se is None:
             raise ImportError(
                 "SpikeInterface is required for convert_file_with_mne_to_recording"
