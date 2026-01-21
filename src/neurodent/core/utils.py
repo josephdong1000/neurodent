@@ -608,11 +608,11 @@ def parse_str_to_day(
     # Validate date_patterns
     if date_patterns is not None:
         if not isinstance(date_patterns, list):
-            raise TypeError("date_patterns must be a list of (regex_pattern, strptime_format) tuples")
-        for i, pattern_tuple in enumerate(date_patterns):
-            if not isinstance(pattern_tuple, tuple) or len(pattern_tuple) != 2:
-                raise TypeError(f"date_patterns[{i}] must be a tuple of (regex_pattern, strptime_format)")
-            if not isinstance(pattern_tuple[0], str) or not isinstance(pattern_tuple[1], str):
+            raise TypeError("date_patterns must be a list of sequences")
+        for i, pattern_seq in enumerate(date_patterns):
+            if not isinstance(pattern_seq, (tuple, list)) or len(pattern_seq) != 2:
+                raise TypeError(f"date_patterns[{i}] must be a sequence of (regex_pattern, strptime_format)")
+            if not isinstance(pattern_seq[0], str) or not isinstance(pattern_seq[1], str):
                 raise TypeError(f"date_patterns[{i}] must contain string elements")
 
     # Validate parse_mode
