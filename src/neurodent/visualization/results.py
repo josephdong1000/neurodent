@@ -228,6 +228,7 @@ class AnimalOrganizer(AnimalFeatureParser):
 
         # Store grouping info
         self._animalday_folder_groups = animalday_to_folders
+        self._animalday_str_to_dict = {d["animalday"]: d for d in self._animalday_dicts}
         self.unique_animaldays = list(animalday_to_folders.keys())
 
         # Log merging operations for overlapping days
@@ -688,6 +689,8 @@ class AnimalOrganizer(AnimalFeatureParser):
                 logging.info(f"Passing {len(items)} files to single LRO for {animalday}")
                 folder_kwargs = self._get_lro_kwargs_for_folder(items[0], lro_kwargs)
                 lro = core.LongRecordingOrganizer(items, **folder_kwargs)
+                # AnimalOrganizer is the primary source of truth for these labels
+                lro.labels.update(self._animalday_str_to_dict[animalday])
                 self.long_recordings.append(lro)
                 continue
 
@@ -747,6 +750,8 @@ class AnimalOrganizer(AnimalFeatureParser):
                     f"Successfully merged {len(sorted_folder_lro_pairs)} LROs for {animalday}"
                 )
 
+            # AnimalOrganizer is the primary source of truth for these labels
+            lro.labels.update(self._animalday_str_to_dict[animalday])
             self.long_recordings.append(lro)
 
         # Log timeline summary for debugging
@@ -1287,17 +1292,23 @@ class AnimalOrganizer(AnimalFeatureParser):
     ):
         row = {}
 
-        lan_folder = lan.LongRecording.base_folder_path
-        animalday_dict = core.parse_path_to_animalday(
-            lan_folder,
-            animal_param=self.animal_param,
-            day_sep=self.day_sep,
-            mode=self.read_mode,
-        )
-        row["animalday"] = animalday_dict["animalday"]
-        row["animal"] = animalday_dict["animal"]
-        row["day"] = animalday_dict["day"]
-        row["genotype"] = animalday_dict["genotype"]
+        # The session labels (animal, day, genotype) are formally attached to the LongRecording object
+        session_labels = getattr(lan.LongRecording, "labels", {})
+        
+        # Fallback for old recordings without formal labels
+        if not session_labels:
+            lan_folder = lan.LongRecording.base_folder_path
+            session_labels = core.parse_path_to_animalday(
+                lan_folder,
+                animal_param=self.animal_param,
+                day_sep=self.day_sep,
+                mode=self.read_mode,
+            )
+
+        row["animalday"] = session_labels["animalday"]
+        row["animal"] = session_labels["animal"]
+        row["day"] = session_labels["day"]
+        row["genotype"] = session_labels["genotype"]
         row["duration"] = lan.LongRecording.get_dur_fragment(window_s, idx)
         row["endfile"] = lan.get_file_end(idx)
 

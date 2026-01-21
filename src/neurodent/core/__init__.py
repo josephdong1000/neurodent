@@ -11,8 +11,6 @@ handling everything from raw data loading to feature extraction.
 
     # 1. Load and organize recordings
     organizer = core.LongRecordingOrganizer(data_path)
-    organizer.parse_dates_from_filenames()
-    organizer.infer_channel_names()
 
     # 2. Run windowed feature analysis
     analyzer = core.LongRecordingAnalyzer(organizer)

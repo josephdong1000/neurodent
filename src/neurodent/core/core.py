@@ -428,11 +428,15 @@ class LongRecordingOrganizer:
         n_jobs (int, optional): Number of parallel jobs for data loading. Defaults to 1.
         recording (si.BaseRecording, optional): Existing SpikeInterface recording object for in-memory initialization.
             Use this when creating LRO wrappers around split recordings.
+        labels (dict, optional): High-level session labels (animal ID, day, genotype, etc.).
+            This object is parsing-agnostic; it does not perform high-level parsing itself.
+            Labels should be provided by a parser (like `AnimalOrganizer`).
         **kwargs: Additional arguments passed to the data loading functions.
 
     Attributes:
         LongRecording (si.BaseRecording): The SpikeInterface recording object.
-        meta (DDFBinaryMetadata): Metadata object associated with the recording.
+        meta (DDFBinaryMetadata): Technical metadata (sampling rate, channels, etc.).
+        labels (dict): High-level session labels (animal ID, day, genotype, etc.).
         channel_names (list[str]): List of channel names.
         file_durations (list[float]): Duration of each individual file in seconds.
         cumulative_file_durations (list[float]): Cumulative duration timestamps for file boundaries.
@@ -460,6 +464,7 @@ class LongRecordingOrganizer:
         datetimes_are_start: bool = True,
         n_jobs: int = 1,
         recording: "si.BaseRecording" = None,
+        labels: dict = None,
         **kwargs,
     ):
         if isinstance(base_folder_path, list):
@@ -470,6 +475,8 @@ class LongRecordingOrganizer:
         else:
             self.base_folder_path = Path(base_folder_path) if base_folder_path else None
             self.data_files = None
+
+        self.labels = labels or {}
 
         self.n_truncate = parse_truncate(truncate)
         self.truncate = True if self.n_truncate > 0 else False
@@ -1598,6 +1605,7 @@ class LongRecordingOrganizer:
                 base_folder_path=None,
                 mode=None,
                 recording=sub_rec,
+                labels=self.labels.copy(),
             )
             # Inherit parent timestamps
             child_lro.manual_datetimes = self.manual_datetimes
@@ -2202,9 +2210,19 @@ class LongRecordingOrganizer:
         Args:
             other_lro (LongRecordingOrganizer): The LRO that was merged into this one
         """
-        # Update end time to reflect the merged recording duration
         if hasattr(other_lro.meta, "dt_end") and hasattr(self.meta, "dt_end"):
             self.meta.dt_end = other_lro.meta.dt_end
+
+        # Merge high-level labels
+        if hasattr(other_lro, "labels") and other_lro.labels:
+            for key, value in other_lro.labels.items():
+                if key in self.labels and self.labels[key] != value:
+                    warnings.warn(
+                        f"Label conflict during merge for key '{key}': "
+                        f"'{self.labels[key]}' != '{value}'. Overwriting with new value.",
+                        UserWarning,
+                    )
+                self.labels[key] = value
 
         # Note: Channel names, sampling rate, etc. should already be validated as identical
 
