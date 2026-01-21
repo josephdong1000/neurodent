@@ -467,23 +467,23 @@ class AnimalOrganizer(AnimalFeatureParser):
         """
         if isinstance(manual_datetimes, dict):
             # Direct lookup: keys are expected to be animal IDs
-            spec = manual_datetimes.get(self.animal_id)
+            spec = manual_datetimes.get(self.anim_id)
             
             if spec is None:
                 raise ValueError(
-                    f"manual_datetimes dictionary was provided in the config, but no entry was found for animal ID '{self.animal_id}'. "
+                    f"manual_datetimes dictionary was provided in the config, but no entry was found for animal ID '{self.anim_id}'. "
                     f"Available keys in config: {list(manual_datetimes.keys())}"
                 )
 
-            logging.info(f"Processing manual datetimes for animal '{self.animal_id}'")
+            logging.info(f"Processing manual datetimes for animal '{self.anim_id}'")
             out = {}
             
             # Find folders for this animal to apply the spec
-            animal_folders = self._get_folders_for_animal(self.animal_id, animalday_to_folders)
+            animal_folders = self._get_folders_for_animal(self.anim_id, animalday_to_folders)
             
             if not animal_folders:
                 raise ValueError(
-                    f"Manual timestamps were provided for animal ID '{self.animal_id}' in the config, "
+                    f"Manual timestamps were provided for animal ID '{self.anim_id}' in the config, "
                     f"but no data folders starting with this ID were found in the data path. "
                     f"Check for typos or naming mismatches between config keys and folder names."
                 )
@@ -491,7 +491,7 @@ class AnimalOrganizer(AnimalFeatureParser):
             if isinstance(spec, list):
                 if len(spec) != len(animal_folders):
                     raise ValueError(
-                        f"manual_datetimes list for animal '{self.animal_id}' has {len(spec)} entries "
+                        f"manual_datetimes list for animal '{self.anim_id}' has {len(spec)} entries "
                         f"but animal has {len(animal_folders)} folders"
                     )
                 for folder_path, ts in zip(animal_folders, spec):
