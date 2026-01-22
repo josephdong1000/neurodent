@@ -413,6 +413,8 @@ class AnimalOrganizer(AnimalFeatureParser):
 
         # Step 2: Estimate total duration for each folder
         folder_durations = {}
+        
+        logging.info(f"Ordered folders for timeline: {[Path(f).name for f in ordered_folders]}")
 
         for folder in ordered_folders:
             # Create temporary LRO to get duration
@@ -423,7 +425,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                 else 0.0
             )
             folder_durations[folder] = duration
-            logging.debug(
+            logging.info(
                 f"Folder {Path(folder).name}: estimated duration = {duration:.1f}s"
             )
 
