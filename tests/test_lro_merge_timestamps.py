@@ -60,7 +60,7 @@ def test_lro_merge_preserves_timestamps():
     
     # Check gap detection works correctly with the updated lists
     with pytest.warns(UserWarning, match="Files may not be contiguous"):
-        lro1.check_file_gaps(lro1.file_end_datetimes, lro1.file_durations)
+        lro1._validate_file_contiguity(lro1.file_end_datetimes, lro1.file_durations)
 
 def test_lro_merge_timestamps_missing_attributes():
     """Test resilience when file_durations or file_end_datetimes are missing."""
@@ -110,4 +110,4 @@ def test_lro_merge_overlap_warning():
     
     # Verify overlap warning
     with pytest.warns(UserWarning, match="Files may overlap"):
-        lro1.check_file_gaps(lro1.file_end_datetimes, lro1.file_durations)
+        lro1._validate_file_contiguity(lro1.file_end_datetimes, lro1.file_durations)
