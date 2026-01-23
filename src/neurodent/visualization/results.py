@@ -32,7 +32,7 @@ from .. import constants, core
 from ..core import FragmentAnalyzer, get_temp_directory
 from ..core.analyze_sort import MOUNTAINSORT_AVAILABLE
 from ..core.frequency_domain_spike_detection import FrequencyDomainSpikeDetector
-from ..core.utils import parse_chname_to_abbrev
+from ..core.utils import filepath_to_index, parse_chname_to_abbrev
 
 
 class AnimalFeatureParser:
@@ -164,7 +164,9 @@ class AnimalOrganizer(AnimalFeatureParser):
         if self.file_pattern:
             self.bin_folder_pattern = self.bin_folder_pattern / self.file_pattern
 
-        self._bin_folders = glob.glob(str(self.bin_folder_pattern))
+        self._bin_folders = sorted(
+            glob.glob(str(self.bin_folder_pattern)), key=filepath_to_index
+        )
 
         # Filter to only include directories (unless searching for files)
         before_filter_count = len(self._bin_folders)
@@ -197,6 +199,10 @@ class AnimalOrganizer(AnimalFeatureParser):
         logging.info(f"bin_folder_pattern: {self.bin_folder_pattern}")
         logging.info(f"self._bin_folders: {self._bin_folders}")
         logging.info(f"self.bin_folder_names: {self.bin_folder_names}")
+
+        # Validate discovered folders/files to ensure they match the animal ID
+        # Critical when glob patterns are broad, e.g. parent folder name contains ID
+        self._bin_folders = self._validate_discovery(self._bin_folders, day_parse_kwargs)
 
         if mode == "noday" and len(self._bin_folders) > 1:
             raise ValueError(
@@ -277,7 +283,48 @@ class AnimalOrganizer(AnimalFeatureParser):
             self._processed_timestamps = None
 
         # Create LongRecordingOrganizer instances
+        self.long_recordings: list[core.LongRecordingOrganizer] = []
         self._create_long_recordings(lro_kwargs)
+
+    def _validate_discovery(self, folders, day_parse_kwargs):
+        """
+        Validates discovered folders/files by attempting to parse them.
+        Filters out 'ghost' files that match the glob pattern but do not contain the correct Animal ID.
+        """
+        valid_folders = []
+        for folder in folders:
+            try:
+                core.parse_path_to_animalday(
+                    folder,
+                    animal_param=self.animal_param,
+                    day_sep=self.day_sep,
+                    mode=self.read_mode,
+                    **day_parse_kwargs,
+                )
+                valid_folders.append(folder)
+            except ValueError as e:
+                # Differentiate between "Filtering" (mismatch) and "Parsing Error" (bad config/date)
+                msg = str(e)
+                is_filter_error = (
+                    "No matching ID found" in msg 
+                    or "No match found for pattern" in msg
+                    or "does not have any matching values" in msg
+                )
+                
+                if is_filter_error:
+                    # This file/folder does not match the animal ID parsing rules (Ghost/Sibling).
+                    logging.warning(
+                        f"file/folder '{Path(folder).name}' captured by glob but failed ID/Genotype validation (mode='{self.read_mode}'). Skipping. Reason: {msg}"
+                    )
+                    continue
+                
+                # If we get here, the ID/Genotype matched, but something else failed (likely Date).
+                # This suggests a configuration error or a valid file with a malformed date.
+                # We should NOT silence this.
+                raise ValueError(
+                    f"File '{Path(folder).name}' matched Animal ID/Genotype but failed parsing (likely Date/Config error): {e}"
+                ) from e
+        return valid_folders
 
     def _resolve_timestamp_input(self, input_spec, folder_path: Path):
         """
@@ -295,10 +342,11 @@ class AnimalOrganizer(AnimalFeatureParser):
             Exception: If user function fails (wrapped with context)
         """
         if isinstance(input_spec, datetime):
-            return input_spec
+            return input_spec.replace(tzinfo=None)
 
         elif isinstance(input_spec, str):
-            return dateutil.parser.parse(input_spec)
+            dt = dateutil.parser.parse(input_spec)
+            return dt.replace(tzinfo=None)
 
         elif isinstance(input_spec, list):
             # Validate that all items are datetime objects

@@ -985,7 +985,10 @@ class LongRecordingOrganizer:
         elif input_type == "file":
             # For single file, validate that timestamps are provided
             self._validate_timestamps_for_mode("si", 1)
-            datafiles = glob.glob(str(self.base_folder_path / file_pattern))
+            datafiles = sorted(
+                glob.glob(str(self.base_folder_path / file_pattern)),
+                key=filepath_to_index,
+            )
             if len(datafiles) == 0:
                 raise ValueError(f"No files found matching pattern: {file_pattern}")
             elif len(datafiles) > 1:
@@ -1006,7 +1009,7 @@ class LongRecordingOrganizer:
             datafiles = self._truncate_file_list(datafiles)
             # Validate timestamps early before slow processing
             self._validate_timestamps_for_mode("si", len(datafiles))
-            datafiles.sort()  # FIXME sort by index, or some other logic. Files may be out of order otherwise, messing up isday calculation
+            datafiles.sort(key=filepath_to_index)
             recs: list["si.BaseRecording"] = [
                 extract_func(x, **kwargs) for x in datafiles
             ]

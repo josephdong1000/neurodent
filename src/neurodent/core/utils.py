@@ -657,7 +657,7 @@ def parse_str_to_day(
                 date = dateutil.parser.parse(token, default=constants.DEFAULT_DAY, **parse_params)
                 if date.year <= 1980:
                     continue
-                return date
+                return date.replace(tzinfo=None)
             except ParserError:
                 continue
 
@@ -673,7 +673,7 @@ def parse_str_to_day(
                     date = dateutil.parser.parse(grouped, default=constants.DEFAULT_DAY, **parse_params)
                     if date.year <= 1980:
                         continue
-                    return date
+                    return date.replace(tzinfo=None)
                 except ParserError:
                     continue
 
