@@ -40,8 +40,13 @@ def generate_war_for_animal(samples_config, config, animal_folder, animal_id, lo
     # Set temp directory
     core.set_temp_directory(config["temp_directory"])
 
-    # Set genotype aliases
-    constants.GENOTYPE_ALIASES = samples_config["GENOTYPE_ALIASES"]
+    # Set aliases
+    if "GENOTYPE_ALIASES" in samples_config:
+        constants.GENOTYPE_ALIASES = samples_config["GENOTYPE_ALIASES"]
+    if "CHNAME_ALIASES" in samples_config:
+        constants.CHNAME_ALIASES = samples_config["CHNAME_ALIASES"]
+    if "LR_ALIASES" in samples_config:
+        constants.LR_ALIASES = samples_config["LR_ALIASES"]
     animal_key = f"{animal_folder} {animal_id}"
 
     try:
