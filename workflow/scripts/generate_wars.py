@@ -17,7 +17,7 @@ from pathlib import Path
 from dask.distributed import Client, LocalCluster
 
 from neurodent import constants, core, visualization
-from neurodent.workflow import setup_snakemake_logging
+from neurodent.workflow import setup_snakemake_logging, inject_config_aliases
 
 
 def load_samples_and_config():
@@ -41,12 +41,7 @@ def generate_war_for_animal(samples_config, config, animal_folder, animal_id, lo
     core.set_temp_directory(config["temp_directory"])
 
     # Set aliases
-    if "GENOTYPE_ALIASES" in samples_config:
-        constants.GENOTYPE_ALIASES = samples_config["GENOTYPE_ALIASES"]
-    if "CHNAME_ALIASES" in samples_config:
-        constants.CHNAME_ALIASES = samples_config["CHNAME_ALIASES"]
-    if "LR_ALIASES" in samples_config:
-        constants.LR_ALIASES = samples_config["LR_ALIASES"]
+    inject_config_aliases(samples_config)
     animal_key = f"{animal_folder} {animal_id}"
 
     try:

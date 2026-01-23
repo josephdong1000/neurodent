@@ -66,6 +66,27 @@ def setup_snakemake_logging(snakemake) -> logging.Logger:
     return logging.getLogger(__name__)
 
 
+def inject_config_aliases(samples_config: dict):
+    """Inject aliases from samples_config into the global neurodent.constants.
+
+    This ensures that custom aliases for genotypes, channel names, and L/R labels
+    are available across all modules in the pipeline. This should be called at the
+    beginning of every Snakemake script that loads WindowAnalysisResults or uses
+    channel name parsing.
+
+    Args:
+        samples_config (dict): Configuration dictionary loaded from samples_jess.json
+    """
+    from neurodent import constants
+
+    if "GENOTYPE_ALIASES" in samples_config:
+        constants.GENOTYPE_ALIASES = samples_config["GENOTYPE_ALIASES"]
+    if "CHNAME_ALIASES" in samples_config:
+        constants.CHNAME_ALIASES = samples_config["CHNAME_ALIASES"]
+    if "LR_ALIASES" in samples_config:
+        constants.LR_ALIASES = samples_config["LR_ALIASES"]
+
+
 def load_wars(
     pkl_paths: list[str | Path],
     json_paths: list[str | Path] | None = None,
