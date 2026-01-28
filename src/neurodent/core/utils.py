@@ -267,7 +267,7 @@ def filepath_to_index(filepath) -> int:
         filepath (str | Path): Path to the file to extract index from.
 
     Returns:
-        int: The extracted index number.
+        int: The extracted index number, or 0 if no number is found in the filename.
 
     Examples:
         >>> filepath_to_index("/path/to/data_ColMajor_001.bin")
