@@ -300,29 +300,28 @@ class TestAnimalOrganizerTimestampHandling:
 
     @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
     @patch("glob.glob")
-    def test_missing_folder_in_dictionary_error(self, mock_glob, mock_lro_class):
-        """Test that missing folders in dictionary specification raise errors."""
+    def test_mixed_config_is_allowed(self, mock_glob, mock_lro_class):
+        """Test that dictionary with extra keys (mixed config) is allowed in fallback mode."""
         # Setup
         mock_glob.return_value = [str(self.folder1), str(self.folder2)]
         mock_lro_class.return_value = self._create_mock_lro()
 
-        # Dictionary with nonexistent folder
-        incomplete_spec = {
+        # Dictionary with extra "Start_Animal" key - should be ignored now
+        mixed_spec = {
             f"WT_{self.animal_id}_2023-01-15": datetime(2023, 1, 15, 10, 0, 0),
             f"WT_{self.animal_id}_2023-01-16": datetime(2023, 1, 16, 10, 0, 0),
-            "NonexistentFolder": datetime(2023, 1, 17, 10, 0, 0),  # This folder doesn't exist
+            "Start_Animal": datetime(2023, 1, 17, 10, 0, 0),
         }
 
-        with pytest.raises(ValueError) as exc_info:
-            results.AnimalOrganizer(
-                base_folder_path=str(self.base_path),
-                anim_id=self.animal_id,
-                mode="concat",
-                lro_kwargs={"manual_datetimes": incomplete_spec},
-            )
-
-        error_str = str(exc_info.value)
-        assert "Folder name" in error_str and "not found" in error_str
+        # Should NOT raise ValueError anymore
+        ao = results.AnimalOrganizer(
+            base_folder_path=str(self.base_path),
+            anim_id=self.animal_id,
+            mode="concat",
+            lro_kwargs={"manual_datetimes": mixed_spec},
+        )
+        
+        assert len(ao._processed_timestamps) == 2
 
     @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
     @patch("glob.glob")

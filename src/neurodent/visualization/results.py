@@ -517,6 +517,9 @@ class AnimalOrganizer(AnimalFeatureParser):
             dict: Mapping of folder_name -> Union[datetime, List[datetime]]
         """
         if isinstance(manual_datetimes, dict):
+            # Find folders for this animal to apply the spec
+            animal_folders = self._get_folders_for_animal(self.anim_id, animalday_to_folders)
+
             # Direct lookup: keys are expected to be animal IDs
             # Check for shadowing: if both Animal ID key AND flat folder keys are present
             has_id_key = self.anim_id in manual_datetimes
