@@ -518,15 +518,24 @@ class AnimalOrganizer(AnimalFeatureParser):
         """
         if isinstance(manual_datetimes, dict):
             # Direct lookup: keys are expected to be animal IDs
-            spec = manual_datetimes.get(self.anim_id)
+            # Check for shadowing: if both Animal ID key AND flat folder keys are present
+            has_id_key = self.anim_id in manual_datetimes
+            folder_names = {Path(f).name for f in animal_folders}
+            has_folder_keys = any(k in folder_names for k in manual_datetimes.keys())
             
-            # Find folders for this animal to apply the spec
-            animal_folders = self._get_folders_for_animal(self.anim_id, animalday_to_folders)
+            if has_id_key and has_folder_keys:
+                raise ValueError(
+                    f"Ambiguous manual_datetimes configuration for '{self.anim_id}'. "
+                    f"Both the Animal ID key '{self.anim_id}' and individual folder keys "
+                    f"(e.g., {[k for k in manual_datetimes.keys() if k in folder_names][:3]}) are present. "
+                    f"Please nest all folder keys under the Animal ID key to avoid ambiguity."
+                )
+
+            spec = manual_datetimes.get(self.anim_id)
             
             if spec is None:
                 # Check if manual_datetimes keys match any folders (backward compatibility for direct folder mapping)
-                folder_names = {Path(f).name for f in animal_folders}
-                if any(k in folder_names for k in manual_datetimes.keys()):
+                if has_folder_keys:
                     logging.info(f"manual_datetimes keys match folders for {self.anim_id}. Treating as folder mapping spec.")
                     spec = manual_datetimes
                 else:
@@ -554,26 +563,21 @@ class AnimalOrganizer(AnimalFeatureParser):
                 for folder_path, ts in zip(animal_folders, spec):
                     out[Path(folder_path).name] = self._resolve_timestamp_input(ts, Path(folder_path))
             elif isinstance(spec, dict):
-                # Handle dictionary mapping folder names to timestamps
-                for folder_path in animal_folders:
-                    fname = Path(folder_path).name
-                    if fname in spec:
-                        out[fname] = self._resolve_timestamp_input(spec[fname], Path(folder_path))
-                    else:
-                        missing_folders = [Path(f).name for f in animal_folders if Path(f).name not in spec]
-                        raise ValueError(
-                            f"Missing entries in manual_datetimes for folders: {missing_folders}. "
-                            f"When using a dictionary, all folders must be specified."
-                        )
-                
-                # Check for keys in spec that don't match folders (invalid folder names)
-                folder_names = {Path(f).name for f in animal_folders}
-                extra_keys = set(spec.keys()) - folder_names
-                if extra_keys:
-                    raise ValueError(
-                        f"Folder name(s) '{list(extra_keys)[0]}' not found. "
-                        f"Available folders: {list(folder_names)}"
-                    ) 
+                 # Handle dictionary mapping folder names to timestamps
+                 for folder_path in animal_folders:
+                     fname = Path(folder_path).name
+                     if fname in spec:
+                         out[fname] = self._resolve_timestamp_input(spec[fname], Path(folder_path))
+                     else:
+                         missing_folders = [Path(f).name for f in animal_folders if Path(f).name not in spec]
+                         raise ValueError(
+                             f"Missing entries in manual_datetimes for folders: {missing_folders}. "
+                             f"When using a dictionary, all folders must be specified."
+                         )
+                 
+                 # Note: We do NOT check for extra keys here anymore because in fallback mode (mixed bag),
+                 # the dictionary might contain keys for other animals or other purposes.
+                 # We only strictly enforce that all of THIS animal's folders are found.
             else:
                 resolved_dt = self._resolve_timestamp_input(spec, Path(animal_folders[0]))
                 sorted_folders = sorted(animal_folders, key=lambda f: Path(f).stem)
