@@ -934,11 +934,11 @@ class TestParseStrToDay:
             utils.parse_str_to_day("2023-07-04", date_patterns="invalid")
 
         # Test invalid tuple format
-        with pytest.raises(TypeError, match="must be a tuple of"):
+        with pytest.raises(TypeError, match="must be a sequence of"):
             utils.parse_str_to_day("2023-07-04", date_patterns=["invalid"])
 
         # Test invalid tuple length
-        with pytest.raises(TypeError, match="must be a tuple of"):
+        with pytest.raises(TypeError, match="must be a sequence of"):
             utils.parse_str_to_day("2023-07-04", date_patterns=[("pattern",)])
 
         # Test non-string elements
@@ -3171,14 +3171,13 @@ class TestFilepathToIndexEdgeCases:
     """Test edge cases for filepath_to_index function."""
 
     def test_no_numbers_in_path(self):
-        """Test filepath with no numbers raises IndexError."""
-        with pytest.raises(IndexError):
-            utils.filepath_to_index("/path/to/file_without_numbers.bin")
+        """Test filepath with no numbers returns 0."""
+        assert utils.filepath_to_index("/path/to/file_without_numbers.bin") == 0
 
     def test_only_extension_numbers(self):
-        """Test filepath where only the extension contains numbers raises IndexError."""
-        with pytest.raises(IndexError):
-            utils.filepath_to_index("/path/to/file.mp4")  # Only extension has numbers
+        """Test filepath where only the extension contains numbers returns 0."""
+        # Only extension has numbers, so they are stripped and result is empty list -> 0
+        assert utils.filepath_to_index("/path/to/file.mp4") == 0
 
 
 class TestNanaverageEdgeCases:
