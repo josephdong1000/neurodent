@@ -680,6 +680,12 @@ def generate_channel_impact_analysis(manual_ep, lof_ep, features, output_dir, ha
 
             # Calculate symmetric limits for proper centering
             abs_max = np.abs(version_data.values).max()
+            
+            # Handle case where all values are zero or NaN
+            if pd.isna(abs_max) or abs_max == 0:
+                logging.warning(f"No variation found in {version_title} (all zeros or NaNs). Setting default range.")
+                abs_max = 1e-6
+
             vmin, vmax = -abs_max, abs_max
 
             # Use TwoSlopeNorm for proper centering at zero with red-blue colormap
