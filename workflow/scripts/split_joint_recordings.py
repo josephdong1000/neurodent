@@ -18,7 +18,7 @@ Usage (via Snakemake):
 from pathlib import Path
 
 from neurodent.visualization import AnimalOrganizer
-from neurodent.workflow import setup_snakemake_logging
+from neurodent.workflow import setup_snakemake_logging, inject_config_aliases
 
 
 def main():
@@ -32,6 +32,10 @@ def main():
     joint_config = snakemake.params.joint_config
     data_parent = snakemake.params.data_parent
     split_config = snakemake.params.split_config
+    samples_config = snakemake.params.samples_config
+    
+    # Inject aliases
+    inject_config_aliases(samples_config)
     output_base = Path(snakemake.output[0])
     
     logger.info(f"Splitting joint session: {session}")

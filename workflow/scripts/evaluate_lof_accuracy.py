@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import f1_score, precision_score, recall_score
 
 from neurodent import visualization, core
-from neurodent.workflow import setup_snakemake_logging
+from neurodent.workflow import setup_snakemake_logging, inject_config_aliases
 
 
 def get_ground_truth_bad_channels(samples_config, animal_folder, animal_id):
@@ -341,6 +341,9 @@ def main():
     samples_config = snakemake.params.samples_config
     config = snakemake.params.config
     animal_folder_map = snakemake.params.animal_folder_map
+
+    # Inject aliases
+    inject_config_aliases(samples_config)
     animal_id_map = snakemake.params.animal_id_map
 
     output_csv = snakemake.output.results_csv

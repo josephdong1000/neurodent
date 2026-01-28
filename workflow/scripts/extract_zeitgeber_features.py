@@ -19,7 +19,7 @@ import pandas as pd
 # Import the new zeitgeber module
 from neurodent.core import get_expanded_feature_names
 from neurodent.core.zeitgeber import _load_war_for_zeitgeber
-from neurodent.workflow import setup_snakemake_logging
+from neurodent.workflow import setup_snakemake_logging, inject_config_aliases
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +35,10 @@ def main():
     input_war_jsons = snakemake.input.war_json
     output_pkl = snakemake.output.zeitgeber_features
     config = snakemake.params.config
+    samples_config = snakemake.params.samples_config
+
+    # Inject aliases
+    inject_config_aliases(samples_config)
 
     # Get zeitgeber processing parameters from config
     zeitgeber_params = config["analysis"]["zeitgeber"]
@@ -86,6 +90,7 @@ def main():
     # - interval_minutes: Ensure it matches what we want for aggregation
     pipeline_config = zeitgeber_params.copy()
     pipeline_config["shift_for_48h"] = False
+    pipeline_config["genotype_aliases"] = samples_config.get("GENOTYPE_ALIASES", {})
     
     for animal_name in sorted(pkl_animal_set):
         pkl_path = pkl_animals[animal_name]

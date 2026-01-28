@@ -20,7 +20,7 @@ matplotlib.use("Agg")  # Non-interactive backend
 import matplotlib.colors as colors
 
 from neurodent import visualization, constants
-from neurodent.workflow import setup_snakemake_logging, load_wars
+from neurodent.workflow import setup_snakemake_logging, load_wars, inject_config_aliases
 
 
 def generate_regular_heatmaps(ep, features, output_dir, data_dir, ep_config):
@@ -176,6 +176,10 @@ def main():
     war_pkl_files = snakemake.input.war_pkl
     war_json_files = snakemake.input.war_json
     config = snakemake.params.config
+    samples_config = snakemake.params.samples_config
+
+    # Inject aliases
+    inject_config_aliases(samples_config)
 
     # Create output directories
     output_dir = Path(snakemake.output.heatmap_dir)

@@ -20,6 +20,7 @@ rule generate_ep_figures:
         data_dir=directory("results/ep_data/"),
     params:
         config=config,
+        samples_config=samples_config,
     threads:
         config["cluster"]["ep_figures"]["threads"]
     retries:

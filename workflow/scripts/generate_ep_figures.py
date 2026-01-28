@@ -24,7 +24,7 @@ import seaborn.objects as so
 from seaborn import axes_style
 
 from neurodent import visualization, constants
-from neurodent.workflow import setup_snakemake_logging, load_wars
+from neurodent.workflow import setup_snakemake_logging, load_wars, inject_config_aliases
 
 
 def process_feature_dataframe(df, feature):
@@ -234,6 +234,10 @@ def main():
     war_pkl_files = snakemake.input.war_pkl
     war_json_files = snakemake.input.war_json
     config = snakemake.params.config
+    samples_config = snakemake.params.samples_config
+
+    # Inject aliases
+    inject_config_aliases(samples_config)
 
     # Create output directories
     output_dir = Path(snakemake.output.figure_dir)

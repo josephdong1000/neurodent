@@ -28,7 +28,7 @@ from seaborn import axes_style
 from neurodent.core import zeitgeber
 from neurodent.visualization.plotting import ZeitgeberPlotter
 from neurodent import constants
-from neurodent.workflow import setup_snakemake_logging
+from neurodent.workflow import setup_snakemake_logging, inject_config_aliases
 
 
 
@@ -109,6 +109,10 @@ def main():
     # Get inputs and config
     zeitgeber_file = snakemake.input.zeitgeber_features
     config = snakemake.params.config
+    samples_config = snakemake.params.samples_config
+
+    # Inject aliases
+    inject_config_aliases(samples_config)
 
     # Create output directories
     output_dir = Path(snakemake.output.figure_dir)

@@ -22,6 +22,7 @@ rule extract_zeitgeber_features:
         config["cluster"]["war_zeitgeber"]["retries"]
     params:
         config=config,
+        samples_config=samples_config,
     resources:
         time=config["cluster"]["war_zeitgeber"]["time"],
         mem_mb=increment_memory(config["cluster"]["war_zeitgeber"]["mem_mb"]),

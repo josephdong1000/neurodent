@@ -47,6 +47,7 @@ rule split_joint_recordings:
         joint_config=lambda wc: samples_config["joint_sessions"][wc.session],
         data_parent=samples_config["data_parent_folder"],
         split_config=config["analysis"]["split_recordings"],
+        samples_config=samples_config,
     threads: config["cluster"]["split_joint_recordings"]["threads"]
     resources:
         time=config["cluster"]["split_joint_recordings"]["time"],
