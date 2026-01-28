@@ -27,6 +27,47 @@ from neurodent import visualization, constants
 from neurodent.workflow import setup_snakemake_logging, load_wars, inject_config_aliases
 
 
+def infer_metadata_columns(df):
+    """
+    Infer metadata columns (sex, gene) from genotype and animal ID.
+    This logic is isolated as it may change depending on project conventions.
+    """
+    df = df.copy()
+
+    # Add categorical columns based on genotype
+    if "genotype" in df.columns:
+        # First try to map from standard genotypes
+        df["sex"] = df["genotype"].map(
+            lambda x: "Male" if x in ["MWT", "MHet", "MMut"] else "Female" if x in ["FWT", "FHet", "FMut"] else None
+        )
+        
+        # If sex is missing, try to infer from animal ID (e.g. "...-M" or "...-F")
+        if df["sex"].isnull().any() and "animal" in df.columns:
+            def infer_sex_from_animal(row):
+                if pd.notna(row["sex"]):
+                    return row["sex"]
+                animal = str(row["animal"]).upper()
+                if animal.endswith("-M") or animal.endswith("_M"):
+                    return "Male"
+                if animal.endswith("-F") or animal.endswith("_F"):
+                    return "Female"
+                return "Unknown"
+            
+            df["sex"] = df.apply(infer_sex_from_animal, axis=1)
+
+        # Map gene/genotype
+        df["gene"] = df["genotype"].map(
+            lambda x: "WT"
+            if x in ["MWT", "FWT", "WT"]  # Added WT explicitly
+            else "Het"
+            if x in ["MHet", "FHet"]
+            else "Mut"
+            if x in ["MMut", "FMut", "HOMO"] # Added HOMO explicitly if possible, or just fallback
+            else x
+        )
+    return df
+
+
 def process_feature_dataframe(df, feature):
     """Process feature dataframe by adding categorical columns and pivoting.
 
@@ -49,33 +90,30 @@ def process_feature_dataframe(df, feature):
     if "isday" not in df.columns:
         groupby.remove("isday")
 
-    # Add categorical columns based on genotype
-    df["sex"] = df["genotype"].map(
-        lambda x: "Male" if x in ["MWT", "MHet", "MMut"] else "Female" if x in ["FWT", "FHet", "FMut"] else None
-    )
-    df["gene"] = df["genotype"].map(
-        lambda x: "WT"
-        if x in ["MWT", "FWT"]
-        else "Het"
-        if x in ["MHet", "FHet"]
-        else "Mut"
-        if x in ["MMut", "FMut"]
-        else x
-    )
+    # Infer metadata (sex, gene) from genotype/animal ID
+    df = infer_metadata_columns(df)
 
     if "isday" in df.columns:
         df["isday"] = df["isday"].map(lambda x: "Day" if x else "Night")
 
     # Create pivot table
+    pivot_index = ["animal", "gene", "sex"] if "gene" in df.columns and "sex" in df.columns else ["animal"]
+    if "genotype" in df.columns and "gene" not in df.columns:
+        pivot_index.append("genotype")
+    if "freq" in df.columns:
+        pivot_index.append("freq")
+        
+    pivot_columns = []
+    if "isday" in df.columns:
+        pivot_columns.append("isday")
+    if "band" in df.columns:
+        pivot_columns.append("band")
+    if not pivot_columns:
+        pivot_columns = None
+
     df_pivot = df.pivot_table(
-        index=["animal", "gene", "sex"] if "freq" not in df.columns else ["animal", "gene", "sex", "freq"],
-        columns=["isday", "band"]
-        if ("isday" in df.columns and "band" in df.columns)
-        else "band"
-        if "band" in df.columns
-        else "isday"
-        if "isday" in df.columns
-        else None,
+        index=pivot_index,
+        columns=pivot_columns,
         values=feature,
         aggfunc="mean",
         observed=True,
@@ -183,11 +221,6 @@ def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
                 .theme(
                     axes_style("ticks")
                     | sns.plotting_context("notebook")
-                    | {
-                        "axes.prop_cycle": plt.cycler(
-                            color=[blue, orange, red, green, purple, yellow, lightblue, black]
-                        )
-                    }
                     | {"axes.spines.right": False, "axes.spines.top": False}
                 )
                 .layout(size=(10, 6), engine="tight")
@@ -259,8 +292,21 @@ def main():
     features = ep_config["features"]
     exclude_features = ep_config.get("exclude_features", [])
 
-    # Create genotype ordering
+    # Create genotype ordering - ensure we include all genotypes present in the data
     genotype_order = ["MWT", "MHet", "MMut", "FWT", "FHet", "FMut"]
+    
+    # Check for genotypes in loaded WARs that aren't in the default list
+    found_genotypes = set()
+    for war in wars:
+        if hasattr(war, "genotype") and war.genotype:
+            found_genotypes.add(war.genotype)
+    
+    # Add any missing genotypes to the order list
+    for gt in found_genotypes:
+        if gt not in genotype_order:
+            logging.info(f"Adding unknown genotype '{gt}' to plot order")
+            genotype_order.append(gt)
+            
     plot_order = constants.DF_SORT_ORDER.copy()
     plot_order["genotype"] = genotype_order
 

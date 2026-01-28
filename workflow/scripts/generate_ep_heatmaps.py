@@ -84,6 +84,33 @@ def generate_regular_heatmaps(ep, features, output_dir, data_dir, ep_config):
             raise
 
 
+def filter_wars_by_sex(wars, sex):
+    """
+    Filter WARs by sex using genotype and animal ID.
+    This logic is subject to change.
+    """
+    sex_wars = []
+    for war in wars:
+        # Check genotype first
+        if war.genotype.startswith(sex) and war.genotype not in ["WT", "HOMO"]: # avoid matching if genotype is just WT/HOMO unless they start with M/F (unlikely)
+                sex_wars.append(war)
+        # Fallback to animal ID
+        elif war.animal_id.upper().endswith(f"-{sex}") or war.animal_id.upper().endswith(f"_{sex}"):
+            sex_wars.append(war)
+    return sex_wars
+
+
+def determine_baseline_key(found_genotypes, sex):
+    """Determine the baseline genotype key for difference maps."""
+    if f"{sex}WT" in found_genotypes:
+        return f"{sex}WT"
+    elif "WT" in found_genotypes:
+        return "WT"
+    else:
+        # Fallback
+        return f"{sex}WT"
+
+
 def generate_difference_heatmaps(wars, features, output_dir, config):
     """Generate difference heatmaps (baseline comparison)"""
 
@@ -101,7 +128,7 @@ def generate_difference_heatmaps(wars, features, output_dir, config):
             logger.info(f"Generating difference heatmaps for {sex} vs {sex}WT")
 
             # Filter wars by sex
-            sex_wars = [war for war in wars if war.genotype.startswith(sex)]
+            sex_wars = filter_wars_by_sex(wars, sex)
 
             if not sex_wars:
                 logger.warning(f"No wars found for sex {sex}")
@@ -109,6 +136,13 @@ def generate_difference_heatmaps(wars, features, output_dir, config):
 
             # Create genotype ordering
             genotype_order = ["MWT", "MHet", "MMut", "FWT", "FHet", "FMut"]
+            
+            # Add observed genotypes
+            found_genotypes = set(w.genotype for w in sex_wars)
+            for gt in found_genotypes:
+                if gt not in genotype_order:
+                    genotype_order.append(gt)
+
             plot_order = constants.DF_SORT_ORDER.copy()
             plot_order["genotype"] = genotype_order
 
@@ -117,7 +151,10 @@ def generate_difference_heatmaps(wars, features, output_dir, config):
                 plot_order=plot_order,
             )
 
-            baseline_key = f"{sex}WT"
+            # Determine baseline key
+            baseline_key = determine_baseline_key(found_genotypes, sex)
+            if baseline_key not in found_genotypes and "WT" not in found_genotypes: # extra warning if really missing
+                 logger.warning(f"Could not find exact baseline genotype for {sex}. Using {baseline_key} (might fail). Found: {found_genotypes}")
 
             for feature in features:
                 logger.info(f"Generating difference heatmap for {feature} ({sex} vs {baseline_key})")
@@ -200,8 +237,21 @@ def main():
     ep_config = config["analysis"]["ep_heatmaps"]
     features = ep_config["matrix_features"]
 
-    # Create genotype ordering
+    # Create genotype ordering - ensure we include all genotypes present in the data
     genotype_order = ["MWT", "MHet", "MMut", "FWT", "FHet", "FMut"]
+    
+    # Check for genotypes in loaded WARs that aren't in the default list
+    found_genotypes = set()
+    for war in wars:
+        if hasattr(war, "genotype") and war.genotype:
+            found_genotypes.add(war.genotype)
+    
+    # Add any missing genotypes to the order list
+    for gt in found_genotypes:
+        if gt not in genotype_order:
+            logging.info(f"Adding unknown genotype '{gt}' to plot order")
+            genotype_order.append(gt)
+
     plot_order = constants.DF_SORT_ORDER.copy()
     plot_order["genotype"] = genotype_order
 
