@@ -289,6 +289,8 @@ def filepath_to_index(filepath) -> int:
     fname = Path(fpath).name
     fname = re.split(r"\D+", fname)
     fname = list(filter(None, fname))
+    if not fname:
+        return 0
     return int(fname[-1])
 
 
