@@ -221,16 +221,38 @@ class TestAnimalOrganizerTimestampHandling:
         mock_glob.return_value = [str(self.folder1)]
         mock_lro_class.return_value = self._create_mock_lro()
 
-        # Test invalid type (string instead of datetime)
+        # Test invalid type (int instead of datetime/str/list)
         with pytest.raises(TypeError) as exc_info:
             results.AnimalOrganizer(
                 base_folder_path=str(self.base_path),
                 anim_id=self.animal_id,
                 mode="concat",
-                lro_kwargs={"manual_datetimes": "2023-01-15 10:00:00"},  # String instead of datetime
+                lro_kwargs={"manual_datetimes": 12345},  # Int instead of datetime
             )
 
         assert "Invalid timestamp input type" in str(exc_info.value)
+    
+    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    @patch("glob.glob")
+    def test_invalid_list_items_error(self, mock_glob, mock_lro_class):
+        """Test that lists with non-datetime items raise errors."""
+        # Setup
+        mock_glob.return_value = [str(self.folder1)]
+        mock_lro_class.return_value = self._create_mock_lro()
+
+        # Test invalid list items
+        invalid_list = [datetime(2023, 1, 15, 10, 0, 0), "not a datetime"]
+
+        with pytest.raises(TypeError) as exc_info:
+            results.AnimalOrganizer(
+                base_folder_path=str(self.base_path),
+                anim_id=self.animal_id,
+                mode="concat",
+                lro_kwargs={"manual_datetimes": invalid_list},
+            )
+
+        assert "All items in timestamp list must be datetime objects" in str(exc_info.value)
+
 
     @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
     @patch("glob.glob")
@@ -598,7 +620,7 @@ class TestAnimalOrganizerTimestampHandling:
 
         # Test invalid type
         with pytest.raises(TypeError) as exc_info:
-            ao._resolve_timestamp_input("invalid", test_folder)
+            ao._resolve_timestamp_input(12345, test_folder)
         assert "Invalid timestamp input type" in str(exc_info.value)
 
         # Test invalid list items
