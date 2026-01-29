@@ -16,6 +16,10 @@ import pandas as pd
 # Load configuration
 configfile: "config/config.yaml"
 
+# Load local override if it exists
+if os.path.exists("config/config.local.yaml"):
+    configfile: "config/config.local.yaml"
+
 
 samples_file = config["samples"]["samples_file"]
 
