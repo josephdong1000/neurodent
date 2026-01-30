@@ -49,6 +49,7 @@ from .utils import (
     get_file_stem,
     should_use_cache_unified,
     get_cache_status_message,
+    convert_intan_chname_mne,
 )
 
 
@@ -1186,10 +1187,41 @@ class LongRecordingOrganizer:
                 extract_func, input_type, datafolder, datafile, datafiles, **kwargs
             )
 
+            # Check if channel names in MNE Raw object are in Intan format and convert if necessary
+            if any("intan" in ch_name.lower() for ch_name in raw.info["ch_names"]):
+                logging.info("Converting Intan channel names to MNE format")
+                convert_intan_chname_mne(raw)
+
             # Create the intermediate file
             if intermediate == "edf":
                 logging.info(f"Exporting raw to {fname}")
-                mne.export.export_raw(fname, raw=raw, fmt="edf", overwrite=True)
+                try:
+                    mne.export.export_raw(fname, raw=raw, fmt="edf", overwrite=True)
+                except ValueError as e:
+                    if "exceeds maximum field length" in str(e):
+                        logging.warning(f"EDF export failed due to signal range: {e}. Retrying with robust physical range.")
+                        # Calculate robust range (0.01 - 99.99 percentile) to exclude artifacts
+                        data = raw.get_data()
+                        # Use data percentiles to define physical range, excluding extreme outliers
+                        p_min, p_max = np.percentile(data, [0.01, 99.99])
+                        
+                        # Helper to ensure float fits in 8 chars (EDF limit)
+                        def to_valid_edf_float(val):
+                            # Try formatting with decreasing precision
+                            for fmt in [".6g", ".5g", ".4g", ".3g", ".2g"]:
+                                s = f"{val:{fmt}}"
+                                if len(s) <= 8:
+                                    return float(s)
+                            # Fallback
+                            return float(f"{val:.2e}")
+                            
+                        safe_min = to_valid_edf_float(p_min)
+                        safe_max = to_valid_edf_float(p_max)
+                        
+                        logging.info(f"Using robust physical range: ({safe_min}, {safe_max})")
+                        mne.export.export_raw(fname, raw=raw, fmt="edf", overwrite=True, physical_range=(safe_min, safe_max))
+                    else:
+                        raise
 
                 logging.info("Reading edf file")
                 rec = se.read_edf(fname)
@@ -1428,7 +1460,12 @@ class LongRecordingOrganizer:
         """
         data = self.LongRecording.get_traces(
             return_scaled=True
-        )  # This gets data in (n_samples, n_channels) format
+        )  # This gets data in (n_samples, n_channels) format used by SpikeInterface
+        
+        # MNE expects data in Volts (V), but SpikeInterface return_scaled=True returns microvolts (uV)
+        # Convert uV to V to prevent huge values that crash MNE export (e.g. to EDF)
+        data = data * 1e-6
+
         data = data.T  # Convert to (n_channels, n_samples) format for MNE
 
         info = mne.create_info(
@@ -1438,6 +1475,16 @@ class LongRecordingOrganizer:
         )
 
         return mne.io.RawArray(data=data, info=info)
+
+    def save_to_edf(self, filename: Union[str, Path], overwrite: bool = False):
+        """Save the recording to an EDF file via MNE.
+        
+        Args:
+            filename (str | Path): Path to save the EDF file to.
+            overwrite (bool): Whether to overwrite if file exists.
+        """
+        raw = self.convert_to_mne()
+        mne.export.export_raw(str(filename), raw, fmt="edf", overwrite=overwrite)
 
     def compute_bad_channels(
         self,

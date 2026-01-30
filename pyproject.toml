@@ -44,6 +44,8 @@ dependencies = [
     "appnope",
     "zarr>=2.18.3",
     "scikit-learn>=1.7.2",
+    "edfio>=0.4.12",
+    "pyedflib>=0.1.42",
 ]
 requires-python = ">=3.10"
 keywords = [
