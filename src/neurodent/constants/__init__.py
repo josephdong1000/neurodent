@@ -55,6 +55,10 @@ from .mappings import (
     FEATURE_LABELS,
 )
 
+# ANIMAL_METADATA is injected at runtime by inject_config_aliases()
+# Default is empty dict until populated
+ANIMAL_METADATA: dict = {}
+
 from .analysis import (
     LINEAR_FEATURES,
     BAND_FEATURES,
@@ -89,6 +93,7 @@ __all__ = [
     # Mappings
     "DEFAULT_ID_TO_LR",
     "GENOTYPE_ALIASES",
+    "ANIMAL_METADATA",
     "CHNAME_ALIASES",
     "LR_ALIASES",
     "DEFAULT_ID_TO_NAME",

@@ -75,16 +75,22 @@ def inject_config_aliases(samples_config: dict):
     channel name parsing.
 
     Args:
-        samples_config (dict): Configuration dictionary loaded from samples_jess.json
+        samples_config (dict): Configuration dictionary loaded from samples.json
     """
     from neurodent import constants
+    from neurodent.core import metadata as metadata_module
 
+    # Legacy: GENOTYPE_ALIASES for file path parsing (parse_str_to_genotype)
     if "GENOTYPE_ALIASES" in samples_config:
         constants.GENOTYPE_ALIASES = samples_config["GENOTYPE_ALIASES"]
     if "CHNAME_ALIASES" in samples_config:
         constants.CHNAME_ALIASES = samples_config["CHNAME_ALIASES"]
     if "LR_ALIASES" in samples_config:
         constants.LR_ALIASES = samples_config["LR_ALIASES"]
+    
+    # New: ANIMAL_METADATA for sex/gene enrichment (required)
+    if "ANIMAL_METADATA" in samples_config:
+        constants.ANIMAL_METADATA = metadata_module.load_animal_metadata(samples_config)
 
 
 def load_wars(

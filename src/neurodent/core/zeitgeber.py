@@ -10,6 +10,7 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 from .. import visualization
+from . import metadata as metadata_module
 
 logger = logging.getLogger(__name__)
 
@@ -316,81 +317,50 @@ def transform_time_axis(df, time_range=(0, 48), shift=0):
     return df
 
 
-def enrich_genotype_metadata(df, genotype_pattern=None, sex_mapper=None, genotype_aliases=None):
+def enrich_genotype_metadata(df, genotype_pattern=None, sex_mapper=None, genotype_aliases=None, animal_metadata=None):
     """
-    Extract 'sex' and 'gene' from 'genotype' column or 'animal' ID if aliases are provided.
-
-    Args:
-        df (pd.DataFrame): DataFrame potentially containing 'genotype' and 'animal'.
-        genotype_pattern (str, optional): Regex pattern with named groups to extract metadata.
-        sex_mapper (dict, optional): Dictionary to map extracted sex abbreviations to full names.
-        genotype_aliases (dict, optional): Map of Gene -> List of Animal IDs.
-            Example: {"WT": ["Animal1", "Animal2"], "Mut": ["Animal3"]}
-
-    Returns:
-        pd.DataFrame: DataFrame with added 'sex' and 'gene' columns.
-    """
-    if sex_mapper is None:
-        sex_mapper = {"M": "Male", "F": "Female", "m": "Male", "f": "Female"}
-
-    # 1. Try to use explicit aliases first if provided and 'animal' column exists
-    if genotype_aliases and "animal" in df.columns:
-        logger.info("Enriching metadata using provided genotype_aliases")
-        # Build reverse map: AnimalID -> Gene
-        animal_to_gene = {}
-        for gene, animals in genotype_aliases.items():
-            for animal in animals:
-                animal_to_gene[animal] = gene
-        
-        # Map gene
-        df["gene"] = df["animal"].map(animal_to_gene)
-
-        # Infer sex from animal name suffix if possible (-M/-F)
-        if "sex" not in df.columns or df["sex"].isnull().any():
-             # Basic suffix check
-             df["sex"] = df["animal"].apply(lambda x: "Male" if str(x).lower().endswith("-m") else "Female" if str(x).lower().endswith("-f") else None)
-             
-        # If successfully mapped, we can return early or continue to fill gaps?
-        # Let's fill gaps using fallback logic below
+    DEPRECATED: Use neurodent.core.metadata.enrich_metadata instead.
     
-    if "genotype" in df.columns:
-        if df.empty:
-            for col in ["sex", "gene"]:
-                if col not in df.columns:
-                    df[col] = pd.Series([], dtype=object)
-            return df
-
-        # Ensure genotype is string
-        if not pd.api.types.is_string_dtype(df["genotype"]):
-            df["genotype"] = df["genotype"].astype(str)
-
-        if genotype_pattern:
-            logger.info(f"Extracting metadata with pattern: {genotype_pattern}")
-            extracted = df["genotype"].str.extract(genotype_pattern)
-            for col in extracted.columns:
-                 # Only overwrite if not already present or null
-                if col not in df.columns:
-                    df[col] = extracted[col]
-                else:
-                    df[col] = df[col].fillna(extracted[col])
-
-            if "sex" in df.columns and sex_mapper:
-                mask = df["sex"].isin(sex_mapper.keys())
-                if mask.any():
-                    df.loc[mask, "sex"] = df.loc[mask, "sex"].map(sex_mapper)
-
-        else:
-            # Default Strategy (M_WT) as fallback
-            if "sex" not in df.columns:
-                df["sex"] = df["genotype"].str[0].map({"F": "Female", "M": "Male"})
+    This function is kept for backward compatibility but will be removed in a future version.
+    """
+    import warnings
+    warnings.warn(
+        "enrich_genotype_metadata is deprecated. Use neurodent.core.metadata.enrich_metadata instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
+    
+    # If new-style animal_metadata is provided, use the new module
+    if animal_metadata is not None:
+        return metadata_module.enrich_metadata(df, animal_metadata)
+    
+    # Legacy fallback: use old logic with genotype_aliases
+    # This is a simplified pass-through for backward compat
+    if genotype_aliases and "animal" in df.columns:
+        # Build reverse map
+        animal_to_genotype = {}
+        for genotype_group, animals in genotype_aliases.items():
+            for animal in animals:
+                animal_to_genotype[animal] = genotype_group
+        
+        # Convert to new format
+        animal_metadata_converted = {}
+        for animal_id, genotype_key in animal_to_genotype.items():
+            # Parse genotype key to extract sex and gene
+            if "_" in genotype_key:
+                parts = genotype_key.split("_", 1)
+                sex_char, gene = parts[0], parts[1]
+            elif len(genotype_key) >= 2 and genotype_key[0].upper() in ("M", "F"):
+                sex_char, gene = genotype_key[0], genotype_key[1:]
             else:
-                df["sex"] = df["sex"].fillna(df["genotype"].str[0].map({"F": "Female", "M": "Male"}))
-
-            if "gene" not in df.columns:
-                df["gene"] = df["genotype"].str[2:]
-            else:
-                df["gene"] = df["gene"].fillna(df["genotype"].str[2:])
-
+                sex_char, gene = None, genotype_key
+            
+            sex = {"M": "Male", "F": "Female", "m": "Male", "f": "Female"}.get(sex_char)
+            animal_metadata_converted[animal_id] = {"sex": sex, "gene": gene}
+        
+        return metadata_module.enrich_metadata(df, animal_metadata_converted)
+    
+    # No metadata provided, return as-is
     return df
 
 
@@ -423,33 +393,34 @@ def run_zeitgeber_pipeline(
     exclude_from_baseline=None,
     interval_minutes=60,
     zeitgeber_shift_hours=6,
+    shift_for_48h=True,
+    animal_metadata=None,
+    # Deprecated params (kept for backward compat)
     genotype_pattern=None,
     sex_mapper=None,
-    shift_for_48h=True,
     genotype_aliases=None,
 ):
     """
     Main orchestration function for processing zeitgeber data.
 
     The pipeline performs the following steps:
-    1. Enrich metadata (sex, gene).
+    1. Enrich metadata (sex, gene) from ANIMAL_METADATA.
     2. Shift to Zeitgeber Time (ZT) reference.
     3. Subtract baseline.
     4. Prepare for plotting (48h expansion).
 
     Args:
-        df (pd.DataFrame): Input dataframe with 'total_minutes', 'genotype'.
+        df (pd.DataFrame): Input dataframe with 'total_minutes', 'animal'.
         baseline_hours (int): Baseline duration from ZT0. Default 12.
         baseline_window (tuple | str): Explicit baseline window. Override.
         exclude_from_baseline (list): Columns to skip.
-        interval_minutes (int): Binning interval. Ensure data is correctly binned if this is passed.
-            Note: This function doesn't re-bin, just passes it if needed
-            (though here it's mostly for signature compatibility).
+        interval_minutes (int): Binning interval.
         zeitgeber_shift_hours (int): Shift applied to align Clock Time to ZT. Default 6.
-        genotype_pattern (str, optional): Regex pattern for metadata extraction. See `enrich_genotype_metadata`.
-        sex_mapper (dict, optional): Mapper for sex abbreviations. See `enrich_genotype_metadata`.
         shift_for_48h (bool, optional): Whether to duplicate data for 48h plotting. Defaults to True.
-        genotype_aliases (dict, optional): Map of Gene -> List[AnimalID] for explicit mapping.
+        animal_metadata (dict, optional): Dict of animal_id -> {sex, gene} from load_animal_metadata().
+        genotype_pattern (str, optional): DEPRECATED.
+        sex_mapper (dict, optional): DEPRECATED.
+        genotype_aliases (dict, optional): DEPRECATED. Use animal_metadata instead.
 
     Returns:
         pd.DataFrame: Fully processed dataframe.
@@ -459,12 +430,16 @@ def run_zeitgeber_pipeline(
     df_processed = df.copy()
 
     # 1. Enrich Metadata
-    df_processed = enrich_genotype_metadata(
-        df_processed, 
-        genotype_pattern=genotype_pattern, 
-        sex_mapper=sex_mapper,
-        genotype_aliases=genotype_aliases
-    )
+    if animal_metadata is not None:
+        df_processed = metadata_module.enrich_metadata(df_processed, animal_metadata)
+    elif genotype_aliases is not None:
+        # Legacy path
+        df_processed = enrich_genotype_metadata(
+            df_processed, 
+            genotype_pattern=genotype_pattern, 
+            sex_mapper=sex_mapper,
+            genotype_aliases=genotype_aliases
+        )
 
     # 2. Shift to ZT
     df_processed = shift_to_zeitgeber_reference(
