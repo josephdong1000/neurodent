@@ -90,7 +90,10 @@ def main():
     # - interval_minutes: Ensure it matches what we want for aggregation
     pipeline_config = zeitgeber_params.copy()
     pipeline_config["shift_for_48h"] = False
-    pipeline_config["genotype_aliases"] = samples_config.get("GENOTYPE_ALIASES", {})
+    
+    # Use ANIMAL_METADATA (injected by inject_config_aliases, required)
+    from neurodent import constants
+    pipeline_config["animal_metadata"] = constants.ANIMAL_METADATA
     
     for animal_name in sorted(pkl_animal_set):
         pkl_path = pkl_animals[animal_name]

@@ -35,7 +35,7 @@ import pandas as pd
 import psutil
 import seaborn as sns
 from neurodent.workflow import setup_snakemake_logging, inject_config_aliases
-from neurodent.core.zeitgeber import enrich_genotype_metadata
+from neurodent.core import metadata as metadata_module
 
 from neurodent.constants import OKABE_ITO_COLORS
 from neurodent import visualization, constants
@@ -149,21 +149,16 @@ def process_feature_dataframe(df, samples_config):
 
     Args:
         df (pd.DataFrame): Input dataframe with feature data
-        samples_config (dict): Samples configuration containing GENOTYPE_ALIASES
+        samples_config (dict): Samples configuration containing ANIMAL_METADATA
 
     Returns:
         pd.DataFrame: Processed dataframe with sex and gene columns
     """
     df = df.copy()
     
-    # Use centralized metadata enrichment logic
-    # This handles GENOTYPE_ALIASES, simple suffix parsing (-M/-F), and fallbacks
-    # It adds 'sex' and 'gene' columns to the dataframe
-    
-    # Get genotype aliases from samples_config
-    genotype_aliases = samples_config.get("GENOTYPE_ALIASES", {})
-    
-    df = enrich_genotype_metadata(df, genotype_aliases=genotype_aliases)
+    # Use ANIMAL_METADATA for explicit sex/gene lookup (required)
+    animal_metadata = metadata_module.load_animal_metadata(samples_config)
+    df = metadata_module.enrich_metadata(df, animal_metadata)
 
     if "isday" in df.columns:
         df["isday"] = df["isday"].map(lambda x: "Day" if x else "Night")
