@@ -197,7 +197,10 @@ class TestInjectConfigAliases:
         from neurodent.workflow.utils import inject_config_aliases
         
         # Save original state
-        original = getattr(constants, 'ANIMAL_METADATA', None)
+        original_meta = getattr(constants, 'ANIMAL_METADATA', None)
+        original_aliases = getattr(constants, 'GENOTYPE_ALIASES', None)
+        
+        # Explicitly clear/set state for validation
         constants.ANIMAL_METADATA = {}
         
         config = {"GENOTYPE_ALIASES": {"MWT": ["M1"]}}  # No ANIMAL_METADATA
@@ -207,8 +210,10 @@ class TestInjectConfigAliases:
         assert constants.ANIMAL_METADATA == {}
         
         # Restore
-        if original is not None:
-            constants.ANIMAL_METADATA = original
+        if original_meta is not None:
+            constants.ANIMAL_METADATA = original_meta
+        if original_aliases is not None:
+            constants.GENOTYPE_ALIASES = original_aliases
 
     def test_injects_genotype_aliases(self):
         """Test that GENOTYPE_ALIASES is still injected for legacy uses."""
