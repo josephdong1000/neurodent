@@ -315,6 +315,7 @@
         {"id": "AM4", "gene": "WT", "sex": "Male"},
         {"id": "AM2", "gene": "WT", "sex": "Male"},
         {"id": "CM9", "gene": "WT", "sex": "Male"},
+        {"id": "M10", "gene": "WT", "sex": "Male"},
         {"id": "MHet", "gene": "Het", "sex": "Male"},
         {"id": "MHET", "gene": "Het", "sex": "Male"},
         {"id": "M8_HET", "gene": "Het", "sex": "Male"},
