@@ -207,7 +207,7 @@ analysis:
 # SLURM cluster configuration
 cluster:
   war_generation:
-    time: "3h"
+    time: "6h"
     mem_mb: 70_000
     nodes: 1
     threads: 10
