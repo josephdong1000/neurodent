@@ -2140,6 +2140,10 @@ class LongRecordingOrganizer:
         Raises:
             ImportError: If SpikeInterface preprocessing is not available
         """
+        # Guard clause: return early if recording is None or invalid
+        if recording is None:
+            return recording
+        
         if spre is None:
             raise ImportError("SpikeInterface preprocessing is required for resampling")
 
