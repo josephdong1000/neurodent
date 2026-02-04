@@ -1,5 +1,6 @@
 import glob
 import gzip
+import copy
 import json
 import logging
 import math
@@ -527,7 +528,10 @@ class LongRecordingOrganizer:
     
     def _init_from_recording(self, recording: "si.BaseRecording"):
         """Initialize LRO from an existing SpikeInterface recording object (in-memory)."""
-        self.LongRecording = recording
+        # Enforce global dtype and resampling
+        self.LongRecording = self._apply_resampling(recording)
+        recording = self.LongRecording
+        
         self._is_in_memory = True
         
         # Extract metadata from recording
@@ -968,9 +972,16 @@ class LongRecordingOrganizer:
         Raises:
             ValueError: If no files are found for the given ``file_pattern`` or ``input_type`` is invalid.
         """
-        # Filter out binary-mode-only kwargs that aren't relevant for SI extract functions
-        binary_only_kwargs = ["overwrite_rowbins"]
-        kwargs = {k: v for k, v in kwargs.items() if k not in binary_only_kwargs}
+        # Filter out LRO-specific kwargs that aren't relevant for SI extract functions
+        lro_only_kwargs = [
+            "overwrite_rowbins",
+            "mode",  # LRO mode, not extracted func mode
+            "input_type",
+            "file_pattern",
+            "manual_datetimes",
+            "datetimes_are_start",
+        ]
+        kwargs = {k: v for k, v in kwargs.items() if k not in lro_only_kwargs}
         if si is None:
             raise ImportError(
                 "SpikeInterface is required for convert_file_with_si_to_recording"
@@ -985,17 +996,22 @@ class LongRecordingOrganizer:
         elif input_type == "file":
             # For single file, validate that timestamps are provided
             self._validate_timestamps_for_mode("si", 1)
-            datafiles = sorted(
-                glob.glob(str(self.base_folder_path / file_pattern)),
-                key=filepath_to_index,
-            )
-            if len(datafiles) == 0:
-                raise ValueError(f"No files found matching pattern: {file_pattern}")
-            elif len(datafiles) > 1:
-                warnings.warn(
-                    f"Multiple files found matching pattern: {file_pattern}. Using first file."
+            # If base_folder_path is already a file, use it directly
+            if self.base_folder_path.is_file():
+                datafile = str(self.base_folder_path)
+            else:
+                # Otherwise glob for files
+                datafiles = sorted(
+                    glob.glob(str(self.base_folder_path / file_pattern)),
+                    key=filepath_to_index,
                 )
-            datafile = datafiles[0]
+                if len(datafiles) == 0:
+                    raise ValueError(f"No files found matching pattern: {file_pattern}")
+                elif len(datafiles) > 1:
+                    warnings.warn(
+                        f"Multiple files found matching pattern: {file_pattern}. Using first file."
+                    )
+                datafile = datafiles[0]
             rec: "si.BaseRecording" = extract_func(datafile, **kwargs)
             n_processed_files = 1
         elif input_type == "files":
@@ -1613,8 +1629,32 @@ class LongRecordingOrganizer:
             # Inherit parent timestamps
             child_lro.manual_datetimes = self.manual_datetimes
             child_lro.datetimes_are_start = self.datetimes_are_start
+            child_lro.n_jobs = self.n_jobs
+            
+            # Inherit truncation settings
+            child_lro.n_truncate = self.n_truncate
+            child_lro.truncate = self.truncate
+
             if hasattr(self, "file_end_datetimes"):
                 child_lro.file_end_datetimes = self.file_end_datetimes
+            
+            # Inherit parent durations to ensure consistency with timestamps
+            if hasattr(self, "file_durations") and self.file_durations:
+                child_lro.file_durations = self.file_durations
+                child_lro.cumulative_file_durations = self.cumulative_file_durations
+            
+            # Inherit bad channels that are present in this split
+            if self.bad_channel_names:
+                child_lro.bad_channel_names = [
+                    ch for ch in self.bad_channel_names 
+                    if ch in valid_names
+                ]
+            
+            # Inherit complete metadata (preserving units, scaling, etc.)
+            if self.meta:
+                child_lro.meta = copy.deepcopy(self.meta)
+                child_lro.meta.n_channels = len(valid_names)
+                child_lro.meta.channel_names = valid_names
 
             lros[group_name] = child_lro
 
@@ -2089,6 +2129,8 @@ class LongRecordingOrganizer:
         This method centralizes all resampling logic across the different data loading pipelines
         (binary, MNE, SI) to use the fast SpikeInterface resampling implementation consistently.
 
+        It also enforces the global data type (constants.GLOBAL_DTYPE) for consistency.
+
         Args:
             recording (si.BaseRecording): The recording to resample
 
@@ -2101,6 +2143,24 @@ class LongRecordingOrganizer:
         if spre is None:
             raise ImportError("SpikeInterface preprocessing is required for resampling")
 
+        # 1. Enforce signed integer if unsigned (existing logic preserved)
+        dtype = recording.get_dtype()
+        # Handle numpy types, strings. Avoid Mock objects
+        is_unsigned = False
+        if isinstance(dtype, (str, type, np.dtype)):
+            if np.dtype(dtype).kind == "u":
+                is_unsigned = True
+
+        if is_unsigned:
+            logging.info(f"Data type is unsigned ({dtype}) and SpikeInterface can't process. Converting it to signed")
+            recording = spre.unsigned_to_signed(recording)
+
+        # 2. Enforce GLOBAL_DTYPE (New logic)
+        if recording.get_dtype() != constants.GLOBAL_DTYPE:
+            logging.info(f"Converting recording dtype from {recording.get_dtype()} to {constants.GLOBAL_DTYPE}")
+            recording = spre.astype(recording, dtype=constants.GLOBAL_DTYPE)
+
+        # 3. Apply Resampling if needed
         current_rate = recording.get_sampling_frequency()
         target_rate = constants.GLOBAL_SAMPLING_RATE
 
@@ -2113,17 +2173,6 @@ class LongRecordingOrganizer:
         logging.info(
             f"Resampling recording from {current_rate} Hz to {target_rate} Hz using SpikeInterface"
         )
-
-        dtype = recording.get_dtype()
-        # Handle numpy types, strings. Avoid Mock objects
-        is_unsigned = False
-        if isinstance(dtype, (str, type, np.dtype)):
-            if np.dtype(dtype).kind == "u":
-                is_unsigned = True
-
-        if is_unsigned:
-            logging.info(f"Data type is unsigned ({dtype}) and SpikeInterface can't process. Converting it to signed")
-            recording = spre.unsigned_to_signed(recording)
 
         # Use SpikeInterface resampling with margin to reduce edge effects
         resampled_recording = spre.resample(
@@ -2228,13 +2277,31 @@ class LongRecordingOrganizer:
                 self.labels[key] = value
 
         # Merge file timestamps and durations
-        if hasattr(self, "file_end_datetimes") and hasattr(other_lro, "file_end_datetimes"):
-            if self.file_end_datetimes and other_lro.file_end_datetimes:
-                 self.file_end_datetimes.extend(other_lro.file_end_datetimes)
+        has_dates = (
+            hasattr(self, "file_end_datetimes")
+            and self.file_end_datetimes
+            and hasattr(other_lro, "file_end_datetimes")
+            and other_lro.file_end_datetimes
+        )
+        has_durs = (
+            hasattr(self, "file_durations")
+            and self.file_durations
+            and hasattr(other_lro, "file_durations")
+            and other_lro.file_durations
+        )
 
-        if hasattr(self, "file_durations") and hasattr(other_lro, "file_durations"):
-            if self.file_durations and other_lro.file_durations:
+        if has_durs:
+            if has_dates:
+                self.file_end_datetimes.extend(other_lro.file_end_datetimes)
                 self.file_durations.extend(other_lro.file_durations)
+            else:
+                # If we are merging durations, we must be able to merge timestamps
+                # OR we must drop timestamps entirely to avoid mismatch (destructive).
+                # better to raise error and let user fix input data.
+                 raise ValueError(
+                    f"Merge failed: 'other_lro' ({getattr(other_lro, 'base_folder_path', 'unknown')}) "
+                    "has durations but missing 'file_end_datetimes'. Cannot merge safely without corrupting metadata."
+                )
 
         # Note: Channel names, sampling rate, etc. should already be validated as identical
 
