@@ -25,6 +25,7 @@ rule make_war:
         animal_folder=get_animal_folder,
         animal_id=get_animal_id,
         is_split_recording=lambda wc: wc.animal in JOINT_ANIMAL_TO_SESSION,
+        channel_subset=get_joint_session_channels,  # None for regular animals, list for joint sessions
         config=config,
         samples_config=samples_config,
     threads: config["cluster"]["war_generation"]["threads"]

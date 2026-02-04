@@ -27,12 +27,17 @@ def load_samples_and_config():
     config = snakemake.params.config
     animal_folder = snakemake.params.animal_folder
     animal_id = snakemake.params.animal_id
+    channel_subset = snakemake.params.channel_subset  # None for regular, list for joint sessions
 
-    return samples_config, config, animal_folder, animal_id
+    return samples_config, config, animal_folder, animal_id, channel_subset
 
 
-def generate_war_for_animal(samples_config, config, animal_folder, animal_id, logger):
-    """Generate WAR for a specific animal"""
+def generate_war_for_animal(samples_config, config, animal_folder, animal_id, channel_subset, logger):
+    """Generate WAR for a specific animal.
+    
+    For joint session animals, channel_subset is a list of channel names to filter to.
+    The recording is loaded fully, then split() is used to extract only those channels.
+    """
 
     # Set up paths and parameters
     data_parent_folder = Path(samples_config["data_parent_folder"])
@@ -62,29 +67,49 @@ def generate_war_for_animal(samples_config, config, animal_folder, animal_id, lo
             # Create AnimalOrganizer
             analysis_config = config["analysis"]["war_generation"]
             
-            # Check if this is a split recording (saved as zarr)
-            # Split recordings need mode="si" to use load_extractor for zarr
+            # Build lro_kwargs with any config overrides
             lro_kwargs = dict(analysis_config.get("lro_kwargs", {}))
-            if snakemake.params.is_split_recording:
-                lro_kwargs["mode"] = "si"  # Override to read zarr via load_extractor
-                logger.info(f"Detected split recording, using mode='si' for zarr loading")
             
             # Use built-in AnimalOrganizer timestamp resolution if manual_datetimes in JSON
             if "manual_datetimes" in samples_config:
                 lro_kwargs["manual_datetimes"] = samples_config["manual_datetimes"]
                 logger.info("Passing manual_datetimes from JSON to AnimalOrganizer")
             
-            ao = visualization.AnimalOrganizer(
-                data_parent_folder / animal_folder,
-                animal_id,
-                mode=analysis_config["mode"],
-                file_pattern=analysis_config.get("file_pattern"),
-                day_sep=analysis_config.get("day_sep"),
-                assume_from_number=analysis_config["assume_from_number"],
-                skip_days=analysis_config["skip_days"],
-                lro_kwargs=lro_kwargs,
-                day_parse_kwargs=analysis_config.get("day_parse_kwargs", {}),
-            )
+            # For joint sessions, load all files then split to this animal's channels
+            # Validation works because animal_id (e.g., AP3B2homo-240-M) is in the filename
+            if channel_subset is not None:
+                logger.info(f"Joint session detected - loading full session for splitting")
+                ao = visualization.AnimalOrganizer(
+                    data_parent_folder / animal_folder,
+                    animal_id,  # Validation finds this ID in filenames like PortA-AP3B2homo-240-M-...
+                    mode=analysis_config["mode"],
+                    file_pattern=analysis_config.get("file_pattern"),
+                    day_sep=analysis_config.get("day_sep"),
+                    assume_from_number=analysis_config["assume_from_number"],
+                    skip_days=analysis_config["skip_days"],
+                    lro_kwargs=lro_kwargs,
+                    day_parse_kwargs=analysis_config.get("day_parse_kwargs", {}),
+                )
+                logger.info(f"Loaded session with {len(ao.channel_names)} channels: {ao.channel_names[:5]}...")
+                
+                # Split to only the channels assigned to this animal
+                logger.info(f"Filtering to channel subset for {animal_id}: {channel_subset}")
+                splits = ao.split(groups={animal_id: channel_subset})
+                ao = splits[animal_id]
+                logger.info(f"After split: {len(ao.channel_names)} channels: {ao.channel_names}")
+            else:
+                # Regular single-animal recording
+                ao = visualization.AnimalOrganizer(
+                    data_parent_folder / animal_folder,
+                    animal_id,
+                    mode=analysis_config["mode"],
+                    file_pattern=analysis_config.get("file_pattern"),
+                    day_sep=analysis_config.get("day_sep"),
+                    assume_from_number=analysis_config["assume_from_number"],
+                    skip_days=analysis_config["skip_days"],
+                    lro_kwargs=lro_kwargs,
+                    day_parse_kwargs=analysis_config.get("day_parse_kwargs", {}),
+                )
 
             # Compute bad channels
             logger.info(f"Computing bad channels for {animal_key}")
@@ -130,10 +155,10 @@ def main():
     logger.info("WAR generation script started successfully")
 
     # Load configuration
-    samples_config, config, animal_folder, animal_id = load_samples_and_config()
+    samples_config, config, animal_folder, animal_id, channel_subset = load_samples_and_config()
 
     # Generate WAR with integrated spike detection
-    war, fdsar_list = generate_war_for_animal(samples_config, config, animal_folder, animal_id, logger)
+    war, fdsar_list = generate_war_for_animal(samples_config, config, animal_folder, animal_id, channel_subset, logger)
 
     # Save WAR (now includes nspike/lognspike features)
     war.save_pickle_and_json(Path(snakemake.output.war_pkl).parent, filename="war", slugify_filename=False)

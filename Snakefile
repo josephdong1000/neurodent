@@ -84,14 +84,28 @@ for session, animals_dict in samples_config.get("joint_sessions", {}).items():
 def get_animal_folder(wildcards):
     """Get the data folder for an animal from the combined name.
     
-    For animals from joint sessions, returns the split output folder.
     For regular animals, returns the original data folder.
+    For joint sessions, returns the session folder (source, not split output).
+    The generate_wars.py script will use channel_subset to filter channels.
     """
-    # Check if this animal comes from a joint session
+    # For joint sessions, return the session folder name (source folder)
     if wildcards.animal in JOINT_ANIMAL_TO_SESSION:
         session, animal_id = JOINT_ANIMAL_TO_SESSION[wildcards.animal]
-        return f"results/split_recordings/{session}/{animal_id}"
+        return session  # Return session folder name, not split output path
     return ANIMAL_TO_FOLDER_MAP[wildcards.animal][0]
+
+
+def get_joint_session_channels(wildcards):
+    """Get channel subset for joint session animals, or None for regular animals.
+    
+    For animals from joint sessions, returns the list of channels assigned to this
+    animal in the joint_sessions config. The generate_wars.py script uses this to
+    filter the recording to only the relevant channels via AO.split().
+    """
+    if wildcards.animal in JOINT_ANIMAL_TO_SESSION:
+        session, animal_id = JOINT_ANIMAL_TO_SESSION[wildcards.animal]
+        return samples_config["joint_sessions"][session][animal_id]
+    return None
 
 
 def get_animal_id(wildcards):
@@ -235,7 +249,6 @@ include: "workflow/rules/ep_analysis.smk"
 include: "workflow/rules/lof_evaluation.smk"
 include: "workflow/rules/filtering_comparison.smk"
 include: "workflow/rules/notebook.smk"
-include: "workflow/rules/split_joint_recordings.smk"
 
 
 rule all:

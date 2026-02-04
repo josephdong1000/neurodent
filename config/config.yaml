@@ -31,15 +31,6 @@ analysis:
       multiprocess_mode: "dask"
       overwrite_rowbins: false # REVIEW function of this parameter when mode is not "bin"
 
-  # Joint recording splitting parameters
-  split_recordings:
-    mode: "nest"
-    day_sep: null
-    assume_from_number: true
-    lro_kwargs:
-      mode: "si"
-    output_format: "zarr"  # zarr or binary
-
   # Frequency domain spike detection parameters
   frequency_domain_spike_detection:
     # Default detection parameters
@@ -280,7 +271,7 @@ cluster:
 
   relfreq_plots:
     time: "2h"
-    mem_mb: 300_000
+    mem_mb: 150_000
     nodes: 1
     threads: 15
     interface: null
