@@ -1,6 +1,7 @@
 import logging
 import warnings
 import pytest
+import numpy as np
 from neurodent.core import LongRecordingOrganizer
 
 def test_lro_label_merging_success():
@@ -47,6 +48,7 @@ def test_lro_labels_inheritance_on_split():
         'get_num_channels': lambda self: 2,
         'get_sampling_frequency': lambda self: 1000,
         'get_total_duration': lambda self: 10.0,
+        'get_dtype': lambda self: np.float32,
         'select_channels': lambda self, channel_ids: self,
         'rename_channels': lambda self, new_channel_ids: self
     })()

@@ -3309,3 +3309,44 @@ class TestGetKeyFromMatchValues:
 
             result = utils._get_key_from_match_values(f"test_{first_alias}_channel", constants.LR_ALIASES)
             assert result == first_key
+
+    def test_rhd_channel_substring_ambiguity(self):
+        """Test that short numeric aliases falsely match multiple RHD channel names.
+        
+        This documents an edge case discovered when configuring RHD processing:
+        Intan RHD files have channel names like 'A-009', 'A-010', 'B-009', etc.
+        If CHNAME_ALIASES uses simple indices like '0', '9', they will match
+        multiple channels incorrectly due to substring matching.
+        
+        Example: alias '0' would match both 'A-009' and 'A-010' (and many others).
+        
+        Solution: Use full channel names in aliases (e.g., 'A-009' instead of '0').
+        """
+        # Simulate the problematic configuration with short numeric aliases
+        bad_aliases = {
+            "Aud": ["0", "9"],  # These will match multiple channels
+            "Vis": ["1", "8"],
+            "Hip": ["2", "7"],
+        }
+        
+        # RHD channel name that contains multiple digits
+        rhd_channel = "A-010"  # Contains both '0' and '1'
+        
+        # This SHOULD raise ambiguous match error because:
+        # - "0" from "Aud" matches "A-010" 
+        # - "1" from "Vis" also matches "A-010"
+        with pytest.raises(ValueError, match="Ambiguous match"):
+            utils._get_key_from_match_values(rhd_channel, bad_aliases, strict_matching=True)
+        
+        # Demonstrate the correct approach: use full channel names
+        good_aliases = {
+            "Aud": ["A-009", "A-022", "B-009", "B-022"],
+            "Vis": ["A-010", "A-021", "B-010", "B-021"],
+            "Hip": ["A-012", "A-019", "B-012", "B-019"],
+        }
+        
+        # Now matching is unambiguous
+        assert utils._get_key_from_match_values("A-010", good_aliases) == "Vis"
+        assert utils._get_key_from_match_values("A-009", good_aliases) == "Aud"
+        assert utils._get_key_from_match_values("B-012", good_aliases) == "Hip"
+

@@ -293,7 +293,8 @@ class TestInitFromRecording:
         )
         
         assert lro.meta.n_channels == 2
-        assert lro.meta.f_s == 500.0
+        # LRO now resamples to GLOBAL_SAMPLING_RATE (1000.0 Hz) during initialization
+        assert lro.meta.f_s == 1000.0
 
     def test_init_from_recording_sets_durations(self, tmp_path):
         """Test that file_durations is computed from recording."""
