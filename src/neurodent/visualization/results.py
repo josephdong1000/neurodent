@@ -465,8 +465,14 @@ class AnimalOrganizer(AnimalFeatureParser):
         logging.info(f"Ordered folders for timeline: {[Path(f).name for f in ordered_folders]}")
 
         for folder in ordered_folders:
+            # LRO auto-detects if path is a file, but we need to set input_type='file'
+            # so it uses single-file mode instead of trying to glob
+            _lro_kwargs = base_lro_kwargs.copy()
+            if Path(folder).is_file():
+                _lro_kwargs["input_type"] = "file"
+            
             # Create temporary LRO to get duration
-            temp_lro = core.LongRecordingOrganizer(folder, **base_lro_kwargs)
+            temp_lro = core.LongRecordingOrganizer(folder, **_lro_kwargs)
             duration = (
                 temp_lro.LongRecording.get_duration()
                 if hasattr(temp_lro, "LongRecording") and temp_lro.LongRecording
