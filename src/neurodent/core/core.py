@@ -1346,7 +1346,7 @@ class LongRecordingOrganizer:
             # Check if channel names in MNE Raw object are in Intan format and convert if necessary
             if any("intan" in ch_name.lower() for ch_name in raw.info["ch_names"]):
                 logging.info("Converting Intan channel names to MNE format")
-                convert_intan_chname_mne(raw)
+                convert_intan_chname_mne(raw) # REVIEW check that this function is robust
 
             # Create the intermediate file
             if intermediate == "edf":
@@ -1354,6 +1354,7 @@ class LongRecordingOrganizer:
                 try:
                     mne.export.export_raw(fname, raw=raw, fmt="edf", overwrite=True)
                 except ValueError as e:
+                    # REVIEW JD to me this appears hardcoded -- will check with EDF files as well
                     if "exceeds maximum field length" in str(e):
                         logging.warning(f"EDF export failed due to signal range: {e}. Retrying with robust physical range.")
                         # Calculate robust range (0.01 - 99.99 percentile) to exclude artifacts
