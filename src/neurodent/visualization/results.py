@@ -124,6 +124,25 @@ class AnimalOrganizer(AnimalFeatureParser):
         long_analyzers (list[LongRecordingAnalyzer]): List of LongRecordingAnalyzer instances, one per unique animal day.
     """
 
+    def _init_containers(self):
+        """Initialize all output containers and processing lists.
+        
+        This method centralizes initialization to ensure consistency between
+        standard __init__ and factory methods like from_lros().
+        """
+        # Processing lists
+        self.long_analyzers: list[core.LongRecordingAnalyzer] = []
+        
+        # Output containers
+        self.bad_channels_dict = {}
+        self.features_df = pd.DataFrame()
+        self.features_avg_df = pd.DataFrame()
+        
+        # Result objects
+        self.spike_analysis_results = None
+        self.frequency_domain_spike_analysis_results = None
+        self.window_analysis_result = None
+
     def __init__(
         self,
         base_folder_path,
@@ -261,7 +280,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         self.genotype = genotypes[0]
         logging.info(f"self.genotype: {self.genotype}")
 
-        self.long_analyzers: list[core.LongRecordingAnalyzer] = []
+        self._init_containers()
         logging.debug(
             f"Creating {len(self.unique_animaldays)} LongRecordings (one per unique animalday)"
         )
@@ -853,15 +872,11 @@ class AnimalOrganizer(AnimalFeatureParser):
                 f"Inconsistent channel names in long_recordings: {channel_names}"
             )
         self.channel_names = channel_names[0]
-        self.bad_channels_dict = {}
 
         animal_ids = [x["animal"] for x in self._animalday_dicts]
         if len(set(animal_ids)) > 1:
             warnings.warn(f"Inconsistent animal IDs in {animal_ids}")
         self.animal_id = animal_ids[0]
-
-        self.features_df: pd.DataFrame = pd.DataFrame()
-        self.features_avg_df: pd.DataFrame = pd.DataFrame()
 
     def _sort_lros_by_median_time(self, folder_lro_pairs):
         """Sort LROs by median timestamp of their constituent recordings.
@@ -1583,10 +1598,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         ao._animalday_folder_groups = {}
         ao._processed_timestamps = None
 
-        # These are output containers, start empty
-        ao.bad_channels_dict = {}
-        ao.features_df = pd.DataFrame()
-        ao.features_avg_df = pd.DataFrame()
+        ao._init_containers()
 
 
     def split(
