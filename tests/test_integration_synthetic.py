@@ -46,8 +46,12 @@ def test_split_inheritance_synthetic_data():
     # 3. Verify original LRO dtype (should be float32 from _apply_resampling)
     assert lro.LongRecording.get_dtype() == constants.GLOBAL_DTYPE
     
-    # 4. Test split preserves metadata
-    lro_child = lro.split(start_frame_idx=0, end_frame_idx=1000)
+    # 4. Test split preserves metadata (channel splitting)
+    # Get actual channel IDs from the recording
+    channel_ids = lro.LongRecording.get_channel_ids()
+    # Split using the first channel
+    splits = lro.split({"group1": [str(channel_ids[0])]})
+    lro_child = splits["group1"]
     
     # Verify child has consistent metadata
     assert lro_child.file_end_datetimes is not None
