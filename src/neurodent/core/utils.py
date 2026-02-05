@@ -1496,3 +1496,9 @@ def should_use_cache_unified(
         return should_use_cached_file(cache_path, source_paths, "auto")
     else:
         raise ValueError(f"Invalid cache_policy: {cache_policy}. Must be one of: auto, always, force_regenerate")
+
+
+def convert_intan_chname_mne(mne_obj):
+    for i in range(len(mne_obj.info['ch_names'])):
+        mne_obj.info['ch_names'][i] = parse_chname_to_abbrev(channel_name = mne_obj.info['ch_names'][i], assume_from_number=True, strict_matching=False)
+    return mne_obj
