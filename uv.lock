@@ -2451,7 +2451,6 @@ dependencies = [
     { name = "dask", extra = ["distributed"] },
     { name = "dask-jobqueue" },
     { name = "django" },
-    { name = "edfio" },
     { name = "matplotlib" },
     { name = "mne" },
     { name = "mne-connectivity" },
@@ -2461,7 +2460,6 @@ dependencies = [
     { name = "pandas" },
     { name = "probeinterface" },
     { name = "pyarrow" },
-    { name = "pyedflib" },
     { name = "scikit-learn" },
     { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "scipy", version = "1.16.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
@@ -2475,12 +2473,15 @@ dependencies = [
 
 [package.optional-dependencies]
 all = [
+    { name = "edfio" },
     { name = "pulp", version = "2.7.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "pyedflib" },
     { name = "pynwb" },
     { name = "snakemake", version = "7.32.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "snakemake", version = "9.13.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
 ]
 dev = [
+    { name = "edfio" },
     { name = "factory-boy" },
     { name = "faker" },
     { name = "ipykernel" },
@@ -2492,6 +2493,7 @@ dev = [
     { name = "pre-commit" },
     { name = "pulp", version = "2.7.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "pydata-sphinx-theme" },
+    { name = "pyedflib" },
     { name = "pynwb" },
     { name = "pytest" },
     { name = "pytest-benchmark" },
@@ -2516,6 +2518,8 @@ pipeline = [
     { name = "snakemake", version = "9.13.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
 ]
 readers = [
+    { name = "edfio" },
+    { name = "pyedflib" },
     { name = "pynwb" },
 ]
 
@@ -2525,7 +2529,7 @@ requires-dist = [
     { name = "dask", extras = ["distributed"] },
     { name = "dask-jobqueue" },
     { name = "django" },
-    { name = "edfio", specifier = ">=0.4.12" },
+    { name = "edfio", marker = "extra == 'readers'", specifier = ">=0.4.12" },
     { name = "factory-boy", marker = "extra == 'dev'", specifier = ">=3.2.0" },
     { name = "faker", marker = "extra == 'dev'", specifier = ">=18.0.0" },
     { name = "ipykernel", marker = "extra == 'dev'", specifier = ">=6.0.0" },
@@ -2547,6 +2551,7 @@ requires-dist = [
     { name = "pulp", marker = "python_full_version < '3.11' and extra == 'pipeline'", specifier = "==2.7.0" },
     { name = "pyarrow" },
     { name = "pydata-sphinx-theme", marker = "extra == 'dev'", specifier = ">=0.16.1" },
+    { name = "pyedflib", marker = "extra == 'readers'", specifier = ">=0.1.42" },
     { name = "pynwb", marker = "extra == 'readers'", specifier = ">=3.1.3" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
     { name = "pytest-benchmark", marker = "extra == 'dev'", specifier = ">=4.0.0" },
