@@ -9,12 +9,6 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.abspath("../src"))
 
-# Read project metadata from pyproject.toml
-try:
-    import tomllib  # Python 3.11+
-except ImportError:
-    import tomli as tomllib  # Python 3.10 and below
-
 pyproject_path = Path(__file__).parent.parent / "pyproject.toml"
 with open(pyproject_path, "rb") as f:
     pyproject_data = tomllib.load(f)
