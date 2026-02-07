@@ -22,7 +22,7 @@ rule make_war:
         war_json="results/wars/{animal}/war.json",
         fdsar_dir=directory("results/fdsars/{animal}"),
     params:
-        animal_folder=get_animal_folder,
+        animal_folders=get_animal_folders,
         animal_id=get_animal_id,
         is_split_recording=lambda wc: wc.animal in JOINT_ANIMAL_TO_SESSION,
         channel_subset=get_joint_session_channels,  # None for regular animals, list for joint sessions

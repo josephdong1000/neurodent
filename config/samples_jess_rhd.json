@@ -1,13 +1,5 @@
 {
     "data_parent_folder": "/mnt/isilon/marsh_single_unit/PythonEEG Data/AP3B2/Intan recordings/",
-    "GENOTYPE_ALIASES": {
-        "HOMO": [
-            "AP3B2homo-240-M"
-        ],
-        "WT": [
-            "AP3B2wt-241-M"
-        ]
-    },
     "CHNAME_ALIASES": {
         "Aud": ["A-009", "A-022", "B-009", "B-022"],
         "Vis": ["A-010", "A-021", "B-010", "B-021"],
@@ -33,7 +25,11 @@
     "bad_channels": {},
     "bad_folder_animalday": [],
     "manual_datetimes": {
-        "AP3B2homo-240-M": "2025-11-27 15:39:05",
-        "AP3B2wt-241-M": "2025-11-27 15:39:05"
-    }
+        "AP3B2homo-240-M": ["2025-11-27 15:39:05", "2025-11-28 11:47:05"],
+        "AP3B2wt-241-M": ["2025-11-27 15:39:05", "2025-11-28 11:47:05"]
+    },
+    "ANIMAL_METADATA": [
+        {"id": "AP3B2homo-240-M", "gene": "HOMO", "sex": "Male"},
+        {"id": "AP3B2wt-241-M", "gene": "WT", "sex": "Male"}
+    ]
 }

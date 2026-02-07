@@ -51,17 +51,22 @@ with open(samples_file, "r") as f:
 # Extract sample information
 DATA_FOLDERS = list(samples_config["data_folders_to_animal_ids"].keys())
 ANIMALS = []
-ANIMAL_TO_FOLDER_MAP = {}  # Maps slugified name back to (original_folder, original_animal_id)
-SLUGIFIED_TO_ORIGINAL = {}  # Maps slugified name back to original combined name
+ANIMAL_TO_FOLDERS_MAP = {}  # Maps slugified animal_id -> list of (folder, animal_id, original_session_key)
+ANIMAL_TO_FULL_ID_MAP = {} # Maps slugified animal_id -> original animal_id string
 
 for folder, animals in samples_config["data_folders_to_animal_ids"].items():
     for animal in animals:
-        combined_name = f"{folder} {animal}"
-        slugified_name = slugify(combined_name, allow_unicode=True)
+        # We group by the animal ID to merge split sessions
+        slugified_name = slugify(animal, allow_unicode=True)
 
-        ANIMALS.append(slugified_name)  # Use slugified names for file paths
-        ANIMAL_TO_FOLDER_MAP[slugified_name] = (folder, animal)
-        SLUGIFIED_TO_ORIGINAL[slugified_name] = combined_name
+        if slugified_name not in ANIMALS:
+            ANIMALS.append(slugified_name)
+            ANIMAL_TO_FOLDERS_MAP[slugified_name] = []
+            ANIMAL_TO_FULL_ID_MAP[slugified_name] = animal
+        
+        # Store tuple of (real_folder_path, original_animal_id, config_session_key)
+        # config_session_key is 'folder' here
+        ANIMAL_TO_FOLDERS_MAP[slugified_name].append((folder, animal, folder))
 
 # Build mapping for animals from joint sessions
 # These animals will have their data read from split output folders
@@ -69,38 +74,37 @@ JOINT_ANIMAL_TO_SESSION = {}  # Maps slugified animal name -> (session, original
 
 for session, animals_dict in samples_config.get("joint_sessions", {}).items():
     for animal_id in animals_dict.keys():
-        combined_name = f"{session} {animal_id}"
-        slugified_name = slugify(combined_name, allow_unicode=True)
+        slugified_name = slugify(animal_id, allow_unicode=True)
         
         JOINT_ANIMAL_TO_SESSION[slugified_name] = (session, animal_id)
         
-        # Also add to ANIMALS list if not already present
         if slugified_name not in ANIMALS:
             ANIMALS.append(slugified_name)
-            ANIMAL_TO_FOLDER_MAP[slugified_name] = (session, animal_id)
-            SLUGIFIED_TO_ORIGINAL[slugified_name] = combined_name
+            ANIMAL_TO_FOLDERS_MAP[slugified_name] = []
+            ANIMAL_TO_FULL_ID_MAP[slugified_name] = animal_id
+            
+        # For joint sessions, 'session' is the folder
+        ANIMAL_TO_FOLDERS_MAP[slugified_name].append((session, animal_id, session))
 
+
+def get_animal_folders(wildcards):
+    """Get the list of (data_folder, animal_id, config_key) tuples for an animal."""
+    return ANIMAL_TO_FOLDERS_MAP[wildcards.animal]
 
 def get_animal_folder(wildcards):
-    """Get the data folder for an animal from the combined name.
+    """Get the primary (first) data folder for an animal.
     
-    For regular animals, returns the original data folder.
-    For joint sessions, returns the session folder (source, not split output).
-    The generate_wars.py script will use channel_subset to filter channels.
+    Used for backward compatibility with downstream rules (e.g. log paths).
     """
-    # For joint sessions, return the session folder name (source folder)
-    if wildcards.animal in JOINT_ANIMAL_TO_SESSION:
-        session, animal_id = JOINT_ANIMAL_TO_SESSION[wildcards.animal]
-        return session  # Return session folder name, not split output path
-    return ANIMAL_TO_FOLDER_MAP[wildcards.animal][0]
+    return ANIMAL_TO_FOLDERS_MAP[wildcards.animal][0][0]
 
 
 def get_joint_session_channels(wildcards):
     """Get channel subset for joint session animals, or None for regular animals.
     
-    For animals from joint sessions, returns the list of channels assigned to this
-    animal in the joint_sessions config. The generate_wars.py script uses this to
-    filter the recording to only the relevant channels via AO.split().
+    Now looks up based on the animal ID slug. 
+    Assumes if ANY session for this animal is joint, we return the channels for that session.
+    (Merging joint + non-joint sessions for same animal is complex, assumed uniform).
     """
     if wildcards.animal in JOINT_ANIMAL_TO_SESSION:
         session, animal_id = JOINT_ANIMAL_TO_SESSION[wildcards.animal]
@@ -109,8 +113,8 @@ def get_joint_session_channels(wildcards):
 
 
 def get_animal_id(wildcards):
-    """Get the animal ID for an animal from the combined name"""
-    return ANIMAL_TO_FOLDER_MAP[wildcards.animal][1]
+    """Get the original animal ID string."""
+    return ANIMAL_TO_FULL_ID_MAP[wildcards.animal]
 
 
 def increment_memory(base_memory):
