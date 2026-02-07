@@ -1654,7 +1654,7 @@ class LongRecordingOrganizer:
 
             # Create in-memory LRO wrapper
             child_lro = LongRecordingOrganizer(
-                base_folder_path=None,
+                base_folder_path=self.base_folder_path,
                 mode=None,
                 recording=sub_rec,
                 labels=self.labels.copy(),
@@ -2128,6 +2128,31 @@ class LongRecordingOrganizer:
                 raise ValueError(
                     "manual_datetimes must be provided when no CSV metadata is available!"
                 )
+
+    def get_date_string(self) -> str:
+        """
+        Get the string representation of the recording date (Start Time).
+        
+        Returns:
+            str: Date string in format "%b-%d-%Y" (e.g. "Jan-21-2022").
+        
+        Raises:
+            ValueError: If no timestamps are available in the recording.
+        """
+        if not hasattr(self, "file_end_datetimes") or not self.file_end_datetimes:
+             raise ValueError("Cannot determine date: No file timestamps available.")
+        
+        # Find first valid timestamp
+        first_valid_idx = next((i for i, x in enumerate(self.file_end_datetimes) if x is not None), None)
+        
+        if first_valid_idx is None:
+             raise ValueError("Cannot determine date: All file timestamps are None.")
+             
+        end_time = self.file_end_datetimes[first_valid_idx]
+        duration = self.file_durations[first_valid_idx]
+        
+        start_time = end_time - timedelta(seconds=duration)
+        return start_time.strftime("%b-%d-%Y")
 
     def __str__(self):
         """Return a string representation of critical long recording features."""
