@@ -424,7 +424,11 @@ class AnimalOrganizer(AnimalFeatureParser):
         return matching_folders
 
     def _compute_global_timeline(
-        self, base_datetime: datetime, animalday_to_folders: dict, base_lro_kwargs: dict
+        self,
+        base_datetime: datetime,
+        animalday_to_folders: dict,
+        base_lro_kwargs: dict,
+        original_manual_datetimes=None,
     ) -> dict:
         """
         Compute contiguous timeline for all folders starting from base_datetime.
@@ -450,57 +454,180 @@ class AnimalOrganizer(AnimalFeatureParser):
             f"starting at {base_datetime}"
         )
 
-        # Step 1: Create temporary LROs to determine durations
-        # We need to create LROs in the order they will appear in the final timeline
+        # Step 1: Determine folder ordering
+        # When manual_datetimes is provided, skip metadata-based sorting and use config/alphabetical order
         ordered_folders = []
-        for animalday in sorted(animalday_to_folders.keys()):
-            folders = animalday_to_folders[animalday]
-            if len(folders) > 1:
-                # For overlapping folders, we need to sort them by temporal order
-                # Create temp LROs to get timing info for sorting
-                folder_lro_pairs = []
-                for folder in folders:
-                    try:
-                        temp_lro = core.LongRecordingOrganizer(
-                            folder, **base_lro_kwargs
-                        )
-                        folder_lro_pairs.append((folder, temp_lro))
-                    except Exception as e:
-                        logging.warning(
-                            f"Failed to create temp LRO for duration estimation in {folder}: {e}"
-                        )
-                        # Use folder order as fallback
-                        folder_lro_pairs.append((folder, None))
 
-                # Sort by median time if possible
-                sorted_pairs = self._sort_lros_by_median_time(folder_lro_pairs)
-                ordered_folders.extend([folder for folder, _ in sorted_pairs])
+        if original_manual_datetimes is not None:
+            # Manual timestamps provided - skip metadata-based sorting
+            # Strategy depends on format of manual_datetimes:
+            # - List: Order of list entries defines folder order (preserve natural order)
+            # - Scalar: Use alphabetical order for predictability
+
+            if isinstance(original_manual_datetimes, list):
+                logging.info("Manual timestamps provided as list - preserving folder order from config/discovery")
+                # List order is authoritative - don't reorder folders
+                # Just extend in the order they appear in animalday_to_folders
+                for animalday in sorted(animalday_to_folders.keys()):
+                    folders = animalday_to_folders[animalday]
+                    ordered_folders.extend(folders)
             else:
-                ordered_folders.extend(folders)
+                logging.info("Manual timestamps provided as scalar - using alphabetical folder ordering")
+                # Scalar timestamp doesn't define order - use alphabetical for predictability
+                for animalday in sorted(animalday_to_folders.keys()):
+                    folders = animalday_to_folders[animalday]
+                    sorted_folders = sorted(folders, key=lambda f: Path(f).stem)
+                    ordered_folders.extend(sorted_folders)
+        else:
+            # Traditional metadata-based approach: create temp LROs to sort by temporal order
+            for animalday in sorted(animalday_to_folders.keys()):
+                folders = animalday_to_folders[animalday]
+                if len(folders) > 1:
+                    # For overlapping folders, we need to sort them by temporal order
+                    # Create temporary LROs for each folder to get their internal timestamps
+                    folder_lro_pairs = []
+                    for folder in folders:
+                        try:
+                            temp_lro = core.LongRecordingOrganizer(
+                                folder, **base_lro_kwargs
+                            )
+                            folder_lro_pairs.append((folder, temp_lro))
+                        except Exception as e:
+                            logging.warning(
+                                f"Failed to create temp LRO for duration estimation in {folder}: {e}"
+                            )
+                            # Use folder order as fallback
+                            folder_lro_pairs.append((folder, None))
+
+                    # Sort by median time if possible
+                    sorted_pairs = self._sort_lros_by_median_time(folder_lro_pairs)
+                    ordered_folders.extend([folder for folder, _ in sorted_pairs])
+                else:
+                    ordered_folders.extend(folders)
 
         # Step 2: Estimate total duration for each folder
+        # Always get durations from recordings (never assume/default)
         folder_durations = {}
-        
+
         logging.info(f"Ordered folders for timeline: {[Path(f).name for f in ordered_folders]}")
 
-        for folder in ordered_folders:
-            # LRO auto-detects if path is a file, but we need to set input_type='file'
-            # so it uses single-file mode instead of trying to glob
-            _lro_kwargs = base_lro_kwargs.copy()
-            if Path(folder).is_file():
-                _lro_kwargs["input_type"] = "file"
-            
-            # Create temporary LRO to get duration
-            temp_lro = core.LongRecordingOrganizer(folder, **_lro_kwargs)
-            duration = (
-                temp_lro.LongRecording.get_duration()
-                if hasattr(temp_lro, "LongRecording") and temp_lro.LongRecording
-                else 0.0
-            )
-            folder_durations[folder] = duration
-            logging.info(
-                f"Folder {Path(folder).name}: estimated duration = {duration:.1f}s"
-            )
+        if original_manual_datetimes is not None:
+            # When manual timestamps are provided, pass them to temp LROs so raw files can load
+            logging.info("Creating temp LROs with manual timestamps to get durations")
+
+            # Prepare timestamps for each folder
+            if isinstance(original_manual_datetimes, list):
+                # List of timestamps - validate length and distribute to folders
+                if len(original_manual_datetimes) != len(ordered_folders):
+                    raise ValueError(
+                        f"manual_datetimes list length ({len(original_manual_datetimes)}) "
+                        f"does not match number of folders ({len(ordered_folders)}). "
+                        f"Provide one timestamp per folder."
+                    )
+
+                # Resolve each timestamp and pair with folder
+                folder_timestamps = []
+                for i, (folder, ts) in enumerate(zip(ordered_folders, original_manual_datetimes)):
+                    try:
+                        resolved_ts = self._resolve_timestamp_input(ts, Path(folder))
+                        if not isinstance(resolved_ts, (datetime, pd.Timestamp)):
+                            raise ValueError(
+                                f"Timestamp at index {i} for folder {Path(folder).name} "
+                                f"did not resolve to a datetime object: {resolved_ts}"
+                            )
+                        folder_timestamps.append((folder, resolved_ts))
+                    except Exception as e:
+                        raise ValueError(
+                            f"Failed to parse timestamp at index {i} for folder {Path(folder).name}: {e}"
+                        ) from e
+
+            elif isinstance(original_manual_datetimes, (datetime, pd.Timestamp, str)):
+                # Single scalar timestamp - use for all folders
+                try:
+                    if isinstance(original_manual_datetimes, str):
+                        context_path = Path(ordered_folders[0]) if ordered_folders else Path(".")
+                        resolved_ts = self._resolve_timestamp_input(original_manual_datetimes, context_path)
+                    else:
+                        resolved_ts = original_manual_datetimes
+
+                    if not isinstance(resolved_ts, (datetime, pd.Timestamp)):
+                        raise ValueError(
+                            f"Scalar manual_datetimes did not resolve to a datetime object: {resolved_ts}"
+                        )
+
+                    folder_timestamps = [(folder, resolved_ts) for folder in ordered_folders]
+                except Exception as e:
+                    raise ValueError(
+                        f"Failed to parse scalar manual_datetimes: {e}"
+                    ) from e
+            else:
+                # Other format - attempt resolution for each folder
+                folder_timestamps = []
+                for folder in ordered_folders:
+                    try:
+                        resolved_ts = self._resolve_timestamp_input(original_manual_datetimes, Path(folder))
+                        if not isinstance(resolved_ts, (datetime, pd.Timestamp)):
+                            raise ValueError(
+                                f"Timestamp for folder {Path(folder).name} "
+                                f"did not resolve to a datetime object: {resolved_ts}"
+                            )
+                        folder_timestamps.append((folder, resolved_ts))
+                    except Exception as e:
+                        raise ValueError(
+                            f"Failed to parse timestamp for folder {Path(folder).name}: {e}"
+                        ) from e
+
+            # Create temp LROs with manual timestamps to get durations
+            for folder, timestamp in folder_timestamps:
+                _lro_kwargs = base_lro_kwargs.copy()
+                if Path(folder).is_file():
+                    _lro_kwargs["input_type"] = "file"
+
+                # KEY FIX: Pass actual manual_datetimes to temp LRO
+                _lro_kwargs["manual_datetimes"] = timestamp
+
+                try:
+                    temp_lro = core.LongRecordingOrganizer(folder, **_lro_kwargs)
+                    duration = (
+                        temp_lro.LongRecording.get_duration()
+                        if hasattr(temp_lro, "LongRecording") and temp_lro.LongRecording
+                        else 0.0
+                    )
+                    folder_durations[folder] = duration
+                    logging.info(
+                        f"Folder {Path(folder).name}: duration = {duration:.1f}s (loaded with manual timestamp)"
+                    )
+                except Exception as e:
+                    raise RuntimeError(
+                        f"Failed to load folder {Path(folder).name} for duration estimation, "
+                        f"even with manual_datetimes provided. This usually indicates a problem "
+                        f"with the data files or recording format. Error: {e}"
+                    ) from e
+
+        else:
+            # Traditional approach: create temp LROs without manual timestamps
+            for folder in ordered_folders:
+                _lro_kwargs = base_lro_kwargs.copy()
+                if Path(folder).is_file():
+                    _lro_kwargs["input_type"] = "file"
+
+                try:
+                    temp_lro = core.LongRecordingOrganizer(folder, **_lro_kwargs)
+                    duration = (
+                        temp_lro.LongRecording.get_duration()
+                        if hasattr(temp_lro, "LongRecording") and temp_lro.LongRecording
+                        else 0.0
+                    )
+                    folder_durations[folder] = duration
+                    logging.info(
+                        f"Folder {Path(folder).name}: estimated duration = {duration:.1f}s"
+                    )
+                except Exception as e:
+                    raise RuntimeError(
+                        f"Failed to load folder {Path(folder).name} for duration estimation. "
+                        f"If using raw files without metadata, ensure manual_datetimes is provided. "
+                        f"Error: {e}"
+                    ) from e
 
         # Step 3: Compute start times (forward from start or backward from end)
         datetimes_are_start = base_lro_kwargs.get("datetimes_are_start", True)
@@ -608,20 +735,36 @@ class AnimalOrganizer(AnimalFeatureParser):
                  # We only strictly enforce that all of THIS animal's folders are found.
             else:
                 resolved_dt = self._resolve_timestamp_input(spec, Path(animal_folders[0]))
-                sorted_folders = sorted(animal_folders, key=lambda f: Path(f).stem)
-                animalday_dict = {Path(f).name: [f] for f in sorted_folders}
+                # Don't sort here - let _compute_global_timeline handle sorting based on format
+                animalday_dict = {Path(f).name: [f] for f in animal_folders}
                 animal_timeline = self._compute_global_timeline(
-                    resolved_dt, animalday_dict, base_lro_kwargs
+                    resolved_dt, animalday_dict, base_lro_kwargs,
+                    original_manual_datetimes=spec
                 )
                 out.update(animal_timeline)
             
             return out
 
-        elif isinstance(manual_datetimes, datetime):
-            logging.info(f"Processing global manual datetimes starting at {manual_datetimes}")
-            return self._compute_global_timeline(
-                manual_datetimes, animalday_to_folders, base_lro_kwargs
-            )
+        elif isinstance(manual_datetimes, (datetime, str)):
+            # If string, verify it resolves to a single datetime before proceeding
+            # This distinguishes scalar intent from complex string mappings (which should be dicts)
+            start_dt = manual_datetimes
+            if isinstance(start_dt, str):
+                # Try resolving it. _resolve_timestamp_input usually returns a datetime or list of datetimes.
+                # Here we assume if it's a single string it implies a single start time.
+                # We use the animal ID or first folder as context for resolution logic.
+                context_path = Path(list(animalday_to_folders.values())[0][0]) if animalday_to_folders else Path(".")
+                start_dt = self._resolve_timestamp_input(manual_datetimes, context_path)
+            
+            # Ensure we have a scalar datetime to build a timeline from
+            if isinstance(start_dt, datetime) or (isinstance(start_dt, pd.Timestamp)):
+                logging.info(f"Processing global manual datetimes starting at {start_dt}")
+                return self._compute_global_timeline(
+                    start_dt, animalday_to_folders, base_lro_kwargs,
+                    original_manual_datetimes=manual_datetimes
+                )
+            # If resolution returned something else (like a list), fall through to default processing
+            warnings.warn("String timestamp resolved to non-scalar. Falling back to default processing.")
 
         else:
             logging.info("Processing manual datetimes input for all folders")
@@ -1489,10 +1632,19 @@ class AnimalOrganizer(AnimalFeatureParser):
         ao.unique_animaldays = []
         ao.animaldays = []
         for i, lro in enumerate(lros):
-            if hasattr(lro, "base_folder_path") and lro.base_folder_path:
-                animalday = f"{animal_id}_{Path(lro.base_folder_path).name}"
-            else:
-                animalday = f"{animal_id}_day{i}"
+            # Strategy: Metadata-First
+            # We assume LRO is the source of truth for time.
+            try:
+                date_str = lro.get_date_string()
+                animalday = f"{animal_id} {genotype} {date_str}"
+            except ValueError as e:
+                # If we absolutely cannot get a date from metadata, we fail.
+                # We do NOT fallback to string parsing or day0/day1.
+                raise ValueError(
+                    f"Could not determine date for LRO at {lro.base_folder_path}. "
+                    f"Ensure LRO has valid timestamps via metadata or manual_datetimes. Error: {e}"
+                )
+
             ao.unique_animaldays.append(animalday)
             ao.animaldays.append(animalday)
 
