@@ -453,16 +453,19 @@ def parse_path_to_animalday(
     filepath = Path(filepath)
     match mode:
         case "nest":
-            geno = parse_str_to_genotype(filepath.parent.name)
             animid = parse_str_to_animal(filepath.parent.name, animal_param=animal_param)
+            geno = (constants.ANIMAL_METADATA.get(animid, {}).get("gene") or 
+                    parse_str_to_genotype(filepath.parent.name))
             day = parse_str_to_day(filepath.name, sep=day_sep, **day_parse_kwargs).strftime("%b-%d-%Y")
         case "concat" | "base":
-            geno = parse_str_to_genotype(filepath.name)
             animid = parse_str_to_animal(filepath.name, animal_param=animal_param)
+            geno = (constants.ANIMAL_METADATA.get(animid, {}).get("gene") or 
+                    parse_str_to_genotype(filepath.name))
             day = parse_str_to_day(filepath.name, sep=day_sep, **day_parse_kwargs).strftime("%b-%d-%Y")
         case "noday":
-            geno = parse_str_to_genotype(filepath.name)
             animid = parse_str_to_animal(filepath.name, animal_param=animal_param)
+            geno = (constants.ANIMAL_METADATA.get(animid, {}).get("gene") or 
+                    parse_str_to_genotype(filepath.name))
             day = constants.DEFAULT_DAY.strftime("%b-%d-%Y")
         case _:
             raise ValueError(f"Invalid mode: {mode}")
