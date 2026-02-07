@@ -1056,12 +1056,31 @@ class LongRecordingOrganizer:
             )
         channel_names = [str(ch) for ch in raw_channel_ids]
 
+        # Extract gain information from SpikeInterface recording
+        # SpikeInterface's get_traces(return_scaled=True) returns data in microvolts
+        # so we need to set metadata to reflect this scaling
+        V_units = "µV"
+        mult_to_uV = 1.0
+
+        # Try to verify gain is available (for logging/debugging purposes)
+        try:
+            if hasattr(self.LongRecording, 'get_property'):
+                gains = self.LongRecording.get_property('gain_to_uV')
+                if gains is not None:
+                    logging.debug(f"SpikeInterface recording has gain_to_uV property: {gains[0] if len(gains) > 0 else 'empty'}")
+        except (AttributeError, KeyError, ValueError, TypeError) as e:
+            # Property may not exist or be accessible, which is fine - we rely on return_scaled=True
+            logging.debug(f"Could not access gain_to_uV property: {e}")
+            pass
+
         self.meta = DDFBinaryMetadata(
             None,
             n_channels=self.LongRecording.get_num_channels(),
             f_s=self.LongRecording.get_sampling_frequency(),
             dt_end=dt_end,  # Will be properly set by finalize_file_timestamps
             channel_names=channel_names,
+            V_units=V_units,
+            mult_to_uV=mult_to_uV,
         )
         self.channel_names = self.meta.channel_names
 
