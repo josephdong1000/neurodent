@@ -5,7 +5,7 @@ import pandas as pd
 from neurodent.visualization import AnimalOrganizer
 
 class TestTimelineSortingCrash:
-    @patch("neurodent.core.LongRecordingOrganizer")
+    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
     @patch("neurodent.core.utils.parse_str_to_day")
     def test_sort_crash_fix_via_parsing(self, mock_parse, mock_lro_cls):
         """
@@ -14,10 +14,11 @@ class TestTimelineSortingCrash:
         """
         ao = MagicMock(spec=AnimalOrganizer)
         ao.anim_id = "M1"
-        ao.day_sep = None 
+        ao.day_sep = None
         # Bind the real valid methods we want to test
         ao._compute_global_timeline = AnimalOrganizer._compute_global_timeline.__get__(ao, AnimalOrganizer)
         ao._sort_lros_by_median_time = AnimalOrganizer._sort_lros_by_median_time.__get__(ao, AnimalOrganizer)
+        ao._resolve_timestamp_input = MagicMock(side_effect=lambda ts, path: ts if isinstance(ts, pd.Timestamp) else pd.to_datetime(ts))
         ao._get_folder_duration = MagicMock(return_value=3600.0)
 
         animalday_to_folders = {
