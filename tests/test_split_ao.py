@@ -36,6 +36,9 @@ def mock_lro():
     lro.file_end_datetimes = [datetime(2023, 1, 1, 14, 0)]
     lro._is_in_memory = False
     
+    # Mock date string
+    lro.get_date_string.return_value = "Jan-01-2023"
+    
     # Mock the split method
     def mock_split(groups):
         result = {}
@@ -47,6 +50,7 @@ def mock_lro():
             child_lro.manual_datetimes = lro.manual_datetimes
             child_lro.datetimes_are_start = lro.datetimes_are_start
             child_lro.file_end_datetimes = lro.file_end_datetimes
+            child_lro.get_date_string.return_value = lro.get_date_string.return_value
             result[group_name] = child_lro
         return result
     
@@ -65,6 +69,7 @@ def mock_multi_day_lros():
         lro.manual_datetimes = datetime(2023, 1, 1 + i, 12, 0)
         lro.datetimes_are_start = True
         lro._is_in_memory = False
+        lro.get_date_string.return_value = f"Jan-{i+1:02d}-2023"
         
         def make_mock_split(parent_lro):
             def mock_split(groups):
@@ -76,6 +81,7 @@ def mock_multi_day_lros():
                     child_lro._is_in_memory = True
                     child_lro.manual_datetimes = parent_lro.manual_datetimes
                     child_lro.persist = MagicMock(return_value=Path("/output"))
+                    child_lro.get_date_string.return_value = parent_lro.get_date_string.return_value
                     result[group_name] = child_lro
                 return result
             return mock_split
@@ -116,16 +122,18 @@ class TestFromLros:
         assert ao.channel_names == ["Ch0", "Ch1", "Ch2", "Ch3"]
 
     def test_from_lros_generates_animaldays(self, mock_multi_day_lros):
-        """Test that animaldays are generated from LRO paths."""
+        """Test that animaldays are generated from LRO metadata (get_date_string)."""
         ao = AnimalOrganizer.from_lros(
             lros=mock_multi_day_lros,
             animal_id="TestAnimal",
         )
         
         assert len(ao.animaldays) == 3
-        assert "TestAnimal_day0" in ao.animaldays[0]
-        assert "TestAnimal_day1" in ao.animaldays[1]
-        assert "TestAnimal_day2" in ao.animaldays[2]
+        # Expected format: "{animal_id} {genotype} {date}"
+        # genotype defaults to "Unknown" if not specified
+        assert "TestAnimal Unknown Jan-01-2023" in ao.animaldays[0]
+        assert "TestAnimal Unknown Jan-02-2023" in ao.animaldays[1]
+        assert "TestAnimal Unknown Jan-03-2023" in ao.animaldays[2]
 
     def test_from_lros_empty_list_raises_error(self):
         """Test that empty LRO list raises ValueError."""
@@ -153,18 +161,19 @@ class TestFromLros:
         assert ao.features_df.empty
         assert ao.features_avg_df.empty
 
-    def test_from_lros_fallback_animalday_for_in_memory(self):
-        """Test animalday generation when LRO has no base_folder_path."""
+    def test_from_lros_works_for_in_memory_with_metadata(self):
+        """Test animalday generation when LRO has no base_folder_path but has metadata."""
         lro = MagicMock(spec=LongRecordingOrganizer)
         lro.channel_names = ["Ch0"]
         lro.base_folder_path = None  # In-memory LRO
+        lro.get_date_string.return_value = "Jan-01-2023"
         
         ao = AnimalOrganizer.from_lros(
             lros=[lro],
             animal_id="TestAnimal",
         )
         
-        assert ao.animaldays[0] == "TestAnimal_day0"
+        assert ao.animaldays[0] == "TestAnimal Unknown Jan-01-2023"
 
     def test_from_lros_warns_on_channel_reorder(self, caplog):
         """Test that from_lros warns when channels are in different order."""

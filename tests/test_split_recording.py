@@ -62,9 +62,10 @@ class TestSplitInMemory:
         """Test that split() creates in-memory LROs."""
         groups = {"GroupA": ["Ch0", "Ch1"]}
         splits = dummy_long_recording.split(groups)
-        
+
         assert splits["GroupA"]._is_in_memory is True
-        assert splits["GroupA"].base_folder_path is None
+        # Split children now inherit base_folder_path from parent
+        assert splits["GroupA"].base_folder_path == dummy_long_recording.base_folder_path
 
     def test_split_preserves_channel_names(self, dummy_long_recording):
         """Test that channel names are preserved in split LROs."""

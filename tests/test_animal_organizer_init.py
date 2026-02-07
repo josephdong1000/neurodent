@@ -38,6 +38,33 @@ class TestAnimalOrganizerInitialization:
         ao = AnimalOrganizer.from_lros([mock_lro], animal_id="test_animal")
         self._assert_containers_initialized(ao)
 
+    def test_from_lros_uses_metadata_date(self, mock_lro):
+        """Test that from_lros uses LRO metadata for date, ignoring folder path."""
+        # Set a misleading path to prove we aren't parsing it
+        mock_lro.base_folder_path = "/path/to/Misleading_Feb-02-2023"
+        # Set explicit metadata return value
+        mock_lro.get_date_string.return_value = "Jan-01-2022"
+        
+        ao = AnimalOrganizer.from_lros(
+            [mock_lro], 
+            animal_id="Animal",
+            genotype="WT"
+        )
+        
+        # Verify get_date_string was called
+        mock_lro.get_date_string.assert_called_once()
+        
+        # Verify result used the metadata date, NOT the path date
+        expected_animalday = "Animal WT Jan-01-2022"
+        assert ao.animaldays[0] == expected_animalday
+
+    def test_from_lros_fails_without_metadata(self, mock_lro):
+        """Test that from_lros fails hard if metadata date is missing."""
+        mock_lro.get_date_string.side_effect = ValueError("No timestamps")
+        
+        with pytest.raises(ValueError, match="Could not determine date"):
+            AnimalOrganizer.from_lros([mock_lro], animal_id="Animal")
+
     def test_containers_are_usable(self, mock_lro):
         """Test that initialized containers are mutable and usable."""
         ao = AnimalOrganizer.from_lros([mock_lro], animal_id="test_animal")

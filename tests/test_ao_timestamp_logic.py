@@ -73,7 +73,7 @@ def test_ao_grouping_logic(mock_overlap_structure, monkeypatch):
     # Since files are empty, LRO creation inside _compute_global_timeline will fail.
     # We should mock _compute_global_timeline to return dummy mapping.
     
-    def mock_compute_global(self, base_dt, ad_folders, kw):
+    def mock_compute_global(self, base_dt, ad_folders, kw, original_manual_datetimes=None):
         # Return dummy map
         out = {}
         for day, folders in ad_folders.items():
