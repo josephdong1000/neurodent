@@ -2216,18 +2216,23 @@ class LongRecordingOrganizer:
         )
 
     def _apply_resampling(self, recording: "si.BaseRecording") -> "si.BaseRecording":
-        """Apply unified resampling using SpikeInterface preprocessing.
+        """Apply unified resampling and voltage scaling using SpikeInterface preprocessing.
 
         This method centralizes all resampling logic across the different data loading pipelines
         (binary, MNE, SI) to use the fast SpikeInterface resampling implementation consistently.
 
         It also enforces the global data type (constants.GLOBAL_DTYPE) for consistency.
 
+        If the recording has scaleable traces (gain_to_uV and offset_to_uV properties),
+        voltage scaling is applied first via ``spre.scale_to_uV``. This bakes the correct
+        ADC-to-µV conversion into the data and resets gain/offset to 1.0/0.0, which prevents
+        offset bugs from subsequent unsigned-to-signed conversion.
+
         Args:
             recording (si.BaseRecording): The recording to resample
 
         Returns:
-            si.BaseRecording: The resampled recording
+            si.BaseRecording: The resampled recording with data in µV (if scaleable)
 
         Raises:
             ImportError: If SpikeInterface preprocessing is not available
@@ -2235,9 +2240,24 @@ class LongRecordingOrganizer:
         # Guard clause: return early if recording is None or invalid
         if recording is None:
             return recording
-        
+
         if spre is None:
             raise ImportError("SpikeInterface preprocessing is required for resampling")
+
+        # 0. Apply voltage scaling FIRST for integer-typed recordings with gain/offset.
+        # SpikeInterface extractors (e.g., read_intan) store gain_to_uV and offset_to_uV
+        # which encode how to convert raw ADC values to microvolts. Applying scale_to_uV
+        # bakes this conversion into the data and resets gain/offset to 1.0/0.0.
+        # This MUST happen before unsigned_to_signed, because unsigned_to_signed shifts
+        # the raw data by 2^(bits-1) without updating offset_to_uV, which would cause
+        # the offset to be applied twice when get_traces(return_scaled=True) is called.
+        # Only apply for integer dtypes — float recordings are assumed to already be in
+        # physical units, matching SpikeInterface's own convention (baserecording.py:356).
+        dtype = recording.get_dtype()
+        is_integer = isinstance(dtype, (str, type, np.dtype)) and np.dtype(dtype).kind in ("i", "u")
+        if is_integer and recording.has_scaleable_traces():
+            logging.info("Applying scale_to_uV to convert raw ADC data to microvolts")
+            recording = spre.scale_to_uV(recording)
 
         # 1. Enforce signed integer if unsigned (existing logic preserved)
         dtype = recording.get_dtype()
