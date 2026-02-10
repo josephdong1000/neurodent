@@ -2940,8 +2940,8 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 updated_dict = self.bad_channels_dict.copy()
                 for animalday in animaldays:
                     if animalday in updated_dict:
-                        # Union of existing and new channels
-                        updated_dict[animalday] = list(
+                        # Union of existing and new channels (sorted for deterministic order)
+                        updated_dict[animalday] = sorted(
                             set(updated_dict[animalday]) | set(channels_to_save)
                         )
                     else:
@@ -3030,8 +3030,8 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 updated_dict = self.bad_channels_dict.copy()
                 for animalday, channels in bad_channels_dict.items():
                     if animalday in updated_dict:
-                        # Union of existing and new channels
-                        updated_dict[animalday] = list(
+                        # Union of existing and new channels (sorted for deterministic order)
+                        updated_dict[animalday] = sorted(
                             set(updated_dict[animalday]) | set(channels)
                         )
                     else:
