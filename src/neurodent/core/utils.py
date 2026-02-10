@@ -1265,6 +1265,7 @@ class Natural_Neighbor(object):
         flag = 0
         r = 1
 
+        max_r = len(self.data) - 1  # r + 1 must not exceed n_points
         while flag == 0:
             for i in range(len(self.data)):
                 knn = self.findKNN(self.data[i], r, tree)
@@ -1279,7 +1280,7 @@ class Natural_Neighbor(object):
             cnt = self.count()
             rep = self.repeat[cnt]
             self.repeat[cnt] += 1
-            if cnt == 0 or rep >= math.sqrt(r - rep):
+            if cnt == 0 or rep >= math.sqrt(r - rep) or r >= max_r:
                 flag = 1
             else:
                 r += 1
