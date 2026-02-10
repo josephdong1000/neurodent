@@ -510,22 +510,35 @@ def test_subtract_baseline_invalid_window_type():
 
 
 def test_enrich_genotype_metadata_empty_df():
-    """Test enrich_genotype_metadata with empty dataframe."""
-    empty_df = pd.DataFrame({"genotype": []})
-    result = zeitgeber.enrich_genotype_metadata(empty_df)
-    assert "sex" in result.columns
-    assert "gene" in result.columns
+    """Test new metadata.enrich_metadata with empty dataframe."""
+    from neurodent.core import metadata
+    
+    empty_df = pd.DataFrame({"animal": []})
+    animal_meta = {"M1": {"sex": "Male", "gene": "WT"}}
+    
+    # Should handle empty df gracefully
+    result = metadata.enrich_metadata(empty_df, animal_meta)
     assert len(result) == 0
 
 
-def test_enrich_genotype_metadata_non_string():
-    """Test enrich_genotype_metadata when genotype is not string type."""
+def test_enrich_metadata_basic():
+    """Test new metadata.enrich_metadata basic functionality."""
+    from neurodent.core import metadata
+    
     df = pd.DataFrame({
-        "genotype": [123, 456],  # Non-string genotypes
+        "animal": ["M1", "F1"],
+        "value": [10, 20],
     })
-    result = zeitgeber.enrich_genotype_metadata(df)
-    # Should convert to string and still work
+    animal_meta = {
+        "M1": {"sex": "Male", "gene": "WT"},
+        "F1": {"sex": "Female", "gene": "Mut"},
+    }
+    
+    result = metadata.enrich_metadata(df, animal_meta)
     assert "sex" in result.columns
+    assert "gene" in result.columns
+    assert result.iloc[0]["sex"] == "Male"
+    assert result.iloc[1]["gene"] == "Mut"
 
 
 def test_zar_get_grouprows_result():
@@ -578,28 +591,35 @@ def test_zar_empty_df():
     assert result.empty
 
 
-def test_enrich_genotype_with_pattern_and_sex_mapper():
-    """Test enrich_genotype_metadata with custom pattern and sex mapper."""
+def test_deprecated_enrich_genotype_with_aliases():
+    """Test deprecated enrich_genotype_metadata with genotype_aliases."""
+    import warnings
+    
     df = pd.DataFrame({
-        "genotype": ["WT-M", "KO-F", "Het-M"],
+        "animal": ["M1", "F1"],
+        "value": [10, 20],
     })
     
-    # Pattern that extracts gene and sex
-    pattern = r"(?P<gene>\w+)-(?P<sex>[MF])"
-    sex_mapper = {"M": "Male", "F": "Female"}
+    genotype_aliases = {
+        "MWT": ["M1"],
+        "FMut": ["F1"],
+    }
     
-    result = zeitgeber.enrich_genotype_metadata(
-        df, 
-        genotype_pattern=pattern,
-        sex_mapper=sex_mapper
-    )
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        result = zeitgeber.enrich_genotype_metadata(
+            df, 
+            genotype_aliases=genotype_aliases
+        )
+        # Should emit deprecation warning
+        assert len(w) == 1
+        assert issubclass(w[0].category, DeprecationWarning)
     
-    # Verify extraction worked
-    assert "gene" in result.columns
+    # Should still work via conversion to new format
     assert "sex" in result.columns
-    assert result.iloc[0]["gene"] == "WT"
+    assert "gene" in result.columns
     assert result.iloc[0]["sex"] == "Male"
-    assert result.iloc[1]["sex"] == "Female"
+    assert result.iloc[0]["gene"] == "WT"
 
 
 def test_baseline_grouped_empty_window(caplog):

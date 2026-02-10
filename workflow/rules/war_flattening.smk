@@ -21,8 +21,8 @@ checkpoint flatten_wars:
     retries:
         config["cluster"]["war_flattening"]["retries"]
     params:
-        samples_config=samples_config,
         config=config,
+        samples_config=samples_config,
     resources:
         time=config["cluster"]["war_flattening"]["time"],
         mem_mb=increment_memory(config["cluster"]["war_flattening"]["mem_mb"]),
@@ -48,8 +48,8 @@ rule flatten_wars_manual:
     retries:
         config["cluster"]["war_flattening"]["retries"]
     params:
-        samples_config=samples_config,
         config=config,
+        samples_config=samples_config,
     resources:
         time=config["cluster"]["war_flattening"]["time"],
         mem_mb=increment_memory(config["cluster"]["war_flattening"]["mem_mb"]),
@@ -75,8 +75,8 @@ rule flatten_wars_lof:
     retries:
         config["cluster"]["war_flattening"]["retries"]
     params:
-        samples_config=samples_config,
         config=config,
+        samples_config=samples_config,
     resources:
         time=config["cluster"]["war_flattening"]["time"],
         mem_mb=increment_memory(config["cluster"]["war_flattening"]["mem_mb"]),

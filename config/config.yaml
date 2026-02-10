@@ -2,8 +2,6 @@
 # =====================================
 
 # Core directories and paths
-base_folder: "/mnt/isilon/marsh_single_unit/NeuRodent"
-data_parent_folder: "/mnt/isilon/marsh_single_unit/PythonEEG Data Bins/Sox5/Dr. Lefebvre Project"
 temp_directory: "/scr1/users/dongjp"
 
 # Sample configuration
@@ -20,13 +18,18 @@ samples:
 analysis:
   # WAR generation parameters
   war_generation:
-    mode: "nest"
+    mode: "concat"
+    file_pattern: "*.nwb"
+    day_sep: null
     assume_from_number: true
     skip_days: ["bad"]
+    day_parse_kwargs:
+      date_patterns:
+        - ["\\d{6}", "%y%m%d"]
     lro_kwargs:
-      mode: "bin"
+      mode: "si"
       multiprocess_mode: "dask"
-      overwrite_rowbins: false
+      overwrite_rowbins: false # REVIEW function of this parameter when mode is not "bin"
 
   # Frequency domain spike detection parameters
   frequency_domain_spike_detection:
@@ -195,10 +198,18 @@ analysis:
 # SLURM cluster configuration
 cluster:
   war_generation:
-    time: "3h"
+    time: "6h"
     mem_mb: 70_000
     nodes: 1
     threads: 10
+    interface: null
+    retries: 2
+
+  split_joint_recordings:
+    time: "3h"
+    mem_mb: 70_000
+    nodes: 1
+    threads: 4
     interface: null
     retries: 2
 
@@ -260,7 +271,7 @@ cluster:
 
   relfreq_plots:
     time: "2h"
-    mem_mb: 300_000
+    mem_mb: 150_000
     nodes: 1
     threads: 15
     interface: null

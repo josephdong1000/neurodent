@@ -52,6 +52,7 @@ logs/
 results/
 .snakemake_run_id
 CLAUDE.md
+config/config.local.yaml
 
 docs/_build/
 docs/quickstart/output/

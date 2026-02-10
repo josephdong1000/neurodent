@@ -842,6 +842,7 @@ class TestLongRecordingOrganizer:
         mock_extract = Mock()
         mock_recording = Mock()
         mock_recording.get_num_channels.return_value = 4
+        mock_recording.get_dtype.return_value = constants.GLOBAL_DTYPE
         mock_recording.get_sampling_frequency.return_value = 1000.0
         mock_recording.get_channel_ids.return_value = np.array(['ch1', 'ch2', 'ch3', 'ch4'])
         mock_recording.get_duration.return_value = 3600.0
@@ -873,6 +874,7 @@ class TestLongRecordingOrganizer:
         mock_extract = Mock()
         mock_recording = Mock()
         mock_recording.get_num_channels.return_value = 2
+        mock_recording.get_dtype.return_value = constants.GLOBAL_DTYPE
         mock_recording.get_sampling_frequency.return_value = 500.0
         mock_recording.get_channel_ids.return_value = np.array(['ch1', 'ch2'])
         mock_recording.get_duration.return_value = 1800.0
@@ -923,6 +925,7 @@ class TestLongRecordingOrganizer:
         # Mock concatenate_recordings
         mock_concat_rec = Mock()
         mock_concat_rec.get_num_channels.return_value = 2
+        mock_concat_rec.get_dtype.return_value = constants.GLOBAL_DTYPE
         mock_concat_rec.get_sampling_frequency.return_value = 1000.0
         mock_concat_rec.get_channel_ids.return_value = np.array(['ch1', 'ch2'])
         mock_concat_rec.get_duration.return_value = 5400.0
@@ -966,6 +969,7 @@ class TestLongRecordingOrganizer:
         # Mock SpikeInterface recording - should have original sampling rate from MNE raw
         mock_si_rec = Mock()
         mock_si_rec.get_num_channels.return_value = 2
+        mock_si_rec.get_dtype.return_value = constants.GLOBAL_DTYPE
         mock_si_rec.get_sampling_frequency.return_value = 2000.0  # Original MNE sampling rate
         mock_si_rec.get_channel_ids.return_value = np.array(['ch1', 'ch2'])
         mock_si_rec.get_duration.return_value = 3600.0
@@ -1027,6 +1031,7 @@ class TestLongRecordingOrganizer:
         # Mock SpikeInterface recording
         mock_si_rec = Mock()
         mock_si_rec.get_num_channels.return_value = n_channels
+        mock_si_rec.get_dtype.return_value = constants.GLOBAL_DTYPE
         mock_si_rec.get_sampling_frequency.return_value = 1000.0
         mock_si_rec.get_channel_ids.return_value = np.array(['ch1', 'ch2', 'ch3'])
         mock_si_rec.get_duration.return_value = 1.0  # 1000 samples at 1000 Hz = 1 second
@@ -1061,6 +1066,7 @@ class TestLongRecordingOrganizer:
 
         # Mock input recording
         mock_recording = Mock()
+        mock_recording.get_dtype.return_value = constants.GLOBAL_DTYPE
         mock_recording.get_sampling_frequency.return_value = 2000.0
 
         # Mock resampled recording
@@ -1086,6 +1092,7 @@ class TestLongRecordingOrganizer:
 
         # Mock input recording at target rate
         mock_recording = Mock()
+        mock_recording.get_dtype.return_value = constants.GLOBAL_DTYPE
         mock_recording.get_sampling_frequency.return_value = constants.GLOBAL_SAMPLING_RATE
 
         result = organizer._apply_resampling(mock_recording)
@@ -1100,6 +1107,7 @@ class TestLongRecordingOrganizer:
 
         # Mock input recording
         mock_recording = Mock()
+        mock_recording.get_dtype.return_value = constants.GLOBAL_DTYPE
         mock_recording.get_sampling_frequency.return_value = 2000.0
 
         # Mock resampled recording
@@ -1116,6 +1124,7 @@ class TestLongRecordingOrganizer:
         organizer = LongRecordingOrganizer(temp_dir, mode=None)
 
         mock_recording = Mock()
+        mock_recording.get_dtype.return_value = constants.GLOBAL_DTYPE
         mock_recording.get_sampling_frequency.return_value = 2000.0
 
         # Mock missing preprocessing module
@@ -1134,6 +1143,7 @@ class TestLongRecordingOrganizer:
 
         # Test that metadata update is called when resampling occurs
         mock_recording = Mock()
+        mock_recording.get_dtype.return_value = constants.GLOBAL_DTYPE
         mock_recording.get_sampling_frequency.return_value = original_rate
 
         with patch('spikeinterface.preprocessing.resample') as mock_resample:
@@ -1154,6 +1164,7 @@ class TestLongRecordingOrganizer:
 
         for test_rate in test_rates:
             mock_recording = Mock()
+            mock_recording.get_dtype.return_value = constants.GLOBAL_DTYPE
             mock_recording.get_sampling_frequency.return_value = test_rate
 
             with patch('spikeinterface.preprocessing.resample') as mock_resample:
@@ -1176,6 +1187,7 @@ class TestLongRecordingOrganizer:
         organizer = LongRecordingOrganizer(temp_dir, mode=None)
 
         mock_recording = Mock()
+        mock_recording.get_dtype.return_value =constants.GLOBAL_DTYPE
         mock_recording.get_sampling_frequency.return_value = 2000.0
 
         with patch('spikeinterface.preprocessing.resample') as mock_resample:
@@ -1196,6 +1208,7 @@ class TestLongRecordingOrganizer:
 
         # Test logging when resampling is needed
         mock_recording = Mock()
+        mock_recording.get_dtype.return_value = constants.GLOBAL_DTYPE
         mock_recording.get_sampling_frequency.return_value = 2000.0
 
         with (
@@ -1269,6 +1282,7 @@ class TestMNENJobsParameter:
         # Mock SpikeInterface recording
         mock_si_rec = Mock()
         mock_si_rec.get_num_channels.return_value = 2
+        mock_si_rec.get_dtype.return_value = constants.GLOBAL_DTYPE
         mock_si_rec.get_sampling_frequency.return_value = constants.GLOBAL_SAMPLING_RATE
         mock_si_rec.get_channel_ids.return_value = np.array(['ch1', 'ch2'])
         mock_si_rec.get_duration.return_value = 3.6
@@ -1320,6 +1334,7 @@ class TestMNENJobsParameter:
         # Mock SpikeInterface recording
         mock_si_rec = Mock()
         mock_si_rec.get_num_channels.return_value = 2
+        mock_si_rec.get_dtype.return_value = constants.GLOBAL_DTYPE
         mock_si_rec.get_sampling_frequency.return_value = constants.GLOBAL_SAMPLING_RATE
         mock_si_rec.get_channel_ids.return_value = np.array(['ch1', 'ch2'])
         mock_si_rec.get_duration.return_value = 3.6
@@ -1368,6 +1383,7 @@ class TestMNENJobsParameter:
         # Mock SpikeInterface recording
         mock_si_rec = Mock()
         mock_si_rec.get_num_channels.return_value = 2
+        mock_si_rec.get_dtype.return_value = constants.GLOBAL_DTYPE
         mock_si_rec.get_sampling_frequency.return_value = constants.GLOBAL_SAMPLING_RATE
         mock_si_rec.get_channel_ids.return_value = np.array(['ch1', 'ch2'])
         mock_si_rec.get_duration.return_value = 1.0

@@ -77,6 +77,10 @@ class LongRecordingAnalyzer:
         rec = self.LongRecording.get_fragment(self.fragment_len_s, index)
 
         if self.apply_notch_filter and spre is not None:
+            # Notch filter requires signed/float types. LRO guarantees GLOBAL_DTYPE (float32).
+            if rec.get_dtype().kind == 'u':
+                raise ValueError(f"Recording has unsigned dtype {rec.get_dtype()}. LRO should have converted to {constants.GLOBAL_DTYPE}.")
+
             rec = spre.notch_filter(rec, freq=constants.LINE_FREQ)
 
         return rec

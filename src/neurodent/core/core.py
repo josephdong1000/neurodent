@@ -1,5 +1,6 @@
 import glob
 import gzip
+import copy
 import json
 import logging
 import math
@@ -354,38 +355,96 @@ def _convert_ddfrowbin_to_si_no_resample(bin_rowmajor_path, metadata):
     return rec, temppath
 
 
-class LongRecordingOrganizer:
+def split_recording(
+    input_path: Union[str, Path],
+    groups: dict[str, list[str]],
+    output_base: Union[str, Path] = None,
+    mode: Literal["bin", "si", "mne"] = "bin",
+    format: Literal["zarr", "binary"] = "zarr",
+    persist: bool = True,
+    **lro_kwargs,
+) -> dict[str, "LongRecordingOrganizer"]:
     """
-    Construct a long recording from binary files or EDF files.
+    Split a multi-animal recording file into separate per-animal recordings.
+
+    This is a standalone convenience function that creates an LRO, splits it,
+    and optionally persists the results to disk.
 
     Args:
-        base_folder_path (str): Path to the base folder containing the data files.
+        input_path (Union[str, Path]): Path to the input recording file/folder.
+        groups (dict[str, list[str]]): Dictionary mapping group names to channel lists.
+            Example: {"AnimalA": ["Ch1", "Ch2"], "AnimalB": ["Ch3", "Ch4"]}
+        output_base (Union[str, Path], optional): Base directory for output. Required if persist=True.
+        mode (Literal["bin", "si", "mne"], optional): Mode for loading input. Defaults to "bin".
+        format (Literal["zarr", "binary"], optional): Output format. Defaults to "zarr".
+        persist (bool, optional): If True, save splits to disk. Defaults to True.
+        **lro_kwargs: Additional arguments passed to LongRecordingOrganizer.
+
+    Returns:
+        dict[str, LongRecordingOrganizer]: Dictionary mapping group names to LRO instances.
+
+    Example:
+        >>> from neurodent.core import split_recording
+        >>> splits = split_recording(
+        ...     "/path/to/session.bin",
+        ...     groups={"AnimalA": ["Ch1", "Ch2"], "AnimalB": ["Ch3", "Ch4"]},
+        ...     output_base="/path/to/output",
+        ... )
+    """
+    # Load the input recording
+    lro = LongRecordingOrganizer(input_path, mode=mode, **lro_kwargs)
+
+    # Split into in-memory LROs
+    splits = lro.split(groups)
+
+    # Persist if requested
+    if persist:
+        if output_base is None:
+            raise ValueError("output_base is required when persist=True")
+        output_base = Path(output_base)
+        output_base.mkdir(parents=True, exist_ok=True)
+
+        for group_name, child_lro in splits.items():
+            output_dir = output_base / group_name
+            child_lro.persist(output_dir, format=format)
+
+    return splits
+
+
+class LongRecordingOrganizer:
+    """
+    Construct a long recording from binary files, EDF files, or an existing recording object.
+
+    Args:
+        base_folder_path (str | None): Path to the base folder containing the data files.
+            Set to None when initializing from an existing recording object.
         mode (Literal['bin', 'si', 'mne', None], optional): Mode to load data in. Defaults to 'bin'.
         truncate (bool | int, optional): If True, truncate data to first 10 files. If an integer, truncate data to the first n files. Defaults to False.
         cache_policy (Literal['auto', 'always', 'force_regenerate'], optional): Cache policy for intermediate files. Defaults to 'auto'.
         multiprocess_mode (Literal['dask', 'serial'], optional): Processing mode for parallel operations. Defaults to 'serial'.
-        extract_func (Callable, optional): Function to extract data when using 'si' or 'mne' mode. Required for those modes.
+        extract_func (Literal[Callable, str], optional): Function to extract data when using 'si' or 'mne' mode. Required for those modes.
         input_type (Literal['folder', 'file', 'files'], optional): Type of input processing. Defaults to 'folder'.
-            * 'folder': Passes base_folder_path directly to extract_func.
-            * 'file': Finds a single file matching file_pattern in base_folder_path.
-            * 'files': Finds multiple files matching file_pattern in base_folder_path, processes each, and concatenates.
-        file_pattern (str, optional): Pattern to match files when using 'file' or 'files' input type. Defaults to '*'.
-        manual_datetimes (datetime | list[datetime] | Callable, optional): Manually provided start times for the files. If None (default), times are inferred from file modification times.
-            * For 'bin' mode: if datetime, used as global start/end time; if list, one timestamp per file.
-            * For 'si'/'mne' modes: if datetime, used as start/end of entire recording; if list, one per input file.
-            * If Callable, must accept a Path and return a datetime.
-        datetimes_are_start (bool, optional): If True (default), manual_datetimes are start times. If False, they are end times.
-        n_jobs (int, optional): Number of parallel jobs to use for data loading. Defaults to 1 for safety. Set to -1 for automatic parallel detection, or >1 for specific job count.
+        file_pattern (str, optional): Pattern to match files when using 'file' or 'files' input type.
+        manual_datetimes (datetime | list[datetime] | Callable, optional): Manually provided timestamps.
+        datetimes_are_start (bool, optional): If True (default), manual_datetimes are start times.
+        n_jobs (int, optional): Number of parallel jobs for data loading. Defaults to 1.
+        recording (si.BaseRecording, optional): Existing SpikeInterface recording object for in-memory initialization.
+            Use this when creating LRO wrappers around split recordings.
+        labels (dict, optional): High-level session labels (animal ID, day, genotype, etc.).
+            This object is parsing-agnostic; it does not perform high-level parsing itself.
+            Labels should be provided by a parser (like `AnimalOrganizer`).
         **kwargs: Additional arguments passed to the data loading functions.
 
     Attributes:
-        LongRecording (si.BaseRecording): The SpikeInterface recording object containing the concatenated data.
-        meta (DDFBinaryMetadata): Metadata object associated with the recording.
+        LongRecording (si.BaseRecording): The SpikeInterface recording object.
+        meta (DDFBinaryMetadata): Technical metadata (sampling rate, channels, etc.).
+        labels (dict): High-level session labels (animal ID, day, genotype, etc.).
         channel_names (list[str]): List of channel names.
         file_durations (list[float]): Duration of each individual file in seconds.
         cumulative_file_durations (list[float]): Cumulative duration timestamps for file boundaries.
         temppaths (list[str]): Paths to temporary files created during processing.
         bad_channel_names (list[str]): List of channels identified as bad/noisy.
+        _is_in_memory (bool): True if this LRO was created from an in-memory recording (via split()).
 
     Raises:
         ValueError: If no data files are found, if the folder contains mixed file types, or if manual time parameters are invalid.
@@ -393,22 +452,33 @@ class LongRecordingOrganizer:
 
     def __init__(
         self,
-        base_folder_path,
+        base_folder_path: Union[str, Path, list[str]],
         mode: Literal["bin", "si", "mne", None] = "bin",
         truncate: Union[bool, int] = False,
         cache_policy: Literal["auto", "always", "force_regenerate"] = "auto",
         multiprocess_mode: Literal["dask", "serial"] = "serial",
         extract_func: Union[
-            Callable[..., "si.BaseRecording"], Callable[..., mne.io.Raw]
+            Callable[..., "si.BaseRecording"], Callable[..., mne.io.Raw], str
         ] = None,
         input_type: Literal["folder", "file", "files"] = "folder",
         file_pattern: str = None,
         manual_datetimes: datetime | list[datetime] = None,
         datetimes_are_start: bool = True,
         n_jobs: int = 1,
+        recording: "si.BaseRecording" = None,
+        labels: dict = None,
         **kwargs,
     ):
-        self.base_folder_path = Path(base_folder_path)
+        if isinstance(base_folder_path, list):
+            self.data_files = [str(x) for x in base_folder_path]
+            self.base_folder_path = Path(self.data_files[0]).parent if self.data_files else None
+            input_type = "files"
+            file_pattern = "*" # Not used when data_files is present
+        else:
+            self.base_folder_path = Path(base_folder_path) if base_folder_path else None
+            self.data_files = None
+
+        self.labels = labels or {}
 
         self.n_truncate = parse_truncate(truncate)
         self.truncate = True if self.n_truncate > 0 else False
@@ -424,9 +494,6 @@ class LongRecordingOrganizer:
         # Store n_jobs parameter for MNE operations
         self.n_jobs = n_jobs
 
-        # Validate manual time parameters
-        self._validate_manual_time_params()
-
         # Initialize core attributes
         self.meta = None
         self.channel_names = None
@@ -435,9 +502,21 @@ class LongRecordingOrganizer:
         self.file_durations = []
         self.cumulative_file_durations = []
         self.bad_channel_names = []
+        
+        # Track if this LRO was created in-memory (for split operations)
+        self._is_in_memory = False
+
+        # Handle in-memory initialization from existing recording
+        if recording is not None:
+            self._init_from_recording(recording)
+            return
+
+        # Validate manual time parameters (only if loading from files)
+        if base_folder_path is not None:
+            self._validate_manual_time_params()
 
         # Load data if mode is specified
-        if mode is not None:
+        if mode is not None and base_folder_path is not None:
             self.detect_and_load_data(
                 mode=mode,
                 cache_policy=cache_policy,
@@ -447,6 +526,31 @@ class LongRecordingOrganizer:
                 file_pattern=file_pattern,
                 **kwargs,
             )
+    
+    def _init_from_recording(self, recording: "si.BaseRecording"):
+        """Initialize LRO from an existing SpikeInterface recording object (in-memory)."""
+        # Enforce global dtype and resampling
+        self.LongRecording = self._apply_resampling(recording)
+        recording = self.LongRecording
+        
+        self._is_in_memory = True
+        
+        # Extract metadata from recording
+        channel_ids = recording.get_channel_ids()
+        self.channel_names = [str(ch) for ch in channel_ids]
+        
+        self.meta = DDFBinaryMetadata(
+            None,
+            n_channels=recording.get_num_channels(),
+            f_s=recording.get_sampling_frequency(),
+            dt_end=None,  # In-memory recordings don't have timestamps until persisted
+            channel_names=self.channel_names,
+        )
+        
+        # Compute file duration from recording
+        duration_s = recording.get_total_duration()
+        self.file_durations = [duration_s]
+        self.cumulative_file_durations = [duration_s]
 
     def detect_and_load_data(
         self,
@@ -454,7 +558,7 @@ class LongRecordingOrganizer:
         cache_policy: Literal["auto", "always", "force_regenerate"] = "auto",
         multiprocess_mode: Literal["dask", "serial"] = "serial",
         extract_func: Union[
-            Callable[..., "si.BaseRecording"], Callable[..., mne.io.Raw]
+            Callable[..., "si.BaseRecording"], Callable[..., mne.io.Raw], str
         ] = None,
         input_type: Literal["folder", "file", "files"] = "folder",
         file_pattern: str = None,
@@ -469,7 +573,21 @@ class LongRecordingOrganizer:
                 multiprocess_mode=multiprocess_mode,
             )
         elif mode == "si":
-            # EDF file pipeline
+            # Data pipeline using SpikeInterface
+            if si is None:
+                raise ImportError("SpikeInterface is required for mode='si'")
+
+            if isinstance(extract_func, str):
+                # Resolve from se (extractors) or si (core)
+                func_name = extract_func
+                extract_func = getattr(se, func_name, getattr(si, func_name, None))
+                if extract_func is None:
+                    raise ValueError(f"Could not resolve SpikeInterface extractor: {func_name}")
+            elif extract_func is None:
+                # Default to generic load_extractor if not provided, allowing loading of SI folders
+                extract_func = si.load_extractor
+
+            # SI file pipeline 
             self.convert_file_with_si_to_recording(
                 extract_func=extract_func,
                 input_type=input_type,
@@ -479,6 +597,13 @@ class LongRecordingOrganizer:
             )
         elif mode == "mne":
             # MNE file pipeline
+            if isinstance(extract_func, str):
+                # Resolve from mne.io
+                func_name = extract_func
+                extract_func = getattr(mne.io, func_name, None)
+                if extract_func is None:
+                    raise ValueError(f"Could not resolve MNE extractor: {func_name}")
+
             self.convert_file_with_mne_to_recording(
                 extract_func=extract_func,
                 input_type=input_type,
@@ -848,6 +973,16 @@ class LongRecordingOrganizer:
         Raises:
             ValueError: If no files are found for the given ``file_pattern`` or ``input_type`` is invalid.
         """
+        # Filter out LRO-specific kwargs that aren't relevant for SI extract functions
+        lro_only_kwargs = [
+            "overwrite_rowbins",
+            "mode",  # LRO mode, not extracted func mode
+            "input_type",
+            "file_pattern",
+            "manual_datetimes",
+            "datetimes_are_start",
+        ]
+        kwargs = {k: v for k, v in kwargs.items() if k not in lro_only_kwargs}
         if si is None:
             raise ImportError(
                 "SpikeInterface is required for convert_file_with_si_to_recording"
@@ -862,24 +997,36 @@ class LongRecordingOrganizer:
         elif input_type == "file":
             # For single file, validate that timestamps are provided
             self._validate_timestamps_for_mode("si", 1)
-            datafiles = glob.glob(str(self.base_folder_path / file_pattern))
-            if len(datafiles) == 0:
-                raise ValueError(f"No files found matching pattern: {file_pattern}")
-            elif len(datafiles) > 1:
-                warnings.warn(
-                    f"Multiple files found matching pattern: {file_pattern}. Using first file."
+            # If base_folder_path is already a file, use it directly
+            if self.base_folder_path.is_file():
+                datafile = str(self.base_folder_path)
+            else:
+                # Otherwise glob for files
+                datafiles = sorted(
+                    glob.glob(str(self.base_folder_path / file_pattern)),
+                    key=filepath_to_index,
                 )
-            datafile = datafiles[0]
+                if len(datafiles) == 0:
+                    raise ValueError(f"No files found matching pattern: {file_pattern}")
+                elif len(datafiles) > 1:
+                    warnings.warn(
+                        f"Multiple files found matching pattern: {file_pattern}. Using first file."
+                    )
+                datafile = datafiles[0]
             rec: "si.BaseRecording" = extract_func(datafile, **kwargs)
             n_processed_files = 1
         elif input_type == "files":
-            datafiles = [str(x) for x in self.base_folder_path.glob(file_pattern)]
+            if hasattr(self, "data_files") and self.data_files is not None:
+                datafiles = self.data_files
+            else:
+                datafiles = [str(x) for x in self.base_folder_path.glob(file_pattern)]
+            
             if len(datafiles) == 0:
                 raise ValueError(f"No files found matching pattern: {file_pattern}")
             datafiles = self._truncate_file_list(datafiles)
             # Validate timestamps early before slow processing
             self._validate_timestamps_for_mode("si", len(datafiles))
-            datafiles.sort()  # FIXME sort by index, or some other logic. Files may be out of order otherwise, messing up isday calculation
+            datafiles.sort(key=filepath_to_index)
             recs: list["si.BaseRecording"] = [
                 extract_func(x, **kwargs) for x in datafiles
             ]
@@ -899,13 +1046,41 @@ class LongRecordingOrganizer:
             None if self.manual_datetimes is not None else None
         )  # Will be set by finalize_file_timestamps
 
+        # Check if channel IDs are integers and warn user
+        raw_channel_ids = self.LongRecording.get_channel_ids()
+        if len(raw_channel_ids) > 0 and isinstance(raw_channel_ids[0], (int, np.integer)):
+            logging.warning(
+                f"Channel IDs are integers ({raw_channel_ids[:3]}...). Converting to strings. "
+                "If you need specific channel names, set them via the extract_func or "
+                "use recording.rename_channels() after loading."
+            )
+        channel_names = [str(ch) for ch in raw_channel_ids]
+
+        # Extract gain information from SpikeInterface recording
+        # SpikeInterface's get_traces(return_scaled=True) returns data in microvolts
+        # so we need to set metadata to reflect this scaling
+        V_units = "µV"
+        mult_to_uV = 1.0
+
+        # Try to verify gain is available (for logging/debugging purposes)
+        try:
+            if hasattr(self.LongRecording, 'get_property'):
+                gains = self.LongRecording.get_property('gain_to_uV')
+                if gains is not None:
+                    logging.debug(f"SpikeInterface recording has gain_to_uV property: {gains[0] if len(gains) > 0 else 'empty'}")
+        except (AttributeError, KeyError, ValueError, TypeError) as e:
+            # Property may not exist or be accessible, which is fine - we rely on return_scaled=True
+            logging.debug(f"Could not access gain_to_uV property: {e}")
+            pass
+
         self.meta = DDFBinaryMetadata(
             None,
             n_channels=self.LongRecording.get_num_channels(),
             f_s=self.LongRecording.get_sampling_frequency(),
             dt_end=dt_end,  # Will be properly set by finalize_file_timestamps
-            channel_names=self.LongRecording.get_channel_ids().tolist(),  # NOTE may potentially be a list of integers, which is undesirable. The ability to set names is available in the extractor function itself
-            # In the case this is integers, raise a warning and/or error, convert to string, and make a note that you may need to adjust parameters in si extractor
+            channel_names=channel_names,
+            V_units=V_units,
+            mult_to_uV=mult_to_uV,
         )
         self.channel_names = self.meta.channel_names
 
@@ -1190,7 +1365,7 @@ class LongRecordingOrganizer:
             # Check if channel names in MNE Raw object are in Intan format and convert if necessary
             if any("intan" in ch_name.lower() for ch_name in raw.info["ch_names"]):
                 logging.info("Converting Intan channel names to MNE format")
-                convert_intan_chname_mne(raw)
+                convert_intan_chname_mne(raw) # REVIEW check that this function is robust
 
             # Create the intermediate file
             if intermediate == "edf":
@@ -1198,6 +1373,7 @@ class LongRecordingOrganizer:
                 try:
                     mne.export.export_raw(fname, raw=raw, fmt="edf", overwrite=True)
                 except ValueError as e:
+                    # REVIEW JD to me this appears hardcoded -- will check with EDF files as well
                     if "exceeds maximum field length" in str(e):
                         logging.warning(f"EDF export failed due to signal range: {e}. Retrying with robust physical range.")
                         # Calculate robust range (0.01 - 99.99 percentile) to exclude artifacts
@@ -1293,6 +1469,10 @@ class LongRecordingOrganizer:
             Both files must exist for cache to be used. Metadata preserves channel names, original
             sampling rates, and other DDFBinaryMetadata fields across cache hits.
         """
+        # Filter out binary-mode-only kwargs that aren't relevant for MNE extract functions
+        binary_only_kwargs = ["overwrite_rowbins"]
+        kwargs = {k: v for k, v in kwargs.items() if k not in binary_only_kwargs}
+
         if se is None:
             raise ImportError(
                 "SpikeInterface is required for convert_file_with_mne_to_recording"
@@ -1321,7 +1501,11 @@ class LongRecordingOrganizer:
             n_processed_files = 1
 
         elif input_type == "files":
-            datafiles = list(self.base_folder_path.glob(file_pattern))
+            if hasattr(self, "data_files") and self.data_files is not None:
+                datafiles = [Path(x) for x in self.data_files]
+            else:
+                datafiles = list(self.base_folder_path.glob(file_pattern))
+            
             if len(datafiles) == 0:
                 raise ValueError(f"No files found matching pattern: {file_pattern}")
             datafiles = self._truncate_file_list(datafiles)
@@ -1397,6 +1581,198 @@ class LongRecordingOrganizer:
             logging.warning("LongRecording does not exist, probably deleted already")
         for tpath in self.temppaths:
             Path.unlink(tpath)
+
+    def split(
+        self,
+        groups: dict[str, list[str]],
+    ) -> dict[str, "LongRecordingOrganizer"]:
+        """
+        Split the current recording into multiple in-memory LongRecordingOrganizer objects.
+
+        This creates lightweight LRO wrappers around channel-sliced views of the
+        recording. No disk I/O is performed. Use `persist()` on individual results
+        to save them to disk if needed.
+
+        Args:
+            groups (dict[str, list[str]]): Dictionary mapping group names (e.g., 'AnimalA')
+                                           to lists of channel names.
+
+        Returns:
+            dict[str, LongRecordingOrganizer]: Dictionary mapping group names to new LRO instances.
+
+        Raises:
+            ValueError: If requested channels are not found in the recording.
+            ImportError: If SpikeInterface is not available.
+        
+        Example:
+            >>> lro = LongRecordingOrganizer("/path/to/data", mode="bin")
+            >>> splits = lro.split({"AnimalA": ["Ch1", "Ch2"], "AnimalB": ["Ch3", "Ch4"]})
+            >>> splits["AnimalA"].persist("/output/AnimalA", format="zarr")
+        """
+        if si is None:
+            raise ImportError("SpikeInterface is required for split()")
+
+        if not hasattr(self, "LongRecording") or self.LongRecording is None:
+            raise ValueError("No recording loaded to split")
+
+        # Build channel name to ID mapping
+        if not self.channel_names:
+            lro_names = [str(x) for x in self.LongRecording.get_channel_ids()]
+        else:
+            lro_names = self.channel_names
+
+        rec_channel_ids = self.LongRecording.get_channel_ids()
+        name_to_id = {}
+        if len(lro_names) == len(rec_channel_ids):
+            for name, ch_id in zip(lro_names, rec_channel_ids):
+                name_to_id[name] = ch_id
+        else:
+            logging.warning("LRO channel_names length mismatch. Falling back to str(id).")
+            for ch_id in rec_channel_ids:
+                name_to_id[str(ch_id)] = ch_id
+
+        # Track which channels are used for validation warning
+        all_requested_channels = set()
+        for channel_list in groups.values():
+            all_requested_channels.update(channel_list)
+        
+        unused_channels = [ch for ch in lro_names if ch not in all_requested_channels]
+        if unused_channels:
+            logging.warning(
+                f"{len(unused_channels)} channels not included in any group: "
+                f"{unused_channels[:5]}{'...' if len(unused_channels) > 5 else ''}"
+            )
+
+        lros = {}
+        for group_name, channel_subset in groups.items():
+            logging.info(f"Splitting group '{group_name}' with {len(channel_subset)} channels")
+
+            # Map names to IDs
+            target_ids = []
+            valid_names = []
+            missing = []
+
+            for name in channel_subset:
+                if name in name_to_id:
+                    target_ids.append(name_to_id[name])
+                    valid_names.append(name)
+                else:
+                    missing.append(name)
+
+            if missing:
+                raise ValueError(
+                    f"Channels not found in recording for group '{group_name}': {missing}"
+                )
+
+            # Slice (in-memory view, no copy)
+            sub_rec = self.LongRecording.select_channels(channel_ids=target_ids)
+
+            # Rename channels to string names for consistency
+            if hasattr(sub_rec, "rename_channels"):
+                sub_rec = sub_rec.rename_channels(new_channel_ids=valid_names)
+
+            # Create in-memory LRO wrapper
+            child_lro = LongRecordingOrganizer(
+                base_folder_path=self.base_folder_path,
+                mode=None,
+                recording=sub_rec,
+                labels=self.labels.copy(),
+            )
+            # Inherit parent timestamps
+            child_lro.manual_datetimes = self.manual_datetimes
+            child_lro.datetimes_are_start = self.datetimes_are_start
+            child_lro.n_jobs = self.n_jobs
+            
+            # Inherit truncation settings
+            child_lro.n_truncate = self.n_truncate
+            child_lro.truncate = self.truncate
+
+            if hasattr(self, "file_end_datetimes"):
+                child_lro.file_end_datetimes = self.file_end_datetimes
+            
+            # Inherit parent durations to ensure consistency with timestamps
+            if hasattr(self, "file_durations") and self.file_durations:
+                child_lro.file_durations = self.file_durations
+                child_lro.cumulative_file_durations = self.cumulative_file_durations
+            
+            # Inherit bad channels that are present in this split
+            if self.bad_channel_names:
+                child_lro.bad_channel_names = [
+                    ch for ch in self.bad_channel_names 
+                    if ch in valid_names
+                ]
+            
+            # Inherit complete metadata (preserving units, scaling, etc.)
+            if self.meta:
+                child_lro.meta = copy.deepcopy(self.meta)
+                child_lro.meta.n_channels = len(valid_names)
+                child_lro.meta.channel_names = valid_names
+
+            lros[group_name] = child_lro
+
+        return lros
+
+    def persist(
+        self,
+        output_dir: Union[str, Path],
+        format: Literal["zarr", "binary"] = "zarr",
+        n_jobs: int = 1,
+        chunk_duration: str = "1s",
+        progress_bar: bool = True,
+        **kwargs,
+    ) -> Path:
+        """
+        Save this LRO's recording to disk.
+
+        Delegates to SpikeInterface's save() function.
+
+        Args:
+            output_dir (Union[str, Path]): Directory to save the recording.
+            format (Literal["zarr", "binary"], optional): Save format. Defaults to "zarr".
+            n_jobs (int, optional): Number of parallel jobs. Defaults to 1.
+            chunk_duration (str, optional): Chunk duration for processing. Defaults to "1s".
+            progress_bar (bool, optional): Show progress bar. Defaults to True.
+            **kwargs: Additional arguments passed to SI's save().
+
+        Returns:
+            Path: The output directory where the recording was saved.
+        """
+        if si is None:
+            raise ImportError("SpikeInterface is required for persist()")
+
+        if self.LongRecording is None:
+            raise ValueError("No recording to persist")
+
+        output_dir = Path(output_dir)
+        
+        # Ensure parent directory exists
+        output_dir.parent.mkdir(parents=True, exist_ok=True)
+        
+        # For zarr format, SI appends .zarr suffix to folder name
+        actual_output_dir = output_dir
+        if format == "zarr" and not str(output_dir).endswith(".zarr"):
+            actual_output_dir = output_dir.parent / f"{output_dir.name}.zarr"
+        
+        if actual_output_dir.exists():
+            logging.warning(f"Overwriting existing folder: {actual_output_dir}")
+            import shutil
+            shutil.rmtree(actual_output_dir)
+
+        saved_rec = self.LongRecording.save(
+            folder=output_dir,
+            format=format,
+            n_jobs=n_jobs,
+            chunk_duration=chunk_duration,
+            progress_bar=progress_bar,
+            **kwargs,
+        )
+
+        # SI returns saved recording; update our path to actual location
+        self.base_folder_path = actual_output_dir
+        self._is_in_memory = False
+        logging.info(f"Persisted recording to {actual_output_dir} (format={format})")
+
+        return actual_output_dir
 
     def get_num_fragments(self, fragment_len_s):
         frag_len_idx = self.__time_to_idx(fragment_len_s)
@@ -1772,6 +2148,31 @@ class LongRecordingOrganizer:
                     "manual_datetimes must be provided when no CSV metadata is available!"
                 )
 
+    def get_date_string(self) -> str:
+        """
+        Get the string representation of the recording date (Start Time).
+        
+        Returns:
+            str: Date string in format "%b-%d-%Y" (e.g. "Jan-21-2022").
+        
+        Raises:
+            ValueError: If no timestamps are available in the recording.
+        """
+        if not hasattr(self, "file_end_datetimes") or not self.file_end_datetimes:
+             raise ValueError("Cannot determine date: No file timestamps available.")
+        
+        # Find first valid timestamp
+        first_valid_idx = next((i for i, x in enumerate(self.file_end_datetimes) if x is not None), None)
+        
+        if first_valid_idx is None:
+             raise ValueError("Cannot determine date: All file timestamps are None.")
+             
+        end_time = self.file_end_datetimes[first_valid_idx]
+        duration = self.file_durations[first_valid_idx]
+        
+        start_time = end_time - timedelta(seconds=duration)
+        return start_time.strftime("%b-%d-%Y")
+
     def __str__(self):
         """Return a string representation of critical long recording features."""
         if not hasattr(self, "LongRecording") or self.LongRecording is None:
@@ -1815,23 +2216,67 @@ class LongRecordingOrganizer:
         )
 
     def _apply_resampling(self, recording: "si.BaseRecording") -> "si.BaseRecording":
-        """Apply unified resampling using SpikeInterface preprocessing.
+        """Apply unified resampling and voltage scaling using SpikeInterface preprocessing.
 
         This method centralizes all resampling logic across the different data loading pipelines
         (binary, MNE, SI) to use the fast SpikeInterface resampling implementation consistently.
+
+        It also enforces the global data type (constants.GLOBAL_DTYPE) for consistency.
+
+        If the recording has scaleable traces (gain_to_uV and offset_to_uV properties),
+        voltage scaling is applied first via ``spre.scale_to_uV``. This bakes the correct
+        ADC-to-µV conversion into the data and resets gain/offset to 1.0/0.0, which prevents
+        offset bugs from subsequent unsigned-to-signed conversion.
 
         Args:
             recording (si.BaseRecording): The recording to resample
 
         Returns:
-            si.BaseRecording: The resampled recording
+            si.BaseRecording: The resampled recording with data in µV (if scaleable)
 
         Raises:
             ImportError: If SpikeInterface preprocessing is not available
         """
+        # Guard clause: return early if recording is None or invalid
+        if recording is None:
+            return recording
+
         if spre is None:
             raise ImportError("SpikeInterface preprocessing is required for resampling")
 
+        # 0. Apply voltage scaling FIRST for integer-typed recordings with gain/offset.
+        # SpikeInterface extractors (e.g., read_intan) store gain_to_uV and offset_to_uV
+        # which encode how to convert raw ADC values to microvolts. Applying scale_to_uV
+        # bakes this conversion into the data and resets gain/offset to 1.0/0.0.
+        # This MUST happen before unsigned_to_signed, because unsigned_to_signed shifts
+        # the raw data by 2^(bits-1) without updating offset_to_uV, which would cause
+        # the offset to be applied twice when get_traces(return_scaled=True) is called.
+        # Only apply for integer dtypes — float recordings are assumed to already be in
+        # physical units, matching SpikeInterface's own convention (baserecording.py:356).
+        dtype = recording.get_dtype()
+        is_integer = isinstance(dtype, (str, type, np.dtype)) and np.dtype(dtype).kind in ("i", "u")
+        if is_integer and recording.has_scaleable_traces():
+            logging.info("Applying scale_to_uV to convert raw ADC data to microvolts")
+            recording = spre.scale_to_uV(recording)
+
+        # 1. Enforce signed integer if unsigned (existing logic preserved)
+        dtype = recording.get_dtype()
+        # Handle numpy types, strings. Avoid Mock objects
+        is_unsigned = False
+        if isinstance(dtype, (str, type, np.dtype)):
+            if np.dtype(dtype).kind == "u":
+                is_unsigned = True
+
+        if is_unsigned:
+            logging.info(f"Data type is unsigned ({dtype}) and SpikeInterface can't process. Converting it to signed")
+            recording = spre.unsigned_to_signed(recording)
+
+        # 2. Enforce GLOBAL_DTYPE (New logic)
+        if recording.get_dtype() != constants.GLOBAL_DTYPE:
+            logging.info(f"Converting recording dtype from {recording.get_dtype()} to {constants.GLOBAL_DTYPE}")
+            recording = spre.astype(recording, dtype=constants.GLOBAL_DTYPE)
+
+        # 3. Apply Resampling if needed
         current_rate = recording.get_sampling_frequency()
         target_rate = constants.GLOBAL_SAMPLING_RATE
 
@@ -1844,17 +2289,6 @@ class LongRecordingOrganizer:
         logging.info(
             f"Resampling recording from {current_rate} Hz to {target_rate} Hz using SpikeInterface"
         )
-
-        dtype = recording.get_dtype()
-        # Handle numpy types, strings. Avoid Mock objects
-        is_unsigned = False
-        if isinstance(dtype, (str, type, np.dtype)):
-            if np.dtype(dtype).kind == "u":
-                is_unsigned = True
-
-        if is_unsigned:
-            logging.info(f"Data type is unsigned ({dtype}) and SpikeInterface can't process. Converting it to signed")
-            recording = spre.unsigned_to_signed(recording)
 
         # Use SpikeInterface resampling with margin to reduce edge effects
         resampled_recording = spre.resample(
@@ -1944,9 +2378,46 @@ class LongRecordingOrganizer:
         Args:
             other_lro (LongRecordingOrganizer): The LRO that was merged into this one
         """
-        # Update end time to reflect the merged recording duration
         if hasattr(other_lro.meta, "dt_end") and hasattr(self.meta, "dt_end"):
             self.meta.dt_end = other_lro.meta.dt_end
+
+        # Merge high-level labels
+        if hasattr(other_lro, "labels") and other_lro.labels:
+            for key, value in other_lro.labels.items():
+                if key in self.labels and self.labels[key] != value:
+                    warnings.warn(
+                        f"Label conflict during merge for key '{key}': "
+                        f"'{self.labels[key]}' != '{value}'. Overwriting with new value.",
+                        UserWarning,
+                    )
+                self.labels[key] = value
+
+        # Merge file timestamps and durations
+        has_dates = (
+            hasattr(self, "file_end_datetimes")
+            and self.file_end_datetimes
+            and hasattr(other_lro, "file_end_datetimes")
+            and other_lro.file_end_datetimes
+        )
+        has_durs = (
+            hasattr(self, "file_durations")
+            and self.file_durations
+            and hasattr(other_lro, "file_durations")
+            and other_lro.file_durations
+        )
+
+        if has_durs:
+            if has_dates:
+                self.file_end_datetimes.extend(other_lro.file_end_datetimes)
+                self.file_durations.extend(other_lro.file_durations)
+            else:
+                # If we are merging durations, we must be able to merge timestamps
+                # OR we must drop timestamps entirely to avoid mismatch (destructive).
+                # better to raise error and let user fix input data.
+                 raise ValueError(
+                    f"Merge failed: 'other_lro' ({getattr(other_lro, 'base_folder_path', 'unknown')}) "
+                    "has durations but missing 'file_end_datetimes'. Cannot merge safely without corrupting metadata."
+                )
 
         # Note: Channel names, sampling rate, etc. should already be validated as identical
 

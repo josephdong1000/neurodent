@@ -267,7 +267,7 @@ def filepath_to_index(filepath) -> int:
         filepath (str | Path): Path to the file to extract index from.
 
     Returns:
-        int: The extracted index number.
+        int: The extracted index number, or 0 if no number is found in the filename.
 
     Examples:
         >>> filepath_to_index("/path/to/data_ColMajor_001.bin")
@@ -289,6 +289,8 @@ def filepath_to_index(filepath) -> int:
     fname = Path(fpath).name
     fname = re.split(r"\D+", fname)
     fname = list(filter(None, fname))
+    if not fname:
+        return 0
     return int(fname[-1])
 
 
@@ -451,16 +453,19 @@ def parse_path_to_animalday(
     filepath = Path(filepath)
     match mode:
         case "nest":
-            geno = parse_str_to_genotype(filepath.parent.name)
             animid = parse_str_to_animal(filepath.parent.name, animal_param=animal_param)
+            geno = (constants.ANIMAL_METADATA.get(animid, {}).get("gene") or 
+                    parse_str_to_genotype(filepath.parent.name))
             day = parse_str_to_day(filepath.name, sep=day_sep, **day_parse_kwargs).strftime("%b-%d-%Y")
         case "concat" | "base":
-            geno = parse_str_to_genotype(filepath.name)
             animid = parse_str_to_animal(filepath.name, animal_param=animal_param)
+            geno = (constants.ANIMAL_METADATA.get(animid, {}).get("gene") or 
+                    parse_str_to_genotype(filepath.name))
             day = parse_str_to_day(filepath.name, sep=day_sep, **day_parse_kwargs).strftime("%b-%d-%Y")
         case "noday":
-            geno = parse_str_to_genotype(filepath.name)
             animid = parse_str_to_animal(filepath.name, animal_param=animal_param)
+            geno = (constants.ANIMAL_METADATA.get(animid, {}).get("gene") or 
+                    parse_str_to_genotype(filepath.name))
             day = constants.DEFAULT_DAY.strftime("%b-%d-%Y")
         case _:
             raise ValueError(f"Invalid mode: {mode}")
@@ -608,11 +613,11 @@ def parse_str_to_day(
     # Validate date_patterns
     if date_patterns is not None:
         if not isinstance(date_patterns, list):
-            raise TypeError("date_patterns must be a list of (regex_pattern, strptime_format) tuples")
-        for i, pattern_tuple in enumerate(date_patterns):
-            if not isinstance(pattern_tuple, tuple) or len(pattern_tuple) != 2:
-                raise TypeError(f"date_patterns[{i}] must be a tuple of (regex_pattern, strptime_format)")
-            if not isinstance(pattern_tuple[0], str) or not isinstance(pattern_tuple[1], str):
+            raise TypeError("date_patterns must be a list of sequences")
+        for i, pattern_seq in enumerate(date_patterns):
+            if not isinstance(pattern_seq, (tuple, list)) or len(pattern_seq) != 2:
+                raise TypeError(f"date_patterns[{i}] must be a sequence of (regex_pattern, strptime_format)")
+            if not isinstance(pattern_seq[0], str) or not isinstance(pattern_seq[1], str):
                 raise TypeError(f"date_patterns[{i}] must contain string elements")
 
     # Validate parse_mode
@@ -657,7 +662,7 @@ def parse_str_to_day(
                 date = dateutil.parser.parse(token, default=constants.DEFAULT_DAY, **parse_params)
                 if date.year <= 1980:
                     continue
-                return date
+                return date.replace(tzinfo=None)
             except ParserError:
                 continue
 
@@ -673,7 +678,7 @@ def parse_str_to_day(
                     date = dateutil.parser.parse(grouped, default=constants.DEFAULT_DAY, **parse_params)
                     if date.year <= 1980:
                         continue
-                    return date
+                    return date.replace(tzinfo=None)
                 except ParserError:
                     continue
 
@@ -1260,6 +1265,7 @@ class Natural_Neighbor(object):
         flag = 0
         r = 1
 
+        max_r = len(self.data) - 1  # r + 1 must not exceed n_points
         while flag == 0:
             for i in range(len(self.data)):
                 knn = self.findKNN(self.data[i], r, tree)
@@ -1274,7 +1280,7 @@ class Natural_Neighbor(object):
             cnt = self.count()
             rep = self.repeat[cnt]
             self.repeat[cnt] += 1
-            if cnt == 0 or rep >= math.sqrt(r - rep):
+            if cnt == 0 or rep >= math.sqrt(r - rep) or r >= max_r:
                 flag = 1
             else:
                 r += 1

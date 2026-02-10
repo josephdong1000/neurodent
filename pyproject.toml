@@ -44,8 +44,6 @@ dependencies = [
     "appnope",
     "zarr>=2.18.3",
     "scikit-learn>=1.7.2",
-    "edfio>=0.4.12",
-    "pyedflib>=0.1.42",
 ]
 requires-python = ">=3.10"
 keywords = [
@@ -63,12 +61,17 @@ pipeline = [
     "snakemake>=7.32.4",
     "pulp==2.7.0 ; python_full_version < '3.11'",
 ]
+readers = [
+    "edfio>=0.4.12",
+    "pyedflib>=0.1.42",
+    "pynwb>=3.1.3",
+]
 all = [
-    "neurodent[pipeline]",
+    "neurodent[pipeline, readers]",
 ]
 dev = [
-    # Include pipeline deps
-    "neurodent[pipeline]",
+    # Include pipeline and reader deps
+    "neurodent[pipeline, readers]",
     # Testing
     "snakeviz",
     "pytest>=7.0.0",

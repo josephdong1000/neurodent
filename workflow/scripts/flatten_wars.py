@@ -14,7 +14,7 @@ Output: Individual aggregated WARs saved as pickle and json in wars_flattened/
 from pathlib import Path
 
 from neurodent import visualization
-from neurodent.workflow import setup_snakemake_logging
+from neurodent.workflow import setup_snakemake_logging, inject_config_aliases
 
 
 def main():
@@ -29,6 +29,10 @@ def main():
     war_json_name = Path(snakemake.input.war_json).name
     output_war_pkl = snakemake.output.war_pkl
     config = snakemake.params.config
+    samples_config = snakemake.params.samples_config
+
+    # Inject aliases
+    inject_config_aliases(samples_config)
 
     # Get animal name from wildcards
     animal_name = snakemake.wildcards.animal
