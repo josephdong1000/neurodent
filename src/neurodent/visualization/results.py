@@ -1009,6 +1009,23 @@ class AnimalOrganizer(AnimalFeatureParser):
         # Log timeline summary for debugging
         self._log_timeline_summary()
 
+        # CRITICAL VALIDATION: Ensure animaldays and long_recordings are aligned
+        if len(self.long_recordings) != len(self.unique_animaldays):
+            error_msg = (
+                f"CRITICAL ERROR: Mismatch between animaldays and long_recordings! "
+                f"Expected {len(self.unique_animaldays)} LROs for {len(self.unique_animaldays)} unique animaldays, "
+                f"but got {len(self.long_recordings)} LROs instead. "
+                f"\nAnimaldays: {self.unique_animaldays}"
+                f"\nLRO count: {len(self.long_recordings)}"
+                f"\nThis will cause incorrect mapping of LOF scores and bad channels."
+            )
+            logging.error(error_msg)
+            raise ValueError(error_msg)
+
+        logging.info(
+            f"✓ Validated: {len(self.long_recordings)} LROs match {len(self.unique_animaldays)} animaldays"
+        )
+
         channel_names = [x.channel_names for x in self.long_recordings]
         if len(set([" ".join(x) for x in channel_names])) > 1:
             warnings.warn(
@@ -1355,6 +1372,7 @@ class AnimalOrganizer(AnimalFeatureParser):
 
         # Collect LOF scores from long recordings
         lof_scores_dict = {}
+        missing_lof_animaldays = []
         for animalday, lrec in zip(self.animaldays, self.long_recordings):
             logging.debug(
                 f"Checking LOF scores for {animalday}: has_attr={hasattr(lrec, 'lof_scores')}, "
@@ -1368,8 +1386,24 @@ class AnimalOrganizer(AnimalFeatureParser):
                 logging.info(
                     f"Added LOF scores for {animalday}: {len(lrec.lof_scores)} channels"
                 )
+            else:
+                missing_lof_animaldays.append(animalday)
+                logging.warning(
+                    f"Missing LOF scores for {animalday}! LOF computation may have failed or "
+                    f"compute_bad_channels() was not called for this LRO."
+                )
 
         logging.info(f"Total LOF scores collected: {len(lof_scores_dict)} animal days")
+
+        # Warn loudly if any animaldays are missing LOF scores
+        if missing_lof_animaldays:
+            warning_msg = (
+                f"WARNING: {len(missing_lof_animaldays)} animalday(s) are missing LOF scores: {missing_lof_animaldays}. "
+                f"Expected {len(self.animaldays)} but got {len(lof_scores_dict)}. "
+                f"These sessions will be auto-populated with empty placeholders and excluded from LOF-based analysis."
+            )
+            logging.warning(warning_msg)
+            warnings.warn(warning_msg)
 
         self.window_analysis_result = WindowAnalysisResult(
             self.features_df,
@@ -2023,11 +2057,16 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
             if animalday not in self.lof_scores_dict:
                 # Add missing animalday with empty LOF scores
+                # NOTE: Both lof_scores AND channel_names must be empty to maintain invariant!
                 self.lof_scores_dict[animalday] = {
                     "lof_scores": [],
-                    "channel_names": self.channel_names if self.channel_names else []
+                    "channel_names": []  # Must be empty to match empty lof_scores!
                 }
-                logging.info(f"Added missing animalday to lof_scores_dict: {animalday}")
+                logging.warning(
+                    f"Added missing animalday to lof_scores_dict: {animalday}. "
+                    f"This indicates LOF scores were not computed for this session. "
+                    f"It will be excluded from LOF-based analysis."
+                )
 
         self.channel_abbrevs = [
             core.parse_chname_to_abbrev(x, assume_from_number=self.assume_from_number)
@@ -3702,6 +3741,24 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
             scores = np.array(lof_data["lof_scores"])
             channel_names = lof_data["channel_names"]
+
+            # Validate data integrity before processing
+            # NOTE address this issue since this should not be happening in the first place
+            # if len(scores) == 0:
+            #     logging.warning(
+            #         f"Skipping {animalday}: No LOF scores available. "
+            #         f"This session will be excluded from LOF accuracy evaluation."
+            #     )
+            #     continue
+
+            # if len(scores) != len(channel_names):
+            #     logging.error(
+            #         f"Skipping {animalday}: LOF scores ({len(scores)}) and "
+            #         f"channels ({len(channel_names)}) length mismatch. "
+            #         f"This indicates a data integrity issue - the animalday may have been "
+            #         f"improperly mapped during LOF score collection."
+            #     )
+            #     continue
 
             # Get ground truth bad channels for this animal-day
             animalday_bad_channels = ground_truth_bad_channels.get(animalday, set())
