@@ -2012,6 +2012,23 @@ class WindowAnalysisResult(AnimalFeatureParser):
         ]
         self.animaldays = self.result.loc[:, "animalday"].unique()
 
+        # Ensure bad_channels_dict and lof_scores_dict have entries for all animaldays
+        # This fixes the issue where windowed analysis creates per-date animaldays
+        # but bad_channels_dict only has LRO-level (per-folder) entries
+        for animalday in self.animaldays:
+            if animalday not in self.bad_channels_dict:
+                # Add missing animalday with empty bad channels list
+                self.bad_channels_dict[animalday] = []
+                logging.info(f"Added missing animalday to bad_channels_dict: {animalday}")
+
+            if animalday not in self.lof_scores_dict:
+                # Add missing animalday with empty LOF scores
+                self.lof_scores_dict[animalday] = {
+                    "lof_scores": [],
+                    "channel_names": self.channel_names if self.channel_names else []
+                }
+                logging.info(f"Added missing animalday to lof_scores_dict: {animalday}")
+
         self.channel_abbrevs = [
             core.parse_chname_to_abbrev(x, assume_from_number=self.assume_from_number)
             for x in self.channel_names
