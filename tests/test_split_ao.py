@@ -180,10 +180,12 @@ class TestFromLros:
         lro1 = MagicMock(spec=LongRecordingOrganizer)
         lro1.channel_names = ["Ch0", "Ch1", "Ch2"]
         lro1.base_folder_path = Path("/mock/day1")
-        
+        lro1.get_date_string.return_value = "Jan-01-2023"
+
         lro2 = MagicMock(spec=LongRecordingOrganizer)
         lro2.channel_names = ["Ch2", "Ch1", "Ch0"]  # Same channels, different order
         lro2.base_folder_path = Path("/mock/day2")
+        lro2.get_date_string.return_value = "Jan-02-2023"
         
         import logging
         with caplog.at_level(logging.WARNING):
@@ -202,10 +204,12 @@ class TestFromLros:
         lro1 = MagicMock(spec=LongRecordingOrganizer)
         lro1.channel_names = ["Ch0", "Ch1"]
         lro1.base_folder_path = Path("/mock/day1")
-        
+        lro1.get_date_string.return_value = "Jan-01-2023"
+
         lro2 = MagicMock(spec=LongRecordingOrganizer)
         lro2.channel_names = ["Ch0", "Ch2"]  # Different channel set
         lro2.base_folder_path = Path("/mock/day2")
+        lro2.get_date_string.return_value = "Jan-02-2023"
         
         with pytest.raises(ValueError, match="inconsistent channel names"):
             AnimalOrganizer.from_lros(
@@ -218,10 +222,12 @@ class TestFromLros:
         lro1 = MagicMock(spec=LongRecordingOrganizer)
         lro1.channel_names = ["Ch0"]
         lro1.base_folder_path = Path("/mock/animal/day1")
-        
+        lro1.get_date_string.return_value = "Jan-01-2023"
+
         lro2 = MagicMock(spec=LongRecordingOrganizer)
         lro2.channel_names = ["Ch0"]
         lro2.base_folder_path = Path("/mock/animal/day2")
+        lro2.get_date_string.return_value = "Jan-02-2023"
         
         ao = AnimalOrganizer.from_lros(
             lros=[lro1, lro2],
@@ -232,6 +238,184 @@ class TestFromLros:
         assert ao.bin_folder_names == ["day1", "day2"]
         # Should find common parent
         assert ao.base_folder_path == Path("/mock/animal")
+
+    def test_from_lros_merges_duplicate_dates(self):
+        """Test that from_lros automatically merges LROs with same date."""
+        from datetime import datetime
+
+        # Create 4 mock LROs: 2 for Jan-01, 1 for Jan-02, 1 for Jan-03
+        lros = []
+
+        # Two LROs for Jan-01-2023
+        for i in range(2):
+            lro = MagicMock(spec=LongRecordingOrganizer)
+            lro.channel_names = ["Ch0", "Ch1"]
+            lro.base_folder_path = Path(f"/mock/session{i}/day1")
+            lro.get_date_string.return_value = "Jan-01-2023"
+            lro.file_end_datetimes = [datetime(2023, 1, 1, 12 + i, 0)]
+            lro.file_durations = [3600.0]
+
+            # Mock merge method
+            lro.merge = MagicMock()
+
+            lros.append(lro)
+
+        # One LRO for Jan-02-2023
+        lro = MagicMock(spec=LongRecordingOrganizer)
+        lro.channel_names = ["Ch0", "Ch1"]
+        lro.base_folder_path = Path("/mock/session0/day2")
+        lro.get_date_string.return_value = "Jan-02-2023"
+        lro.file_end_datetimes = [datetime(2023, 1, 2, 12, 0)]
+        lro.file_durations = [3600.0]
+        lros.append(lro)
+
+        # One LRO for Jan-03-2023
+        lro = MagicMock(spec=LongRecordingOrganizer)
+        lro.channel_names = ["Ch0", "Ch1"]
+        lro.base_folder_path = Path("/mock/session1/day3")
+        lro.get_date_string.return_value = "Jan-03-2023"
+        lro.file_end_datetimes = [datetime(2023, 1, 3, 12, 0)]
+        lro.file_durations = [3600.0]
+        lros.append(lro)
+
+        # Create AnimalOrganizer
+        ao = AnimalOrganizer.from_lros(
+            lros=lros,
+            animal_id="TestAnimal",
+            genotype="WT"
+        )
+
+        # Verify merge was called for Jan-01 LROs
+        assert lros[0].merge.called or lros[1].merge.called, \
+            "merge() should be called for duplicate date LROs"
+
+        # Verify only 3 unique dates in final result
+        assert len(ao.long_recordings) == 3, \
+            f"Expected 3 merged LROs, got {len(ao.long_recordings)}"
+        assert len(ao.unique_animaldays) == 3, \
+            f"Expected 3 unique animaldays, got {len(ao.unique_animaldays)}"
+        assert len(set(ao.unique_animaldays)) == 3, \
+            "Animaldays should all be unique"
+
+        # Verify animalday strings
+        expected_dates = {"Jan-01-2023", "Jan-02-2023", "Jan-03-2023"}
+        actual_dates = {day.split()[-1] for day in ao.unique_animaldays}
+        assert actual_dates == expected_dates
+
+    def test_from_lros_merge_incompatible_raises_error(self):
+        """Test that incompatible LROs with same date raise clear error."""
+        from datetime import datetime
+
+        lros = []
+
+        # LRO 1: Jan-01, channels Ch0, Ch1
+        lro1 = MagicMock(spec=LongRecordingOrganizer)
+        lro1.channel_names = ["Ch0", "Ch1"]
+        lro1.get_date_string.return_value = "Jan-01-2023"
+        lro1.file_end_datetimes = [datetime(2023, 1, 1, 12, 0)]
+        lro1.file_durations = [3600.0]
+        lro1.base_folder_path = Path("/mock/session0/day1")
+
+        # LRO 2: Jan-01, DIFFERENT channels Ch2, Ch3
+        lro2 = MagicMock(spec=LongRecordingOrganizer)
+        lro2.channel_names = ["Ch2", "Ch3"]  # Incompatible!
+        lro2.get_date_string.return_value = "Jan-01-2023"
+        lro2.file_end_datetimes = [datetime(2023, 1, 1, 14, 0)]
+        lro2.file_durations = [3600.0]
+        lro2.base_folder_path = Path("/mock/session1/day1")
+
+        # Mock merge to raise ValueError (mimicking real validation)
+        lro1.merge = MagicMock(
+            side_effect=ValueError("Channel names mismatch")
+        )
+
+        lros = [lro1, lro2]
+
+        # Should raise ValueError with helpful message
+        with pytest.raises(ValueError, match="Cannot merge LROs for"):
+            AnimalOrganizer.from_lros(
+                lros=lros,
+                animal_id="TestAnimal",
+                genotype="WT"
+            )
+
+    def test_consolidate_sessions_with_overlapping_dates(self):
+        """
+        Test end-to-end consolidation mimicking generate_wars.py workflow
+        where multiple session AOs are consolidated via from_lros(), and
+        some sessions share dates.
+        """
+        from datetime import datetime
+
+        # Simulate 2 session AOs:
+        # Session 1: Jan-01, Jan-02
+        # Session 2: Jan-01 (same day!), Jan-03
+
+        session1_lros = []
+        session2_lros = []
+
+        # Session 1, Day 1 (Jan-01)
+        lro = MagicMock(spec=LongRecordingOrganizer)
+        lro.channel_names = ["Ch0", "Ch1"]
+        lro.get_date_string.return_value = "Jan-01-2023"
+        lro.file_end_datetimes = [datetime(2023, 1, 1, 8, 0)]  # Morning session
+        lro.file_durations = [3600.0]
+        lro.base_folder_path = Path("/mock/session1/day1")
+        lro.merge = MagicMock()
+        session1_lros.append(lro)
+
+        # Session 1, Day 2 (Jan-02)
+        lro = MagicMock(spec=LongRecordingOrganizer)
+        lro.channel_names = ["Ch0", "Ch1"]
+        lro.get_date_string.return_value = "Jan-02-2023"
+        lro.file_end_datetimes = [datetime(2023, 1, 2, 12, 0)]
+        lro.file_durations = [3600.0]
+        lro.base_folder_path = Path("/mock/session1/day2")
+        session1_lros.append(lro)
+
+        # Session 2, Day 1 (Jan-01 again!)
+        lro = MagicMock(spec=LongRecordingOrganizer)
+        lro.channel_names = ["Ch0", "Ch1"]
+        lro.get_date_string.return_value = "Jan-01-2023"
+        lro.file_end_datetimes = [datetime(2023, 1, 1, 14, 0)]  # Afternoon session
+        lro.file_durations = [3600.0]
+        lro.base_folder_path = Path("/mock/session2/day1")
+        lro.merge = MagicMock()
+        session2_lros.append(lro)
+
+        # Session 2, Day 2 (Jan-03)
+        lro = MagicMock(spec=LongRecordingOrganizer)
+        lro.channel_names = ["Ch0", "Ch1"]
+        lro.get_date_string.return_value = "Jan-03-2023"
+        lro.file_end_datetimes = [datetime(2023, 1, 3, 12, 0)]
+        lro.file_durations = [3600.0]
+        lro.base_folder_path = Path("/mock/session2/day3")
+        session2_lros.append(lro)
+
+        # Consolidate all LROs (mimicking generate_wars.py line 142-153)
+        all_lros = session1_lros + session2_lros
+
+        ao = AnimalOrganizer.from_lros(
+            lros=all_lros,
+            animal_id="Animal123",
+            genotype="WT"
+        )
+
+        # Should have exactly 3 unique dates (Jan-01, Jan-02, Jan-03)
+        assert len(ao.long_recordings) == 3
+        assert len(ao.unique_animaldays) == 3
+        assert len(set(ao.unique_animaldays)) == 3
+
+        # Verify Jan-01 LROs were merged
+        # (Check that merge was called on at least one of the Jan-01 LROs)
+        jan01_lros = [session1_lros[0], session2_lros[0]]
+        merge_called = any(lro.merge.called for lro in jan01_lros)
+        assert merge_called, "Jan-01 LROs should have been merged"
+
+        # Verify animaldays
+        expected_dates = {"Jan-01-2023", "Jan-02-2023", "Jan-03-2023"}
+        actual_dates = {day.split()[-1] for day in ao.unique_animaldays}
+        assert actual_dates == expected_dates
 
 
 # =============================================================================

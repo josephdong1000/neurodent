@@ -1474,9 +1474,10 @@ class TestWindowAnalysisResultLOF:
         war = WindowAnalysisResult(result=test_df, animal_id="A1", genotype="WT", channel_names=["LMot", "RMot"])
 
         # After __init__, missing sessions should be auto-populated with empty LOF scores
+        # Both lof_scores AND channel_names should be empty to maintain invariant
         assert "day1" in war.lof_scores_dict
         assert war.lof_scores_dict["day1"]["lof_scores"] == []
-        assert war.lof_scores_dict["day1"]["channel_names"] == ["LMot", "RMot"]
+        assert war.lof_scores_dict["day1"]["channel_names"] == []  # Must be empty too!
 
     def test_war_lof_scores_empty_dict(self):
         """Test that empty LOF scores dict is auto-populated with empty entries in __init__."""
@@ -1495,9 +1496,10 @@ class TestWindowAnalysisResultLOF:
         )
 
         # After __init__, empty dict should be populated with all sessions
+        # Both lof_scores AND channel_names should be empty to maintain invariant
         assert "day1" in war.lof_scores_dict
         assert war.lof_scores_dict["day1"]["lof_scores"] == []
-        assert war.lof_scores_dict["day1"]["channel_names"] == ["LMot", "RMot"]
+        assert war.lof_scores_dict["day1"]["channel_names"] == []  # Must be empty too!
 
     def test_war_save_load_preserves_lof_scores(self, war_with_lof):
         """Test that LOF scores are preserved through save/load cycle."""
@@ -1708,7 +1710,7 @@ class TestWindowAnalysisResultLOF:
         assert y_pred == expected_y_pred
 
     def test_war_evaluate_lof_threshold_binary_missing_lof_scores(self):
-        """Test error when LOF scores are empty (auto-populated but not computed)."""
+        """Test graceful handling when LOF scores are empty (auto-populated but not computed)."""
         # Create WAR without LOF scores
         test_df = pd.DataFrame(
             {
@@ -1724,9 +1726,12 @@ class TestWindowAnalysisResultLOF:
 
         ground_truth = {"day1": {"LMot"}}
 
-        # Auto-population creates empty LOF scores, which causes IndexError when trying to evaluate
-        with pytest.raises(IndexError, match="index .* is out of bounds"):
-            war.evaluate_lof_threshold_binary(ground_truth, 1.5)
+        # Auto-population creates empty LOF scores, which should be gracefully skipped
+        y_true, y_pred = war.evaluate_lof_threshold_binary(ground_truth, 1.5)
+
+        # Should return empty lists since the session with empty LOF scores is skipped
+        assert y_true == []
+        assert y_pred == []
 
     def test_war_evaluate_lof_threshold_binary_default_ground_truth(self, war_with_lof):
         """Test evaluate_lof_threshold_binary using self.bad_channels_dict as default ground truth."""
@@ -2058,3 +2063,68 @@ class TestAnimalOrganizerLOF:
         scores = war.get_lof_scores()
         assert scores["day1"]["LMot"] == 1.5
         assert scores["day2"]["RMot"] == 1.2
+
+    def test_get_all_lof_scores_no_overwrites(self):
+        """Test that get_all_lof_scores preserves all LOF data with no overwrites."""
+        from neurodent.visualization.results import AnimalOrganizer
+        from datetime import datetime
+        from unittest.mock import MagicMock
+        from pathlib import Path
+
+        # Create 3 mock LROs with unique LOF scores
+        lros = []
+
+        for i in range(3):
+            lro = MagicMock()
+            lro.channel_names = ["Ch0", "Ch1", "Ch2"]
+            lro.base_folder_path = Path(f"/mock/day{i}")
+            lro.get_date_string.return_value = f"Jan-{i+1:02d}-2023"
+            lro.file_end_datetimes = [datetime(2023, 1, i+1, 12, 0)]
+            lro.file_durations = [3600.0]
+
+            # Each LRO has unique LOF scores
+            lro.lof_scores = np.array([1.0 + i*0.1, 1.5 + i*0.1, 2.0 + i*0.1])
+            lro.get_lof_scores = MagicMock(return_value={
+                "Ch0": 1.0 + i*0.1,
+                "Ch1": 1.5 + i*0.1,
+                "Ch2": 2.0 + i*0.1,
+            })
+
+            lros.append(lro)
+
+        # Create AnimalOrganizer from LROs
+        ao = AnimalOrganizer.from_lros(
+            lros=lros,
+            animal_id="TestAnimal",
+            genotype="WT"
+        )
+
+        # Get LOF scores
+        lof_dict = ao.get_all_lof_scores()
+
+        # Should have exactly 3 entries
+        assert len(lof_dict) == 3, \
+            f"Expected 3 LOF score entries, got {len(lof_dict)}"
+
+        # Verify all animaldays are present
+        assert len(lof_dict) == len(ao.unique_animaldays), \
+            "LOF dict size should match unique_animaldays"
+
+        # Verify each animalday has unique scores
+        all_ch0_scores = []
+        for animalday, scores in lof_dict.items():
+            assert animalday in ao.unique_animaldays, \
+                f"Animalday {animalday} not in unique_animaldays"
+
+            ch0_score = scores["Ch0"]
+            all_ch0_scores.append(ch0_score)
+
+        # All Ch0 scores should be different (no overwrites)
+        assert len(set(all_ch0_scores)) == 3, \
+            f"LOF scores were overwritten! Got {all_ch0_scores}, expected 3 unique values"
+
+        # Verify specific values
+        expected_ch0_scores = {1.0, 1.1, 1.2}
+        actual_ch0_scores = set(all_ch0_scores)
+        assert actual_ch0_scores == expected_ch0_scores, \
+            f"Expected Ch0 scores {expected_ch0_scores}, got {actual_ch0_scores}"
