@@ -158,3 +158,72 @@ def load_wars(
         raise RuntimeError("No WARs were successfully loaded")
 
     return wars
+
+
+def deep_merge_dict(base: dict, override: dict) -> dict:
+    """Recursively merge override dict into base dict.
+
+    This function performs a deep merge, recursively merging nested dictionaries.
+    Non-dict values in override will replace corresponding values in base.
+
+    Used in the Snakefile to merge dataset-specific configurations into the main
+    configuration, allowing any nested parameter to be overridden.
+
+    Args:
+        base: Base dictionary to merge into
+        override: Dictionary with override values
+
+    Returns:
+        Merged dictionary with values from both base and override
+
+    Examples:
+        >>> base = {"a": 1, "b": {"c": 2, "d": 3}}
+        >>> override = {"b": {"d": 4, "e": 5}, "f": 6}
+        >>> deep_merge_dict(base, override)
+        {'a': 1, 'b': {'c': 2, 'd': 4, 'e': 5}, 'f': 6}
+
+        Real-world config merge::
+
+            # Main config
+            base = {
+                "samples": {"quality_filter": {"exclude_unknown": True}},
+                "analysis": {
+                    "war_generation": {
+                        "day_sep": None,
+                        "lro_kwargs": {"multiprocess_mode": "dask"}
+                    }
+                }
+            }
+
+            # Dataset override
+            override = {
+                "samples": {"samples_file": "config/custom.json"},
+                "analysis": {
+                    "war_generation": {
+                        "mode": "base",
+                        "lro_kwargs": {"extract_func": "read_intan"}
+                    }
+                }
+            }
+
+            # Result preserves nested values from both
+            merged = deep_merge_dict(base, override)
+            # merged["samples"]["quality_filter"]["exclude_unknown"] == True (preserved)
+            # merged["samples"]["samples_file"] == "config/custom.json" (added)
+            # merged["analysis"]["war_generation"]["day_sep"] == None (preserved)
+            # merged["analysis"]["war_generation"]["mode"] == "base" (added)
+            # merged["analysis"]["war_generation"]["lro_kwargs"]["multiprocess_mode"] == "dask" (preserved)
+            # merged["analysis"]["war_generation"]["lro_kwargs"]["extract_func"] == "read_intan" (added)
+
+    Note:
+        This function does NOT mutate the input dictionaries - it returns a new dict.
+    """
+    result = base.copy()
+    for key, value in override.items():
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            # Recursively merge nested dictionaries
+            result[key] = deep_merge_dict(result[key], value)
+        else:
+            # Override value (or add new key)
+            result[key] = value
+    return result
