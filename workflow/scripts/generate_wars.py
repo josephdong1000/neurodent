@@ -18,6 +18,7 @@ from dask.distributed import Client, LocalCluster
 
 from neurodent import constants, core, visualization
 from neurodent.workflow import setup_snakemake_logging, inject_config_aliases
+from neurodent.workflow.utils import apply_path_overrides
 
 
 def load_samples_and_config():
@@ -93,9 +94,20 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
                 # Check if this specific session is a joint session
                 # We check if the session_key exists in the joint_sessions config
                 is_joint = session_key in samples_config.get("joint_sessions", {})
-                
+
+                # Apply session-specific overrides from dataset config
+                session_analysis_config = analysis_config.copy()
+
+                if "overrides" in config and "by_session" in config["overrides"]:
+                    session_overrides = config["overrides"]["by_session"].get(session_key, {})
+                    if session_overrides:
+                        logger.info(f"  -> Applying session overrides: {list(session_overrides.keys())}")
+                        # Apply path-based overrides to the full config
+                        overridden_config = apply_path_overrides(config, session_overrides)
+                        session_analysis_config = overridden_config["analysis"]["war_generation"]
+
                 # Prepare kwargs for this specific session
-                session_lro_kwargs = lro_kwargs.copy()
+                session_lro_kwargs = dict(session_analysis_config.get("lro_kwargs", {}))
 
                 # Correctly handle list-based manual_datetimes by distributing them
                 if "manual_datetimes" in samples_config:
@@ -110,24 +122,26 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
                                     f"Length of manual_datetimes list ({len(spec)}) for {animal_id} "
                                     f"does not match number of session folders ({len(animal_folders)})"
                                 )
-                            
+
                             # Apply specific timestamp for this session index
                             current_dt = spec[animal_folders.index(folder_info)]
                             session_lro_kwargs["manual_datetimes"] = current_dt
                             logger.info(f"  -> Using specific timestamp from list: {current_dt}")
 
-                # Create AO for this session
+                logger.info(f"  -> File pattern: {session_analysis_config.get('file_pattern')}")
+
+                # Create AO for this session with overridden parameters
                 # Note: We use source_animal_id (e.g. 'M1') to match filenames in that folder
                 session_ao = visualization.AnimalOrganizer(
                     data_parent_folder / folder_path,
                     source_animal_id,
-                    mode=analysis_config["mode"],
-                    file_pattern=analysis_config.get("file_pattern"),
-                    day_sep=analysis_config.get("day_sep"),
-                    assume_from_number=analysis_config["assume_from_number"],
-                    skip_days=analysis_config["skip_days"],
+                    mode=session_analysis_config["mode"],
+                    file_pattern=session_analysis_config.get("file_pattern"),
+                    day_sep=session_analysis_config.get("day_sep"),
+                    assume_from_number=session_analysis_config["assume_from_number"],
+                    skip_days=session_analysis_config["skip_days"],
                     lro_kwargs=session_lro_kwargs,
-                    day_parse_kwargs=analysis_config.get("day_parse_kwargs", {}),
+                    day_parse_kwargs=session_analysis_config.get("day_parse_kwargs", {}),
                 )
 
                 
