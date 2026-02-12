@@ -1,0 +1,10 @@
+# Sox5 Project - NWB Format
+# Dataset-specific configuration overrides
+# This file is deep-merged into the main config when active_dataset="sox5_bin"
+
+samples:
+  samples_file: "config/samples.json"
+
+analysis:
+  war_generation:
+    mode: "bin"
