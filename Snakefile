@@ -326,9 +326,9 @@ rule all:
         expand("results/wars_quality_filtered/{animal}", animal=ANIMALS),
 
         # FDSAR spike detection diagnostics
-        # expand("results/fdsar_diagnostics/{animal}", animal=ANIMALS), # FIXME this crashes my VDI - perhaps a logic issue
+        expand("results/fdsar_diagnostics/{animal}", animal=ANIMALS), # FIXME this crashes my VDI - perhaps a logic issue
+        
         # WAR per-animal diagnostic plots (unfiltered)
-        # NOTE also trigger fragment filtering + diagnostic figures filter unfiltered
         get_diagnostic_figures_unfiltered,
 
         # WAR per-animal diagnostic plots (filtered)
