@@ -49,7 +49,7 @@ analysis:
       smooth_len: 5                # SNEO smoothing window length
 
     # Processing parameters
-    multiprocess_mode: "serial"    # "dask" or "serial"
+    multiprocess_mode: "dask"    # "dask" or "serial"
 
     # Visualization parameters
     spike_averaged_traces:

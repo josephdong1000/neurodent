@@ -37,6 +37,117 @@ Build with live reload (auto-refresh on changes):
    make docs-live
 
 
+Validation Scripts
+------------------
+
+NeuRodent includes validation scripts to verify correctness and performance on real data.
+These scripts are located in the ``scripts/`` directory and should be run on the cluster.
+
+Dask vs Serial Spike Detection Validation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+To verify that dask and serial multiprocess modes produce identical spike detection results:
+
+.. code-block:: bash
+
+   # Request 10 cores for dask processing
+   srun -c 10 --pty bash
+   cd /mnt/isilon/marsh_single_unit/YY_PyEEG/neurodent_Joseph_devtree
+
+   # Run validation (default: 30 minutes of data)
+   uv run python scripts/validate_dask_serial_spike_consistency.py \
+       --recording-folder "/path/to/real/recording" \
+       --verbose
+
+This script validates exact spike indices (sample-level precision) and measures performance.
+Run this after modifying ``src/neurodent/core/frequency_domain_spike_detection.py``.
+
+**When to run:**
+
+- After modifying spike detection algorithm
+- Before releasing major versions
+- When investigating spike count discrepancies
+- Periodically (e.g., quarterly) as a sanity check
+
+**Expected output:**
+
+- ✅ All channels match perfectly at sample-level precision
+- Performance comparison (dask should be 1.5-2x faster)
+- Exit code 0 if identical, 1 if different
+
+For full usage: ``python scripts/validate_dask_serial_spike_consistency.py --help``
+
+
+Writing Validation Scripts
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When creating validation scripts for the neurodent project:
+
+**Structure:**
+
+- Location: ``/scripts/`` directory
+- CLI interface via ``argparse`` with ``--help`` output
+- Comprehensive module docstring (30-40 lines) with usage examples
+- Exit code 0 for success, 1 for failure
+- Use ``uv run python scripts/<name>.py`` in documentation
+
+**Docstring requirements:**
+
+- Brief description of what the script validates
+- Important warnings (e.g., "Run on cluster only")
+- Installation/setup requirements
+- Usage examples with real data paths (or placeholders)
+- Expected output description
+
+**Code style:**
+
+- Follow project style (ruff/PEP8)
+- Helper functions with Google-style docstrings
+- Structured output with visual separators
+- Informative error messages
+
+**Documentation:**
+
+- Add section to ``/docs/contributing/testing.rst``
+- Update CLAUDE.md if establishing new patterns
+- Reference in README.md if user-facing
+
+**Example structure:**
+
+.. code-block:: python
+
+   #!/usr/bin/env python3
+   """
+   Brief description.
+
+   Detailed explanation.
+
+   IMPORTANT:
+   - Requirements/warnings
+
+   Usage:
+       uv run python scripts/script_name.py [options]
+
+   Example:
+       uv run python scripts/script_name.py --input /path/to/data
+   """
+
+   import argparse
+   import sys
+
+   def helper_function():
+       """Docstring."""
+       pass
+
+   def main():
+       parser = argparse.ArgumentParser(description="...")
+       # ...
+       sys.exit(0 if success else 1)
+
+   if __name__ == "__main__":
+       main()
+
+
 Code Style
 ----------
 

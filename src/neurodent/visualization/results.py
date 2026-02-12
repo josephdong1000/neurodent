@@ -1009,6 +1009,23 @@ class AnimalOrganizer(AnimalFeatureParser):
         # Log timeline summary for debugging
         self._log_timeline_summary()
 
+        # CRITICAL VALIDATION: Ensure animaldays and long_recordings are aligned
+        if len(self.long_recordings) != len(self.unique_animaldays):
+            error_msg = (
+                f"CRITICAL ERROR: Mismatch between animaldays and long_recordings! "
+                f"Expected {len(self.unique_animaldays)} LROs for {len(self.unique_animaldays)} unique animaldays, "
+                f"but got {len(self.long_recordings)} LROs instead. "
+                f"\nAnimaldays: {self.unique_animaldays}"
+                f"\nLRO count: {len(self.long_recordings)}"
+                f"\nThis will cause incorrect mapping of LOF scores and bad channels."
+            )
+            logging.error(error_msg)
+            raise ValueError(error_msg)
+
+        logging.info(
+            f"✓ Validated: {len(self.long_recordings)} LROs match {len(self.unique_animaldays)} animaldays"
+        )
+
         channel_names = [x.channel_names for x in self.long_recordings]
         if len(set([" ".join(x) for x in channel_names])) > 1:
             warnings.warn(
@@ -1021,8 +1038,82 @@ class AnimalOrganizer(AnimalFeatureParser):
             warnings.warn(f"Inconsistent animal IDs in {animal_ids}")
         self.animal_id = animal_ids[0]
 
+    @staticmethod
+    def _sort_lros_by_median_time_static(lro_pairs):
+        """Sort LROs by median timestamp of their constituent recordings.
+
+        Static version that can be called from classmethods.
+
+        Args:
+            lro_pairs (list): List of (identifier, lro) tuples where identifier
+                can be folder path or any string.
+
+        Returns:
+            list: Sorted (identifier, lro) tuples in temporal order based on median timestamp
+
+        Note:
+            Extracts file_end_datetimes from each LRO, calculates median timestamp,
+            and sorts LROs by this median. Falls back to identifier ordering if
+            timestamps unavailable.
+        """
+        if len(lro_pairs) <= 1:
+            return lro_pairs
+
+        lro_times = []
+
+        for identifier, lro in lro_pairs:
+            try:
+                # Get median timestamp from constituent recordings
+                if hasattr(lro, "file_end_datetimes") and lro.file_end_datetimes:
+                    try:
+                        valid_timestamps = [
+                            ts for ts in lro.file_end_datetimes if ts is not None
+                        ]
+                    except TypeError:
+                        valid_timestamps = []
+
+                    if valid_timestamps:
+                        # Sort and get median
+                        valid_timestamps.sort()
+                        n = len(valid_timestamps)
+
+                        if n % 2 == 1:
+                            median_timestamp = valid_timestamps[n // 2]
+                        else:
+                            mid1 = valid_timestamps[n // 2 - 1]
+                            mid2 = valid_timestamps[n // 2]
+                            median_timestamp = mid1 + (mid2 - mid1) / 2
+
+                        median_time_seconds = median_timestamp.timestamp()
+                        logging.debug(
+                            f"LRO {identifier}: {n} recordings, "
+                            f"median timestamp: {median_timestamp}"
+                        )
+                    else:
+                        raise ValueError(f"No valid timestamps in LRO {identifier}")
+                else:
+                    raise ValueError(f"No file_end_datetimes in LRO {identifier}")
+
+            except ValueError as e:
+                logging.warning(
+                    f"Could not determine timestamp for LRO {identifier}: {e}. "
+                    f"Using fallback ordering."
+                )
+                # Use a very large timestamp to sort to end
+                median_time_seconds = float('inf')
+
+            lro_times.append((median_time_seconds, identifier, lro))
+
+        # Sort by timestamp
+        lro_times.sort(key=lambda x: x[0])
+
+        # Return as (identifier, lro) tuples
+        return [(identifier, lro) for _, identifier, lro in lro_times]
+
     def _sort_lros_by_median_time(self, folder_lro_pairs):
         """Sort LROs by median timestamp of their constituent recordings.
+
+        Instance method wrapper around static version for backward compatibility.
 
         Args:
             folder_lro_pairs (list): List of (folder_path, lro) tuples
@@ -1037,78 +1128,39 @@ class AnimalOrganizer(AnimalFeatureParser):
             content rather than folder naming conventions. Falls back to folder modification time if
             no valid timestamps are available.
         """
-        if len(folder_lro_pairs) <= 1:
-            return folder_lro_pairs
+        # Call static version for sorting logic
+        sorted_folder_lro_pairs = self._sort_lros_by_median_time_static(folder_lro_pairs)
 
-        folder_lro_times = []
+        # Add detailed logging (only in instance method)
+        if len(folder_lro_pairs) > 1:
+            from datetime import datetime
 
-        for folder_path, lro in folder_lro_pairs:
-            try:
-                # Get median timestamp from constituent recordings within the LRO
-                if hasattr(lro, "file_end_datetimes") and lro.file_end_datetimes:
-                    try:
+            logging.info("LRO temporal sorting details:")
+            for i, (folder, lro) in enumerate(sorted_folder_lro_pairs):
+                folder_name = Path(folder).name
+
+                # Get median time for logging
+                try:
+                    if hasattr(lro, "file_end_datetimes") and lro.file_end_datetimes:
                         valid_timestamps = [
                             ts for ts in lro.file_end_datetimes if ts is not None
                         ]
-                    except TypeError:
-                        valid_timestamps = []
-
-                    if valid_timestamps:
-                        # Sort timestamps and get the median
-                        valid_timestamps.sort()
-                        n_timestamps = len(valid_timestamps)
-
-                        if n_timestamps % 2 == 1:
-                            # Odd number of timestamps - take middle one
-                            median_timestamp = valid_timestamps[n_timestamps // 2]
+                        if valid_timestamps:
+                            valid_timestamps.sort()
+                            n = len(valid_timestamps)
+                            if n % 2 == 1:
+                                median_timestamp = valid_timestamps[n // 2]
+                            else:
+                                mid1 = valid_timestamps[n // 2 - 1]
+                                mid2 = valid_timestamps[n // 2]
+                                median_timestamp = mid1 + (mid2 - mid1) / 2
+                            median_time_str = median_timestamp.strftime("%Y-%m-%d %H:%M:%S")
                         else:
-                            # Even number of timestamps - take average of two middle ones
-                            mid1 = valid_timestamps[n_timestamps // 2 - 1]
-                            mid2 = valid_timestamps[n_timestamps // 2]
-                            median_timestamp = mid1 + (mid2 - mid1) / 2
-
-                        # Convert to seconds since epoch for sorting
-                        median_time_seconds = median_timestamp.timestamp()
-                        logging.debug(
-                            f"LRO {Path(folder_path).name}: {n_timestamps} recordings, median timestamp: {median_timestamp}"
-                        )
+                            median_time_str = "no timestamps"
                     else:
-                        raise ValueError(
-                            f"No file_end_datetimes available in LRO {Path(folder_path).name}, cannot determine temporal order"
-                        )
-                else:
-                    raise ValueError(
-                        f"No file_end_datetimes available in LRO {Path(folder_path).name}, cannot determine temporal order"
-                    )
-
-                folder_lro_times.append((folder_path, lro, median_time_seconds))
-
-            except Exception as e:
-                logging.warning(f"Could not extract timing from {folder_path}: {e}")
-                raise
-
-        # Sort by median time
-        sorted_folder_lro_times = sorted(folder_lro_times, key=lambda x: x[2])
-        sorted_folder_lro_pairs = [
-            (folder, lro) for folder, lro, _ in sorted_folder_lro_times
-        ]
-
-        # Log the sorting for debugging
-        if len(folder_lro_pairs) > 1:
-            logging.info("LRO temporal sorting details:")
-            for i, (folder, lro, median_time_seconds) in enumerate(
-                sorted_folder_lro_times
-            ):
-                folder_name = Path(folder).name
-
-                # Convert back to datetime for readable logging
-                try:
-                    from datetime import datetime
-
-                    median_datetime = datetime.fromtimestamp(median_time_seconds)
-                    median_time_str = median_datetime.strftime("%Y-%m-%d %H:%M:%S")
-                except (TypeError, ValueError, OSError):
-                    median_time_str = f"{median_time_seconds:.1f}s"
+                        median_time_str = "no timestamps"
+                except Exception:
+                    median_time_str = "error"
 
                 # Handle mock objects gracefully for duration
                 try:
@@ -1136,13 +1188,8 @@ class AnimalOrganizer(AnimalFeatureParser):
                 )
 
             # Summary line for quick reference
-            folder_names = [Path(f).name for f, _, _ in sorted_folder_lro_times]
-            median_times = []
-            for _, _, median_time_seconds in sorted_folder_lro_times:
-                median_datetime = datetime.fromtimestamp(median_time_seconds)
-                median_times.append(median_datetime.strftime("%H:%M:%S"))
-
-            logging.info(f"Final sort order: {list(zip(folder_names, median_times))}")
+            folder_names = [Path(f).name for f, _ in sorted_folder_lro_pairs]
+            logging.info(f"Final sort order: {folder_names}")
 
         return sorted_folder_lro_pairs
 
@@ -1355,6 +1402,7 @@ class AnimalOrganizer(AnimalFeatureParser):
 
         # Collect LOF scores from long recordings
         lof_scores_dict = {}
+        missing_lof_animaldays = []
         for animalday, lrec in zip(self.animaldays, self.long_recordings):
             logging.debug(
                 f"Checking LOF scores for {animalday}: has_attr={hasattr(lrec, 'lof_scores')}, "
@@ -1368,8 +1416,24 @@ class AnimalOrganizer(AnimalFeatureParser):
                 logging.info(
                     f"Added LOF scores for {animalday}: {len(lrec.lof_scores)} channels"
                 )
+            else:
+                missing_lof_animaldays.append(animalday)
+                logging.warning(
+                    f"Missing LOF scores for {animalday}! LOF computation may have failed or "
+                    f"compute_bad_channels() was not called for this LRO."
+                )
 
         logging.info(f"Total LOF scores collected: {len(lof_scores_dict)} animal days")
+
+        # Warn loudly if any animaldays are missing LOF scores
+        if missing_lof_animaldays:
+            warning_msg = (
+                f"WARNING: {len(missing_lof_animaldays)} animalday(s) are missing LOF scores: {missing_lof_animaldays}. "
+                f"Expected {len(self.animaldays)} but got {len(lof_scores_dict)}. "
+                f"These sessions will be auto-populated with empty placeholders and excluded from LOF-based analysis."
+            )
+            logging.warning(warning_msg)
+            warnings.warn(warning_msg)
 
         self.window_analysis_result = WindowAnalysisResult(
             self.features_df,
@@ -1590,8 +1654,9 @@ class AnimalOrganizer(AnimalFeatureParser):
         Create an AnimalOrganizer from an existing list of LongRecordingOrganizer objects.
 
         This factory method bypasses the normal folder discovery logic and creates
-        an AnimalOrganizer directly from pre-existing LROs. Useful for creating
-        child AOs after splitting multi-animal recordings.
+        an AnimalOrganizer directly from pre-existing LROs. If multiple LROs share
+        the same date, they will be automatically merged into a single LRO per unique date,
+        matching the behavior of the normal __init__ path.
 
         Args:
             lros (list[LongRecordingOrganizer]): List of LRO instances to wrap.
@@ -1601,16 +1666,26 @@ class AnimalOrganizer(AnimalFeatureParser):
                 from numbers. Defaults to False.
 
         Returns:
-            AnimalOrganizer: A new AnimalOrganizer instance wrapping the provided LROs.
+            AnimalOrganizer: A new AnimalOrganizer instance wrapping the provided LROs
+                (with duplicates merged).
 
         Raises:
-            ValueError: If lros is empty or channel names are inconsistent.
+            ValueError: If lros is empty, channel names are inconsistent, or LROs
+                with the same date cannot be merged due to incompatible metadata.
+
+        Note:
+            Multiple LROs with the same date will be automatically merged in temporal
+            order (sorted by median timestamp). This ensures proper handling of
+            multi-session recordings consolidated via generate_wars.py.
 
         Example:
-            >>> # After splitting a multi-animal recording
-            >>> splits = parent_lro.split({"AnimalA": ["Ch0", "Ch1"]})
-            >>> child_lros = [splits["AnimalA"] for _ in parent_ao.long_recordings]
-            >>> child_ao = AnimalOrganizer.from_lros(child_lros, animal_id="AnimalA")
+            >>> # After splitting a multi-animal recording across multiple sessions
+            >>> all_lros = []
+            >>> for session_ao in session_aos:
+            ...     splits = session_ao.split({"AnimalA": ["Ch0", "Ch1"]})
+            ...     all_lros.append(splits["AnimalA"])
+            >>> # from_lros automatically merges LROs with same date
+            >>> child_ao = AnimalOrganizer.from_lros(all_lros, animal_id="AnimalA")
         """
         if not lros:
             raise ValueError("Cannot create AnimalOrganizer from empty LRO list")
@@ -1619,40 +1694,106 @@ class AnimalOrganizer(AnimalFeatureParser):
         ao = object.__new__(cls)
 
         # Core attributes
-        ao.long_recordings = lros
         ao.anim_id = animal_id
         ao.animal_id = animal_id
         ao.genotype = genotype
         ao.assume_from_number = assume_from_number
 
-        # Validate and reconcile channel names across all LROs
-        ao.channel_names = cls._validate_channel_names(lros)
+        # Step 1: Group LROs by date
+        date_to_lros = {}  # dict[str, list[tuple[int, LRO]]]
 
-        # Generate animaldays from LROs
-        ao.unique_animaldays = []
-        ao.animaldays = []
         for i, lro in enumerate(lros):
-            # Strategy: Metadata-First
-            # We assume LRO is the source of truth for time.
             try:
                 date_str = lro.get_date_string()
-                animalday = f"{animal_id} {genotype} {date_str}"
             except ValueError as e:
-                # If we absolutely cannot get a date from metadata, we fail.
-                # We do NOT fallback to string parsing or day0/day1.
                 raise ValueError(
-                    f"Could not determine date for LRO at {lro.base_folder_path}. "
+                    f"Could not determine date for LRO at index {i} (path: {lro.base_folder_path}). "
                     f"Ensure LRO has valid timestamps via metadata or manual_datetimes. Error: {e}"
                 )
 
-            ao.unique_animaldays.append(animalday)
-            ao.animaldays.append(animalday)
+            if date_str not in date_to_lros:
+                date_to_lros[date_str] = []
+            date_to_lros[date_str].append((i, lro))
 
-        # Initialize default attributes for factory-created instances
-        cls._init_factory_defaults(ao, animal_id, lros)
+        # Step 2: Merge LROs with duplicate dates
+        merged_lros = []
+        merged_animaldays = []
+
+        for date_str in sorted(date_to_lros.keys()):  # Sort for deterministic ordering
+            lro_group = date_to_lros[date_str]
+            animalday = f"{animal_id} {genotype} {date_str}"
+
+            if len(lro_group) == 1:
+                # Single LRO for this date - use as-is
+                _, lro = lro_group[0]
+                merged_lros.append(lro)
+                merged_animaldays.append(animalday)
+                logging.info(f"Using single LRO for {animalday}")
+            else:
+                # Multiple LROs for same date - merge them
+                logging.info(
+                    f"Found {len(lro_group)} LROs for {animalday}. "
+                    f"Merging into single LRO (mimicking normal __init__ behavior)."
+                )
+
+                # Sort by median time (same logic as normal __init__)
+                lro_pairs = [(f"lro_{idx}", lro) for idx, lro in lro_group]
+                sorted_pairs = cls._sort_lros_by_median_time_static(lro_pairs)
+
+                # Merge all LROs into the first one (in temporal order)
+                base_lro = sorted_pairs[0][1]
+                original_idx = lro_group[0][0]
+                logging.info(f"Base LRO: index {original_idx}")
+
+                for i, (_, lro) in enumerate(sorted_pairs[1:], 1):
+                    try:
+                        logging.info(f"Merging LRO {i} into base LRO for {animalday}")
+                        base_lro.merge(lro)
+                    except ValueError as e:
+                        # Provide detailed error for incompatible LROs
+                        raise ValueError(
+                            f"Cannot merge LROs for {animalday}: {e}\n"
+                            f"All LROs with the same date must have compatible metadata "
+                            f"(same channels, sampling rate, etc.)."
+                        ) from e
+
+                merged_lros.append(base_lro)
+                merged_animaldays.append(animalday)
+                logging.info(f"Successfully merged {len(lro_group)} LROs for {animalday}")
+
+        # Step 3: Set merged LROs and animaldays
+        ao.long_recordings = merged_lros
+        ao.unique_animaldays = merged_animaldays
+        ao.animaldays = merged_animaldays.copy()  # Create separate list for compatibility
+
+        # Step 4: Validate and reconcile channel names across all merged LROs
+        ao.channel_names = cls._validate_channel_names(merged_lros)
+
+        # Step 5: CRITICAL VALIDATION - ensure no duplicates after merge
+        if len(ao.long_recordings) != len(set(ao.unique_animaldays)):
+            duplicate_dates = [
+                date for date in ao.unique_animaldays
+                if ao.unique_animaldays.count(date) > 1
+            ]
+            raise ValueError(
+                f"CRITICAL ERROR: Duplicate animaldays detected after merge! "
+                f"This indicates a logic error in the merge process. "
+                f"Duplicates: {set(duplicate_dates)}\n"
+                f"Expected {len(set(ao.unique_animaldays))} unique dates, "
+                f"but got {len(ao.long_recordings)} LROs."
+            )
 
         logging.info(
-            f"Created AnimalOrganizer from {len(lros)} LROs for animal '{animal_id}'"
+            f"✓ Validated: {len(ao.long_recordings)} LROs match "
+            f"{len(ao.unique_animaldays)} unique animaldays (no duplicates)"
+        )
+
+        # Step 6: Initialize default attributes for factory-created instances
+        cls._init_factory_defaults(ao, animal_id, merged_lros)
+
+        logging.info(
+            f"Created AnimalOrganizer from {len(lros)} input LROs "
+            f"(merged into {len(merged_lros)} unique dates) for animal '{animal_id}'"
         )
 
         return ao
@@ -2023,11 +2164,16 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
             if animalday not in self.lof_scores_dict:
                 # Add missing animalday with empty LOF scores
+                # NOTE: Both lof_scores AND channel_names must be empty to maintain invariant!
                 self.lof_scores_dict[animalday] = {
                     "lof_scores": [],
-                    "channel_names": self.channel_names if self.channel_names else []
+                    "channel_names": []  # Must be empty to match empty lof_scores!
                 }
-                logging.info(f"Added missing animalday to lof_scores_dict: {animalday}")
+                logging.warning(
+                    f"Added missing animalday to lof_scores_dict: {animalday}. "
+                    f"This indicates LOF scores were not computed for this session. "
+                    f"It will be excluded from LOF-based analysis."
+                )
 
         self.channel_abbrevs = [
             core.parse_chname_to_abbrev(x, assume_from_number=self.assume_from_number)
@@ -3702,6 +3848,24 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
             scores = np.array(lof_data["lof_scores"])
             channel_names = lof_data["channel_names"]
+
+            # Validate data integrity before processing
+            # NOTE address this issue since this should not be happening in the first place
+            # if len(scores) == 0:
+            #     logging.warning(
+            #         f"Skipping {animalday}: No LOF scores available. "
+            #         f"This session will be excluded from LOF accuracy evaluation."
+            #     )
+            #     continue
+
+            # if len(scores) != len(channel_names):
+            #     logging.error(
+            #         f"Skipping {animalday}: LOF scores ({len(scores)}) and "
+            #         f"channels ({len(channel_names)}) length mismatch. "
+            #         f"This indicates a data integrity issue - the animalday may have been "
+            #         f"improperly mapped during LOF score collection."
+            #     )
+            #     continue
 
             # Get ground truth bad channels for this animal-day
             animalday_bad_channels = ground_truth_bad_channels.get(animalday, set())
