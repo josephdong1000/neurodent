@@ -11,8 +11,6 @@ handling everything from raw data loading to feature extraction.
 
     # 1. Load and organize recordings
     organizer = core.LongRecordingOrganizer(data_path)
-    organizer.parse_dates_from_filenames()
-    organizer.infer_channel_names()
 
     # 2. Run windowed feature analysis
     analyzer = core.LongRecordingAnalyzer(organizer)
@@ -52,6 +50,7 @@ from .core import (
     DDFBinaryMetadata,
     convert_ddfcolbin_to_ddfrowbin,
     convert_ddfrowbin_to_si,
+    split_recording,
 )
 from .analysis import LongRecordingAnalyzer
 from .analyze_frag import FragmentAnalyzer
@@ -64,6 +63,7 @@ from .utils import (
     validate_timestamps,
     nanaverage,
     parse_chname_to_abbrev,
+    parse_str_to_day,
     log_transform,
     should_use_cache_unified,
     get_feature_label,
@@ -81,6 +81,9 @@ from . import utils
 __all__ = [
     # Data loading
     "DDFBinaryMetadata",
+    "convert_ddfcolbin_to_ddfrowbin",
+    "convert_ddfrowbin_to_si",
+    "split_recording",
     "LongRecordingOrganizer",
     # Analysis
     "LongRecordingAnalyzer",
@@ -100,6 +103,7 @@ __all__ = [
     "validate_timestamps",
     "nanaverage",
     "parse_chname_to_abbrev",
+    "parse_str_to_day",
     "log_transform",
     "get_feature_label",
     "get_cache_status_message",

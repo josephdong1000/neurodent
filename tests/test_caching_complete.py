@@ -14,6 +14,7 @@ from unittest.mock import Mock, patch, MagicMock, mock_open
 import numpy as np
 
 from neurodent import core
+from neurodent import constants
 
 try:
     import spikeinterface
@@ -302,6 +303,7 @@ class TestMNECachingOptimization:
                 # Mock the SpikeInterface read_edf to return something reasonable
                 mock_recording = Mock()
                 mock_recording.get_num_channels.return_value = 4
+                mock_recording.get_dtype.return_value = constants.GLOBAL_DTYPE
                 mock_recording.get_sampling_frequency.return_value = 1000  # Should match metadata
                 mock_recording.get_duration.return_value = 10.0
                 mock_recording.get_channel_ids.return_value = np.array(["ch0", "ch1", "ch2", "ch3"])
@@ -371,6 +373,7 @@ class TestMNECachingOptimization:
                 # Mock the SpikeInterface read_edf to return something reasonable
                 mock_recording = Mock()
                 mock_recording.get_num_channels.return_value = 4
+                mock_recording.get_dtype.return_value = constants.GLOBAL_DTYPE
                 mock_recording.get_sampling_frequency.return_value = 1000
                 mock_recording.get_duration.return_value = 10.0
                 mock_recording.get_channel_ids.return_value = np.array(["ch0", "ch1", "ch2", "ch3"])
@@ -443,6 +446,7 @@ class TestMNECachingOptimization:
                 # Mock the SpikeInterface read_edf to return something reasonable
                 mock_recording = Mock()
                 mock_recording.get_num_channels.return_value = 4
+                mock_recording.get_dtype.return_value = constants.GLOBAL_DTYPE
                 mock_recording.get_sampling_frequency.return_value = 1000
                 mock_recording.get_duration.return_value = 10.0
                 mock_recording.get_channel_ids.return_value = np.array(["ch0", "ch1", "ch2", "ch3"])
@@ -523,6 +527,7 @@ class TestMNECachingOptimization:
                 # Mock the SpikeInterface read_edf to return something reasonable
                 mock_recording = Mock()
                 mock_recording.get_num_channels.return_value = 4
+                mock_recording.get_dtype.return_value = constants.GLOBAL_DTYPE
                 mock_recording.get_sampling_frequency.return_value = 250
                 mock_recording.get_duration.return_value = 10.0
                 mock_recording.get_channel_ids.return_value = np.array(["ch0", "ch1", "ch2", "ch3"])
@@ -616,6 +621,7 @@ class TestMNECachingOptimization:
                     # Mock recording
                     mock_recording = Mock()
                     mock_recording.get_num_channels.return_value = 4
+                    mock_recording.get_dtype.return_value = constants.GLOBAL_DTYPE
                     mock_recording.get_sampling_frequency.return_value = 1000
                     mock_recording.get_duration.return_value = 10.0
                     mock_recording.get_channel_ids.return_value = np.array(["ch0", "ch1", "ch2", "ch3"])
@@ -676,6 +682,7 @@ class TestMNECachingOptimization:
                 # Mock recording
                 mock_recording = Mock()
                 mock_recording.get_num_channels.return_value = 4
+                mock_recording.get_dtype.return_value = constants.GLOBAL_DTYPE
                 mock_recording.get_sampling_frequency.return_value = 1000
                 mock_recording.get_duration.return_value = 10.0
                 mock_recording.get_channel_ids.return_value = np.array(["ch0", "ch1", "ch2", "ch3"])

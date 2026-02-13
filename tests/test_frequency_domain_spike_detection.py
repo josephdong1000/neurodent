@@ -321,6 +321,241 @@ class TestFrequencyDomainSpikeDetector:
         assert len(spike_indices) == 4  # 4 channels
         assert mne_raw is not None
 
+    @patch.object(FrequencyDomainSpikeDetector, "_apply_preprocessing")
+    @patch.object(FrequencyDomainSpikeDetector, "_detect_spikes_channel")
+    @patch.object(FrequencyDomainSpikeDetector, "_add_spike_annotations")
+    def test_detect_spikes_recording_dask(
+        self, mock_add_annotations, mock_detect_channel, mock_preprocess, mock_recording, detection_params
+    ):
+        """Test full spike detection pipeline in dask mode."""
+        # Setup mocks
+        mock_preprocess.return_value = mock_recording
+        mock_detect_channel.return_value = np.array([100, 500, 1000])
+
+        # Mock MNE creation
+        with patch("mne.create_info"), patch("mne.io.RawArray") as mock_raw_array:
+            mock_raw = MagicMock()
+            mock_raw_array.return_value = mock_raw
+            mock_add_annotations.return_value = mock_raw
+
+            spike_indices, mne_raw = FrequencyDomainSpikeDetector.detect_spikes_recording(
+                mock_recording, detection_params, multiprocess_mode="dask"
+            )
+
+        # Check calls
+        mock_preprocess.assert_called_once()
+        assert mock_detect_channel.call_count == 4  # 4 channels
+        mock_add_annotations.assert_called_once()
+
+        # Check outputs - dask.compute returns tuple, should be converted to list/tuple
+        assert len(spike_indices) == 4  # 4 channels
+        assert isinstance(spike_indices, (list, tuple))
+        assert mne_raw is not None
+
+    def test_detect_spikes_dask_vs_serial_consistency(self, detection_params):
+        """Test that dask and serial modes produce identical results on real data."""
+        try:
+            import spikeinterface.core as si
+        except ImportError:
+            pytest.skip("SpikeInterface not available")
+
+        # Create realistic test recording with artificial spikes
+        np.random.seed(42)
+        n_channels = 4
+        fs = 1000.0
+        duration = 5.0  # 5 seconds
+        n_samples = int(duration * fs)
+
+        # Generate base noise
+        data = np.random.randn(n_channels, n_samples) * 0.1
+
+        # Add artificial spikes at known locations
+        spike_times_samples = [500, 1500, 2500, 3500, 4000]
+        for ch in range(n_channels):
+            for spike_time in spike_times_samples:
+                if spike_time < n_samples:
+                    # Create negative spike (20ms wide)
+                    spike_width = int(0.02 * fs)
+                    start = max(0, spike_time - spike_width // 2)
+                    end = min(n_samples, spike_time + spike_width // 2)
+                    spike_indices = np.arange(start, end)
+                    # Add channel-specific variation
+                    amplitude = 2.0 + ch * 0.3
+                    data[ch, spike_indices] -= np.exp(
+                        -(((spike_indices - spike_time) / (spike_width / 4)) ** 2)
+                    ) * amplitude
+
+        # Create SpikeInterface recording (transpose to samples x channels)
+        recording = si.NumpyRecording(data.T, sampling_frequency=fs, channel_ids=[f"ch{i}" for i in range(n_channels)])
+
+        # Lower thresholds for testing
+        test_params = detection_params.copy()
+        test_params["sneo_percentile"] = 90.0
+
+        # Run both modes
+        spike_indices_serial, _ = FrequencyDomainSpikeDetector.detect_spikes_recording(
+            recording, test_params, multiprocess_mode="serial"
+        )
+
+        spike_indices_dask, _ = FrequencyDomainSpikeDetector.detect_spikes_recording(
+            recording, test_params, multiprocess_mode="dask"
+        )
+
+        # Check consistency
+        assert len(spike_indices_serial) == len(spike_indices_dask), "Different number of channels"
+
+        for ch in range(n_channels):
+            serial_spikes = spike_indices_serial[ch]
+            dask_spikes = spike_indices_dask[ch]
+
+            # Should detect same number of spikes
+            assert len(serial_spikes) == len(dask_spikes), f"Channel {ch}: Different spike counts"
+
+            # Spike indices should be identical
+            np.testing.assert_array_equal(
+                serial_spikes, dask_spikes, err_msg=f"Channel {ch}: Different spike locations"
+            )
+
+    def test_detect_spikes_dask_empty_channels(self, detection_params):
+        """Test dask mode with channels that have no spikes."""
+        try:
+            import spikeinterface.core as si
+        except ImportError:
+            pytest.skip("SpikeInterface not available")
+
+        np.random.seed(123)
+        n_channels = 3
+        fs = 1000.0
+        duration = 2.0
+        n_samples = int(duration * fs)
+
+        # Pure noise - no spikes
+        data = np.random.randn(n_channels, n_samples) * 0.05
+
+        recording = si.NumpyRecording(data.T, sampling_frequency=fs, channel_ids=[f"ch{i}" for i in range(n_channels)])
+
+        test_params = detection_params.copy()
+        test_params["sneo_percentile"] = 99.9  # Very high threshold
+
+        spike_indices, mne_raw = FrequencyDomainSpikeDetector.detect_spikes_recording(
+            recording, test_params, multiprocess_mode="dask"
+        )
+
+        # Should return empty arrays for each channel
+        assert len(spike_indices) == n_channels
+        assert isinstance(spike_indices, (list, tuple))
+        for ch_spikes in spike_indices:
+            assert isinstance(ch_spikes, np.ndarray)
+            assert len(ch_spikes) == 0 or len(ch_spikes) < 10  # Very few or no spikes
+
+    def test_detect_spikes_dask_single_channel(self, detection_params):
+        """Test dask mode with single channel recording."""
+        try:
+            import spikeinterface.core as si
+        except ImportError:
+            pytest.skip("SpikeInterface not available")
+
+        np.random.seed(456)
+        fs = 1000.0
+        duration = 3.0
+        n_samples = int(duration * fs)
+
+        # Single channel with spikes
+        data = np.random.randn(1, n_samples) * 0.1
+        spike_time = 1000
+        spike_width = 20
+        data[0, spike_time - spike_width : spike_time + spike_width] -= 3.0 * np.exp(
+            -((np.arange(-spike_width, spike_width) / 8) ** 2)
+        )
+
+        recording = si.NumpyRecording(data.T, sampling_frequency=fs, channel_ids=["ch0"])
+
+        test_params = detection_params.copy()
+        test_params["sneo_percentile"] = 95.0
+
+        spike_indices, mne_raw = FrequencyDomainSpikeDetector.detect_spikes_recording(
+            recording, test_params, multiprocess_mode="dask"
+        )
+
+        # Should work with single channel
+        assert len(spike_indices) == 1
+        assert isinstance(spike_indices, (list, tuple))
+        assert isinstance(spike_indices[0], np.ndarray)
+
+    def test_detect_spikes_dask_many_channels(self, detection_params):
+        """Test dask mode with many channels (tests parallel scaling)."""
+        try:
+            import spikeinterface.core as si
+        except ImportError:
+            pytest.skip("SpikeInterface not available")
+
+        np.random.seed(789)
+        n_channels = 16  # Larger number of channels
+        fs = 1000.0
+        duration = 2.0
+        n_samples = int(duration * fs)
+
+        # Generate data with varying noise levels per channel
+        data = np.random.randn(n_channels, n_samples) * 0.1
+
+        # Add spikes to some channels
+        for ch in range(0, n_channels, 2):  # Every other channel
+            spike_time = 500 + ch * 50
+            if spike_time < n_samples - 20:
+                data[ch, spike_time - 10 : spike_time + 10] -= 2.0
+
+        recording = si.NumpyRecording(data.T, sampling_frequency=fs, channel_ids=[f"ch{i:02d}" for i in range(n_channels)])
+
+        test_params = detection_params.copy()
+        test_params["sneo_percentile"] = 95.0
+
+        spike_indices, mne_raw = FrequencyDomainSpikeDetector.detect_spikes_recording(
+            recording, test_params, multiprocess_mode="dask"
+        )
+
+        # Should handle many channels
+        assert len(spike_indices) == n_channels
+        assert isinstance(spike_indices, (list, tuple))
+
+        # Each channel should return valid array
+        for ch_spikes in spike_indices:
+            assert isinstance(ch_spikes, np.ndarray)
+
+    def test_detect_spikes_dask_return_type_consistency(self, detection_params):
+        """Test that dask mode returns consistent types with serial mode."""
+        try:
+            import spikeinterface.core as si
+        except ImportError:
+            pytest.skip("SpikeInterface not available")
+
+        np.random.seed(111)
+        n_channels = 3
+        fs = 1000.0
+        n_samples = 2000
+
+        data = np.random.randn(n_channels, n_samples) * 0.1
+        recording = si.NumpyRecording(data.T, sampling_frequency=fs, channel_ids=[f"ch{i}" for i in range(n_channels)])
+
+        spike_indices_serial, mne_serial = FrequencyDomainSpikeDetector.detect_spikes_recording(
+            recording, detection_params, multiprocess_mode="serial"
+        )
+
+        spike_indices_dask, mne_dask = FrequencyDomainSpikeDetector.detect_spikes_recording(
+            recording, detection_params, multiprocess_mode="dask"
+        )
+
+        # Both should return same container types
+        assert type(spike_indices_serial).__name__ == type(spike_indices_dask).__name__ or (
+            isinstance(spike_indices_serial, (list, tuple)) and isinstance(spike_indices_dask, (list, tuple))
+        )
+
+        # Both should be iterable and have same structure
+        assert len(spike_indices_serial) == len(spike_indices_dask)
+
+        for serial_arr, dask_arr in zip(spike_indices_serial, spike_indices_dask):
+            assert type(serial_arr) == type(dask_arr)
+            assert serial_arr.dtype == dask_arr.dtype
+
 
 @pytest.mark.unit
 class TestFrequencyDomainSpikeDetectorUtils:

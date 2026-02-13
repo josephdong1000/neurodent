@@ -17,7 +17,7 @@ from pathlib import Path
 from dask.distributed import Client, LocalCluster
 
 from neurodent import constants, core, visualization
-from neurodent.workflow import setup_snakemake_logging
+from neurodent.workflow import setup_snakemake_logging, inject_config_aliases
 
 
 def load_samples_and_config():
@@ -25,25 +25,32 @@ def load_samples_and_config():
     # Get parameters from Snakemake
     samples_config = snakemake.params.samples_config
     config = snakemake.params.config
-    animal_folder = snakemake.params.animal_folder
+    animal_folders = snakemake.params.animal_folders # List of (folder, animal_id, session_key)
     animal_id = snakemake.params.animal_id
+    channel_subset = snakemake.params.channel_subset  # None for regular, list for joint sessions
 
-    return samples_config, config, animal_folder, animal_id
+    return samples_config, config, animal_folders, animal_id, channel_subset
 
 
-def generate_war_for_animal(samples_config, config, animal_folder, animal_id, logger):
-    """Generate WAR for a specific animal"""
+def generate_war_for_animal(samples_config, config, animal_folders, animal_id, channel_subset, logger):
+    """Generate WAR for a specific animal, aggregating across multiple folders/sessions.
+    
+    Args:
+        animal_folders: List of (folder_path, source_animal_id, session_key) tuples.
+        channel_subset: Global channel subset for this animal if it is part of a joint session.
+    """
 
     # Set up paths and parameters
-    base_folder = Path(config["base_folder"])
     data_parent_folder = Path(samples_config["data_parent_folder"])
 
     # Set temp directory
     core.set_temp_directory(config["temp_directory"])
 
-    # Set genotype aliases
-    constants.GENOTYPE_ALIASES = samples_config["GENOTYPE_ALIASES"]
-    animal_key = f"{animal_folder} {animal_id}"
+    # Set aliases
+    inject_config_aliases(samples_config)
+    
+    # Logging key
+    animal_key = f"{animal_id} (across {len(animal_folders)} folders)"
 
     try:
         with (
@@ -54,26 +61,101 @@ def generate_war_for_animal(samples_config, config, animal_folder, animal_id, lo
         ):
             logger.info(f"\n\nLocal Dask cluster dashboard: {cluster.dashboard_link}")
             logger.info(f"Number of workers: {len(client.scheduler_info()['workers'])}")
-            for worker, info in client.scheduler_info()["workers"].items():
-                print(f"Worker {worker}: {info['memory_limit']}, CPUs: {info['nthreads']}")
-            print("\n")
-
-            logger.info(f"Processing {animal_folder} - {animal_id}")
-
-            # Create AnimalOrganizer
+            
+            logger.info(f"Processing {animal_id} across {len(animal_folders)} sessions")
+            
+            all_lros = []
             analysis_config = config["analysis"]["war_generation"]
-            ao = visualization.AnimalOrganizer(
-                data_parent_folder / animal_folder,
-                animal_id,
-                mode=analysis_config["mode"],
-                assume_from_number=analysis_config["assume_from_number"],
-                skip_days=analysis_config["skip_days"],
-                lro_kwargs=analysis_config["lro_kwargs"],
+            lro_kwargs = dict(analysis_config.get("lro_kwargs", {}))
+            
+            # Use built-in AnimalOrganizer timestamp resolution if manual_datetimes in JSON
+            if "manual_datetimes" in samples_config:
+                lro_kwargs["manual_datetimes"] = samples_config["manual_datetimes"]
+            
+            # Resolve genotype from metadata (Metadata-First)
+            if animal_id not in constants.ANIMAL_METADATA:
+                 raise KeyError(
+                     f"Animal '{animal_id}' (from {animal_folders[0][0]}) not found in ANIMAL_METADATA. "
+                     "All animals in the pipeline must be defined in the metadata for reliable processing."
+                 )
+            
+            meta = constants.ANIMAL_METADATA[animal_id]
+            genotype = meta.get("gene", "Unknown")
+            logger.info(f"Resolved genotype '{genotype}' for {animal_id} from ANIMAL_METADATA")
+
+            # Load data from all source folders
+            for folder_info in animal_folders:
+                # Unpack tuple from Snakefile
+                folder_path, source_animal_id, session_key = folder_info
+                
+                logger.info(f"Loading session: {folder_path} (ID in metadata: {source_animal_id})")
+                
+                # Check if this specific session is a joint session
+                # We check if the session_key exists in the joint_sessions config
+                is_joint = session_key in samples_config.get("joint_sessions", {})
+                
+                # Prepare kwargs for this specific session
+                session_lro_kwargs = lro_kwargs.copy()
+
+                # Correctly handle list-based manual_datetimes by distributing them
+                if "manual_datetimes" in samples_config:
+                    all_manual_dts = samples_config["manual_datetimes"]
+                    if animal_id in all_manual_dts:
+                        spec = all_manual_dts[animal_id]
+                        if isinstance(spec, list):
+                            # Distribute timestamps to session AOs
+                            # We assume the order of animal_folders matches the order of timestamps
+                            if len(spec) != len(animal_folders):
+                                raise ValueError(
+                                    f"Length of manual_datetimes list ({len(spec)}) for {animal_id} "
+                                    f"does not match number of session folders ({len(animal_folders)})"
+                                )
+                            
+                            # Apply specific timestamp for this session index
+                            current_dt = spec[animal_folders.index(folder_info)]
+                            session_lro_kwargs["manual_datetimes"] = current_dt
+                            logger.info(f"  -> Using specific timestamp from list: {current_dt}")
+
+                # Create AO for this session
+                # Note: We use source_animal_id (e.g. 'M1') to match filenames in that folder
+                session_ao = visualization.AnimalOrganizer(
+                    data_parent_folder / folder_path,
+                    source_animal_id,
+                    mode=analysis_config["mode"],
+                    file_pattern=analysis_config.get("file_pattern"),
+                    day_sep=analysis_config.get("day_sep"),
+                    assume_from_number=analysis_config["assume_from_number"],
+                    skip_days=analysis_config["skip_days"],
+                    lro_kwargs=session_lro_kwargs,
+                    day_parse_kwargs=analysis_config.get("day_parse_kwargs", {}),
+                )
+
+                
+                if is_joint and channel_subset is not None:
+                     logger.info(f"  -> Joint session detected. Filtering to channels: {channel_subset}")
+                     # Split to only the channels assigned to this animal
+                     # source_animal_id is the key in the splits dict
+                     splits = session_ao.split(groups={source_animal_id: channel_subset})
+                     session_ao = splits[source_animal_id]
+                
+                # Collect LROs
+                all_lros.extend(session_ao.long_recordings)
+            
+            # Consolidate into single AnimalOrganizer
+            logger.info(f"Consolidating {len(all_lros)} recordings into single AnimalOrganizer for {animal_id}")
+            if not all_lros:
+                raise ValueError(f"No recordings found for {animal_id}")
+
+            ao = visualization.AnimalOrganizer.from_lros(
+                all_lros,
+                animal_id=animal_id,
+                genotype=genotype,
             )
 
             # Compute bad channels
             logger.info(f"Computing bad channels for {animal_key}")
-            ao.compute_bad_channels()
+            lof_threshold = config["analysis"]["channel_filter_config"]["lof"].get("reject_lof_threshold")
+            ao.compute_bad_channels(lof_threshold=lof_threshold)
 
             # Generate WAR using Dask
             logger.info(f"Computing windowed analysis for {animal_key}")
@@ -115,10 +197,10 @@ def main():
     logger.info("WAR generation script started successfully")
 
     # Load configuration
-    samples_config, config, animal_folder, animal_id = load_samples_and_config()
+    samples_config, config, animal_folder, animal_id, channel_subset = load_samples_and_config()
 
     # Generate WAR with integrated spike detection
-    war, fdsar_list = generate_war_for_animal(samples_config, config, animal_folder, animal_id, logger)
+    war, fdsar_list = generate_war_for_animal(samples_config, config, animal_folder, animal_id, channel_subset, logger)
 
     # Save WAR (now includes nspike/lognspike features)
     war.save_pickle_and_json(Path(snakemake.output.war_pkl).parent, filename="war", slugify_filename=False)

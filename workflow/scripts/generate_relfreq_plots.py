@@ -34,7 +34,8 @@ import numpy as np
 import pandas as pd
 import psutil
 import seaborn as sns
-from neurodent.workflow import setup_snakemake_logging
+from neurodent.workflow import setup_snakemake_logging, inject_config_aliases
+from neurodent.core import metadata as metadata_module
 
 from neurodent.constants import OKABE_ITO_COLORS
 from neurodent import visualization, constants
@@ -143,30 +144,21 @@ def extract_feature_from_war(args):
         raise
 
 
-def process_feature_dataframe(df):
-    """Process feature dataframe by adding categorical columns.
+def process_feature_dataframe(df, samples_config):
+    """Process feature dataframe by adding categorical columns using samples mapping.
 
     Args:
         df (pd.DataFrame): Input dataframe with feature data
+        samples_config (dict): Samples configuration containing ANIMAL_METADATA
 
     Returns:
         pd.DataFrame: Processed dataframe with sex and gene columns
     """
     df = df.copy()
     
-    # Add categorical columns based on genotype
-    df["sex"] = df["genotype"].map(
-        lambda x: "Male" if x in ["MWT", "MHet", "MMut"] else "Female" if x in ["FWT", "FHet", "FMut"] else None
-    )
-    df["gene"] = df["genotype"].map(
-        lambda x: "WT"
-        if x in ["MWT", "FWT"]
-        else "Het"
-        if x in ["MHet", "FHet"]
-        else "Mut"
-        if x in ["MMut", "FMut"]
-        else x
-    )
+    # Use ANIMAL_METADATA for explicit sex/gene lookup (required)
+    animal_metadata = metadata_module.load_animal_metadata(samples_config)
+    df = metadata_module.enrich_metadata(df, animal_metadata)
 
     if "isday" in df.columns:
         df["isday"] = df["isday"].map(lambda x: "Day" if x else "Night")
@@ -284,7 +276,7 @@ def create_relfreq_plots_from_df(df_weighted, feature, feature_label, output_dir
                 feature=feature,
                 feature_label=f"{feature_label} ({band})",
                 hue="gene",
-                hue_order=["WT", "Het", "Mut"],
+                hue_order=sorted(df_weighted["gene"].unique().tolist()),  # Dynamic hue order
                 palette=["blue", "blueviolet", "red"],
                 log_scale=False,
                 output_path=output_dir / f"{feature}_relfreq_{band}.{figure_format}",
@@ -316,7 +308,7 @@ def create_relfreq_plots_from_df(df_weighted, feature, feature_label, output_dir
             feature=feature,
             feature_label=feature_label,
             hue="gene",
-            hue_order=["WT", "Het", "Mut"],
+            hue_order=sorted(df_weighted["gene"].unique().tolist()),  # Dynamic hue order
             palette=["blue", "blueviolet", "red"],
             log_scale=False,
             output_path=output_dir / f"{feature}_relfreq.{figure_format}",
@@ -337,6 +329,10 @@ def main():
     war_pkl_files = snakemake.input.war_pkl
     war_json_files = snakemake.input.war_json
     config = snakemake.params.config
+    samples_config = snakemake.params.samples_config
+
+    # Inject aliases
+    inject_config_aliases(samples_config)
 
     # Create output directories
     output_dir = Path(snakemake.output.figure_dir)
@@ -439,7 +435,7 @@ def main():
             logger.info(f"After melt, DataFrame shape: {combined_df.shape}")
         
         # Process dataframe (add sex, gene columns)
-        df_processed = process_feature_dataframe(combined_df)
+        df_processed = process_feature_dataframe(combined_df, samples_config)
         del combined_df
         gc.collect()
         

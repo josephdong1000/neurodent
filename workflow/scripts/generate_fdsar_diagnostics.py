@@ -15,7 +15,7 @@ import warnings
 from pathlib import Path
 
 from neurodent.visualization.frequency_domain_results import FrequencyDomainSpikeAnalysisResult
-from neurodent.workflow import setup_snakemake_logging
+from neurodent.workflow import setup_snakemake_logging, inject_config_aliases
 
 
 def load_fdsar_results(fdsar_base_dir: Path):
@@ -119,6 +119,10 @@ def main():
     # Load FDSAR results
     fdsar_dir = Path(snakemake.params.fdsar_dir)
     output_dir = Path(snakemake.output.diagnostics_dir)
+    samples_config = snakemake.params.samples_config
+    
+    # Inject aliases
+    inject_config_aliases(samples_config)
 
     logger.info(f"Loading FDSAR results from: {fdsar_dir}")
     fdsar_list = load_fdsar_results(fdsar_dir)

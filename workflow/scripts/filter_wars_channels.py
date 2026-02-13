@@ -13,7 +13,7 @@ Output: Channel-filtered WARs ready for flattening
 from pathlib import Path
 
 from neurodent import visualization
-from neurodent.workflow import setup_snakemake_logging
+from neurodent.workflow import setup_snakemake_logging, inject_config_aliases
 
 
 def main():
@@ -41,6 +41,9 @@ def main():
     animal_folder = snakemake.params.animal_folder
     animal_id = snakemake.params.animal_id
     filter_type = snakemake.params.filter_type  # "manual" or "lof"
+
+    # Inject aliases
+    inject_config_aliases(samples_config)
 
     # Get animal name from wildcards and construct the animal key
     animal_name = snakemake.wildcards.animal

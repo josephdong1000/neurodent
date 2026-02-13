@@ -29,6 +29,7 @@ rule war_explorer_notebook:
     params:
         # Pass configuration for resource allocation
         config=config,
+        samples_config=samples_config,
     resources:
         time=config["cluster"]["notebook"]["time"],
         mem_mb=increment_memory(config["cluster"]["notebook"]["mem_mb"]),

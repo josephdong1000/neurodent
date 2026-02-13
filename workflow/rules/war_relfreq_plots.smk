@@ -24,6 +24,7 @@ rule generate_relfreq_plots:
         data_dir=directory("results/relfreq_plot_data/"),
     params:
         config=config,
+        samples_config=samples_config,
     threads:
         config["cluster"]["relfreq_plots"]["threads"]
     retries:

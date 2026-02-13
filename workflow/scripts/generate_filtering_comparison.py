@@ -15,12 +15,13 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.colors import TwoSlopeNorm
 import seaborn as sns
 from scipy import stats
 from sklearn.metrics import mean_squared_error
 
 from neurodent import visualization, constants
-from neurodent.workflow import setup_snakemake_logging
+from neurodent.workflow import setup_snakemake_logging, inject_config_aliases
 
 
 def load_wars_from_paths(war_paths, label):
@@ -644,7 +645,6 @@ def generate_channel_impact_analysis(manual_ep, lof_ep, features, output_dir, ha
         logging.info("Step 5: Creating three versions of the heatmap")
 
         # Create three versions: absolute differences, z-score-like, and log2 fold-change
-        from matplotlib.colors import TwoSlopeNorm
 
         versions = [
             ("absolute", "Absolute Differences (LOF - Manual)", group_diff),
@@ -680,6 +680,12 @@ def generate_channel_impact_analysis(manual_ep, lof_ep, features, output_dir, ha
 
             # Calculate symmetric limits for proper centering
             abs_max = np.abs(version_data.values).max()
+            
+            # Handle case where all values are zero or NaN
+            if pd.isna(abs_max) or abs_max == 0:
+                logging.warning(f"No variation found in {version_title} (all zeros or NaNs). Setting default range.")
+                abs_max = 1e-6
+
             vmin, vmax = -abs_max, abs_max
 
             # Use TwoSlopeNorm for proper centering at zero with red-blue colormap
@@ -981,6 +987,10 @@ def main():
     manual_war_paths = snakemake.input.manual_wars
     lof_war_paths = snakemake.input.lof_wars
     config = snakemake.params.config
+    samples_config = snakemake.params.samples_config
+    
+    # Inject aliases
+    inject_config_aliases(samples_config)
 
     # Create output directories
     comparison_dir = Path(snakemake.output.comparison_dir)

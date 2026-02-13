@@ -80,3 +80,25 @@ To customize log directory, add to your profile:
    slurm-logdir: "logs/slurm"
 
 See the `plugin documentation <https://snakemake.github.io/snakemake-plugin-catalog/plugins/executor/slurm.html>`_ for full configuration options.
+
+Local Configuration Overrides
+-----------------------------
+
+You can override any setting from ``config/config.yaml`` using a local configuration file. This is useful for adjusting analysis parameters or file paths for your specific environment without modifying the main configuration file (which is tracked by git).
+
+To use local overrides:
+
+1.  Create a file named ``config/config.local.yaml``.
+2.  Add the specific configuration keys you wish to override. You do *not* need to copy the entire configuration file; Snakemake performs a "deep merge", so only the keys you specify will be updated.
+
+**Example:**
+
+If you want to change the analysis sampling rate but keep all other settings:
+
+.. code-block:: yaml
+
+   # config/config.local.yaml
+   analysis:
+     sampling_rate: 2000
+
+The ``config/config.local.yaml`` file is included in ``.gitignore`` and will not be pushed to the repository.

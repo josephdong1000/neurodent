@@ -78,7 +78,7 @@ checkpoint war_quality_filter:
         cleanup_existing_files(destination_dir, input)
 
         # Check if this is a bad animalday first
-        combined_name = SLUGIFIED_TO_ORIGINAL[animal]
+        combined_name = ANIMAL_TO_FULL_ID_MAP[animal]
         logger.info(f"Original animal name: {combined_name}")
 
         if exclude_bad_animaldays and combined_name in bad_folder_animalday:

@@ -121,7 +121,8 @@ class FrequencyDomainSpikeDetector:
                         raw_data[ch, :], sampling_freq, params
                     ) for ch in range(n_channels)
                 ]
-                spike_indices_per_channel = dask.compute(*spike_tasks)
+                # dask.compute returns tuple, convert to list for consistency with serial mode
+                spike_indices_per_channel = list(dask.compute(*spike_tasks))
             case "serial":
                 spike_indices_per_channel = [
                     FrequencyDomainSpikeDetector._detect_spikes_channel(

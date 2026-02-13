@@ -20,6 +20,7 @@ rule generate_ep_figures:
         data_dir=directory("results/ep_data/"),
     params:
         config=config,
+        samples_config=samples_config,
     threads:
         config["cluster"]["ep_figures"]["threads"]
     retries:
@@ -49,6 +50,7 @@ rule generate_ep_heatmaps:
         heatmap_data_dir=directory("results/ep_heatmap_data/"),
     params:
         config=config,
+        samples_config=samples_config,
     threads:
         config["cluster"]["ep_heatmaps"]["threads"]
     retries:
