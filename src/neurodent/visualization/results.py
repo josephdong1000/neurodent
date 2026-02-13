@@ -98,7 +98,7 @@ class AnimalOrganizer(AnimalFeatureParser):
 
     Args:
         base_folder_path (str): The path to the base folder of the animal data.
-        anim_id (str): The ID of the animal. This should correspond to only one animal.
+        animal_id (str): The ID of the animal. This should correspond to only one animal.
         day_sep (str, optional): Separator for day in folder name. Set to None or empty string to get all folders. Defaults to None.
         mode (Literal["nest", "concat", "base", "noday"], optional): The mode of the AnimalOrganizer. Defaults to "concat".
             * "nest": base_folder_path / animal_id / \*date_format\* (looks for folders/files within animal_id subdirectories)
@@ -112,7 +112,7 @@ class AnimalOrganizer(AnimalFeatureParser):
 
     Attributes:
         base_folder_path (Path): The path to the base folder of the animal data.
-        anim_id (str): The ID of the animal.
+        animal_id (str): The ID of the animal.
         day_sep (str): Separator for day in folder name.
         read_mode (str): The mode of the AnimalOrganizer.
         assume_from_number (bool): Whether to assume the animal ID is a number.
@@ -126,7 +126,7 @@ class AnimalOrganizer(AnimalFeatureParser):
     def __init__(
         self,
         base_folder_path,
-        anim_id: str,
+        animal_id: str,
         day_sep: str | None = None,
         mode: Literal["nest", "concat", "base", "noday"] = "concat",
         assume_from_number=False,
@@ -136,8 +136,8 @@ class AnimalOrganizer(AnimalFeatureParser):
     ) -> None:
 
         self.base_folder_path = Path(base_folder_path)
-        self.anim_id = anim_id
-        self.animal_param = [anim_id]
+        self.animal_id = animal_id
+        self.animal_param = [animal_id]
         self.day_sep = day_sep
         self.read_mode = mode
         self.assume_from_number = assume_from_number
@@ -145,15 +145,15 @@ class AnimalOrganizer(AnimalFeatureParser):
         match mode:
             case "nest":
                 self.bin_folder_pattern = (
-                    self.base_folder_path / f"*{self.anim_id}*" / "*"
+                    self.base_folder_path / f"*{self.animal_id}*" / "*"
                 )
             case "concat" | "noday":
-                self.bin_folder_pattern = self.base_folder_path / f"*{self.anim_id}*"
-                # self.bin_folder_pat = self.base_folder_path / f"*{self.anim_id}*{self.date_format}*"
+                self.bin_folder_pattern = self.base_folder_path / f"*{self.animal_id}*"
+                # self.bin_folder_pat = self.base_folder_path / f"*{self.animal_id}*{self.date_format}*"
             case "base":
                 self.bin_folder_pattern = self.base_folder_path
             # case 'noday':
-            #     self.bin_folder_pat = self.base_folder_path / f"*{self.anim_id}*"
+            #     self.bin_folder_pat = self.base_folder_path / f"*{self.animal_id}*"
             case _:
                 raise ValueError(f"Invalid mode: {mode}")
 
@@ -188,11 +188,11 @@ class AnimalOrganizer(AnimalFeatureParser):
 
         if mode == "noday" and len(self._bin_folders) > 1:
             raise ValueError(
-                f"Animal ID '{self.anim_id}' is not unique, found: {', '.join(self._bin_folders)}"
+                f"Animal ID '{self.animal_id}' is not unique, found: {', '.join(self._bin_folders)}"
             )
         elif len(self._bin_folders) == 0:
             raise ValueError(
-                f"No directories found for animal ID {self.anim_id} (pattern: {self.bin_folder_pattern})"
+                f"No directories found for animal ID {self.animal_id} (pattern: {self.bin_folder_pattern})"
             )
 
         self._animalday_dicts = [
