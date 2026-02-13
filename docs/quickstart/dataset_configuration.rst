@@ -47,30 +47,6 @@ How It Works
 
    config.yaml → datasets/{active}.yaml → config.local.yaml
 
-Available Datasets
-------------------
-
-.. list-table::
-   :header-rows: 1
-   :widths: 20 30 30 20
-
-   * - Dataset ID
-     - Config File
-     - Samples File
-     - Format
-   * - ``sox5_bin``
-     - ``datasets/sox5_bin.yaml``
-     - ``samples.json``
-     - Binary
-   * - ``ap3b2_nwb``
-     - ``datasets/ap3b2_nwb.yaml``
-     - ``samples_jess.json``
-     - NWB
-   * - ``ap3b2_rhd``
-     - ``datasets/ap3b2_rhd.yaml``
-     - ``samples_jess_rhd.json``
-     - RHD (raw Intan)
-
 Switching Datasets
 ------------------
 
@@ -193,6 +169,44 @@ Step 3: Use the New Dataset
 .. code-block:: bash
 
    NEURODENT_DATASET=mydata_nwb uv run snakemake --profile your-profile
+
+Session-Specific Configuration
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Some datasets contain mixed file formats that require different processing parameters per recording session. Use the ``overrides.by_session`` section in your dataset config to override any parameter on a per-session basis.
+
+**Example:** Dataset with both EDF and RHD formats
+
+.. code-block:: yaml
+
+   # config/datasets/mixed_format.yaml
+   samples:
+     samples_file: "config/samples_mixed.json"
+
+   analysis:
+     war_generation:
+       mode: "base"
+       lro_kwargs:
+         mode: "si"
+
+   overrides:
+     by_session:
+       "Session_EDF":
+         "analysis.war_generation.file_pattern": "*.EDF"
+         "analysis.war_generation.lro_kwargs.extract_func": "read_edf"
+       "Session_RHD":
+         "analysis.war_generation.file_pattern": "*.rhd"
+         "analysis.war_generation.lro_kwargs.extract_func": "read_intan"
+         "analysis.war_generation.lro_kwargs.stream_id": "0"
+
+**How it works:**
+
+- Use dotted paths to specify which parameter to override (e.g., ``"analysis.war_generation.file_pattern"``)
+- Can override **any** config parameter, not just war_generation settings
+- Overrides are applied via deep merge before session processing
+- Falls back to global config if no override specified for a session
+
+Session-specific settings override the dataset config for that session only. This allows processing mixed formats in a single pipeline run while keeping all animals in unified analysis outputs.
 
 Common Use Cases
 ----------------
