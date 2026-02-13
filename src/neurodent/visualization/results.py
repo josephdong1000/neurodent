@@ -1273,7 +1273,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         self,
         features: list[str],
         exclude: list[str] = [],
-        window_s=4,
+        window_s=5,
         multiprocess_mode: Literal["dask", "serial"] = "serial",
         suppress_short_interval_error=False,
         apply_notch_filter=True,
