@@ -12,7 +12,7 @@ class TestTimelineSequencing:
     def ao(self):
         # Create a dummy AnimalOrganizer. We only need partial functionality.
         ao = MagicMock(spec=AnimalOrganizer)
-        ao.anim_id = "M1"
+        ao.animal_id = "M1"
         # Bind the real method we want to test
         ao._process_manual_datetimes = AnimalOrganizer._process_manual_datetimes.__get__(ao, AnimalOrganizer)
         # Bind the timeline method too since we want to verify it gets used

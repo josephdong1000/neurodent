@@ -670,41 +670,41 @@ class AnimalOrganizer(AnimalFeatureParser):
         """
         if isinstance(manual_datetimes, dict):
             # Find folders for this animal to apply the spec
-            animal_folders = self._get_folders_for_animal(self.anim_id, animalday_to_folders)
+            animal_folders = self._get_folders_for_animal(self.animal_id, animalday_to_folders)
 
             # Direct lookup: keys are expected to be animal IDs
             # Check for shadowing: if both Animal ID key AND flat folder keys are present
-            has_id_key = self.anim_id in manual_datetimes
+            has_id_key = self.animal_id in manual_datetimes
             folder_names = {Path(f).name for f in animal_folders}
             has_folder_keys = any(k in folder_names for k in manual_datetimes.keys())
             
             if has_id_key and has_folder_keys:
                 raise ValueError(
-                    f"Ambiguous manual_datetimes configuration for '{self.anim_id}'. "
-                    f"Both the Animal ID key '{self.anim_id}' and individual folder keys "
+                    f"Ambiguous manual_datetimes configuration for '{self.animal_id}'. "
+                    f"Both the Animal ID key '{self.animal_id}' and individual folder keys "
                     f"(e.g., {[k for k in manual_datetimes.keys() if k in folder_names][:3]}) are present. "
                     f"Please nest all folder keys under the Animal ID key to avoid ambiguity."
                 )
 
-            spec = manual_datetimes.get(self.anim_id)
+            spec = manual_datetimes.get(self.animal_id)
             
             if spec is None:
                 # Check if manual_datetimes keys match any folders (backward compatibility for direct folder mapping)
                 if has_folder_keys:
-                    logging.info(f"manual_datetimes keys match folders for {self.anim_id}. Treating as folder mapping spec.")
+                    logging.info(f"manual_datetimes keys match folders for {self.animal_id}. Treating as folder mapping spec.")
                     spec = manual_datetimes
                 else:
                     raise ValueError(
-                        f"manual_datetimes dictionary was provided in the config, but no entry was found for animal ID '{self.anim_id}'. "
+                        f"manual_datetimes dictionary was provided in the config, but no entry was found for animal ID '{self.animal_id}'. "
                         f"Available keys in config: {list(manual_datetimes.keys())}"
                     )
 
-            logging.info(f"Processing manual datetimes for animal '{self.anim_id}'")
+            logging.info(f"Processing manual datetimes for animal '{self.animal_id}'")
             out = {}
             
             if not animal_folders:
                 raise ValueError(
-                    f"Manual timestamps were provided for animal ID '{self.anim_id}' in the config, "
+                    f"Manual timestamps were provided for animal ID '{self.animal_id}' in the config, "
                     f"but no data folders starting with this ID were found in the data path. "
                     f"Check for typos or naming mismatches between config keys and folder names."
                 )
@@ -712,7 +712,7 @@ class AnimalOrganizer(AnimalFeatureParser):
             if isinstance(spec, list):
                 if len(spec) != len(animal_folders):
                     raise ValueError(
-                        f"manual_datetimes list for animal '{self.anim_id}' has {len(spec)} entries "
+                        f"manual_datetimes list for animal '{self.animal_id}' has {len(spec)} entries "
                         f"but animal has {len(animal_folders)} folders"
                     )
                 for folder_path, ts in zip(animal_folders, spec):

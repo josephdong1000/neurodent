@@ -109,7 +109,7 @@ class TestOverlappingAnimaldaysBug:
                     mock_lro_class.side_effect = mock_lro_side_effect
 
                     # Create AnimalOrganizer - this should trigger the bug
-                    ao = results.AnimalOrganizer(anim_id="A10", base_folder_path=temp_path, mode="base")
+                    ao = results.AnimalOrganizer(animal_id="A10", base_folder_path=temp_path, mode="base")
 
                     # Verify that all folders parse to same animalday
                     parsed_animaldays = []
@@ -280,7 +280,7 @@ class TestOverlappingAnimaldaysBug:
                     mock_lro_c.merge = mock_merge
 
                     # Create AnimalOrganizer which should trigger temporal sorting and merging
-                    ao = results.AnimalOrganizer(anim_id="A10", base_folder_path=temp_path, mode="base")
+                    ao = results.AnimalOrganizer(animal_id="A10", base_folder_path=temp_path, mode="base")
 
                     # Verify that we have one merged LRO (overlapping folders)
                     assert len(ao.long_recordings) == 1
@@ -346,7 +346,7 @@ class TestOverlappingAnimaldaysBug:
 
                     mock_lro_class.side_effect = mock_lro_side_effect
 
-                    ao = results.AnimalOrganizer(anim_id="A10", base_folder_path=temp_path, mode="base")
+                    ao = results.AnimalOrganizer(animal_id="A10", base_folder_path=temp_path, mode="base")
 
                     # Should have 2 unique animaldays, not 3 folders
                     assert len(ao.animaldays) == 2
@@ -497,7 +497,7 @@ class TestAnimalOrganizerDirectoryFiltering:
         mock_lro.return_value = self._create_mock_lro()
 
         # Create AnimalOrganizer
-        ao = results.AnimalOrganizer(base_folder_path=str(self.base_path), anim_id=self.animal_id, mode="concat")
+        ao = results.AnimalOrganizer(base_folder_path=str(self.base_path), animal_id=self.animal_id, mode="concat")
 
         # Verify only directories were found
         assert len(ao._bin_folders) == 2  # 2 directories created
@@ -521,7 +521,7 @@ class TestAnimalOrganizerDirectoryFiltering:
         mock_lro.return_value = self._create_mock_lro()
 
         # Create AnimalOrganizer
-        ao = results.AnimalOrganizer(base_folder_path=str(self.base_path), anim_id=self.animal_id, mode="nest")
+        ao = results.AnimalOrganizer(base_folder_path=str(self.base_path), animal_id=self.animal_id, mode="nest")
 
         # Verify only directories were found
         assert len(ao._bin_folders) == 2  # 2 directories created
@@ -545,7 +545,7 @@ class TestAnimalOrganizerDirectoryFiltering:
         mock_lro.return_value = self._create_mock_lro()
 
         # Create AnimalOrganizer
-        ao = results.AnimalOrganizer(base_folder_path=str(self.base_path), anim_id=self.animal_id, mode="noday")
+        ao = results.AnimalOrganizer(base_folder_path=str(self.base_path), animal_id=self.animal_id, mode="noday")
 
         # Verify only one directory was found
         assert len(ao._bin_folders) == 1
@@ -561,7 +561,7 @@ class TestAnimalOrganizerDirectoryFiltering:
 
         # Should raise ValueError when no directories found
         with pytest.raises(ValueError) as exc_info:
-            results.AnimalOrganizer(base_folder_path=str(self.base_path), anim_id=self.animal_id, mode="concat")
+            results.AnimalOrganizer(base_folder_path=str(self.base_path), animal_id=self.animal_id, mode="concat")
 
         error_message = str(exc_info.value)
         assert "No directories found" in error_message
@@ -578,7 +578,7 @@ class TestAnimalOrganizerDirectoryFiltering:
 
         # Should raise ValueError for multiple directories in noday mode
         with pytest.raises(ValueError) as exc_info:
-            results.AnimalOrganizer(base_folder_path=str(self.base_path), anim_id=self.animal_id, mode="noday")
+            results.AnimalOrganizer(base_folder_path=str(self.base_path), animal_id=self.animal_id, mode="noday")
 
         error_message = str(exc_info.value)
         assert "not unique" in error_message
@@ -600,7 +600,7 @@ class TestAnimalOrganizerDirectoryFiltering:
         mock_lro.return_value = self._create_mock_lro()
 
         # Create AnimalOrganizer in base mode using the properly named directory
-        ao = results.AnimalOrganizer(base_folder_path=str(base_dir), anim_id=self.animal_id, mode="base")
+        ao = results.AnimalOrganizer(base_folder_path=str(base_dir), animal_id=self.animal_id, mode="base")
 
         # In base mode, should use the base directory itself
         assert len(ao._bin_folders) == 1
@@ -617,7 +617,7 @@ class TestAnimalOrganizerDirectoryFiltering:
         mock_lro.return_value = self._create_mock_lro()
 
         # Create AnimalOrganizer
-        _ = results.AnimalOrganizer(base_folder_path=str(self.base_path), anim_id=self.animal_id, mode="concat")
+        _ = results.AnimalOrganizer(base_folder_path=str(self.base_path), animal_id=self.animal_id, mode="concat")
 
         # Check that filtering information was logged
         logged_messages = [call[0][0] for call in mock_logging.call_args_list]
