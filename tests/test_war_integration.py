@@ -74,7 +74,7 @@ class TestWARIntegration:
             warnings.filterwarnings("ignore", category=RuntimeWarning)
 
             war = animal_organizer_with_war.compute_windowed_analysis(
-                features=war_features, window_s=4, multiprocess_mode="serial"
+                features=war_features, window_s=5, multiprocess_mode="serial"
             )
 
         # Verify WAR structure
@@ -126,7 +126,7 @@ class TestWARIntegration:
             warnings.filterwarnings("ignore", category=RuntimeWarning)
 
             war = animal_organizer_with_war.compute_windowed_analysis(
-                features=war_features, window_s=4, multiprocess_mode="serial"
+                features=war_features, window_s=5, multiprocess_mode="serial"
             )
 
             # Step 2: Run frequency domain spike detection
@@ -190,7 +190,7 @@ class TestWARIntegration:
             warnings.filterwarnings("ignore", category=RuntimeWarning)
 
             war = animal_organizer_with_war.compute_windowed_analysis(
-                features=["rms"], window_s=4, multiprocess_mode="serial"
+                features=["rms"], window_s=5, multiprocess_mode="serial"
             )
 
             # Generate spike detection results
@@ -225,7 +225,7 @@ class TestWARIntegration:
             warnings.filterwarnings("ignore", category=RuntimeWarning)
 
             war = animal_organizer_with_war.compute_windowed_analysis(
-                features=["rms"], window_s=4, multiprocess_mode="serial"
+                features=["rms"], window_s=5, multiprocess_mode="serial"
             )
 
             fdsar_list = animal_organizer_with_war.compute_frequency_domain_spike_analysis(
@@ -259,7 +259,7 @@ class TestWARIntegration:
             warnings.filterwarnings("ignore", category=RuntimeWarning)
 
             war = animal_organizer_with_war.compute_windowed_analysis(
-                features=["rms"], window_s=4, multiprocess_mode="serial"
+                features=["rms"], window_s=5, multiprocess_mode="serial"
             )
 
             fdsar_list = animal_organizer_with_war.compute_frequency_domain_spike_analysis(
@@ -298,7 +298,7 @@ class TestWARIntegration:
             warnings.filterwarnings("ignore", category=RuntimeWarning)
 
             war = animal_organizer_with_war.compute_windowed_analysis(
-                features=["rms"], window_s=4, multiprocess_mode="serial"
+                features=["rms"], window_s=5, multiprocess_mode="serial"
             )
 
             fdsar_list = animal_organizer_with_war.compute_frequency_domain_spike_analysis(
@@ -338,7 +338,7 @@ class TestWARIntegration:
             warnings.filterwarnings("ignore", category=RuntimeWarning)
 
             war = animal_organizer_with_war.compute_windowed_analysis(
-                features=["rms", "ampvar"], window_s=4, multiprocess_mode="serial"
+                features=["rms", "ampvar"], window_s=5, multiprocess_mode="serial"
             )
 
             fdsar_list = animal_organizer_with_war.compute_frequency_domain_spike_analysis(

@@ -15,7 +15,7 @@ handling everything from raw data loading to feature extraction.
     # 2. Run windowed feature analysis
     analyzer = core.LongRecordingAnalyzer(organizer)
     results = analyzer.run_analysis(
-        window_sec=4,
+        window_sec=5,
         step_sec=4,
         features=['psdband', 'cohere'],
     )
