@@ -75,14 +75,14 @@
     },
     "data_folders_to_animal_ids": {
         "010822_cohort4_group2_2mice_MWT_MHET": [
-            "M3",
-            "M10"
+            "010822_M3",
+            "010822_M10"
         ],
         "011322_cohort4_group3_4mice_AllM_MT_WT_HET_WT": [
-            "M2",
-            "M3",
-            "M4",
-            "M8"
+            "011322_M2",
+            "011322_M3",
+            "011322_M4",
+            "011322_M8"
         ],
         "011622_cohort4_group4_3mice_MMutOLD_FMUT_FMUT_FWT": [
             "FMUT_",
@@ -91,15 +91,15 @@
             "OLDMMT"
         ],
         "012022_cohort4_group5_3mice__FWT_MMUT_FMUT": [
-            "FMUT",
-            "FWT",
-            "MMUT"
+            "012022_FMUT",
+            "012022_FWT",
+            "012022_MMUT"
         ],
         "012322_cohort4_group6_3mice_FMUT___MMUT_MWT": [
-            "FMUT",
-            "FHET",
+            "012322_FMUT",
+            "012322_FHET",
             "MHET",
-            "MMUT"
+            "012322_MMUT"
         ],
         "013122_cohort4_group7_2mice both_FHET": [
             "FHET(1)",
@@ -113,13 +113,13 @@
         ],
         "031122_cohort5_group1_2mice_FHET_MWT": [
             "F4",
-            "M2"
+            "031122_M2"
         ],
         "031621_cohort 2 group 2 and group 5": [
             "F5",
             "F6",
             "F10",
-            "M2"
+            "031621_M2"
         ],
         "031722_cohort_6_group1_3mice_MMUT_MMUT_MWT": [
             "M7",
@@ -147,11 +147,11 @@
             "group9_M3_Cage 4"
         ],
         "061322_Group10 M8, M10": [
-            "M8",
-            "M10"
+            "061322_M8",
+            "061322_M10"
         ],
         "061722_group10 M3, F8": [
-            "M3",
+            "061722_M3",
             "F8"
         ],
         "062122_group 10_2mice_F7Het_F9Mut": [
@@ -175,20 +175,20 @@
             "FF6"
         ],
         "081922_cohort10_group4_2mice_FMut_FHet": [
-            "FHET",
-            "FMUT"
+            "081922_FHET",
+            "081922_FMUT"
         ],
         "082922_group4_2mice_MMUT_FMUT": [
-            "MMUT",
-            "FMUT"
+            "082922_MMUT",
+            "082922_FMUT"
         ],
         "090122_group4_2mice_FMut_MMut": [
-            "MMUT",
-            "FMUT"
+            "090122_MMUT",
+            "090122_FMUT"
         ],
         "121821_cohort4_Group1_2mice": [
-            "M2",
-            "M4"
+            "121821_M2",
+            "121821_M4"
         ]
     },
     "bad_channels": {
@@ -315,7 +315,10 @@
         {"id": "AM4", "gene": "WT", "sex": "Male"},
         {"id": "AM2", "gene": "WT", "sex": "Male"},
         {"id": "CM9", "gene": "WT", "sex": "Male"},
-        {"id": "M10", "gene": "WT", "sex": "Male"},
+        {"id": "M7", "gene": "WT", "sex": "Male"},
+        {"id": "010822_M3", "gene": "WT", "sex": "Male"},
+        {"id": "011322_M3", "gene": "WT", "sex": "Male"},
+        {"id": "031122_M2", "gene": "WT", "sex": "Male"},
         {"id": "MHet", "gene": "Het", "sex": "Male"},
         {"id": "MHET", "gene": "Het", "sex": "Male"},
         {"id": "M8_HET", "gene": "Het", "sex": "Male"},
@@ -326,20 +329,33 @@
         {"id": "EM1", "gene": "Het", "sex": "Male"},
         {"id": "AM5", "gene": "Het", "sex": "Male"},
         {"id": "mouse M2 cage 3A", "gene": "Het", "sex": "Male"},
+        {"id": "011322_M4", "gene": "Het", "sex": "Male"},
+        {"id": "121821_M4", "gene": "Het", "sex": "Male"},
+        {"id": "011322_M8", "gene": "Het", "sex": "Male"},
+        {"id": "061322_M8", "gene": "Het", "sex": "Male"},
         {"id": "M3_MT", "gene": "Mut", "sex": "Male"},
         {"id": "OLDMMT", "gene": "Mut", "sex": "Male"},
-        {"id": "MMUT", "gene": "Mut", "sex": "Male"},
         {"id": "MMT", "gene": "Mut", "sex": "Male"},
         {"id": "mouse #8 Cage 3A", "gene": "Mut", "sex": "Male"},
         {"id": "mouse #2 Cage 2A", "gene": "Mut", "sex": "Male"},
         {"id": "mouse M5 cage2A", "gene": "Mut", "sex": "Male"},
         {"id": "mouse M5 cage4A", "gene": "Mut", "sex": "Male"},
+        {"id": "011322_M2", "gene": "Mut", "sex": "Male"},
+        {"id": "121821_M2", "gene": "Mut", "sex": "Male"},
+        {"id": "031621_M2", "gene": "Mut", "sex": "Male"},
+        {"id": "MMUT(1)", "gene": "Mut", "sex": "Male"},
+        {"id": "MMUT(2)", "gene": "Mut", "sex": "Male"},
+        {"id": "012022_MMUT", "gene": "Mut", "sex": "Male"},
+        {"id": "012322_MMUT", "gene": "Mut", "sex": "Male"},
+        {"id": "082922_MMUT", "gene": "Mut", "sex": "Male"},
+        {"id": "090122_MMUT", "gene": "Mut", "sex": "Male"},
         {"id": "FWT", "gene": "WT", "sex": "Female"},
+        {"id": "012022_FWT", "gene": "WT", "sex": "Female"},
+        {"id": "011622_FWT", "gene": "WT", "sex": "Female"},
         {"id": "BF3", "gene": "WT", "sex": "Female"},
         {"id": "CF2", "gene": "WT", "sex": "Female"},
         {"id": "DF3", "gene": "WT", "sex": "Female"},
         {"id": "CF1", "gene": "WT", "sex": "Female"},
-        {"id": "FHET", "gene": "Het", "sex": "Female"},
         {"id": "F7Het", "gene": "Het", "sex": "Female"},
         {"id": "F5 cage 1A", "gene": "Het", "sex": "Female"},
         {"id": "F6 cage 2A", "gene": "Het", "sex": "Female"},
@@ -350,14 +366,38 @@
         {"id": "GF4", "gene": "Het", "sex": "Female"},
         {"id": "IF5", "gene": "Het", "sex": "Female"},
         {"id": "FF6", "gene": "Het", "sex": "Female"},
-        {"id": "FMUT", "gene": "Mut", "sex": "Female"},
+        {"id": "F4", "gene": "Het", "sex": "Female"},
+        {"id": "F7", "gene": "Het", "sex": "Female"},
+        {"id": "FHET(1)", "gene": "Het", "sex": "Female"},
+        {"id": "FHET(2)", "gene": "Het", "sex": "Female"},
+        {"id": "012322_FHET", "gene": "Het", "sex": "Female"},
+        {"id": "081922_FHET", "gene": "Het", "sex": "Female"},
+        {"id": "F9", "gene": "Mut", "sex": "Female"},
+        {"id": "FMUT_", "gene": "Mut", "sex": "Female"},
+        {"id": "FMUT(2)", "gene": "Mut", "sex": "Female"},
+        {"id": "012022_FMUT", "gene": "Mut", "sex": "Female"},
+        {"id": "012322_FMUT", "gene": "Mut", "sex": "Female"},
+        {"id": "081922_FMUT", "gene": "Mut", "sex": "Female"},
+        {"id": "082922_FMUT", "gene": "Mut", "sex": "Female"},
+        {"id": "090122_FMUT", "gene": "Mut", "sex": "Female"},
         {"id": "F9Mut", "gene": "Mut", "sex": "Female"},
         {"id": "mouse F10 cage 4A", "gene": "Mut", "sex": "Female"},
         {"id": "040221_Group 1 Mouse 9 Recording", "gene": "Mut", "sex": "Female"},
+        {"id": "010822_M10", "gene": "WT", "sex": "Male"},
+        {"id": "061322_M10", "gene": "WT", "sex": "Male"},
+        {"id": "061722_M3", "gene": "Unknown", "sex": "Male"},
         {"id": "M3_group 10_cage 1", "gene": "Unknown"},
         {"id": "F8_group 10_cage 3", "gene": "Unknown"},
         {"id": "M2_cohort4_group1", "gene": "Unknown"},
         {"id": "M4_cohort4_group1", "gene": "Unknown"},
-        {"id": "group9_M1_Cage1", "gene": "Unknown"}
+        {"id": "group9_M1_Cage1", "gene": "Unknown"},
+        {"id": "F5", "gene": "Unknown", "sex": "Female"},
+        {"id": "F6", "gene": "Unknown", "sex": "Female"},
+        {"id": "F8", "gene": "Unknown", "sex": "Female"},
+        {"id": "F10", "gene": "Unknown", "sex": "Female"},
+        {"id": "#2 Cage 2A", "gene": "Unknown", "sex": "Male"},
+        {"id": "#3 Cage 4A", "gene": "Unknown", "sex": "Male"},
+        {"id": "#8 Cage 1A", "gene": "Unknown", "sex": "Male"},
+        {"id": "#8 Cage 3A", "gene": "Unknown", "sex": "Male"}
     ]
 }
