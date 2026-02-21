@@ -24,9 +24,13 @@ from neurodent.workflow.utils import deep_merge_dict
 # Load configuration
 configfile: "config/config.yaml"
 
-# Load local override if it exists
+# Load local override if it exists (skip if file is empty/comment-only)
 if os.path.exists("config/config.local.yaml"):
-    configfile: "config/config.local.yaml"
+    import yaml as _yaml
+    with open("config/config.local.yaml") as _f:
+        _local_config = _yaml.safe_load(_f)
+    if isinstance(_local_config, dict):
+        configfile: "config/config.local.yaml"
 
 
 # Apply dataset-specific configuration
