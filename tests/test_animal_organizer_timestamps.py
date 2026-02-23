@@ -83,7 +83,7 @@ class TestAnimalOrganizerTimestampHandling:
             # Create AnimalOrganizer with single datetime
             ao = results.AnimalOrganizer(
                 base_folder_path=str(self.base_path),
-                anim_id=self.animal_id,
+                animal_id=self.animal_id,
                 mode="concat",
                 lro_kwargs={"manual_datetimes": global_start},
             )
@@ -125,7 +125,7 @@ class TestAnimalOrganizerTimestampHandling:
         # Create AnimalOrganizer with datetime list
         ao = results.AnimalOrganizer(
             base_folder_path=str(self.base_path),
-            anim_id=self.animal_id,
+            animal_id=self.animal_id,
             mode="concat",
             lro_kwargs={"manual_datetimes": datetime_list},
         )
@@ -157,7 +157,7 @@ class TestAnimalOrganizerTimestampHandling:
         # Create AnimalOrganizer with user function
         ao = results.AnimalOrganizer(
             base_folder_path=str(self.base_path),
-            anim_id=self.animal_id,
+            animal_id=self.animal_id,
             mode="concat",
             lro_kwargs={"manual_datetimes": extract_timestamp_from_folder},
         )
@@ -195,7 +195,7 @@ class TestAnimalOrganizerTimestampHandling:
         # Create AnimalOrganizer with mixed dictionary
         ao = results.AnimalOrganizer(
             base_folder_path=str(self.base_path),
-            anim_id=self.animal_id,
+            animal_id=self.animal_id,
             mode="concat",
             lro_kwargs={"manual_datetimes": mixed_spec},
         )
@@ -225,7 +225,7 @@ class TestAnimalOrganizerTimestampHandling:
         with pytest.raises(TypeError) as exc_info:
             results.AnimalOrganizer(
                 base_folder_path=str(self.base_path),
-                anim_id=self.animal_id,
+                animal_id=self.animal_id,
                 mode="concat",
                 lro_kwargs={"manual_datetimes": 12345},  # Int instead of datetime
             )
@@ -246,7 +246,7 @@ class TestAnimalOrganizerTimestampHandling:
         with pytest.raises(TypeError) as exc_info:
             results.AnimalOrganizer(
                 base_folder_path=str(self.base_path),
-                anim_id=self.animal_id,
+                animal_id=self.animal_id,
                 mode="concat",
                 lro_kwargs={"manual_datetimes": invalid_list},
             )
@@ -268,7 +268,7 @@ class TestAnimalOrganizerTimestampHandling:
         with pytest.raises(TypeError) as exc_info:
             results.AnimalOrganizer(
                 base_folder_path=str(self.base_path),
-                anim_id=self.animal_id,
+                animal_id=self.animal_id,
                 mode="concat",
                 lro_kwargs={"manual_datetimes": invalid_list},
             )
@@ -289,7 +289,7 @@ class TestAnimalOrganizerTimestampHandling:
         with pytest.raises(Exception) as exc_info:
             results.AnimalOrganizer(
                 base_folder_path=str(self.base_path),
-                anim_id=self.animal_id,
+                animal_id=self.animal_id,
                 mode="concat",
                 lro_kwargs={"manual_datetimes": failing_function},
             )
@@ -316,7 +316,7 @@ class TestAnimalOrganizerTimestampHandling:
         # Should NOT raise ValueError anymore
         ao = results.AnimalOrganizer(
             base_folder_path=str(self.base_path),
-            anim_id=self.animal_id,
+            animal_id=self.animal_id,
             mode="concat",
             lro_kwargs={"manual_datetimes": mixed_spec},
         )
@@ -332,7 +332,7 @@ class TestAnimalOrganizerTimestampHandling:
         mock_lro_class.return_value = self._create_mock_lro()
 
         # Create AnimalOrganizer without manual_datetimes
-        ao = results.AnimalOrganizer(base_folder_path=str(self.base_path), anim_id=self.animal_id, mode="concat")
+        ao = results.AnimalOrganizer(base_folder_path=str(self.base_path), animal_id=self.animal_id, mode="concat")
 
         # Should work fine
         assert ao._processed_timestamps is None
@@ -360,7 +360,7 @@ class TestAnimalOrganizerTimestampHandling:
         # Create AnimalOrganizer
         ao = results.AnimalOrganizer(
             base_folder_path=str(self.base_path),
-            anim_id=self.animal_id,
+            animal_id=self.animal_id,
             mode="concat",
             lro_kwargs={"manual_datetimes": start_times[0]},  # Single datetime
         )
@@ -404,7 +404,7 @@ class TestAnimalOrganizerTimestampHandling:
         # Create AnimalOrganizer with nested function
         ao = results.AnimalOrganizer(
             base_folder_path=str(self.base_path),
-            anim_id=self.animal_id,
+            animal_id=self.animal_id,
             mode="concat",
             lro_kwargs={"manual_datetimes": outer_function},
         )
@@ -455,7 +455,7 @@ class TestAnimalOrganizerTimestampHandling:
             # Create AnimalOrganizer with single datetime
             ao = results.AnimalOrganizer(
                 base_folder_path=str(self.base_path),
-                anim_id=self.animal_id,
+                animal_id=self.animal_id,
                 mode="concat",
                 lro_kwargs={"manual_datetimes": global_start},
             )
@@ -578,7 +578,7 @@ class TestAnimalOrganizerTimestampHandling:
         # Create AnimalOrganizer with overlapping folders
         ao = results.AnimalOrganizer(
             base_folder_path=str(overlap_dir),
-            anim_id=self.animal_id,
+            animal_id=self.animal_id,
             mode="concat",
             lro_kwargs={"manual_datetimes": folder_timestamps},
         )
@@ -664,7 +664,7 @@ class TestAnimalOrganizerTimestampHandling:
 
             ao = results.AnimalOrganizer(
                 base_folder_path=str(self.base_path),
-                anim_id=self.animal_id,
+                animal_id=self.animal_id,
                 mode="concat",
                 lro_kwargs={
                     "manual_datetimes": global_end,

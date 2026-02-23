@@ -23,7 +23,7 @@ class TestComputeGlobalTimelineFileDetection:
     def mock_ao(self):
         """Create a minimal AnimalOrganizer mock for testing."""
         ao = Mock(spec=AnimalOrganizer)
-        ao.anim_id = "test_animal"
+        ao.animal_id = "test_animal"
         ao.animal_param = ["test_animal"]
         ao.read_mode = "base"
         return ao
