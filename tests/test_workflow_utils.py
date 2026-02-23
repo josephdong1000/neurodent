@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from neurodent.workflow import setup_snakemake_logging, load_wars
+from neurodent.workflow.utils import apply_path_overrides
 
 
 class TestSetupSnakemakeLogging:
@@ -93,3 +94,112 @@ class TestLoadWars:
         """Test that empty list raises RuntimeError."""
         with pytest.raises(RuntimeError, match="No WARs were successfully loaded"):
             load_wars([])
+
+
+class TestApplyPathOverrides:
+    """Tests for apply_path_overrides function."""
+
+    def test_simple_override(self):
+        """Test simple single-level override."""
+        config = {"key": "original"}
+        overrides = {"key": "overridden"}
+        result = apply_path_overrides(config, overrides)
+        assert result["key"] == "overridden"
+
+    def test_nested_override(self):
+        """Test multi-level nested override."""
+        config = {"level1": {"level2": {"level3": "original"}}}
+        overrides = {"level1.level2.level3": "overridden"}
+        result = apply_path_overrides(config, overrides)
+        assert result["level1"]["level2"]["level3"] == "overridden"
+
+    def test_create_new_keys(self):
+        """Test creating new keys that don't exist."""
+        config = {"existing": "value"}
+        overrides = {"new.nested.key": "new_value"}
+        result = apply_path_overrides(config, overrides)
+        assert result["new"]["nested"]["key"] == "new_value"
+        assert result["existing"] == "value"  # Original preserved
+
+    def test_multiple_overrides(self):
+        """Test applying multiple overrides."""
+        config = {"a": 1, "b": {"c": 2}}
+        overrides = {
+            "a": 10,
+            "b.c": 20,
+            "b.d": 30,
+            "e.f": 40
+        }
+        result = apply_path_overrides(config, overrides)
+        assert result == {
+            "a": 10,
+            "b": {"c": 20, "d": 30},
+            "e": {"f": 40}
+        }
+
+    def test_does_not_mutate_input(self):
+        """Test that original config is not mutated."""
+        config = {"key": {"nested": "original"}}
+        overrides = {"key.nested": "modified"}
+        result = apply_path_overrides(config, overrides)
+        assert config["key"]["nested"] == "original"  # Unchanged
+        assert result["key"]["nested"] == "modified"
+
+    def test_empty_overrides(self):
+        """Test that empty overrides returns deep copy."""
+        config = {"key": {"nested": "value"}}
+        result = apply_path_overrides(config, {})
+        assert result == config
+        assert result is not config  # Different object
+
+    def test_override_with_dict(self):
+        """Test overriding with dict value."""
+        config = {"key": "scalar"}
+        overrides = {"key": {"nested": "dict"}}
+        result = apply_path_overrides(config, overrides)
+        assert result["key"] == {"nested": "dict"}
+
+    def test_override_with_list(self):
+        """Test overriding with list value."""
+        config = {"key": [1, 2, 3]}
+        overrides = {"key": [4, 5, 6]}
+        result = apply_path_overrides(config, overrides)
+        assert result["key"] == [4, 5, 6]
+
+    def test_error_on_empty_path(self):
+        """Test that empty path raises ValueError."""
+        config = {"key": "value"}
+        overrides = {"": "invalid"}
+        with pytest.raises(ValueError, match="Override path cannot be empty"):
+            apply_path_overrides(config, overrides)
+
+    def test_error_on_non_dict_intermediate(self):
+        """Test error when intermediate value is not a dict."""
+        config = {"key": "scalar_value"}
+        overrides = {"key.nested": "will_fail"}
+        with pytest.raises(KeyError, match="intermediate key 'key' is str, not dict"):
+            apply_path_overrides(config, overrides)
+
+    def test_real_world_example(self):
+        """Test with realistic neurodent config structure."""
+        config = {
+            "analysis": {
+                "war_generation": {
+                    "mode": "base",
+                    "lro_kwargs": {
+                        "mode": "si",
+                        "input_type": "files"
+                    }
+                }
+            }
+        }
+        overrides = {
+            "analysis.war_generation.file_pattern": "*.EDF",
+            "analysis.war_generation.lro_kwargs.extract_func": "read_edf"
+        }
+        result = apply_path_overrides(config, overrides)
+
+        assert result["analysis"]["war_generation"]["mode"] == "base"
+        assert result["analysis"]["war_generation"]["file_pattern"] == "*.EDF"
+        assert result["analysis"]["war_generation"]["lro_kwargs"]["mode"] == "si"
+        assert result["analysis"]["war_generation"]["lro_kwargs"]["extract_func"] == "read_edf"

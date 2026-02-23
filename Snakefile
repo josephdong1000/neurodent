@@ -24,9 +24,13 @@ from neurodent.workflow.utils import deep_merge_dict
 # Load configuration
 configfile: "config/config.yaml"
 
-# Load local override if it exists
+# Load local override if it exists (skip if file is empty/comment-only)
 if os.path.exists("config/config.local.yaml"):
-    configfile: "config/config.local.yaml"
+    import yaml as _yaml
+    with open("config/config.local.yaml") as _f:
+        _local_config = _yaml.safe_load(_f)
+    if isinstance(_local_config, dict):
+        configfile: "config/config.local.yaml"
 
 
 # Apply dataset-specific configuration
@@ -326,9 +330,9 @@ rule all:
         expand("results/wars_quality_filtered/{animal}", animal=ANIMALS),
 
         # FDSAR spike detection diagnostics
-        # expand("results/fdsar_diagnostics/{animal}", animal=ANIMALS), # FIXME this crashes my VDI - perhaps a logic issue
+        expand("results/fdsar_diagnostics/{animal}", animal=ANIMALS), # FIXME this crashes my VDI - perhaps a logic issue
+        
         # WAR per-animal diagnostic plots (unfiltered)
-        # NOTE also trigger fragment filtering + diagnostic figures filter unfiltered
         get_diagnostic_figures_unfiltered,
 
         # WAR per-animal diagnostic plots (filtered)

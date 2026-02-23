@@ -11,3 +11,7 @@ analysis:
     file_pattern: "*.nwb"
     lro_kwargs:
       mode: "si"
+
+cluster:
+  war_generation:
+    retries: 0

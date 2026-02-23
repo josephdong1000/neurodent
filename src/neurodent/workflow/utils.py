@@ -227,3 +227,96 @@ def deep_merge_dict(base: dict, override: dict) -> dict:
             # Override value (or add new key)
             result[key] = value
     return result
+
+
+def apply_path_overrides(base_config: dict, overrides: dict) -> dict:
+    """Apply path-based overrides to a config dictionary using deep merge.
+
+    This function allows overriding nested configuration values using dotted path notation,
+    enabling flexible session-specific, animal-specific, or other granular overrides in the
+    Snakemake pipeline.
+
+    Args:
+        base_config: Base configuration dictionary
+        overrides: Dict mapping dotted paths to values
+                  e.g., {"analysis.war_generation.file_pattern": "*.EDF"}
+
+    Returns:
+        Merged configuration with overrides applied
+
+    Raises:
+        KeyError: If a path references a non-dict intermediate value
+        ValueError: If override path is empty or malformed
+
+    Examples:
+        Basic usage with nested paths::
+
+            >>> config = {"analysis": {"war_generation": {"mode": "base"}}}
+            >>> overrides = {"analysis.war_generation.file_pattern": "*.EDF"}
+            >>> result = apply_path_overrides(config, overrides)
+            >>> result["analysis"]["war_generation"]["file_pattern"]
+            '*.EDF'
+
+        Creating new nested keys::
+
+            >>> config = {"existing": "value"}
+            >>> overrides = {"new.nested.key": "new_value"}
+            >>> result = apply_path_overrides(config, overrides)
+            >>> result["new"]["nested"]["key"]
+            'new_value'
+
+        Real-world session-specific override::
+
+            # Base dataset config
+            config = {
+                "analysis": {
+                    "war_generation": {
+                        "mode": "base",
+                        "lro_kwargs": {"mode": "si", "input_type": "files"}
+                    }
+                }
+            }
+
+            # Session-specific overrides for EDF format
+            overrides = {
+                "analysis.war_generation.file_pattern": "*.EDF",
+                "analysis.war_generation.lro_kwargs.extract_func": "read_edf"
+            }
+
+            result = apply_path_overrides(config, overrides)
+            # result["analysis"]["war_generation"]["file_pattern"] == "*.EDF"
+            # result["analysis"]["war_generation"]["lro_kwargs"]["extract_func"] == "read_edf"
+            # result["analysis"]["war_generation"]["lro_kwargs"]["mode"] == "si" (preserved)
+
+    Note:
+        This function does NOT mutate the input config - it returns a new deep copy.
+    """
+    import copy
+
+    if not overrides:
+        return copy.deepcopy(base_config)
+
+    result = copy.deepcopy(base_config)
+
+    for path, value in overrides.items():
+        if not path:
+            raise ValueError("Override path cannot be empty")
+
+        keys = path.split('.')
+        target = result
+
+        # Navigate to the parent of the target key
+        for key in keys[:-1]:
+            if key not in target:
+                target[key] = {}
+            elif not isinstance(target[key], dict):
+                raise KeyError(
+                    f"Cannot override '{path}': intermediate key '{key}' "
+                    f"is {type(target[key]).__name__}, not dict"
+                )
+            target = target[key]
+
+        # Set the value
+        target[keys[-1]] = value
+
+    return result
