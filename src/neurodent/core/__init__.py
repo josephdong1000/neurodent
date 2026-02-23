@@ -7,22 +7,37 @@ handling everything from raw data loading to feature extraction.
 
 .. code-block:: python
 
-    from neurodent import core
+    from neurodent import visualization
 
-    # 1. Load and organize recordings
-    organizer = core.LongRecordingOrganizer(data_path)
-
-    # 2. Run windowed feature analysis
-    analyzer = core.LongRecordingAnalyzer(organizer)
-    results = analyzer.run_analysis(
-        window_sec=5,
-        step_sec=4,
-        features=['psdband', 'cohere'],
+    # 1. Organize recordings for an animal
+    ao = visualization.AnimalOrganizer(
+        data_path, animal_id, mode="nest",
     )
 
-    # 3. Access results
-    df = results.features_df  # pandas DataFrame with all features
-    results.save('output.pkl')
+    # 2. Run windowed feature analysis
+    war = ao.compute_windowed_analysis(
+        features=['psdband', 'cohere'],
+        window_s=5,
+        multiprocess_mode="dask",
+    )
+
+    # 3. Access results (WindowAnalysisResult)
+    df = war.result  # pandas DataFrame with all features
+    war.save_pickle_and_json('output/')
+
+The lower-level classes can also be used directly:
+
+.. code-block:: python
+
+    from neurodent import core
+
+    # Load a single recording
+    lro = core.LongRecordingOrganizer(day_folder_path)
+
+    # Analyze in fragments
+    analyzer = core.LongRecordingAnalyzer(lro, fragment_len_s=5)
+    rms = analyzer.compute_rms(fragment_index=0)
+    psd = analyzer.compute_psdband(fragment_index=0)
 
 **What Gets Computed:**
 
