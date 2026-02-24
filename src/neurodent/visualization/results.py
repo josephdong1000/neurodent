@@ -1273,7 +1273,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         self,
         features: list[str],
         exclude: list[str] = [],
-        window_s=4,
+        window_s=5,
         multiprocess_mode: Literal["dask", "serial"] = "serial",
         suppress_short_interval_error=False,
         apply_notch_filter=True,
@@ -1285,7 +1285,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         Args:
             features (list[str]): List of features to compute. See individual ``compute_...()`` functions for output format
             exclude (list[str], optional): List of features to ignore. Will override the features parameter. Defaults to [].
-            window_s (int, optional): Length of each window in seconds. Note that some features break with very short window times. Defaults to 4.
+            window_s (int, optional): Length of each window in seconds. Note that some features break with very short window times. Defaults to 5.
             suppress_short_interval_error (bool, optional): If True, suppress ValueError for short intervals between timestamps in resulting WindowAnalysisResult. Useful for aggregated WARs. Defaults to False.
             apply_notch_filter (bool, optional): Whether to apply notch filtering to remove line noise. Uses constants.LINE_FREQ. Defaults to True.
 
