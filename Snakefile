@@ -321,11 +321,10 @@ include: "workflow/rules/notebook.smk"
 
 rule all:
     input:
-        # Pipeline visualization
-        'results/graphs/rulegraph.png',
-        'results/graphs/filegraph.png',
-        'results/graphs/dag.png',
-
+        # Pipeline visualization (run `snakemake graphs` separately — nested snakemake hits directory lock)
+        # 'results/graphs/rulegraph.png',
+        # 'results/graphs/filegraph.png',
+        # 'results/graphs/dag.png',
         # WAR generation and prefiltering (includes spike detection)
         expand("results/wars_quality_filtered/{animal}", animal=ANIMALS),
 
@@ -378,6 +377,8 @@ rule filegraph:
 rule dag:
     output: "results/graphs/dag.png"
     shell: "snakemake --dag --forceall | dot -Tpng > {output}"
+
+localrules: graphs, rulegraph, filegraph, dag
 
 
 
