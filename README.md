@@ -1,7 +1,11 @@
 # NeuRodent 🐁
 
+[![CI](https://github.com/josephdong1000/neurodent/actions/workflows/test-build-docs.yml/badge.svg)](https://github.com/josephdong1000/neurodent/actions/workflows/test-build-docs.yml)
+<!-- [![Coverage](https://codecov.io/gh/josephdong1000/neurodent/branch/main/graph/badge.svg)](https://codecov.io/gh/josephdong1000/neurodent) -->
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.10+](https://img.shields.io/pypi/pyversions/neurodent)](https://pypi.org/project/neurodent/)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.15780751.svg)](https://doi.org/10.5281/zenodo.15780751)
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/josephdong1000/neurodent/HEAD) 
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/josephdong1000/neurodent/HEAD)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/josephdong1000/neurodent/)
 
 
