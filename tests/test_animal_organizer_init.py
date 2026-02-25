@@ -27,7 +27,7 @@ class TestAnimalOrganizerInitialization:
         with patch.object(AnimalOrganizer, '_create_long_recordings'):
              ao = AnimalOrganizer(
                 base_folder_path=str(study_folder), 
-                anim_id="test_animal",
+                animal_id="test_animal",
                 mode="concat" 
             )
         

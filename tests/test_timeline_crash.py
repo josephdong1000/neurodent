@@ -13,7 +13,7 @@ class TestTimelineSortingCrash:
         and passes it to LRO, preventing the crash.
         """
         ao = MagicMock(spec=AnimalOrganizer)
-        ao.anim_id = "M1"
+        ao.animal_id = "M1"
         ao.day_sep = None
         # Bind the real valid methods we want to test
         ao._compute_global_timeline = AnimalOrganizer._compute_global_timeline.__get__(ao, AnimalOrganizer)

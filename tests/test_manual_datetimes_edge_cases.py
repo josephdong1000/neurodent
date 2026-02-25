@@ -62,7 +62,7 @@ class TestManualDatetimesEdgeCases:
         # Run for A123
         ao = results.AnimalOrganizer(
             base_folder_path=str(self.base_path),
-            anim_id=self.animal_id,  # "A123"
+            animal_id=self.animal_id,  # "A123"
             mode="concat",
             lro_kwargs={"manual_datetimes": mixed_config}
         )
@@ -97,7 +97,7 @@ class TestManualDatetimesEdgeCases:
         with pytest.raises(ValueError) as exc_info:
             results.AnimalOrganizer(
                 base_folder_path=str(self.base_path),
-                anim_id=self.animal_id,
+                animal_id=self.animal_id,
                 mode="concat",
                 lro_kwargs={"manual_datetimes": shadowing_config}
             )

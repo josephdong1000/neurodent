@@ -81,7 +81,7 @@ def test_ao_directory_mode_repro(tmp_path, monkeypatch):
     # Initialize AO
     ao = results.AnimalOrganizer(
         base_folder_path=data_dir,
-        anim_id="AP3B2homo-240-M",
+        animal_id="AP3B2homo-240-M",
         mode="concat", # Directory name itself contains the ID
         file_pattern=None, # Directory mode
         day_parse_kwargs=day_parse_kwargs
@@ -109,7 +109,7 @@ def test_ao_discovery_production_setup_homo(mock_production_structure, monkeypat
     day_parse_kwargs = {"date_patterns": [(r"\d{6}", "%y%m%d")]}
     ao = results.AnimalOrganizer(
         base_folder_path=parent_folder,
-        anim_id=anim_id,
+        animal_id=anim_id,
         mode="concat",
         file_pattern="*.nwb",
         day_parse_kwargs=day_parse_kwargs
@@ -145,7 +145,7 @@ def test_ao_discovery_production_setup_wt(mock_production_structure, monkeypatch
     day_parse_kwargs = {"date_patterns": [(r"\d{6}", "%y%m%d")]}
     ao = results.AnimalOrganizer(
         base_folder_path=parent_folder,
-        anim_id=anim_id,
+        animal_id=anim_id,
         mode="concat",
         file_pattern="*.nwb",
         day_parse_kwargs=day_parse_kwargs
@@ -178,7 +178,7 @@ def test_ao_discovery_grandparent_setup(mock_production_structure, monkeypatch):
     with pytest.raises(ValueError, match="No directories found"):
         ao = results.AnimalOrganizer(
             base_folder_path=grandparent,
-            anim_id=anim_id,
+            animal_id=anim_id,
             mode="concat",
             file_pattern="*.nwb",
             day_parse_kwargs=day_parse_kwargs
@@ -253,7 +253,7 @@ def test_ao_discovery_ambiguous_names(mock_production_structure, monkeypatch):
     day_parse_kwargs = {"date_patterns": [(r"\d{6}", "%y%m%d")]}
     ao = results.AnimalOrganizer(
         base_folder_path=parent,
-        anim_id="AP3B2homo-240-M",
+        animal_id="AP3B2homo-240-M",
         mode="concat",
         file_pattern="*.nwb",
         day_parse_kwargs=day_parse_kwargs
@@ -290,7 +290,7 @@ def test_ao_discovery_nested_duplicates(mock_production_structure, monkeypatch):
     day_parse_kwargs = {"date_patterns": [(r"\d{6}", "%y%m%d")]}
     ao = results.AnimalOrganizer(
         base_folder_path=parent,
-        anim_id="AP3B2homo-240-M",
+        animal_id="AP3B2homo-240-M",
         mode="concat",
         file_pattern="*.nwb",
         day_parse_kwargs=day_parse_kwargs
@@ -321,7 +321,7 @@ def test_ao_discovery_file_level_exclusion(mock_production_structure, monkeypatc
     day_parse_kwargs = {"date_patterns": [(r"\d{6}", "%y%m%d")]}
     ao = results.AnimalOrganizer(
         base_folder_path=parent,
-        anim_id="AP3B2homo-240-M",
+        animal_id="AP3B2homo-240-M",
         mode="concat",
         file_pattern="*.nwb",
         day_parse_kwargs=day_parse_kwargs

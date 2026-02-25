@@ -40,7 +40,7 @@ def test_bad_date_config_masks_valid_files(mock_valid_structure, monkeypatch):
     with pytest.raises(ValueError) as excinfo:
         results.AnimalOrganizer(
             base_folder_path=parent,
-            anim_id=anim_id,
+            animal_id=anim_id,
             mode="concat",
             file_pattern="*.nwb"
         )
@@ -73,7 +73,7 @@ def test_strange_format_errors(mock_valid_structure, monkeypatch):
     with pytest.raises(ValueError) as excinfo:
         results.AnimalOrganizer(
             base_folder_path=parent,
-            anim_id=anim_id,
+            animal_id=anim_id,
             mode="concat",
             file_pattern="*.nwb"
         )
@@ -117,7 +117,7 @@ def test_filtering_still_works(mock_valid_structure, monkeypatch):
     with pytest.raises(ValueError) as excinfo:
         results.AnimalOrganizer(
             base_folder_path=parent,
-            anim_id=anim_id,
+            animal_id=anim_id,
             mode="concat",
             file_pattern="*.nwb",
             day_parse_kwargs = {"date_patterns": [(r"\d{6}", "%y%m%d")]}
