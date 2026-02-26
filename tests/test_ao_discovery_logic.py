@@ -335,3 +335,88 @@ def test_ao_discovery_file_level_exclusion(mock_production_structure, monkeypatc
     
     # Should NOT find IgnoredFile.nwb (because mode=concat checks filename)
     assert "IgnoredFile_251127.nwb" not in found_files
+
+
+@pytest.fixture
+def mock_joint_session_structure(tmp_path):
+    """
+    Simulate a joint session structure where filenames contain concatenated animal IDs.
+    e.g. Arx Rosa dataset: MARSH 20141125ARXROSATAM967968969418_1_Selection1.EDF
+    """
+    session_dir = tmp_path / "Arx Rosa  967 968 969 418"
+    session_dir.mkdir(parents=True)
+
+    # Joint session EDF files — IDs are concatenated in the filename
+    (session_dir / "MARSH_20141125ARXROSATAM967968969418_Selection1_251125.EDF").touch()
+    (session_dir / "MARSH_20141125ARXROSATAM967968969418_Selection2_251126.EDF").touch()
+
+    # An unrelated file that should NOT match
+    (session_dir / "UNRELATED_FILE_999999_251127.EDF").touch()
+
+    return session_dir
+
+
+def test_ao_animal_file_match_pattern_regex(mock_joint_session_structure, monkeypatch):
+    """
+    Test animal_file_match_pattern with a regex pattern for joint sessions.
+    Without animal_file_match_pattern, AO would fail because 'ArxRosa-967' is not
+    a substring of 'MARSH_20141125ARXROSATAM967968969418_Selection1_251125.EDF'.
+    With animal_file_match_pattern="967|968|969|418", the regex matches '967' in the filename.
+    """
+    monkeypatch.setattr(results.AnimalOrganizer, "_create_long_recordings", lambda self, kw: None)
+
+    day_parse_kwargs = {"date_patterns": [(r"\d{6}", "%y%m%d")]}
+
+    # Without animal_file_match_pattern: should fail
+    with pytest.raises(ValueError, match="No directories found"):
+        results.AnimalOrganizer(
+            base_folder_path=mock_joint_session_structure,
+            animal_id="ArxRosa-967",
+            mode="base",
+            file_pattern="*.EDF",
+            day_parse_kwargs=day_parse_kwargs,
+        )
+
+    # With animal_file_match_pattern: should succeed
+    ao = results.AnimalOrganizer(
+        base_folder_path=mock_joint_session_structure,
+        animal_id="ArxRosa-967",
+        mode="base",
+        file_pattern="*.EDF",
+        day_parse_kwargs=day_parse_kwargs,
+        animal_file_match_pattern="967|968|969|418",
+    )
+
+    found_files = [Path(f).name for f in ao._bin_folders]
+
+    # Should find the joint session files
+    assert "MARSH_20141125ARXROSATAM967968969418_Selection1_251125.EDF" in found_files
+    assert "MARSH_20141125ARXROSATAM967968969418_Selection2_251126.EDF" in found_files
+
+    # Should NOT find the unrelated file
+    assert "UNRELATED_FILE_999999_251127.EDF" not in found_files
+
+    # animal_id should still be the original ID
+    assert ao.animal_id == "ArxRosa-967"
+
+
+def test_ao_animal_file_match_pattern_none_default(mock_production_structure, monkeypatch):
+    """
+    Test that animal_file_match_pattern=None (default) preserves existing behavior.
+    """
+    monkeypatch.setattr("neurodent.constants.GENOTYPE_ALIASES", MOCK_ALIASES)
+    monkeypatch.setattr(results.AnimalOrganizer, "_create_long_recordings", lambda self, kw: None)
+
+    day_parse_kwargs = {"date_patterns": [(r"\d{6}", "%y%m%d")]}
+    ao = results.AnimalOrganizer(
+        base_folder_path=mock_production_structure,
+        animal_id="AP3B2homo-240-M",
+        mode="concat",
+        file_pattern="*.nwb",
+        day_parse_kwargs=day_parse_kwargs,
+        # animal_file_match_pattern not passed — should default to [animal_id]
+    )
+
+    found_files = [Path(f).name for f in ao._bin_folders]
+    assert "AP3B2homo-240-M_Correct_HOMO_251127.nwb" in found_files
+    assert ao.animal_file_match_pattern == ["AP3B2homo-240-M"]

@@ -155,11 +155,13 @@ class AnimalOrganizer(AnimalFeatureParser):
         file_pattern: str | None = None,
         lro_kwargs: dict = {},
         day_parse_kwargs: dict = {},
+        animal_file_match_pattern: list[str] | str | tuple | None = None,
     ) -> None:
 
         self.base_folder_path = Path(base_folder_path)
         self.animal_id = animal_id
-        self.animal_param = [animal_id]
+        self._has_custom_match_rule = animal_file_match_pattern is not None
+        self.animal_file_match_pattern = animal_file_match_pattern if animal_file_match_pattern is not None else [animal_id]
         self.day_sep = day_sep
         self.read_mode = mode
         self.assume_from_number = assume_from_number
@@ -232,16 +234,38 @@ class AnimalOrganizer(AnimalFeatureParser):
                 f"No directories found for animal ID {self.animal_id} (pattern: {self.bin_folder_pattern})"
             )
 
-        self._animalday_dicts = [
-            core.parse_path_to_animalday(
-                e,
-                animal_param=self.animal_param,
-                day_sep=self.day_sep,
-                mode=self.read_mode,
-                **day_parse_kwargs,
-            )
-            for e in self._bin_folders
-        ]
+        if self._has_custom_match_rule:
+            # Custom match rule (e.g. joint sessions): filenames don't follow
+            # standard genotype_animal_date format, so we use the known animal_id
+            # and resolve genotype from ANIMAL_METADATA, parsing only the date.
+            geno = constants.ANIMAL_METADATA.get(self.animal_id, {}).get("gene", "Unknown")
+            self._animalday_dicts = []
+            for e in self._bin_folders:
+                fp = Path(e)
+                name = fp.parent.name if self.read_mode == "nest" else fp.name
+                if self.read_mode == "noday":
+                    day = constants.DEFAULT_DAY.strftime("%b-%d-%Y")
+                else:
+                    day = core.utils.parse_str_to_day(
+                        name, sep=self.day_sep, **day_parse_kwargs
+                    ).strftime("%b-%d-%Y")
+                self._animalday_dicts.append({
+                    "animal": self.animal_id,
+                    "genotype": geno,
+                    "day": day,
+                    "animalday": f"{self.animal_id} {geno} {day}",
+                })
+        else:
+            self._animalday_dicts = [
+                core.parse_path_to_animalday(
+                    e,
+                    animal_param=self.animal_file_match_pattern,
+                    day_sep=self.day_sep,
+                    mode=self.read_mode,
+                    **day_parse_kwargs,
+                )
+                for e in self._bin_folders
+            ]
 
         # Group folders by parsed animalday to handle overlapping days
         animalday_to_folders = {}
@@ -309,34 +333,44 @@ class AnimalOrganizer(AnimalFeatureParser):
         """
         Validates discovered folders/files by attempting to parse them.
         Filters out 'ghost' files that match the glob pattern but do not contain the correct Animal ID.
+
+        When file_match_pattern was explicitly provided, only validates the animal ID match
+        (skipping genotype/date parsing which may not work for joint session filenames).
         """
         valid_folders = []
         for folder in folders:
             try:
-                core.parse_path_to_animalday(
-                    folder,
-                    animal_param=self.animal_param,
-                    day_sep=self.day_sep,
-                    mode=self.read_mode,
-                    **day_parse_kwargs,
-                )
+                if self._has_custom_match_rule:
+                    # Custom match rule: only validate that the file matches the pattern
+                    core.utils.parse_str_to_animal(
+                        Path(folder).name, animal_param=self.animal_file_match_pattern
+                    )
+                else:
+                    # Default: full validation (animal + genotype + date)
+                    core.parse_path_to_animalday(
+                        folder,
+                        animal_param=self.animal_file_match_pattern,
+                        day_sep=self.day_sep,
+                        mode=self.read_mode,
+                        **day_parse_kwargs,
+                    )
                 valid_folders.append(folder)
             except ValueError as e:
                 # Differentiate between "Filtering" (mismatch) and "Parsing Error" (bad config/date)
                 msg = str(e)
                 is_filter_error = (
-                    "No matching ID found" in msg 
+                    "No matching ID found" in msg
                     or "No match found for pattern" in msg
                     or "does not have any matching values" in msg
                 )
-                
+
                 if is_filter_error:
                     # This file/folder does not match the animal ID parsing rules (Ghost/Sibling).
                     logging.warning(
                         f"file/folder '{Path(folder).name}' captured by glob but failed ID/Genotype validation (mode='{self.read_mode}'). Skipping. Reason: {msg}"
                     )
                     continue
-                
+
                 # If we get here, the ID/Genotype matched, but something else failed (likely Date).
                 # This suggests a configuration error or a valid file with a malformed date.
                 # We should NOT silence this.
@@ -1612,7 +1646,7 @@ class AnimalOrganizer(AnimalFeatureParser):
             lan_folder = lan.LongRecording.base_folder_path
             session_labels = core.parse_path_to_animalday(
                 lan_folder,
-                animal_param=self.animal_param,
+                animal_param=self.animal_file_match_pattern,
                 day_sep=self.day_sep,
                 mode=self.read_mode,
             )
@@ -1882,7 +1916,7 @@ class AnimalOrganizer(AnimalFeatureParser):
             ao.base_folder_path = None
 
         # Standard attributes
-        ao.animal_param = [animal_id]
+        ao.animal_file_match_pattern = [animal_id]
         ao.day_sep = None
         ao.read_mode = "base"
 
