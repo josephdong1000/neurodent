@@ -530,9 +530,9 @@ def parse_str_to_animal(string: str, animal_param: tuple[int, str] | str | list[
         'A10'
 
         # Regex pattern format
-        >>> parse_str_to_animal("WT_A10_2023-01-01_data.bin", r"A\\d+")
+        >>> parse_str_to_animal("WT_A10_2023-01-01_data.bin", r"A\\\\d+")
         'A10'
-        >>> parse_str_to_animal("subject_123_data.bin", r"\\d+")
+        >>> parse_str_to_animal("subject_123_data.bin", r"\\\\d+")
         '123'
 
         # List format: possible IDs to match
@@ -597,12 +597,12 @@ def parse_str_to_day(
 
     Examples:
         >>> # Handle ambiguous date formats with explicit patterns
-        >>> patterns = [(r'(19\d{2}|20\d{2})-(\d{1,2})-(\d{1,2})', '%Y-%m-%d')]
+        >>> patterns = [(r'(19\\d{2}|20\\d{2})-(\\d{1,2})-(\\d{1,2})', '%Y-%m-%d')]
         >>> parse_str_to_day('2001_2023-07-04_data', date_patterns=patterns)
         datetime.datetime(2023, 7, 4, 0, 0)
 
         >>> # European format pattern
-        >>> patterns = [(r'(\d{1,2})/(\d{1,2})/(19\d{2}|20\d{2})', '%d/%m/%Y')]
+        >>> patterns = [(r'(\\d{1,2})/(\\d{1,2})/(19\\d{2}|20\\d{2})', '%d/%m/%Y')]
         >>> parse_str_to_day('04/07/2023_data', date_patterns=patterns)
         datetime.datetime(2023, 7, 4, 0, 0)  # July 4th, not April 7th
 

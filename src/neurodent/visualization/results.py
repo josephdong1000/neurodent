@@ -112,8 +112,8 @@ class AnimalOrganizer(AnimalFeatureParser):
             Examples:
                 - "/data/{animal}/{session}/{index}.rhd"
                 - "/data/{animal}-{session}-{index}.edf"
-                - "/data/{session}/*/{animal}-{index}.rhd"
-                - "/data/**/{animal}-{session}-{index}.rhd"
+                - "/data/{session}/\\*/{animal}-{index}.rhd"
+                - "/data/\\*\\*/{animal}-{session}-{index}.rhd"
                 - "/data/{animal}/{index}.edf"  (no session - will use "unknown")
 
         animal_id (str | None, optional): Animal ID to filter discovered files.
