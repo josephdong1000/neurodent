@@ -417,64 +417,32 @@ class TestAnimalOrganizerDirectoryFiltering:
         yield
         # Cleanup happens automatically with tmp_path fixture
 
-    def _create_mixed_structure(self, mode):
+    def _create_mixed_structure(self):
         """Create a mixed file/directory structure for testing.
 
-        Args:
-            mode: AnimalOrganizer mode to test
+        Creates a standard directory structure with genotype-animal-date format
+        and some test files that should be filtered out.
 
         Returns:
             dict: Paths of created items
         """
         created_items = {"directories": [], "files": []}
 
-        if mode == "nest":
-            # Create animal subfolder structure
-            animal_dir = self.base_path / f"WT_{self.animal_id}_data"
-            animal_dir.mkdir()
+        # Create directories with genotype-animal-date format
+        day1_dir = self.base_path / f"WT_{self.animal_id}_2023-01-01"
+        day2_dir = self.base_path / f"WT_{self.animal_id}_2023-01-02"
+        day1_dir.mkdir()
+        day2_dir.mkdir()
+        created_items["directories"].extend([day1_dir, day2_dir])
 
-            # Create subdirectories within animal folder
-            day1_dir = animal_dir / "WT_2023-01-01"
-            day2_dir = animal_dir / "WT_2023-01-02"
-            day1_dir.mkdir()
-            day2_dir.mkdir()
-            created_items["directories"].extend([day1_dir, day2_dir])
-
-            # Create files within animal folder (should be filtered out)
-            edf_file = animal_dir / "recording.edf"
-            bin_file = animal_dir / "data.bin"
-            edf_file.touch()
-            bin_file.touch()
-            created_items["files"].extend([edf_file, bin_file])
-
-        elif mode in ["concat", "noday"]:
-            # Create directories with genotype-animal-date format
-            day1_dir = self.base_path / f"WT_{self.animal_id}_2023-01-01"
-            day2_dir = self.base_path / f"WT_{self.animal_id}_2023-01-02"
-            day1_dir.mkdir()
-            if mode == "concat":  # Only create second directory for concat mode
-                day2_dir.mkdir()
-                created_items["directories"].extend([day1_dir, day2_dir])
-            else:  # noday mode
-                created_items["directories"].extend([day1_dir])
-
-            # Create files with animal ID in name (should be filtered out)
-            edf_file = self.base_path / f"WT_{self.animal_id}_recording.edf"
-            bin_file = self.base_path / f"WT_{self.animal_id}_data.bin"
-            json_file = self.base_path / f"WT_{self.animal_id}_metadata.json"
-            edf_file.touch()
-            bin_file.touch()
-            json_file.touch()
-            created_items["files"].extend([edf_file, bin_file, json_file])
-
-        elif mode == "base":
-            # For base mode, we test the base directory itself
-            # Create some files in base directory (should be filtered out)
-            edf_file = self.base_path / "recording.edf"
-            bin_file = self.base_path / "data.bin"
-            edf_file.touch()
-            bin_file.touch()
-            created_items["files"].extend([edf_file, bin_file])
+        # Create files with animal ID in name (should be filtered out)
+        edf_file = self.base_path / f"WT_{self.animal_id}_recording.edf"
+        bin_file = self.base_path / f"WT_{self.animal_id}_data.bin"
+        json_file = self.base_path / f"WT_{self.animal_id}_metadata.json"
+        edf_file.touch()
+        bin_file.touch()
+        json_file.touch()
+        created_items["files"].extend([edf_file, bin_file, json_file])
 
         return created_items
 
@@ -487,16 +455,16 @@ class TestAnimalOrganizerDirectoryFiltering:
         return mock_lro
 
     @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
-    def test_concat_mode_filters_files(self, mock_lro):
-        """Test that concat mode filters out files and only processes directories."""
+    def test_directory_filtering(self, mock_lro):
+        """Test that AnimalOrganizer filters out files and only processes directories."""
         # Create mixed structure
-        _ = self._create_mixed_structure("concat")
+        _ = self._create_mixed_structure()
 
         # Configure mock to avoid actual data processing
         mock_lro.return_value = self._create_mock_lro()
 
         # Create AnimalOrganizer
-        ao = results.AnimalOrganizer(pattern=f"{self.base_path}/*{self.animal_id}*", animal_id=self.animal_id, )
+        ao = results.AnimalOrganizer(pattern=f"{self.base_path}/*{self.animal_id}*", animal_id=self.animal_id)
 
         # Verify only directories were found
         assert len(ao._bin_folders) == 2  # 2 directories created
@@ -509,46 +477,6 @@ class TestAnimalOrganizerDirectoryFiltering:
         for call in mock_lro.call_args_list:
             folder_path = call[0][0]  # First positional argument
             assert Path(folder_path).is_dir()
-
-    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
-    def test_nest_mode_filters_files(self, mock_lro):
-        """Test that nest mode filters out files and only processes directories."""
-        # Create mixed structure
-        _ = self._create_mixed_structure("nest")
-
-        # Configure mock to avoid actual data processing
-        mock_lro.return_value = self._create_mock_lro()
-
-        # Create AnimalOrganizer
-        ao = results.AnimalOrganizer(pattern=f"{self.base_path}/*{self.animal_id}*", animal_id=self.animal_id, )
-
-        # Verify only directories were found
-        assert len(ao._bin_folders) == 2  # 2 directories created
-        for folder_path in ao._bin_folders:
-            assert Path(folder_path).is_dir()
-
-    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
-    def test_noday_mode_filters_files(self, mock_lro):
-        """Test that noday mode filters out files and only processes directories."""
-        # Create structure with only one directory for noday mode
-        day_dir = self.base_path / f"WT_{self.animal_id}_data"
-        day_dir.mkdir()
-
-        # Create files that should be filtered out
-        edf_file = self.base_path / f"WT_{self.animal_id}_recording.edf"
-        bin_file = self.base_path / f"WT_{self.animal_id}_data.bin"
-        edf_file.touch()
-        bin_file.touch()
-
-        # Configure mock to avoid actual data processing
-        mock_lro.return_value = self._create_mock_lro()
-
-        # Create AnimalOrganizer
-        ao = results.AnimalOrganizer(pattern=f"{self.base_path}/*{self.animal_id}*", animal_id=self.animal_id, )
-
-        # Verify only one directory was found
-        assert len(ao._bin_folders) == 1
-        assert Path(ao._bin_folders[0]).is_dir()
 
     def test_no_directories_found_raises_error(self):
         """Test that when no directories are found, an informative error is raised."""
@@ -565,57 +493,32 @@ class TestAnimalOrganizerDirectoryFiltering:
         error_message = str(exc_info.value)
         assert "No items discovered" in error_message
 
-    @patch("neurodent.core.LongRecordingOrganizer")
-    def test_noday_mode_multiple_directories_error(self, mock_lro):
-        """Test that noday mode raises error when multiple directories are found."""
+    def test_multiple_directories_error(self):        """Test that proper error is raised when multiple directories match but only one expected."""
         # Create multiple directories
         day1_dir = self.base_path / f"WT_{self.animal_id}_day1"
         day2_dir = self.base_path / f"WT_{self.animal_id}_day2"
         day1_dir.mkdir()
         day2_dir.mkdir()
 
-        # Should raise ValueError for multiple directories in noday mode
+        # Should raise ValueError for multiple directories
         with pytest.raises(ValueError) as exc_info:
-            results.AnimalOrganizer(pattern=f"{self.base_path}/*{self.animal_id}*", animal_id=self.animal_id, )
+            results.AnimalOrganizer(pattern=f"{self.base_path}/*{self.animal_id}*", animal_id=self.animal_id)
 
         error_message = str(exc_info.value)
         assert "not unique" in error_message
-
-    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
-    def test_base_mode_directory_handling(self, mock_lro):
-        """Test that base mode correctly handles the base directory."""
-        # For base mode, create a properly named base directory with date
-        base_dir = self.base_path / f"WT_{self.animal_id}_2023-01-01"
-        base_dir.mkdir()
-
-        # Create some files in the base directory (should be filtered out)
-        edf_file = base_dir / "recording.edf"
-        bin_file = base_dir / "data.bin"
-        edf_file.touch()
-        bin_file.touch()
-
-        # Configure mock to avoid actual data processing
-        mock_lro.return_value = self._create_mock_lro()
-
-        # Create AnimalOrganizer in base mode using the properly named directory
-        ao = results.AnimalOrganizer(pattern=f"{base_dir}/*{self.animal_id}*", animal_id=self.animal_id, )
-
-        # In base mode, should use the base directory itself
-        assert len(ao._bin_folders) == 1
-        assert ao._bin_folders[0] == str(base_dir)
 
     @patch("logging.info")
     @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
     def test_logging_filtering_information(self, mock_lro, mock_logging):
         """Test that filtering information is logged when files are filtered out."""
         # Create mixed structure
-        _ = self._create_mixed_structure("concat")
+        _ = self._create_mixed_structure()
 
         # Configure mock to avoid actual data processing
         mock_lro.return_value = self._create_mock_lro()
 
         # Create AnimalOrganizer
-        _ = results.AnimalOrganizer(pattern=f"{self.base_path}/*{self.animal_id}*", animal_id=self.animal_id, )
+        _ = results.AnimalOrganizer(pattern=f"{self.base_path}/*{self.animal_id}*", animal_id=self.animal_id)
 
         # Check that filtering information was logged
         logged_messages = [call[0][0] for call in mock_logging.call_args_list]

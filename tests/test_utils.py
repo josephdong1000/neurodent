@@ -259,49 +259,17 @@ class TestNanAverage:
 class TestParsePathToAnimalday:
     """Test parse_path_to_animalday function."""
 
-    def test_nest_mode(self):
-        """Test nest mode parsing."""
+    def test_default_parsing(self):
+        """Test default parsing (concat mode is default)."""
         # Use a filename with a valid date token that the parser can recognize
-        filepath = Path("/parent/WT_A10_2023-04-01/recording_2023-04-01.bin")
+        filepath = Path("/path/WT_A10_2023-04-01_data.bin")
 
-        result = utils.parse_path_to_animalday(filepath, animal_param=(1, "_"), mode="nest")
+        result = utils.parse_path_to_animalday(filepath, animal_param=(1, "_"))
 
         assert result["animal"] == "A10"
         assert result["genotype"] == "WT"
         assert result["day"] == "Apr-01-2023"
         assert result["animalday"] == "A10 WT Apr-01-2023"
-
-    def test_concat_mode(self):
-        """Test concat mode parsing."""
-        # Use a filename with a valid date token that the parser can recognize
-        filepath = Path("/path/WT_A10_2023-04-01_data.bin")
-
-        result = utils.parse_path_to_animalday(filepath, animal_param=(1, "_"), )
-
-        assert result["animal"] == "A10"
-        assert result["genotype"] == "WT"
-        assert result["day"] == "Apr-01-2023"
-
-    def test_noday_mode(self):
-        """Test noday mode parsing."""
-        filepath = Path("/path/WT_A10_data.bin")
-
-        result = utils.parse_path_to_animalday(filepath, animal_param=(1, "_"), mode="noday")
-
-        assert result["animal"] == "A10"
-        assert result["genotype"] == "WT"
-        assert result["day"] == constants.DEFAULT_DAY.strftime("%b-%d-%Y")
-        assert result["animalday"] == f"A10 WT {constants.DEFAULT_DAY.strftime('%b-%d-%Y')}"
-
-    def test_invalid_mode(self):
-        """Test invalid mode handling."""
-        filepath = Path("/path/WT_A10_2023-01-1")
-
-        # Test various invalid modes
-        invalid_modes = ["invalid", "test", "random", "unknown", None]
-        for mode in invalid_modes:
-            with pytest.raises(ValueError, match=f"Invalid mode: {mode}"):
-                utils.parse_path_to_animalday(filepath, mode=mode)
 
     def test_invalid_filepath_type(self):
         """Test invalid filepath type handling."""
@@ -330,38 +298,13 @@ class TestParsePathToAnimalday:
         filepath = Path("/path/WT_A10nvalid_date.bin")
 
         with pytest.raises(ValueError, match="No valid date token found"):
-            utils.parse_path_to_animalday(filepath, animal_param=(1, "_"), )
-
-    def test_nest_mode_with_invalid_parent_name(self):
-        """Test nest mode with invalid parent directory name."""
-        filepath = Path("/parent/INVALID_NAME/recording_2023-04-1")
-
-        with pytest.raises(ValueError, match="does not have any matching values"):
-            utils.parse_path_to_animalday(filepath, animal_param=(1, "_"), )
-
-    def test_nest_mode_with_invalid_filename(self):
-        """Test nest mode with invalid filename (no date)."""
-        filepath = Path("/parent/WT_A10_20231/recording_invalid.bin")
-
-        # Filename without valid genotype or date will raise ValueError
-        with pytest.raises(ValueError, match="does not have any matching values"):
-            utils.parse_path_to_animalday(filepath, animal_param=(1, "_"), mode="nest")
-
-    def test_base_mode(self):
-        """Test base mode parsing (same as concat)."""
-        filepath = Path("/path/WT_A10_2023-04-01_data.bin")
-
-        result = utils.parse_path_to_animalday(filepath, animal_param=(1, "_"), )
-
-        assert result["animal"] == "A10"
-        assert result["genotype"] == "WT"
-        assert result["day"] == "Apr-01-2023"
+            utils.parse_path_to_animalday(filepath, animal_param=(1, "_"))
 
     def test_with_day_sep_parameter(self):
         """Test parsing with custom day separator."""
         filepath = Path("/path/WT_A10_2023-04-01_data.bin")
 
-        result = utils.parse_path_to_animalday(filepath, animal_param=(1, "_"), day_sep="_", )
+        result = utils.parse_path_to_animalday(filepath, animal_param=(1, "_"), day_sep="_")
 
         assert result["animal"] == "A10"
         assert result["genotype"] == "WT"
@@ -371,7 +314,7 @@ class TestParsePathToAnimalday:
         """Test animal_param as tuple (index, separator) format."""
         filepath = Path("/path/WT_A10_2023-04-01_data.bin")
 
-        result = utils.parse_path_to_animalday(filepath, animal_param=(1, "_"), )
+        result = utils.parse_path_to_animalday(filepath, animal_param=(1, "_"))
 
         assert result["animal"] == "A10"
 
@@ -379,7 +322,7 @@ class TestParsePathToAnimalday:
         """Test animal_param as regex pattern format."""
         filepath = Path("/path/WT_A10_2023-04-01_data.bin")
 
-        result = utils.parse_path_to_animalday(filepath, animal_param=r"A\d+", )
+        result = utils.parse_path_to_animalday(filepath, animal_param=r"A\d+")
 
         assert result["animal"] == "A10"
 
@@ -387,36 +330,9 @@ class TestParsePathToAnimalday:
         """Test animal_param as list of possible IDs format."""
         filepath = Path("/path/WT_A10_2023-04-01_data.bin")
 
-        result = utils.parse_path_to_animalday(filepath, animal_param=["A10", "A11", "A12"], )
+        result = utils.parse_path_to_animalday(filepath, animal_param=["A10", "A11", "A12"])
 
         assert result["animal"] == "A10"
-
-    def test_documentation_examples(self):
-        """Test the specific examples mentioned in the documentation."""
-        # Test nest mode example: /WT_A10/recording_2023-04-01.bin
-        nest_filepath = Path("/parent/WT_A10/recording_2023-04-01.bin")
-
-        nest_result = utils.parse_path_to_animalday(nest_filepath, animal_param=(1, "_"), mode="nest")
-        assert nest_result["animal"] == "A10"
-        assert nest_result["genotype"] == "WT"
-        assert nest_result["day"] == "Apr-01-2023"
-        assert nest_result["animalday"] == "A10 WT Apr-01-2023"
-
-        # Test concat mode example: /WT_A10_2023-04-01_data.bin
-        concat_filepath = Path("/path/WT_A10_2023-04-01_data.bin")
-        concat_result = utils.parse_path_to_animalday(concat_filepath, animal_param=(1, "_"), )
-        assert concat_result["animal"] == "A10"
-        assert concat_result["genotype"] == "WT"
-        assert concat_result["day"] == "Apr-01-2023"
-        assert concat_result["animalday"] == "A10 WT Apr-01-2023"
-
-        # Test noday mode example: /WT_A10_recording.*"
-        noday_filepath = Path("/path/WT_A10_data.bin")
-        noday_result = utils.parse_path_to_animalday(noday_filepath, animal_param=(1, "_"), mode="noday")
-        assert noday_result["animal"] == "A10"
-        assert noday_result["genotype"] == "WT"
-        assert noday_result["day"] == constants.DEFAULT_DAY.strftime("%b-%d-%Y")
-        assert noday_result["animalday"] == f"A10 WT {constants.DEFAULT_DAY.strftime('%b-%d-%Y')}"
 
 
 class TestParseStrToGenotype:
