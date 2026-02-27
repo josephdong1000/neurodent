@@ -126,18 +126,18 @@ class AnimalOrganizer(AnimalFeatureParser):
 
     def _init_containers(self):
         """Initialize all output containers and processing lists.
-        
+
         This method centralizes initialization to ensure consistency between
         standard __init__ and factory methods like from_lros().
         """
         # Processing lists
         self.long_analyzers: list[core.LongRecordingAnalyzer] = []
-        
+
         # Output containers
         self.bad_channels_dict = {}
         self.features_df = pd.DataFrame()
         self.features_avg_df = pd.DataFrame()
-        
+
         # Result objects
         self.spike_analysis_results = None
         self.frequency_domain_spike_analysis_results = None
@@ -145,174 +145,89 @@ class AnimalOrganizer(AnimalFeatureParser):
 
     def __init__(
         self,
-        base_folder_path,
-        animal_id: str,
-        day_sep: str | None = None,
-        mode: Literal["nest", "concat", "base", "noday"] = "concat",
-        assume_from_number=False,
-        skip_days: list[str] = [],
+        pattern: str | list[str],
+        animal_id: str | None = None,
+        skip_sessions: list[str] = [],
         truncate: bool | int = False,
-        file_pattern: str | None = None,
         lro_kwargs: dict = {},
         day_parse_kwargs: dict = {},
-        animal_file_match_pattern: list[str] | str | tuple | None = None,
     ) -> None:
-
-        self.base_folder_path = Path(base_folder_path)
+        self.pattern = pattern
         self.animal_id = animal_id
-        self._has_custom_match_rule = animal_file_match_pattern is not None
-        self.animal_file_match_pattern = animal_file_match_pattern if animal_file_match_pattern is not None else [animal_id]
-        self.day_sep = day_sep
-        self.read_mode = mode
-        self.assume_from_number = assume_from_number
-        self.file_pattern = file_pattern
 
-        match mode:
-            case "nest":
-                self.bin_folder_pattern = (
-                    self.base_folder_path / f"*{self.animal_id}*" / "*"
-                )
-            case "concat" | "noday":
-                self.bin_folder_pattern = self.base_folder_path / f"*{self.animal_id}*"
-                # self.bin_folder_pat = self.base_folder_path / f"*{self.animal_id}*{self.date_format}*"
-            case "base":
-                self.bin_folder_pattern = self.base_folder_path
-            # case 'noday':
-            #     self.bin_folder_pat = self.base_folder_path / f"*{self.animal_id}*"
-            case _:
-                raise ValueError(f"Invalid mode: {mode}")
+        from neurodent.core.discovery import FileDiscoverer
 
-        if self.file_pattern:
-            self.bin_folder_pattern = self.bin_folder_pattern / self.file_pattern
+        self.discoverer = FileDiscoverer(pattern)
 
-        self._bin_folders = sorted(
-            glob.glob(str(self.bin_folder_pattern)), key=filepath_to_index
-        )
+        filter_kwargs = {}
+        if animal_id is not None:
+            filter_kwargs["animal"] = animal_id
 
-        # Filter to only include directories (unless searching for files)
-        before_filter_count = len(self._bin_folders)
-        if self.file_pattern:
-            # If file_pattern provided, filter for files
-            self._bin_folders = [x for x in self._bin_folders if Path(x).is_file()]
-        else:
-            # Default behavior: filter for directories
-            self._bin_folders = [x for x in self._bin_folders if Path(x).is_dir()]
-        after_filter_count = len(self._bin_folders)
+        discovered_items = self.discoverer.discover(**filter_kwargs)
 
-        if before_filter_count > after_filter_count:
-            filtered_count = before_filter_count - after_filter_count
-            logging.info(
-                f"Filtered out {filtered_count} non-directory items (files) from glob results"
-            )
+        self._animalday_folder_groups = {}
+        processed_animaldays = []
 
-        # if mode != 'noday':
-        #     self.__bin_folders = [x for x in self.__bin_folders if datetime.strptime(Path(x).name, self.date_format)]
-        truncate = core.utils.parse_truncate(truncate)
+        for item in discovered_items:
+            session = item.get("session", "unknown")
+            if session in skip_sessions:
+                continue
+
+            if session not in self._animalday_folder_groups:
+                self._animalday_folder_groups[session] = []
+                animal_val = item.get("animal", animal_id if animal_id else "unknown")
+                processed_animaldays.append(f"{animal_val}_{session}")
+
+            path_val = item.get("paths", item.get("path"))
+            if path_val:
+                self._animalday_folder_groups[session].append(path_val)
+
+        if not self._animalday_folder_groups:
+            raise ValueError(f"No items discovered for pattern: {pattern}")
+
         if truncate:
+            import warnings
+            from neurodent import core
+
+            truncate = core.utils.parse_truncate(truncate)
             warnings.warn(
-                f"AnimalOrganizer will be truncated to the first {truncate} LongRecordings"
+                f"AnimalOrganizer will be truncated to the first {truncate} sessions"
             )
-            self._bin_folders = self._bin_folders[:truncate]
-        self._bin_folders = [
-            x for x in self._bin_folders if not any(y in x for y in skip_days)
-        ]
-        self.bin_folder_names = [Path(x).name for x in self._bin_folders]
-        logging.info(f"bin_folder_pattern: {self.bin_folder_pattern}")
-        logging.info(f"self._bin_folders: {self._bin_folders}")
-        logging.info(f"self.bin_folder_names: {self.bin_folder_names}")
+            truncated_keys = list(self._animalday_folder_groups.keys())[:truncate]
+            self._animalday_folder_groups = {
+                k: self._animalday_folder_groups[k] for k in truncated_keys
+            }
+            processed_animaldays = processed_animaldays[:truncate]
 
-        # Validate discovered folders/files to ensure they match the animal ID
-        # Critical when glob patterns are broad, e.g. parent folder name contains ID
-        self._bin_folders = self._validate_discovery(self._bin_folders, day_parse_kwargs)
+        self.unique_animaldays = processed_animaldays
+        self.animaldays = processed_animaldays
 
-        if mode == "noday" and len(self._bin_folders) > 1:
-            raise ValueError(
-                f"Animal ID '{self.animal_id}' is not unique, found: {', '.join(self._bin_folders)}"
-            )
-        elif len(self._bin_folders) == 0:
-            raise ValueError(
-                f"No directories found for animal ID {self.animal_id} (pattern: {self.bin_folder_pattern})"
-            )
+        from neurodent import constants
 
-        if self._has_custom_match_rule:
-            # Custom match rule (e.g. joint sessions): filenames don't follow
-            # standard genotype_animal_date format, so we use the known animal_id
-            # and resolve genotype from ANIMAL_METADATA, parsing only the date.
-            geno = constants.ANIMAL_METADATA.get(self.animal_id, {}).get("gene", "Unknown")
-            self._animalday_dicts = []
-            for e in self._bin_folders:
-                fp = Path(e)
-                name = fp.parent.name if self.read_mode == "nest" else fp.name
-                if self.read_mode == "noday":
-                    day = constants.DEFAULT_DAY.strftime("%b-%d-%Y")
-                else:
-                    day = core.utils.parse_str_to_day(
-                        name, sep=self.day_sep, **day_parse_kwargs
-                    ).strftime("%b-%d-%Y")
-                self._animalday_dicts.append({
-                    "animal": self.animal_id,
-                    "genotype": geno,
-                    "day": day,
-                    "animalday": f"{self.animal_id} {geno} {day}",
-                })
-        else:
-            self._animalday_dicts = [
-                core.parse_path_to_animalday(
-                    e,
-                    animal_param=self.animal_file_match_pattern,
-                    day_sep=self.day_sep,
-                    mode=self.read_mode,
-                    **day_parse_kwargs,
-                )
-                for e in self._bin_folders
-            ]
-
-        # Group folders by parsed animalday to handle overlapping days
-        animalday_to_folders = {}
-        for folder, animalday_dict in zip(self._bin_folders, self._animalday_dicts):
-            animalday = animalday_dict["animalday"]
-            if animalday not in animalday_to_folders:
-                animalday_to_folders[animalday] = []
-            animalday_to_folders[animalday].append(folder)
-
-        # Store grouping info
-        self._animalday_folder_groups = animalday_to_folders
-        self._animalday_str_to_dict = {d["animalday"]: d for d in self._animalday_dicts}
-        self.unique_animaldays = list(animalday_to_folders.keys())
-
-        # Log merging operations for overlapping days
-        overlapping_days = 0
-        for animalday, folders in animalday_to_folders.items():
-            if len(folders) > 1:
-                overlapping_days += 1
-                logging.info(
-                    f"Merging {len(folders)} folders for {animalday}: {[Path(f).name for f in folders]}"
-                )
-
-        if overlapping_days > 0:
-            logging.info(
-                f"Found {overlapping_days} animaldays with overlapping folders"
-            )
-
-        # Update animaldays to reflect unique days (not total folders)
-        self.animaldays = self.unique_animaldays
-        logging.info(f"self.animaldays (unique): {self.animaldays}")
-
-        genotypes = [x["genotype"] for x in self._animalday_dicts]
-        if len(set(genotypes)) > 1:
-            warnings.warn(f"Inconsistent genotypes in {genotypes}")
-        self.genotype = genotypes[0]
-        logging.info(f"self.genotype: {self.genotype}")
+        self.genotype = (
+            constants.ANIMAL_METADATA.get(self.animal_id, {}).get("gene", "Unknown")
+            if self.animal_id
+            else "Unknown"
+        )
+        self._animalday_str_to_dict = {
+            ad: {
+                "animal": ad.split("_")[0],
+                "date": ad.split("_")[1] if "_" in ad else ad,
+                "genotype": self.genotype,
+                "animalday": ad,
+            }
+            for ad in self.unique_animaldays
+        }
 
         self._init_containers()
-        logging.debug(
-            f"Creating {len(self.unique_animaldays)} LongRecordings (one per unique animalday)"
-        )
 
-        # Process manual_datetimes if provided in lro_kwargs
         if "manual_datetimes" in lro_kwargs:
+            import logging
+
             logging.info("Processing manual_datetimes configuration")
             base_lro_kwargs = lro_kwargs.copy()
+            from datetime import datetime
+
             base_lro_kwargs["manual_datetimes"] = datetime(2000, 1, 1, 0, 0, 0)
 
             self._processed_timestamps = self._process_manual_datetimes(
@@ -320,12 +235,12 @@ class AnimalOrganizer(AnimalFeatureParser):
                 self._animalday_folder_groups,
                 base_lro_kwargs,
             )
-            # Remove from lro_kwargs since we'll handle it manually
             lro_kwargs = base_lro_kwargs
         else:
             self._processed_timestamps = None
 
-        # Create LongRecordingOrganizer instances
+        from neurodent import core
+
         self.long_recordings: list[core.LongRecordingOrganizer] = []
         self._create_long_recordings(lro_kwargs)
 
@@ -378,6 +293,18 @@ class AnimalOrganizer(AnimalFeatureParser):
                     f"File '{Path(folder).name}' matched Animal ID/Genotype but failed parsing (likely Date/Config error): {e}"
                 ) from e
         return valid_folders
+
+    def _get_item_name(self, item):
+        """Helper to get a representative name for an item which could be a string, Path, or list of strings."""
+        if isinstance(item, (list, tuple)):
+            return Path(item[0]).name
+        return Path(item).name
+
+    def _is_item_file(self, item):
+        """Helper to check if an item represents a file(s) rather than a directory."""
+        if isinstance(item, (list, tuple)):
+            return Path(item[0]).is_file()
+        return Path(item).is_file()
 
     def _resolve_timestamp_input(self, input_spec, folder_path: Path):
         """
@@ -459,396 +386,400 @@ class AnimalOrganizer(AnimalFeatureParser):
 
     def _compute_global_timeline(
         self,
-        base_datetime: datetime,
-        animalday_to_folders: dict,
+        base_datetime,
+        animalday_to_items: dict,
         base_lro_kwargs: dict,
         original_manual_datetimes=None,
     ) -> dict:
-        """
-        Compute contiguous timeline for all folders starting from base_datetime.
-
-        This uses a two-pass approach:
-        1. Create temporary LROs to determine durations
-        2. Compute continuous start times based on cumulative durations
-        3. Return timeline mapping for final LRO creation
-
-        Args:
-            base_datetime: Starting datetime for the timeline
-            animalday_to_folders: Mapping of animalday -> list of folder paths
-            base_lro_kwargs: Base kwargs for LRO construction (without manual_datetimes)
-
-        Returns:
-            dict: Mapping of folder_name -> start_datetime for continuous timeline
-        """
-        total_folders = sum(len(folders) for folders in animalday_to_folders.values())
-        total_animaldays = len(animalday_to_folders)
+        total_items = sum(len(items) for items in animalday_to_items.values())
+        total_animaldays = len(animalday_to_items)
 
         logging.info(
-            f"Computing continuous timeline for {total_animaldays} animaldays ({total_folders} total folders) "
+            f"Computing continuous timeline for {total_animaldays} animaldays ({total_items} total items) "
             f"starting at {base_datetime}"
         )
 
-        # Step 1: Determine folder ordering
-        # When manual_datetimes is provided, skip metadata-based sorting and use config/alphabetical order
-        ordered_folders = []
-
+        ordered_items = []
         if original_manual_datetimes is not None:
-            # Manual timestamps provided - skip metadata-based sorting
-            # Strategy depends on format of manual_datetimes:
-            # - List: Order of list entries defines folder order (preserve natural order)
-            # - Scalar: Use alphabetical order for predictability
-
             if isinstance(original_manual_datetimes, list):
-                logging.info("Manual timestamps provided as list - preserving folder order from config/discovery")
-                # List order is authoritative - don't reorder folders
-                # Just extend in the order they appear in animalday_to_folders
-                for animalday in sorted(animalday_to_folders.keys()):
-                    folders = animalday_to_folders[animalday]
-                    ordered_folders.extend(folders)
+                for animalday in sorted(animalday_to_items.keys()):
+                    items = animalday_to_items[animalday]
+                    ordered_items.extend(items)
             else:
-                logging.info("Manual timestamps provided as scalar - using alphabetical folder ordering")
-                # Scalar timestamp doesn't define order - use alphabetical for predictability
-                for animalday in sorted(animalday_to_folders.keys()):
-                    folders = animalday_to_folders[animalday]
-                    sorted_folders = sorted(folders, key=lambda f: Path(f).stem)
-                    ordered_folders.extend(sorted_folders)
+                for animalday in sorted(animalday_to_items.keys()):
+                    items = animalday_to_items[animalday]
+                    sorted_items = sorted(items, key=lambda f: self._get_item_name(f))
+                    ordered_items.extend(sorted_items)
         else:
-            # Traditional metadata-based approach: create temp LROs to sort by temporal order
-            for animalday in sorted(animalday_to_folders.keys()):
-                folders = animalday_to_folders[animalday]
-                if len(folders) > 1:
-                    # For overlapping folders, we need to sort them by temporal order
-                    # Create temporary LROs for each folder to get their internal timestamps
-                    folder_lro_pairs = []
-                    for folder in folders:
+            for animalday in sorted(animalday_to_items.keys()):
+                items = animalday_to_items[animalday]
+                if len(items) > 1:
+                    item_lro_pairs = []
+                    for item in items:
                         try:
                             temp_lro = core.LongRecordingOrganizer(
-                                folder, **base_lro_kwargs
+                                item, **base_lro_kwargs
                             )
-                            folder_lro_pairs.append((folder, temp_lro))
+                            item_lro_pairs.append((item, temp_lro))
                         except Exception as e:
                             logging.warning(
-                                f"Failed to create temp LRO for duration estimation in {folder}: {e}"
+                                f"Failed to create temp LRO for duration estimation in {self._get_item_name(item)}: {e}"
                             )
-                            # Use folder order as fallback
-                            folder_lro_pairs.append((folder, None))
+                            item_lro_pairs.append((item, None))
 
-                    # Sort by median time if possible
-                    sorted_pairs = self._sort_lros_by_median_time(folder_lro_pairs)
-                    ordered_folders.extend([folder for folder, _ in sorted_pairs])
+                    sorted_pairs = self._sort_lros_by_median_time(item_lro_pairs)
+                    ordered_items.extend([item for item, _ in sorted_pairs])
                 else:
-                    ordered_folders.extend(folders)
+                    ordered_items.extend(items)
 
-        # Step 2: Estimate total duration for each folder
-        # Always get durations from recordings (never assume/default)
-        folder_durations = {}
-
-        logging.info(f"Ordered folders for timeline: {[Path(f).name for f in ordered_folders]}")
+        item_durations = {}
+        logging.info(
+            f"Ordered items for timeline: {[self._get_item_name(f) for f in ordered_items]}"
+        )
 
         if original_manual_datetimes is not None:
-            # When manual timestamps are provided, pass them to temp LROs so raw files can load
-            logging.info("Creating temp LROs with manual timestamps to get durations")
-
-            # Prepare timestamps for each folder
             if isinstance(original_manual_datetimes, list):
-                # List of timestamps - validate length and distribute to folders
-                if len(original_manual_datetimes) != len(ordered_folders):
+                if len(original_manual_datetimes) != len(ordered_items):
                     raise ValueError(
                         f"manual_datetimes list length ({len(original_manual_datetimes)}) "
-                        f"does not match number of folders ({len(ordered_folders)}). "
-                        f"Provide one timestamp per folder."
+                        f"does not match number of items ({len(ordered_items)})."
                     )
 
-                # Resolve each timestamp and pair with folder
-                folder_timestamps = []
-                for i, (folder, ts) in enumerate(zip(ordered_folders, original_manual_datetimes)):
+                item_timestamps = []
+                for i, (item, ts) in enumerate(
+                    zip(ordered_items, original_manual_datetimes)
+                ):
                     try:
-                        resolved_ts = self._resolve_timestamp_input(ts, Path(folder))
-                        if not isinstance(resolved_ts, (datetime, pd.Timestamp)):
-                            raise ValueError(
-                                f"Timestamp at index {i} for folder {Path(folder).name} "
-                                f"did not resolve to a datetime object: {resolved_ts}"
-                            )
-                        folder_timestamps.append((folder, resolved_ts))
+                        context_path = (
+                            Path(item[0])
+                            if isinstance(item, (list, tuple))
+                            else Path(item)
+                        )
+                        resolved_ts = self._resolve_timestamp_input(ts, context_path)
+                        item_timestamps.append((item, resolved_ts))
                     except Exception as e:
                         raise ValueError(
-                            f"Failed to parse timestamp at index {i} for folder {Path(folder).name}: {e}"
+                            f"Failed to parse timestamp at index {i} for item {self._get_item_name(item)}: {e}"
                         ) from e
 
-            elif isinstance(original_manual_datetimes, (datetime, pd.Timestamp, str)):
-                # Single scalar timestamp - use for all folders
+            elif isinstance(original_manual_datetimes, (str, type(base_datetime))):
                 try:
                     if isinstance(original_manual_datetimes, str):
-                        context_path = Path(ordered_folders[0]) if ordered_folders else Path(".")
-                        resolved_ts = self._resolve_timestamp_input(original_manual_datetimes, context_path)
+                        first_item = ordered_items[0] if ordered_items else "."
+                        context_path = (
+                            Path(first_item[0])
+                            if isinstance(first_item, (list, tuple))
+                            else Path(first_item)
+                        )
+                        resolved_ts = self._resolve_timestamp_input(
+                            original_manual_datetimes, context_path
+                        )
                     else:
                         resolved_ts = original_manual_datetimes
 
-                    if not isinstance(resolved_ts, (datetime, pd.Timestamp)):
-                        raise ValueError(
-                            f"Scalar manual_datetimes did not resolve to a datetime object: {resolved_ts}"
-                        )
-
-                    folder_timestamps = [(folder, resolved_ts) for folder in ordered_folders]
+                    item_timestamps = [(item, resolved_ts) for item in ordered_items]
                 except Exception as e:
                     raise ValueError(
                         f"Failed to parse scalar manual_datetimes: {e}"
                     ) from e
             else:
-                # Other format - attempt resolution for each folder
-                folder_timestamps = []
-                for folder in ordered_folders:
-                    try:
-                        resolved_ts = self._resolve_timestamp_input(original_manual_datetimes, Path(folder))
-                        if not isinstance(resolved_ts, (datetime, pd.Timestamp)):
-                            raise ValueError(
-                                f"Timestamp for folder {Path(folder).name} "
-                                f"did not resolve to a datetime object: {resolved_ts}"
-                            )
-                        folder_timestamps.append((folder, resolved_ts))
-                    except Exception as e:
-                        raise ValueError(
-                            f"Failed to parse timestamp for folder {Path(folder).name}: {e}"
-                        ) from e
+                item_timestamps = []
+                for item in ordered_items:
+                    context_path = (
+                        Path(item[0]) if isinstance(item, (list, tuple)) else Path(item)
+                    )
+                    resolved_ts = self._resolve_timestamp_input(
+                        original_manual_datetimes, context_path
+                    )
+                    item_timestamps.append((item, resolved_ts))
 
-            # Create temp LROs with manual timestamps to get durations
-            for folder, timestamp in folder_timestamps:
+            for item, timestamp in item_timestamps:
                 _lro_kwargs = base_lro_kwargs.copy()
-                if Path(folder).is_file():
+                if self._is_item_file(item):
                     _lro_kwargs["input_type"] = "file"
-
-                # KEY FIX: Pass actual manual_datetimes to temp LRO
                 _lro_kwargs["manual_datetimes"] = timestamp
 
                 try:
-                    temp_lro = core.LongRecordingOrganizer(folder, **_lro_kwargs)
+                    temp_lro = core.LongRecordingOrganizer(item, **_lro_kwargs)
                     duration = (
                         temp_lro.LongRecording.get_duration()
                         if hasattr(temp_lro, "LongRecording") and temp_lro.LongRecording
                         else 0.0
                     )
-                    folder_durations[folder] = duration
+                    item_durations[item] = duration
                     logging.info(
-                        f"Folder {Path(folder).name}: duration = {duration:.1f}s (loaded with manual timestamp)"
+                        f"Item {self._get_item_name(item)}: duration = {duration:.1f}s (loaded with manual timestamp)"
                     )
                 except Exception as e:
                     raise RuntimeError(
-                        f"Failed to load folder {Path(folder).name} for duration estimation, "
-                        f"even with manual_datetimes provided. This usually indicates a problem "
-                        f"with the data files or recording format. Error: {e}"
+                        f"Failed to load item {self._get_item_name(item)} for duration estimation: {e}"
                     ) from e
 
         else:
-            # Traditional approach: create temp LROs without manual timestamps
-            for folder in ordered_folders:
+            for item in ordered_items:
                 _lro_kwargs = base_lro_kwargs.copy()
-                if Path(folder).is_file():
+                if self._is_item_file(item):
                     _lro_kwargs["input_type"] = "file"
 
                 try:
-                    temp_lro = core.LongRecordingOrganizer(folder, **_lro_kwargs)
+                    temp_lro = core.LongRecordingOrganizer(item, **_lro_kwargs)
                     duration = (
                         temp_lro.LongRecording.get_duration()
                         if hasattr(temp_lro, "LongRecording") and temp_lro.LongRecording
                         else 0.0
                     )
-                    folder_durations[folder] = duration
+                    item_durations[item] = duration
                     logging.info(
-                        f"Folder {Path(folder).name}: estimated duration = {duration:.1f}s"
+                        f"Item {self._get_item_name(item)}: estimated duration = {duration:.1f}s"
                     )
                 except Exception as e:
                     raise RuntimeError(
-                        f"Failed to load folder {Path(folder).name} for duration estimation. "
-                        f"If using raw files without metadata, ensure manual_datetimes is provided. "
-                        f"Error: {e}"
+                        f"Failed to load item {self._get_item_name(item)} for duration estimation: {e}"
                     ) from e
 
-        # Step 3: Compute start times (forward from start or backward from end)
         datetimes_are_start = base_lro_kwargs.get("datetimes_are_start", True)
         result = {}
 
         if datetimes_are_start:
             current_start_time = base_datetime
-            for folder in ordered_folders:
-                folder_name = Path(folder).name
-                result[folder_name] = current_start_time
-                current_start_time = current_start_time + timedelta(seconds=folder_durations[folder])
+            for item in ordered_items:
+                item_name = self._get_item_name(item)
+                result[item_name] = current_start_time
+                current_start_time = current_start_time + timedelta(
+                    seconds=item_durations[item]
+                )
         else:
-            # Work backwards from end time
             current_end_time = base_datetime
-            for folder in reversed(ordered_folders):
-                folder_name = Path(folder).name
-                duration = folder_durations[folder]
+            for item in reversed(ordered_items):
+                item_name = self._get_item_name(item)
+                duration = item_durations[item]
                 start_time = current_end_time - timedelta(seconds=duration)
-                result[folder_name] = start_time
+                result[item_name] = start_time
                 current_end_time = start_time
 
-        total_duration = sum(folder_durations.values())
-        logging.info(f"Timeline computed: {len(result)} folders, total duration {total_duration:.1f}s")
-
+        total_duration = sum(item_durations.values())
+        logging.info(
+            f"Timeline computed: {len(result)} items, total duration {total_duration:.1f}s"
+        )
         return result
 
     def _process_manual_datetimes(
-        self, manual_datetimes, animalday_to_folders: dict, base_lro_kwargs: dict
+        self, manual_datetimes, animalday_to_items: dict, base_lro_kwargs: dict
     ) -> dict:
-        """
-        Process the top-level manual_datetimes input and return folder_name -> resolved_timestamps mapping.
-
-        Args:
-            manual_datetimes: Any supported timestamp input type
-            animalday_to_folders: Mapping of animalday -> list of folder paths
-            base_lro_kwargs: Base kwargs for LRO construction (without manual_datetimes)
-
-        Returns:
-            dict: Mapping of folder_name -> Union[datetime, List[datetime]]
-        """
         if isinstance(manual_datetimes, dict):
-            # Find folders for this animal to apply the spec
-            animal_folders = self._get_folders_for_animal(self.animal_id, animalday_to_folders)
+            animal_items = []
+            for items in animalday_to_items.values():
+                animal_items.extend(items)
 
-            # Direct lookup: keys are expected to be animal IDs
-            # Check for shadowing: if both Animal ID key AND flat folder keys are present
             has_id_key = self.animal_id in manual_datetimes
-            folder_names = {Path(f).name for f in animal_folders}
-            has_folder_keys = any(k in folder_names for k in manual_datetimes.keys())
-            
-            if has_id_key and has_folder_keys:
+            item_names = {self._get_item_name(f) for f in animal_items}
+            has_item_keys = any(k in item_names for k in manual_datetimes.keys())
+
+            if has_id_key and has_item_keys:
                 raise ValueError(
                     f"Ambiguous manual_datetimes configuration for '{self.animal_id}'. "
-                    f"Both the Animal ID key '{self.animal_id}' and individual folder keys "
-                    f"(e.g., {[k for k in manual_datetimes.keys() if k in folder_names][:3]}) are present. "
-                    f"Please nest all folder keys under the Animal ID key to avoid ambiguity."
+                    f"Both the Animal ID '{self.animal_id}' and individual item keys are present."
                 )
 
             spec = manual_datetimes.get(self.animal_id)
-            
+
             if spec is None:
-                # Check if manual_datetimes keys match any folders (backward compatibility for direct folder mapping)
-                if has_folder_keys:
-                    logging.info(f"manual_datetimes keys match folders for {self.animal_id}. Treating as folder mapping spec.")
+                if has_item_keys:
+                    logging.info(
+                        f"manual_datetimes keys match items for {self.animal_id}. Treating as item mapping spec."
+                    )
                     spec = manual_datetimes
                 else:
                     raise ValueError(
-                        f"manual_datetimes dictionary was provided in the config, but no entry was found for animal ID '{self.animal_id}'. "
-                        f"Available keys in config: {list(manual_datetimes.keys())}"
+                        f"manual_datetimes dictionary provided, but no entry for '{self.animal_id}'."
                     )
 
             logging.info(f"Processing manual datetimes for animal '{self.animal_id}'")
             out = {}
-            
-            if not animal_folders:
+
+            if not animal_items:
                 raise ValueError(
-                    f"Manual timestamps were provided for animal ID '{self.animal_id}' in the config, "
-                    f"but no data folders starting with this ID were found in the data path. "
-                    f"Check for typos or naming mismatches between config keys and folder names."
+                    f"Manual timestamps provided for '{self.animal_id}' but no items found."
                 )
 
             if isinstance(spec, list):
-                if len(spec) != len(animal_folders):
+                if len(spec) != len(animal_items):
                     raise ValueError(
-                        f"manual_datetimes list for animal '{self.animal_id}' has {len(spec)} entries "
-                        f"but animal has {len(animal_folders)} folders"
+                        f"manual_datetimes list has {len(spec)} entries but animal has {len(animal_items)} items"
                     )
-                for folder_path, ts in zip(animal_folders, spec):
-                    out[Path(folder_path).name] = self._resolve_timestamp_input(ts, Path(folder_path))
+                for item, ts in zip(animal_items, spec):
+                    context_path = (
+                        Path(item[0]) if isinstance(item, (list, tuple)) else Path(item)
+                    )
+                    out[self._get_item_name(item)] = self._resolve_timestamp_input(
+                        ts, context_path
+                    )
             elif isinstance(spec, dict):
-                 # Handle dictionary mapping folder names to timestamps
-                 for folder_path in animal_folders:
-                     fname = Path(folder_path).name
-                     if fname in spec:
-                         out[fname] = self._resolve_timestamp_input(spec[fname], Path(folder_path))
-                     else:
-                         missing_folders = [Path(f).name for f in animal_folders if Path(f).name not in spec]
-                         raise ValueError(
-                             f"Missing entries in manual_datetimes for folders: {missing_folders}. "
-                             f"When using a dictionary, all folders must be specified."
-                         )
-                 
-                 # Note: We do NOT check for extra keys here anymore because in fallback mode (mixed bag),
-                 # the dictionary might contain keys for other animals or other purposes.
-                 # We only strictly enforce that all of THIS animal's folders are found.
+                for item in animal_items:
+                    fname = self._get_item_name(item)
+                    if fname in spec:
+                        context_path = (
+                            Path(item[0])
+                            if isinstance(item, (list, tuple))
+                            else Path(item)
+                        )
+                        out[fname] = self._resolve_timestamp_input(
+                            spec[fname], context_path
+                        )
+                    else:
+                        missing = [
+                            self._get_item_name(f)
+                            for f in animal_items
+                            if self._get_item_name(f) not in spec
+                        ]
+                        raise ValueError(
+                            f"Missing entries in manual_datetimes for items: {missing}."
+                        )
             else:
-                resolved_dt = self._resolve_timestamp_input(spec, Path(animal_folders[0]))
-                # Don't sort here - let _compute_global_timeline handle sorting based on format
-                animalday_dict = {Path(f).name: [f] for f in animal_folders}
+                context_path = (
+                    Path(animal_items[0][0])
+                    if isinstance(animal_items[0], (list, tuple))
+                    else Path(animal_items[0])
+                )
+                resolved_dt = self._resolve_timestamp_input(spec, context_path)
+                animalday_dict = {self._get_item_name(f): [f] for f in animal_items}
                 animal_timeline = self._compute_global_timeline(
-                    resolved_dt, animalday_dict, base_lro_kwargs,
-                    original_manual_datetimes=spec
+                    resolved_dt,
+                    animalday_dict,
+                    base_lro_kwargs,
+                    original_manual_datetimes=spec,
                 )
                 out.update(animal_timeline)
-            
+
             return out
 
         elif isinstance(manual_datetimes, (datetime, str)):
-            # If string, verify it resolves to a single datetime before proceeding
-            # This distinguishes scalar intent from complex string mappings (which should be dicts)
             start_dt = manual_datetimes
             if isinstance(start_dt, str):
-                # Try resolving it. _resolve_timestamp_input usually returns a datetime or list of datetimes.
-                # Here we assume if it's a single string it implies a single start time.
-                # We use the animal ID or first folder as context for resolution logic.
-                context_path = Path(list(animalday_to_folders.values())[0][0]) if animalday_to_folders else Path(".")
-                start_dt = self._resolve_timestamp_input(manual_datetimes, context_path)
-            
-            # Ensure we have a scalar datetime to build a timeline from
-            if isinstance(start_dt, datetime) or (isinstance(start_dt, pd.Timestamp)):
-                logging.info(f"Processing global manual datetimes starting at {start_dt}")
-                return self._compute_global_timeline(
-                    start_dt, animalday_to_folders, base_lro_kwargs,
-                    original_manual_datetimes=manual_datetimes
+                first_item = (
+                    list(animalday_to_items.values())[0][0]
+                    if animalday_to_items
+                    else "."
                 )
-            # If resolution returned something else (like a list), fall through to default processing
-            warnings.warn("String timestamp resolved to non-scalar. Falling back to default processing.")
+                context_path = (
+                    Path(first_item[0])
+                    if isinstance(first_item, (list, tuple))
+                    else Path(first_item)
+                )
+                start_dt = self._resolve_timestamp_input(manual_datetimes, context_path)
+
+            from pandas import Timestamp
+
+            if isinstance(start_dt, datetime) or isinstance(start_dt, Timestamp):
+                logging.info(
+                    f"Processing global manual datetimes starting at {start_dt}"
+                )
+                return self._compute_global_timeline(
+                    start_dt,
+                    animalday_to_items,
+                    base_lro_kwargs,
+                    original_manual_datetimes=manual_datetimes,
+                )
+            warnings.warn(
+                "String timestamp resolved to non-scalar. Falling back to default processing."
+            )
 
         else:
-            logging.info("Processing manual datetimes input for all folders")
+            logging.info("Processing manual datetimes input for all items")
             out = {}
-            for animalday, folders in animalday_to_folders.items():
-                for folder in folders:
-                    folder_name = Path(folder).name
-                    out[folder_name] = self._resolve_timestamp_input(
-                        manual_datetimes, Path(folder)
+            for animalday, items in animalday_to_items.items():
+                for item in items:
+                    item_name = self._get_item_name(item)
+                    context_path = (
+                        Path(item[0]) if isinstance(item, (list, tuple)) else Path(item)
+                    )
+                    out[item_name] = self._resolve_timestamp_input(
+                        manual_datetimes, context_path
                     )
             return out
 
-    def _get_lro_kwargs_for_folder(
-        self, folder_path: str, base_lro_kwargs: dict
-    ) -> dict:
-        """
-        Get the appropriate lro_kwargs for a specific folder, including processed timestamps if available.
+    def _create_long_recordings(self, lro_kwargs: dict):
+        """Create LongRecordingOrganizer instances for each unique animalday."""
+        self.long_recordings: list[core.LongRecordingOrganizer] = []
+        for animalday, items in self._animalday_folder_groups.items():
+            kwargs = lro_kwargs.copy()
+            if (
+                hasattr(self, "_processed_timestamps")
+                and animalday in self._processed_timestamps
+            ):
+                kwargs["manual_datetimes"] = self._processed_timestamps[animalday]
+                logging.debug(
+                    f"Using processed timestamps for {animalday}: {kwargs['manual_datetimes']}"
+                )
 
-        Args:
-            folder_path: Path to the folder
-            base_lro_kwargs: Base kwargs to extend
+            if len(items) == 1:
+                item_to_pass = items[0]
+                kw = kwargs.copy()
+                if self._is_item_file(item_to_pass) and isinstance(
+                    item_to_pass, (list, tuple)
+                ):
+                    # LRO handles lists of files directly, but we pass input_type='files'? Wait, LRO handles it natively now
+                    pass
+                lro = core.LongRecordingOrganizer(item_to_pass, **kw)
+            else:
+                logging.info(
+                    f"Creating individual LROs for {len(items)} items for {animalday}"
+                )
+                item_lro_pairs = []
+                for item in items:
+                    individual_lro = core.LongRecordingOrganizer(item, **kwargs)
+                    item_lro_pairs.append((item, individual_lro))
 
-        Returns:
-            dict: lro_kwargs with manual_datetimes added if available
-        """
-        if self._processed_timestamps is None:
-            return base_lro_kwargs
+                sorted_folder_lro_pairs = self._sort_lros_by_median_time(item_lro_pairs)
 
-        folder_name = Path(folder_path).name
-        if folder_name in self._processed_timestamps:
-            # Add the processed timestamps for this folder
-            kwargs = base_lro_kwargs.copy()
-            kwargs["manual_datetimes"] = self._processed_timestamps[folder_name]
-            logging.debug(
-                f"Using processed timestamps for folder {folder_name}: {kwargs['manual_datetimes']}"
+                logging.info("LRO merge order for overlapping animalday:")
+                for i, (item, lro) in enumerate(sorted_folder_lro_pairs):
+                    item_name = self._get_item_name(item)
+                    try:
+                        duration = (
+                            lro.LongRecording.get_duration()
+                            if hasattr(lro, "LongRecording") and lro.LongRecording
+                            else 0
+                        )
+                        duration_str = f"{float(duration):.1f}s"
+                    except (TypeError, ValueError):
+                        duration_str = "mock"
+                    logging.info(f"  {i + 1}. {item_name} (duration: {duration_str})")
+
+                merged_lro = sorted_folder_lro_pairs[0][1]
+                logging.info(
+                    f"Base LRO: {self._get_item_name(sorted_folder_lro_pairs[0][0])}"
+                )
+
+                for i, (item, lro) in enumerate(sorted_folder_lro_pairs[1:], 1):
+                    item_name = self._get_item_name(item)
+                    logging.info(f"Merging LRO {i}: {item_name} into base LRO")
+                    merged_lro.merge(lro)
+
+                lro = merged_lro
+                logging.info(
+                    f"Successfully merged {len(sorted_folder_lro_pairs)} LROs for {animalday}"
+                )
+
+            lro.labels.update(self._animalday_str_to_dict.get(animalday, {}))
+            self.long_recordings.append(lro)
+
+        self._log_timeline_summary()
+
+        if len(self.long_recordings) != len(self.unique_animaldays):
+            error_msg = (
+                f"Mismatch: Created {len(self.long_recordings)} LROs "
+                f"but found {len(self.unique_animaldays)} unique animaldays. "
             )
-            return kwargs
-        else:
-            # No processed timestamps for this folder - use base kwargs
-            logging.debug(
-                f"No processed timestamps for folder {folder_name}, using base kwargs"
-            )
-            return base_lro_kwargs
+            logging.error(error_msg)
+            raise RuntimeError(error_msg)
 
     def _log_timeline_summary(self):
         """Log timeline summary for debugging purposes."""
 
         lines = ["AnimalOrganizer Timeline Summary:"]
 
-        if not self.long_recordings:
+        if not getattr(self, "long_recordings", []):
             lines.append("No LongRecordings created")
         else:
             for i, lro in enumerate(self.long_recordings):
@@ -865,11 +796,20 @@ class AnimalOrganizer(AnimalFeatureParser):
                         if hasattr(lro, "file_durations") and lro.file_durations
                         else 1
                     )
-                    folder_path = getattr(lro, "base_folder_path", "unknown")
+
+                    folder_path = getattr(lro, "base_folder_path", None)
+                    if folder_path:
+                        name = Path(folder_path).name
+                    elif hasattr(lro, "data_files") and lro.data_files:
+                        name = Path(lro.data_files[0]).name + "..."
+                    elif hasattr(lro, "item") and lro.item:
+                        name = self._get_item_name(lro.item)
+                    else:
+                        name = "unknown"
 
                     lines.append(
                         f"LRO {i}: {start_time} → {end_time} "
-                        f"(duration: {duration:.1f}s, files: {n_files}, folder: {Path(folder_path).name})"
+                        f"(duration: {duration:.1f}s, items: {n_files}, item: {name})"
                     )
                 except Exception as e:
                     lines.append(f"Failed to get timeline info for LRO {i}: {e}")
@@ -880,36 +820,33 @@ class AnimalOrganizer(AnimalFeatureParser):
         """Get the start time of an LRO."""
         if hasattr(lro, "file_end_datetimes") and lro.file_end_datetimes:
             if hasattr(lro, "file_durations") and lro.file_durations:
-                # Calculate start time from first end time and duration
-                first_end = next(dt for dt in lro.file_end_datetimes if dt is not None)
-                first_duration = lro.file_durations[0]
-                return first_end - timedelta(seconds=first_duration)
+                try:
+                    first_end = next(
+                        dt for dt in lro.file_end_datetimes if dt is not None
+                    )
+                    first_duration = lro.file_durations[0]
+                    from datetime import timedelta
+
+                    return first_end - timedelta(seconds=first_duration)
+                except StopIteration:
+                    pass
         return "unknown"
 
     def _get_lro_end_time(self, lro):
         """Get the end time of an LRO."""
         if hasattr(lro, "file_end_datetimes") and lro.file_end_datetimes:
-            # Get the last non-None end time
             end_times = [dt for dt in lro.file_end_datetimes if dt is not None]
             if end_times:
                 return max(end_times)
         return "unknown"
 
-    def get_timeline_summary(self) -> pd.DataFrame:
+    def get_timeline_summary(self):
         """
         Get timeline summary as a DataFrame for user inspection and debugging.
-
-        Returns:
-            pd.DataFrame: Timeline information with columns:
-                - lro_index: Index of the LRO
-                - start_time: Start datetime of the LRO
-                - end_time: End datetime of the LRO
-                - duration_s: Duration in seconds
-                - n_files: Number of files in the LRO
-                - folder_path: Base folder path
-                - animalday: Parsed animalday identifier
         """
-        if not self.long_recordings:
+        if not getattr(self, "long_recordings", []):
+            import pandas as pd
+
             return pd.DataFrame()
 
         timeline_data = []
@@ -936,141 +873,23 @@ class AnimalOrganizer(AnimalFeatureParser):
                         "end_time": end_time,
                         "duration_s": duration,
                         "n_files": n_files,
-                        "folder_path": str(folder_path),
-                        "folder_name": (
-                            Path(folder_path).name
-                            if folder_path != "unknown"
-                            else "unknown"
+                        "folder_path": folder_path,
+                        "folder_name": Path(str(folder_path)).name
+                        if folder_path != "unknown"
+                        else "unknown",
+                        "animalday": getattr(lro, "labels", {}).get(
+                            "animalday", "unknown"
                         ),
-                        "animalday": getattr(
-                            lro, "_animalday", "unknown"
-                        ),  # This might not exist, but useful if it does
                     }
                 )
             except Exception as e:
-                # Include failed LROs in the summary for debugging
-                timeline_data.append(
-                    {
-                        "lro_index": i,
-                        "start_time": "error",
-                        "end_time": "error",
-                        "duration_s": 0,
-                        "n_files": 0,
-                        "folder_path": "error",
-                        "folder_name": "error",
-                        "animalday": "error",
-                        "error": str(e),
-                    }
-                )
+                import logging
+
+                logging.warning(f"Failed to get timeline metrics for LRO {i}: {e}")
+
+        import pandas as pd
 
         return pd.DataFrame(timeline_data)
-
-    def _create_long_recordings(self, lro_kwargs: dict):
-        """Create LongRecordingOrganizer instances for each unique animalday."""
-        # Create one LRO per unique animalday (not per folder)
-        self.long_recordings: list[core.LongRecordingOrganizer] = []
-        for animalday, items in self._animalday_folder_groups.items():
-            # If we are in file_pattern mode, pass all files at once to LRO
-            if self.file_pattern:
-                logging.info(f"Passing {len(items)} files to single LRO for {animalday}")
-                folder_kwargs = self._get_lro_kwargs_for_folder(items[0], lro_kwargs)
-                lro = core.LongRecordingOrganizer(items, **folder_kwargs)
-                # AnimalOrganizer is the primary source of truth for these labels
-                lro.labels.update(self._animalday_str_to_dict[animalday])
-                self.long_recordings.append(lro)
-                continue
-
-            if len(items) == 1:
-                # Single folder - use processed timestamps if available
-                folder_kwargs = self._get_lro_kwargs_for_folder(items[0], lro_kwargs)
-                lro = core.LongRecordingOrganizer(items[0], **folder_kwargs)
-            else:
-                # Multiple folders - create individual LROs then sort and merge
-                logging.info(
-                    f"Creating individual LROs for {len(items)} folders for {animalday}"
-                )
-
-                # Create individual LROs first, each with their own processed timestamps
-                folder_lro_pairs = []
-                for folder in items:
-                    folder_kwargs = self._get_lro_kwargs_for_folder(folder, lro_kwargs)
-                    individual_lro = core.LongRecordingOrganizer(
-                        folder, **folder_kwargs
-                    )
-                    folder_lro_pairs.append((folder, individual_lro))
-
-                # Sort by median time using constructed LROs
-                sorted_folder_lro_pairs = self._sort_lros_by_median_time(
-                    folder_lro_pairs
-                )
-
-                # Debug logging to show the order of LROs being merged
-                logging.info("LRO merge order for overlapping animalday:")
-                for i, (folder, lro) in enumerate(sorted_folder_lro_pairs):
-                    folder_name = Path(folder).name
-                    # Handle mock objects gracefully
-                    try:
-                        duration = (
-                            lro.LongRecording.get_duration()
-                            if hasattr(lro, "LongRecording") and lro.LongRecording
-                            else 0
-                        )
-                        duration_str = f"{float(duration):.1f}s"
-                    except (TypeError, ValueError):
-                        duration_str = "mock"
-                    logging.info(f"  {i + 1}. {folder_name} (duration: {duration_str})")
-
-                # Merge all LROs into the first one (in temporal order)
-                merged_lro = sorted_folder_lro_pairs[0][
-                    1
-                ]  # Get the LRO from first tuple
-                logging.info(f"Base LRO: {Path(sorted_folder_lro_pairs[0][0]).name}")
-
-                for i, (folder, lro) in enumerate(sorted_folder_lro_pairs[1:], 1):
-                    folder_name = Path(folder).name
-                    logging.info(f"Merging LRO {i}: {folder_name} into base LRO")
-                    merged_lro.merge(lro)
-
-                lro = merged_lro
-                logging.info(
-                    f"Successfully merged {len(sorted_folder_lro_pairs)} LROs for {animalday}"
-                )
-
-            # AnimalOrganizer is the primary source of truth for these labels
-            lro.labels.update(self._animalday_str_to_dict[animalday])
-            self.long_recordings.append(lro)
-
-        # Log timeline summary for debugging
-        self._log_timeline_summary()
-
-        # CRITICAL VALIDATION: Ensure animaldays and long_recordings are aligned
-        if len(self.long_recordings) != len(self.unique_animaldays):
-            error_msg = (
-                f"CRITICAL ERROR: Mismatch between animaldays and long_recordings! "
-                f"Expected {len(self.unique_animaldays)} LROs for {len(self.unique_animaldays)} unique animaldays, "
-                f"but got {len(self.long_recordings)} LROs instead. "
-                f"\nAnimaldays: {self.unique_animaldays}"
-                f"\nLRO count: {len(self.long_recordings)}"
-                f"\nThis will cause incorrect mapping of LOF scores and bad channels."
-            )
-            logging.error(error_msg)
-            raise ValueError(error_msg)
-
-        logging.info(
-            f"✓ Validated: {len(self.long_recordings)} LROs match {len(self.unique_animaldays)} animaldays"
-        )
-
-        channel_names = [x.channel_names for x in self.long_recordings]
-        if len(set([" ".join(x) for x in channel_names])) > 1:
-            warnings.warn(
-                f"Inconsistent channel names in long_recordings: {channel_names}"
-            )
-        self.channel_names = channel_names[0]
-
-        animal_ids = [x["animal"] for x in self._animalday_dicts]
-        if len(set(animal_ids)) > 1:
-            warnings.warn(f"Inconsistent animal IDs in {animal_ids}")
-        self.animal_id = animal_ids[0]
 
     @staticmethod
     def _sort_lros_by_median_time_static(lro_pairs):
@@ -1134,7 +953,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                     f"Using fallback ordering."
                 )
                 # Use a very large timestamp to sort to end
-                median_time_seconds = float('inf')
+                median_time_seconds = float("inf")
 
             lro_times.append((median_time_seconds, identifier, lro))
 
@@ -1163,7 +982,9 @@ class AnimalOrganizer(AnimalFeatureParser):
             no valid timestamps are available.
         """
         # Call static version for sorting logic
-        sorted_folder_lro_pairs = self._sort_lros_by_median_time_static(folder_lro_pairs)
+        sorted_folder_lro_pairs = self._sort_lros_by_median_time_static(
+            folder_lro_pairs
+        )
 
         # Add detailed logging (only in instance method)
         if len(folder_lro_pairs) > 1:
@@ -1188,7 +1009,9 @@ class AnimalOrganizer(AnimalFeatureParser):
                                 mid1 = valid_timestamps[n // 2 - 1]
                                 mid2 = valid_timestamps[n // 2]
                                 median_timestamp = mid1 + (mid2 - mid1) / 2
-                            median_time_str = median_timestamp.strftime("%Y-%m-%d %H:%M:%S")
+                            median_time_str = median_timestamp.strftime(
+                                "%Y-%m-%d %H:%M:%S"
+                            )
                         else:
                             median_time_str = "no timestamps"
                     else:
@@ -1222,7 +1045,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                 )
 
             # Summary line for quick reference
-            folder_names = [Path(f).name for f, _ in sorted_folder_lro_pairs]
+            folder_names = [self._get_item_name(f) for f, _ in sorted_folder_lro_pairs]
             logging.info(f"Final sort order: {folder_names}")
 
         return sorted_folder_lro_pairs
@@ -1611,11 +1434,11 @@ class AnimalOrganizer(AnimalFeatureParser):
                 # Log results
                 total_spikes = sum(len(spikes) for spikes in spike_indices_per_channel)
                 logging.info(
-                    f"Recording {i+1}/{len(recs)}: Detected {total_spikes} spikes across {len(spike_indices_per_channel)} channels"
+                    f"Recording {i + 1}/{len(recs)}: Detected {total_spikes} spikes across {len(spike_indices_per_channel)} channels"
                 )
 
             except Exception as e:
-                logging.error(f"Error processing recording {i+1}/{len(recs)}: {e}")
+                logging.error(f"Error processing recording {i + 1}/{len(recs)}: {e}")
                 raise
 
         # Store results for later access
@@ -1640,7 +1463,7 @@ class AnimalOrganizer(AnimalFeatureParser):
 
         # The session labels (animal, day, genotype) are formally attached to the LongRecording object
         session_labels = getattr(lan.LongRecording, "labels", {})
-        
+
         # Fallback for old recordings without formal labels
         if not session_labels:
             lan_folder = lan.LongRecording.base_folder_path
@@ -1793,12 +1616,16 @@ class AnimalOrganizer(AnimalFeatureParser):
 
                 merged_lros.append(base_lro)
                 merged_animaldays.append(animalday)
-                logging.info(f"Successfully merged {len(lro_group)} LROs for {animalday}")
+                logging.info(
+                    f"Successfully merged {len(lro_group)} LROs for {animalday}"
+                )
 
         # Step 3: Set merged LROs and animaldays
         ao.long_recordings = merged_lros
         ao.unique_animaldays = merged_animaldays
-        ao.animaldays = merged_animaldays.copy()  # Create separate list for compatibility
+        ao.animaldays = (
+            merged_animaldays.copy()
+        )  # Create separate list for compatibility
 
         # Step 4: Validate and reconcile channel names across all merged LROs
         ao.channel_names = cls._validate_channel_names(merged_lros)
@@ -1806,7 +1633,8 @@ class AnimalOrganizer(AnimalFeatureParser):
         # Step 5: CRITICAL VALIDATION - ensure no duplicates after merge
         if len(ao.long_recordings) != len(set(ao.unique_animaldays)):
             duplicate_dates = [
-                date for date in ao.unique_animaldays
+                date
+                for date in ao.unique_animaldays
                 if ao.unique_animaldays.count(date) > 1
             ]
             raise ValueError(
@@ -1926,7 +1754,6 @@ class AnimalOrganizer(AnimalFeatureParser):
         ao._processed_timestamps = None
 
         ao._init_containers()
-
 
     def split(
         self,
@@ -2194,14 +2021,16 @@ class WindowAnalysisResult(AnimalFeatureParser):
             if animalday not in self.bad_channels_dict:
                 # Add missing animalday with empty bad channels list
                 self.bad_channels_dict[animalday] = []
-                logging.info(f"Added missing animalday to bad_channels_dict: {animalday}")
+                logging.info(
+                    f"Added missing animalday to bad_channels_dict: {animalday}"
+                )
 
             if animalday not in self.lof_scores_dict:
                 # Add missing animalday with empty LOF scores
                 # NOTE: Both lof_scores AND channel_names must be empty to maintain invariant!
                 self.lof_scores_dict[animalday] = {
                     "lof_scores": [],
-                    "channel_names": []  # Must be empty to match empty lof_scores!
+                    "channel_names": [],  # Must be empty to match empty lof_scores!
                 }
                 logging.warning(
                     f"Added missing animalday to lof_scores_dict: {animalday}. "
@@ -2656,28 +2485,44 @@ class WindowAnalysisResult(AnimalFeatureParser):
         available_features = [f for f in features if f in result_win.columns]
 
         # Get the base result with requested features
-        df_result = result_win.loc[:, self._nonfeature_columns + available_features].copy()
+        df_result = result_win.loc[
+            :, self._nonfeature_columns + available_features
+        ].copy()
 
         # Classify features by type
-        band_features_in_data = [f for f in available_features if f in constants.BAND_FEATURES]
-        banded_matrix_features_in_data = [f for f in available_features if f in constants.BANDED_MATRIX_FEATURES]
-        simple_matrix_features_in_data = [f for f in available_features if f in constants.SIMPLE_MATRIX_FEATURES]
-        simple_features_in_data = [f for f in available_features if f in constants.LINEAR_FEATURES]
+        band_features_in_data = [
+            f for f in available_features if f in constants.BAND_FEATURES
+        ]
+        banded_matrix_features_in_data = [
+            f for f in available_features if f in constants.BANDED_MATRIX_FEATURES
+        ]
+        simple_matrix_features_in_data = [
+            f for f in available_features if f in constants.SIMPLE_MATRIX_FEATURES
+        ]
+        simple_features_in_data = [
+            f for f in available_features if f in constants.LINEAR_FEATURES
+        ]
 
         # Process band features - extract all 5 bands
         for band_feature in band_features_in_data:
             if band_feature in df_result.columns:
-                df_result = self._extract_band_features(df_result, band_feature, constants.BAND_NAMES)
+                df_result = self._extract_band_features(
+                    df_result, band_feature, constants.BAND_NAMES
+                )
 
         # Process banded matrix features - extract all 5 bands
         for matrix_feature in banded_matrix_features_in_data:
             if matrix_feature in df_result.columns:
-                df_result = self._extract_banded_matrix_features(df_result, matrix_feature, constants.BAND_NAMES)
+                df_result = self._extract_banded_matrix_features(
+                    df_result, matrix_feature, constants.BAND_NAMES
+                )
 
         # Build list of features to average
         features_to_average = []
         features_to_average.extend(simple_features_in_data)
-        features_to_average.extend(simple_matrix_features_in_data)  # pcorr, zpcorr (no bands)
+        features_to_average.extend(
+            simple_matrix_features_in_data
+        )  # pcorr, zpcorr (no bands)
 
         for band_feature in band_features_in_data:
             for band in constants.BAND_NAMES:
@@ -2693,11 +2538,13 @@ class WindowAnalysisResult(AnimalFeatureParser):
         # Drop original band/banded-matrix features (now that bands are extracted into separate columns)
         # These are no longer needed and cannot be aggregated (contain dicts/arrays)
         features_to_drop = band_features_in_data + banded_matrix_features_in_data
-        df_result = df_result.drop(columns=features_to_drop, errors='ignore')
+        df_result = df_result.drop(columns=features_to_drop, errors="ignore")
 
         return df_result
 
-    def _extract_band_features(self, df: pd.DataFrame, feature_name: str, band_names: list[str]) -> pd.DataFrame:
+    def _extract_band_features(
+        self, df: pd.DataFrame, feature_name: str, band_names: list[str]
+    ) -> pd.DataFrame:
         """Extract individual frequency bands from band features.
 
         Band features (logpsdband, logpsdfrac, etc.) are stored as dicts with
@@ -2713,6 +2560,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         """
         import numpy as np
         import logging
+
         logger = logging.getLogger(__name__)
 
         if feature_name not in df.columns:
@@ -2721,7 +2569,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         # Determine number of windows and channels from first element
         first_element = df[feature_name].iloc[0]
         if not isinstance(first_element, dict):
-             raise ValueError(
+            raise ValueError(
                 f"Band feature {feature_name} must be a dictionary of bands. "
                 f"Got {type(first_element)}. If this is a linear feature, fix constants."
             )
@@ -2731,7 +2579,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
             band_values = []
             for i, row_dict in enumerate(df[feature_name]):
                 if not isinstance(row_dict, dict):
-                    logger.warning(f"Row {i} of {feature_name} is not a dict. Using NaNs.")
+                    logger.warning(
+                        f"Row {i} of {feature_name} is not a dict. Using NaNs."
+                    )
                     band_values.append(np.full(len(self.channel_names), np.nan))
                     continue
 
@@ -2741,7 +2591,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
                         val = np.array(val)
                     band_values.append(val)
                 else:
-                    logger.warning(f"Band {band_name} missing in {feature_name} at row {i}")
+                    logger.warning(
+                        f"Band {band_name} missing in {feature_name} at row {i}"
+                    )
                     band_values.append(np.full(len(self.channel_names), np.nan))
 
             # Store as list of arrays/values
@@ -2749,7 +2601,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
         return df
 
-    def _extract_banded_matrix_features(self, df: pd.DataFrame, feature_name: str, band_names: list[str]) -> pd.DataFrame:
+    def _extract_banded_matrix_features(
+        self, df: pd.DataFrame, feature_name: str, band_names: list[str]
+    ) -> pd.DataFrame:
         """Extract individual frequency bands from banded matrix features.
 
         This method handles banded matrix features (cohere, zcohere, imcoh, zimcoh)
@@ -2794,10 +2648,22 @@ class WindowAnalysisResult(AnimalFeatureParser):
                                 f"Expected 2D matrix for {feature_name}[{band_name}], "
                                 f"got {type(matrix)} with shape {getattr(matrix, 'shape', 'N/A')}"
                             )
-                            band_matrices.append(np.full((len(self.channel_names), len(self.channel_names)), np.nan))
+                            band_matrices.append(
+                                np.full(
+                                    (len(self.channel_names), len(self.channel_names)),
+                                    np.nan,
+                                )
+                            )
                     else:
-                        logger.warning(f"Missing band {band_name} in {feature_name} dictionary")
-                        band_matrices.append(np.full((len(self.channel_names), len(self.channel_names)), np.nan))
+                        logger.warning(
+                            f"Missing band {band_name} in {feature_name} dictionary"
+                        )
+                        band_matrices.append(
+                            np.full(
+                                (len(self.channel_names), len(self.channel_names)),
+                                np.nan,
+                            )
+                        )
 
                 df[f"{feature_name}_{band_name}"] = band_matrices
 
@@ -2857,7 +2723,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
         return df
 
-    def _average_across_channels(self, df: pd.DataFrame, features: list[str]) -> pd.DataFrame:
+    def _average_across_channels(
+        self, df: pd.DataFrame, features: list[str]
+    ) -> pd.DataFrame:
         """Average features across channels to produce scalar values.
 
         Handles two types of features:
@@ -2887,7 +2755,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     # Vector features: Mean across channels
                     # We use a robust approach to handle potential list formats or shape drifts
                     feature_values = df[feature].values
-                    
+
                     # Check if we can use vectorized approach (faster)
                     try:
                         # This will fail efficiently if shapes don't match
@@ -2900,12 +2768,13 @@ class WindowAnalysisResult(AnimalFeatureParser):
                             f"This likely indicates data corruption during feature extraction. "
                             f"Original error: {e}"
                         ) from e
-                    
+
                     df[feature] = feature_avg
 
                 elif first_element.ndim == 2:
                     # Matrix features: Mean of upper triangle
                     import logging
+
                     logger = logging.getLogger(__name__)
 
                     feature_avg = []
@@ -2924,7 +2793,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
                         if matrix.shape[0] < 2 or matrix.shape[1] < 2:
                             # Can't get upper triangle (excluding diag) from 1x1 or smaller
-                            feature_avg.append(np.nanmean(matrix) if matrix.size > 0 else np.nan)
+                            feature_avg.append(
+                                np.nanmean(matrix) if matrix.size > 0 else np.nan
+                            )
                             continue
 
                         upper_tri_indices = np.triu_indices_from(matrix, k=1)
@@ -2934,7 +2805,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                             avg_val = np.nanmean(matrix) if matrix.size > 0 else np.nan
                         else:
                             avg_val = np.nanmean(upper_tri_values)
-                        
+
                         feature_avg.append(avg_val)
 
                     df[feature] = feature_avg
