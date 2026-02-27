@@ -447,6 +447,13 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
                 picks=[ch_idx], preload=True, event_repeated='merge'
             )
 
+            if len(epochs) == 0:
+                logging.warning(
+                    f"No valid epochs for {event_name} after windowing "
+                    f"(tmin={tmin}, tmax={tmax}). Skipping plot."
+                )
+                continue
+
             # Save epoch data if requested
             if save_epoch and animal_id and save_dir:
                 saveFile_MNE = f"{animal_id}_fdsar_epoch_{ch_idx}.fif"
