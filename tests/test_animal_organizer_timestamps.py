@@ -73,7 +73,11 @@ class TestAnimalOrganizerTimestampHandling:
     def test_single_datetime_global_timeline(self, mock_glob):
         """Test that a single datetime creates a global timeline for all LROs."""
         # Setup
-        mock_glob.return_value = [str(self.folder1), str(self.folder2), str(self.folder3)]
+        mock_glob.return_value = [
+            str(self.folder1),
+            str(self.folder2),
+            str(self.folder3),
+        ]
 
         with patch.object(core, "LongRecordingOrganizer") as mock_lro_class:
             mock_lro_class.return_value = self._create_mock_lro()
@@ -113,7 +117,11 @@ class TestAnimalOrganizerTimestampHandling:
     def test_list_of_datetimes_per_lro_assignment(self, mock_glob, mock_lro_class):
         """Test that a list of datetimes gets assigned to LROs in order."""
         # Setup
-        mock_glob.return_value = [str(self.folder1), str(self.folder2), str(self.folder3)]
+        mock_glob.return_value = [
+            str(self.folder1),
+            str(self.folder2),
+            str(self.folder3),
+        ]
         mock_lro_class.return_value = self._create_mock_lro()
 
         datetime_list = [
@@ -140,7 +148,11 @@ class TestAnimalOrganizerTimestampHandling:
     def test_user_defined_timestamp_function(self, mock_glob, mock_lro_class):
         """Test that user-defined functions can extract timestamps from folders."""
         # Setup
-        mock_glob.return_value = [str(self.folder1), str(self.folder2), str(self.folder3)]
+        mock_glob.return_value = [
+            str(self.folder1),
+            str(self.folder2),
+            str(self.folder3),
+        ]
         mock_lro_class.return_value = self._create_mock_lro()
 
         def extract_timestamp_from_folder(folder_path):
@@ -180,7 +192,11 @@ class TestAnimalOrganizerTimestampHandling:
     def test_mixed_dictionary_specification(self, mock_glob, mock_lro_class):
         """Test dictionary with mixed function and explicit timestamp specification."""
         # Setup
-        mock_glob.return_value = [str(self.folder1), str(self.folder2), str(self.folder3)]
+        mock_glob.return_value = [
+            str(self.folder1),
+            str(self.folder2),
+            str(self.folder3),
+        ]
         mock_lro_class.return_value = self._create_mock_lro()
 
         def extract_for_folder2(folder_path):
@@ -189,7 +205,10 @@ class TestAnimalOrganizerTimestampHandling:
         mixed_spec = {
             f"WT_{self.animal_id}_2023-01-15": datetime(2023, 1, 15, 8, 0, 0),
             f"WT_{self.animal_id}_2023-01-16": extract_for_folder2,
-            f"WT_{self.animal_id}_2023-01-17": [datetime(2023, 1, 17, 10, 0, 0), datetime(2023, 1, 17, 14, 0, 0)],
+            f"WT_{self.animal_id}_2023-01-17": [
+                datetime(2023, 1, 17, 10, 0, 0),
+                datetime(2023, 1, 17, 14, 0, 0),
+            ],
         }
 
         # Create AnimalOrganizer with mixed dictionary
@@ -204,14 +223,23 @@ class TestAnimalOrganizerTimestampHandling:
         assert len(ao._processed_timestamps) == 3
 
         # Check explicit datetime
-        assert ao._processed_timestamps[f"WT_{self.animal_id}_2023-01-15"] == datetime(2023, 1, 15, 8, 0, 0)
+        assert ao._processed_timestamps[f"WT_{self.animal_id}_2023-01-15"] == datetime(
+            2023, 1, 15, 8, 0, 0
+        )
 
         # Check function result
-        assert ao._processed_timestamps[f"WT_{self.animal_id}_2023-01-16"] == datetime(2023, 1, 16, 14, 30, 0)
+        assert ao._processed_timestamps[f"WT_{self.animal_id}_2023-01-16"] == datetime(
+            2023, 1, 16, 14, 30, 0
+        )
 
         # Check list
-        expected_list = [datetime(2023, 1, 17, 10, 0, 0), datetime(2023, 1, 17, 14, 0, 0)]
-        assert ao._processed_timestamps[f"WT_{self.animal_id}_2023-01-17"] == expected_list
+        expected_list = [
+            datetime(2023, 1, 17, 10, 0, 0),
+            datetime(2023, 1, 17, 14, 0, 0),
+        ]
+        assert (
+            ao._processed_timestamps[f"WT_{self.animal_id}_2023-01-17"] == expected_list
+        )
 
     @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
     @patch("glob.glob")
@@ -231,28 +259,6 @@ class TestAnimalOrganizerTimestampHandling:
             )
 
         assert "Invalid timestamp input type" in str(exc_info.value)
-    
-    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
-    @patch("glob.glob")
-    def test_invalid_list_items_error(self, mock_glob, mock_lro_class):
-        """Test that lists with non-datetime items raise errors."""
-        # Setup
-        mock_glob.return_value = [str(self.folder1)]
-        mock_lro_class.return_value = self._create_mock_lro()
-
-        # Test invalid list items
-        invalid_list = [datetime(2023, 1, 15, 10, 0, 0), "not a datetime"]
-
-        with pytest.raises(TypeError) as exc_info:
-            results.AnimalOrganizer(
-                base_folder_path=str(self.base_path),
-                animal_id=self.animal_id,
-                mode="concat",
-                lro_kwargs={"manual_datetimes": invalid_list},
-            )
-
-        assert "All items in timestamp list must be datetime objects" in str(exc_info.value)
-
 
     @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
     @patch("glob.glob")
@@ -273,7 +279,32 @@ class TestAnimalOrganizerTimestampHandling:
                 lro_kwargs={"manual_datetimes": invalid_list},
             )
 
-        assert "All items in timestamp list must be datetime objects" in str(exc_info.value)
+        assert "All items in timestamp list must be datetime objects" in str(
+            exc_info.value
+        )
+
+    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    @patch("glob.glob")
+    def test_invalid_list_items_error(self, mock_glob, mock_lro_class):
+        """Test that lists with non-datetime items raise errors."""
+        # Setup
+        mock_glob.return_value = [str(self.folder1)]
+        mock_lro_class.return_value = self._create_mock_lro()
+
+        # Test invalid list items
+        invalid_list = [datetime(2023, 1, 15, 10, 0, 0), "not a datetime"]
+
+        with pytest.raises(TypeError) as exc_info:
+            results.AnimalOrganizer(
+                base_folder_path=str(self.base_path),
+                animal_id=self.animal_id,
+                mode="concat",
+                lro_kwargs={"manual_datetimes": invalid_list},
+            )
+
+        assert "All items in timestamp list must be datetime objects" in str(
+            exc_info.value
+        )
 
     @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
     @patch("glob.glob")
@@ -320,19 +351,24 @@ class TestAnimalOrganizerTimestampHandling:
             mode="concat",
             lro_kwargs={"manual_datetimes": mixed_spec},
         )
-        
+
         assert len(ao._processed_timestamps) == 2
 
     @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
     @patch("glob.glob")
-    def test_backward_compatibility_no_manual_datetimes(self, mock_glob, mock_lro_class):
+    def test_backward_compatibility_no_manual_datetimes(
+        self, mock_glob, mock_lro_class
+    ):
         """Test that AnimalOrganizer works without manual_datetimes (backward compatibility)."""
         # Setup
         mock_glob.return_value = [str(self.folder1), str(self.folder2)]
         mock_lro_class.return_value = self._create_mock_lro()
 
         # Create AnimalOrganizer without manual_datetimes
-        ao = results.AnimalOrganizer(base_folder_path=str(self.base_path), animal_id=self.animal_id, mode="concat")
+        ao = results.AnimalOrganizer(
+            pattern=f"{self.base_path}/WT_{{animal}}_{{session}}",
+            animal_id=self.animal_id,
+        )
 
         # Should work fine
         assert ao._processed_timestamps is None
@@ -417,7 +453,11 @@ class TestAnimalOrganizerTimestampHandling:
     def test_continuous_timeline_single_datetime(self, mock_glob):
         """Test that single datetime creates continuous (non-overlapping) timeline."""
         # Setup
-        mock_glob.return_value = [str(self.folder1), str(self.folder2), str(self.folder3)]
+        mock_glob.return_value = [
+            str(self.folder1),
+            str(self.folder2),
+            str(self.folder3),
+        ]
 
         # Create mock LROs with specific durations
         def create_mock_lro_with_duration(duration_seconds):
@@ -465,7 +505,8 @@ class TestAnimalOrganizerTimestampHandling:
 
             # Convert folder paths to folder names for lookup
             folder_name_to_path = {
-                Path(path).name: path for path in [str(self.folder1), str(self.folder2), str(self.folder3)]
+                Path(path).name: path
+                for path in [str(self.folder1), str(self.folder2), str(self.folder3)]
             }
 
             # Expected timeline (continuous, non-overlapping)
@@ -487,7 +528,9 @@ class TestAnimalOrganizerTimestampHandling:
                 )
 
             # Verify no temporal overlaps
-            timeline_list = [(name, time) for name, time in ao._processed_timestamps.items()]
+            timeline_list = [
+                (name, time) for name, time in ao._processed_timestamps.items()
+            ]
             timeline_list.sort(key=lambda x: x[1])  # Sort by start time
 
             for i in range(len(timeline_list) - 1):
@@ -504,7 +547,9 @@ class TestAnimalOrganizerTimestampHandling:
                     f"Gap/overlap between {current_folder} and {next_folder}: {current_folder} ends at {current_end}, {next_folder} starts at {next_start}"
                 )
 
-            logging.info("✅ Continuous timeline verified: folders are sequential with no gaps or overlaps")
+            logging.info(
+                "✅ Continuous timeline verified: folders are sequential with no gaps or overlaps"
+            )
 
     @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
     @patch("glob.glob")
@@ -527,7 +572,11 @@ class TestAnimalOrganizerTimestampHandling:
 
         # Create different mock LROs for sorting/merging
         mock_lros = []
-        expected_median_times = [100.0, 50.0, 150.0]  # Out of name order but chronological
+        expected_median_times = [
+            100.0,
+            50.0,
+            150.0,
+        ]  # Out of name order but chronological
 
         for i, median_time in enumerate(expected_median_times):
             mock_lro = Mock()
@@ -626,12 +675,18 @@ class TestAnimalOrganizerTimestampHandling:
         invalid_list = [datetime(2023, 1, 15, 10, 0, 0), "not datetime"]
         with pytest.raises(TypeError) as exc_info:
             ao._resolve_timestamp_input(invalid_list, test_folder)
-        assert "All items in timestamp list must be datetime objects" in str(exc_info.value)
+        assert "All items in timestamp list must be datetime objects" in str(
+            exc_info.value
+        )
 
     @patch("glob.glob")
     def test_datetimes_are_start_end_time_support(self, mock_glob):
         """Test that datetimes_are_start=False computes timeline backwards from end time."""
-        mock_glob.return_value = [str(self.folder1), str(self.folder2), str(self.folder3)]
+        mock_glob.return_value = [
+            str(self.folder1),
+            str(self.folder2),
+            str(self.folder3),
+        ]
 
         def create_mock_lro_with_duration(duration_seconds):
             mock_lro = Mock()

@@ -33,8 +33,8 @@ def dummy_long_recording(tmp_path):
     recording.save(folder=rec_folder, format="binary")
     
     lro = LongRecordingOrganizer(
-        base_folder_path=rec_folder,
-        mode="si",
+        item=rec_folder,
+        
         manual_datetimes=datetime(2023, 1, 1, 12, 0),
     )
     
@@ -204,14 +204,14 @@ class TestSplitEdgeCases:
 
     def test_persist_no_recording_raises_error(self, tmp_path):
         """Test that persist() raises error when no recording is loaded."""
-        lro = LongRecordingOrganizer(base_folder_path=None, mode=None)
+        lro = LongRecordingOrganizer(item=None)
         
         with pytest.raises(ValueError, match="No recording to persist"):
             lro.persist(tmp_path / "output")
 
     def test_split_no_recording_raises_error(self):
         """Test that split() raises error when no recording is loaded."""
-        lro = LongRecordingOrganizer(base_folder_path=None, mode=None)
+        lro = LongRecordingOrganizer(item=None)
         
         with pytest.raises(ValueError, match="No recording loaded"):
             lro.split({"GroupA": ["Ch0"]})
@@ -260,8 +260,8 @@ class TestInitFromRecording:
         recording = si.NumpyRecording(traces_list=[traces], sampling_frequency=1000.0)
         
         lro = LongRecordingOrganizer(
-            base_folder_path=None,
-            mode=None,
+            item=None,
+            
             recording=recording,
         )
         
@@ -274,8 +274,8 @@ class TestInitFromRecording:
         recording = si.NumpyRecording(traces_list=[traces], sampling_frequency=1000.0)
         
         lro = LongRecordingOrganizer(
-            base_folder_path=None,
-            mode=None,
+            item=None,
+            
             recording=recording,
         )
         
@@ -288,8 +288,8 @@ class TestInitFromRecording:
         recording = si.NumpyRecording(traces_list=[traces], sampling_frequency=500.0)
         
         lro = LongRecordingOrganizer(
-            base_folder_path=None,
-            mode=None,
+            item=None,
+            
             recording=recording,
         )
         
@@ -304,8 +304,8 @@ class TestInitFromRecording:
         recording = si.NumpyRecording(traces_list=[traces], sampling_frequency=1000.0)
         
         lro = LongRecordingOrganizer(
-            base_folder_path=None,
-            mode=None,
+            item=None,
+            
             recording=recording,
         )
         
@@ -364,8 +364,8 @@ class TestChannelNameInheritance:
         recording.save(folder=input_folder, format="binary")
         
         lro = LongRecordingOrganizer(
-            base_folder_path=input_folder,
-            mode="si",
+            item=input_folder,
+            
             manual_datetimes=datetime(2023, 1, 1, 12, 0),
         )
         
@@ -393,8 +393,8 @@ class TestChannelNameInheritance:
         
         # Loading should trigger warning about integer channel IDs
         lro = LongRecordingOrganizer(
-            base_folder_path=input_folder,
-            mode="si",
+            item=input_folder,
+            
             manual_datetimes=datetime(2023, 1, 1),
         )
         
@@ -406,8 +406,8 @@ class TestChannelNameInheritance:
         recording = si.NumpyRecording(traces_list=[traces], sampling_frequency=1000.0)
         
         lro = LongRecordingOrganizer(
-            base_folder_path=None,
-            mode=None,
+            item=None,
+            
             recording=recording,
         )
         lro.channel_names = None
@@ -421,8 +421,8 @@ class TestChannelNameInheritance:
         recording = si.NumpyRecording(traces_list=[traces], sampling_frequency=1000.0)
         
         lro = LongRecordingOrganizer(
-            base_folder_path=None,
-            mode=None,
+            item=None,
+            
             recording=recording,
         )
         lro.channel_names = []
@@ -439,8 +439,8 @@ class TestChannelNameInheritance:
         recording = si.NumpyRecording(traces_list=[traces], sampling_frequency=1000.0)
         
         lro = LongRecordingOrganizer(
-            base_folder_path=None,
-            mode=None,
+            item=None,
+            
             recording=recording,
         )
         lro.channel_names = ["Ch0", "Ch1"]  # Mismatched: 2 names for 4 channels
@@ -477,8 +477,8 @@ class TestBoundaryConditions:
         recording = si.NumpyRecording(traces_list=[traces], sampling_frequency=1000.0)
         
         lro = LongRecordingOrganizer(
-            base_folder_path=None,
-            mode=None,
+            item=None,
+            
             recording=recording,
         )
         lro.channel_names = [f"Ch{i}" for i in range(10)]
@@ -570,8 +570,8 @@ class TestDataVerification:
         
         # Reload
         reloaded = LongRecordingOrganizer(
-            base_folder_path=actual_path,
-            mode="si",
+            item=actual_path,
+            
             manual_datetimes=datetime(2023, 1, 1),
         )
         reloaded_traces = reloaded.LongRecording.get_traces()
