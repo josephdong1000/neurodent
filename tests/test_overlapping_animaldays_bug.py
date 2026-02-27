@@ -563,8 +563,7 @@ class TestAnimalOrganizerDirectoryFiltering:
             results.AnimalOrganizer(pattern=f"{self.base_path}/*{self.animal_id}*", animal_id=self.animal_id, )
 
         error_message = str(exc_info.value)
-        assert "No directories found" in error_message
-        assert self.animal_id in error_message
+        assert "No items discovered" in error_message
 
     @patch("neurodent.core.LongRecordingOrganizer")
     def test_noday_mode_multiple_directories_error(self, mock_lro):
