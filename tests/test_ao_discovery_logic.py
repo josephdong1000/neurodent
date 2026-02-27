@@ -59,7 +59,7 @@ def test_ao_directory_mode_repro(tmp_path, monkeypatch):
     Regression Test: Reproduce "No directories found" for Directory Mode.
     Scenario:
       Structure: Root/Data/20230101/recording.bin
-      Config: mode="nest", file_pattern=None (implies directory mode)
+      Config:  file_pattern=None (implies directory mode)
     """
     monkeypatch.setattr("neurodent.constants.GENOTYPE_ALIASES", MOCK_ALIASES)
     
@@ -82,12 +82,11 @@ def test_ao_directory_mode_repro(tmp_path, monkeypatch):
 
     # Initialize AO
     ao = results.AnimalOrganizer(
-        base_folder_path=data_dir,
+        pattern=f"{data_dir}/*{anim_id}*",
         animal_id="AP3B2homo-240-M",
-        mode="concat", # Directory name itself contains the ID
+         # Directory name itself contains the ID
         file_pattern=None, # Directory mode
-        day_parse_kwargs=day_parse_kwargs
-    )
+            )
     
     # If successful, no error raised.
     # Check what was found
@@ -110,12 +109,9 @@ def test_ao_discovery_production_setup_homo(mock_production_structure, monkeypat
     
     day_parse_kwargs = {"date_patterns": [(r"\d{6}", "%y%m%d")]}
     ao = results.AnimalOrganizer(
-        base_folder_path=parent_folder,
+        pattern=f"{parent_folder}/*{anim_id}*",
         animal_id=anim_id,
-        mode="concat",
-        file_pattern="*.nwb",
-        day_parse_kwargs=day_parse_kwargs
-    )
+                            )
     
     found_files = [Path(f).name for f in ao._bin_folders]
     print(f"\n[Production HOMO Check] Found files for {anim_id}: {found_files}")
@@ -146,12 +142,9 @@ def test_ao_discovery_production_setup_wt(mock_production_structure, monkeypatch
     
     day_parse_kwargs = {"date_patterns": [(r"\d{6}", "%y%m%d")]}
     ao = results.AnimalOrganizer(
-        base_folder_path=parent_folder,
+        pattern=f"{parent_folder}/*{anim_id}*",
         animal_id=anim_id,
-        mode="concat",
-        file_pattern="*.nwb",
-        day_parse_kwargs=day_parse_kwargs
-    )
+                            )
     
     found_files = [Path(f).name for f in ao._bin_folders]
     print(f"\n[Production WT Check] Found files for {anim_id}: {found_files}")
@@ -179,12 +172,9 @@ def test_ao_discovery_grandparent_setup(mock_production_structure, monkeypatch):
     # So it should raise ValueError: No directories found.
     with pytest.raises(ValueError, match="No directories found"):
         ao = results.AnimalOrganizer(
-            base_folder_path=grandparent,
+            pattern=f"{grandparent}/*{anim_id}*",
             animal_id=anim_id,
-            mode="concat",
-            file_pattern="*.nwb",
-            day_parse_kwargs=day_parse_kwargs
-        )
+                                            )
         
     # found_files = [Path(f).name for f in ao._bin_folders] # Unreachable
     # assert "AP3B2homo-240-M_Correct_HOMO_251127.nwb" in found_files
@@ -206,7 +196,7 @@ def test_parse_ghost_file_behavior(monkeypatch):
     # So 'concat' mode should FAIL to parse.
     day_parse_kwargs = {"date_patterns": [(r"\d{6}", "%y%m%d")]}
     try:
-        parsed_concat = utils.parse_path_to_animalday(ghost_path, mode="concat", **day_parse_kwargs)
+        parsed_concat = utils.parse_path_to_animalday(ghost_path,  **day_parse_kwargs)
         print(f"\n[Ghost Parse] Concat mode result: {parsed_concat}")
     except Exception as e:
         print(f"\n[Ghost Parse] Concat mode failed: {e}")
@@ -221,7 +211,7 @@ def test_parse_ghost_file_behavior(monkeypatch):
     # The actual return IS the animal ID, derived from the folder name string.
     
     try:
-        parsed_nest = utils.parse_path_to_animalday(ghost_path, mode="nest", **day_parse_kwargs)
+        parsed_nest = utils.parse_path_to_animalday(ghost_path,  **day_parse_kwargs)
         print(f"[Ghost Parse] Nest mode result: {parsed_nest}")
         
         # Verify that 'nest' mode correctly extracts the genotype and animal ID from 
@@ -254,12 +244,9 @@ def test_ao_discovery_ambiguous_names(mock_production_structure, monkeypatch):
     monkeypatch.setattr(results.AnimalOrganizer, "_create_long_recordings", lambda self, kw: None)
     day_parse_kwargs = {"date_patterns": [(r"\d{6}", "%y%m%d")]}
     ao = results.AnimalOrganizer(
-        base_folder_path=parent,
+        pattern=f"{parent}/*{anim_id}*",
         animal_id="AP3B2homo-240-M",
-        mode="concat",
-        file_pattern="*.nwb",
-        day_parse_kwargs=day_parse_kwargs
-    )
+                            )
     
     found_files = [Path(f).name for f in ao._bin_folders]
     print(f"\n[Ambiguous Check] Found files: {found_files}")
@@ -291,12 +278,9 @@ def test_ao_discovery_nested_duplicates(mock_production_structure, monkeypatch):
     monkeypatch.setattr(results.AnimalOrganizer, "_create_long_recordings", lambda self, kw: None)
     day_parse_kwargs = {"date_patterns": [(r"\d{6}", "%y%m%d")]}
     ao = results.AnimalOrganizer(
-        base_folder_path=parent,
+        pattern=f"{parent}/*{anim_id}*",
         animal_id="AP3B2homo-240-M",
-        mode="concat",
-        file_pattern="*.nwb",
-        day_parse_kwargs=day_parse_kwargs
-    )
+                            )
     
     found_files = [Path(f).name for f in ao._bin_folders]
     print(f"\n[Nested Duplicate Check] Found files: {found_files}")
@@ -322,12 +306,9 @@ def test_ao_discovery_file_level_exclusion(mock_production_structure, monkeypatc
     
     day_parse_kwargs = {"date_patterns": [(r"\d{6}", "%y%m%d")]}
     ao = results.AnimalOrganizer(
-        base_folder_path=parent,
+        pattern=f"{parent}/*{anim_id}*",
         animal_id="AP3B2homo-240-M",
-        mode="concat",
-        file_pattern="*.nwb",
-        day_parse_kwargs=day_parse_kwargs
-    )
+                            )
     
     found_files = [Path(f).name for f in ao._bin_folders]
     print(f"\n[File Level Check] Found files: {found_files}")
@@ -372,22 +353,15 @@ def test_ao_animal_file_match_pattern_regex(mock_joint_session_structure, monkey
     # Without animal_file_match_pattern: should fail
     with pytest.raises(ValueError, match="No directories found"):
         results.AnimalOrganizer(
-            base_folder_path=mock_joint_session_structure,
+            pattern=f"{mock_joint_session_structure}/*{anim_id}*",
             animal_id="ArxRosa-967",
-            mode="base",
-            file_pattern="*.EDF",
-            day_parse_kwargs=day_parse_kwargs,
-        )
+                                            )
 
     # With animal_file_match_pattern: should succeed
     ao = results.AnimalOrganizer(
-        base_folder_path=mock_joint_session_structure,
+        pattern=f"{mock_joint_session_structure}/*{anim_id}*",
         animal_id="ArxRosa-967",
-        mode="base",
-        file_pattern="*.EDF",
-        day_parse_kwargs=day_parse_kwargs,
-        animal_file_match_pattern="967|968|969|418",
-    )
+                                    )
 
     found_files = [Path(f).name for f in ao._bin_folders]
 
@@ -411,12 +385,9 @@ def test_ao_animal_file_match_pattern_none_default(mock_production_structure, mo
 
     day_parse_kwargs = {"date_patterns": [(r"\d{6}", "%y%m%d")]}
     ao = results.AnimalOrganizer(
-        base_folder_path=mock_production_structure,
+        pattern=f"{mock_production_structure}/*{anim_id}*",
         animal_id="AP3B2homo-240-M",
-        mode="concat",
-        file_pattern="*.nwb",
-        day_parse_kwargs=day_parse_kwargs,
-        # animal_file_match_pattern not passed — should default to [animal_id]
+                                # animal_file_match_pattern not passed — should default to [animal_id]
     )
 
     found_files = [Path(f).name for f in ao._bin_folders]
@@ -456,15 +427,11 @@ def test_ao_animal_file_match_pattern_with_manual_datetimes(mock_joint_session_s
     monkeypatch.setattr(results.AnimalOrganizer, "_compute_global_timeline", mock_compute_global_timeline)
 
     # Simulate what generate_wars.py does: pass manual_datetimes as a string
-    # and lro_kwargs with mode="mne" (the EDF override)
+    # and lro_kwargs with (the EDF override)
     ao = results.AnimalOrganizer(
-        base_folder_path=mock_joint_session_structure,
+        pattern=f"{mock_joint_session_structure}/*{anim_id}*",
         animal_id="ArxRosa-967",
-        mode="base",
-        file_pattern="*.EDF",
-        day_parse_kwargs=day_parse_kwargs,
-        animal_file_match_pattern="967|968|969|418",
-        lro_kwargs={
+                                        lro_kwargs={
             "mode": "mne",
             "input_type": "files",
             "extract_func": "read_raw_edf",
@@ -498,7 +465,7 @@ def test_ao_animal_file_match_pattern_with_manual_datetimes(mock_joint_session_s
 def test_ao_animal_file_match_pattern_si_mode(mock_joint_session_structure, monkeypatch):
     """
     Test that SI mode (RHD sessions) also works with animal_file_match_pattern
-    and manual_datetimes. Verifies the lro_kwargs preserve mode='si'.
+    and manual_datetimes. Verifies the lro_kwargs preserve .
     """
     monkeypatch.setattr(results.AnimalOrganizer, "_create_long_recordings", lambda self, kw: None)
 
@@ -520,13 +487,9 @@ def test_ao_animal_file_match_pattern_si_mode(mock_joint_session_structure, monk
     monkeypatch.setattr(results.AnimalOrganizer, "_compute_global_timeline", mock_compute_global_timeline)
 
     ao = results.AnimalOrganizer(
-        base_folder_path=mock_joint_session_structure,
+        pattern=f"{mock_joint_session_structure}/*{anim_id}*",
         animal_id="ArxRosa-967",
-        mode="base",
-        file_pattern="*.EDF",
-        day_parse_kwargs=day_parse_kwargs,
-        animal_file_match_pattern="967|968|969|418",
-        lro_kwargs={
+                                        lro_kwargs={
             "mode": "si",
             "input_type": "files",
             "extract_func": "read_intan",

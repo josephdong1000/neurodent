@@ -24,6 +24,7 @@ from scipy.signal import iirfilter, iirnotch, sosfiltfilt, filtfilt, stft, windo
 
 try:
     import spikeinterface.core as si
+
     SPIKEINTERFACE_AVAILABLE = True
 except ImportError:  # pragma: no cover
     si = None
@@ -44,19 +45,19 @@ class FrequencyDomainSpikeDetector:
 
     # Default detection parameters
     DEFAULT_PARAMS = {
-        'bp': [3.0, 40.0],              # bandpass filter Hz
-        'notch': 60.0,                  # notch filter Hz
-        'notch_q': 30.0,                # notch filter quality factor
-        'freq_slices': [10.0, 20.0],    # STFT energy slices Hz
-        'window_s': 0.125,              # STFT window size s
-        'sneo_percentile': 99.99,       # SNEO threshold percentile
-        'cluster_gap_ms': 80.0,         # clustering gap ms
-        'search_ms': 160.0,             # spike refinement search window ms
-        'baseline_ms': 500.0,           # baseline analysis window ms
-        'k_sigma': 3.0,                 # statistical significance threshold
-        'smooth_window': 7,             # smoothing kernel size
-        'vote_k': 2,                    # minimum votes required for detection
-        'smooth_len': 5,                # SNEO smoothing length
+        "bp": [3.0, 40.0],  # bandpass filter Hz
+        "notch": 60.0,  # notch filter Hz
+        "notch_q": 30.0,  # notch filter quality factor
+        "freq_slices": [10.0, 20.0],  # STFT energy slices Hz
+        "window_s": 0.125,  # STFT window size s
+        "sneo_percentile": 99.99,  # SNEO threshold percentile
+        "cluster_gap_ms": 80.0,  # clustering gap ms
+        "search_ms": 160.0,  # spike refinement search window ms
+        "baseline_ms": 500.0,  # baseline analysis window ms
+        "k_sigma": 3.0,  # statistical significance threshold
+        "smooth_window": 7,  # smoothing kernel size
+        "vote_k": 2,  # minimum votes required for detection
+        "smooth_len": 5,  # SNEO smoothing length
     }
 
     @staticmethod
@@ -64,7 +65,7 @@ class FrequencyDomainSpikeDetector:
         recording: "si.BaseRecording",
         detection_params: dict = None,
         max_length: int = None,
-        multiprocess_mode: Literal["dask", "serial"] = "serial"
+        multiprocess_mode: Literal["dask", "serial"] = "serial",
     ) -> tuple[list[np.ndarray], "mne.io.RawArray"]:
         """
         Detect spikes in a recording using frequency-domain analysis.
@@ -81,7 +82,9 @@ class FrequencyDomainSpikeDetector:
                 - mne_raw_with_annotations: MNE RawArray with spike annotations
         """
         if not SPIKEINTERFACE_AVAILABLE:
-            raise ImportError("SpikeInterface is required for frequency domain spike detection")
+            raise ImportError(
+                "SpikeInterface is required for frequency domain spike detection"
+            )
 
         # Merge with default parameters
         params = FrequencyDomainSpikeDetector.DEFAULT_PARAMS.copy()
@@ -93,11 +96,13 @@ class FrequencyDomainSpikeDetector:
         logging.debug(f"Recording channels: {recording.get_channel_ids()}")
 
         # Get preprocessed recording
-        rec_preprocessed = FrequencyDomainSpikeDetector._apply_preprocessing(recording, params)
+        rec_preprocessed = FrequencyDomainSpikeDetector._apply_preprocessing(
+            recording, params
+        )
 
         # Extract data for analysis
-        raw_data = rec_preprocessed.get_traces(return_in_uV=True) # (samples, channels)
-        raw_data = raw_data.T # (channels, samples)
+        raw_data = rec_preprocessed.get_traces(return_in_uV=True)  # (samples, channels)
+        raw_data = raw_data.T  # (channels, samples)
 
         sampling_freq = rec_preprocessed.get_sampling_frequency()
         channel_names = [str(ch_id) for ch_id in rec_preprocessed.get_channel_ids()]
@@ -108,7 +113,9 @@ class FrequencyDomainSpikeDetector:
             raw_data = raw_data[:, :max_length]
 
         # Create MNE RawArray for consistency
-        info = mne.create_info(ch_names=channel_names, sfreq=sampling_freq, ch_types='eeg')
+        info = mne.create_info(
+            ch_names=channel_names, sfreq=sampling_freq, ch_types="eeg"
+        )
         mne_raw = mne.io.RawArray(data=raw_data, info=info)
 
         # Run spike detection
@@ -119,15 +126,17 @@ class FrequencyDomainSpikeDetector:
                 spike_tasks = [
                     dask.delayed(FrequencyDomainSpikeDetector._detect_spikes_channel)(
                         raw_data[ch, :], sampling_freq, params
-                    ) for ch in range(n_channels)
+                    )
+                    for ch in range(n_channels)
                 ]
                 # dask.compute returns tuple, convert to list for consistency with serial mode
                 spike_indices_per_channel = list(dask.compute(*spike_tasks))
-            case "serial":
+            case _:
                 spike_indices_per_channel = [
                     FrequencyDomainSpikeDetector._detect_spikes_channel(
                         raw_data[ch, :], sampling_freq, params
-                    ) for ch in range(n_channels)
+                    )
+                    for ch in range(n_channels)
                 ]
 
         # Add spike annotations to MNE object
@@ -138,25 +147,33 @@ class FrequencyDomainSpikeDetector:
         return spike_indices_per_channel, mne_raw_with_annotations
 
     @staticmethod
-    def _apply_preprocessing(recording: "si.BaseRecording", params: dict) -> "si.BaseRecording":
+    def _apply_preprocessing(
+        recording: "si.BaseRecording", params: dict
+    ) -> "si.BaseRecording":
         """Apply bandpass and notch filtering to the recording."""
         rec = recording.clone()
 
         # Get raw data for scipy filtering (SpikeInterface preprocessing can be complex)
-        raw_data = rec.get_traces(return_in_uV=True) # (samples, channels)
-        raw_data = raw_data.T # (channels, samples)
+        raw_data = rec.get_traces(return_in_uV=True)  # (samples, channels)
+        raw_data = raw_data.T  # (channels, samples)
 
         sampling_freq = rec.get_sampling_frequency()
 
         # Apply bandpass filter
-        bp_lo, bp_hi = params['bp']
-        sos_bp = iirfilter(N=4, Wn=[bp_lo, bp_hi], btype='bandpass',
-                          ftype='butter', output='sos', fs=sampling_freq)
+        bp_lo, bp_hi = params["bp"]
+        sos_bp = iirfilter(
+            N=4,
+            Wn=[bp_lo, bp_hi],
+            btype="bandpass",
+            ftype="butter",
+            output="sos",
+            fs=sampling_freq,
+        )
         raw_filtered = sosfiltfilt(sos_bp, raw_data, axis=-1)
 
         # Apply notch filter
-        notch_freq = params['notch']
-        notch_q = params['notch_q']
+        notch_freq = params["notch"]
+        notch_q = params["notch_q"]
         b_notch, a_notch = iirnotch(w0=notch_freq, Q=notch_q, fs=sampling_freq)
         raw_notch = filtfilt(b_notch, a_notch, raw_filtered, axis=-1)
 
@@ -171,12 +188,18 @@ class FrequencyDomainSpikeDetector:
         # Convert back to SpikeInterface format
         # Note: This is a simplified approach. In production, might want to use SpikeInterface preprocessing
         # SpikeInterface expects (n_times, n_channels) while our data is (n_channels, n_times)
-        filtered_rec = si.NumpyRecording(raw_notch.T, sampling_frequency=sampling_freq, channel_ids=rec.get_channel_ids())
+        filtered_rec = si.NumpyRecording(
+            raw_notch.T,
+            sampling_frequency=sampling_freq,
+            channel_ids=rec.get_channel_ids(),
+        )
 
         return filtered_rec
 
     @staticmethod
-    def _detect_spikes_channel(signal: np.ndarray, fs: float, params: dict) -> np.ndarray:
+    def _detect_spikes_channel(
+        signal: np.ndarray, fs: float, params: dict
+    ) -> np.ndarray:
         """
         Detect spikes in a single channel using the STFT+SNEO algorithm.
 
@@ -188,56 +211,75 @@ class FrequencyDomainSpikeDetector:
         Returns:
             spike_indices: Array of spike sample indices
         """
-        logging.debug(f"Starting spike detection for channel - signal length: {len(signal)} samples, fs: {fs} Hz")
+        logging.debug(
+            f"Starting spike detection for channel - signal length: {len(signal)} samples, fs: {fs} Hz"
+        )
 
         # Step 1: STFT analysis
         logging.debug(
             f"Step 1/4: Computing STFT slices at frequencies {params['freq_slices']} Hz with window size {params['window_s']} s"
         )
         slices_dict = FrequencyDomainSpikeDetector._compute_stft_slices(
-            signal, fs, freqs=params['freq_slices'], window_s=params['window_s']
+            signal, fs, freqs=params["freq_slices"], window_s=params["window_s"]
         )
-        logging.debug(f"Step 1/4: Completed STFT analysis - extracted {len(slices_dict)} frequency bands")
+        logging.debug(
+            f"Step 1/4: Completed STFT analysis - extracted {len(slices_dict)} frequency bands"
+        )
 
         # Step 2: SNEO detection with multi-band voting
         logging.debug(
             f"Step 2/4: Applying SNEO detection with threshold percentile {params['sneo_percentile']} and vote_k={params['vote_k']}"
         )
         sneo_spikes, _ = FrequencyDomainSpikeDetector._apply_sneo_on_slices(
-            slices_dict, fs,
-            threshold_percentile=params['sneo_percentile'],
-            smooth_len=params['smooth_len'],
-            vote_k=params['vote_k']
+            slices_dict,
+            fs,
+            threshold_percentile=params["sneo_percentile"],
+            smooth_len=params["smooth_len"],
+            vote_k=params["vote_k"],
         )
-        logging.info(f"Step 2/4: SNEO detection found {len(sneo_spikes)} candidate spikes")
+        logging.info(
+            f"Step 2/4: SNEO detection found {len(sneo_spikes)} candidate spikes"
+        )
 
         # Step 3: Spike refinement and morphological validation
         logging.debug(
             f"Step 3/4: Refining spikes with morphological validation (search_ms={params['search_ms']}, k_sigma={params['k_sigma']})"
         )
         neg_spikes = FrequencyDomainSpikeDetector._enforce_downward_and_refine_minimal(
-            signal, fs, sneo_spikes,
-            search_ms=params['search_ms'],
-            baseline_ms=params['baseline_ms'],
-            k_sigma=params['k_sigma'],
-            smooth_window=params['smooth_window']
+            signal,
+            fs,
+            sneo_spikes,
+            search_ms=params["search_ms"],
+            baseline_ms=params["baseline_ms"],
+            k_sigma=params["k_sigma"],
+            smooth_window=params["smooth_window"],
         )
-        logging.info(f"Step 3/4: After refinement and validation: {len(neg_spikes)} spikes retained")
+        logging.info(
+            f"Step 3/4: After refinement and validation: {len(neg_spikes)} spikes retained"
+        )
 
         # Step 4: Temporal clustering and deduplication
-        logging.debug(f"Step 4/4: Clustering and deduplicating spikes (min_gap_ms={params['cluster_gap_ms']})")
-        final_spikes = FrequencyDomainSpikeDetector._filter_close_spikes_by_min_local(
-            signal, fs, neg_spikes,
-            min_gap_ms=params['cluster_gap_ms'],
-            window_ms=60.0,
-            smooth_window=5
+        logging.debug(
+            f"Step 4/4: Clustering and deduplicating spikes (min_gap_ms={params['cluster_gap_ms']})"
         )
-        logging.info(f"Step 4/4: Final spike count after clustering: {len(final_spikes)} spikes")
+        final_spikes = FrequencyDomainSpikeDetector._filter_close_spikes_by_min_local(
+            signal,
+            fs,
+            neg_spikes,
+            min_gap_ms=params["cluster_gap_ms"],
+            window_ms=60.0,
+            smooth_window=5,
+        )
+        logging.info(
+            f"Step 4/4: Final spike count after clustering: {len(final_spikes)} spikes"
+        )
 
         return final_spikes.astype(int)
 
     @staticmethod
-    def _compute_stft_slices(signal, fs, freqs=(40, 60), window='hann', window_s=0.125, noverlap=None):
+    def _compute_stft_slices(
+        signal, fs, freqs=(40, 60), window="hann", window_s=0.125, noverlap=None
+    ):
         """
         Compute STFT and extract power at specific frequency bands.
 
@@ -253,7 +295,9 @@ class FrequencyDomainSpikeDetector:
             dict: Frequency -> energy time series mapping
         """
         N = len(signal)
-        logging.debug(f"Computing STFT slices - signal length: {N} samples, fs: {fs} Hz")
+        logging.debug(
+            f"Computing STFT slices - signal length: {N} samples, fs: {fs} Hz"
+        )
 
         # Default window length informed by expected spike width (~125 ms)
         nperseg = int(round(fs * window_s))
@@ -261,11 +305,17 @@ class FrequencyDomainSpikeDetector:
             f"STFT parameters: window={window}, nperseg={nperseg} samples ({window_s} s), noverlap={noverlap}"
         )
 
-        f, t, Zxx = stft(signal, fs=fs, window=window, nperseg=nperseg, noverlap=noverlap)
+        f, t, Zxx = stft(
+            signal, fs=fs, window=window, nperseg=nperseg, noverlap=noverlap
+        )
         t_samp = (t * fs).astype(float)
 
-        logging.debug(f"STFT output dimensions: frequency bins={len(f)}, time bins={len(t)}, Zxx shape={Zxx.shape}")
-        logging.debug(f"Frequency range: {f[0]:.2f} - {f[-1]:.2f} Hz, frequency resolution: {f[1] - f[0]:.2f} Hz")
+        logging.debug(
+            f"STFT output dimensions: frequency bins={len(f)}, time bins={len(t)}, Zxx shape={Zxx.shape}"
+        )
+        logging.debug(
+            f"Frequency range: {f[0]:.2f} - {f[-1]:.2f} Hz, frequency resolution: {f[1] - f[0]:.2f} Hz"
+        )
         logging.debug(
             f"Time range: {t[0]:.4f} - {t[-1]:.4f} s, STFT time samples: {len(t_samp)}, Original signal samples: {N}"
         )
@@ -283,8 +333,12 @@ class FrequencyDomainSpikeDetector:
 
             # REVIEW the output of stft should already be the correct length, so unsure why interpolation is required
             # Interpolate back to original sampling rate
-            energy_resampled = np.interp(np.arange(N), t_samp, energy, left=energy[0], right=energy[-1])
-            logging.debug(f"Interpolated energy from {len(energy)} to {len(energy_resampled)} samples")
+            energy_resampled = np.interp(
+                np.arange(N), t_samp, energy, left=energy[0], right=energy[-1]
+            )
+            logging.debug(
+                f"Interpolated energy from {len(energy)} to {len(energy_resampled)} samples"
+            )
             logging.debug(
                 f"Energy stats - original: min={energy.min():.2e}, max={energy.max():.2e}, mean={energy.mean():.2e}"
             )
@@ -300,10 +354,12 @@ class FrequencyDomainSpikeDetector:
     @staticmethod
     def _sneo(x):
         """Smoothed Nonlinear Energy Operator (SNEO)."""
-        return x[1:-1]**2 - x[2:] * x[:-2]
+        return x[1:-1] ** 2 - x[2:] * x[:-2]
 
     @staticmethod
-    def _apply_sneo_on_slices(slice_dict, fs, threshold_percentile=99.9, smooth_len=5, vote_k=2):
+    def _apply_sneo_on_slices(
+        slice_dict, fs, threshold_percentile=99.9, smooth_len=5, vote_k=2
+    ):
         """
         Apply SNEO on frequency slices with multi-band consensus voting.
 
@@ -317,12 +373,16 @@ class FrequencyDomainSpikeDetector:
         Returns:
             tuple: (final_spikes, sneo_combined)
         """
-        sneo_len = len(next(iter(slice_dict.values()))) - 2 # REVIEW fragile hardcoded -2, what if the energy operation doesn't reduce the length by 2?
+        sneo_len = (
+            len(next(iter(slice_dict.values()))) - 2
+        )  # REVIEW fragile hardcoded -2, what if the energy operation doesn't reduce the length by 2?
         sneo_combined = np.zeros(sneo_len)
         detections = []
 
         # Bartlett window for smoothing
-        win = windows.bartlett(smooth_len) if smooth_len > 1 else None # REVIEW I wonder if this can be replaced with a filter function -- becomes independent of sample frequency
+        win = (
+            windows.bartlett(smooth_len) if smooth_len > 1 else None
+        )  # REVIEW I wonder if this can be replaced with a filter function -- becomes independent of sample frequency
 
         for _, slice_ in slice_dict.items():
             s = FrequencyDomainSpikeDetector._sneo(slice_)
@@ -330,9 +390,11 @@ class FrequencyDomainSpikeDetector:
             # Apply smoothing if specified
             if win is not None:
                 if len(s) >= len(win):
-                    s = np.convolve(s, win, mode='same')
+                    s = np.convolve(s, win, mode="same")
                 else:
-                    warnings.warn(f"Skipping smoothing, smoothing window length {len(win)} is greater than the length of the SNEO signal {len(s)}")
+                    warnings.warn(
+                        f"Skipping smoothing, smoothing window length {len(win)} is greater than the length of the SNEO signal {len(s)}"
+                    )
 
             sneo_combined += s
 
@@ -355,8 +417,13 @@ class FrequencyDomainSpikeDetector:
 
     @staticmethod
     def _enforce_downward_and_refine_minimal(
-        signal, fs, candidates,
-        search_ms=160, baseline_ms=500, k_sigma=3.0, smooth_window=7
+        signal,
+        fs,
+        candidates,
+        search_ms=160,
+        baseline_ms=500,
+        k_sigma=3.0,
+        smooth_window=7,
     ):
         """
         Refine spike candidates by enforcing downward deflection and statistical significance.
@@ -377,8 +444,12 @@ class FrequencyDomainSpikeDetector:
             return np.array([])
 
         N = len(signal)
-        half = int(round(fs * (search_ms / 1e3) / 2)) # REVIEW rename these variables -- spike search window
-        base_half = int(round(fs * (baseline_ms / 1e3) / 2)) # REVIEW rename these variables -- window size to use as a baseline comparison
+        half = int(
+            round(fs * (search_ms / 1e3) / 2)
+        )  # REVIEW rename these variables -- spike search window
+        base_half = int(
+            round(fs * (baseline_ms / 1e3) / 2)
+        )  # REVIEW rename these variables -- window size to use as a baseline comparison
         out = []
 
         for c in np.asarray(candidates, dtype=int):
@@ -390,9 +461,11 @@ class FrequencyDomainSpikeDetector:
             # Apply smoothing
             if smooth_window and smooth_window > 1 and len(w) >= smooth_window:
                 pad = smooth_window // 2
-                wpad = np.pad(w, (pad, pad), mode='edge')
-                kern = np.ones(smooth_window) / smooth_window # REVIEW I wonder if this can be replaced with a filter function -- becomes independent of sample frequency
-                w = np.convolve(wpad, kern, mode='valid')
+                wpad = np.pad(w, (pad, pad), mode="edge")
+                kern = (
+                    np.ones(smooth_window) / smooth_window
+                )  # REVIEW I wonder if this can be replaced with a filter function -- becomes independent of sample frequency
+                w = np.convolve(wpad, kern, mode="valid")
 
             # Find minimum (most negative deflection)
             rel_min = np.argmin(w)
@@ -404,7 +477,9 @@ class FrequencyDomainSpikeDetector:
             base = signal[B0:B1]
 
             if len(base) < 10:
-                warnings.warn(f"Skipping baseline analysis for spike at index {idx}, baseline window length {len(base)} is less than 10")
+                warnings.warn(
+                    f"Skipping baseline analysis for spike at index {idx}, baseline window length {len(base)} is less than 10"
+                )
                 continue
 
             # Exclude spike region from baseline
@@ -416,15 +491,20 @@ class FrequencyDomainSpikeDetector:
 
             # Statistical significance test using robust statistics
             baseline_median = np.median(baseline_without_spike)
-            baseline_mad = np.median(np.abs(baseline_without_spike - baseline_median)) + 1e-12  # REVIEW should this epsilon be a parameter?
+            baseline_mad = (
+                np.median(np.abs(baseline_without_spike - baseline_median)) + 1e-12
+            )  # REVIEW should this epsilon be a parameter?
 
             if signal[idx] <= baseline_median - k_sigma * 1.4826 * baseline_mad:
                 # Morphological validation: check derivative pattern
                 # REVIEW this appears hardcoded. Checks for a negative then positive derivative but
                 # what if the before/after is noisy but there's still a trend?
                 # maybe better to fit a line to the before/after and check slopes
-                d = np.diff(signal[max(0, idx-3):min(N, idx+4)])
-                if d.size >= 2 and (np.any(d[:max(1,len(d)//2)] < 0) and np.any(d[max(1,len(d)//2):] > 0)):
+                d = np.diff(signal[max(0, idx - 3) : min(N, idx + 4)])
+                if d.size >= 2 and (
+                    np.any(d[: max(1, len(d) // 2)] < 0)
+                    and np.any(d[max(1, len(d) // 2) :] > 0)
+                ):
                     out.append(idx)
 
         return np.array(sorted(set(out)))
@@ -476,9 +556,11 @@ class FrequencyDomainSpikeDetector:
             # Apply smoothing
             if smooth_window and smooth_window > 1 and len(w) >= smooth_window:
                 pad = smooth_window // 2
-                wpad = np.pad(w, (pad, pad), mode='edge')
-                kern = np.ones(smooth_window, dtype=float) / smooth_window # REVIEW I wonder if this can be replaced with a filter function -- becomes independent of sample frequency
-                w = np.convolve(wpad, kern, mode='valid')
+                wpad = np.pad(w, (pad, pad), mode="edge")
+                kern = (
+                    np.ones(smooth_window, dtype=float) / smooth_window
+                )  # REVIEW I wonder if this can be replaced with a filter function -- becomes independent of sample frequency
+                w = np.convolve(wpad, kern, mode="valid")
 
             rel_min = int(np.argmin(w))
             best_idx = L + rel_min
@@ -504,21 +586,25 @@ class FrequencyDomainSpikeDetector:
         for ch_idx, channel_spikes in enumerate(spike_indices_per_channel):
             if len(channel_spikes) > 0:
                 # Convert sample indices to seconds
-                spike_times_seconds = (channel_spikes + 1) / sampling_freq # REVIEW why is +1 here?
+                spike_times_seconds = (
+                    channel_spikes + 1
+                ) / sampling_freq  # REVIEW why is +1 here?
                 for spike_time in spike_times_seconds:
-                    spike_annotations.append({
-                        'onset': float(spike_time),
-                        'duration': 0.0,
-                        'description': f'Spike_Ch{ch_idx}'
-                    })
+                    spike_annotations.append(
+                        {
+                            "onset": float(spike_time),
+                            "duration": 0.0,
+                            "description": f"Spike_Ch{ch_idx}",
+                        }
+                    )
 
         if spike_annotations:
             # Sort by onset time
-            spike_annotations.sort(key=lambda x: x['onset'])
+            spike_annotations.sort(key=lambda x: x["onset"])
             annotations = mne.Annotations(
-                onset=[a['onset'] for a in spike_annotations],
-                duration=[a['duration'] for a in spike_annotations],
-                description=[a['description'] for a in spike_annotations]
+                onset=[a["onset"] for a in spike_annotations],
+                duration=[a["duration"] for a in spike_annotations],
+                description=[a["description"] for a in spike_annotations],
             )
             mne_raw = mne_raw.copy().set_annotations(annotations)
 

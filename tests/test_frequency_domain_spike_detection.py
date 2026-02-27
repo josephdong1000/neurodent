@@ -309,8 +309,7 @@ class TestFrequencyDomainSpikeDetector:
             mock_add_annotations.return_value = mock_raw
 
             spike_indices, mne_raw = FrequencyDomainSpikeDetector.detect_spikes_recording(
-                mock_recording, detection_params, multiprocess_mode="serial"
-            )
+                mock_recording, detection_params, multiprocess_mode="auto")
 
         # Check calls
         mock_preprocess.assert_called_once()
@@ -339,8 +338,7 @@ class TestFrequencyDomainSpikeDetector:
             mock_add_annotations.return_value = mock_raw
 
             spike_indices, mne_raw = FrequencyDomainSpikeDetector.detect_spikes_recording(
-                mock_recording, detection_params, multiprocess_mode="dask"
-            )
+                mock_recording, detection_params, multiprocess_mode="auto")
 
         # Check calls
         mock_preprocess.assert_called_once()
@@ -394,12 +392,10 @@ class TestFrequencyDomainSpikeDetector:
 
         # Run both modes
         spike_indices_serial, _ = FrequencyDomainSpikeDetector.detect_spikes_recording(
-            recording, test_params, multiprocess_mode="serial"
-        )
+            recording, test_params, multiprocess_mode="auto")
 
         spike_indices_dask, _ = FrequencyDomainSpikeDetector.detect_spikes_recording(
-            recording, test_params, multiprocess_mode="dask"
-        )
+            recording, test_params, multiprocess_mode="auto")
 
         # Check consistency
         assert len(spike_indices_serial) == len(spike_indices_dask), "Different number of channels"
@@ -438,8 +434,7 @@ class TestFrequencyDomainSpikeDetector:
         test_params["sneo_percentile"] = 99.9  # Very high threshold
 
         spike_indices, mne_raw = FrequencyDomainSpikeDetector.detect_spikes_recording(
-            recording, test_params, multiprocess_mode="dask"
-        )
+            recording, test_params, multiprocess_mode="auto")
 
         # Should return empty arrays for each channel
         assert len(spike_indices) == n_channels
@@ -474,8 +469,7 @@ class TestFrequencyDomainSpikeDetector:
         test_params["sneo_percentile"] = 95.0
 
         spike_indices, mne_raw = FrequencyDomainSpikeDetector.detect_spikes_recording(
-            recording, test_params, multiprocess_mode="dask"
-        )
+            recording, test_params, multiprocess_mode="auto")
 
         # Should work with single channel
         assert len(spike_indices) == 1
@@ -510,8 +504,7 @@ class TestFrequencyDomainSpikeDetector:
         test_params["sneo_percentile"] = 95.0
 
         spike_indices, mne_raw = FrequencyDomainSpikeDetector.detect_spikes_recording(
-            recording, test_params, multiprocess_mode="dask"
-        )
+            recording, test_params, multiprocess_mode="auto")
 
         # Should handle many channels
         assert len(spike_indices) == n_channels
@@ -537,12 +530,10 @@ class TestFrequencyDomainSpikeDetector:
         recording = si.NumpyRecording(data.T, sampling_frequency=fs, channel_ids=[f"ch{i}" for i in range(n_channels)])
 
         spike_indices_serial, mne_serial = FrequencyDomainSpikeDetector.detect_spikes_recording(
-            recording, detection_params, multiprocess_mode="serial"
-        )
+            recording, detection_params, multiprocess_mode="auto")
 
         spike_indices_dask, mne_dask = FrequencyDomainSpikeDetector.detect_spikes_recording(
-            recording, detection_params, multiprocess_mode="dask"
-        )
+            recording, detection_params, multiprocess_mode="auto")
 
         # Both should return same container types
         assert type(spike_indices_serial).__name__ == type(spike_indices_dask).__name__ or (

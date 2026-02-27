@@ -39,11 +39,9 @@ def test_bad_date_config_masks_valid_files(mock_valid_structure, monkeypatch):
     
     with pytest.raises(ValueError) as excinfo:
         results.AnimalOrganizer(
-            base_folder_path=parent,
+            pattern=f"{parent}/*{anim_id}*",
             animal_id=anim_id,
-            mode="concat",
-            file_pattern="*.nwb"
-        )
+                                )
     
     error_msg = str(excinfo.value)
     print(f"\n[Scenario 1] Caught expected error: {error_msg}")
@@ -72,11 +70,9 @@ def test_strange_format_errors(mock_valid_structure, monkeypatch):
     
     with pytest.raises(ValueError) as excinfo:
         results.AnimalOrganizer(
-            base_folder_path=parent,
+            pattern=f"{parent}/*{anim_id}*",
             animal_id=anim_id,
-            mode="concat",
-            file_pattern="*.nwb"
-        )
+                                )
     assert "matched Animal ID/Genotype but failed parsing" in str(excinfo.value)
 
 
@@ -116,11 +112,9 @@ def test_filtering_still_works(mock_valid_structure, monkeypatch):
     
     with pytest.raises(ValueError) as excinfo:
         results.AnimalOrganizer(
-            base_folder_path=parent,
+            pattern=f"{parent}/*{anim_id}*",
             animal_id=anim_id,
-            mode="concat",
-            file_pattern="*.nwb",
-            day_parse_kwargs = {"date_patterns": [(r"\d{6}", "%y%m%d")]}
+                                    day_parse_kwargs = {"date_patterns": [(r"\d{6}", "%y%m%d")]}
         )
         
     error_msg = str(excinfo.value)

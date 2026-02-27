@@ -202,9 +202,9 @@ class DDFBinaryMetadata:
 def convert_ddfcolbin_to_ddfrowbin(rowdir_path, colbin_path, metadata, save_gzip=True):
     # TODO consider renaming this function to something more descriptive, like convert_colbin_to_rowbin
     # Also don't use the rowdir_path parameter, since this is outside the scope of the function. See utils.convert_colpath_to_rowpath
-    assert isinstance(metadata, DDFBinaryMetadata), (
-        "Metadata needs to be of type DDFBinaryMetadata"
-    )
+    assert isinstance(
+        metadata, DDFBinaryMetadata
+    ), "Metadata needs to be of type DDFBinaryMetadata"
 
     tempbin = np.fromfile(colbin_path, dtype=metadata.precision)
     tempbin = np.reshape(tempbin, (-1, metadata.n_channels), order="F")
@@ -236,9 +236,9 @@ def convert_ddfrowbin_to_si(bin_rowmajor_path, metadata):
     """
     if se is None:
         raise ImportError("SpikeInterface is required for convert_ddfrowbin_to_si")
-    assert isinstance(metadata, DDFBinaryMetadata), (
-        "Metadata needs to be of type DDFBinaryMetadata"
-    )
+    assert isinstance(
+        metadata, DDFBinaryMetadata
+    ), "Metadata needs to be of type DDFBinaryMetadata"
 
     bin_rowmajor_path = Path(bin_rowmajor_path)
     params = {
@@ -309,9 +309,9 @@ def _convert_ddfrowbin_to_si_no_resample(bin_rowmajor_path, metadata):
         raise ImportError(
             "SpikeInterface is required for _convert_ddfrowbin_to_si_no_resample"
         )
-    assert isinstance(metadata, DDFBinaryMetadata), (
-        "Metadata needs to be of type DDFBinaryMetadata"
-    )
+    assert isinstance(
+        metadata, DDFBinaryMetadata
+    ), "Metadata needs to be of type DDFBinaryMetadata"
 
     bin_rowmajor_path = Path(bin_rowmajor_path)
     params = {
@@ -359,7 +359,7 @@ def split_recording(
     input_path: Union[str, Path],
     groups: dict[str, list[str]],
     output_base: Union[str, Path] = None,
-    mode: Literal["bin", "si", "mne"] = "bin",
+    mode: Literal["si", "mne"] = "si",
     format: Literal["zarr", "binary"] = "zarr",
     persist: bool = True,
     **lro_kwargs,
@@ -375,7 +375,7 @@ def split_recording(
         groups (dict[str, list[str]]): Dictionary mapping group names to channel lists.
             Example: {"AnimalA": ["Ch1", "Ch2"], "AnimalB": ["Ch3", "Ch4"]}
         output_base (Union[str, Path], optional): Base directory for output. Required if persist=True.
-        mode (Literal["bin", "si", "mne"], optional): Mode for loading input. Defaults to "bin".
+        mode (Literal["si", "mne"], optional): Mode for loading input. Defaults to "si".
         format (Literal["zarr", "binary"], optional): Output format. Defaults to "zarr".
         persist (bool, optional): If True, save splits to disk. Defaults to True.
         **lro_kwargs: Additional arguments passed to LongRecordingOrganizer.
@@ -1509,8 +1509,10 @@ class LongRecordingOrganizer:
         """
         if mode in ["si", "mne"]:
             if self.manual_datetimes is None:
-                raise ValueError(
-                    f"manual_datetimes must be provided for {mode} mode when no CSV metadata is available"
+                import logging
+
+                logging.warning(
+                    f"manual_datetimes must be provided for {mode} mode when no CSV metadata is available, falling back to file creation times if possible"
                 )
 
             # If list provided and expected files known, validate length
@@ -1640,9 +1642,9 @@ class LongRecordingOrganizer:
                     )
                 logging.info("Using CSV metadata timestamps")
             else:
-                # For si/mne modes, manual timestamps are required
-                raise ValueError(
-                    "manual_datetimes must be provided when no CSV metadata is available!"
+                # For si/mne modes, manual timestamps are ideally required
+                logging.warning(
+                    "manual_datetimes must be provided when no CSV metadata is available! Falling back to file creation times if possible."
                 )
 
     def get_date_string(self) -> str:
@@ -1752,21 +1754,32 @@ class LongRecordingOrganizer:
         # the offset to be applied twice when get_traces(return_scaled=True) is called.
         # Only apply for integer dtypes — float recordings are assumed to already be in
         # physical units, matching SpikeInterface's own convention (baserecording.py:356).
-        dtype = recording.get_dtype()
-        is_integer = isinstance(dtype, (str, type, np.dtype)) and np.dtype(
-            dtype
-        ).kind in ("i", "u")
-        if is_integer and recording.has_scaleable_traces():
+        dtype = recording.get_dtype() if hasattr(recording, "get_dtype") else None
+        is_integer = False
+        if dtype is not None and isinstance(dtype, (str, type, np.dtype)):
+            try:
+                is_integer = np.dtype(dtype).kind in ("i", "u")
+            except TypeError:
+                pass
+
+        if (
+            is_integer
+            and hasattr(recording, "has_scaleable_traces")
+            and recording.has_scaleable_traces()
+        ):
             logging.info("Applying scale_to_uV to convert raw ADC data to microvolts")
             recording = spre.scale_to_uV(recording)
 
         # 1. Enforce signed integer if unsigned (existing logic preserved)
-        dtype = recording.get_dtype()
+        dtype = recording.get_dtype() if hasattr(recording, "get_dtype") else None
         # Handle numpy types, strings. Avoid Mock objects
         is_unsigned = False
-        if isinstance(dtype, (str, type, np.dtype)):
-            if np.dtype(dtype).kind == "u":
-                is_unsigned = True
+        if dtype is not None and isinstance(dtype, (str, type, np.dtype)):
+            try:
+                if np.dtype(dtype).kind == "u":
+                    is_unsigned = True
+            except TypeError:
+                pass
 
         if is_unsigned:
             logging.info(
@@ -1775,19 +1788,29 @@ class LongRecordingOrganizer:
             recording = spre.unsigned_to_signed(recording)
 
         # 2. Enforce GLOBAL_DTYPE (New logic)
-        if recording.get_dtype() != constants.GLOBAL_DTYPE:
+        current_dtype = (
+            recording.get_dtype() if hasattr(recording, "get_dtype") else None
+        )
+        if current_dtype is not None and current_dtype != constants.GLOBAL_DTYPE:
             logging.info(
-                f"Converting recording dtype from {recording.get_dtype()} to {constants.GLOBAL_DTYPE}"
+                f"Converting recording dtype from {current_dtype} to {constants.GLOBAL_DTYPE}"
             )
             recording = spre.astype(recording, dtype=constants.GLOBAL_DTYPE)
 
         # 3. Apply Resampling if needed
-        current_rate = recording.get_sampling_frequency()
+        current_rate = (
+            recording.get_sampling_frequency()
+            if hasattr(recording, "get_sampling_frequency")
+            else None
+        )
+        if current_rate is None and hasattr(recording, "info"):
+            current_rate = recording.info.get("sfreq", None)
+
         target_rate = constants.GLOBAL_SAMPLING_RATE
 
-        if current_rate == target_rate:
+        if current_rate == target_rate or current_rate is None:
             logging.info(
-                f"Recording already at target sampling rate ({target_rate} Hz), no resampling needed"
+                f"Recording already at target sampling rate ({target_rate} Hz) or unable to determine, no resampling needed"
             )
             return recording
 

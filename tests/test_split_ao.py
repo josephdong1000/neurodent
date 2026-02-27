@@ -553,9 +553,8 @@ class TestSplitIntegration:
         # Create LROs manually with different dates for each day
         lros = []
         for day_idx, folder in enumerate(day_folders):
-            lro = LongRecordingOrganizer(
-                base_folder_path=folder,
-                mode="si",
+            lro = LongRecordingOrganizer(item=folder,
+                
                 manual_datetimes=datetime(2023, 1, day_idx + 1, 12, 0),  # Jan-01, Jan-02
             )
             lro.channel_names = ["Ch0", "Ch1", "Ch2", "Ch3"]

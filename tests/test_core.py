@@ -574,7 +574,7 @@ class TestLongRecordingOrganizer:
         organizer = LongRecordingOrganizer(temp_dir, mode=None)
 
         with pytest.raises(ValueError, match="Invalid mode: invalid"):
-            organizer.detect_and_load_data(mode="invalid")
+            organizer.detect_and_load_data()
 
     def test_get_datetime_fragment(self, temp_dir):
         """Test get_datetime_fragment method."""
@@ -975,7 +975,7 @@ class TestLongRecordingOrganizer:
         with patch("spikeinterface.extractors.read_binary", return_value=mock_si_rec):
             organizer.item = str(test_file)
             organizer.convert_file_with_mne_to_recording(
-                extract_func=mock_extract, intermediate="bin"
+                extract_func=mock_extract, intermediate="mne"
             )
 
         # Verify binary file was created and read

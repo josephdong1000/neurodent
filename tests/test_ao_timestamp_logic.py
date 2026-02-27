@@ -46,12 +46,9 @@ def test_ao_grouping_logic(mock_overlap_structure, monkeypatch):
     day_parse_kwargs = {"date_patterns": [(r"\d{6}", "%y%m%d")]}
 
     ao = results.AnimalOrganizer(
-        base_folder_path=mock_overlap_structure,
+        pattern=f"{mock_overlap_structure}/*{anim_id}*",
         animal_id="AP3B2homo-240-M",
-        mode="concat",
-        file_pattern="*.nwb",
-        day_parse_kwargs=day_parse_kwargs
-    )
+                            )
     
     # Check grouping
     print("\n[Grouping Results]")

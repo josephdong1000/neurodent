@@ -279,7 +279,7 @@ def create_test_directory_structure():
     Usage:
         def test_something(create_test_directory_structure):
             base_path, dirs = create_test_directory_structure(
-                mode="concat",
+                
                 animal_id="A123"
             )
             # Use the created structure...
@@ -293,7 +293,7 @@ def create_test_directory_structure():
 
     created_temps = []
 
-    def _create_structure(mode="concat", animal_id="A123", genotype="WT", include_files=True, base_path=None):
+    def _create_structure( animal_id="A123", genotype="WT", include_files=True, base_path=None):
         """
         Create a test directory structure.
 
@@ -346,14 +346,14 @@ def create_test_directory_structure():
                 result["directories"].append(day1_dir)
 
             if include_files:
-                for ext in ["edf", "bin", "json"]:
+                for ext in ["edf", "json"]:
                     f = base_path / f"{genotype}_{animal_id}_recording.{ext}"
                     f.touch()
                     result["files"].append(f)
 
         elif mode == "base":
             if include_files:
-                for ext in ["edf", "bin"]:
+                for ext in ["edf", "json"]:
                     f = base_path / f"recording.{ext}"
                     f.touch()
                     result["files"].append(f)

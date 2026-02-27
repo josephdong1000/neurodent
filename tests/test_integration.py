@@ -85,7 +85,7 @@ class TestAnalysisPipeline:
         # Use a filename with a valid genotype
         filepath = Path("WT_A10_2023-01-01.bin")
 
-        metadata = utils.parse_path_to_animalday(filepath, animal_param=(1, "_"), mode="concat")
+        metadata = utils.parse_path_to_animalday(filepath, animal_param=(1, "_"), )
 
         assert metadata["genotype"] == "WT"
         assert metadata["animal"] == "A10"
@@ -117,7 +117,7 @@ class TestAnalysisPipeline:
         assert index == 1
 
         # Test metadata parsing
-        metadata = utils.parse_path_to_animalday(Path("WT_A10_2023-01-01.bin"), animal_param=(1, "_"), mode="concat")
+        metadata = utils.parse_path_to_animalday(Path("WT_A10_2023-01-01.bin"), animal_param=(1, "_"), )
         assert "animal" in metadata
         assert "genotype" in metadata
         assert "day" in metadata
@@ -248,7 +248,7 @@ class TestErrorHandlingIntegration:
 
         # Test invalid mode
         with pytest.raises(ValueError):
-            utils.parse_path_to_animalday(Path("/test"), mode="invalid")
+            utils.parse_path_to_animalday(Path("/test"), )
 
 
 class TestPerformanceIntegration:

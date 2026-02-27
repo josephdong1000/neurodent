@@ -149,11 +149,16 @@ class AnimalOrganizer(AnimalFeatureParser):
         animal_id: str | None = None,
         skip_sessions: list[str] = [],
         truncate: bool | int = False,
+        assume_from_number: bool = False,
         lro_kwargs: dict = {},
         day_parse_kwargs: dict = {},
     ) -> None:
         self.pattern = pattern
         self.animal_id = animal_id
+        self.assume_from_number = assume_from_number
+        self.animal_file_match_pattern = [animal_id] if animal_id else []
+        self.day_sep = None
+        self.read_mode = "pattern"  # Legacy compat; new pattern-based discovery
 
         from neurodent.core.discovery import FileDiscoverer
 
@@ -704,7 +709,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         for animalday, items in self._animalday_folder_groups.items():
             kwargs = lro_kwargs.copy()
             if (
-                hasattr(self, "_processed_timestamps")
+                getattr(self, "_processed_timestamps", None) is not None
                 and animalday in self._processed_timestamps
             ):
                 kwargs["manual_datetimes"] = self._processed_timestamps[animalday]
@@ -874,9 +879,11 @@ class AnimalOrganizer(AnimalFeatureParser):
                         "duration_s": duration,
                         "n_files": n_files,
                         "folder_path": folder_path,
-                        "folder_name": Path(str(folder_path)).name
-                        if folder_path != "unknown"
-                        else "unknown",
+                        "folder_name": (
+                            Path(str(folder_path)).name
+                            if folder_path != "unknown"
+                            else "unknown"
+                        ),
                         "animalday": getattr(lro, "labels", {}).get(
                             "animalday", "unknown"
                         ),
@@ -1424,7 +1431,11 @@ class AnimalOrganizer(AnimalFeatureParser):
                     animal_id=self.animal_id,
                     genotype=self.genotype,
                     animal_day=self.animaldays[i],
-                    bin_folder_name=self.bin_folder_names[i],
+                    bin_folder_name=(
+                        getattr(self, "base_folder_names", [None] * len(recs))[i]
+                        if hasattr(self, "base_folder_names")
+                        else None
+                    ),
                     metadata=self.long_recordings[i].meta,
                     assume_from_number=self.assume_from_number,
                 )

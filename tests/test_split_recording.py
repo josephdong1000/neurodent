@@ -141,7 +141,7 @@ class TestSplitRecordingFunction:
             input_path=input_folder,
             groups=groups,
             output_base=output_base,
-            mode="si",
+            
             format="zarr",
             manual_datetimes=datetime.now(),
         )
@@ -165,7 +165,7 @@ class TestSplitRecordingFunction:
             input_path=input_folder,
             groups=groups,
             persist=False,
-            mode="si",
+            
             manual_datetimes=datetime.now(),
         )
         
@@ -226,7 +226,7 @@ class TestSplitEdgeCases:
         
         monkeypatch.setattr(core_module, 'si', None)
         
-        lro = LRO(base_folder_path=None, mode=None)
+        lro = LRO(item='.', mode='mne')
         lro.LongRecording = "dummy"
         
         with pytest.raises(ImportError, match="SpikeInterface is required for split"):
@@ -242,7 +242,7 @@ class TestSplitEdgeCases:
         
         monkeypatch.setattr(core_module, 'si', None)
         
-        lro = LRO(base_folder_path=None, mode=None)
+        lro = LRO(item='.', mode='mne')
         lro.LongRecording = "dummy"
         
         with pytest.raises(ImportError, match="SpikeInterface is required for persist"):
@@ -529,7 +529,7 @@ class TestSplitRecordingFunctionEdgeCases:
                 input_path=input_folder,
                 groups={"A": ["0"]},
                 persist=True,
-                mode="si",
+                
                 manual_datetimes=datetime.now(),
             )
 
@@ -545,7 +545,7 @@ class TestSplitRecordingFunctionEdgeCases:
             groups={"A": ["0"]},
             output_base=tmp_path / "output",
             format="binary",
-            mode="si",
+            
             manual_datetimes=datetime.now(),
         )
         

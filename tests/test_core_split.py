@@ -64,7 +64,7 @@ class TestLROSplit(unittest.TestCase):
         base_path = Path("/tmp/test/recording")
         
         # Instantiate parent (uses _init_side_effect)
-        lro = LongRecordingOrganizer(base_folder_path=base_path)
+        lro = LongRecordingOrganizer(item=base_path)
         
         # Manually set additional state needed for split logic
         lro.LongRecording = self.mock_recording
@@ -84,7 +84,7 @@ class TestLROSplit(unittest.TestCase):
         """Verify other properties are inherited."""
         base_path = Path("/tmp/test/recording")
         
-        lro = LongRecordingOrganizer(base_folder_path=base_path)
+        lro = LongRecordingOrganizer(item=base_path)
         lro.LongRecording = self.mock_recording
         lro.channel_names = ["ch1", "ch2"]
         lro.labels = {"key": "val"} # Overwrite what init set (empty dict)

@@ -59,30 +59,40 @@ class TestMountainSortAnalyzer:
 
             # Verify probe configuration methods were called
             mock_probe.set_device_channel_indices.assert_called_once()
-            mock_probe.set_contact_ids.assert_called_once_with(["ch1", "ch2", "ch3", "ch4"])
+            mock_probe.set_contact_ids.assert_called_once_with(
+                ["ch1", "ch2", "ch3", "ch4"]
+            )
 
             assert result == mock_probe
 
     def test_get_recording_for_sorting(self, mock_recording):
         """Test _get_recording_for_sorting method."""
-        with patch.object(MountainSortAnalyzer, "_apply_preprocessing") as mock_preprocess:
+        with patch.object(
+            MountainSortAnalyzer, "_apply_preprocessing"
+        ) as mock_preprocess:
             mock_preprocess.return_value = mock_recording
 
             result = MountainSortAnalyzer._get_recording_for_sorting(mock_recording)
 
             # Verify preprocessing was called with sorting parameters
-            mock_preprocess.assert_called_once_with(mock_recording, constants.SORTING_PARAMS)
+            mock_preprocess.assert_called_once_with(
+                mock_recording, constants.SORTING_PARAMS
+            )
             assert result == mock_recording
 
     def test_get_recording_for_waveforms(self, mock_recording):
         """Test _get_recording_for_waveforms method."""
-        with patch.object(MountainSortAnalyzer, "_apply_preprocessing") as mock_preprocess:
+        with patch.object(
+            MountainSortAnalyzer, "_apply_preprocessing"
+        ) as mock_preprocess:
             mock_preprocess.return_value = mock_recording
 
             result = MountainSortAnalyzer._get_recording_for_waveforms(mock_recording)
 
             # Verify preprocessing was called with waveform parameters
-            mock_preprocess.assert_called_once_with(mock_recording, constants.WAVEFORM_PARAMS)
+            mock_preprocess.assert_called_once_with(
+                mock_recording, constants.WAVEFORM_PARAMS
+            )
             assert result == mock_recording
 
     @patch("spikeinterface.preprocessing.notch_filter")
@@ -92,7 +102,14 @@ class TestMountainSortAnalyzer:
     @patch("spikeinterface.preprocessing.highpass_filter")
     @patch("spikeinterface.preprocessing.bandpass_filter")
     def test_apply_preprocessing_all_filters(
-        self, mock_bandpass, mock_highpass, mock_whiten, mock_scale, mock_common_ref, mock_notch, mock_recording
+        self,
+        mock_bandpass,
+        mock_highpass,
+        mock_whiten,
+        mock_scale,
+        mock_common_ref,
+        mock_notch,
+        mock_recording,
     ):
         """Test _apply_preprocessing with all filters enabled."""
         # Define test parameters with all filters enabled
@@ -119,7 +136,9 @@ class TestMountainSortAnalyzer:
         mock_common_ref.assert_called_once()
         mock_scale.assert_called_once_with(mock_recording, gain=2.0)
         mock_whiten.assert_called_once()
-        mock_bandpass.assert_called_once_with(mock_recording, freq_min=0.1, freq_max=100, ftype="bessel")
+        mock_bandpass.assert_called_once_with(
+            mock_recording, freq_min=0.1, freq_max=100, ftype="bessel"
+        )
 
         assert result == mock_recording
 
@@ -139,11 +158,15 @@ class TestMountainSortAnalyzer:
 
         result = MountainSortAnalyzer._apply_preprocessing(mock_recording, test_params)
 
-        mock_highpass.assert_called_once_with(mock_recording, freq_min=0.5, ftype="bessel")
+        mock_highpass.assert_called_once_with(
+            mock_recording, freq_min=0.5, ftype="bessel"
+        )
         assert result == mock_recording
 
     @patch("spikeinterface.preprocessing.bandpass_filter")
-    def test_apply_preprocessing_lowpass_equivalent(self, mock_bandpass, mock_recording):
+    def test_apply_preprocessing_lowpass_equivalent(
+        self, mock_bandpass, mock_recording
+    ):
         """Test _apply_preprocessing with only freq_max (lowpass equivalent)."""
         test_params = {
             "notch_freq": None,
@@ -159,7 +182,9 @@ class TestMountainSortAnalyzer:
         result = MountainSortAnalyzer._apply_preprocessing(mock_recording, test_params)
 
         # Should use bandpass with freq_min=0.1 as a lowpass equivalent
-        mock_bandpass.assert_called_once_with(mock_recording, freq_min=0.1, freq_max=50, ftype="bessel")
+        mock_bandpass.assert_called_once_with(
+            mock_recording, freq_min=0.1, freq_max=50, ftype="bessel"
+        )
         assert result == mock_recording
 
     def test_apply_preprocessing_no_filters(self, mock_recording):
@@ -186,7 +211,9 @@ class TestMountainSortAnalyzer:
 
         # Mock select_channels to return different objects for each channel
         mock_single_channel_recs = [Mock() for _ in channel_ids]
-        mock_recording.clone.return_value.select_channels.side_effect = mock_single_channel_recs
+        mock_recording.clone.return_value.select_channels.side_effect = (
+            mock_single_channel_recs
+        )
 
         result = MountainSortAnalyzer._split_recording(mock_recording)
 
@@ -204,7 +231,14 @@ class TestMountainSortAnalyzer:
     @patch("neurodent.core.analyze_sort.create_cached_recording")
     @patch("spikeinterface.preprocessing.astype")
     @patch("os.makedirs")
-    def test_cache_recording(self, mock_makedirs, mock_astype, mock_create_cached, mock_get_temp_dir, mock_recording):
+    def test_cache_recording(
+        self,
+        mock_makedirs,
+        mock_astype,
+        mock_create_cached,
+        mock_get_temp_dir,
+        mock_recording,
+    ):
         """Test _cache_recording method."""
         mock_temp_dir = Path("/tmp/test_temp")
         mock_get_temp_dir.return_value = mock_temp_dir
@@ -223,10 +257,14 @@ class TestMountainSortAnalyzer:
             mock_makedirs.assert_called_once_with(expected_path)
 
             # Verify cached recording creation
-            mock_create_cached.assert_called_once_with(mock_recording, folder=expected_path, chunk_duration="60s")
+            mock_create_cached.assert_called_once_with(
+                mock_recording, folder=expected_path, chunk_duration="60s"
+            )
 
             # Verify dtype conversion
-            mock_astype.assert_called_once_with(mock_cached_rec, dtype=constants.GLOBAL_DTYPE)
+            mock_astype.assert_called_once_with(
+                mock_cached_rec, dtype=constants.GLOBAL_DTYPE
+            )
 
             assert result == mock_cached_rec
 
@@ -245,19 +283,29 @@ class TestMountainSortAnalyzer:
         result = MountainSortAnalyzer._run_sorting(mock_recording)
 
         # Verify parameter calculation (snippet times converted from seconds to samples)
-        expected_t1_samples = round(1000.0 * constants.SCHEME2_SORTING_PARAMS["snippet_T1"])
-        expected_t2_samples = round(1000.0 * constants.SCHEME2_SORTING_PARAMS["snippet_T2"])
+        expected_t1_samples = round(
+            1000.0 * constants.SCHEME2_SORTING_PARAMS["snippet_T1"]
+        )
+        expected_t2_samples = round(
+            1000.0 * constants.SCHEME2_SORTING_PARAMS["snippet_T2"]
+        )
 
         # Verify sorting parameters creation
         mock_sort_params.assert_called_once_with(
-            phase1_detect_channel_radius=constants.SCHEME2_SORTING_PARAMS["phase1_detect_channel_radius"],
-            detect_channel_radius=constants.SCHEME2_SORTING_PARAMS["detect_channel_radius"],
+            phase1_detect_channel_radius=constants.SCHEME2_SORTING_PARAMS[
+                "phase1_detect_channel_radius"
+            ],
+            detect_channel_radius=constants.SCHEME2_SORTING_PARAMS[
+                "detect_channel_radius"
+            ],
             snippet_T1=expected_t1_samples,
             snippet_T2=expected_t2_samples,
         )
 
         # Verify sorting execution
-        mock_sorting_scheme2.assert_called_once_with(recording=mock_recording, sorting_parameters=mock_params_instance)
+        mock_sorting_scheme2.assert_called_once_with(
+            recording=mock_recording, sorting_parameters=mock_params_instance
+        )
 
         assert result == mock_sorting
 
@@ -295,7 +343,7 @@ class TestMountainSortAnalyzer:
 
         # Test serial mode
         sortings, wave_recs = MountainSortAnalyzer.sort_recording(
-            mock_recording, plot_probe=False, multiprocess_mode="serial"
+            mock_recording, plot_probe=False, multiprocess_mode="auto"
         )
 
         # Verify probe setup
@@ -352,7 +400,7 @@ class TestMountainSortAnalyzer:
 
         # Test dask mode
         sortings, wave_recs = MountainSortAnalyzer.sort_recording(
-            mock_recording, plot_probe=False, multiprocess_mode="dask"
+            mock_recording, plot_probe=False, multiprocess_mode="auto"
         )
 
         # Verify dask.delayed was called for each channel (cache + sort)
@@ -397,8 +445,12 @@ class TestMountainSortAnalyzer:
         mock_subplots.return_value = (mock_fig, mock_ax)
 
         # Test with plotting enabled
-        with patch("neurodent.core.analyze_sort.pi_plotting.plot_probe") as mock_plot_probe:
-            MountainSortAnalyzer.sort_recording(mock_recording, plot_probe=True, multiprocess_mode="serial")
+        with patch(
+            "neurodent.core.analyze_sort.pi_plotting.plot_probe"
+        ) as mock_plot_probe:
+            MountainSortAnalyzer.sort_recording(
+                mock_recording, plot_probe=True, multiprocess_mode="auto"
+            )
 
             # Verify plotting was called
             mock_subplots.assert_called_once_with(1, 1)
@@ -416,7 +468,12 @@ class TestMountainSortAnalyzer:
         assert hasattr(constants, "GLOBAL_DTYPE")
 
         # Check that SCHEME2_SORTING_PARAMS has required keys
-        required_keys = ["snippet_T1", "snippet_T2", "detect_channel_radius", "phase1_detect_channel_radius"]
+        required_keys = [
+            "snippet_T1",
+            "snippet_T2",
+            "detect_channel_radius",
+            "phase1_detect_channel_radius",
+        ]
         for key in required_keys:
             assert key in constants.SCHEME2_SORTING_PARAMS
 
@@ -428,7 +485,9 @@ class TestMountainSortAnalyzer:
                     with patch.object(MountainSortAnalyzer, "_split_recording"):
                         # This should work without error for valid modes
                         try:
-                            MountainSortAnalyzer.sort_recording(mock_recording, multiprocess_mode="serial")
+                            MountainSortAnalyzer.sort_recording(
+                                mock_recording, multiprocess_mode="auto"
+                            )
                         except Exception as e:
                             # The test setup might cause other errors, but not from invalid mode
                             assert "multiprocess_mode" not in str(e)
@@ -454,7 +513,9 @@ class TestMountainSortAnalyzer:
         """Test that _cache_recording creates unique temporary paths."""
         with patch("neurodent.core.analyze_sort.get_temp_directory") as mock_get_temp:
             with patch("os.makedirs") as mock_makedirs:
-                with patch("neurodent.core.analyze_sort.create_cached_recording") as mock_create:
+                with patch(
+                    "neurodent.core.analyze_sort.create_cached_recording"
+                ) as mock_create:
                     with patch("spikeinterface.preprocessing.astype") as mock_astype:
                         mock_get_temp.return_value = Path("/tmp/test")
                         mock_create.return_value = Mock()
@@ -463,7 +524,11 @@ class TestMountainSortAnalyzer:
                         # Call multiple times and verify different paths are used
                         with patch("os.urandom") as mock_urandom:
                             # Mock urandom to return different values
-                            mock_urandom.return_value.hex.side_effect = ["hex1", "hex2", "hex3"]
+                            mock_urandom.return_value.hex.side_effect = [
+                                "hex1",
+                                "hex2",
+                                "hex3",
+                            ]
 
                             MountainSortAnalyzer._cache_recording(mock_recording)
                             MountainSortAnalyzer._cache_recording(mock_recording)

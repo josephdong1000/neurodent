@@ -11,10 +11,15 @@ class FileDiscoverer:
     Extracts metadata from paths based on named placeholders like {animal}, {session}, {index}.
     """
 
-    def __init__(self, pattern: Union[str, List[str]]):
+    def __init__(self, pattern: Union[str, Path, List[Union[str, Path]]]):
         if not pattern:
             raise ValueError("Pattern cannot be empty")
-        self.patterns = [pattern] if isinstance(pattern, str) else pattern
+
+        # Ensure all patterns are strings, as users may pass pathlib.Path objects
+        if isinstance(pattern, (str, Path)):
+            self.patterns = [str(pattern)]
+        else:
+            self.patterns = [str(p) for p in pattern]
 
     def _pattern_to_regex_and_glob(self, pattern: str) -> Tuple[re.Pattern, str]:
         """

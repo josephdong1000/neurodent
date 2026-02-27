@@ -639,6 +639,7 @@ class TestFragmentAnalyzer:
             freq_res,
             geomspace=False,
             mode="cwt_morlet",
+            
             cwt_n_cycles_max=cwt_n_cycles_max,
             epsilon=epsilon,
         )

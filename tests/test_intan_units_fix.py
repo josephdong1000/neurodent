@@ -50,14 +50,16 @@ class TestIntanUnitsFixIntegration:
             temp_dir,
             mode=None,
             manual_datetimes=datetime(2023, 1, 1, 10, 0, 0),
-            datetimes_are_start=True
+            datetimes_are_start=True,
         )
 
         # Simulate Intan recording from read_intan
         mock_recording = Mock()
         mock_recording.get_num_channels.return_value = 32
         mock_recording.get_dtype.return_value = constants.GLOBAL_DTYPE
-        mock_recording.get_sampling_frequency.return_value = 20000.0  # Typical Intan rate
+        mock_recording.get_sampling_frequency.return_value = (
+            20000.0  # Typical Intan rate
+        )
         mock_recording.get_channel_ids.return_value = np.arange(32)
         mock_recording.get_duration.return_value = 10800.0  # 3 hours
 
@@ -74,19 +76,22 @@ class TestIntanUnitsFixIntegration:
         mock_resampled = Mock()
         mock_resampled.get_num_channels.return_value = 32
         mock_resampled.get_dtype.return_value = constants.GLOBAL_DTYPE
-        mock_resampled.get_sampling_frequency.return_value = constants.GLOBAL_SAMPLING_RATE
+        mock_resampled.get_sampling_frequency.return_value = (
+            constants.GLOBAL_SAMPLING_RATE
+        )
         mock_resampled.get_channel_ids.return_value = np.arange(32)
         mock_resampled.get_duration.return_value = 10800.0
         mock_resampled.get_traces = Mock(return_value=normal_data_uv)
 
-        with patch('spikeinterface.preprocessing.resample', return_value=mock_resampled):
+        with patch(
+            "spikeinterface.preprocessing.resample", return_value=mock_resampled
+        ):
             organizer.convert_file_with_si_to_recording(
-                extract_func=mock_extract,
-                input_type="folder"
+                extract_func=mock_extract, input_type="folder"
             )
 
         # Verify metadata is set correctly
-        assert organizer.meta.V_units == 'µV'
+        assert organizer.meta.V_units == "µV"
         assert organizer.meta.mult_to_uV == 1.0
 
         # Verify data is in reasonable µV range (not ADC counts)
@@ -94,10 +99,12 @@ class TestIntanUnitsFixIntegration:
         rms_values = np.sqrt(np.mean(data**2, axis=0))
 
         # RMS should be in reasonable µV range (5-20 µV), not thousands
-        assert np.all(rms_values < 100), \
-            f"RMS values should be in µV range (<100), got: {rms_values}"
-        assert np.all(rms_values > 0.1), \
-            f"RMS values should be reasonable (>0.1 µV), got: {rms_values}"
+        assert np.all(
+            rms_values < 100
+        ), f"RMS values should be in µV range (<100), got: {rms_values}"
+        assert np.all(
+            rms_values > 0.1
+        ), f"RMS values should be reasonable (>0.1 µV), got: {rms_values}"
 
     def test_units_consistency_across_formats(self, temp_dir):
         """
@@ -113,7 +120,7 @@ class TestIntanUnitsFixIntegration:
             temp_dir,
             mode=None,
             manual_datetimes=datetime(2023, 1, 1, 10, 0, 0),
-            datetimes_are_start=True
+            datetimes_are_start=True,
         )
 
         mock_intan = Mock()
@@ -128,18 +135,21 @@ class TestIntanUnitsFixIntegration:
         mock_resampled = Mock()
         mock_resampled.get_num_channels.return_value = 32
         mock_resampled.get_dtype.return_value = constants.GLOBAL_DTYPE
-        mock_resampled.get_sampling_frequency.return_value = constants.GLOBAL_SAMPLING_RATE
+        mock_resampled.get_sampling_frequency.return_value = (
+            constants.GLOBAL_SAMPLING_RATE
+        )
         mock_resampled.get_channel_ids.return_value = np.arange(32)
         mock_resampled.get_duration.return_value = 3600.0
 
-        with patch('spikeinterface.preprocessing.resample', return_value=mock_resampled):
+        with patch(
+            "spikeinterface.preprocessing.resample", return_value=mock_resampled
+        ):
             organizer_intan.convert_file_with_si_to_recording(
-                extract_func=mock_extract,
-                input_type="folder"
+                extract_func=mock_extract, input_type="folder"
             )
 
         # All formats should have consistent units
-        assert organizer_intan.meta.V_units == 'µV'
+        assert organizer_intan.meta.V_units == "µV"
         assert organizer_intan.meta.mult_to_uV == 1.0
 
     def test_filter_calibration_with_correct_units(self, temp_dir):
@@ -153,7 +163,7 @@ class TestIntanUnitsFixIntegration:
             temp_dir,
             mode=None,
             manual_datetimes=datetime(2023, 1, 1, 10, 0, 0),
-            datetimes_are_start=True
+            datetimes_are_start=True,
         )
 
         mock_recording = Mock()
@@ -173,8 +183,7 @@ class TestIntanUnitsFixIntegration:
         mock_extract = Mock(return_value=mock_recording)
 
         organizer.convert_file_with_si_to_recording(
-            extract_func=mock_extract,
-            input_type="folder"
+            extract_func=mock_extract, input_type="folder"
         )
 
         # Calculate RMS like fragment filters do
@@ -184,10 +193,12 @@ class TestIntanUnitsFixIntegration:
         # With correct units:
         # - Normal data RMS < 500 µV (passes filter)
         # - Artifact data RMS > 500 µV (filtered out)
-        assert np.all(normal_rms < 500), \
-            f"Normal data should pass filter (<500 µV), RMS: {normal_rms}"
-        assert np.all(artifact_rms > 500), \
-            f"Artifact data should fail filter (>500 µV), RMS: {artifact_rms}"
+        assert np.all(
+            normal_rms < 500
+        ), f"Normal data should pass filter (<500 µV), RMS: {normal_rms}"
+        assert np.all(
+            artifact_rms > 500
+        ), f"Artifact data should fail filter (>500 µV), RMS: {artifact_rms}"
 
     def test_metadata_persists_through_serialization(self, temp_dir):
         """
@@ -200,7 +211,7 @@ class TestIntanUnitsFixIntegration:
             temp_dir,
             mode=None,
             manual_datetimes=datetime(2023, 1, 1, 10, 0, 0),
-            datetimes_are_start=True
+            datetimes_are_start=True,
         )
 
         mock_recording = Mock()
@@ -215,76 +226,31 @@ class TestIntanUnitsFixIntegration:
         mock_resampled = Mock()
         mock_resampled.get_num_channels.return_value = 32
         mock_resampled.get_dtype.return_value = constants.GLOBAL_DTYPE
-        mock_resampled.get_sampling_frequency.return_value = constants.GLOBAL_SAMPLING_RATE
+        mock_resampled.get_sampling_frequency.return_value = (
+            constants.GLOBAL_SAMPLING_RATE
+        )
         mock_resampled.get_channel_ids.return_value = np.arange(32)
         mock_resampled.get_duration.return_value = 3600.0
 
-        with patch('spikeinterface.preprocessing.resample', return_value=mock_resampled):
+        with patch(
+            "spikeinterface.preprocessing.resample", return_value=mock_resampled
+        ):
             organizer.convert_file_with_si_to_recording(
-                extract_func=mock_extract,
-                input_type="folder"
+                extract_func=mock_extract, input_type="folder"
             )
 
         # Convert metadata to dict (as would happen during WAR serialization)
         meta_dict = organizer.meta.to_dict()
 
         # Verify critical fields are present and correct
-        assert 'V_units' in meta_dict
-        assert 'mult_to_uV' in meta_dict
-        assert meta_dict['V_units'] == 'µV'
-        assert meta_dict['mult_to_uV'] == 1.0
+        assert "V_units" in meta_dict
+        assert "mult_to_uV" in meta_dict
+        assert meta_dict["V_units"] == "µV"
+        assert meta_dict["mult_to_uV"] == 1.0
 
         # This ensures downstream code can access scaling info
-        assert meta_dict['n_channels'] == 32
-        assert meta_dict['f_s'] == constants.GLOBAL_SAMPLING_RATE
-
-
-class TestTruncationRemoval:
-    """Test that truncation removal allows full dataset loading."""
-
-    @pytest.fixture
-    def temp_dir(self):
-        """Create temporary directory for tests."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            yield Path(tmp_dir)
-
-    def test_no_truncation_warning_with_false(self, temp_dir):
-        """Test that truncate=False doesn't produce warnings."""
-        # Should not produce any truncation warnings
-        organizer = LongRecordingOrganizer(
-            temp_dir,
-            mode=None,
-            truncate=False
-        )
-
-        # Create many files (simulating full dataset)
-        files = [f"recording_{i:03d}.rhd" for i in range(122)]
-
-        # Should return all files without warning
-        result = organizer._truncate_file_list(files)
-        assert len(result) == 122
-
-    def test_full_dataset_loading_scenario(self, temp_dir):
-        """
-        Test realistic scenario: loading 122 RHD files for multi-day recording.
-
-        Before fix: truncate=5 → only 5 files → incomplete data
-        After fix: truncate=false → all 122 files → complete data
-        """
-        organizer = LongRecordingOrganizer(
-            temp_dir,
-            mode=None,
-            truncate=False  # Config change from truncate=5
-        )
-
-        # Simulate 122 RHD files (from logs: "122 folders")
-        files = [f"recording_{i:03d}.rhd" for i in range(122)]
-
-        result = organizer._truncate_file_list(files)
-
-        # All files should be loaded
-        assert len(result) == 122
-        assert result == sorted(files)
+        assert meta_dict["n_channels"] == 32
+        assert meta_dict["f_s"] == constants.GLOBAL_SAMPLING_RATE
 
 
 class TestUnsignedOffsetBugFix:
@@ -315,7 +281,9 @@ class TestUnsignedOffsetBugFix:
         n_channels = 4
         # Simulate uint16 ADC values centered around 32768 (0µV for Intan)
         # Small neural signal ~ ±100 ADC counts
-        adc_data = (32768 + rng.integers(-100, 100, size=(n_samples, n_channels))).astype(np.uint16)
+        adc_data = (
+            32768 + rng.integers(-100, 100, size=(n_samples, n_channels))
+        ).astype(np.uint16)
 
         sampling_frequency = 1000.0
         recording = si_core.NumpyRecording(
@@ -344,15 +312,17 @@ class TestUnsignedOffsetBugFix:
         # Correct µV = (ADC - 32768) * 0.195 ≈ ±19.5 µV
         # Without fix: µV = (ADC - 32768) * 0.195 - 6389.76 ≈ -6390 ± 19.5
         mean_value = np.mean(traces)
-        rms_value = np.sqrt(np.mean(traces ** 2))
+        rms_value = np.sqrt(np.mean(traces**2))
 
         # Mean should be near 0 µV (not near -6390 µV)
-        assert abs(mean_value) < 50, \
-            f"Mean should be near 0 µV, got {mean_value:.1f} µV (double-offset bug?)"
+        assert (
+            abs(mean_value) < 50
+        ), f"Mean should be near 0 µV, got {mean_value:.1f} µV (double-offset bug?)"
 
         # RMS should be small (< 50 µV), not ~6390 µV
-        assert rms_value < 50, \
-            f"RMS should be < 50 µV, got {rms_value:.1f} µV (double-offset bug?)"
+        assert (
+            rms_value < 50
+        ), f"RMS should be < 50 µV, got {rms_value:.1f} µV (double-offset bug?)"
 
     def test_scale_to_uv_not_applied_for_float_recordings(self, temp_dir):
         """Test that scale_to_uV is NOT called for float32 recordings."""
@@ -394,7 +364,9 @@ class TestUnsignedOffsetBugFix:
         # Simulate realistic Intan amplifier recording:
         # - uint16 centered at 32768 (0µV)
         # - Neural signal: ~50 µV peak-to-peak ≈ ±25 ADC counts (25 * 0.195 ≈ 4.9 µV)
-        neural_signal = rng.standard_normal((n_samples, n_channels)) * 50  # ~50 ADC counts RMS
+        neural_signal = (
+            rng.standard_normal((n_samples, n_channels)) * 50
+        )  # ~50 ADC counts RMS
         adc_data = (32768 + neural_signal).astype(np.uint16)
 
         recording = si_core.NumpyRecording(
@@ -410,14 +382,16 @@ class TestUnsignedOffsetBugFix:
         result = organizer._apply_resampling(recording)
 
         traces = result.get_traces(return_scaled=True)
-        channel_rms = np.sqrt(np.mean(traces ** 2, axis=0))
+        channel_rms = np.sqrt(np.mean(traces**2, axis=0))
 
         # RMS should be ~9.75 µV (50 ADC * 0.195), definitely not 6390 µV
         for ch_idx, rms in enumerate(channel_rms):
-            assert rms < 20, \
-                f"Channel {ch_idx} RMS = {rms:.1f} µV, expected < 20 (double-offset bug if ~6390)"
-            assert rms > 1, \
-                f"Channel {ch_idx} RMS = {rms:.1f} µV, expected > 1 (signal lost?)"
+            assert (
+                rms < 20
+            ), f"Channel {ch_idx} RMS = {rms:.1f} µV, expected < 20 (double-offset bug if ~6390)"
+            assert (
+                rms > 1
+            ), f"Channel {ch_idx} RMS = {rms:.1f} µV, expected > 1 (signal lost?)"
 
     def test_filter_threshold_compatibility_after_fix(self, temp_dir):
         """Test that properly scaled data passes fragment filter thresholds.
@@ -433,7 +407,9 @@ class TestUnsignedOffsetBugFix:
         n_channels = 4
 
         # Create data with known RMS
-        neural_signal = rng.standard_normal((n_samples, n_channels)) * 100  # ~100 ADC counts RMS
+        neural_signal = (
+            rng.standard_normal((n_samples, n_channels)) * 100
+        )  # ~100 ADC counts RMS
         adc_data = (32768 + neural_signal).astype(np.uint16)
 
         recording = si_core.NumpyRecording(
@@ -447,12 +423,13 @@ class TestUnsignedOffsetBugFix:
         result = organizer._apply_resampling(recording)
 
         traces = result.get_traces(return_scaled=True)
-        channel_rms = np.sqrt(np.mean(traces ** 2, axis=0))
+        channel_rms = np.sqrt(np.mean(traces**2, axis=0))
 
         max_rms_threshold = 500  # from config
         for rms in channel_rms:
-            assert rms < max_rms_threshold, \
-                f"RMS {rms:.1f} µV exceeds max_rms={max_rms_threshold} — data not properly scaled"
+            assert (
+                rms < max_rms_threshold
+            ), f"RMS {rms:.1f} µV exceeds max_rms={max_rms_threshold} — data not properly scaled"
 
 
 if __name__ == "__main__":

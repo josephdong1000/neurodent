@@ -31,68 +31,20 @@ class TestDeepMergeDict:
 
     def test_nested_dict_merge(self):
         """Test merging nested dictionaries."""
-        base = {
-            "level1": {
-                "a": 1,
-                "b": 2
-            }
-        }
-        override = {
-            "level1": {
-                "b": 99,
-                "c": 3
-            }
-        }
+        base = {"level1": {"a": 1, "b": 2}}
+        override = {"level1": {"b": 99, "c": 3}}
         result = deep_merge_dict(base, override)
 
-        expected = {
-            "level1": {
-                "a": 1,
-                "b": 99,
-                "c": 3
-            }
-        }
+        expected = {"level1": {"a": 1, "b": 99, "c": 3}}
         assert result == expected
 
     def test_deep_nested_merge(self):
         """Test merging deeply nested dictionaries (3+ levels)."""
-        base = {
-            "l1": {
-                "l2": {
-                    "l3": {
-                        "a": 1,
-                        "b": 2
-                    },
-                    "x": 10
-                }
-            }
-        }
-        override = {
-            "l1": {
-                "l2": {
-                    "l3": {
-                        "b": 99,
-                        "c": 3
-                    },
-                    "y": 20
-                }
-            }
-        }
+        base = {"l1": {"l2": {"l3": {"a": 1, "b": 2}, "x": 10}}}
+        override = {"l1": {"l2": {"l3": {"b": 99, "c": 3}, "y": 20}}}
         result = deep_merge_dict(base, override)
 
-        expected = {
-            "l1": {
-                "l2": {
-                    "l3": {
-                        "a": 1,
-                        "b": 99,
-                        "c": 3
-                    },
-                    "x": 10,
-                    "y": 20
-                }
-            }
-        }
+        expected = {"l1": {"l2": {"l3": {"a": 1, "b": 99, "c": 3}, "x": 10, "y": 20}}}
         assert result == expected
 
     def test_empty_base(self):
@@ -135,16 +87,8 @@ class TestDeepMergeDict:
 
     def test_mixed_types_override(self):
         """Test overriding dict with non-dict value."""
-        base = {
-            "config": {
-                "nested": {
-                    "value": 1
-                }
-            }
-        }
-        override = {
-            "config": "simple_string"
-        }
+        base = {"config": {"nested": {"value": 1}}}
+        override = {"config": "simple_string"}
         result = deep_merge_dict(base, override)
 
         # Override should replace entire nested dict with string
@@ -153,13 +97,7 @@ class TestDeepMergeDict:
     def test_non_dict_to_dict(self):
         """Test overriding non-dict with dict."""
         base = {"config": "simple_string"}
-        override = {
-            "config": {
-                "nested": {
-                    "value": 1
-                }
-            }
-        }
+        override = {"config": {"nested": {"value": 1}}}
         result = deep_merge_dict(base, override)
 
         assert result == {"config": {"nested": {"value": 1}}}
@@ -172,7 +110,7 @@ class TestDeepMergeDict:
             "samples": {
                 "quality_filter": {
                     "exclude_unknown_genotypes": True,
-                    "exclude_bad_animaldays": True
+                    "exclude_bad_animaldays": True,
                 }
             },
             "analysis": {
@@ -181,17 +119,15 @@ class TestDeepMergeDict:
                     "skip_days": ["bad"],
                     "lro_kwargs": {
                         "multiprocess_mode": "dask",
-                        "overwrite_rowbins": False
-                    }
+                        "overwrite_rowbins": False,
+                    },
                 }
-            }
+            },
         }
 
         # Dataset config (ap3b2_rhd)
         override = {
-            "samples": {
-                "samples_file": "config/samples_jess_rhd.json"
-            },
+            "samples": {"samples_file": "config/samples_jess_rhd.json"},
             "analysis": {
                 "war_generation": {
                     "mode": "base",
@@ -200,24 +136,36 @@ class TestDeepMergeDict:
                         "extract_func": "read_intan",
                         "input_type": "files",
                         "mode": "si",
-                        "stream_id": "0"
-                    }
+                        "stream_id": "0",
+                    },
                 }
-            }
+            },
         }
 
         result = deep_merge_dict(base, override)
 
         # Verify key merges
         assert result["temp_directory"] == "/tmp"  # preserved from base
-        assert result["samples"]["samples_file"] == "config/samples_jess_rhd.json"  # from override
-        assert result["samples"]["quality_filter"]["exclude_unknown_genotypes"] is True  # preserved
+        assert (
+            result["samples"]["samples_file"] == "config/samples_jess_rhd.json"
+        )  # from override
+        assert (
+            result["samples"]["quality_filter"]["exclude_unknown_genotypes"] is True
+        )  # preserved
         assert result["analysis"]["war_generation"]["mode"] == "base"  # from override
         assert result["analysis"]["war_generation"]["day_sep"] is None  # preserved
         assert result["analysis"]["war_generation"]["skip_days"] == ["bad"]  # preserved
-        assert result["analysis"]["war_generation"]["lro_kwargs"]["multiprocess_mode"] == "dask"  # preserved
-        assert result["analysis"]["war_generation"]["lro_kwargs"]["extract_func"] == "read_intan"  # from override
-        assert result["analysis"]["war_generation"]["lro_kwargs"]["mode"] == "si"  # from override
+        assert (
+            result["analysis"]["war_generation"]["lro_kwargs"]["multiprocess_mode"]
+            == "dask"
+        )  # preserved
+        assert (
+            result["analysis"]["war_generation"]["lro_kwargs"]["extract_func"]
+            == "read_intan"
+        )  # from override
+        assert (
+            result["analysis"]["war_generation"]["lro_kwargs"]["mode"] == "si"
+        )  # from override
 
     def test_no_mutation_of_inputs(self):
         """Test that input dictionaries are not mutated."""

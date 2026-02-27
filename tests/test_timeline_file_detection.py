@@ -25,7 +25,7 @@ class TestComputeGlobalTimelineFileDetection:
         ao = Mock(spec=AnimalOrganizer)
         ao.animal_id = "test_animal"
         ao.animal_param = ["test_animal"]
-        ao.read_mode = "base"
+        ao.read_mode = "concat"
         return ao
 
     def test_detects_file_path_and_adjusts_input_type(self, tmp_path):
@@ -195,7 +195,7 @@ class TestComputeGlobalTimelineIntegration:
                 rhd_file,
                 extract_func="read_intan",
                 input_type="file",  # Single file mode
-                mode="si",
+                
                 stream_id="0",
                 manual_datetimes=base_datetime,  # Required for SI mode
             )
@@ -220,9 +220,7 @@ class TestComputeGlobalTimelineIntegration:
             ao = visualization.AnimalOrganizer(
                 rhd_session_path,
                 "AP3B2homo-240-M",
-                mode="base",
-                file_pattern="*.rhd",
-                lro_kwargs={
+                                                lro_kwargs={
                     "extract_func": "read_intan",
                     "input_type": "files",
                     "file_pattern": "*.rhd",
