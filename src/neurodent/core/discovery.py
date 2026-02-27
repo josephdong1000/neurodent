@@ -58,8 +58,9 @@ class FileDiscoverer:
         parts = re.split(r"\{[^}]+\}", pattern)
         regex_string = "^" + re.escape(parts[0])
         for i, placeholder in enumerate(placeholders):
-            # Match anything except slashes. This ensures {animal} doesn't span multiple directories.
-            regex_string += f"(?P<{placeholder}>[^/]+)"
+            # Match anything except slashes and backslashes.
+            # This ensures placeholders don't span multiple directories.
+            regex_string += f"(?P<{placeholder}>[^/\\\\]+)"
             regex_string += re.escape(parts[i + 1])
         regex_string += "$"
 
@@ -138,31 +139,38 @@ class FileDiscoverer:
         """Discovers files for a single pattern."""
         regex, glob_str = self._pattern_to_regex_and_glob(pattern)
 
+        # Check if pattern has any placeholders
+        has_placeholders = bool(re.findall(r"\{([^}]+)\}", pattern))
+
         # Handle tilde and resolve to absolute just in case, though user can pass absolute.
         # For glob to work nicely with absolute/relative, we just pass the string.
         discovered_paths = glob.glob(glob_str, recursive=True)
 
         results = []
         for path in discovered_paths:
-            # Normalize path for regex matching
-            normalized_path = str(Path(path)).replace("\\", "/")
+            if has_placeholders:
+                # Normalize path for regex matching
+                normalized_path = str(Path(path)).replace("\\", "/")
 
-            match = regex.match(normalized_path)
-            if match:
-                meta = match.groupdict()
+                match = regex.match(normalized_path)
+                if match:
+                    meta = match.groupdict()
 
-                # Apply filters
-                skip = False
-                for k, v in filter_kwargs.items():
-                    if k in meta and meta[k] != v:
-                        skip = True
-                        break
+                    # Apply filters
+                    skip = False
+                    for k, v in filter_kwargs.items():
+                        if k in meta and meta[k] != v:
+                            skip = True
+                            break
 
-                if skip:
-                    continue
+                    if skip:
+                        continue
 
-                meta["path"] = path
-                results.append(meta)
+                    meta["path"] = path
+                    results.append(meta)
+            else:
+                # No placeholders - just return paths with no metadata
+                results.append({"path": path})
 
         # Sort results by path for deterministic ordering (like old filepath_to_index)
         results.sort(key=lambda x: x["path"])

@@ -232,17 +232,17 @@ def test_pattern_without_index(tmp_path, monkeypatch):
 
 
 def test_complex_pattern(tmp_path, monkeypatch):
-    """Test pattern with different ordering: {animal}-{session}-{index}"""
+    """Test pattern with different ordering using underscores instead of dashes to avoid ambiguity"""
     monkeypatch.setattr(results.AnimalOrganizer, "_create_long_recordings", lambda self, kw: None)
 
-    # Create structure: tmp_path/data/A10-2025-01-24-1.rhd
+    # Create structure: tmp_path/data/A10_20250124_1.rhd (no dashes in date to avoid ambiguity)
     data_dir = tmp_path / "data"
     data_dir.mkdir(parents=True)
-    (data_dir / "A10-2025-01-24-1.rhd").touch()
-    (data_dir / "A10-2025-01-24-2.rhd").touch()
-    (data_dir / "A10-2025-01-25-1.rhd").touch()
+    (data_dir / "A10_20250124_1.rhd").touch()
+    (data_dir / "A10_20250124_2.rhd").touch()
+    (data_dir / "A10_20250125_1.rhd").touch()
 
-    pattern = str(tmp_path / "data") + "/{animal}-{session}-{index}.rhd"
+    pattern = str(tmp_path / "data") + "/{animal}_{session}_{index}.rhd"
     ao = results.AnimalOrganizer(
         pattern=pattern,
         animal_id="A10",
@@ -250,10 +250,10 @@ def test_complex_pattern(tmp_path, monkeypatch):
 
     # Should find 2 sessions
     assert len(ao._animalday_folder_groups) == 2
-    assert "2025-01-24" in ao._animalday_folder_groups
-    assert "2025-01-25" in ao._animalday_folder_groups
-    assert len(ao._animalday_folder_groups["2025-01-24"]) == 2
-    assert len(ao._animalday_folder_groups["2025-01-25"]) == 1
+    assert "20250124" in ao._animalday_folder_groups
+    assert "20250125" in ao._animalday_folder_groups
+    assert len(ao._animalday_folder_groups["20250124"]) == 2
+    assert len(ao._animalday_folder_groups["20250125"]) == 1
 
 
 def test_unique_animaldays_format(simple_structure, monkeypatch):

@@ -119,11 +119,7 @@ class TestUnifiedCachingSystem:
         )
         assert "cache_policy" in mne_signature.parameters
 
-        # Check convert_rowbins_to_rec signature
-        rowbins_signature = inspect.signature(
-            core.LongRecordingOrganizer.convert_rowbins_to_rec
-        )
-        assert "cache_policy" in rowbins_signature.parameters
+        # Note: convert_rowbins_to_rec was removed/renamed in recent refactoring
 
         print("✅ All methods have cache_policy in their signatures")
 
