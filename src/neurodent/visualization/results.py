@@ -1803,6 +1803,12 @@ class AnimalOrganizer(AnimalFeatureParser):
         """
         Validate that all LROs have consistent channel names.
 
+        Compares abbreviated channel names (via ``parse_chname_to_abbrev``)
+        so that cosmetic variants like ``L Barrel`` vs ``L Barrel Ctx`` are
+        treated as equivalent. If raw names differ but abbreviations match,
+        the mismatched LRO's channel names are renamed to match the reference
+        LRO's raw names for downstream consistency.
+
         If channel names are the same but in different order, the first LRO's
         order is used as reference.
 
@@ -1810,10 +1816,10 @@ class AnimalOrganizer(AnimalFeatureParser):
             lros: List of LROs to validate.
 
         Returns:
-            list[str]: The canonical channel names.
+            list[str]: The canonical channel names (from the first LRO).
 
         Raises:
-            ValueError: If LROs have different channel sets.
+            ValueError: If LROs have different abbreviated channel sets.
         """
         if not lros:
             return []
@@ -1822,22 +1828,45 @@ class AnimalOrganizer(AnimalFeatureParser):
         if not first_names:
             return []
 
-        reference_set = set(first_names)
+        def _abbreviate(names: list[str]) -> list[str]:
+            result = []
+            for n in names:
+                try:
+                    result.append(core.parse_chname_to_abbrev(n, strict_matching=False))
+                except ValueError:
+                    result.append(n)  # Fall back to raw name if parsing fails
+            return result
+
+        reference_abbrevs = _abbreviate(first_names)
+        reference_set = set(reference_abbrevs)
+        # Map abbreviation -> canonical raw name from first LRO
+        abbrev_to_raw = dict(zip(reference_abbrevs, first_names))
 
         for i, lro in enumerate(lros[1:], start=1):
             current_names = lro.channel_names if lro.channel_names else []
-            current_set = set(current_names)
+            current_abbrevs = _abbreviate(current_names)
+            current_set = set(current_abbrevs)
 
             if current_set != reference_set:
                 missing = reference_set - current_set
                 extra = current_set - reference_set
                 raise ValueError(
                     f"LRO {i} has inconsistent channel names. "
-                    f"Missing: {missing}, Extra: {extra}"
+                    f"Abbreviated missing: {missing}, Extra: {extra}"
                 )
 
+            # If raw names differ but abbreviations match, rename to reference
+            if set(current_names) != set(first_names):
+                renamed = [abbrev_to_raw[a] for a in current_abbrevs]
+                logging.warning(
+                    f"LRO {i} has variant channel names "
+                    f"({current_names} vs {first_names}), "
+                    f"renaming to reference names: {renamed}"
+                )
+                lro.channel_names = renamed
+
             # If same channels but different order, log a warning
-            if current_names != first_names:
+            if lro.channel_names != first_names:
                 logging.warning(
                     f"LRO {i} has channels in different order, using reference order"
                 )
