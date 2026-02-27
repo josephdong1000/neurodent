@@ -109,7 +109,7 @@ class TestOverlappingAnimaldaysBug:
                     mock_lro_class.side_effect = mock_lro_side_effect
 
                     # Create AnimalOrganizer - this should trigger the bug
-                    ao = results.AnimalOrganizer(animal_id="A10", pattern=f"{temp_path}/*{animal_id}*", )
+                    ao = results.AnimalOrganizer(animal_id="A10", pattern=f"{temp_path}/*A10*", )
 
                     # Verify that all folders parse to same animalday
                     parsed_animaldays = []
@@ -280,7 +280,7 @@ class TestOverlappingAnimaldaysBug:
                     mock_lro_c.merge = mock_merge
 
                     # Create AnimalOrganizer which should trigger temporal sorting and merging
-                    ao = results.AnimalOrganizer(animal_id="A10", pattern=f"{temp_path}/*{animal_id}*", )
+                    ao = results.AnimalOrganizer(animal_id="A10", pattern=f"{temp_path}/*A10*", )
 
                     # Verify that we have one merged LRO (overlapping folders)
                     assert len(ao.long_recordings) == 1
@@ -346,7 +346,7 @@ class TestOverlappingAnimaldaysBug:
 
                     mock_lro_class.side_effect = mock_lro_side_effect
 
-                    ao = results.AnimalOrganizer(animal_id="A10", pattern=f"{temp_path}/*{animal_id}*", )
+                    ao = results.AnimalOrganizer(animal_id="A10", pattern=f"{temp_path}/*A10*", )
 
                     # Should have 2 unique animaldays, not 3 folders
                     assert len(ao.animaldays) == 2
@@ -413,11 +413,11 @@ class TestAnimalOrganizerDirectoryFiltering:
         """Set up test fixtures with mixed file/directory structures."""
         self.temp_dir = tmp_path
         self.base_path = Path(tmp_path)
-        animal_id = "A123"
+        self.animal_id = "A123"
         yield
         # Cleanup happens automatically with tmp_path fixture
 
-    def _create_mixed_structure(self, ):
+    def _create_mixed_structure(self, mode):
         """Create a mixed file/directory structure for testing.
 
         Args:
@@ -430,7 +430,7 @@ class TestAnimalOrganizerDirectoryFiltering:
 
         if mode == "nest":
             # Create animal subfolder structure
-            animal_dir = self.base_path / f"WT_{animal_id}_data"
+            animal_dir = self.base_path / f"WT_{self.animal_id}_data"
             animal_dir.mkdir()
 
             # Create subdirectories within animal folder
@@ -449,8 +449,8 @@ class TestAnimalOrganizerDirectoryFiltering:
 
         elif mode in ["concat", "noday"]:
             # Create directories with genotype-animal-date format
-            day1_dir = self.base_path / f"WT_{animal_id}_2023-01-01"
-            day2_dir = self.base_path / f"WT_{animal_id}_2023-01-02"
+            day1_dir = self.base_path / f"WT_{self.animal_id}_2023-01-01"
+            day2_dir = self.base_path / f"WT_{self.animal_id}_2023-01-02"
             day1_dir.mkdir()
             if mode == "concat":  # Only create second directory for concat mode
                 day2_dir.mkdir()
@@ -459,9 +459,9 @@ class TestAnimalOrganizerDirectoryFiltering:
                 created_items["directories"].extend([day1_dir])
 
             # Create files with animal ID in name (should be filtered out)
-            edf_file = self.base_path / f"WT_{animal_id}_recording.edf"
-            bin_file = self.base_path / f"WT_{animal_id}_data.bin"
-            json_file = self.base_path / f"WT_{animal_id}_metadata.json"
+            edf_file = self.base_path / f"WT_{self.animal_id}_recording.edf"
+            bin_file = self.base_path / f"WT_{self.animal_id}_data.bin"
+            json_file = self.base_path / f"WT_{self.animal_id}_metadata.json"
             edf_file.touch()
             bin_file.touch()
             json_file.touch()
@@ -496,13 +496,13 @@ class TestAnimalOrganizerDirectoryFiltering:
         mock_lro.return_value = self._create_mock_lro()
 
         # Create AnimalOrganizer
-        ao = results.AnimalOrganizer(pattern=f"{self.base_path}/*{animal_id}*", animal_id=animal_id, )
+        ao = results.AnimalOrganizer(pattern=f"{self.base_path}/*{self.animal_id}*", animal_id=self.animal_id, )
 
         # Verify only directories were found
         assert len(ao._bin_folders) == 2  # 2 directories created
         for folder_path in ao._bin_folders:
             assert Path(folder_path).is_dir()
-            assert animal_id in folder_path
+            assert self.animal_id in folder_path
 
         # Verify LongRecordingOrganizer was called only with directory paths
         assert mock_lro.call_count == 2
@@ -520,7 +520,7 @@ class TestAnimalOrganizerDirectoryFiltering:
         mock_lro.return_value = self._create_mock_lro()
 
         # Create AnimalOrganizer
-        ao = results.AnimalOrganizer(pattern=f"{self.base_path}/*{animal_id}*", animal_id=animal_id, )
+        ao = results.AnimalOrganizer(pattern=f"{self.base_path}/*{self.animal_id}*", animal_id=self.animal_id, )
 
         # Verify only directories were found
         assert len(ao._bin_folders) == 2  # 2 directories created
@@ -531,12 +531,12 @@ class TestAnimalOrganizerDirectoryFiltering:
     def test_noday_mode_filters_files(self, mock_lro):
         """Test that noday mode filters out files and only processes directories."""
         # Create structure with only one directory for noday mode
-        day_dir = self.base_path / f"WT_{animal_id}_data"
+        day_dir = self.base_path / f"WT_{self.animal_id}_data"
         day_dir.mkdir()
 
         # Create files that should be filtered out
-        edf_file = self.base_path / f"WT_{animal_id}_recording.edf"
-        bin_file = self.base_path / f"WT_{animal_id}_data.bin"
+        edf_file = self.base_path / f"WT_{self.animal_id}_recording.edf"
+        bin_file = self.base_path / f"WT_{self.animal_id}_data.bin"
         edf_file.touch()
         bin_file.touch()
 
@@ -544,7 +544,7 @@ class TestAnimalOrganizerDirectoryFiltering:
         mock_lro.return_value = self._create_mock_lro()
 
         # Create AnimalOrganizer
-        ao = results.AnimalOrganizer(pattern=f"{self.base_path}/*{animal_id}*", animal_id=animal_id, )
+        ao = results.AnimalOrganizer(pattern=f"{self.base_path}/*{self.animal_id}*", animal_id=self.animal_id, )
 
         # Verify only one directory was found
         assert len(ao._bin_folders) == 1
@@ -553,31 +553,31 @@ class TestAnimalOrganizerDirectoryFiltering:
     def test_no_directories_found_raises_error(self):
         """Test that when no directories are found, an informative error is raised."""
         # Create only files, no directories
-        edf_file = self.base_path / f"WT_{animal_id}_recording.edf"
-        bin_file = self.base_path / f"WT_{animal_id}_data.bin"
+        edf_file = self.base_path / f"WT_{self.animal_id}_recording.edf"
+        bin_file = self.base_path / f"WT_{self.animal_id}_data.bin"
         edf_file.touch()
         bin_file.touch()
 
         # Should raise ValueError when no directories found
         with pytest.raises(ValueError) as exc_info:
-            results.AnimalOrganizer(pattern=f"{self.base_path}/*{animal_id}*", animal_id=animal_id, )
+            results.AnimalOrganizer(pattern=f"{self.base_path}/*{self.animal_id}*", animal_id=self.animal_id, )
 
         error_message = str(exc_info.value)
         assert "No directories found" in error_message
-        assert animal_id in error_message
+        assert self.animal_id in error_message
 
     @patch("neurodent.core.LongRecordingOrganizer")
     def test_noday_mode_multiple_directories_error(self, mock_lro):
         """Test that noday mode raises error when multiple directories are found."""
         # Create multiple directories
-        day1_dir = self.base_path / f"WT_{animal_id}_day1"
-        day2_dir = self.base_path / f"WT_{animal_id}_day2"
+        day1_dir = self.base_path / f"WT_{self.animal_id}_day1"
+        day2_dir = self.base_path / f"WT_{self.animal_id}_day2"
         day1_dir.mkdir()
         day2_dir.mkdir()
 
         # Should raise ValueError for multiple directories in noday mode
         with pytest.raises(ValueError) as exc_info:
-            results.AnimalOrganizer(pattern=f"{self.base_path}/*{animal_id}*", animal_id=animal_id, )
+            results.AnimalOrganizer(pattern=f"{self.base_path}/*{self.animal_id}*", animal_id=self.animal_id, )
 
         error_message = str(exc_info.value)
         assert "not unique" in error_message
@@ -586,7 +586,7 @@ class TestAnimalOrganizerDirectoryFiltering:
     def test_base_mode_directory_handling(self, mock_lro):
         """Test that base mode correctly handles the base directory."""
         # For base mode, create a properly named base directory with date
-        base_dir = self.base_path / f"WT_{animal_id}_2023-01-01"
+        base_dir = self.base_path / f"WT_{self.animal_id}_2023-01-01"
         base_dir.mkdir()
 
         # Create some files in the base directory (should be filtered out)
@@ -599,7 +599,7 @@ class TestAnimalOrganizerDirectoryFiltering:
         mock_lro.return_value = self._create_mock_lro()
 
         # Create AnimalOrganizer in base mode using the properly named directory
-        ao = results.AnimalOrganizer(pattern=f"{base_dir}/*{animal_id}*", animal_id=animal_id, )
+        ao = results.AnimalOrganizer(pattern=f"{base_dir}/*{self.animal_id}*", animal_id=self.animal_id, )
 
         # In base mode, should use the base directory itself
         assert len(ao._bin_folders) == 1
@@ -616,7 +616,7 @@ class TestAnimalOrganizerDirectoryFiltering:
         mock_lro.return_value = self._create_mock_lro()
 
         # Create AnimalOrganizer
-        _ = results.AnimalOrganizer(pattern=f"{self.base_path}/*{animal_id}*", animal_id=animal_id, )
+        _ = results.AnimalOrganizer(pattern=f"{self.base_path}/*{self.animal_id}*", animal_id=self.animal_id, )
 
         # Check that filtering information was logged
         logged_messages = [call[0][0] for call in mock_logging.call_args_list]
