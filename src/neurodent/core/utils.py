@@ -421,6 +421,8 @@ def parse_path_to_animalday(
     **day_parse_kwargs,
 ):
     """
+    DEPRECATED: Use FileDiscoverer with pattern-based discovery instead.
+
     Parses the filename of a binfolder to get the animalday identifier (animal id, genotype, and day).
 
     Args:
@@ -506,6 +508,8 @@ def parse_str_to_genotype(string: str, strict_matching: bool = False) -> str:
 
 def parse_str_to_animal(string: str, animal_param: tuple[int, str] | str | list[str] = (0, None)) -> str:
     """
+    DEPRECATED: Use FileDiscoverer with {animal} placeholder in pattern instead.
+
     Parses the filename of a binfolder to get the animal id.
 
     Args:
@@ -566,6 +570,8 @@ def parse_str_to_day(
     date_patterns: list[tuple[str, str]] = None,
 ) -> datetime:
     """
+    DEPRECATED: Use FileDiscoverer with {session} placeholder in pattern instead.
+
     Parses the filename of a binfolder to get the day.
 
     Args:

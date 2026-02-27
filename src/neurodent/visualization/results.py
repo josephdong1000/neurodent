@@ -94,34 +94,49 @@ class AnimalFeatureParser:
 
 class AnimalOrganizer(AnimalFeatureParser):
     """
-    AnimalOrganizer is used to organize data from a single animal into a format that can be used for analysis.
-    It is used to organize data from a single animal into a format that can be used for analysis.
+    Organizes and analyzes recording data from a single animal across multiple sessions.
+
+    AnimalOrganizer uses flexible pattern-based file discovery to locate recording files,
+    groups them by session, and creates LongRecordingOrganizer instances for each session.
 
     Args:
-        base_folder_path (str): The path to the base folder of the animal data.
-        animal_id (str): The ID of the animal. This should correspond to only one animal.
-        day_sep (str, optional): Separator for day in folder name. Set to None or empty string to get all folders. Defaults to None.
-        mode (Literal["nest", "concat", "base", "noday"], optional): The mode of the AnimalOrganizer. Defaults to "concat".
-            * "nest": base_folder_path / animal_id / \*date_format\* (looks for folders/files within animal_id subdirectories)
-            * "concat": base_folder_path / \*animal_id\*date_format\* (looks for folders/files with animal_id+date in name at base level)
-            * "base": base_folder_path / \* (looks for folders/files directly in base_folder_path)
-            * "noday": base_folder_path / \*animal_id\* (same as concat but expects single unique match, no date filtering)
-        assume_from_number (bool, optional): Whether to assume the animal ID is a number. Defaults to False.
-        skip_days (list[str], optional): The days to skip. Defaults to [].
-        truncate (bool | int, optional): Whether to truncate the data. Defaults to False.
-        lro_kwargs (dict, optional): Keyword arguments for LongRecordingOrganizer. Defaults to {}.
+        pattern (str | list[str]): File pattern(s) for discovering recording files.
+            - Single pattern: "/path/{animal}/{session}/{index}.rhd"
+            - Multiple patterns: ["/path/{animal}/{session}/data.bin", "/path/{animal}/{session}/meta.csv"]
+
+            Placeholders:
+                {animal}: Animal ID (e.g., "A10")
+                {session}: Session identifier (e.g., "2025-01-24" or "day1")
+                {index}: File index within a session (e.g., "1", "2", "3")
+
+            Examples:
+                - "/data/{animal}/{session}/{index}.rhd"
+                - "/data/{animal}-{session}-{index}.edf"
+                - "/data/{session}/*/{animal}-{index}.rhd"
+                - "/data/**/{animal}-{session}-{index}.rhd"
+                - "/data/{animal}/{index}.edf"  (no session - will use "unknown")
+
+        animal_id (str | None, optional): Animal ID to filter discovered files.
+            If provided, only files matching this animal ID will be included.
+        skip_sessions (list[str], optional): Session identifiers to exclude. Defaults to [].
+        truncate (bool | int, optional): If True, truncate to first 10 sessions.
+            If an integer, truncate to first n sessions. Defaults to False.
+        assume_from_number (bool, optional): Whether to parse channel names as numbers
+            (used for analysis, not discovery). Defaults to False.
+        lro_kwargs (dict, optional): Keyword arguments passed to each LongRecordingOrganizer
+            instance. Common options include 'mode', 'extract_func', 'manual_datetimes'.
+            Defaults to {}.
 
     Attributes:
-        base_folder_path (Path): The path to the base folder of the animal data.
-        animal_id (str): The ID of the animal.
-        day_sep (str): Separator for day in folder name.
-        read_mode (str): The mode of the AnimalOrganizer.
-        assume_from_number (bool): Whether to assume the animal ID is a number.
-        bin_folder_pattern (Path): The glob pattern used to find binary folders.
-        unique_animaldays (list[str]): List of unique animal days found.
-        animaldays (list[str]): List of unique animal days (alias).
-        genotype (str): Genotype of the animal.
-        long_analyzers (list[LongRecordingAnalyzer]): List of LongRecordingAnalyzer instances, one per unique animal day.
+        pattern (str | list[str]): The file pattern(s) used for discovery.
+        animal_id (str | None): The ID of the animal being analyzed.
+        unique_animaldays (list[str]): List of unique session identifiers (format: "{animal}_{session}").
+        animaldays (list[str]): Alias for unique_animaldays.
+        genotype (str): Genotype of the animal (from ANIMAL_METADATA if available).
+        long_recordings (list[LongRecordingOrganizer]): LRO instances, one per session.
+        long_analyzers (list[LongRecordingAnalyzer]): Analysis instances, one per session.
+        features_df (pd.DataFrame): Aggregated feature DataFrame across all sessions.
+        features_avg_df (pd.DataFrame): Average features across sessions.
     """
 
     def _init_containers(self):

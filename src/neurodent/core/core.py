@@ -413,32 +413,38 @@ def split_recording(
 
 class LongRecordingOrganizer:
     """
-    Construct a long recording from binary files, EDF files, or an existing recording object.
+    Construct a long recording from various file formats or an existing recording object.
 
     Args:
-        base_folder_path (str | None): Path to the base folder containing the data files.
-            Set to None when initializing from an existing recording object.
-        mode (Literal['bin', 'si', 'mne', None], optional): Mode to load data in. Defaults to 'bin'.
-        truncate (bool | int, optional): If True, truncate data to first 10 files. If an integer, truncate data to the first n files. Defaults to False.
-        cache_policy (Literal['auto', 'always', 'force_regenerate'], optional): Cache policy for intermediate files. Defaults to 'auto'.
-        multiprocess_mode (Literal['dask', 'serial'], optional): Processing mode for parallel operations. Defaults to 'serial'.
-        extract_func (Literal[Callable, str], optional): Function to extract data when using 'si' or 'mne' mode. Required for those modes.
-        input_type (Literal['folder', 'file', 'files'], optional): Type of input processing. Defaults to 'folder'.
-        file_pattern (str, optional): Pattern to match files when using 'file' or 'files' input type.
-        manual_datetimes (datetime | list[datetime] | Callable, optional): Manually provided timestamps.
+        item (str | Path | list[str] | MultiFileGroup | None): Input data specification.
+            - str/Path: Single file or directory path
+            - list[str]: Multiple files to concatenate
+            - MultiFileGroup: Multiple files that should be loaded together as one unit
+            - None: Used when initializing from an existing recording object
+        mode (Literal['si', 'mne', None], optional): Data loading mode. Defaults to 'si'.
+            - 'si': Use SpikeInterface extractors
+            - 'mne': Use MNE-Python extractors (creates intermediate file)
+            - None: No data loading (item must be None, recording must be provided)
+        truncate (bool | int, optional): If True, truncate to first 10 files.
+            If an integer, truncate to first n files. Defaults to False.
+        cache_policy (Literal['auto', 'always', 'force_regenerate'], optional):
+            Cache policy for intermediate files. Defaults to 'auto'.
+        multiprocess_mode (Literal['dask', 'serial'], optional): Processing mode for
+            parallel operations when loading multiple files. Defaults to 'serial'.
+        extract_func (Callable | str, optional): Function to extract data.
+            - If str: name of SpikeInterface or MNE extractor (e.g., 'read_intan', 'read_raw_edf')
+            - If Callable: custom extraction function
+            - If None: defaults to si.load_extractor for SI mode
+        manual_datetimes (datetime | list[datetime], optional): Manually provided timestamps.
         datetimes_are_start (bool, optional): If True (default), manual_datetimes are start times.
-        n_jobs (int, optional): Number of parallel jobs for data loading. Defaults to 1.
-        recording (si.BaseRecording, optional): Existing SpikeInterface recording object for in-memory initialization.
-            Use this when creating LRO wrappers around split recordings.
-        labels (dict, optional): High-level session labels (animal ID, day, genotype, etc.).
-            This object is parsing-agnostic; it does not perform high-level parsing itself.
-            Labels should be provided by a parser (like `AnimalOrganizer`).
+        n_jobs (int, optional): Number of parallel jobs for MNE resampling. Defaults to 1.
+        recording (si.BaseRecording, optional): Existing SpikeInterface recording object
+            for in-memory initialization. Use this when creating LRO wrappers around split recordings.
         **kwargs: Additional arguments passed to the data loading functions.
 
     Attributes:
         LongRecording (si.BaseRecording): The SpikeInterface recording object.
         meta (DDFBinaryMetadata): Technical metadata (sampling rate, channels, etc.).
-        labels (dict): High-level session labels (animal ID, day, genotype, etc.).
         channel_names (list[str]): List of channel names.
         file_durations (list[float]): Duration of each individual file in seconds.
         cumulative_file_durations (list[float]): Cumulative duration timestamps for file boundaries.
@@ -447,7 +453,8 @@ class LongRecordingOrganizer:
         _is_in_memory (bool): True if this LRO was created from an in-memory recording (via split()).
 
     Raises:
-        ValueError: If no data files are found, if the folder contains mixed file types, or if manual time parameters are invalid.
+        ValueError: If no data files are found, if the folder contains mixed file types,
+            or if manual time parameters are invalid.
     """
 
     def __init__(
