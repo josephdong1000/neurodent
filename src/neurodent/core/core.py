@@ -452,7 +452,7 @@ class LongRecordingOrganizer:
 
     def __init__(
         self,
-        item: Union[str, Path, list[str], tuple[str]],
+        item: Union[str, Path, list[str], tuple[str], "MultiFileGroup"],
         mode: Literal["si", "mne", None] = "si",
         truncate: Union[bool, int] = False,
         cache_policy: Literal["auto", "always", "force_regenerate"] = "auto",
@@ -464,21 +464,23 @@ class LongRecordingOrganizer:
         datetimes_are_start: bool = True,
         n_jobs: int = 1,
         recording: "si.BaseRecording" = None,
-        labels: dict = None,
         **kwargs,
     ):
-        if isinstance(item, (list, tuple)):
-            self.data_files = [str(x) for x in item]
-            self.base_folder_path = (
-                Path(self.data_files[0]).parent if self.data_files else None
-            )
-            self.item = self.data_files
-        else:
-            self.base_folder_path = Path(item) if item else None
+        # Import MultiFileGroup here to avoid circular imports
+        from .discovery import MultiFileGroup
+
+        if isinstance(item, MultiFileGroup):
+            # MultiFileGroup: pass as-is to extract_func
             self.data_files = None
             self.item = item
-
-        self.labels = labels or {}
+        elif isinstance(item, (list, tuple)):
+            # List of files: will be concatenated individually
+            self.data_files = [str(x) for x in item]
+            self.item = self.data_files
+        else:
+            # Single file/path or None
+            self.data_files = None
+            self.item = item
 
         self.n_truncate = parse_truncate(truncate)
         self.truncate = True if self.n_truncate > 0 else False
@@ -1171,9 +1173,8 @@ class LongRecordingOrganizer:
 
             # Create in-memory LRO wrapper
             child_lro = LongRecordingOrganizer(
-                item=self.base_folder_path,
+                item=None,
                 recording=sub_rec,
-                labels=self.labels.copy(),
             )
             # Inherit parent timestamps
             child_lro.manual_datetimes = self.manual_datetimes
@@ -1852,7 +1853,7 @@ class LongRecordingOrganizer:
 
         # Concatenate recordings using SpikeInterface
         logging.info(
-            f"Merging LRO {other_lro.base_folder_path} into {self.base_folder_path}"
+            f"Merging LRO {getattr(other_lro, 'item', 'unknown')} into {getattr(self, 'item', 'unknown')}"
         )
         self.LongRecording = si.concatenate_recordings(
             [self.LongRecording, other_lro.LongRecording]
@@ -1908,17 +1909,6 @@ class LongRecordingOrganizer:
         """
         if hasattr(other_lro.meta, "dt_end") and hasattr(self.meta, "dt_end"):
             self.meta.dt_end = other_lro.meta.dt_end
-
-        # Merge high-level labels
-        if hasattr(other_lro, "labels") and other_lro.labels:
-            for key, value in other_lro.labels.items():
-                if key in self.labels and self.labels[key] != value:
-                    warnings.warn(
-                        f"Label conflict during merge for key '{key}': "
-                        f"'{self.labels[key]}' != '{value}'. Overwriting with new value.",
-                        UserWarning,
-                    )
-                self.labels[key] = value
 
         # Merge file timestamps and durations
         has_dates = (

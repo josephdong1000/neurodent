@@ -5,6 +5,25 @@ from typing import Union, Dict, List, Tuple, Optional
 import warnings
 
 
+class MultiFileGroup:
+    """Files that must be loaded together as one recording unit.
+
+    Created by FileDiscoverer when multiple patterns are provided.
+    This wrapper distinguishes multi-file sessions (e.g., .bin + .csv that should
+    be loaded together) from lists of single files (e.g., multiple .rhd files that
+    should be concatenated).
+    """
+    def __init__(self, paths: tuple[str, ...], metadata: dict):
+        self.paths = paths
+        self.metadata = metadata  # {animal: ..., session: ..., etc.}
+
+    def __iter__(self):
+        return iter(self.paths)
+
+    def __repr__(self):
+        return f"MultiFileGroup(paths={self.paths}, metadata={self.metadata})"
+
+
 class FileDiscoverer:
     """
     Utility class for discovering files based on wildcard pattern strings.
@@ -46,17 +65,17 @@ class FileDiscoverer:
 
         return re.compile(regex_string), glob_pattern
 
-    def discover(self, **filter_kwargs) -> List[Dict]:
+    def discover(self, **filter_kwargs) -> List[Union[Dict, "MultiFileGroup"]]:
         """
-        Discovers files matching patterns, returning a list of dictionaries.
+        Discovers files matching patterns, returning a list of dictionaries or MultiFileGroup objects.
         Keyword args like `animal="A10"` can strictly filter the returned files.
 
         Returns:
-            A list of dicts.
+            A list of dicts (for single pattern) or MultiFileGroup objects (for multiple patterns).
             If a single pattern was provided, dicts look like:
                 {'path': '...', 'animal': 'A10', 'session': '1'}
-            If multiple patterns were provided, dicts group them by metadata:
-                {'paths': ('..._data.bin', '..._meta.json'), 'animal': 'A10', 'session': '1'}
+            If multiple patterns were provided, returns MultiFileGroup objects with grouped files:
+                MultiFileGroup(paths=('..._data.bin', '..._meta.json'), metadata={'animal': 'A10', 'session': '1'})
         """
         is_single = len(self.patterns) == 1
         return_list = []
@@ -107,13 +126,11 @@ class FileDiscoverer:
                             f"Duplicate or out-of-order match found for metadata {key} in pattern {self.patterns[pattern_idx]}"
                         )
 
-        # Filter for complete groups and construct final dictionaries
+        # Filter for complete groups and construct MultiFileGroup objects
         for key, paths in grouped_results.items():
             if len(paths) == len(self.patterns):
-                res = {"paths": tuple(paths)}
-                for k, v in zip(keys_to_group, key):
-                    res[k] = v
-                return_list.append(res)
+                metadata = {k: v for k, v in zip(keys_to_group, key)}
+                return_list.append(MultiFileGroup(paths=tuple(paths), metadata=metadata))
 
         return return_list
 

@@ -151,7 +151,6 @@ class AnimalOrganizer(AnimalFeatureParser):
         truncate: bool | int = False,
         assume_from_number: bool = False,
         lro_kwargs: dict = {},
-        day_parse_kwargs: dict = {},
     ) -> None:
         self.pattern = pattern
         self.animal_id = animal_id
@@ -160,7 +159,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         self.day_sep = None
         self.read_mode = "pattern"  # Legacy compat; new pattern-based discovery
 
-        from neurodent.core.discovery import FileDiscoverer
+        from neurodent.core.discovery import FileDiscoverer, MultiFileGroup
 
         self.discoverer = FileDiscoverer(pattern)
 
@@ -174,16 +173,23 @@ class AnimalOrganizer(AnimalFeatureParser):
         processed_animaldays = []
 
         for item in discovered_items:
-            session = item.get("session", "unknown")
+            # Handle both dict (single pattern) and MultiFileGroup (multiple patterns)
+            if isinstance(item, MultiFileGroup):
+                session = item.metadata.get("session", "unknown")
+                animal_val = item.metadata.get("animal", animal_id if animal_id else "unknown")
+                path_val = item  # Pass the entire MultiFileGroup object
+            else:
+                session = item.get("session", "unknown")
+                animal_val = item.get("animal", animal_id if animal_id else "unknown")
+                path_val = item.get("path")
+
             if session in skip_sessions:
                 continue
 
             if session not in self._animalday_folder_groups:
                 self._animalday_folder_groups[session] = []
-                animal_val = item.get("animal", animal_id if animal_id else "unknown")
                 processed_animaldays.append(f"{animal_val}_{session}")
 
-            path_val = item.get("paths", item.get("path"))
             if path_val:
                 self._animalday_folder_groups[session].append(path_val)
 
@@ -214,15 +220,6 @@ class AnimalOrganizer(AnimalFeatureParser):
             if self.animal_id
             else "Unknown"
         )
-        self._animalday_str_to_dict = {
-            ad: {
-                "animal": ad.split("_")[0],
-                "date": ad.split("_")[1] if "_" in ad else ad,
-                "genotype": self.genotype,
-                "animalday": ad,
-            }
-            for ad in self.unique_animaldays
-        }
 
         self._init_containers()
 
@@ -766,7 +763,6 @@ class AnimalOrganizer(AnimalFeatureParser):
                     f"Successfully merged {len(sorted_folder_lro_pairs)} LROs for {animalday}"
                 )
 
-            lro.labels.update(self._animalday_str_to_dict.get(animalday, {}))
             self.long_recordings.append(lro)
 
         self._log_timeline_summary()
@@ -802,10 +798,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                         else 1
                     )
 
-                    folder_path = getattr(lro, "base_folder_path", None)
-                    if folder_path:
-                        name = Path(folder_path).name
-                    elif hasattr(lro, "data_files") and lro.data_files:
+                    if hasattr(lro, "data_files") and lro.data_files:
                         name = Path(lro.data_files[0]).name + "..."
                     elif hasattr(lro, "item") and lro.item:
                         name = self._get_item_name(lro.item)
