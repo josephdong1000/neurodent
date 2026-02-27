@@ -1,6 +1,8 @@
 
 import pytest
 from pathlib import Path
+from datetime import datetime
+from unittest.mock import patch
 import neurodent.visualization.results as results
 import neurodent.constants as constants
 import neurodent.core.utils as utils
@@ -81,7 +83,7 @@ def test_ao_directory_mode_repro(tmp_path, monkeypatch):
     # Initialize AO
     ao = results.AnimalOrganizer(
         base_folder_path=data_dir,
-        anim_id="AP3B2homo-240-M",
+        animal_id="AP3B2homo-240-M",
         mode="concat", # Directory name itself contains the ID
         file_pattern=None, # Directory mode
         day_parse_kwargs=day_parse_kwargs
@@ -109,7 +111,7 @@ def test_ao_discovery_production_setup_homo(mock_production_structure, monkeypat
     day_parse_kwargs = {"date_patterns": [(r"\d{6}", "%y%m%d")]}
     ao = results.AnimalOrganizer(
         base_folder_path=parent_folder,
-        anim_id=anim_id,
+        animal_id=anim_id,
         mode="concat",
         file_pattern="*.nwb",
         day_parse_kwargs=day_parse_kwargs
@@ -145,7 +147,7 @@ def test_ao_discovery_production_setup_wt(mock_production_structure, monkeypatch
     day_parse_kwargs = {"date_patterns": [(r"\d{6}", "%y%m%d")]}
     ao = results.AnimalOrganizer(
         base_folder_path=parent_folder,
-        anim_id=anim_id,
+        animal_id=anim_id,
         mode="concat",
         file_pattern="*.nwb",
         day_parse_kwargs=day_parse_kwargs
@@ -178,7 +180,7 @@ def test_ao_discovery_grandparent_setup(mock_production_structure, monkeypatch):
     with pytest.raises(ValueError, match="No directories found"):
         ao = results.AnimalOrganizer(
             base_folder_path=grandparent,
-            anim_id=anim_id,
+            animal_id=anim_id,
             mode="concat",
             file_pattern="*.nwb",
             day_parse_kwargs=day_parse_kwargs
@@ -253,7 +255,7 @@ def test_ao_discovery_ambiguous_names(mock_production_structure, monkeypatch):
     day_parse_kwargs = {"date_patterns": [(r"\d{6}", "%y%m%d")]}
     ao = results.AnimalOrganizer(
         base_folder_path=parent,
-        anim_id="AP3B2homo-240-M",
+        animal_id="AP3B2homo-240-M",
         mode="concat",
         file_pattern="*.nwb",
         day_parse_kwargs=day_parse_kwargs
@@ -290,7 +292,7 @@ def test_ao_discovery_nested_duplicates(mock_production_structure, monkeypatch):
     day_parse_kwargs = {"date_patterns": [(r"\d{6}", "%y%m%d")]}
     ao = results.AnimalOrganizer(
         base_folder_path=parent,
-        anim_id="AP3B2homo-240-M",
+        animal_id="AP3B2homo-240-M",
         mode="concat",
         file_pattern="*.nwb",
         day_parse_kwargs=day_parse_kwargs
@@ -321,7 +323,7 @@ def test_ao_discovery_file_level_exclusion(mock_production_structure, monkeypatc
     day_parse_kwargs = {"date_patterns": [(r"\d{6}", "%y%m%d")]}
     ao = results.AnimalOrganizer(
         base_folder_path=parent,
-        anim_id="AP3B2homo-240-M",
+        animal_id="AP3B2homo-240-M",
         mode="concat",
         file_pattern="*.nwb",
         day_parse_kwargs=day_parse_kwargs
@@ -335,3 +337,207 @@ def test_ao_discovery_file_level_exclusion(mock_production_structure, monkeypatc
     
     # Should NOT find IgnoredFile.nwb (because mode=concat checks filename)
     assert "IgnoredFile_251127.nwb" not in found_files
+
+
+@pytest.fixture
+def mock_joint_session_structure(tmp_path):
+    """
+    Simulate a joint session structure where filenames contain concatenated animal IDs.
+    e.g. Arx Rosa dataset: MARSH 20141125ARXROSATAM967968969418_1_Selection1.EDF
+    """
+    session_dir = tmp_path / "Arx Rosa  967 968 969 418"
+    session_dir.mkdir(parents=True)
+
+    # Joint session EDF files — IDs are concatenated in the filename
+    (session_dir / "MARSH_20141125ARXROSATAM967968969418_Selection1_251125.EDF").touch()
+    (session_dir / "MARSH_20141125ARXROSATAM967968969418_Selection2_251126.EDF").touch()
+
+    # An unrelated file that should NOT match
+    (session_dir / "UNRELATED_FILE_999999_251127.EDF").touch()
+
+    return session_dir
+
+
+def test_ao_animal_file_match_pattern_regex(mock_joint_session_structure, monkeypatch):
+    """
+    Test animal_file_match_pattern with a regex pattern for joint sessions.
+    Without animal_file_match_pattern, AO would fail because 'ArxRosa-967' is not
+    a substring of 'MARSH_20141125ARXROSATAM967968969418_Selection1_251125.EDF'.
+    With animal_file_match_pattern="967|968|969|418", the regex matches '967' in the filename.
+    """
+    monkeypatch.setattr(results.AnimalOrganizer, "_create_long_recordings", lambda self, kw: None)
+
+    day_parse_kwargs = {"date_patterns": [(r"\d{6}", "%y%m%d")]}
+
+    # Without animal_file_match_pattern: should fail
+    with pytest.raises(ValueError, match="No directories found"):
+        results.AnimalOrganizer(
+            base_folder_path=mock_joint_session_structure,
+            animal_id="ArxRosa-967",
+            mode="base",
+            file_pattern="*.EDF",
+            day_parse_kwargs=day_parse_kwargs,
+        )
+
+    # With animal_file_match_pattern: should succeed
+    ao = results.AnimalOrganizer(
+        base_folder_path=mock_joint_session_structure,
+        animal_id="ArxRosa-967",
+        mode="base",
+        file_pattern="*.EDF",
+        day_parse_kwargs=day_parse_kwargs,
+        animal_file_match_pattern="967|968|969|418",
+    )
+
+    found_files = [Path(f).name for f in ao._bin_folders]
+
+    # Should find the joint session files
+    assert "MARSH_20141125ARXROSATAM967968969418_Selection1_251125.EDF" in found_files
+    assert "MARSH_20141125ARXROSATAM967968969418_Selection2_251126.EDF" in found_files
+
+    # Should NOT find the unrelated file
+    assert "UNRELATED_FILE_999999_251127.EDF" not in found_files
+
+    # animal_id should still be the original ID
+    assert ao.animal_id == "ArxRosa-967"
+
+
+def test_ao_animal_file_match_pattern_none_default(mock_production_structure, monkeypatch):
+    """
+    Test that animal_file_match_pattern=None (default) preserves existing behavior.
+    """
+    monkeypatch.setattr("neurodent.constants.GENOTYPE_ALIASES", MOCK_ALIASES)
+    monkeypatch.setattr(results.AnimalOrganizer, "_create_long_recordings", lambda self, kw: None)
+
+    day_parse_kwargs = {"date_patterns": [(r"\d{6}", "%y%m%d")]}
+    ao = results.AnimalOrganizer(
+        base_folder_path=mock_production_structure,
+        animal_id="AP3B2homo-240-M",
+        mode="concat",
+        file_pattern="*.nwb",
+        day_parse_kwargs=day_parse_kwargs,
+        # animal_file_match_pattern not passed — should default to [animal_id]
+    )
+
+    found_files = [Path(f).name for f in ao._bin_folders]
+    assert "AP3B2homo-240-M_Correct_HOMO_251127.nwb" in found_files
+    assert ao.animal_file_match_pattern == ["AP3B2homo-240-M"]
+
+
+def test_ao_animal_file_match_pattern_with_manual_datetimes(mock_joint_session_structure, monkeypatch):
+    """
+    Test that manual_datetimes flows through _process_manual_datetimes correctly
+    when animal_file_match_pattern is used (joint session scenario).
+
+    Mocks _compute_global_timeline to avoid needing real data files, but verifies
+    the full path: __init__ -> _process_manual_datetimes -> _compute_global_timeline
+    receives the correct lro_kwargs (including mode override from 'si' to 'mne').
+    """
+    monkeypatch.setattr(results.AnimalOrganizer, "_create_long_recordings", lambda self, kw: None)
+
+    day_parse_kwargs = {"date_patterns": [(r"\d{6}", "%y%m%d")]}
+
+    # Track what _compute_global_timeline receives
+    captured_calls = []
+
+    def mock_compute_global_timeline(self, start_dt, animalday_to_folders, base_lro_kwargs, original_manual_datetimes=None):
+        captured_calls.append({
+            "start_dt": start_dt,
+            "base_lro_kwargs": base_lro_kwargs.copy(),
+            "n_folders": sum(len(v) for v in animalday_to_folders.values()),
+        })
+        # Return a mock folder->timestamp mapping for each file
+        out = {}
+        for folders in animalday_to_folders.values():
+            for folder in folders:
+                out[Path(folder).name] = start_dt
+        return out
+
+    monkeypatch.setattr(results.AnimalOrganizer, "_compute_global_timeline", mock_compute_global_timeline)
+
+    # Simulate what generate_wars.py does: pass manual_datetimes as a string
+    # and lro_kwargs with mode="mne" (the EDF override)
+    ao = results.AnimalOrganizer(
+        base_folder_path=mock_joint_session_structure,
+        animal_id="ArxRosa-967",
+        mode="base",
+        file_pattern="*.EDF",
+        day_parse_kwargs=day_parse_kwargs,
+        animal_file_match_pattern="967|968|969|418",
+        lro_kwargs={
+            "mode": "mne",
+            "input_type": "files",
+            "extract_func": "read_raw_edf",
+            "manual_datetimes": "2014-11-26 09:37:10",
+        },
+    )
+
+    # _compute_global_timeline should have been called
+    assert len(captured_calls) == 1
+    call = captured_calls[0]
+
+    # Verify the start datetime was parsed correctly
+    assert call["start_dt"] == datetime(2014, 11, 26, 9, 37, 10)
+
+    # Verify lro_kwargs passed to _compute_global_timeline contain the MNE mode
+    assert call["base_lro_kwargs"]["mode"] == "mne"
+    assert call["base_lro_kwargs"]["extract_func"] == "read_raw_edf"
+    assert call["base_lro_kwargs"]["input_type"] == "files"
+
+    # Verify 2 files were discovered (the joint session EDF files, not the unrelated one)
+    assert call["n_folders"] == 2
+
+    # Verify _processed_timestamps was populated
+    assert ao._processed_timestamps is not None
+    assert len(ao._processed_timestamps) == 2
+
+    # animal_id should still be the original
+    assert ao.animal_id == "ArxRosa-967"
+
+
+def test_ao_animal_file_match_pattern_si_mode(mock_joint_session_structure, monkeypatch):
+    """
+    Test that SI mode (RHD sessions) also works with animal_file_match_pattern
+    and manual_datetimes. Verifies the lro_kwargs preserve mode='si'.
+    """
+    monkeypatch.setattr(results.AnimalOrganizer, "_create_long_recordings", lambda self, kw: None)
+
+    day_parse_kwargs = {"date_patterns": [(r"\d{6}", "%y%m%d")]}
+
+    captured_calls = []
+
+    def mock_compute_global_timeline(self, start_dt, animalday_to_folders, base_lro_kwargs, original_manual_datetimes=None):
+        captured_calls.append({
+            "start_dt": start_dt,
+            "base_lro_kwargs": base_lro_kwargs.copy(),
+        })
+        out = {}
+        for folders in animalday_to_folders.values():
+            for folder in folders:
+                out[Path(folder).name] = start_dt
+        return out
+
+    monkeypatch.setattr(results.AnimalOrganizer, "_compute_global_timeline", mock_compute_global_timeline)
+
+    ao = results.AnimalOrganizer(
+        base_folder_path=mock_joint_session_structure,
+        animal_id="ArxRosa-967",
+        mode="base",
+        file_pattern="*.EDF",
+        day_parse_kwargs=day_parse_kwargs,
+        animal_file_match_pattern="967|968|969|418",
+        lro_kwargs={
+            "mode": "si",
+            "input_type": "files",
+            "extract_func": "read_intan",
+            "manual_datetimes": "2020-08-04 08:48:59",
+        },
+    )
+
+    assert len(captured_calls) == 1
+    call = captured_calls[0]
+
+    # Verify SI mode is preserved in lro_kwargs
+    assert call["base_lro_kwargs"]["mode"] == "si"
+    assert call["base_lro_kwargs"]["extract_func"] == "read_intan"
+    assert call["start_dt"] == datetime(2020, 8, 4, 8, 48, 59)

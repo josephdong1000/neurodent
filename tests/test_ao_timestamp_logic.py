@@ -47,7 +47,7 @@ def test_ao_grouping_logic(mock_overlap_structure, monkeypatch):
 
     ao = results.AnimalOrganizer(
         base_folder_path=mock_overlap_structure,
-        anim_id="AP3B2homo-240-M",
+        animal_id="AP3B2homo-240-M",
         mode="concat",
         file_pattern="*.nwb",
         day_parse_kwargs=day_parse_kwargs

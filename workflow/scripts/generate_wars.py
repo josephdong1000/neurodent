@@ -12,6 +12,7 @@ Output: WAR pickle and JSON files
 """
 
 import warnings
+import os
 from pathlib import Path
 
 from dask.distributed import Client, LocalCluster
@@ -67,12 +68,7 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
             
             all_lros = []
             analysis_config = config["analysis"]["war_generation"]
-            lro_kwargs = dict(analysis_config.get("lro_kwargs", {}))
-            
-            # Use built-in AnimalOrganizer timestamp resolution if manual_datetimes in JSON
-            if "manual_datetimes" in samples_config:
-                lro_kwargs["manual_datetimes"] = samples_config["manual_datetimes"]
-            
+
             # Resolve genotype from metadata (Metadata-First)
             if animal_id not in constants.ANIMAL_METADATA:
                  raise KeyError(
@@ -109,29 +105,40 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
                 # Prepare kwargs for this specific session
                 session_lro_kwargs = dict(session_analysis_config.get("lro_kwargs", {}))
 
-                # Correctly handle list-based manual_datetimes by distributing them
+                # Resolve manual_datetimes for this session
                 if "manual_datetimes" in samples_config:
                     all_manual_dts = samples_config["manual_datetimes"]
                     if animal_id in all_manual_dts:
                         spec = all_manual_dts[animal_id]
                         if isinstance(spec, list):
-                            # Distribute timestamps to session AOs
-                            # We assume the order of animal_folders matches the order of timestamps
+                            # Distribute: each AO gets one timestamp from the list
+                            # (one per session folder, matched by index order)
                             if len(spec) != len(animal_folders):
                                 raise ValueError(
                                     f"Length of manual_datetimes list ({len(spec)}) for {animal_id} "
                                     f"does not match number of session folders ({len(animal_folders)})"
                                 )
-
-                            # Apply specific timestamp for this session index
                             current_dt = spec[animal_folders.index(folder_info)]
                             session_lro_kwargs["manual_datetimes"] = current_dt
                             logger.info(f"  -> Using specific timestamp from list: {current_dt}")
+                        else:
+                            # Single string/scalar/dict: pass directly
+                            session_lro_kwargs["manual_datetimes"] = spec
+                            logger.info(f"  -> Using manual datetime: {spec}")
 
                 logger.info(f"  -> File pattern: {session_analysis_config.get('file_pattern')}")
 
+                # For joint sessions, build a regex to match any animal's numeric ID in filenames
+                # e.g. "ArxRosa-967", "ArxRosa-968" -> regex "967|968|969|418"
+                if is_joint:
+                    all_ids = list(samples_config["joint_sessions"][session_key].keys())
+                    numeric_ids = [aid.split("-")[-1] for aid in all_ids]
+                    animal_file_match_pattern = "|".join(numeric_ids)
+                    logger.info(f"  -> Joint session file match pattern: {animal_file_match_pattern}")
+                else:
+                    animal_file_match_pattern = None
+
                 # Create AO for this session with overridden parameters
-                # Note: We use source_animal_id (e.g. 'M1') to match filenames in that folder
                 session_ao = visualization.AnimalOrganizer(
                     data_parent_folder / folder_path,
                     source_animal_id,
@@ -142,6 +149,7 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
                     skip_days=session_analysis_config["skip_days"],
                     lro_kwargs=session_lro_kwargs,
                     day_parse_kwargs=session_analysis_config.get("day_parse_kwargs", {}),
+                    animal_file_match_pattern=animal_file_match_pattern,
                 )
 
                 
@@ -236,4 +244,15 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    if os.environ.get("NEURODENT_PROFILE"):
+        import cProfile
+        profiler = cProfile.Profile()
+        profiler.enable()
+        main()
+        profiler.disable()
+        prof_path = Path(snakemake.output.war_pkl).parent / "profile.prof"
+        profiler.dump_stats(str(prof_path))
+        print(f"Profile saved to {prof_path}")
+        print("Analyze with: python -m snakeviz {prof_path}")
+    else:
+        main()

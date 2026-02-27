@@ -99,7 +99,7 @@ class AnimalOrganizer(AnimalFeatureParser):
 
     Args:
         base_folder_path (str): The path to the base folder of the animal data.
-        anim_id (str): The ID of the animal. This should correspond to only one animal.
+        animal_id (str): The ID of the animal. This should correspond to only one animal.
         day_sep (str, optional): Separator for day in folder name. Set to None or empty string to get all folders. Defaults to None.
         mode (Literal["nest", "concat", "base", "noday"], optional): The mode of the AnimalOrganizer. Defaults to "concat".
             * "nest": base_folder_path / animal_id / \*date_format\* (looks for folders/files within animal_id subdirectories)
@@ -113,7 +113,7 @@ class AnimalOrganizer(AnimalFeatureParser):
 
     Attributes:
         base_folder_path (Path): The path to the base folder of the animal data.
-        anim_id (str): The ID of the animal.
+        animal_id (str): The ID of the animal.
         day_sep (str): Separator for day in folder name.
         read_mode (str): The mode of the AnimalOrganizer.
         assume_from_number (bool): Whether to assume the animal ID is a number.
@@ -146,7 +146,7 @@ class AnimalOrganizer(AnimalFeatureParser):
     def __init__(
         self,
         base_folder_path,
-        anim_id: str,
+        animal_id: str,
         day_sep: str | None = None,
         mode: Literal["nest", "concat", "base", "noday"] = "concat",
         assume_from_number=False,
@@ -155,11 +155,13 @@ class AnimalOrganizer(AnimalFeatureParser):
         file_pattern: str | None = None,
         lro_kwargs: dict = {},
         day_parse_kwargs: dict = {},
+        animal_file_match_pattern: list[str] | str | tuple | None = None,
     ) -> None:
 
         self.base_folder_path = Path(base_folder_path)
-        self.anim_id = anim_id
-        self.animal_param = [anim_id]
+        self.animal_id = animal_id
+        self._has_custom_match_rule = animal_file_match_pattern is not None
+        self.animal_file_match_pattern = animal_file_match_pattern if animal_file_match_pattern is not None else [animal_id]
         self.day_sep = day_sep
         self.read_mode = mode
         self.assume_from_number = assume_from_number
@@ -168,15 +170,15 @@ class AnimalOrganizer(AnimalFeatureParser):
         match mode:
             case "nest":
                 self.bin_folder_pattern = (
-                    self.base_folder_path / f"*{self.anim_id}*" / "*"
+                    self.base_folder_path / f"*{self.animal_id}*" / "*"
                 )
             case "concat" | "noday":
-                self.bin_folder_pattern = self.base_folder_path / f"*{self.anim_id}*"
-                # self.bin_folder_pat = self.base_folder_path / f"*{self.anim_id}*{self.date_format}*"
+                self.bin_folder_pattern = self.base_folder_path / f"*{self.animal_id}*"
+                # self.bin_folder_pat = self.base_folder_path / f"*{self.animal_id}*{self.date_format}*"
             case "base":
                 self.bin_folder_pattern = self.base_folder_path
             # case 'noday':
-            #     self.bin_folder_pat = self.base_folder_path / f"*{self.anim_id}*"
+            #     self.bin_folder_pat = self.base_folder_path / f"*{self.animal_id}*"
             case _:
                 raise ValueError(f"Invalid mode: {mode}")
 
@@ -225,23 +227,45 @@ class AnimalOrganizer(AnimalFeatureParser):
 
         if mode == "noday" and len(self._bin_folders) > 1:
             raise ValueError(
-                f"Animal ID '{self.anim_id}' is not unique, found: {', '.join(self._bin_folders)}"
+                f"Animal ID '{self.animal_id}' is not unique, found: {', '.join(self._bin_folders)}"
             )
         elif len(self._bin_folders) == 0:
             raise ValueError(
-                f"No directories found for animal ID {self.anim_id} (pattern: {self.bin_folder_pattern})"
+                f"No directories found for animal ID {self.animal_id} (pattern: {self.bin_folder_pattern})"
             )
 
-        self._animalday_dicts = [
-            core.parse_path_to_animalday(
-                e,
-                animal_param=self.animal_param,
-                day_sep=self.day_sep,
-                mode=self.read_mode,
-                **day_parse_kwargs,
-            )
-            for e in self._bin_folders
-        ]
+        if self._has_custom_match_rule:
+            # Custom match rule (e.g. joint sessions): filenames don't follow
+            # standard genotype_animal_date format, so we use the known animal_id
+            # and resolve genotype from ANIMAL_METADATA, parsing only the date.
+            geno = constants.ANIMAL_METADATA.get(self.animal_id, {}).get("gene", "Unknown")
+            self._animalday_dicts = []
+            for e in self._bin_folders:
+                fp = Path(e)
+                name = fp.parent.name if self.read_mode == "nest" else fp.name
+                if self.read_mode == "noday":
+                    day = constants.DEFAULT_DAY.strftime("%b-%d-%Y")
+                else:
+                    day = core.utils.parse_str_to_day(
+                        name, sep=self.day_sep, **day_parse_kwargs
+                    ).strftime("%b-%d-%Y")
+                self._animalday_dicts.append({
+                    "animal": self.animal_id,
+                    "genotype": geno,
+                    "day": day,
+                    "animalday": f"{self.animal_id} {geno} {day}",
+                })
+        else:
+            self._animalday_dicts = [
+                core.parse_path_to_animalday(
+                    e,
+                    animal_param=self.animal_file_match_pattern,
+                    day_sep=self.day_sep,
+                    mode=self.read_mode,
+                    **day_parse_kwargs,
+                )
+                for e in self._bin_folders
+            ]
 
         # Group folders by parsed animalday to handle overlapping days
         animalday_to_folders = {}
@@ -309,34 +333,44 @@ class AnimalOrganizer(AnimalFeatureParser):
         """
         Validates discovered folders/files by attempting to parse them.
         Filters out 'ghost' files that match the glob pattern but do not contain the correct Animal ID.
+
+        When file_match_pattern was explicitly provided, only validates the animal ID match
+        (skipping genotype/date parsing which may not work for joint session filenames).
         """
         valid_folders = []
         for folder in folders:
             try:
-                core.parse_path_to_animalday(
-                    folder,
-                    animal_param=self.animal_param,
-                    day_sep=self.day_sep,
-                    mode=self.read_mode,
-                    **day_parse_kwargs,
-                )
+                if self._has_custom_match_rule:
+                    # Custom match rule: only validate that the file matches the pattern
+                    core.utils.parse_str_to_animal(
+                        Path(folder).name, animal_param=self.animal_file_match_pattern
+                    )
+                else:
+                    # Default: full validation (animal + genotype + date)
+                    core.parse_path_to_animalday(
+                        folder,
+                        animal_param=self.animal_file_match_pattern,
+                        day_sep=self.day_sep,
+                        mode=self.read_mode,
+                        **day_parse_kwargs,
+                    )
                 valid_folders.append(folder)
             except ValueError as e:
                 # Differentiate between "Filtering" (mismatch) and "Parsing Error" (bad config/date)
                 msg = str(e)
                 is_filter_error = (
-                    "No matching ID found" in msg 
+                    "No matching ID found" in msg
                     or "No match found for pattern" in msg
                     or "does not have any matching values" in msg
                 )
-                
+
                 if is_filter_error:
                     # This file/folder does not match the animal ID parsing rules (Ghost/Sibling).
                     logging.warning(
                         f"file/folder '{Path(folder).name}' captured by glob but failed ID/Genotype validation (mode='{self.read_mode}'). Skipping. Reason: {msg}"
                     )
                     continue
-                
+
                 # If we get here, the ID/Genotype matched, but something else failed (likely Date).
                 # This suggests a configuration error or a valid file with a malformed date.
                 # We should NOT silence this.
@@ -670,41 +704,41 @@ class AnimalOrganizer(AnimalFeatureParser):
         """
         if isinstance(manual_datetimes, dict):
             # Find folders for this animal to apply the spec
-            animal_folders = self._get_folders_for_animal(self.anim_id, animalday_to_folders)
+            animal_folders = self._get_folders_for_animal(self.animal_id, animalday_to_folders)
 
             # Direct lookup: keys are expected to be animal IDs
             # Check for shadowing: if both Animal ID key AND flat folder keys are present
-            has_id_key = self.anim_id in manual_datetimes
+            has_id_key = self.animal_id in manual_datetimes
             folder_names = {Path(f).name for f in animal_folders}
             has_folder_keys = any(k in folder_names for k in manual_datetimes.keys())
             
             if has_id_key and has_folder_keys:
                 raise ValueError(
-                    f"Ambiguous manual_datetimes configuration for '{self.anim_id}'. "
-                    f"Both the Animal ID key '{self.anim_id}' and individual folder keys "
+                    f"Ambiguous manual_datetimes configuration for '{self.animal_id}'. "
+                    f"Both the Animal ID key '{self.animal_id}' and individual folder keys "
                     f"(e.g., {[k for k in manual_datetimes.keys() if k in folder_names][:3]}) are present. "
                     f"Please nest all folder keys under the Animal ID key to avoid ambiguity."
                 )
 
-            spec = manual_datetimes.get(self.anim_id)
+            spec = manual_datetimes.get(self.animal_id)
             
             if spec is None:
                 # Check if manual_datetimes keys match any folders (backward compatibility for direct folder mapping)
                 if has_folder_keys:
-                    logging.info(f"manual_datetimes keys match folders for {self.anim_id}. Treating as folder mapping spec.")
+                    logging.info(f"manual_datetimes keys match folders for {self.animal_id}. Treating as folder mapping spec.")
                     spec = manual_datetimes
                 else:
                     raise ValueError(
-                        f"manual_datetimes dictionary was provided in the config, but no entry was found for animal ID '{self.anim_id}'. "
+                        f"manual_datetimes dictionary was provided in the config, but no entry was found for animal ID '{self.animal_id}'. "
                         f"Available keys in config: {list(manual_datetimes.keys())}"
                     )
 
-            logging.info(f"Processing manual datetimes for animal '{self.anim_id}'")
+            logging.info(f"Processing manual datetimes for animal '{self.animal_id}'")
             out = {}
             
             if not animal_folders:
                 raise ValueError(
-                    f"Manual timestamps were provided for animal ID '{self.anim_id}' in the config, "
+                    f"Manual timestamps were provided for animal ID '{self.animal_id}' in the config, "
                     f"but no data folders starting with this ID were found in the data path. "
                     f"Check for typos or naming mismatches between config keys and folder names."
                 )
@@ -712,7 +746,7 @@ class AnimalOrganizer(AnimalFeatureParser):
             if isinstance(spec, list):
                 if len(spec) != len(animal_folders):
                     raise ValueError(
-                        f"manual_datetimes list for animal '{self.anim_id}' has {len(spec)} entries "
+                        f"manual_datetimes list for animal '{self.animal_id}' has {len(spec)} entries "
                         f"but animal has {len(animal_folders)} folders"
                     )
                 for folder_path, ts in zip(animal_folders, spec):
@@ -1273,7 +1307,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         self,
         features: list[str],
         exclude: list[str] = [],
-        window_s=4,
+        window_s=5,
         multiprocess_mode: Literal["dask", "serial"] = "serial",
         suppress_short_interval_error=False,
         apply_notch_filter=True,
@@ -1285,7 +1319,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         Args:
             features (list[str]): List of features to compute. See individual ``compute_...()`` functions for output format
             exclude (list[str], optional): List of features to ignore. Will override the features parameter. Defaults to [].
-            window_s (int, optional): Length of each window in seconds. Note that some features break with very short window times. Defaults to 4.
+            window_s (int, optional): Length of each window in seconds. Note that some features break with very short window times. Defaults to 5.
             suppress_short_interval_error (bool, optional): If True, suppress ValueError for short intervals between timestamps in resulting WindowAnalysisResult. Useful for aggregated WARs. Defaults to False.
             apply_notch_filter (bool, optional): Whether to apply notch filtering to remove line noise. Uses constants.LINE_FREQ. Defaults to True.
 
@@ -1612,7 +1646,7 @@ class AnimalOrganizer(AnimalFeatureParser):
             lan_folder = lan.LongRecording.base_folder_path
             session_labels = core.parse_path_to_animalday(
                 lan_folder,
-                animal_param=self.animal_param,
+                animal_param=self.animal_file_match_pattern,
                 day_sep=self.day_sep,
                 mode=self.read_mode,
             )
@@ -1911,7 +1945,7 @@ class AnimalOrganizer(AnimalFeatureParser):
             ao.base_folder_path = None
 
         # Standard attributes
-        ao.animal_param = [animal_id]
+        ao.animal_file_match_pattern = [animal_id]
         ao.day_sep = None
         ao.read_mode = "base"
 

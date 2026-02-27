@@ -18,15 +18,18 @@ overrides:
   by_session:
     "Arx Rosa 1017 1015":
       "analysis.war_generation.file_pattern": "*.EDF"
-      "analysis.war_generation.lro_kwargs.extract_func": "read_edf"
+      "analysis.war_generation.lro_kwargs.mode": "mne"
+      "analysis.war_generation.lro_kwargs.extract_func": "read_raw_edf"
 
     "Arx Rosa 1199 1198 1211 1201":
       "analysis.war_generation.file_pattern": "*.EDF"
-      "analysis.war_generation.lro_kwargs.extract_func": "read_edf"
+      "analysis.war_generation.lro_kwargs.mode": "mne"
+      "analysis.war_generation.lro_kwargs.extract_func": "read_raw_edf"
 
     "Arx Rosa  967 968 969 418":
       "analysis.war_generation.file_pattern": "*.EDF"
-      "analysis.war_generation.lro_kwargs.extract_func": "read_edf"
+      "analysis.war_generation.lro_kwargs.mode": "mne"
+      "analysis.war_generation.lro_kwargs.extract_func": "read_raw_edf"
 
     "Arx Rosa 2059_2063_2064":
       "analysis.war_generation.file_pattern": "*.rhd"
