@@ -84,11 +84,10 @@ class TestAnimalOrganizerTimestampHandling:
 
             global_start = datetime(2023, 1, 15, 10, 0, 0)
 
-            # Create AnimalOrganizer with single datetime
+            # Create AnimalOrganizer with single datetime using new pattern-based discovery
             ao = results.AnimalOrganizer(
-                pattern=f"{self.base_path}/*{self.animal_id}*",
+                pattern=str(self.base_path) + "/WT_{animal}_{session}",
                 animal_id=self.animal_id,
-                
                 lro_kwargs={"manual_datetimes": global_start},
             )
 
@@ -132,7 +131,7 @@ class TestAnimalOrganizerTimestampHandling:
 
         # Create AnimalOrganizer with datetime list
         ao = results.AnimalOrganizer(
-            pattern=f"{self.base_path}/*{self.animal_id}*",
+            pattern=str(self.base_path) + "/WT_{animal}_{session}",
             animal_id=self.animal_id,
             
             lro_kwargs={"manual_datetimes": datetime_list},
@@ -168,7 +167,7 @@ class TestAnimalOrganizerTimestampHandling:
 
         # Create AnimalOrganizer with user function
         ao = results.AnimalOrganizer(
-            pattern=f"{self.base_path}/*{self.animal_id}*",
+            pattern=str(self.base_path) + "/WT_{animal}_{session}",
             animal_id=self.animal_id,
             
             lro_kwargs={"manual_datetimes": extract_timestamp_from_folder},
@@ -213,7 +212,7 @@ class TestAnimalOrganizerTimestampHandling:
 
         # Create AnimalOrganizer with mixed dictionary
         ao = results.AnimalOrganizer(
-            pattern=f"{self.base_path}/*{self.animal_id}*",
+            pattern=str(self.base_path) + "/WT_{animal}_{session}",
             animal_id=self.animal_id,
             
             lro_kwargs={"manual_datetimes": mixed_spec},
@@ -252,7 +251,7 @@ class TestAnimalOrganizerTimestampHandling:
         # Test invalid type (int instead of datetime/str/list)
         with pytest.raises(TypeError) as exc_info:
             results.AnimalOrganizer(
-                pattern=f"{self.base_path}/*{self.animal_id}*",
+                pattern=str(self.base_path) + "/WT_{animal}_{session}",
                 animal_id=self.animal_id,
                 
                 lro_kwargs={"manual_datetimes": 12345},  # Int instead of datetime
@@ -273,7 +272,7 @@ class TestAnimalOrganizerTimestampHandling:
 
         with pytest.raises(TypeError) as exc_info:
             results.AnimalOrganizer(
-                pattern=f"{self.base_path}/*{self.animal_id}*",
+                pattern=str(self.base_path) + "/WT_{animal}_{session}",
                 animal_id=self.animal_id,
                 
                 lro_kwargs={"manual_datetimes": invalid_list},
@@ -296,7 +295,7 @@ class TestAnimalOrganizerTimestampHandling:
 
         with pytest.raises(TypeError) as exc_info:
             results.AnimalOrganizer(
-                pattern=f"{self.base_path}/*{self.animal_id}*",
+                pattern=str(self.base_path) + "/WT_{animal}_{session}",
                 animal_id=self.animal_id,
                 
                 lro_kwargs={"manual_datetimes": invalid_list},
@@ -319,7 +318,7 @@ class TestAnimalOrganizerTimestampHandling:
 
         with pytest.raises(Exception) as exc_info:
             results.AnimalOrganizer(
-                pattern=f"{self.base_path}/*{self.animal_id}*",
+                pattern=str(self.base_path) + "/WT_{animal}_{session}",
                 animal_id=self.animal_id,
                 
                 lro_kwargs={"manual_datetimes": failing_function},
@@ -346,7 +345,7 @@ class TestAnimalOrganizerTimestampHandling:
 
         # Should NOT raise ValueError anymore
         ao = results.AnimalOrganizer(
-            pattern=f"{self.base_path}/*{self.animal_id}*",
+            pattern=str(self.base_path) + "/WT_{animal}_{session}",
             animal_id=self.animal_id,
             
             lro_kwargs={"manual_datetimes": mixed_spec},
@@ -395,7 +394,7 @@ class TestAnimalOrganizerTimestampHandling:
 
         # Create AnimalOrganizer
         ao = results.AnimalOrganizer(
-            pattern=f"{self.base_path}/*{self.animal_id}*",
+            pattern=str(self.base_path) + "/WT_{animal}_{session}",
             animal_id=self.animal_id,
             
             lro_kwargs={"manual_datetimes": start_times[0]},  # Single datetime
@@ -439,7 +438,7 @@ class TestAnimalOrganizerTimestampHandling:
 
         # Create AnimalOrganizer with nested function
         ao = results.AnimalOrganizer(
-            pattern=f"{self.base_path}/*{self.animal_id}*",
+            pattern=str(self.base_path) + "/WT_{animal}_{session}",
             animal_id=self.animal_id,
             
             lro_kwargs={"manual_datetimes": outer_function},
@@ -494,7 +493,7 @@ class TestAnimalOrganizerTimestampHandling:
 
             # Create AnimalOrganizer with single datetime
             ao = results.AnimalOrganizer(
-                pattern=f"{self.base_path}/*{self.animal_id}*",
+                pattern=str(self.base_path) + "/WT_{animal}_{session}",
                 animal_id=self.animal_id,
                 
                 lro_kwargs={"manual_datetimes": global_start},
@@ -626,15 +625,15 @@ class TestAnimalOrganizerTimestampHandling:
 
         # Create AnimalOrganizer with overlapping folders
         ao = results.AnimalOrganizer(
-            pattern=f"{overlap_dir}/*{self.animal_id}*",
+            pattern=str(overlap_dir) + "/WT_{animal}_{session}",
             animal_id=self.animal_id,
-            
             lro_kwargs={"manual_datetimes": folder_timestamps},
         )
 
-        # Should have 1 LRO (merged from overlapping folders)
-        assert len(ao.long_recordings) == 1
-        assert len(ao.animaldays) == 1
+        # With new pattern-based system, each folder is a separate session
+        # (not merged like in the old system)
+        assert len(ao.long_recordings) == 3  # 3 separate sessions
+        assert len(ao.animaldays) == 3  # 3 separate animaldays
 
         # Verify all folders were processed with their timestamps
         assert len(ao._processed_timestamps) == 3
@@ -718,7 +717,7 @@ class TestAnimalOrganizerTimestampHandling:
             global_end = datetime(2023, 1, 15, 14, 30, 0)
 
             ao = results.AnimalOrganizer(
-                pattern=f"{self.base_path}/*{self.animal_id}*",
+                pattern=str(self.base_path) + "/WT_{animal}_{session}",
                 animal_id=self.animal_id,
                 
                 lro_kwargs={
