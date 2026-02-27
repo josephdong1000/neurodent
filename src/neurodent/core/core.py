@@ -571,6 +571,7 @@ class LongRecordingOrganizer:
             self.convert_file_with_si_to_recording(
                 extract_func=extract_func,
                 cache_policy=cache_policy,
+                multiprocess_mode=multiprocess_mode,
                 **kwargs,
             )
         elif mode == "mne":
@@ -595,34 +596,42 @@ class LongRecordingOrganizer:
         self,
         extract_func: Callable[..., "si.BaseRecording"],
         cache_policy: Literal["auto", "always", "force_regenerate"] = "auto",
+        multiprocess_mode: Literal["dask", "serial"] = "serial",
         **kwargs,
     ):
-        lro_only_kwargs = [
-            "overwrite_rowbins",
-            "mode",
-            "manual_datetimes",
-            "datetimes_are_start",
-        ]
-        kwargs = {k: v for k, v in kwargs.items() if k not in lro_only_kwargs}
+        from .discovery import MultiFileGroup
+
         if si is None:
             raise ImportError("SpikeInterface is required")
 
-        n_processed_files = len(self.item) if isinstance(self.item, list) else 1
+        # Determine number of files being processed
+        if isinstance(self.item, MultiFileGroup):
+            n_processed_files = 1  # MultiFileGroup is one recording unit
+        elif isinstance(self.item, list):
+            n_processed_files = len(self.item)
+        else:
+            n_processed_files = 1
+
         self._validate_timestamps_for_mode("si", n_processed_files)
 
-        if isinstance(self.item, list):
-            try:
-                rec: "si.BaseRecording" = extract_func(self.item, **kwargs)
-            except Exception as e:
-                logging.info(
-                    f"extract_func failed on list, attempting to apply to individual files and concatenate: {e}"
-                )
-                kwargs.pop(
-                    "stream_name", None
-                )  # Some kwargs might not apply to individual files
+        # Handle different item types
+        if isinstance(self.item, MultiFileGroup):
+            # MultiFileGroup: pass as-is to extract_func (user's custom reader)
+            rec: "si.BaseRecording" = extract_func(self.item, **kwargs)
+        elif isinstance(self.item, list):
+            # List of files: concatenate individually using multiprocess_mode
+            if multiprocess_mode == "dask":
+                if dask is None:
+                    raise ImportError("dask is required for multiprocess_mode='dask'")
+                logging.info(f"Loading {len(self.item)} files in parallel with dask")
+                tasks = [dask.delayed(extract_func)(x, **kwargs) for x in self.item]
+                recs = list(dask.compute(*tasks))
+            else:
+                logging.info(f"Loading {len(self.item)} files serially")
                 recs = [extract_func(x, **kwargs) for x in self.item]
-                rec = si.concatenate_recordings(recs)
+            rec = si.concatenate_recordings(recs)
         else:
+            # Single file/path
             rec: "si.BaseRecording" = extract_func(self.item, **kwargs)
 
         self._n_processed_files = n_processed_files
@@ -996,52 +1005,32 @@ class LongRecordingOrganizer:
         n_jobs: int = None,
         **kwargs,
     ):
-        binary_only_kwargs = ["overwrite_rowbins", "input_type", "file_pattern", "mode"]
-        kwargs = {k: v for k, v in kwargs.items() if k not in binary_only_kwargs}
-
         if se is None:
             raise ImportError(
                 "SpikeInterface is required for convert_file_with_mne_to_recording"
             )
 
+        # Determine number of files and source paths
         if isinstance(self.item, list):
             self._validate_timestamps_for_mode("mne", len(self.item))
-            datafolder = None
-            datafile = None
-            datafiles = self.item
-            source_paths = datafiles
-            n_processed_files = len(datafiles)
+            source_paths = self.item
+            n_processed_files = len(self.item)
         else:
             self._validate_timestamps_for_mode("mne", 1)
-            item_path = Path(self.item)
-            if item_path.is_dir():
-                datafolder = item_path
-                datafile = None
-                datafiles = None
-                source_paths = [item_path]
-            else:
-                datafolder = None
-                datafile = item_path
-                datafiles = None
-                source_paths = [item_path]
+            source_paths = [self.item]
             n_processed_files = 1
 
         self._n_processed_files = n_processed_files
 
-        base_name = (
-            self.base_folder_path.name if self.base_folder_path else "mne_recording"
-        )
+        # Generate intermediate filename
+        base_name = Path(source_paths[0]).stem if source_paths else "mne_recording"
         intermediate_name = (
             f"{base_name}_mne-to-rec"
             if intermediate_name is None
             else intermediate_name
         )
 
-        base_dir = (
-            self.base_folder_path
-            if self.base_folder_path and self.base_folder_path.is_dir()
-            else Path(source_paths[0]).parent
-        )
+        base_dir = Path(source_paths[0]).parent
         fname = base_dir / f"{intermediate_name}.{intermediate}"
 
         rec, _, metadata = self._get_or_create_intermediate_file(
