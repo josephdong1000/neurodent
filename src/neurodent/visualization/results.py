@@ -256,6 +256,12 @@ class AnimalOrganizer(AnimalFeatureParser):
         self.long_recordings: list[core.LongRecordingOrganizer] = []
         self._create_long_recordings(lro_kwargs)
 
+        # Set channel_names from the first LRO
+        if self.long_recordings:
+            self.channel_names = self.long_recordings[0].channel_names or []
+        else:
+            self.channel_names = []
+
     def _validate_discovery(self, folders, day_parse_kwargs):
         """
         Validates discovered folders/files by attempting to parse them.
