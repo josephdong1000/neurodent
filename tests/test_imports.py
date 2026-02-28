@@ -275,14 +275,12 @@ class TestVisualizationImports:
         from neurodent.visualization import (
             WindowAnalysisResult,
             AnimalOrganizer,
-            SpikeAnalysisResult,
             AnimalPlotter,
             ExperimentPlotter,
         )
 
         assert WindowAnalysisResult is not None
         assert AnimalOrganizer is not None
-        assert SpikeAnalysisResult is not None
         assert AnimalPlotter is not None
         assert ExperimentPlotter is not None
 

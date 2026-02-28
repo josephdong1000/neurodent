@@ -165,24 +165,6 @@ class TestConstants:
             f"Combined band range {combined_range} does not match FREQ_BAND_TOTAL {constants.FREQ_BAND_TOTAL}"
         )
 
-    def test_sorting_params(self):
-        """Test SORTING_PARAMS."""
-        expected_keys = ["notch_freq", "common_ref", "scale", "whiten", "freq_min", "freq_max"]
-        for key in expected_keys:
-            assert key in constants.SORTING_PARAMS
-
-    def test_scheme2_sorting_params(self):
-        """Test SCHEME2_SORTING_PARAMS."""
-        expected_keys = ["detect_channel_radius", "phase1_detect_channel_radius", "snippet_T1", "snippet_T2"]
-        for key in expected_keys:
-            assert key in constants.SCHEME2_SORTING_PARAMS
-
-    def test_waveform_params(self):
-        """Test WAVEFORM_PARAMS."""
-        expected_keys = ["notch_freq", "common_ref", "scale", "whiten", "freq_min", "freq_max"]
-        for key in expected_keys:
-            assert key in constants.WAVEFORM_PARAMS
-
 
 class TestOkabeItoColors:
     """Test Okabe-Ito colorblind-friendly color palette."""

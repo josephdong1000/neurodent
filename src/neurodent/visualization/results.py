@@ -20,7 +20,6 @@ import dask.array as da
 import mne
 import numpy as np
 import pandas as pd
-import spikeinterface as si
 from dask import delayed
 from django.utils.text import slugify
 from scipy.stats import zscore
@@ -30,7 +29,6 @@ from tqdm import tqdm
 
 from .. import constants, core
 from ..core import FragmentAnalyzer, get_temp_directory
-from ..core.analyze_sort import MOUNTAINSORT_AVAILABLE
 from ..core.frequency_domain_spike_detection import FrequencyDomainSpikeDetector
 from ..core.utils import filepath_to_index, parse_chname_to_abbrev
 
@@ -1300,70 +1298,6 @@ class AnimalOrganizer(AnimalFeatureParser):
 
         return self.window_analysis_result
 
-    def compute_spike_analysis(
-        self, multiprocess_mode: Literal["dask", "serial"] = "serial"
-    ) -> list["SpikeAnalysisResult"]:
-        """Compute spike sorting on all long recordings and return a list of SpikeAnalysisResult objects
-
-        Args:
-            multiprocess_mode (Literal['dask', 'serial']): Whether to use Dask for parallel processing. Defaults to 'serial'.
-
-        Returns:
-            list[SpikeAnalysisResult]: List of SpikeAnalysisResult objects. Each SpikeAnalysisResult object corresponds
-                to a LongRecording object, typically a different day or recording session.
-
-        Raises:
-            ImportError: If mountainsort5 is not available.
-        """
-        # Check if mountainsort5 is available
-        if not MOUNTAINSORT_AVAILABLE:
-            raise ImportError(
-                "Spike analysis requires mountainsort5. Install it with: pip install mountainsort5"
-            )
-        sars = []
-        lrec_sorts = []
-        lrec_recs = []
-        recs = [lrec.LongRecording for lrec in self.long_recordings]
-        logging.info(f"Sorting {len(recs)} recordings")
-        for rec in recs:
-            if rec.get_total_samples() == 0:
-                logging.warning(f"Skipping {rec.__str__()} because it has no samples")
-                sortings, recordings = [], []
-            else:
-                sortings, recordings = core.MountainSortAnalyzer.sort_recording(
-                    rec, multiprocess_mode=multiprocess_mode
-                )
-            lrec_sorts.append(sortings)
-            lrec_recs.append(recordings)
-
-        if multiprocess_mode == "dask":
-            lrec_sorts = dask.compute(*lrec_sorts)
-
-        lrec_sas = [
-            [
-                si.create_sorting_analyzer(sorting, recording, sparse=False)
-                for sorting, recording in zip(sortings, recordings)
-            ]
-            for sortings, recordings in zip(lrec_sorts, lrec_recs)
-        ]
-        sars = [
-            SpikeAnalysisResult(
-                result_sas=sas,
-                result_mne=None,
-                animal_id=self.animal_id,
-                genotype=self.genotype,
-                animal_day=self.animaldays[i],
-                bin_folder_name=self.bin_folder_names[i],
-                metadata=self.long_recordings[i].meta,
-                channel_names=self.channel_names,
-                assume_from_number=self.assume_from_number,
-            )
-            for i, sas in enumerate(lrec_sas)
-        ]
-
-        self.spike_analysis_results = sars
-        return self.spike_analysis_results
-
     def compute_frequency_domain_spike_analysis(
         self,
         detection_params: dict = None,
@@ -1668,6 +1602,12 @@ class AnimalOrganizer(AnimalFeatureParser):
         """
         Validate that all LROs have consistent channel names.
 
+        Compares abbreviated channel names (via ``parse_chname_to_abbrev``)
+        so that cosmetic variants like ``L Barrel`` vs ``L Barrel Ctx`` are
+        treated as equivalent. If raw names differ but abbreviations match,
+        the mismatched LRO's channel names are renamed to match the reference
+        LRO's raw names for downstream consistency.
+
         If channel names are the same but in different order, the first LRO's
         order is used as reference.
 
@@ -1675,10 +1615,10 @@ class AnimalOrganizer(AnimalFeatureParser):
             lros: List of LROs to validate.
 
         Returns:
-            list[str]: The canonical channel names.
+            list[str]: The canonical channel names (from the first LRO).
 
         Raises:
-            ValueError: If LROs have different channel sets.
+            ValueError: If LROs have different abbreviated channel sets.
         """
         if not lros:
             return []
@@ -1687,22 +1627,45 @@ class AnimalOrganizer(AnimalFeatureParser):
         if not first_names:
             return []
 
-        reference_set = set(first_names)
+        def _abbreviate(names: list[str]) -> list[str]:
+            result = []
+            for n in names:
+                try:
+                    result.append(core.parse_chname_to_abbrev(n, strict_matching=False))
+                except ValueError:
+                    result.append(n)  # Fall back to raw name if parsing fails
+            return result
+
+        reference_abbrevs = _abbreviate(first_names)
+        reference_set = set(reference_abbrevs)
+        # Map abbreviation -> canonical raw name from first LRO
+        abbrev_to_raw = dict(zip(reference_abbrevs, first_names))
 
         for i, lro in enumerate(lros[1:], start=1):
             current_names = lro.channel_names if lro.channel_names else []
-            current_set = set(current_names)
+            current_abbrevs = _abbreviate(current_names)
+            current_set = set(current_abbrevs)
 
             if current_set != reference_set:
                 missing = reference_set - current_set
                 extra = current_set - reference_set
                 raise ValueError(
                     f"LRO {i} has inconsistent channel names. "
-                    f"Missing: {missing}, Extra: {extra}"
+                    f"Abbreviated missing: {missing}, Extra: {extra}"
                 )
 
+            # If raw names differ but abbreviations match, rename to reference
+            if set(current_names) != set(first_names):
+                renamed = [abbrev_to_raw[a] for a in current_abbrevs]
+                logging.warning(
+                    f"LRO {i} has variant channel names "
+                    f"({current_names} vs {first_names}), "
+                    f"renaming to reference names: {renamed}"
+                )
+                lro.channel_names = renamed
+
             # If same channels but different order, log a warning
-            if current_names != first_names:
+            if lro.channel_names != first_names:
                 logging.warning(
                     f"LRO {i} has channels in different order, using reference order"
                 )
@@ -2167,7 +2130,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
     def read_sars_spikes(
         self,
-        sars: list[Union["SpikeAnalysisResult", "FrequencyDomainSpikeAnalysisResult"]],
+        sars: list["FrequencyDomainSpikeAnalysisResult"],
         read_mode: Literal["sa", "mne"] = "sa",
         inplace=True,
     ):
@@ -2178,7 +2141,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         them according to the WAR's time windows, adding spike count features to each row.
 
         Args:
-            sars: List of SpikeAnalysisResult or FrequencyDomainSpikeAnalysisResult objects.
+            sars: List of FrequencyDomainSpikeAnalysisResult objects.
                   One result per recording session (animalday).
             read_mode: Mode for extracting spike data:
                 - "sa": Read from SortingAnalyzer objects (result_sas attribute)
@@ -4040,265 +4003,3 @@ def _bin_spike_df(df: pd.DataFrame, spikes_channel: list[list[float]]) -> np.nda
     for i, spike_times in enumerate(spikes_channel):
         out[:, i] = bin_spike_times(spike_times, durations)
     return out
-
-
-class SpikeAnalysisResult(AnimalFeatureParser):
-    """
-    Class for handling spike analysis results.
-
-    Args:
-        result_sas (list[si.SortingAnalyzer]): Result comes from AnimalOrganizer.compute_spike_analysis(). Each SortingAnalyzer is a single channel.
-        result_mne (mne.io.RawArray, optional): MNE RawArray containing the spike data.
-        animal_id (str, optional): Identifier for the animal where result was computed from. Defaults to None.
-        genotype (str, optional): Genotype of animal. Defaults to None.
-        animal_day (str, optional): Animal day identifier. Defaults to None.
-        bin_folder_name (str, optional): Name of binary folder. Defaults to None.
-        metadata (DDFBinaryMetadata, optional): Metadata object. Defaults to None.
-        channel_names (list[str], optional): List of channel names. Defaults to None.
-        assume_from_number (bool, optional): If true, assumes channel names according to AnimalFeatureParser.DEFAULT_CHNUM_TO_NAME. Defaults to False.
-
-    Attributes:
-        result_sas (list[si.SortingAnalyzer]): List of SortingAnalyzer objects, one per channel.
-        result_mne (mne.io.RawArray): MNE RawArray representation of spike data.
-        animal_id (str): Identifier for the animal.
-        genotype (str): Genotype of the animal.
-        animal_day (str): Animal day identifier.
-        bin_folder_name (str): Name of the source binary folder.
-        metadata (DDFBinaryMetadata): Metadata associated with the recording.
-        channel_names (list[str]): List of channel names.
-        channel_abbrevs (list[str]): Abbreviated channel names.
-    """
-
-    def __init__(
-        self,
-        result_sas: list[si.SortingAnalyzer],
-        result_mne: mne.io.RawArray = None,
-        animal_id: str = None,
-        genotype: str = None,
-        animal_day: str = None,
-        bin_folder_name: str = None,
-        metadata: core.DDFBinaryMetadata = None,
-        channel_names: list[str] = None,
-        assume_from_number=False,
-    ) -> None:
-        self.result_sas = result_sas
-        self.result_mne = result_mne
-        if (result_mne is None) == (result_sas is None):
-            raise ValueError("Exactly one of result_sas or result_mne must be provided")
-        self.animal_id = animal_id
-        self.genotype = genotype
-        self.animal_day = animal_day
-        self.bin_folder_name = bin_folder_name
-        self.metadata = metadata
-        self.channel_names = channel_names
-        self.assume_from_number = assume_from_number
-        self.channel_abbrevs = [
-            core.parse_chname_to_abbrev(x, assume_from_number=assume_from_number)
-            for x in self.channel_names
-        ]
-
-        logging.info(f"Channel names: \t{self.channel_names}")
-        logging.info(f"Channel abbreviations: \t{self.channel_abbrevs}")
-
-    def convert_to_mne(self, chunk_len: float = 60, save_raw=True) -> mne.io.RawArray:
-        if self.result_mne is None:
-            result_mne = SpikeAnalysisResult.convert_sas_to_mne(
-                self.result_sas, chunk_len
-            )
-            if save_raw:
-                self.result_mne = result_mne
-            else:
-                return result_mne
-        return self.result_mne
-
-    def save_fif_and_json(
-        self,
-        folder: str | Path,
-        convert_to_mne=True,
-        make_folder=True,
-        slugify_filebase=True,
-        save_abbrevs_as_chnames=False,
-        overwrite=False,
-    ):
-        """Archive spike analysis result into the folder specified, as a fif and json file.
-
-        Args:
-            folder (str | Path): Destination folder to save results to
-            convert_to_mne (bool, optional): If True, convert the SortingAnalyzers to a MNE RawArray if self.result_mne is None. Defaults to True.
-            make_folder (bool, optional): If True, create the folder if it doesn't exist. Defaults to True.
-            slugify_filebase (bool, optional): If True, slugify the filebase (replace special characters). Defaults to True.
-            save_abbrevs_as_chnames (bool, optional): If True, save the channel abbreviations as the channel names in the json file. Defaults to False.
-            overwrite (bool, optional): If True, overwrite the existing files. Defaults to False.
-        """
-        if self.result_mne is None:
-            if convert_to_mne:
-                result_mne = self.convert_to_mne(save_raw=True)
-                if result_mne is None:
-                    warnings.warn("No SortingAnalyzers found, skipping saving")
-                    return
-            else:
-                raise ValueError(
-                    "No MNE RawArray found, and convert_to_mne is False. Run convert_to_mne() first."
-                )
-        else:
-            result_mne = self.result_mne
-
-        folder = Path(folder)
-        if make_folder:
-            folder.mkdir(parents=True, exist_ok=True)
-
-        if slugify_filebase:
-            filebase = folder / slugify(
-                f"{self.animal_id}-{self.genotype}-{self.animal_day}"
-            )
-        else:
-            filebase = folder / f"{self.animal_id}-{self.genotype}-{self.animal_day}"
-        filebase = str(filebase)
-
-        if not overwrite:
-            if filebase + ".json" in folder.glob("*.json"):
-                raise FileExistsError(f"File {filebase}.json already exists")
-            if filebase + ".fif" in folder.glob("*.fif"):
-                raise FileExistsError(f"File {filebase}.fif already exists")
-        else:
-            for f in folder.glob("*"):
-                f.unlink()
-        result_mne.save(filebase + "-raw.fif", overwrite=overwrite)
-        del result_mne
-
-        json_dict = {
-            "animal_id": self.animal_id,
-            "genotype": self.genotype,
-            "animal_day": self.animal_day,
-            "bin_folder_name": self.bin_folder_name,
-            "metadata": self.metadata.metadata_path,
-            "channel_names": (
-                self.channel_abbrevs if save_abbrevs_as_chnames else self.channel_names
-            ),
-            "assume_from_number": (
-                False if save_abbrevs_as_chnames else self.assume_from_number
-            ),
-        }
-        with open(filebase + ".json", "w") as f:
-            json.dump(json_dict, f, indent=2)
-
-    @classmethod
-    def load_fif_and_json(cls, folder: str | Path):
-        folder = Path(folder)
-        if not folder.exists():
-            raise ValueError(f"Folder {folder} does not exist")
-
-        fif_files = list(folder.glob("*.fif"))  # there may be more than 1 fif file
-        json_files = list(folder.glob("*.json"))
-
-        if len(json_files) != 1:
-            raise ValueError(f"Expected exactly one json file in {folder}")
-
-        fif_path = fif_files[0]
-        json_path = json_files[0]
-
-        with open(json_path, "r") as f:
-            data = json.load(f)
-        # data['metadata'] = core.DDFBinaryMetadata(data['metadata'])
-        data["result_mne"] = mne.io.read_raw_fif(fif_path)
-        data["result_sas"] = None
-        return cls(**data)
-
-    @staticmethod
-    def convert_sas_to_mne(
-        sas: list[si.SortingAnalyzer], chunk_len: float = 60
-    ) -> mne.io.RawArray:
-        """Convert a list of SortingAnalyzers to a MNE RawArray.
-
-        Args:
-            sas (list[si.SortingAnalyzer]): The list of SortingAnalyzers to convert
-            chunk_len (float, optional): The length of the chunks to use for the conversion. Defaults to 60.
-
-        Returns:
-            mne.io.RawArray: The converted RawArray, with spikes labeled as annotations
-        """
-        if len(sas) == 0:
-            return None
-
-        # Check that all SortingAnalyzers have the same sampling frequency
-        sfreqs = [sa.recording.get_sampling_frequency() for sa in sas]
-        if not all(sf == sfreqs[0] for sf in sfreqs):
-            raise ValueError(
-                f"All SortingAnalyzers must have the same sampling frequency. Got frequencies: {sfreqs}"
-            )
-
-        # Preallocate data array
-        total_frames = int(sas[0].recording.get_duration() * sfreqs[0])
-        n_channels = len(sas)
-        data = np.empty((n_channels, total_frames))
-        logging.debug(f"Data shape: {data.shape}")
-
-        # Fill data array one channel at a time
-        for i, sa in enumerate(sas):
-            logging.debug(f"Converting channel {i + 1} of {n_channels}")
-            data[i, :] = SpikeAnalysisResult.convert_sa_to_np(sa, chunk_len)
-
-        channel_names = [str(sa.recording.get_channel_ids().item()) for sa in sas]
-        logging.debug(f"Channel names: {channel_names}")
-        sfreq = sfreqs[0]
-
-        # Extract spike times for each unit and create annotations
-        onset = []
-        description = []
-        for sa in sas:
-            for unit_id in sa.sorting.get_unit_ids():
-                spike_train = sa.sorting.get_unit_spike_train(unit_id)
-                # Convert to seconds and filter to recording duration
-                spike_times = spike_train / sa.sorting.get_sampling_frequency()
-                mask = spike_times < sa.recording.get_duration()
-                spike_times = spike_times[mask]
-
-                # Create annotation for each spike
-                onset.extend(spike_times)
-                description.extend(
-                    [sa.recording.get_channel_ids().item()] * len(spike_times)
-                )  # collapse all units into 1 spike train
-        annotations = mne.Annotations(onset, duration=0, description=description)
-
-        info = mne.create_info(ch_names=channel_names, sfreq=sfreq, ch_types="eeg")
-        raw = mne.io.RawArray(data=data, info=info)
-        raw = raw.set_annotations(annotations)
-        return raw
-
-    @staticmethod
-    def convert_sa_to_np(sa: si.SortingAnalyzer, chunk_len: float = 60) -> np.ndarray:
-        """Convert a SortingAnalyzer to an MNE RawArray.
-
-        Args:
-            sa (si.SortingAnalyzer): The SortingAnalyzer to convert. Must have only 1 channel.
-            chunk_len (float, optional): The length of the chunks to use for the conversion. Defaults to 60.
-        Returns:
-            np.ndarray: The converted traces
-        """
-        # Check that SortingAnalyzer only has 1 channel
-        if len(sa.recording.get_channel_ids()) != 1:
-            raise ValueError(
-                f"Expected SortingAnalyzer to have 1 channel, but got {len(sa.recording.get_channel_ids())} channels"
-            )
-
-        rec = sa.recording
-        logging.debug(f"Recording info: {rec}")
-
-        # Calculate total number of frames and chunks
-        total_frames = int(rec.get_duration() * rec.get_sampling_frequency())
-        frames_per_chunk = round(chunk_len * rec.get_sampling_frequency())
-        n_chunks = total_frames // frames_per_chunk
-
-        traces = np.empty(total_frames)
-
-        for j in range(n_chunks):
-            start_frame = j * frames_per_chunk
-            if j == n_chunks - 1:
-                end_frame = total_frames
-            else:
-                end_frame = (j + 1) * frames_per_chunk
-            traces[start_frame:end_frame] = rec.get_traces(
-                start_frame=start_frame, end_frame=end_frame, return_scaled=True
-            ).flatten()
-        traces *= 1e-6  # convert from uV to V
-        return traces

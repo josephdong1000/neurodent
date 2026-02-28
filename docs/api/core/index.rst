@@ -19,7 +19,6 @@ Classes
    long_recording_organizer
    long_recording_analyzer
    fragment_analyzer
-   mountain_sort_analyzer
    frequency_domain_spike_detector
    zeitgeber
    utils
