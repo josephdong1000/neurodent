@@ -109,7 +109,7 @@ class TestOverlappingAnimaldaysBug:
                     mock_lro_class.side_effect = mock_lro_side_effect
 
                     # Create AnimalOrganizer - this should trigger the bug
-                    ao = results.AnimalOrganizer(animal_id="A10", pattern=f"{temp_path}/*A10*", )
+                    ao = results.AnimalOrganizer(animal_id="A10", pattern=f"{temp_path}/WT_{{animal}}_*/dummy_ColMajor_*.bin", )
 
                     # Verify that all folders parse to same animalday
                     parsed_animaldays = []
@@ -280,7 +280,7 @@ class TestOverlappingAnimaldaysBug:
                     mock_lro_c.merge = mock_merge
 
                     # Create AnimalOrganizer which should trigger temporal sorting and merging
-                    ao = results.AnimalOrganizer(animal_id="A10", pattern=f"{temp_path}/*A10*", )
+                    ao = results.AnimalOrganizer(animal_id="A10", pattern=f"{temp_path}/WT_{{animal}}_*/dummy_ColMajor_*.bin", )
 
                     # Verify that we have one merged LRO (overlapping folders)
                     assert len(ao.long_recordings) == 1
@@ -346,7 +346,7 @@ class TestOverlappingAnimaldaysBug:
 
                     mock_lro_class.side_effect = mock_lro_side_effect
 
-                    ao = results.AnimalOrganizer(animal_id="A10", pattern=f"{temp_path}/*A10*", )
+                    ao = results.AnimalOrganizer(animal_id="A10", pattern=f"{temp_path}/WT_{{animal}}_*/dummy_ColMajor_*.bin", )
 
                     # Should have 2 unique animaldays, not 3 folders
                     assert len(ao.animaldays) == 2
