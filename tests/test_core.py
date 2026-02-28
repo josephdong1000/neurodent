@@ -22,6 +22,7 @@ except Exception:
     si = None
 
 from neurodent.core.core import (
+    RecordingMetadata,
     DDFBinaryMetadata,
     LongRecordingOrganizer,
     convert_ddfcolbin_to_ddfrowbin,

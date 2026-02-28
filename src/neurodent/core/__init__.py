@@ -62,7 +62,8 @@ if not os.environ.get("TMPDIR"):
 # Core classes
 from .core import (
     LongRecordingOrganizer,
-    DDFBinaryMetadata,
+    RecordingMetadata,
+    DDFBinaryMetadata,  # Deprecated, kept for backward compatibility
     convert_ddfcolbin_to_ddfrowbin,
     convert_ddfrowbin_to_si,
     split_recording,
@@ -95,7 +96,8 @@ from . import utils
 
 __all__ = [
     # Data loading
-    "DDFBinaryMetadata",
+    "RecordingMetadata",
+    "DDFBinaryMetadata",  # Deprecated, kept for backward compatibility
     "convert_ddfcolbin_to_ddfrowbin",
     "convert_ddfrowbin_to_si",
     "split_recording",

@@ -54,7 +54,37 @@ from .utils import (
 )
 
 
-class DDFBinaryMetadata:
+class RecordingMetadata:
+    """Stores metadata information for neural recordings.
+
+    This class handles recording metadata including channel information, sampling rates,
+    timestamps, and voltage units. It can be initialized either from a CSV metadata file
+    (for backward compatibility with DDF binary format) or directly from parameters.
+
+    Attributes:
+        metadata_path (str | Path | None): Path to metadata CSV file if loaded from file
+        metadata_df (pd.DataFrame | None): DataFrame containing metadata if loaded from file
+        n_channels (int): Number of channels in the recording
+        f_s (float): Sampling frequency in Hz
+        V_units (str | None): Voltage units (e.g., 'µV', 'mV', 'V')
+        mult_to_uV (float | None): Multiplication factor to convert to microvolts
+        precision (str | None): Data precision/dtype (e.g., 'float32', 'int16')
+        dt_end (datetime | None): End datetime of recording
+        channel_names (list[str]): List of channel names
+
+    Examples:
+        From parameters:
+        >>> meta = RecordingMetadata(
+        ...     None,
+        ...     n_channels=4,
+        ...     f_s=1000.0,
+        ...     dt_end=datetime(2023, 1, 1),
+        ...     channel_names=['ch1', 'ch2', 'ch3', 'ch4']
+        ... )
+
+        From CSV file:
+        >>> meta = RecordingMetadata('/path/to/metadata.csv')
+    """
     def __init__(
         self,
         metadata_path: str | Path | None,
@@ -66,16 +96,20 @@ class DDFBinaryMetadata:
         V_units: str | None = None,
         mult_to_uV: float | None = None,
     ) -> None:
-        """Initialize DDFBinaryMetadata either from a file path or direct parameters.
+        """Initialize RecordingMetadata either from a file path or direct parameters.
 
         Args:
-            metadata_path (str, optional): Path to metadata CSV file. If provided, other parameters are ignored.
-            n_channels (int, optional): Number of channels
+            metadata_path (str | Path | None): Path to metadata CSV file. If provided,
+                other parameters are ignored and metadata is loaded from the file.
+            n_channels (int, optional): Number of channels in the recording
             f_s (float, optional): Sampling frequency in Hz
             dt_end (datetime, optional): End datetime of recording
-            channel_names (list, optional): List of channel names
+            channel_names (list[str], optional): List of channel names
             V_units (str, optional): Voltage units (e.g., 'µV', 'mV', 'V')
             mult_to_uV (float, optional): Multiplication factor to convert to microvolts
+
+        Raises:
+            ValueError: If metadata_path is None and required parameters are missing
         """
         if metadata_path is not None:
             self._init_from_path(metadata_path)
@@ -139,7 +173,7 @@ class DDFBinaryMetadata:
         return vals.iloc[0]
 
     def to_dict(self) -> dict:
-        """Convert DDFBinaryMetadata to a dictionary for JSON serialization."""
+        """Convert RecordingMetadata to a dictionary for JSON serialization."""
         return {
             "metadata_path": str(self.metadata_path) if self.metadata_path else None,
             "n_channels": self.n_channels,
@@ -152,8 +186,8 @@ class DDFBinaryMetadata:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "DDFBinaryMetadata":
-        """Create DDFBinaryMetadata from a dictionary (from JSON deserialization)."""
+    def from_dict(cls, data: dict) -> "RecordingMetadata":
+        """Create RecordingMetadata from a dictionary (from JSON deserialization)."""
         dt_end = datetime.fromisoformat(data["dt_end"]) if data["dt_end"] else None
 
         return cls(
@@ -167,13 +201,13 @@ class DDFBinaryMetadata:
         )
 
     def to_json(self, file_path: Path) -> None:
-        """Save DDFBinaryMetadata to a JSON file."""
+        """Save RecordingMetadata to a JSON file."""
         with open(file_path, "w") as f:
             json.dump(self.to_dict(), f, indent=2)
 
     @classmethod
-    def from_json(cls, file_path: Path) -> "DDFBinaryMetadata":
-        """Load DDFBinaryMetadata from a JSON file."""
+    def from_json(cls, file_path: Path) -> "RecordingMetadata":
+        """Load RecordingMetadata from a JSON file."""
         with open(file_path, "r") as f:
             data = json.load(f)
 
@@ -195,16 +229,33 @@ class DDFBinaryMetadata:
         old_f_s = self.f_s
         self.f_s = new_f_s
         logging.info(
-            f"Updated DDFBinaryMetadata sampling rate from {old_f_s} Hz to {new_f_s} Hz"
+            f"Updated RecordingMetadata sampling rate from {old_f_s} Hz to {new_f_s} Hz"
         )
+
+
+# Deprecated: Keep DDFBinaryMetadata for backward compatibility
+class DDFBinaryMetadata(RecordingMetadata):
+    """Deprecated: Use RecordingMetadata instead.
+
+    This class is maintained for backward compatibility but will be removed in a future version.
+    The name DDFBinaryMetadata is no longer appropriate as the pipeline moves beyond
+    DDF binary files with metadata sidecars.
+    """
+    def __init__(self, *args, **kwargs):
+        warnings.warn(
+            "DDFBinaryMetadata is deprecated. Use RecordingMetadata instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        super().__init__(*args, **kwargs)
 
 
 def convert_ddfcolbin_to_ddfrowbin(rowdir_path, colbin_path, metadata, save_gzip=True):
     # TODO consider renaming this function to something more descriptive, like convert_colbin_to_rowbin
     # Also don't use the rowdir_path parameter, since this is outside the scope of the function. See utils.convert_colpath_to_rowpath
     assert isinstance(
-        metadata, DDFBinaryMetadata
-    ), "Metadata needs to be of type DDFBinaryMetadata"
+        metadata, RecordingMetadata
+    ), "Metadata needs to be of type RecordingMetadata"
 
     tempbin = np.fromfile(colbin_path, dtype=metadata.precision)
     tempbin = np.reshape(tempbin, (-1, metadata.n_channels), order="F")
@@ -227,7 +278,7 @@ def convert_ddfrowbin_to_si(bin_rowmajor_path, metadata):
 
     Args:
         bin_rowmajor_path (str): Path to the row-major binary file
-        metadata (DDFBinaryMetadata): Metadata object containing information about the recording
+        metadata (RecordingMetadata): Metadata object containing information about the recording
 
     Returns:
         tuple: A tuple containing:
@@ -237,8 +288,8 @@ def convert_ddfrowbin_to_si(bin_rowmajor_path, metadata):
     if se is None:
         raise ImportError("SpikeInterface is required for convert_ddfrowbin_to_si")
     assert isinstance(
-        metadata, DDFBinaryMetadata
-    ), "Metadata needs to be of type DDFBinaryMetadata"
+        metadata, RecordingMetadata
+    ), "Metadata needs to be of type RecordingMetadata"
 
     bin_rowmajor_path = Path(bin_rowmajor_path)
     params = {
@@ -440,11 +491,16 @@ class LongRecordingOrganizer:
         n_jobs (int, optional): Number of parallel jobs for MNE resampling. Defaults to 1.
         recording (si.BaseRecording, optional): Existing SpikeInterface recording object
             for in-memory initialization. Use this when creating LRO wrappers around split recordings.
+        file_end_datetimes (list, optional): End datetimes for each file. Used for split() inheritance.
+        file_durations (list[float], optional): Duration of each file in seconds. Used for split() inheritance.
+        cumulative_file_durations (list[float], optional): Cumulative durations. Used for split() inheritance.
+        bad_channel_names (list[str], optional): Bad channel names to inherit. Used for split() inheritance.
+        meta (RecordingMetadata, optional): Metadata object to inherit. Used for split() inheritance.
         **kwargs: Additional arguments passed to the data loading functions.
 
     Attributes:
         LongRecording (si.BaseRecording): The SpikeInterface recording object.
-        meta (DDFBinaryMetadata): Technical metadata (sampling rate, channels, etc.).
+        meta (RecordingMetadata): Technical metadata (sampling rate, channels, etc.).
         channel_names (list[str]): List of channel names.
         file_durations (list[float]): Duration of each individual file in seconds.
         cumulative_file_durations (list[float]): Cumulative duration timestamps for file boundaries.
@@ -471,6 +527,12 @@ class LongRecordingOrganizer:
         datetimes_are_start: bool = True,
         n_jobs: int = 1,
         recording: "si.BaseRecording" = None,
+        # Optional inheritance parameters for split() children
+        file_end_datetimes: list = None,
+        file_durations: list[float] = None,
+        cumulative_file_durations: list[float] = None,
+        bad_channel_names: list[str] = None,
+        meta: "RecordingMetadata" = None,
         **kwargs,
     ):
         # Import DiscoveredFile here to avoid circular imports
@@ -500,14 +562,18 @@ class LongRecordingOrganizer:
         self.datetimes_are_start = datetimes_are_start
         self.n_jobs = n_jobs
 
-        self.meta = None
+        self.meta = meta  # Will be overwritten if mode is not None
         self.channel_names = None
         self.LongRecording = None
         self.temppaths = []
-        self.file_durations = []
-        self.cumulative_file_durations = []
-        self.bad_channel_names = []
+        self.file_durations = file_durations if file_durations is not None else []
+        self.cumulative_file_durations = cumulative_file_durations if cumulative_file_durations is not None else []
+        self.bad_channel_names = bad_channel_names if bad_channel_names is not None else []
         self._is_in_memory = False
+
+        # Set file_end_datetimes if provided (used for split() inheritance)
+        if file_end_datetimes is not None:
+            self.file_end_datetimes = file_end_datetimes
 
         if recording is not None:
             self._init_from_recording(recording)
@@ -537,7 +603,7 @@ class LongRecordingOrganizer:
         channel_ids = recording.get_channel_ids()
         self.channel_names = [str(ch) for ch in channel_ids]
 
-        self.meta = DDFBinaryMetadata(
+        self.meta = RecordingMetadata(
             None,
             n_channels=recording.get_num_channels(),
             f_s=recording.get_sampling_frequency(),
@@ -658,7 +724,7 @@ class LongRecordingOrganizer:
             logging.warning("Channel IDs are integers. Converting to strings.")
         channel_names = [str(ch) for ch in raw_channel_ids]
 
-        self.meta = DDFBinaryMetadata(
+        self.meta = RecordingMetadata(
             None,
             n_channels=self.LongRecording.get_num_channels(),
             f_s=self.LongRecording.get_sampling_frequency(),
@@ -901,7 +967,7 @@ class LongRecordingOrganizer:
             # Extract unit information from MNE Raw object
             unit_str, mult_to_uv = extract_mne_unit_info(original_info)
 
-            metadata = DDFBinaryMetadata(
+            metadata = RecordingMetadata(
                 metadata_path=None,
                 n_channels=original_info["nchan"],
                 f_s=original_info["sfreq"],  # Original sampling rate
@@ -1173,7 +1239,19 @@ class LongRecordingOrganizer:
             if hasattr(sub_rec, "rename_channels"):
                 sub_rec = sub_rec.rename_channels(new_channel_ids=valid_names)
 
-            # Create in-memory LRO wrapper, passing parent attributes via constructor
+            # Create in-memory LRO wrapper, passing ALL parent attributes via constructor
+            # Prepare metadata for child (copy and update channel info)
+            child_meta = None
+            if self.meta:
+                child_meta = copy.deepcopy(self.meta)
+                child_meta.n_channels = len(valid_names)
+                child_meta.channel_names = valid_names
+
+            # Filter bad channels to only those present in this split
+            child_bad_channels = [
+                ch for ch in self.bad_channel_names if ch in valid_names
+            ] if self.bad_channel_names else []
+
             child_lro = LongRecordingOrganizer(
                 item=None,
                 recording=sub_rec,
@@ -1181,28 +1259,13 @@ class LongRecordingOrganizer:
                 datetimes_are_start=self.datetimes_are_start,
                 n_jobs=self.n_jobs,
                 truncate=self.n_truncate if self.truncate else False,
+                # Pass inherited attributes via constructor
+                file_end_datetimes=self.file_end_datetimes if hasattr(self, "file_end_datetimes") else None,
+                file_durations=self.file_durations if self.file_durations else None,
+                cumulative_file_durations=self.cumulative_file_durations if self.cumulative_file_durations else None,
+                bad_channel_names=child_bad_channels,
+                meta=child_meta,
             )
-
-            # Inherit file-level timestamps and durations (not in constructor)
-            if hasattr(self, "file_end_datetimes"):
-                child_lro.file_end_datetimes = self.file_end_datetimes
-
-            # Inherit parent durations to ensure consistency with timestamps
-            if hasattr(self, "file_durations") and self.file_durations:
-                child_lro.file_durations = self.file_durations
-                child_lro.cumulative_file_durations = self.cumulative_file_durations
-
-            # Inherit bad channels that are present in this split
-            if self.bad_channel_names:
-                child_lro.bad_channel_names = [
-                    ch for ch in self.bad_channel_names if ch in valid_names
-                ]
-
-            # Inherit complete metadata (preserving units, scaling, etc.)
-            if self.meta:
-                child_lro.meta = copy.deepcopy(self.meta)
-                child_lro.meta.n_channels = len(valid_names)
-                child_lro.meta.channel_names = valid_names
 
             lros[group_name] = child_lro
 
