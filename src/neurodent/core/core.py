@@ -2013,7 +2013,7 @@ class LongRecordingOrganizer:
                 if key in self.labels and self.labels[key] != value:
                     warnings.warn(
                         f"Label conflict during merge for key '{key}': "
-                        f"'{self.labels[key]}' vs '{value}'. Using value from merged LRO.",
+                        f"'{self.labels[key]}' vs '{value}'. Using value from other LRO.",
                         UserWarning,
                     )
                 self.labels[key] = value

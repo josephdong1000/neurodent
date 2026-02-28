@@ -1144,7 +1144,7 @@ class TestParseStrToDay:
             assert result.day == 4
 
     def test_complex_date_formats_parsemode_split(self):
-        """Test parsing of complex date formats with parsemode full."""
+        """Test parsing of complex date formats with parse_mode full."""
         test_cases = [
             ("ID1524_January-20-2012_data", 2012, 1, 20),
             ("ID1524_Jan-20-2012_data", 2012, 1, 20),
@@ -1298,7 +1298,7 @@ class TestParseStrToDay:
             utils.parse_str_to_day("no date here", parse_mode="full")
 
     def test_parse_mode_window(self):
-        """Test parse_mode with various date strings."""
+        """Test parse_mode with explicit date patterns for separated date components."""
         # Use explicit date patterns for strings with separated date components
         month_patterns = [
             (
@@ -1323,8 +1323,8 @@ class TestParseStrToDay:
 
     def test_parse_mode_all(self):
         """Test parse_- uses all three approaches in sequence."""
-        # Should work with full string parsing (no patterns needed)
-        # parse_tries full parsing first, so no warning for simple dates
+        # Should work with full string parsing (parse_mode='full', no patterns needed)
+        # parse_mode='full' tries full parsing first, so no warning for simple dates
         result = utils.parse_str_to_day("2023-07-04", parse_mode="all")
         assert result.year == 2023
         assert result.month == 7
