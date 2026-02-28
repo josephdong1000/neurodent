@@ -10,8 +10,10 @@ import json
 import logging
 import warnings
 from pathlib import Path
-from typing import Union
+from typing import Literal, Union
 
+import dask
+import dask.delayed
 import numpy as np
 import matplotlib.pyplot as plt
 import mne
@@ -521,13 +523,16 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
 
     @staticmethod
     def convert_sas_to_mne(
-        sas: list[si.SortingAnalyzer], chunk_len: float = 60
+        sas: list[si.SortingAnalyzer], chunk_len: float = 60,
+        multiprocess_mode: Literal["dask", "serial"] = "serial",
     ) -> mne.io.RawArray:
         """Convert a list of SortingAnalyzers to a MNE RawArray.
 
         Args:
             sas (list[si.SortingAnalyzer]): The list of SortingAnalyzers to convert
             chunk_len (float, optional): The length of the chunks to use for the conversion. Defaults to 60.
+            multiprocess_mode (Literal["dask", "serial"], optional): Whether to use Dask for parallel
+                per-channel conversion. Defaults to "serial".
 
         Returns:
             mne.io.RawArray: The converted RawArray, with spikes labeled as annotations
@@ -549,9 +554,19 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
         logging.debug(f"Data shape: {data.shape}")
 
         # Fill data array one channel at a time
-        for i, sa in enumerate(sas):
-            logging.debug(f"Converting channel {i + 1} of {n_channels}")
-            data[i, :] = FrequencyDomainSpikeAnalysisResult.convert_sa_to_np(sa, chunk_len)
+        match multiprocess_mode:
+            case "dask":
+                delayed_traces = [
+                    dask.delayed(FrequencyDomainSpikeAnalysisResult.convert_sa_to_np)(sa, chunk_len)
+                    for sa in sas
+                ]
+                traces_list = dask.compute(*delayed_traces)
+                for i, traces in enumerate(traces_list):
+                    data[i, :] = traces
+            case "serial":
+                for i, sa in enumerate(sas):
+                    logging.debug(f"Converting channel {i + 1} of {n_channels}")
+                    data[i, :] = FrequencyDomainSpikeAnalysisResult.convert_sa_to_np(sa, chunk_len)
 
         channel_names = [str(sa.recording.get_channel_ids().item()) for sa in sas]
         logging.debug(f"Channel names: {channel_names}")
@@ -581,12 +596,19 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
         return raw
 
     @staticmethod
-    def convert_sa_to_np(sa: si.SortingAnalyzer, chunk_len: float = 60) -> np.ndarray:
+    def convert_sa_to_np(
+        sa: si.SortingAnalyzer, chunk_len: float = 60,
+        multiprocess_mode: Literal["dask", "serial"] = "serial",
+    ) -> np.ndarray:
         """Convert a SortingAnalyzer to a numpy array of traces.
 
         Args:
             sa (si.SortingAnalyzer): The SortingAnalyzer to convert. Must have only 1 channel.
             chunk_len (float, optional): The length of the chunks to use for the conversion. Defaults to 60.
+            multiprocess_mode (Literal["dask", "serial"], optional): Whether to use Dask for parallel
+                per-chunk reads. Defaults to "serial". Note: avoid using "dask" when this method is
+                already called from ``convert_sas_to_mne`` in Dask mode, as that parallelizes across
+                channels and nested Dask may not improve performance.
         Returns:
             np.ndarray: The converted traces
         """
@@ -604,17 +626,32 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
         frames_per_chunk = round(chunk_len * rec.get_sampling_frequency())
         n_chunks = total_frames // frames_per_chunk
 
-        traces = np.empty(total_frames)
+        def _read_chunk(recording, start, end):
+            return recording.get_traces(
+                start_frame=start, end_frame=end, return_scaled=True
+            ).flatten()
 
+        chunk_ranges = []
         for j in range(n_chunks):
             start_frame = j * frames_per_chunk
-            if j == n_chunks - 1:
-                end_frame = total_frames
-            else:
-                end_frame = (j + 1) * frames_per_chunk
-            traces[start_frame:end_frame] = rec.get_traces(
-                start_frame=start_frame, end_frame=end_frame, return_scaled=True
-            ).flatten()
+            end_frame = total_frames if j == n_chunks - 1 else (j + 1) * frames_per_chunk
+            chunk_ranges.append((start_frame, end_frame))
+
+        traces = np.empty(total_frames)
+
+        match multiprocess_mode:
+            case "dask":
+                delayed_chunks = [
+                    dask.delayed(_read_chunk)(rec, start, end)
+                    for start, end in chunk_ranges
+                ]
+                chunk_results = dask.compute(*delayed_chunks)
+                for (start, end), chunk_data in zip(chunk_ranges, chunk_results):
+                    traces[start:end] = chunk_data
+            case "serial":
+                for start, end in chunk_ranges:
+                    traces[start:end] = _read_chunk(rec, start, end)
+
         traces *= 1e-6  # convert from uV to V
         return traces
 
