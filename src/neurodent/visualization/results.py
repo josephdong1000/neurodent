@@ -312,7 +312,11 @@ class AnimalOrganizer(AnimalFeatureParser):
         return valid_folders
 
     def _get_item_name(self, item):
-        """Helper to get a representative name for an item which could be a string, Path, or list of strings."""
+        """Helper to get a representative name for an item which could be a string, Path, list of strings, or MultiFileGroup."""
+        from ..core.discovery import MultiFileGroup
+
+        if isinstance(item, MultiFileGroup):
+            return Path(item.paths[0]).name + "..."
         if isinstance(item, (list, tuple)):
             return Path(item[0]).name
         return Path(item).name

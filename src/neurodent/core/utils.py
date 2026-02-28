@@ -452,6 +452,11 @@ def parse_path_to_animalday(
         ValueError: If mode is invalid or required components cannot be extracted
         TypeError: If filepath is not str or Path
     """
+    warnings.warn(
+        "parse_path_to_animalday is deprecated. Use FileDiscoverer with pattern-based discovery instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
     filepath = Path(filepath)
     match mode:
         case "nest":
