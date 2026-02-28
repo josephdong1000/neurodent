@@ -19,6 +19,9 @@ class TestTimelineSequencing:
         ao._compute_global_timeline = AnimalOrganizer._compute_global_timeline.__get__(ao, AnimalOrganizer)
         # Also need to bind _sort_lros_by_median_time because _compute_global_timeline uses it
         ao._sort_lros_by_median_time = AnimalOrganizer._sort_lros_by_median_time.__get__(ao, AnimalOrganizer)
+        # Bind helpers that _compute_global_timeline uses
+        ao._get_item_name = AnimalOrganizer._get_item_name.__get__(ao, AnimalOrganizer)
+        ao._is_item_file = AnimalOrganizer._is_item_file.__get__(ao, AnimalOrganizer)
         
         # Mock dependencies
         ao._resolve_timestamp_input = MagicMock(side_effect=lambda x, y: pd.to_datetime(x))
