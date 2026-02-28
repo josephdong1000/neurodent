@@ -164,7 +164,7 @@ class TestSIModeGainScaling:
         file2.touch()
 
         organizer = LongRecordingOrganizer(
-            temp_dir,
+            [str(file1), str(file2)],
             mode=None,
             manual_datetimes=[
                 datetime(2023, 1, 1, 10, 0, 0),
@@ -194,7 +194,7 @@ class TestSIModeGainScaling:
             "spikeinterface.core.concatenate_recordings", return_value=mock_concat
         ):
             organizer.convert_file_with_si_to_recording(
-                extract_func=mock_extract, input_type="files", file_pattern="*.rhd"
+                extract_func=mock_extract
             )
 
         # Verify metadata is set correctly

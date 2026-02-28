@@ -276,7 +276,7 @@ class TestMNECachingOptimization:
             time.sleep(0.1)  # Small delay to ensure cache is newer
 
             # Create cache files with correct naming as used in the actual code
-            intermediate_name = f"{tmpdir_path.name}_mne-to-rec"
+            intermediate_name = "test_mne-to-rec"
             cache_file = tmpdir_path / f"{intermediate_name}.edf"
             meta_cache_file = cache_file.with_suffix(cache_file.suffix + ".meta.json")
 
@@ -330,11 +330,9 @@ class TestMNECachingOptimization:
                 mock_read_edf.return_value = mock_recording
 
                 lro = core.LongRecordingOrganizer(
-                    item=tmpdir_path,
+                    item=source_file,
                     mode="mne",
                     extract_func=mock_func,
-                    input_type="file",
-                    file_pattern="test.edf",
                     intermediate="edf",
                     cache_policy="always",  # Force use of cache
                     manual_datetimes=manual_dt,
@@ -609,7 +607,7 @@ class TestMNECachingOptimization:
             time.sleep(0.1)
 
             # Create cache files with correct naming
-            intermediate_name = f"{tmpdir_path.name}_mne-to-rec"
+            intermediate_name = "test_mne-to-rec"
             cache_file = tmpdir_path / f"{intermediate_name}.edf"
             meta_cache_file = cache_file.with_suffix(cache_file.suffix + ".meta.json")
 
@@ -673,11 +671,9 @@ class TestMNECachingOptimization:
                     mock_read_edf.return_value = mock_recording
 
                     lro = core.LongRecordingOrganizer(
-                        item=tmpdir_path,
+                        item=source_file,
                         mode="mne",
                         extract_func=mock_func,
-                        input_type="file",
-                        file_pattern="test.edf",
                         intermediate="edf",
                         cache_policy=cache_policy,
                         manual_datetimes=manual_dt,

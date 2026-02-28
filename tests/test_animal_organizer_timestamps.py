@@ -473,19 +473,23 @@ class TestAnimalOrganizerTimestampHandling:
 
             return mock_lro
 
-        # Define durations for each folder (in seconds)
-        folder_durations = {
-            str(self.folder1): 3600.0,  # 1 hour
-            str(self.folder2): 1800.0,  # 30 minutes
-            str(self.folder3): 7200.0,  # 2 hours
+        # Define durations for each folder (by folder name)
+        folder_durations_by_name = {
+            "WT_A123_2023-01-15": 3600.0,  # 1 hour
+            "WT_A123_2023-01-16": 1800.0,  # 30 minutes
+            "WT_A123_2023-01-17": 7200.0,  # 2 hours
         }
 
         with patch.object(core, "LongRecordingOrganizer") as mock_lro_class:
 
             def mock_lro_side_effect(*args, **kwargs):
-                folder_path = str(args[0])
-                duration = folder_durations.get(folder_path, 3600.0)
-                return create_mock_lro_with_duration(duration)
+                item = args[0] if args else None
+                item_str = str(item)
+                # Match by folder name substring
+                for fname, dur in folder_durations_by_name.items():
+                    if fname in item_str:
+                        return create_mock_lro_with_duration(dur)
+                return create_mock_lro_with_duration(3600.0)
 
             mock_lro_class.side_effect = mock_lro_side_effect
 
@@ -515,8 +519,12 @@ class TestAnimalOrganizerTimestampHandling:
             # Process folders in sorted order (by animalday, then by folder order)
             for folder_name in sorted(ao._processed_timestamps.keys()):
                 expected_timeline[folder_name] = current_time
-                folder_path = folder_name_to_path[folder_name]
-                duration = folder_durations[folder_path]
+                # Look up duration by matching folder name
+                duration = 3600.0  # default
+                for fname, dur in folder_durations_by_name.items():
+                    if fname in folder_name or folder_name in fname:
+                        duration = dur
+                        break
                 current_time = current_time + timedelta(seconds=duration)
 
             # Verify continuous timeline
@@ -536,9 +544,12 @@ class TestAnimalOrganizerTimestampHandling:
                 current_folder, current_start = timeline_list[i]
                 next_folder, next_start = timeline_list[i + 1]
 
-                # Calculate end time of current folder
-                current_path = folder_name_to_path[current_folder]
-                current_duration = folder_durations[current_path]
+                # Calculate end time of current folder using name-based lookup
+                current_duration = 3600.0  # default
+                for fname, dur in folder_durations_by_name.items():
+                    if fname in current_folder or current_folder in fname:
+                        current_duration = dur
+                        break
                 current_end = current_start + timedelta(seconds=current_duration)
 
                 # Verify next folder starts exactly when current folder ends
@@ -698,18 +709,21 @@ class TestAnimalOrganizerTimestampHandling:
             mock_lro.file_end_datetimes = [None]
             return mock_lro
 
-        folder_durations = {
-            str(self.folder1): 3600.0,  # 1 hour
-            str(self.folder2): 1800.0,  # 30 minutes
-            str(self.folder3): 7200.0,  # 2 hours
+        folder_durations_by_name = {
+            "WT_A123_2023-01-15": 3600.0,  # 1 hour
+            "WT_A123_2023-01-16": 1800.0,  # 30 minutes
+            "WT_A123_2023-01-17": 7200.0,  # 2 hours
         }
 
         with patch.object(core, "LongRecordingOrganizer") as mock_lro_class:
 
             def mock_lro_side_effect(*args, **kwargs):
-                folder_path = str(args[0])
-                duration = folder_durations.get(folder_path, 3600.0)
-                return create_mock_lro_with_duration(duration)
+                item = args[0] if args else None
+                item_str = str(item)
+                for fname, dur in folder_durations_by_name.items():
+                    if fname in item_str:
+                        return create_mock_lro_with_duration(dur)
+                return create_mock_lro_with_duration(3600.0)
 
             mock_lro_class.side_effect = mock_lro_side_effect
 
@@ -731,7 +745,7 @@ class TestAnimalOrganizerTimestampHandling:
             # With datetimes_are_start=False, should work backwards
             # Total duration = 3600 + 1800 + 7200 = 12600s = 3.5 hours
             # So first folder should start at 14:30 - 3.5 hours = 11:00
-            total_duration = sum(folder_durations.values())
+            total_duration = sum(folder_durations_by_name.values())
             expected_first_start = global_end - timedelta(seconds=total_duration)
 
             sorted_folders = sorted(ao._processed_timestamps.keys())

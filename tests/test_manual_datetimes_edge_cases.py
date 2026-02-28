@@ -106,4 +106,4 @@ class TestManualDatetimesEdgeCases:
 
         error_msg = str(exc_info.value)
         assert "Ambiguous manual_datetimes configuration" in error_msg
-        assert "Please nest all folder keys" in error_msg
+        assert "Both the Animal ID" in error_msg

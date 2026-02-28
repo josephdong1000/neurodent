@@ -278,7 +278,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                         folder,
                         animal_param=self.animal_file_match_pattern,
                         day_sep=self.day_sep,
-                        mode=self.read_mode,
+                        mode="concat" if self.read_mode == "pattern" else self.read_mode,
                         **day_parse_kwargs,
                     )
                 valid_folders.append(folder)
@@ -1497,7 +1497,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                 lan_folder,
                 animal_param=self.animal_file_match_pattern,
                 day_sep=self.day_sep,
-                mode=self.read_mode,
+                mode="concat" if self.read_mode == "pattern" else self.read_mode,
             )
 
         row["animalday"] = session_labels["animalday"]
