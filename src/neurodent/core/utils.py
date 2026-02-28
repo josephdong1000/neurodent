@@ -546,6 +546,11 @@ def parse_str_to_animal(string: str, animal_param: tuple[int, str] | str | list[
         >>> parse_str_to_animal("WT_A10_data.bin", ["B15", "C20"])  # No match
         ValueError: No matching ID found in WT_A10_data.bin from possible IDs: ['B15', 'C20']
     """
+    warnings.warn(
+        "parse_str_to_animal is deprecated. Use FileDiscoverer with {animal} placeholder in pattern instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
     if isinstance(animal_param, tuple):
         index, sep = animal_param
         animid = string.split(sep)
@@ -616,6 +621,11 @@ def parse_str_to_day(
         Without date_patterns, the function falls back to token-based parsing which may
         be ambiguous for formats like MM/DD/YYYY vs DD/MM/YYYY.
     """
+    warnings.warn(
+        "parse_str_to_day is deprecated. Use FileDiscoverer with {session} placeholder in pattern instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
     if parse_params is None:
         parse_params = {"fuzzy": True}
     elif not isinstance(parse_params, dict):

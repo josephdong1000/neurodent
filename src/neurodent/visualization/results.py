@@ -188,15 +188,10 @@ class AnimalOrganizer(AnimalFeatureParser):
         processed_animaldays = []
 
         for item in discovered_items:
-            # Handle both dict (single pattern) and MultiFileGroup (multiple patterns)
-            if isinstance(item, MultiFileGroup):
-                session = item.metadata.get("session", "unknown")
-                animal_val = item.metadata.get("animal", animal_id if animal_id else "unknown")
-                path_val = item  # Pass the entire MultiFileGroup object
-            else:
-                session = item.get("session", "unknown")
-                animal_val = item.get("animal", animal_id if animal_id else "unknown")
-                path_val = item.get("path")
+            # All items are now DiscoveredFile objects with unified interface
+            session = item.metadata.get("session", "unknown")
+            animal_val = item.metadata.get("animal", animal_id if animal_id else "unknown")
+            path_val = item  # Pass the entire DiscoveredFile object
 
             if session in skip_sessions:
                 continue
@@ -312,11 +307,13 @@ class AnimalOrganizer(AnimalFeatureParser):
         return valid_folders
 
     def _get_item_name(self, item):
-        """Helper to get a representative name for an item which could be a string, Path, list of strings, or MultiFileGroup."""
-        from ..core.discovery import MultiFileGroup
+        """Helper to get a representative name for an item which could be a string, Path, list of strings, or DiscoveredFile."""
+        from ..core.discovery import DiscoveredFile
 
-        if isinstance(item, MultiFileGroup):
-            return Path(item.paths[0]).name + "..."
+        if isinstance(item, DiscoveredFile):
+            if item.is_multi_file:
+                return Path(item.paths[0]).name + "..."
+            return Path(item.path).name
         if isinstance(item, (list, tuple)):
             return Path(item[0]).name
         return Path(item).name

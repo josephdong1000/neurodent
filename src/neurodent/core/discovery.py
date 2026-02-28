@@ -5,23 +5,65 @@ from typing import Union, Dict, List, Tuple, Optional
 import warnings
 
 
-class MultiFileGroup:
-    """Files that must be loaded together as one recording unit.
+class DiscoveredFile:
+    """Represents discovered file(s) with associated metadata.
 
-    Created by FileDiscoverer when multiple patterns are provided.
-    This wrapper distinguishes multi-file sessions (e.g., .bin + .csv that should
-    be loaded together) from lists of single files (e.g., multiple .rhd files that
-    should be concatenated).
+    This unified class handles both single files and groups of files that must
+    be loaded together. It replaces the previous dict/MultiFileGroup split behavior.
+
+    Attributes:
+        path (str | None): Single file path (for single-pattern discoveries)
+        paths (tuple[str, ...] | None): Multiple file paths (for multi-pattern discoveries)
+        metadata (dict): Extracted metadata from pattern placeholders (e.g., {animal, session, index})
+
+    Examples:
+        Single file: DiscoveredFile(path="/data/A10/session1/001.rhd", metadata={"animal": "A10", "session": "session1", "index": "001"})
+        Multiple files: DiscoveredFile(paths=("/data/A10/s1/data.bin", "/data/A10/s1/meta.csv"), metadata={"animal": "A10", "session": "s1"})
     """
-    def __init__(self, paths: tuple[str, ...], metadata: dict):
+    def __init__(self, path: str = None, paths: tuple[str, ...] = None, metadata: dict = None):
+        if path is None and paths is None:
+            raise ValueError("Either path or paths must be provided")
+        if path is not None and paths is not None:
+            raise ValueError("Cannot provide both path and paths")
+
+        self.path = path
         self.paths = paths
-        self.metadata = metadata  # {animal: ..., session: ..., etc.}
+        self.metadata = metadata or {}
+
+    @property
+    def is_multi_file(self) -> bool:
+        """Returns True if this represents multiple files that should be loaded together."""
+        return self.paths is not None
+
+    def get_path_list(self) -> List[str]:
+        """Returns all paths as a list, whether single or multiple files."""
+        if self.paths is not None:
+            return list(self.paths)
+        return [self.path] if self.path else []
 
     def __iter__(self):
-        return iter(self.paths)
+        """Iterate over paths (useful for backward compatibility with MultiFileGroup)."""
+        return iter(self.get_path_list())
 
     def __repr__(self):
-        return f"MultiFileGroup(paths={self.paths}, metadata={self.metadata})"
+        if self.is_multi_file:
+            return f"DiscoveredFile(paths={self.paths}, metadata={self.metadata})"
+        return f"DiscoveredFile(path={self.path!r}, metadata={self.metadata})"
+
+
+# Deprecated: Keep MultiFileGroup for backward compatibility
+class MultiFileGroup(DiscoveredFile):
+    """Deprecated: Use DiscoveredFile instead.
+
+    This class is maintained for backward compatibility but will be removed in a future version.
+    """
+    def __init__(self, paths: tuple[str, ...], metadata: dict):
+        warnings.warn(
+            "MultiFileGroup is deprecated. Use DiscoveredFile(paths=..., metadata=...) instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        super().__init__(paths=paths, metadata=metadata)
 
 
 class FileDiscoverer:
@@ -66,17 +108,15 @@ class FileDiscoverer:
 
         return re.compile(regex_string), glob_pattern
 
-    def discover(self, **filter_kwargs) -> List[Union[Dict, "MultiFileGroup"]]:
+    def discover(self, **filter_kwargs) -> List["DiscoveredFile"]:
         """
-        Discovers files matching patterns, returning a list of dictionaries or MultiFileGroup objects.
+        Discovers files matching patterns, returning a list of DiscoveredFile objects.
         Keyword args like `animal="A10"` can strictly filter the returned files.
 
         Returns:
-            A list of dicts (for single pattern) or MultiFileGroup objects (for multiple patterns).
-            If a single pattern was provided, dicts look like:
-                {'path': '...', 'animal': 'A10', 'session': '1'}
-            If multiple patterns were provided, returns MultiFileGroup objects with grouped files:
-                MultiFileGroup(paths=('..._data.bin', '..._meta.json'), metadata={'animal': 'A10', 'session': '1'})
+            A list of DiscoveredFile objects.
+            For single pattern: DiscoveredFile(path='...', metadata={'animal': 'A10', 'session': '1'})
+            For multiple patterns: DiscoveredFile(paths=('..._data.bin', '..._meta.json'), metadata={'animal': 'A10', 'session': '1'})
         """
         is_single = len(self.patterns) == 1
         return_list = []
@@ -88,7 +128,11 @@ class FileDiscoverer:
         ]
 
         if is_single:
-            return all_discovered[0]
+            # Convert dicts to DiscoveredFile objects
+            for item in all_discovered[0]:
+                path = item.pop("path")
+                return_list.append(DiscoveredFile(path=path, metadata=item))
+            return return_list
 
         # Grouping for multiple patterns.
         # Find the intersection of metadata keys across all found files.
@@ -127,11 +171,11 @@ class FileDiscoverer:
                             f"Duplicate or out-of-order match found for metadata {key} in pattern {self.patterns[pattern_idx]}"
                         )
 
-        # Filter for complete groups and construct MultiFileGroup objects
+        # Filter for complete groups and construct DiscoveredFile objects
         for key, paths in grouped_results.items():
             if len(paths) == len(self.patterns):
                 metadata = {k: v for k, v in zip(keys_to_group, key)}
-                return_list.append(MultiFileGroup(paths=tuple(paths), metadata=metadata))
+                return_list.append(DiscoveredFile(paths=tuple(paths), metadata=metadata))
 
         return return_list
 

@@ -473,11 +473,11 @@ class LongRecordingOrganizer:
         recording: "si.BaseRecording" = None,
         **kwargs,
     ):
-        # Import MultiFileGroup here to avoid circular imports
-        from .discovery import MultiFileGroup
+        # Import DiscoveredFile here to avoid circular imports
+        from .discovery import DiscoveredFile
 
-        if isinstance(item, MultiFileGroup):
-            # MultiFileGroup: pass as-is to extract_func
+        if isinstance(item, DiscoveredFile):
+            # DiscoveredFile: handle both single and multi-file cases
             self.data_files = None
             self.item = item
         elif isinstance(item, (list, tuple)):
@@ -622,9 +622,15 @@ class LongRecordingOrganizer:
         self._validate_timestamps_for_mode("si", n_processed_files)
 
         # Handle different item types
-        if isinstance(self.item, MultiFileGroup):
-            # MultiFileGroup: pass as-is to extract_func (user's custom reader)
-            rec: "si.BaseRecording" = extract_func(self.item, **kwargs)
+        from .discovery import DiscoveredFile
+        if isinstance(self.item, DiscoveredFile):
+            # DiscoveredFile: handle both single and multi-file cases
+            if self.item.is_multi_file:
+                # Multi-file group: pass as-is to extract_func (user's custom reader)
+                rec: "si.BaseRecording" = extract_func(self.item, **kwargs)
+            else:
+                # Single file
+                rec: "si.BaseRecording" = extract_func(self.item.path, **kwargs)
         elif isinstance(self.item, list):
             # List of files: concatenate individually using multiprocess_mode
             if multiprocess_mode == "dask":
@@ -1167,20 +1173,17 @@ class LongRecordingOrganizer:
             if hasattr(sub_rec, "rename_channels"):
                 sub_rec = sub_rec.rename_channels(new_channel_ids=valid_names)
 
-            # Create in-memory LRO wrapper
+            # Create in-memory LRO wrapper, passing parent attributes via constructor
             child_lro = LongRecordingOrganizer(
                 item=None,
                 recording=sub_rec,
+                manual_datetimes=self.manual_datetimes,
+                datetimes_are_start=self.datetimes_are_start,
+                n_jobs=self.n_jobs,
+                truncate=self.n_truncate if self.truncate else False,
             )
-            # Inherit parent timestamps
-            child_lro.manual_datetimes = self.manual_datetimes
-            child_lro.datetimes_are_start = self.datetimes_are_start
-            child_lro.n_jobs = self.n_jobs
 
-            # Inherit truncation settings
-            child_lro.n_truncate = self.n_truncate
-            child_lro.truncate = self.truncate
-
+            # Inherit file-level timestamps and durations (not in constructor)
             if hasattr(self, "file_end_datetimes"):
                 child_lro.file_end_datetimes = self.file_end_datetimes
 

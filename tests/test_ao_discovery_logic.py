@@ -6,7 +6,7 @@ These tests verify that FileDiscoverer correctly:
 2. Filters by animal_id when provided
 3. Groups files by session
 4. Handles skip_sessions correctly
-5. Works with MultiFileGroup for dual-file scenarios
+5. Works with DiscoveredFile for dual-file scenarios
 """
 
 import pytest
@@ -160,8 +160,6 @@ def test_multi_pattern_discovery(multi_file_structure, monkeypatch):
     """Test multi-file discovery (bin + csv)."""
     monkeypatch.setattr(results.AnimalOrganizer, "_create_long_recordings", lambda self, kw: None)
 
-    from neurodent.core.discovery import MultiFileGroup
-
     base = str(multi_file_structure)
     patterns = [
         base + "/{animal}/{session}/data.bin",
@@ -178,10 +176,12 @@ def test_multi_pattern_discovery(multi_file_structure, monkeypatch):
     assert "session1" in ao._animalday_folder_groups
     assert "session2" in ao._animalday_folder_groups
 
-    # Each session should have a MultiFileGroup with 2 files
+    # Each session should have a DiscoveredFile with 2 files
     for session_files in ao._animalday_folder_groups.values():
         assert len(session_files) == 1
-        assert isinstance(session_files[0], MultiFileGroup)
+        from neurodent.core.discovery import DiscoveredFile
+        assert isinstance(session_files[0], DiscoveredFile)
+        assert session_files[0].is_multi_file
         assert len(session_files[0].paths) == 2
 
 
