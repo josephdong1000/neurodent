@@ -1,0 +1,14 @@
+# Snakemake Workflow Catalog configuration
+# See: https://snakemake.github.io/snakemake-workflow-catalog/docs/about/adding_workflows.html
+
+usage:
+  mandatory-flags:
+    desc: "Specify the configuration file for the pipeline"
+    flags: "--configfile config/config.yaml"
+
+  software-stack-deployment:
+    conda: true
+    apptainer: false
+    apptainer+conda: false
+
+  report: true
