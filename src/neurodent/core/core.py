@@ -491,11 +491,6 @@ class LongRecordingOrganizer:
         n_jobs (int, optional): Number of parallel jobs for MNE resampling. Defaults to 1.
         recording (si.BaseRecording, optional): Existing SpikeInterface recording object
             for in-memory initialization. Use this when creating LRO wrappers around split recordings.
-        file_end_datetimes (list, optional): End datetimes for each file. Used for split() inheritance.
-        file_durations (list[float], optional): Duration of each file in seconds. Used for split() inheritance.
-        cumulative_file_durations (list[float], optional): Cumulative durations. Used for split() inheritance.
-        bad_channel_names (list[str], optional): Bad channel names to inherit. Used for split() inheritance.
-        meta (RecordingMetadata, optional): Metadata object to inherit. Used for split() inheritance.
         **kwargs: Additional arguments passed to the data loading functions.
 
     Attributes:
@@ -527,12 +522,6 @@ class LongRecordingOrganizer:
         datetimes_are_start: bool = True,
         n_jobs: int = 1,
         recording: "si.BaseRecording" = None,
-        # Optional inheritance parameters for split() children
-        file_end_datetimes: list = None,
-        file_durations: list[float] = None,
-        cumulative_file_durations: list[float] = None,
-        bad_channel_names: list[str] = None,
-        meta: "RecordingMetadata" = None,
         **kwargs,
     ):
         # Import DiscoveredFile here to avoid circular imports
@@ -562,18 +551,14 @@ class LongRecordingOrganizer:
         self.datetimes_are_start = datetimes_are_start
         self.n_jobs = n_jobs
 
-        self.meta = meta  # Will be overwritten if mode is not None
+        self.meta = None
         self.channel_names = None
         self.LongRecording = None
         self.temppaths = []
-        self.file_durations = file_durations if file_durations is not None else []
-        self.cumulative_file_durations = cumulative_file_durations if cumulative_file_durations is not None else []
-        self.bad_channel_names = bad_channel_names if bad_channel_names is not None else []
+        self.file_durations = []
+        self.cumulative_file_durations = []
+        self.bad_channel_names = []
         self._is_in_memory = False
-
-        # Set file_end_datetimes if provided (used for split() inheritance)
-        if file_end_datetimes is not None:
-            self.file_end_datetimes = file_end_datetimes
 
         if recording is not None:
             self._init_from_recording(recording)
@@ -1239,19 +1224,7 @@ class LongRecordingOrganizer:
             if hasattr(sub_rec, "rename_channels"):
                 sub_rec = sub_rec.rename_channels(new_channel_ids=valid_names)
 
-            # Create in-memory LRO wrapper, passing ALL parent attributes via constructor
-            # Prepare metadata for child (copy and update channel info)
-            child_meta = None
-            if self.meta:
-                child_meta = copy.deepcopy(self.meta)
-                child_meta.n_channels = len(valid_names)
-                child_meta.channel_names = valid_names
-
-            # Filter bad channels to only those present in this split
-            child_bad_channels = [
-                ch for ch in self.bad_channel_names if ch in valid_names
-            ] if self.bad_channel_names else []
-
+            # Create in-memory LRO wrapper with barebones instantiation
             child_lro = LongRecordingOrganizer(
                 item=None,
                 recording=sub_rec,
@@ -1259,13 +1232,28 @@ class LongRecordingOrganizer:
                 datetimes_are_start=self.datetimes_are_start,
                 n_jobs=self.n_jobs,
                 truncate=self.n_truncate if self.truncate else False,
-                # Pass inherited attributes via constructor
-                file_end_datetimes=self.file_end_datetimes if hasattr(self, "file_end_datetimes") else None,
-                file_durations=self.file_durations if self.file_durations else None,
-                cumulative_file_durations=self.cumulative_file_durations if self.cumulative_file_durations else None,
-                bad_channel_names=child_bad_channels,
-                meta=child_meta,
             )
+
+            # Inherit file-level timestamps and durations (post-instantiation assignment)
+            if hasattr(self, "file_end_datetimes"):
+                child_lro.file_end_datetimes = self.file_end_datetimes
+
+            # Inherit parent durations to ensure consistency with timestamps
+            if hasattr(self, "file_durations") and self.file_durations:
+                child_lro.file_durations = self.file_durations
+                child_lro.cumulative_file_durations = self.cumulative_file_durations
+
+            # Inherit bad channels that are present in this split
+            if self.bad_channel_names:
+                child_lro.bad_channel_names = [
+                    ch for ch in self.bad_channel_names if ch in valid_names
+                ]
+
+            # Inherit complete metadata (preserving units, scaling, etc.)
+            if self.meta:
+                child_lro.meta = copy.deepcopy(self.meta)
+                child_lro.meta.n_channels = len(valid_names)
+                child_lro.meta.channel_names = valid_names
 
             lros[group_name] = child_lro
 

@@ -53,12 +53,11 @@ class TestLROSplit(unittest.TestCase):
         instance.n_truncate = kwargs.get('truncate', None)
         instance.truncate = bool(instance.n_truncate)
 
-        # Inherited attributes (set from kwargs if provided)
-        instance.file_end_datetimes = kwargs.get('file_end_datetimes', None)
-        instance.file_durations = kwargs.get('file_durations', [])
-        instance.cumulative_file_durations = kwargs.get('cumulative_file_durations', [])
-        instance.bad_channel_names = kwargs.get('bad_channel_names', [])
-        instance.meta = kwargs.get('meta', None)
+        # Initialize attributes to defaults (as in real __init__)
+        instance.file_durations = []
+        instance.cumulative_file_durations = []
+        instance.bad_channel_names = []
+        instance.meta = None
 
         # Other defaults
         instance.temppaths = []
@@ -85,7 +84,7 @@ class TestLROSplit(unittest.TestCase):
         self.assertEqual(child.datetimes_are_start, False)
 
     def test_split_inherits_file_timestamps(self):
-        """Verify that split() children inherit file_end_datetimes."""
+        """Verify that split() children inherit file_end_datetimes via post-instantiation assignment."""
         lro = LongRecordingOrganizer(item=Path("/tmp/test"))
         lro.LongRecording = self.mock_recording
         lro.channel_names = ["ch1", "ch2"]
@@ -96,7 +95,7 @@ class TestLROSplit(unittest.TestCase):
         splits = lro.split(groups={"Group1": ["ch1"]})
         child = splits["Group1"]
 
-        # These should be passed via constructor, not post-assigned
+        # These should be copied via post-instantiation assignment
         self.assertEqual(child.file_end_datetimes, lro.file_end_datetimes)
         self.assertEqual(child.file_durations, lro.file_durations)
         self.assertEqual(child.cumulative_file_durations, lro.cumulative_file_durations)
@@ -145,7 +144,7 @@ class TestLROSplit(unittest.TestCase):
         self.assertIsNot(child.meta, meta)
 
     def test_split_all_attributes_passed_via_constructor(self):
-        """Ensure all attributes are passed via constructor, not post-assigned."""
+        """Ensure constructor params are passed correctly and other attributes are assigned post-instantiation."""
         manual_dt = datetime(2023, 1, 1, 12, 0, 0)
         file_end_dt = [datetime(2023, 1, 1, 13, 0, 0)]
         meta = RecordingMetadata(
@@ -171,10 +170,12 @@ class TestLROSplit(unittest.TestCase):
         splits = lro.split(groups={"Group1": ["ch1"]})
         child = splits["Group1"]
 
-        # All these should be set via constructor
+        # Constructor params should be passed via constructor
         self.assertEqual(child.manual_datetimes, manual_dt)
         self.assertEqual(child.datetimes_are_start, False)
         self.assertEqual(child.n_jobs, 4)
+
+        # File-level attributes should be assigned post-instantiation
         self.assertEqual(child.file_end_datetimes, file_end_dt)
         self.assertEqual(child.file_durations, [3600.0])
         self.assertEqual(child.cumulative_file_durations, [3600.0])
