@@ -284,7 +284,7 @@ class TestFrequencyDomainSpikeAnalysisResult:
         )
 
         # Mock the conversion method
-        with patch("neurodent.visualization.results.SpikeAnalysisResult.convert_sas_to_mne") as mock_convert:
+        with patch("neurodent.visualization.frequency_domain_results.FrequencyDomainSpikeAnalysisResult.convert_sas_to_mne") as mock_convert:
             mock_mne = MagicMock()
             mock_convert.return_value = mock_mne
 

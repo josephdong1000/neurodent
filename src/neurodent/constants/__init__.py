@@ -39,7 +39,7 @@ To override defaults, import and modify before running analysis:
 
 - :doc:`/quickstart/configuration` - Full customization guide
 - :mod:`neurodent.constants.analysis` - Feature and frequency definitions
-- :mod:`neurodent.constants.config` - Sampling and sorting parameters
+- :mod:`neurodent.constants.config` - Sampling parameters
 """
 
 # Re-export everything for backward compatibility
@@ -84,9 +84,6 @@ from .config import (
     GLOBAL_SAMPLING_RATE,
     GLOBAL_DTYPE,
     LINE_FREQ,
-    SORTING_PARAMS,
-    SCHEME2_SORTING_PARAMS,
-    WAVEFORM_PARAMS,
 )
 
 __all__ = [
@@ -122,7 +119,5 @@ __all__ = [
     "GLOBAL_SAMPLING_RATE",
     "GLOBAL_DTYPE",
     "LINE_FREQ",
-    "SORTING_PARAMS",
-    "SCHEME2_SORTING_PARAMS",
-    "WAVEFORM_PARAMS",
+
 ]

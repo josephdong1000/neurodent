@@ -17,7 +17,6 @@ Classes
 
    animal_organizer
    window_analysis_result
-   spike_analysis_result
    frequency_domain_spike_analysis_result
    animal_plotter
    experiment_plotter
