@@ -522,7 +522,6 @@ class LongRecordingOrganizer:
         datetimes_are_start: bool = True,
         n_jobs: int = 1,
         recording: "si.BaseRecording" = None,
-        labels: dict = None,
         **kwargs,
     ):
         # Import DiscoveredFile here to avoid circular imports
@@ -551,7 +550,7 @@ class LongRecordingOrganizer:
         self.manual_datetimes = manual_datetimes
         self.datetimes_are_start = datetimes_are_start
         self.n_jobs = n_jobs
-        self.labels = dict(labels) if labels else {}
+        self.labels = {}
 
         self.meta = None
         self.channel_names = None

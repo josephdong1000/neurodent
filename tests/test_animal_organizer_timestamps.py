@@ -11,6 +11,7 @@ This module tests the new timestamp processing system that allows:
 """
 
 import pytest
+import re
 import tempfile
 import pandas as pd
 import numpy as np
@@ -639,9 +640,10 @@ class TestAnimalOrganizerTimestampHandling:
             pattern=str(overlap_dir) + "/WT_{animal}_{session}",
             animal_id=self.animal_id,
             lro_kwargs={"manual_datetimes": folder_timestamps},
+            normalize_session=lambda s: re.sub(r"\(\d+\)$", "", s),
         )
 
-        # With session normalization, folders with (N) suffixes are merged
+        # With normalize_session, folders with (N) suffixes are merged
         # into a single session (overlapping animalday merging)
         assert len(ao.long_recordings) == 1  # Merged into 1 session
         assert len(ao.animaldays) == 1  # 1 unique animalday

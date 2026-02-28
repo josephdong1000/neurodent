@@ -9,6 +9,7 @@ as a single LongRecordingOrganizer, not overwritten.
 """
 
 import pytest
+import re
 import numpy as np
 from unittest.mock import Mock, patch
 from pathlib import Path
@@ -100,8 +101,12 @@ class TestOverlappingAnimaldaysBug:
 
                     mock_lro_class.side_effect = mock_lro_side_effect
 
-                    # Create AnimalOrganizer - overlapping sessions should be merged
-                    ao = results.AnimalOrganizer(animal_id="A10", pattern=f"{temp_path}/WT_{{animal}}_{{session}}/dummy_ColMajor_{{index}}.bin", )
+                    # Create AnimalOrganizer - overlapping sessions should be merged via normalize_session
+                    ao = results.AnimalOrganizer(
+                        animal_id="A10",
+                        pattern=f"{temp_path}/WT_{{animal}}_{{session}}/dummy_ColMajor_{{index}}.bin",
+                        normalize_session=lambda s: re.sub(r"\(\d+\)$", "", s),
+                    )
 
                     # After fix: We expect 1 LRO per unique animalday (not per folder)
                     assert len(ao.long_recordings) == 1, f"Expected 1 merged LRO, got {len(ao.long_recordings)}"
@@ -205,7 +210,11 @@ class TestOverlappingAnimaldaysBug:
                     mock_lro_c.merge = mock_merge
 
                     # Create AnimalOrganizer which should trigger temporal sorting and merging
-                    ao = results.AnimalOrganizer(animal_id="A10", pattern=f"{temp_path}/WT_{{animal}}_{{session}}/dummy_ColMajor_{{index}}.bin", )
+                    ao = results.AnimalOrganizer(
+                        animal_id="A10",
+                        pattern=f"{temp_path}/WT_{{animal}}_{{session}}/dummy_ColMajor_{{index}}.bin",
+                        normalize_session=lambda s: re.sub(r"\(\d+\)$", "", s),
+                    )
 
                     # Verify that we have one merged LRO (overlapping folders)
                     assert len(ao.long_recordings) == 1
@@ -275,7 +284,11 @@ class TestOverlappingAnimaldaysBug:
 
                     mock_lro_class.side_effect = mock_lro_side_effect
 
-                    ao = results.AnimalOrganizer(animal_id="A10", pattern=f"{temp_path}/WT_{{animal}}_{{session}}/dummy_ColMajor_{{index}}.bin", )
+                    ao = results.AnimalOrganizer(
+                        animal_id="A10",
+                        pattern=f"{temp_path}/WT_{{animal}}_{{session}}/dummy_ColMajor_{{index}}.bin",
+                        normalize_session=lambda s: re.sub(r"\(\d+\)$", "", s),
+                    )
 
                     # Should have 2 unique animaldays, not 3 folders
                     assert len(ao.animaldays) == 2

@@ -10,7 +10,7 @@ import warnings
 import dateutil.parser
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Literal, Union, TYPE_CHECKING
+from typing import Callable, Literal, Optional, Union, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .frequency_domain_results import FrequencyDomainSpikeAnalysisResult
@@ -126,6 +126,10 @@ class AnimalOrganizer(AnimalFeatureParser):
         lro_kwargs (dict, optional): Keyword arguments passed to each LongRecordingOrganizer
             instance. Common options include 'mode', 'extract_func', 'manual_datetimes'.
             Defaults to {}.
+        normalize_session (callable | None, optional): A function that transforms session
+            keys before grouping. For example, to merge split-day folders like
+            "2023-01-15", "2023-01-15(1)", "2023-01-15(2)" into one session, pass
+            ``lambda s: re.sub(r"\(\d+\)$", "", s)``. Defaults to None (no normalization).
 
     Attributes:
         pattern (str | list[str]): The file pattern(s) used for discovery.
@@ -166,6 +170,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         truncate: bool | int = False,
         assume_from_number: bool = False,
         lro_kwargs: dict = {},
+        normalize_session: Optional[Callable[[str], str]] = None,
     ) -> None:
         self.pattern = pattern
         self.animal_id = animal_id
@@ -173,6 +178,19 @@ class AnimalOrganizer(AnimalFeatureParser):
         self.animal_file_match_pattern = [animal_id] if animal_id else []
         self.day_sep = None
         self.read_mode = "pattern"  # Legacy compat; new pattern-based discovery
+        self._normalize_session = normalize_session
+
+        # Warn if pattern(s) don't contain placeholders — metadata extraction won't work
+        patterns = [pattern] if isinstance(pattern, (str, Path)) else pattern
+        for p in patterns:
+            if not re.search(r"\{[^}]+\}", str(p)):
+                import warnings
+                warnings.warn(
+                    f"Pattern has no placeholders (e.g., '{{animal}}', '{{session}}'). "
+                    f"Metadata extraction will be limited. Got: '{p}'",
+                    UserWarning,
+                    stacklevel=2,
+                )
 
         from neurodent.core.discovery import FileDiscoverer, MultiFileGroup
 
@@ -193,19 +211,19 @@ class AnimalOrganizer(AnimalFeatureParser):
             animal_val = item.metadata.get("animal", animal_id if animal_id else "unknown")
             path_val = item  # Pass the entire DiscoveredFile object
 
-            # Normalize session by stripping (N) suffixes so overlapping sessions
-            # like "2023-01-15", "2023-01-15(1)", "2023-01-15(2)" get grouped
-            normalized_session = re.sub(r"\(\d+\)$", "", session)
+            # Optionally normalize session keys (e.g., strip "(N)" suffixes)
+            if self._normalize_session is not None:
+                session = self._normalize_session(session)
 
-            if normalized_session in skip_sessions:
+            if session in skip_sessions:
                 continue
 
-            if normalized_session not in self._animalday_folder_groups:
-                self._animalday_folder_groups[normalized_session] = []
-                processed_animaldays.append(f"{animal_val}_{normalized_session}")
+            if session not in self._animalday_folder_groups:
+                self._animalday_folder_groups[session] = []
+                processed_animaldays.append(f"{animal_val}_{session}")
 
             if path_val:
-                self._animalday_folder_groups[normalized_session].append(path_val)
+                self._animalday_folder_groups[session].append(path_val)
 
         if not self._animalday_folder_groups:
             raise ValueError(f"No items discovered for pattern: {pattern}")
@@ -1448,35 +1466,23 @@ class AnimalOrganizer(AnimalFeatureParser):
         from neurodent.core.discovery import DiscoveredFile
         from neurodent import constants
 
-        session_labels = {}
         lro = lan.LongRecording
         item = getattr(lro, "item", None)
 
+        animal = self.animal_id or "unknown"
+        session = "unknown"
+        genotype = self.genotype or "Unknown"
+
         if isinstance(item, DiscoveredFile) and item.metadata:
             meta = item.metadata
-            animal = meta.get("animal", self.animal_id or "unknown")
-            session = meta.get("session", "unknown")
-            genotype = constants.ANIMAL_METADATA.get(animal, {}).get("gene", "Unknown")
-            session_labels = {
-                "animal": animal,
-                "day": session,
-                "genotype": genotype,
-                "animalday": f"{animal} {genotype} {session}",
-            }
+            animal = meta.get("animal", animal)
+            session = meta.get("session", session)
+            genotype = constants.ANIMAL_METADATA.get(animal, {}).get("gene", genotype)
 
-        if not session_labels:
-            # Last-resort fallback: use animal_id and index
-            session_labels = {
-                "animal": self.animal_id or "unknown",
-                "day": "unknown",
-                "genotype": self.genotype or "Unknown",
-                "animalday": f"{self.animal_id or 'unknown'} {self.genotype or 'Unknown'} unknown",
-            }
-
-        row["animalday"] = session_labels["animalday"]
-        row["animal"] = session_labels["animal"]
-        row["day"] = session_labels["day"]
-        row["genotype"] = session_labels["genotype"]
+        row["animalday"] = f"{animal} {genotype} {session}"
+        row["animal"] = animal
+        row["day"] = session
+        row["genotype"] = genotype
         row["duration"] = lan.LongRecording.get_dur_fragment(window_s, idx)
         row["endfile"] = lan.get_file_end(idx)
 
