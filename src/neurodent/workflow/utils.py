@@ -4,6 +4,7 @@ Workflow utility functions.
 This module provides utilities that reduce boilerplate in Snakemake workflow scripts.
 """
 
+import copy
 import logging
 import sys
 from pathlib import Path
@@ -218,8 +219,6 @@ def deep_merge_dict(base: dict, override: dict) -> dict:
     Note:
         This function does NOT mutate the input dictionaries - it returns a new dict.
     """
-    import copy
-
     result = copy.deepcopy(base)
     for key, value in override.items():
         if key in result and isinstance(result[key], dict) and isinstance(value, dict):
@@ -293,8 +292,6 @@ def apply_path_overrides(base_config: dict, overrides: dict) -> dict:
     Note:
         This function does NOT mutate the input config - it returns a new deep copy.
     """
-    import copy
-
     if not overrides:
         return copy.deepcopy(base_config)
 
