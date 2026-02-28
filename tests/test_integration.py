@@ -224,10 +224,6 @@ class TestCoreModuleIntegration:
         assert "psdband" in constants.BAND_FEATURES
         assert "cohere" in constants.MATRIX_FEATURES
 
-        # Test sorting parameters
-        assert "notch_freq" in constants.SORTING_PARAMS
-        assert "common_ref" in constants.SORTING_PARAMS
-
 
 class TestErrorHandlingIntegration:
     """Test error handling across modules."""

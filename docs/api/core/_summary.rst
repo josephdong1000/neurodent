@@ -7,5 +7,4 @@
    LongRecordingOrganizer
    LongRecordingAnalyzer
    FragmentAnalyzer
-   MountainSortAnalyzer
    FrequencyDomainSpikeDetector
