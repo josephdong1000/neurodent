@@ -10,7 +10,19 @@ To run the pipeline, execute the following from the repository root:
 snakemake --configfile config/config.yaml --cores <N>
 ```
 
+Snakemake will automatically detect the main workflow definition at `workflow/Snakefile`.
+
+To use conda for software deployment:
+
+```bash
+snakemake --configfile config/config.yaml --cores <N> --sdm conda
+```
+
 For cluster (SLURM) execution, see the [Snakemake cluster execution documentation](https://snakemake.readthedocs.io/en/stable/executing/cluster.html).
+
+### Local configuration overrides
+
+To customize settings without modifying `config/config.yaml`, create a `config/config.local.yaml` file. Any values in the local config will override the defaults. This file is not tracked by version control and is intended for site-specific settings (e.g., `temp_directory` paths).
 
 ---
 
