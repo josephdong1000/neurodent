@@ -419,7 +419,6 @@ class TestLongRecordingOrganizer:
         """Test initialization with mode=None doesn't load data."""
         organizer = LongRecordingOrganizer(temp_dir, mode=None)
 
-        assert organizer.base_folder_path == Path(temp_dir)
         assert organizer.meta is None
         assert organizer.channel_names is None
         assert organizer.LongRecording is None

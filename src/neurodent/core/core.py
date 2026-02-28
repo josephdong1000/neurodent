@@ -541,14 +541,6 @@ class LongRecordingOrganizer:
             self.data_files = None
             self.item = item
 
-        # Derive base_folder_path from item
-        if isinstance(item, (str, Path)):
-            self.base_folder_path = Path(item)
-        elif isinstance(item, DiscoveredFile) and item.path is not None:
-            self.base_folder_path = Path(item.path)
-        else:
-            self.base_folder_path = None
-
         self.n_truncate = parse_truncate(truncate)
         self.truncate = True if self.n_truncate > 0 else False
         if self.truncate:
@@ -1252,10 +1244,6 @@ class LongRecordingOrganizer:
             if hasattr(self, "file_durations") and self.file_durations:
                 child_lro.file_durations = self.file_durations
                 child_lro.cumulative_file_durations = self.cumulative_file_durations
-
-            # Inherit base_folder_path from parent
-            if hasattr(self, "base_folder_path"):
-                child_lro.base_folder_path = self.base_folder_path
 
             # Inherit bad channels that are present in this split
             if self.bad_channel_names:

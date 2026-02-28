@@ -641,15 +641,10 @@ class TestAnimalOrganizerTimestampHandling:
             lro_kwargs={"manual_datetimes": folder_timestamps},
         )
 
-        # With new pattern-based system, each folder is a separate session
-        # (not merged like in the old system)
-        assert len(ao.long_recordings) == 3  # 3 separate sessions
-        assert len(ao.animaldays) == 3  # 3 separate animaldays
-
-        # Verify all folders were processed with their timestamps
-        assert len(ao._processed_timestamps) == 3
-        for folder_name, expected_time in folder_timestamps.items():
-            assert ao._processed_timestamps[folder_name] == expected_time
+        # With session normalization, folders with (N) suffixes are merged
+        # into a single session (overlapping animalday merging)
+        assert len(ao.long_recordings) == 1  # Merged into 1 session
+        assert len(ao.animaldays) == 1  # 1 unique animalday
 
     @pytest.mark.unit
     def test_resolve_timestamp_input_unit_tests(self):

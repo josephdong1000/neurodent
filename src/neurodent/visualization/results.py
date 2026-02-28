@@ -193,15 +193,20 @@ class AnimalOrganizer(AnimalFeatureParser):
             animal_val = item.metadata.get("animal", animal_id if animal_id else "unknown")
             path_val = item  # Pass the entire DiscoveredFile object
 
-            if session in skip_sessions:
+            # Normalize session by stripping (N) suffixes so overlapping sessions
+            # like "2023-01-15", "2023-01-15(1)", "2023-01-15(2)" get grouped
+            import re as _re
+            normalized_session = _re.sub(r"\(\d+\)$", "", session)
+
+            if normalized_session in skip_sessions:
                 continue
 
-            if session not in self._animalday_folder_groups:
-                self._animalday_folder_groups[session] = []
-                processed_animaldays.append(f"{animal_val}_{session}")
+            if normalized_session not in self._animalday_folder_groups:
+                self._animalday_folder_groups[normalized_session] = []
+                processed_animaldays.append(f"{animal_val}_{normalized_session}")
 
             if path_val:
-                self._animalday_folder_groups[session].append(path_val)
+                self._animalday_folder_groups[normalized_session].append(path_val)
 
         if not self._animalday_folder_groups:
             raise ValueError(f"No items discovered for pattern: {pattern}")
@@ -256,70 +261,18 @@ class AnimalOrganizer(AnimalFeatureParser):
         self.long_recordings: list[core.LongRecordingOrganizer] = []
         self._create_long_recordings(lro_kwargs)
 
-        # Set channel_names from the first LRO
-        if self.long_recordings:
-            self.channel_names = self.long_recordings[0].channel_names or []
-        else:
-            self.channel_names = []
-
-    def _validate_discovery(self, folders, day_parse_kwargs):
-        """
-        Validates discovered folders/files by attempting to parse them.
-        Filters out 'ghost' files that match the glob pattern but do not contain the correct Animal ID.
-
-        When file_match_pattern was explicitly provided, only validates the animal ID match
-        (skipping genotype/date parsing which may not work for joint session filenames).
-        """
-        valid_folders = []
-        for folder in folders:
-            try:
-                if self._has_custom_match_rule:
-                    # Custom match rule: only validate that the file matches the pattern
-                    core.utils.parse_str_to_animal(
-                        Path(folder).name, animal_param=self.animal_file_match_pattern
-                    )
-                else:
-                    # Default: full validation (animal + genotype + date)
-                    core.parse_path_to_animalday(
-                        folder,
-                        animal_param=self.animal_file_match_pattern,
-                        day_sep=self.day_sep,
-                        mode="concat" if self.read_mode == "pattern" else self.read_mode,
-                        **day_parse_kwargs,
-                    )
-                valid_folders.append(folder)
-            except ValueError as e:
-                # Differentiate between "Filtering" (mismatch) and "Parsing Error" (bad config/date)
-                msg = str(e)
-                is_filter_error = (
-                    "No matching ID found" in msg
-                    or "No match found for pattern" in msg
-                    or "does not have any matching values" in msg
-                )
-
-                if is_filter_error:
-                    # This file/folder does not match the animal ID parsing rules (Ghost/Sibling).
-                    logging.warning(
-                        f"file/folder '{Path(folder).name}' captured by glob but failed ID/Genotype validation (mode='{self.read_mode}'). Skipping. Reason: {msg}"
-                    )
-                    continue
-
-                # If we get here, the ID/Genotype matched, but something else failed (likely Date).
-                # This suggests a configuration error or a valid file with a malformed date.
-                # We should NOT silence this.
-                raise ValueError(
-                    f"File '{Path(folder).name}' matched Animal ID/Genotype but failed parsing (likely Date/Config error): {e}"
-                ) from e
-        return valid_folders
+        # Set and validate channel_names across all LROs
+        self.channel_names = self._validate_channel_names(self.long_recordings)
 
     def _get_item_name(self, item):
         """Helper to get a representative name for an item which could be a string, Path, list of strings, or DiscoveredFile."""
         from ..core.discovery import DiscoveredFile
 
         if isinstance(item, DiscoveredFile):
-            if item.is_multi_file:
-                return Path(item.paths[0]).name + "..."
-            return Path(item.path).name
+            paths = item.get_path_list()
+            if len(paths) > 1:
+                return Path(paths[0]).name + "..."
+            return Path(paths[0]).name if paths else "unknown"
         if isinstance(item, (list, tuple)):
             return Path(item[0]).name
         return Path(item).name
@@ -329,9 +282,8 @@ class AnimalOrganizer(AnimalFeatureParser):
         from ..core.discovery import DiscoveredFile
 
         if isinstance(item, DiscoveredFile):
-            if item.is_multi_file:
-                return Path(item.paths[0]).is_file()
-            return Path(item.path).is_file()
+            paths = item.get_path_list()
+            return Path(paths[0]).is_file() if paths else False
         if isinstance(item, (list, tuple)):
             return Path(item[0]).is_file()
         return Path(item).is_file()
@@ -1493,18 +1445,34 @@ class AnimalOrganizer(AnimalFeatureParser):
     ):
         row = {}
 
-        # The session labels (animal, day, genotype) are formally attached to the LongRecording object
-        session_labels = getattr(lan.LongRecording, "labels", {})
+        # Build session labels from LRO's DiscoveredFile metadata
+        from neurodent.core.discovery import DiscoveredFile
+        from neurodent import constants
 
-        # Fallback for old recordings without formal labels
+        session_labels = {}
+        lro = lan.LongRecording
+        item = getattr(lro, "item", None)
+
+        if isinstance(item, DiscoveredFile) and item.metadata:
+            meta = item.metadata
+            animal = meta.get("animal", self.animal_id or "unknown")
+            session = meta.get("session", "unknown")
+            genotype = constants.ANIMAL_METADATA.get(animal, {}).get("gene", "Unknown")
+            session_labels = {
+                "animal": animal,
+                "day": session,
+                "genotype": genotype,
+                "animalday": f"{animal} {genotype} {session}",
+            }
+
         if not session_labels:
-            lan_folder = lan.LongRecording.base_folder_path
-            session_labels = core.parse_path_to_animalday(
-                lan_folder,
-                animal_param=self.animal_file_match_pattern,
-                day_sep=self.day_sep,
-                mode="concat" if self.read_mode == "pattern" else self.read_mode,
-            )
+            # Last-resort fallback: use animal_id and index
+            session_labels = {
+                "animal": self.animal_id or "unknown",
+                "day": "unknown",
+                "genotype": self.genotype or "Unknown",
+                "animalday": f"{self.animal_id or 'unknown'} {self.genotype or 'Unknown'} unknown",
+            }
 
         row["animalday"] = session_labels["animalday"]
         row["animal"] = session_labels["animal"]

@@ -41,12 +41,16 @@ class DiscoveredFile(os.PathLike):
         """Return the file-system path string.
 
         For single-file discoveries returns ``self.path``.
-        For multi-file discoveries returns the first path in ``self.paths``.
+        For multi-file discoveries raises TypeError because the representation
+        is ambiguous – use ``.paths`` or ``.get_path_list()`` instead.
         """
         if self.path is not None:
             return self.path
-        if self.paths is not None and len(self.paths) > 0:
-            return self.paths[0]
+        if self.paths is not None:
+            raise TypeError(
+                "Multi-file DiscoveredFile cannot be converted to a single path. "
+                "Use .paths or .get_path_list() instead."
+            )
         raise TypeError("DiscoveredFile has no path to return")
 
     # -- dict-style backward compatibility ------------------------------------

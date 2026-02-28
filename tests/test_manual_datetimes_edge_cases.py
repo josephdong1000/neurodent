@@ -42,7 +42,7 @@ class TestManualDatetimesEdgeCases:
         return mock_lro
 
     @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
-    @patch("glob.glob")
+    @patch("neurodent.core.discovery.glob.glob")
     def test_mixed_bag_configuration(self, mock_glob, mock_lro_class):
         """
         Test Case 3: The 'Mixed Bag'.
@@ -64,7 +64,7 @@ class TestManualDatetimesEdgeCases:
 
         # Run for A123
         ao = results.AnimalOrganizer(
-            pattern=f"{self.base_path}/*{self.animal_id}*",
+            pattern=f"{self.base_path}/WT_{{animal}}_{{session}}",
             animal_id=self.animal_id,  # "A123"
             lro_kwargs={"manual_datetimes": mixed_config},
         )
@@ -75,7 +75,7 @@ class TestManualDatetimesEdgeCases:
         )
 
     @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
-    @patch("glob.glob")
+    @patch("neurodent.core.discovery.glob.glob")
     def test_shadowing_trap_error(self, mock_glob, mock_lro_class):
         """
         Test Case 4: The 'Shadowing Trap'.
@@ -99,7 +99,7 @@ class TestManualDatetimesEdgeCases:
         # and the flat key providing it is ignored.
         with pytest.raises(ValueError) as exc_info:
             results.AnimalOrganizer(
-                pattern=f"{self.base_path}/*{self.animal_id}*",
+                pattern=f"{self.base_path}/WT_{{animal}}_{{session}}",
                 animal_id=self.animal_id,
                 lro_kwargs={"manual_datetimes": shadowing_config},
             )
