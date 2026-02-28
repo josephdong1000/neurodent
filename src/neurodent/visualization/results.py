@@ -155,11 +155,13 @@ class AnimalOrganizer(AnimalFeatureParser):
         file_pattern: str | None = None,
         lro_kwargs: dict = {},
         day_parse_kwargs: dict = {},
+        animal_file_match_pattern: list[str] | str | tuple | None = None,
     ) -> None:
 
         self.base_folder_path = Path(base_folder_path)
         self.animal_id = animal_id
-        self.animal_param = [animal_id]
+        self._has_custom_match_rule = animal_file_match_pattern is not None
+        self.animal_file_match_pattern = animal_file_match_pattern if animal_file_match_pattern is not None else [animal_id]
         self.day_sep = day_sep
         self.read_mode = mode
         self.assume_from_number = assume_from_number
@@ -232,16 +234,38 @@ class AnimalOrganizer(AnimalFeatureParser):
                 f"No directories found for animal ID {self.animal_id} (pattern: {self.bin_folder_pattern})"
             )
 
-        self._animalday_dicts = [
-            core.parse_path_to_animalday(
-                e,
-                animal_param=self.animal_param,
-                day_sep=self.day_sep,
-                mode=self.read_mode,
-                **day_parse_kwargs,
-            )
-            for e in self._bin_folders
-        ]
+        if self._has_custom_match_rule:
+            # Custom match rule (e.g. joint sessions): filenames don't follow
+            # standard genotype_animal_date format, so we use the known animal_id
+            # and resolve genotype from ANIMAL_METADATA, parsing only the date.
+            geno = constants.ANIMAL_METADATA.get(self.animal_id, {}).get("gene", "Unknown")
+            self._animalday_dicts = []
+            for e in self._bin_folders:
+                fp = Path(e)
+                name = fp.parent.name if self.read_mode == "nest" else fp.name
+                if self.read_mode == "noday":
+                    day = constants.DEFAULT_DAY.strftime("%b-%d-%Y")
+                else:
+                    day = core.utils.parse_str_to_day(
+                        name, sep=self.day_sep, **day_parse_kwargs
+                    ).strftime("%b-%d-%Y")
+                self._animalday_dicts.append({
+                    "animal": self.animal_id,
+                    "genotype": geno,
+                    "day": day,
+                    "animalday": f"{self.animal_id} {geno} {day}",
+                })
+        else:
+            self._animalday_dicts = [
+                core.parse_path_to_animalday(
+                    e,
+                    animal_param=self.animal_file_match_pattern,
+                    day_sep=self.day_sep,
+                    mode=self.read_mode,
+                    **day_parse_kwargs,
+                )
+                for e in self._bin_folders
+            ]
 
         # Group folders by parsed animalday to handle overlapping days
         animalday_to_folders = {}
@@ -309,34 +333,44 @@ class AnimalOrganizer(AnimalFeatureParser):
         """
         Validates discovered folders/files by attempting to parse them.
         Filters out 'ghost' files that match the glob pattern but do not contain the correct Animal ID.
+
+        When file_match_pattern was explicitly provided, only validates the animal ID match
+        (skipping genotype/date parsing which may not work for joint session filenames).
         """
         valid_folders = []
         for folder in folders:
             try:
-                core.parse_path_to_animalday(
-                    folder,
-                    animal_param=self.animal_param,
-                    day_sep=self.day_sep,
-                    mode=self.read_mode,
-                    **day_parse_kwargs,
-                )
+                if self._has_custom_match_rule:
+                    # Custom match rule: only validate that the file matches the pattern
+                    core.utils.parse_str_to_animal(
+                        Path(folder).name, animal_param=self.animal_file_match_pattern
+                    )
+                else:
+                    # Default: full validation (animal + genotype + date)
+                    core.parse_path_to_animalday(
+                        folder,
+                        animal_param=self.animal_file_match_pattern,
+                        day_sep=self.day_sep,
+                        mode=self.read_mode,
+                        **day_parse_kwargs,
+                    )
                 valid_folders.append(folder)
             except ValueError as e:
                 # Differentiate between "Filtering" (mismatch) and "Parsing Error" (bad config/date)
                 msg = str(e)
                 is_filter_error = (
-                    "No matching ID found" in msg 
+                    "No matching ID found" in msg
                     or "No match found for pattern" in msg
                     or "does not have any matching values" in msg
                 )
-                
+
                 if is_filter_error:
                     # This file/folder does not match the animal ID parsing rules (Ghost/Sibling).
                     logging.warning(
                         f"file/folder '{Path(folder).name}' captured by glob but failed ID/Genotype validation (mode='{self.read_mode}'). Skipping. Reason: {msg}"
                     )
                     continue
-                
+
                 # If we get here, the ID/Genotype matched, but something else failed (likely Date).
                 # This suggests a configuration error or a valid file with a malformed date.
                 # We should NOT silence this.
@@ -1612,7 +1646,7 @@ class AnimalOrganizer(AnimalFeatureParser):
             lan_folder = lan.LongRecording.base_folder_path
             session_labels = core.parse_path_to_animalday(
                 lan_folder,
-                animal_param=self.animal_param,
+                animal_param=self.animal_file_match_pattern,
                 day_sep=self.day_sep,
                 mode=self.read_mode,
             )
@@ -1803,6 +1837,12 @@ class AnimalOrganizer(AnimalFeatureParser):
         """
         Validate that all LROs have consistent channel names.
 
+        Compares abbreviated channel names (via ``parse_chname_to_abbrev``)
+        so that cosmetic variants like ``L Barrel`` vs ``L Barrel Ctx`` are
+        treated as equivalent. If raw names differ but abbreviations match,
+        the mismatched LRO's channel names are renamed to match the reference
+        LRO's raw names for downstream consistency.
+
         If channel names are the same but in different order, the first LRO's
         order is used as reference.
 
@@ -1810,10 +1850,10 @@ class AnimalOrganizer(AnimalFeatureParser):
             lros: List of LROs to validate.
 
         Returns:
-            list[str]: The canonical channel names.
+            list[str]: The canonical channel names (from the first LRO).
 
         Raises:
-            ValueError: If LROs have different channel sets.
+            ValueError: If LROs have different abbreviated channel sets.
         """
         if not lros:
             return []
@@ -1822,22 +1862,45 @@ class AnimalOrganizer(AnimalFeatureParser):
         if not first_names:
             return []
 
-        reference_set = set(first_names)
+        def _abbreviate(names: list[str]) -> list[str]:
+            result = []
+            for n in names:
+                try:
+                    result.append(core.parse_chname_to_abbrev(n, strict_matching=False))
+                except ValueError:
+                    result.append(n)  # Fall back to raw name if parsing fails
+            return result
+
+        reference_abbrevs = _abbreviate(first_names)
+        reference_set = set(reference_abbrevs)
+        # Map abbreviation -> canonical raw name from first LRO
+        abbrev_to_raw = dict(zip(reference_abbrevs, first_names))
 
         for i, lro in enumerate(lros[1:], start=1):
             current_names = lro.channel_names if lro.channel_names else []
-            current_set = set(current_names)
+            current_abbrevs = _abbreviate(current_names)
+            current_set = set(current_abbrevs)
 
             if current_set != reference_set:
                 missing = reference_set - current_set
                 extra = current_set - reference_set
                 raise ValueError(
                     f"LRO {i} has inconsistent channel names. "
-                    f"Missing: {missing}, Extra: {extra}"
+                    f"Abbreviated missing: {missing}, Extra: {extra}"
                 )
 
+            # If raw names differ but abbreviations match, rename to reference
+            if set(current_names) != set(first_names):
+                renamed = [abbrev_to_raw[a] for a in current_abbrevs]
+                logging.warning(
+                    f"LRO {i} has variant channel names "
+                    f"({current_names} vs {first_names}), "
+                    f"renaming to reference names: {renamed}"
+                )
+                lro.channel_names = renamed
+
             # If same channels but different order, log a warning
-            if current_names != first_names:
+            if lro.channel_names != first_names:
                 logging.warning(
                     f"LRO {i} has channels in different order, using reference order"
                 )
@@ -1882,7 +1945,7 @@ class AnimalOrganizer(AnimalFeatureParser):
             ao.base_folder_path = None
 
         # Standard attributes
-        ao.animal_param = [animal_id]
+        ao.animal_file_match_pattern = [animal_id]
         ao.day_sep = None
         ao.read_mode = "base"
 

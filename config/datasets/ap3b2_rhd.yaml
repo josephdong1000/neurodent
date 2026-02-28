@@ -1,0 +1,16 @@
+# AP3B2 Project - RHD Format (Raw Intan Files)
+# Dataset-specific configuration overrides
+# This file is deep-merged into the main config when active_dataset="ap3b2_rhd"
+
+samples:
+  samples_file: "config/samples_jess_rhd.json"
+
+analysis:
+  war_generation:
+    mode: "base"  # Read files from session folder directly (not per-animal subdirs)
+    file_pattern: "*.rhd"
+    lro_kwargs:
+      extract_func: "read_intan"  # spikeinterface.extractors.read_intan
+      input_type: "files"  # Multiple RHD files in folder get concatenated
+      mode: "si"
+      stream_id: "0"  # Select amplifier channels (not auxiliary)

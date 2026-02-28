@@ -277,6 +277,47 @@ class TestFrequencyDomainSpikeAnalysisResult:
             if sum(counts.values()) > 0:
                 assert len(saved_files) > 0
 
+    def test_plot_spike_averaged_traces_empty_epochs(self, detection_params):
+        """Test that plot_spike_averaged_traces handles empty epochs gracefully.
+
+        When spike annotations are at recording edges, the epoch window may
+        extend beyond the recording, causing MNE to drop all epochs. The method
+        should log a warning and continue instead of raising.
+        """
+        n_channels = 2
+        fs = 1000.0
+        duration = 1.0  # Short recording
+        n_samples = int(duration * fs)
+
+        info = mne.create_info(ch_names=[f"ch{i}" for i in range(n_channels)], sfreq=fs, ch_types="eeg")
+        data = np.random.randn(n_channels, n_samples) * 0.1
+        raw = mne.io.RawArray(data, info)
+
+        # Place spikes at the very start (index 0) so epoch window extends
+        # before recording start, causing MNE to drop all epochs
+        annotations = mne.Annotations(
+            onset=[0.0, 0.0],
+            duration=[0.0, 0.0],
+            description=["Spike_Ch0", "Spike_Ch1"],
+        )
+        raw.set_annotations(annotations)
+
+        fdsar = FrequencyDomainSpikeAnalysisResult(
+            result_mne=raw,
+            detection_params=detection_params,
+            channel_names=raw.ch_names,
+        )
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=RuntimeWarning)
+
+            # Use a wide window so epochs are dropped (tmin=-0.5 extends before t=0)
+            counts = fdsar.plot_spike_averaged_traces(tmin=-0.5, tmax=0.5)
+
+        # Should return without raising
+        assert isinstance(counts, dict)
+        assert len(counts) == n_channels
+
     def test_convert_to_mne(self, mock_sorting_analyzer, detection_params):
         """Test conversion to MNE format."""
         fdsar = FrequencyDomainSpikeAnalysisResult(

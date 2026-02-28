@@ -11,25 +11,89 @@ This pipeline processes raw EEG data through multiple analysis stages:
 
 from pathlib import Path
 import pandas as pd
-
-
-# Load configuration
-configfile: "config/config.yaml"
-
-# Load local override if it exists
-if os.path.exists("config/config.local.yaml"):
-    configfile: "config/config.local.yaml"
-
-
-samples_file = config["samples"]["samples_file"]
-
-
-# Load sample definitions
 import json
 import re
 import os
 import sys
 import glob
+
+# Import workflow utilities
+from neurodent.workflow.utils import deep_merge_dict
+
+
+# Load configuration
+configfile: "config/config.yaml"
+
+# Load local override if it exists (skip if file is empty/comment-only)
+if os.path.exists("config/config.local.yaml"):
+    import yaml as _yaml
+    with open("config/config.local.yaml") as _f:
+        _local_config = _yaml.safe_load(_f)
+    if isinstance(_local_config, dict):
+        configfile: "config/config.local.yaml"
+
+
+# Apply dataset-specific configuration
+active_dataset = os.environ.get("NEURODENT_DATASET", config.get("active_dataset", "sox5_bin"))
+dataset_config_file = f"config/datasets/{active_dataset}.yaml"
+
+if os.path.exists(dataset_config_file):
+    # Load dataset-specific config from file
+    import yaml
+    with open(dataset_config_file, 'r') as f:
+        dataset_config = yaml.safe_load(f) or {}
+
+    # Deep merge dataset config into main config
+    # This allows datasets to override ANY configuration, not just specific keys
+    config = deep_merge_dict(config, dataset_config)
+
+    # Report dataset configuration in user-readable format
+    def format_config_value(value, indent=4):
+        """Format a config value for display (handles nested dicts, lists, etc.)."""
+        spaces = " " * indent
+        if isinstance(value, dict):
+            if not value:
+                return "{}"
+            lines = []
+            for k, v in value.items():
+                formatted_val = format_config_value(v, indent + 2)
+                if "\n" in formatted_val:
+                    lines.append(f"{spaces}{k}:")
+                    lines.append(formatted_val)
+                else:
+                    lines.append(f"{spaces}{k}: {formatted_val}")
+            return "\n".join(lines)
+        elif isinstance(value, list):
+            if not value:
+                return "[]"
+            return f"[{', '.join(repr(v) for v in value)}]"
+        elif isinstance(value, str):
+            return f'"{value}"'
+        elif value is None:
+            return "null"
+        else:
+            return str(value)
+
+    print(f"✓ Using dataset: {active_dataset}")
+    print(f"  Config file: {dataset_config_file}")
+    print(f"\n  Dataset configuration overrides:")
+    print(format_config_value(dataset_config, indent=4))
+    print()
+else:
+    # List available datasets by scanning config/datasets/ directory
+    available_datasets = []
+    if os.path.exists("config/datasets"):
+        available_datasets = [f.replace('.yaml', '') for f in os.listdir("config/datasets") if f.endswith('.yaml')]
+
+    raise FileNotFoundError(
+        f"Dataset config file not found: {dataset_config_file}\n"
+        f"Available datasets: {', '.join(available_datasets) if available_datasets else 'None'}"
+    )
+
+samples_file = config["samples"]["samples_file"]
+
+
+# Load sample definitions
 from datetime import datetime
 from django.utils.text import slugify
 
@@ -257,18 +321,17 @@ include: "workflow/rules/notebook.smk"
 
 rule all:
     input:
-        # Pipeline visualization
-        'results/graphs/rulegraph.png',
-        'results/graphs/filegraph.png',
-        'results/graphs/dag.png',
-
+        # Pipeline visualization (run `snakemake graphs` separately — nested snakemake hits directory lock)
+        # 'results/graphs/rulegraph.png',
+        # 'results/graphs/filegraph.png',
+        # 'results/graphs/dag.png',
         # WAR generation and prefiltering (includes spike detection)
         expand("results/wars_quality_filtered/{animal}", animal=ANIMALS),
 
         # FDSAR spike detection diagnostics
-        # expand("results/fdsar_diagnostics/{animal}", animal=ANIMALS), # FIXME this crashes my VDI - perhaps a logic issue
+        expand("results/fdsar_diagnostics/{animal}", animal=ANIMALS), # FIXME this crashes my VDI - perhaps a logic issue
+        
         # WAR per-animal diagnostic plots (unfiltered)
-        # NOTE also trigger fragment filtering + diagnostic figures filter unfiltered
         get_diagnostic_figures_unfiltered,
 
         # WAR per-animal diagnostic plots (filtered)
@@ -314,6 +377,8 @@ rule filegraph:
 rule dag:
     output: "results/graphs/dag.png"
     shell: "snakemake --dag --forceall | dot -Tpng > {output}"
+
+localrules: graphs, rulegraph, filegraph, dag
 
 
 

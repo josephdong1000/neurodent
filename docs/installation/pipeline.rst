@@ -102,3 +102,11 @@ If you want to change the analysis sampling rate but keep all other settings:
      sampling_rate: 2000
 
 The ``config/config.local.yaml`` file is included in ``.gitignore`` and will not be pushed to the repository.
+
+Next Steps
+----------
+
+For detailed pipeline configuration guides:
+
+- **Snakemake Setup**: See :doc:`../quickstart/snakemake_setup` for running the pipeline, SLURM configuration, and workflow commands
+- **Dataset Configuration**: See :doc:`../quickstart/dataset_configuration` for switching between datasets and file formats

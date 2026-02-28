@@ -14,6 +14,9 @@ import logging
 import warnings
 from pathlib import Path
 
+import matplotlib
+matplotlib.use("Agg")
+
 from neurodent.visualization.frequency_domain_results import FrequencyDomainSpikeAnalysisResult
 from neurodent.workflow import setup_snakemake_logging, inject_config_aliases
 
