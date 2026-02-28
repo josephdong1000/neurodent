@@ -34,7 +34,7 @@ if os.path.exists("config/config.local.yaml"):
 
 
 # Apply dataset-specific configuration
-active_dataset = os.environ.get("NEURODENT_DATASET", config.get("active_dataset", "sox5_nwb"))
+active_dataset = os.environ.get("NEURODENT_DATASET", config.get("active_dataset", "sox5_bin"))
 dataset_config_file = f"config/datasets/{active_dataset}.yaml"
 
 if os.path.exists(dataset_config_file):
