@@ -183,8 +183,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         # Warn if pattern(s) don't contain placeholders — metadata extraction won't work
         patterns = [pattern] if isinstance(pattern, (str, Path)) else pattern
         for p in patterns:
-            if not re.search(r"\{[^}]+\}", str(p)):
-                import warnings
+            if not re.search(r"\{\w+\}", str(p)):
                 warnings.warn(
                     f"Pattern has no placeholders (e.g., '{{animal}}', '{{session}}'). "
                     f"Metadata extraction will be limited. Got: '{p}'",
@@ -229,7 +228,6 @@ class AnimalOrganizer(AnimalFeatureParser):
             raise ValueError(f"No items discovered for pattern: {pattern}")
 
         if truncate:
-            import warnings
             from neurodent import core
 
             truncate = core.utils.parse_truncate(truncate)
