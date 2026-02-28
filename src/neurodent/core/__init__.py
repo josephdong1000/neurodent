@@ -92,6 +92,7 @@ from .zeitgeber import (
     transform_time_axis,
 )
 from . import utils
+from . import discovery
 
 __all__ = [
     # Data loading
