@@ -233,20 +233,27 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
 
         return sorting_analyzers
 
-    def convert_to_mne(self, chunk_len: float = 60, save_raw=True) -> mne.io.RawArray:
+    def convert_to_mne(
+        self, chunk_len: float = 60, save_raw=True,
+        multiprocess_mode: Literal["dask", "serial"] = "serial",
+    ) -> mne.io.RawArray:
         """
         Convert SortingAnalyzers to MNE RawArray.
 
         Args:
             chunk_len: Chunk length for processing (compatibility parameter)
             save_raw: Whether to save the result internally
+            multiprocess_mode: Whether to use Dask for parallel per-channel conversion.
+                Defaults to "serial".
 
         Returns:
             mne.io.RawArray: MNE RawArray with spike annotations
         """
         if self.result_mne is None:
             if self.result_sas:
-                result_mne = FrequencyDomainSpikeAnalysisResult.convert_sas_to_mne(self.result_sas, chunk_len)
+                result_mne = FrequencyDomainSpikeAnalysisResult.convert_sas_to_mne(
+                    self.result_sas, chunk_len, multiprocess_mode=multiprocess_mode,
+                )
                 if save_raw:
                     self.result_mne = result_mne
                 else:
@@ -263,6 +270,7 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
         slugify_filebase=True,
         save_abbrevs_as_chnames=False,
         overwrite=False,
+        multiprocess_mode: Literal["dask", "serial"] = "serial",
     ):
         """
         Archive frequency domain spike analysis result as fif and json files.
@@ -275,10 +283,14 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
             slugify_filebase: If True, slugify the filename base
             save_abbrevs_as_chnames: If True, save abbreviations as channel names
             overwrite: If True, overwrite existing files
+            multiprocess_mode: Whether to use Dask for parallel conversion.
+                Defaults to "serial".
         """
         if self.result_mne is None:
             if convert_to_mne and self.result_sas:
-                result_mne = self.convert_to_mne(save_raw=True)
+                result_mne = self.convert_to_mne(
+                    save_raw=True, multiprocess_mode=multiprocess_mode,
+                )
                 if result_mne is None:
                     warnings.warn("No data found for saving")
                     return
