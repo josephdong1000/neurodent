@@ -230,7 +230,7 @@ class TestConvertDdfcolbinToDdfrowbin:
         colbin_path.touch()
 
         with pytest.raises(
-            AssertionError, match="Metadata needs to be of type DDFBinaryMetadata"
+            AssertionError, match="Metadata needs to be of type RecordingMetadata"
         ):
             convert_ddfcolbin_to_ddfrowbin(
                 temp_dir, colbin_path, "not_metadata", save_gzip=True
@@ -348,7 +348,7 @@ class TestConvertDdfrowbinToSi:
         rowbin_path = temp_dir / "test.npy.gz"
 
         with pytest.raises(
-            AssertionError, match="Metadata needs to be of type DDFBinaryMetadata"
+            AssertionError, match="Metadata needs to be of type RecordingMetadata"
         ):
             convert_ddfrowbin_to_si(rowbin_path, "not_metadata")
 
@@ -575,7 +575,7 @@ class TestLongRecordingOrganizer:
         organizer = LongRecordingOrganizer(temp_dir, mode=None)
 
         with pytest.raises(ValueError, match="Invalid mode: invalid"):
-            organizer.detect_and_load_data()
+            organizer.detect_and_load_data(mode="invalid")
 
     def test_get_datetime_fragment(self, temp_dir):
         """Test get_datetime_fragment method."""
@@ -859,8 +859,8 @@ class TestLongRecordingOrganizer:
             organizer.item = [str(file1), str(file2)]
             organizer.convert_file_with_si_to_recording(extract_func=mock_extract)
 
-        # Should call extract three times (1 list try + 2 single tries)
-        assert mock_extract.call_count == 3
+        # Should call extract twice (once per file in serial mode)
+        assert mock_extract.call_count == 2
         assert organizer.LongRecording == mock_concat_rec
 
     def test_convert_file_with_mne_to_recording_edf_intermediate(self, temp_dir):
@@ -976,11 +976,11 @@ class TestLongRecordingOrganizer:
         with patch("spikeinterface.extractors.read_binary", return_value=mock_si_rec):
             organizer.item = str(test_file)
             organizer.convert_file_with_mne_to_recording(
-                extract_func=mock_extract, intermediate="mne"
+                extract_func=mock_extract, intermediate="bin"
             )
 
         # Verify binary file was created and read
-        bin_file = temp_dir / f"{temp_dir.name}_mne-to-rec.bin"
+        bin_file = temp_dir / "test_mne-to-rec.bin"
         assert bin_file.exists()
 
         # Verify data was written correctly (transposed from MNE format)
@@ -1185,7 +1185,7 @@ class TestLongRecordingOrganizer:
 
             # Should log that no resampling is needed
             mock_logging.info.assert_called_with(
-                f"Recording already at target sampling rate ({constants.GLOBAL_SAMPLING_RATE} Hz), no resampling needed"
+                f"Recording already at target sampling rate ({constants.GLOBAL_SAMPLING_RATE} Hz) or unable to determine, no resampling needed"
             )
 
 
