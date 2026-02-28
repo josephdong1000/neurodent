@@ -119,5 +119,4 @@ __all__ = [
     "GLOBAL_SAMPLING_RATE",
     "GLOBAL_DTYPE",
     "LINE_FREQ",
-
 ]
