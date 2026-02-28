@@ -54,7 +54,37 @@ from .utils import (
 )
 
 
-class DDFBinaryMetadata:
+class RecordingMetadata:
+    """Stores metadata information for neural recordings.
+
+    This class handles recording metadata including channel information, sampling rates,
+    timestamps, and voltage units. It can be initialized either from a CSV metadata file
+    (for backward compatibility with DDF binary format) or directly from parameters.
+
+    Attributes:
+        metadata_path (str | Path | None): Path to metadata CSV file if loaded from file
+        metadata_df (pd.DataFrame | None): DataFrame containing metadata if loaded from file
+        n_channels (int): Number of channels in the recording
+        f_s (float): Sampling frequency in Hz
+        V_units (str | None): Voltage units (e.g., 'µV', 'mV', 'V')
+        mult_to_uV (float | None): Multiplication factor to convert to microvolts
+        precision (str | None): Data precision/dtype (e.g., 'float32', 'int16')
+        dt_end (datetime | None): End datetime of recording
+        channel_names (list[str]): List of channel names
+
+    Examples:
+        From parameters:
+        >>> meta = RecordingMetadata(
+        ...     None,
+        ...     n_channels=4,
+        ...     f_s=1000.0,
+        ...     dt_end=datetime(2023, 1, 1),
+        ...     channel_names=['ch1', 'ch2', 'ch3', 'ch4']
+        ... )
+
+        From CSV file:
+        >>> meta = RecordingMetadata('/path/to/metadata.csv')
+    """
     def __init__(
         self,
         metadata_path: str | Path | None,
@@ -66,16 +96,20 @@ class DDFBinaryMetadata:
         V_units: str | None = None,
         mult_to_uV: float | None = None,
     ) -> None:
-        """Initialize DDFBinaryMetadata either from a file path or direct parameters.
+        """Initialize RecordingMetadata either from a file path or direct parameters.
 
         Args:
-            metadata_path (str, optional): Path to metadata CSV file. If provided, other parameters are ignored.
-            n_channels (int, optional): Number of channels
+            metadata_path (str | Path | None): Path to metadata CSV file. If provided,
+                other parameters are ignored and metadata is loaded from the file.
+            n_channels (int, optional): Number of channels in the recording
             f_s (float, optional): Sampling frequency in Hz
             dt_end (datetime, optional): End datetime of recording
-            channel_names (list, optional): List of channel names
+            channel_names (list[str], optional): List of channel names
             V_units (str, optional): Voltage units (e.g., 'µV', 'mV', 'V')
             mult_to_uV (float, optional): Multiplication factor to convert to microvolts
+
+        Raises:
+            ValueError: If metadata_path is None and required parameters are missing
         """
         if metadata_path is not None:
             self._init_from_path(metadata_path)
@@ -139,7 +173,7 @@ class DDFBinaryMetadata:
         return vals.iloc[0]
 
     def to_dict(self) -> dict:
-        """Convert DDFBinaryMetadata to a dictionary for JSON serialization."""
+        """Convert RecordingMetadata to a dictionary for JSON serialization."""
         return {
             "metadata_path": str(self.metadata_path) if self.metadata_path else None,
             "n_channels": self.n_channels,
@@ -152,8 +186,8 @@ class DDFBinaryMetadata:
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> "DDFBinaryMetadata":
-        """Create DDFBinaryMetadata from a dictionary (from JSON deserialization)."""
+    def from_dict(cls, data: dict) -> "RecordingMetadata":
+        """Create RecordingMetadata from a dictionary (from JSON deserialization)."""
         dt_end = datetime.fromisoformat(data["dt_end"]) if data["dt_end"] else None
 
         return cls(
@@ -167,13 +201,13 @@ class DDFBinaryMetadata:
         )
 
     def to_json(self, file_path: Path) -> None:
-        """Save DDFBinaryMetadata to a JSON file."""
+        """Save RecordingMetadata to a JSON file."""
         with open(file_path, "w") as f:
             json.dump(self.to_dict(), f, indent=2)
 
     @classmethod
-    def from_json(cls, file_path: Path) -> "DDFBinaryMetadata":
-        """Load DDFBinaryMetadata from a JSON file."""
+    def from_json(cls, file_path: Path) -> "RecordingMetadata":
+        """Load RecordingMetadata from a JSON file."""
         with open(file_path, "r") as f:
             data = json.load(f)
 
@@ -195,16 +229,33 @@ class DDFBinaryMetadata:
         old_f_s = self.f_s
         self.f_s = new_f_s
         logging.info(
-            f"Updated DDFBinaryMetadata sampling rate from {old_f_s} Hz to {new_f_s} Hz"
+            f"Updated RecordingMetadata sampling rate from {old_f_s} Hz to {new_f_s} Hz"
         )
+
+
+# Deprecated: Keep DDFBinaryMetadata for backward compatibility
+class DDFBinaryMetadata(RecordingMetadata):
+    """Deprecated: Use RecordingMetadata instead.
+
+    This class is maintained for backward compatibility but will be removed in a future version.
+    The name DDFBinaryMetadata is no longer appropriate as the pipeline moves beyond
+    DDF binary files with metadata sidecars.
+    """
+    def __init__(self, *args, **kwargs):
+        warnings.warn(
+            "DDFBinaryMetadata is deprecated. Use RecordingMetadata instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        super().__init__(*args, **kwargs)
 
 
 def convert_ddfcolbin_to_ddfrowbin(rowdir_path, colbin_path, metadata, save_gzip=True):
     # TODO consider renaming this function to something more descriptive, like convert_colbin_to_rowbin
     # Also don't use the rowdir_path parameter, since this is outside the scope of the function. See utils.convert_colpath_to_rowpath
     assert isinstance(
-        metadata, DDFBinaryMetadata
-    ), "Metadata needs to be of type DDFBinaryMetadata"
+        metadata, RecordingMetadata
+    ), "Metadata needs to be of type RecordingMetadata"
 
     tempbin = np.fromfile(colbin_path, dtype=metadata.precision)
     tempbin = np.reshape(tempbin, (-1, metadata.n_channels), order="F")
@@ -227,7 +278,7 @@ def convert_ddfrowbin_to_si(bin_rowmajor_path, metadata):
 
     Args:
         bin_rowmajor_path (str): Path to the row-major binary file
-        metadata (DDFBinaryMetadata): Metadata object containing information about the recording
+        metadata (RecordingMetadata): Metadata object containing information about the recording
 
     Returns:
         tuple: A tuple containing:
@@ -237,8 +288,8 @@ def convert_ddfrowbin_to_si(bin_rowmajor_path, metadata):
     if se is None:
         raise ImportError("SpikeInterface is required for convert_ddfrowbin_to_si")
     assert isinstance(
-        metadata, DDFBinaryMetadata
-    ), "Metadata needs to be of type DDFBinaryMetadata"
+        metadata, RecordingMetadata
+    ), "Metadata needs to be of type RecordingMetadata"
 
     bin_rowmajor_path = Path(bin_rowmajor_path)
     params = {
@@ -413,32 +464,38 @@ def split_recording(
 
 class LongRecordingOrganizer:
     """
-    Construct a long recording from binary files, EDF files, or an existing recording object.
+    Construct a long recording from various file formats or an existing recording object.
 
     Args:
-        base_folder_path (str | None): Path to the base folder containing the data files.
-            Set to None when initializing from an existing recording object.
-        mode (Literal['bin', 'si', 'mne', None], optional): Mode to load data in. Defaults to 'bin'.
-        truncate (bool | int, optional): If True, truncate data to first 10 files. If an integer, truncate data to the first n files. Defaults to False.
-        cache_policy (Literal['auto', 'always', 'force_regenerate'], optional): Cache policy for intermediate files. Defaults to 'auto'.
-        multiprocess_mode (Literal['dask', 'serial'], optional): Processing mode for parallel operations. Defaults to 'serial'.
-        extract_func (Literal[Callable, str], optional): Function to extract data when using 'si' or 'mne' mode. Required for those modes.
-        input_type (Literal['folder', 'file', 'files'], optional): Type of input processing. Defaults to 'folder'.
-        file_pattern (str, optional): Pattern to match files when using 'file' or 'files' input type.
-        manual_datetimes (datetime | list[datetime] | Callable, optional): Manually provided timestamps.
+        item (str | Path | list[str] | MultiFileGroup | None): Input data specification.
+            - str/Path: Single file or directory path
+            - list[str]: Multiple files to concatenate
+            - MultiFileGroup: Multiple files that should be loaded together as one unit
+            - None: Used when initializing from an existing recording object
+        mode (Literal['si', 'mne', None], optional): Data loading mode. Defaults to 'si'.
+            - 'si': Use SpikeInterface extractors
+            - 'mne': Use MNE-Python extractors (creates intermediate file)
+            - None: No data loading (item must be None, recording must be provided)
+        truncate (bool | int, optional): If True, truncate to first 10 files.
+            If an integer, truncate to first n files. Defaults to False.
+        cache_policy (Literal['auto', 'always', 'force_regenerate'], optional):
+            Cache policy for intermediate files. Defaults to 'auto'.
+        multiprocess_mode (Literal['dask', 'serial'], optional): Processing mode for
+            parallel operations when loading multiple files. Defaults to 'serial'.
+        extract_func (Callable | str, optional): Function to extract data.
+            - If str: name of SpikeInterface or MNE extractor (e.g., 'read_intan', 'read_raw_edf')
+            - If Callable: custom extraction function
+            - If None: defaults to si.load_extractor for SI mode
+        manual_datetimes (datetime | list[datetime], optional): Manually provided timestamps.
         datetimes_are_start (bool, optional): If True (default), manual_datetimes are start times.
-        n_jobs (int, optional): Number of parallel jobs for data loading. Defaults to 1.
-        recording (si.BaseRecording, optional): Existing SpikeInterface recording object for in-memory initialization.
-            Use this when creating LRO wrappers around split recordings.
-        labels (dict, optional): High-level session labels (animal ID, day, genotype, etc.).
-            This object is parsing-agnostic; it does not perform high-level parsing itself.
-            Labels should be provided by a parser (like `AnimalOrganizer`).
+        n_jobs (int, optional): Number of parallel jobs for MNE resampling. Defaults to 1.
+        recording (si.BaseRecording, optional): Existing SpikeInterface recording object
+            for in-memory initialization. Use this when creating LRO wrappers around split recordings.
         **kwargs: Additional arguments passed to the data loading functions.
 
     Attributes:
         LongRecording (si.BaseRecording): The SpikeInterface recording object.
-        meta (DDFBinaryMetadata): Technical metadata (sampling rate, channels, etc.).
-        labels (dict): High-level session labels (animal ID, day, genotype, etc.).
+        meta (RecordingMetadata): Technical metadata (sampling rate, channels, etc.).
         channel_names (list[str]): List of channel names.
         file_durations (list[float]): Duration of each individual file in seconds.
         cumulative_file_durations (list[float]): Cumulative duration timestamps for file boundaries.
@@ -447,12 +504,13 @@ class LongRecordingOrganizer:
         _is_in_memory (bool): True if this LRO was created from an in-memory recording (via split()).
 
     Raises:
-        ValueError: If no data files are found, if the folder contains mixed file types, or if manual time parameters are invalid.
+        ValueError: If no data files are found, if the folder contains mixed file types,
+            or if manual time parameters are invalid.
     """
 
     def __init__(
         self,
-        item: Union[str, Path, list[str], tuple[str]],
+        item: Union[str, Path, list[str], tuple[str], "MultiFileGroup"],
         mode: Literal["si", "mne", None] = "si",
         truncate: Union[bool, int] = False,
         cache_policy: Literal["auto", "always", "force_regenerate"] = "auto",
@@ -464,21 +522,23 @@ class LongRecordingOrganizer:
         datetimes_are_start: bool = True,
         n_jobs: int = 1,
         recording: "si.BaseRecording" = None,
-        labels: dict = None,
         **kwargs,
     ):
-        if isinstance(item, (list, tuple)):
-            self.data_files = [str(x) for x in item]
-            self.base_folder_path = (
-                Path(self.data_files[0]).parent if self.data_files else None
-            )
-            self.item = self.data_files
-        else:
-            self.base_folder_path = Path(item) if item else None
+        # Import DiscoveredFile here to avoid circular imports
+        from .discovery import DiscoveredFile
+
+        if isinstance(item, DiscoveredFile):
+            # DiscoveredFile: handle both single and multi-file cases
             self.data_files = None
             self.item = item
-
-        self.labels = labels or {}
+        elif isinstance(item, (list, tuple)):
+            # List of files: will be concatenated individually
+            self.data_files = [str(x) for x in item]
+            self.item = self.data_files
+        else:
+            # Single file/path or None
+            self.data_files = None
+            self.item = item
 
         self.n_truncate = parse_truncate(truncate)
         self.truncate = True if self.n_truncate > 0 else False
@@ -528,7 +588,7 @@ class LongRecordingOrganizer:
         channel_ids = recording.get_channel_ids()
         self.channel_names = [str(ch) for ch in channel_ids]
 
-        self.meta = DDFBinaryMetadata(
+        self.meta = RecordingMetadata(
             None,
             n_channels=recording.get_num_channels(),
             f_s=recording.get_sampling_frequency(),
@@ -569,6 +629,7 @@ class LongRecordingOrganizer:
             self.convert_file_with_si_to_recording(
                 extract_func=extract_func,
                 cache_policy=cache_policy,
+                multiprocess_mode=multiprocess_mode,
                 **kwargs,
             )
         elif mode == "mne":
@@ -593,34 +654,48 @@ class LongRecordingOrganizer:
         self,
         extract_func: Callable[..., "si.BaseRecording"],
         cache_policy: Literal["auto", "always", "force_regenerate"] = "auto",
+        multiprocess_mode: Literal["dask", "serial"] = "serial",
         **kwargs,
     ):
-        lro_only_kwargs = [
-            "overwrite_rowbins",
-            "mode",
-            "manual_datetimes",
-            "datetimes_are_start",
-        ]
-        kwargs = {k: v for k, v in kwargs.items() if k not in lro_only_kwargs}
+        from .discovery import MultiFileGroup
+
         if si is None:
             raise ImportError("SpikeInterface is required")
 
-        n_processed_files = len(self.item) if isinstance(self.item, list) else 1
+        # Determine number of files being processed
+        if isinstance(self.item, MultiFileGroup):
+            n_processed_files = 1  # MultiFileGroup is one recording unit
+        elif isinstance(self.item, list):
+            n_processed_files = len(self.item)
+        else:
+            n_processed_files = 1
+
         self._validate_timestamps_for_mode("si", n_processed_files)
 
-        if isinstance(self.item, list):
-            try:
+        # Handle different item types
+        from .discovery import DiscoveredFile
+        if isinstance(self.item, DiscoveredFile):
+            # DiscoveredFile: handle both single and multi-file cases
+            if self.item.is_multi_file:
+                # Multi-file group: pass as-is to extract_func (user's custom reader)
                 rec: "si.BaseRecording" = extract_func(self.item, **kwargs)
-            except Exception as e:
-                logging.info(
-                    f"extract_func failed on list, attempting to apply to individual files and concatenate: {e}"
-                )
-                kwargs.pop(
-                    "stream_name", None
-                )  # Some kwargs might not apply to individual files
+            else:
+                # Single file
+                rec: "si.BaseRecording" = extract_func(self.item.path, **kwargs)
+        elif isinstance(self.item, list):
+            # List of files: concatenate individually using multiprocess_mode
+            if multiprocess_mode == "dask":
+                if dask is None:
+                    raise ImportError("dask is required for multiprocess_mode='dask'")
+                logging.info(f"Loading {len(self.item)} files in parallel with dask")
+                tasks = [dask.delayed(extract_func)(x, **kwargs) for x in self.item]
+                recs = list(dask.compute(*tasks))
+            else:
+                logging.info(f"Loading {len(self.item)} files serially")
                 recs = [extract_func(x, **kwargs) for x in self.item]
-                rec = si.concatenate_recordings(recs)
+            rec = si.concatenate_recordings(recs)
         else:
+            # Single file/path
             rec: "si.BaseRecording" = extract_func(self.item, **kwargs)
 
         self._n_processed_files = n_processed_files
@@ -634,7 +709,7 @@ class LongRecordingOrganizer:
             logging.warning("Channel IDs are integers. Converting to strings.")
         channel_names = [str(ch) for ch in raw_channel_ids]
 
-        self.meta = DDFBinaryMetadata(
+        self.meta = RecordingMetadata(
             None,
             n_channels=self.LongRecording.get_num_channels(),
             f_s=self.LongRecording.get_sampling_frequency(),
@@ -877,7 +952,7 @@ class LongRecordingOrganizer:
             # Extract unit information from MNE Raw object
             unit_str, mult_to_uv = extract_mne_unit_info(original_info)
 
-            metadata = DDFBinaryMetadata(
+            metadata = RecordingMetadata(
                 metadata_path=None,
                 n_channels=original_info["nchan"],
                 f_s=original_info["sfreq"],  # Original sampling rate
@@ -994,52 +1069,32 @@ class LongRecordingOrganizer:
         n_jobs: int = None,
         **kwargs,
     ):
-        binary_only_kwargs = ["overwrite_rowbins", "input_type", "file_pattern", "mode"]
-        kwargs = {k: v for k, v in kwargs.items() if k not in binary_only_kwargs}
-
         if se is None:
             raise ImportError(
                 "SpikeInterface is required for convert_file_with_mne_to_recording"
             )
 
+        # Determine number of files and source paths
         if isinstance(self.item, list):
             self._validate_timestamps_for_mode("mne", len(self.item))
-            datafolder = None
-            datafile = None
-            datafiles = self.item
-            source_paths = datafiles
-            n_processed_files = len(datafiles)
+            source_paths = self.item
+            n_processed_files = len(self.item)
         else:
             self._validate_timestamps_for_mode("mne", 1)
-            item_path = Path(self.item)
-            if item_path.is_dir():
-                datafolder = item_path
-                datafile = None
-                datafiles = None
-                source_paths = [item_path]
-            else:
-                datafolder = None
-                datafile = item_path
-                datafiles = None
-                source_paths = [item_path]
+            source_paths = [self.item]
             n_processed_files = 1
 
         self._n_processed_files = n_processed_files
 
-        base_name = (
-            self.base_folder_path.name if self.base_folder_path else "mne_recording"
-        )
+        # Generate intermediate filename
+        base_name = Path(source_paths[0]).stem if source_paths else "mne_recording"
         intermediate_name = (
             f"{base_name}_mne-to-rec"
             if intermediate_name is None
             else intermediate_name
         )
 
-        base_dir = (
-            self.base_folder_path
-            if self.base_folder_path and self.base_folder_path.is_dir()
-            else Path(source_paths[0]).parent
-        )
+        base_dir = Path(source_paths[0]).parent
         fname = base_dir / f"{intermediate_name}.{intermediate}"
 
         rec, _, metadata = self._get_or_create_intermediate_file(
@@ -1169,21 +1224,17 @@ class LongRecordingOrganizer:
             if hasattr(sub_rec, "rename_channels"):
                 sub_rec = sub_rec.rename_channels(new_channel_ids=valid_names)
 
-            # Create in-memory LRO wrapper
+            # Create in-memory LRO wrapper with barebones instantiation
             child_lro = LongRecordingOrganizer(
-                item=self.base_folder_path,
+                item=None,
                 recording=sub_rec,
-                labels=self.labels.copy(),
+                manual_datetimes=self.manual_datetimes,
+                datetimes_are_start=self.datetimes_are_start,
+                n_jobs=self.n_jobs,
+                truncate=self.n_truncate if self.truncate else False,
             )
-            # Inherit parent timestamps
-            child_lro.manual_datetimes = self.manual_datetimes
-            child_lro.datetimes_are_start = self.datetimes_are_start
-            child_lro.n_jobs = self.n_jobs
 
-            # Inherit truncation settings
-            child_lro.n_truncate = self.n_truncate
-            child_lro.truncate = self.truncate
-
+            # Inherit file-level timestamps and durations (post-instantiation assignment)
             if hasattr(self, "file_end_datetimes"):
                 child_lro.file_end_datetimes = self.file_end_datetimes
 
@@ -1852,7 +1903,7 @@ class LongRecordingOrganizer:
 
         # Concatenate recordings using SpikeInterface
         logging.info(
-            f"Merging LRO {other_lro.base_folder_path} into {self.base_folder_path}"
+            f"Merging LRO {getattr(other_lro, 'item', 'unknown')} into {getattr(self, 'item', 'unknown')}"
         )
         self.LongRecording = si.concatenate_recordings(
             [self.LongRecording, other_lro.LongRecording]
@@ -1908,17 +1959,6 @@ class LongRecordingOrganizer:
         """
         if hasattr(other_lro.meta, "dt_end") and hasattr(self.meta, "dt_end"):
             self.meta.dt_end = other_lro.meta.dt_end
-
-        # Merge high-level labels
-        if hasattr(other_lro, "labels") and other_lro.labels:
-            for key, value in other_lro.labels.items():
-                if key in self.labels and self.labels[key] != value:
-                    warnings.warn(
-                        f"Label conflict during merge for key '{key}': "
-                        f"'{self.labels[key]}' != '{value}'. Overwriting with new value.",
-                        UserWarning,
-                    )
-                self.labels[key] = value
 
         # Merge file timestamps and durations
         has_dates = (

@@ -1,506 +1,311 @@
+"""
+Tests for AnimalOrganizer file discovery with pattern-based matching.
+
+These tests verify that FileDiscoverer correctly:
+1. Discovers files using {animal}, {session}, {index} placeholders
+2. Filters by animal_id when provided
+3. Groups files by session
+4. Handles skip_sessions correctly
+5. Works with DiscoveredFile for dual-file scenarios
+"""
 
 import pytest
 from pathlib import Path
 from datetime import datetime
 from unittest.mock import patch
 import neurodent.visualization.results as results
-import neurodent.constants as constants
-import neurodent.core.utils as utils
-
-# Mock Aliases
-MOCK_ALIASES = {
-    "HOMO": ["AP3B2homo-240-M", "homo", "AP3B2homo"],
-    "WT": ["AP3B2wt-241-M", "wt", "AP3B2wt"]
-}
-
-@pytest.fixture
-def mock_production_structure(tmp_path):
-    """
-    Simulate the production structure:
-    /Intan/
-      PortA-AP3B2homo-240-M-PortB-AP3B2wt-241-M-standardEEG/
-        PortA_... (Ghost, technically)
-        AP3B2homo-240-M_Correct_HOMO.nwb
-        AP3B2wt-241-M_Correct_WT.nwb
-        PortC_... (Ghost, incorrect)
-    """
-    intan = tmp_path / "Intan"
-    parent = intan / "PortA-AP3B2homo-240-M-PortB-AP3B2wt-241-M-standardEEG"
-    parent.mkdir(parents=True)
-    
-    # Create subdirectories for animals (as AO expects them)
-    # The glob pattern `base / *ID*` will match these.
-    homo_dir = parent / "AP3B2homo-240-M"
-    homo_dir.mkdir()
-    
-    wt_dir = parent / "AP3B2wt-241-M"
-    wt_dir.mkdir()
-    
-    # 1. Correct HOMO file (Date: 251127)
-    (homo_dir / "AP3B2homo-240-M_Correct_HOMO_251127.nwb").touch()
-    
-    # 2. Correct WT file (Date: 251127)
-    (wt_dir / "AP3B2wt-241-M_Correct_WT_251127.nwb").touch()
-    
-    # 3. Ghost File (PortC) - If it causes issues, it must be discoverable?
-    # If it's in the PARENT, AO won't find it.
-    # If it's in the HOMO folder, AO will find it.
-    # Let's put a Ghost file in the PARENT to verify it is IGNORED (Validation of safety).
-    (parent / "PortC_251128_060908.nwb").touch()
-    
-    # Also put a 'Ghost' file INSIDE the HOMO folder to test filtering logic
-    # if it doesn't match ID?
-    (homo_dir / "PortC_Inside_251128.nwb").touch()
-    
-    return parent
-
-def test_ao_directory_mode_repro(tmp_path, monkeypatch):
-    """
-    Regression Test: Reproduce "No directories found" for Directory Mode.
-    Scenario:
-      Structure: Root/Data/20230101/recording.bin
-      Config:  file_pattern=None (implies directory mode)
-    """
-    monkeypatch.setattr("neurodent.constants.GENOTYPE_ALIASES", MOCK_ALIASES)
-    
-    # Setup Mock
-    data_dir = tmp_path / "Data"
-    # Create folder named like the animal so 'nest' mode finds it?
-    # Or does the folder need to be the animal ID?
-    # Usually in directory mode: top-level folders ARE the animals.
-    # e.g. /Data/AP3B2homo-240-M_251127/...
-    
-    anim_dir = data_dir / "AP3B2homo-240-M_251127"
-    day_dir = anim_dir / "ignored_subdir"
-    day_dir.mkdir(parents=True)
-    (day_dir / "recording.bin").touch()
-    
-    # Mocking _create_long_recordings because we don't want real LRO instantiation
-    monkeypatch.setattr(results.AnimalOrganizer, "_create_long_recordings", lambda self, kw: None)
-
-    day_parse_kwargs = {"date_patterns": [(r"\d{6}", "%y%m%d")]}
-
-    # Initialize AO
-    ao = results.AnimalOrganizer(
-        pattern=f"{data_dir}/*{anim_id}*",
-        animal_id="AP3B2homo-240-M",
-         # Directory name itself contains the ID
-        file_pattern=None, # Directory mode
-            )
-    
-    # If successful, no error raised.
-    # Check what was found
-    found_folders = [Path(f).name for f in ao._bin_folders]
-    assert "AP3B2homo-240-M_251127" in found_folders
-
-
-def test_ao_discovery_production_setup_homo(mock_production_structure, monkeypatch):
-    """
-    Test Case 1a: Production Setup for HOMO.
-    Config points AO to the PARENT folder.
-    Expectation: Should ONLY find files with 'AP3B2homo-240-M' string.
-    """
-    monkeypatch.setattr("neurodent.constants.GENOTYPE_ALIASES", MOCK_ALIASES)
-    
-    parent_folder = mock_production_structure
-    anim_id = "AP3B2homo-240-M"
-    
-    monkeypatch.setattr(results.AnimalOrganizer, "_create_long_recordings", lambda self, kw: None)
-    
-    day_parse_kwargs = {"date_patterns": [(r"\d{6}", "%y%m%d")]}
-    ao = results.AnimalOrganizer(
-        pattern=f"{parent_folder}/*{anim_id}*",
-        animal_id=anim_id,
-                            )
-    
-    found_files = [Path(f).name for f in ao._bin_folders]
-    print(f"\n[Production HOMO Check] Found files for {anim_id}: {found_files}")
-    
-    # Should find Correct.nwb
-    assert "AP3B2homo-240-M_Correct_HOMO_251127.nwb" in found_files
-    
-    # Should NOT find the sibling WT file
-    assert "AP3B2wt-241-M_Correct_WT_251127.nwb" not in found_files, "HOMO AO incorrectly found WT file"
-    
-    # Should NOT find the Ghost file (PortC)
-    # Because PortC...nwb does NOT contain 'AP3B2homo-240-M' string
-    assert "PortC_251128_060908.nwb" not in found_files, "HOMO AO incorrectly found ghost file"
-
-
-def test_ao_discovery_production_setup_wt(mock_production_structure, monkeypatch):
-    """
-    Test Case 1b: Production Setup for WT.
-    Config points AO to the PARENT folder.
-    Expectation: Should ONLY find files in the 'AP3B2wt-241-M' subdirectory.
-    """
-    monkeypatch.setattr("neurodent.constants.GENOTYPE_ALIASES", MOCK_ALIASES)
-    
-    parent_folder = mock_production_structure
-    anim_id = "AP3B2wt-241-M"
-    
-    monkeypatch.setattr(results.AnimalOrganizer, "_create_long_recordings", lambda self, kw: None)
-    
-    day_parse_kwargs = {"date_patterns": [(r"\d{6}", "%y%m%d")]}
-    ao = results.AnimalOrganizer(
-        pattern=f"{parent_folder}/*{anim_id}*",
-        animal_id=anim_id,
-                            )
-    
-    found_files = [Path(f).name for f in ao._bin_folders]
-    print(f"\n[Production WT Check] Found files for {anim_id}: {found_files}")
-    
-    assert "AP3B2wt-241-M_Correct_WT_251127.nwb" in found_files
-    assert "PortC_251128_060908.nwb" not in found_files, "WT AO incorrectly found ghost file"
-
-def test_ao_discovery_grandparent_setup(mock_production_structure, monkeypatch):
-    """
-    Test Case 2: Grandparent Setup.
-    Initialize AO pointing to the GRANDPARENT folder (e.g. 'Intan').
-    This tests if the glob is too greedy when recursing from higher up.
-    """
-    monkeypatch.setattr("neurodent.constants.GENOTYPE_ALIASES", MOCK_ALIASES)
-    
-    grandparent = mock_production_structure.parent
-    anim_id = "AP3B2homo-240-M"
-    
-    # We mock _create_long_recordings to avoid LRO creation logic which requires full file access
-    monkeypatch.setattr(results.AnimalOrganizer, "_create_long_recordings", lambda self, kw: None)
-    
-    day_parse_kwargs = {"date_patterns": [(r"\d{6}", "%y%m%d")]}
-    # Grandparent setup with simple glob (*ID*/*.nwb) will NOT find deeply nested files
-    # And it will find PortC but filter it out.
-    # So it should raise ValueError: No directories found.
-    with pytest.raises(ValueError, match="No directories found"):
-        ao = results.AnimalOrganizer(
-            pattern=f"{grandparent}/*{anim_id}*",
-            animal_id=anim_id,
-                                            )
-        
-    # found_files = [Path(f).name for f in ao._bin_folders] # Unreachable
-    # assert "AP3B2homo-240-M_Correct_HOMO_251127.nwb" in found_files
-    # assert "PortC_251128_060908.nwb" not in found_files
-
-def test_parse_ghost_file_behavior(monkeypatch):
-    """
-    Test Case 3: Verify WHY the ghost file parses as HOMO.
-    Does 'PortC' inside 'PortA-AP3B2homo...' parse as HOMO?
-    """
-    monkeypatch.setattr("neurodent.constants.GENOTYPE_ALIASES", MOCK_ALIASES)
-    
-    # Construct a path mimicking the discovered ghost file
-    # /.../PortA-AP3B2homo.../PortC...nwb
-    ghost_path = Path("/mock/PortA-AP3B2homo-240-M-PortB-AP3B2wt-241-M-standardEEG/PortC_251128_060908.nwb")
-    
-    # Try parsing in 'concat' mode (default)
-    # This usually checks the filename. 'PortC...' does NOT contain 'AP3B2homo'.
-    # So 'concat' mode should FAIL to parse.
-    day_parse_kwargs = {"date_patterns": [(r"\d{6}", "%y%m%d")]}
-    try:
-        parsed_concat = utils.parse_path_to_animalday(ghost_path,  **day_parse_kwargs)
-        print(f"\n[Ghost Parse] Concat mode result: {parsed_concat}")
-    except Exception as e:
-        print(f"\n[Ghost Parse] Concat mode failed: {e}")
-
-    # Try parsing in 'nest' mode 
-    # This checks parent folder. 'PortA-AP3B2homo...' DOES contain 'AP3B2homo'.
-    # So 'nest' mode should SUCCEED.
-    # Expectation: Nest mode extracts the ANIMAL ID from the parent folder path.
-    # Logic in utils.py verify: 
-    #   geno = parse_str_to_genotype(filepath.parent.name)
-    #   animid = parse_str_to_animal(filepath.parent.name, animal_param=animal_param)
-    # The actual return IS the animal ID, derived from the folder name string.
-    
-    try:
-        parsed_nest = utils.parse_path_to_animalday(ghost_path,  **day_parse_kwargs)
-        print(f"[Ghost Parse] Nest mode result: {parsed_nest}")
-        
-        # Verify that 'nest' mode correctly extracts the genotype and animal ID from 
-        # the parent/grandparent folder path, matching the greedy behavior observed.
-        
-        # However, for this test, let's asserting that it matches the GENOTYPE "HOMO" at least.
-        assert parsed_nest["genotype"] == "HOMO"
-        # And that the animal ID *contains* the target ID (even if it's the full string, AO might match it loosely?)
-        assert "AP3B2homo-240-M" in parsed_nest["animal"] 
-        
-    except Exception as e:
-        pytest.fail(f"Nest mode parsing failed: {e}")
-
-def test_ao_discovery_ambiguous_names(mock_production_structure, monkeypatch):
-    """
-    Test Case 4: Ambiguous/Overlapping Names.
-    e.g. 'AP3B2homo' vs 'AP3B2homo-clone'
-    """
-    monkeypatch.setattr("neurodent.constants.GENOTYPE_ALIASES", MOCK_ALIASES)
-    
-    parent = mock_production_structure
-    
-    # Create ambiguous sibling
-    # Parent/AP3B2homo-240-M-clone/
-    ambiguous_dir = parent / "AP3B2homo-240-M-clone"
-    ambiguous_dir.mkdir()
-    (ambiguous_dir / "Ambiguous_251127.nwb").touch()
-    
-    # Initialize AO for original ID
-    monkeypatch.setattr(results.AnimalOrganizer, "_create_long_recordings", lambda self, kw: None)
-    day_parse_kwargs = {"date_patterns": [(r"\d{6}", "%y%m%d")]}
-    ao = results.AnimalOrganizer(
-        pattern=f"{parent}/*{anim_id}*",
-        animal_id="AP3B2homo-240-M",
-                            )
-    
-    found_files = [Path(f).name for f in ao._bin_folders]
-    print(f"\n[Ambiguous Check] Found files: {found_files}")
-    
-    # Should find Correct.nwb
-    assert "AP3B2homo-240-M_Correct_HOMO_251127.nwb" in found_files
-    
-    # Should NOT find Ambiguous.nwb? 
-    # If glob pattern is *ID*, it matches ID-clone.
-    # This detects if glob is too greedy.
-    assert "Ambiguous_251127.nwb" not in found_files, "AO glob pattern is too greedy (matched ID-suffix)"
-
-def test_ao_discovery_nested_duplicates(mock_production_structure, monkeypatch):
-    """
-    Test Case 5: Nested Duplicates.
-    Parent/Subdir(ID)/Ghost(ID).nwb
-    Should find both?
-    """
-    monkeypatch.setattr("neurodent.constants.GENOTYPE_ALIASES", MOCK_ALIASES)
-    
-    parent = mock_production_structure
-    # Add a file specifically named like the animal INSIDE the animal subdir
-    # Parent/AP3B2homo-240-M/AP3B2homo-240-M_duplicate.nwb
-    duplicate_file = parent / "AP3B2homo-240-M" / "AP3B2homo-240-M_duplicate_251127.nwb"
-    # Ensure parent dir exists (it is created by mock_production_structure but we might need subdir)
-    (parent / "AP3B2homo-240-M").mkdir(exist_ok=True)
-    duplicate_file.touch()
-    
-    monkeypatch.setattr(results.AnimalOrganizer, "_create_long_recordings", lambda self, kw: None)
-    day_parse_kwargs = {"date_patterns": [(r"\d{6}", "%y%m%d")]}
-    ao = results.AnimalOrganizer(
-        pattern=f"{parent}/*{anim_id}*",
-        animal_id="AP3B2homo-240-M",
-                            )
-    
-    found_files = [Path(f).name for f in ao._bin_folders]
-    print(f"\n[Nested Duplicate Check] Found files: {found_files}")
-    
-    # Should find both correctly
-    assert "AP3B2homo-240-M_Correct_HOMO_251127.nwb" in found_files
-    assert "AP3B2homo-240-M_duplicate_251127.nwb" in found_files
-
-def test_ao_discovery_file_level_exclusion(mock_production_structure, monkeypatch):
-    """
-    Test Case 6: File Level Exclusion.
-    Files in correct subdir but named differently.
-    Parent/AP3B2homo-240-M/IgnoredFile.nwb
-    """
-    monkeypatch.setattr("neurodent.constants.GENOTYPE_ALIASES", MOCK_ALIASES)
-    
-    parent = mock_production_structure
-    (parent / "AP3B2homo-240-M").mkdir(exist_ok=True)
-    ignored_file = parent / "AP3B2homo-240-M" / "IgnoredFile_251127.nwb"
-    ignored_file.touch()
-    
-    monkeypatch.setattr(results.AnimalOrganizer, "_create_long_recordings", lambda self, kw: None)
-    
-    day_parse_kwargs = {"date_patterns": [(r"\d{6}", "%y%m%d")]}
-    ao = results.AnimalOrganizer(
-        pattern=f"{parent}/*{anim_id}*",
-        animal_id="AP3B2homo-240-M",
-                            )
-    
-    found_files = [Path(f).name for f in ao._bin_folders]
-    print(f"\n[File Level Check] Found files: {found_files}")
-    
-    # Should find Correct.nwb
-    assert "AP3B2homo-240-M_Correct_HOMO_251127.nwb" in found_files
-    
-    # Should NOT find IgnoredFile.nwb (because mode=concat checks filename)
-    assert "IgnoredFile_251127.nwb" not in found_files
+import neurodent.core.core as core
 
 
 @pytest.fixture
-def mock_joint_session_structure(tmp_path):
+def simple_structure(tmp_path):
     """
-    Simulate a joint session structure where filenames contain concatenated animal IDs.
-    e.g. Arx Rosa dataset: MARSH 20141125ARXROSATAM967968969418_1_Selection1.EDF
+    Create a simple test structure:
+    tmp_path/
+      A10/
+        2025-01-24/
+          1.rhd
+          2.rhd
+        2025-01-25/
+          1.rhd
+      A11/
+        2025-01-24/
+          1.rhd
     """
-    session_dir = tmp_path / "Arx Rosa  967 968 969 418"
-    session_dir.mkdir(parents=True)
+    # A10 sessions
+    a10_day1 = tmp_path / "A10" / "2025-01-24"
+    a10_day1.mkdir(parents=True)
+    (a10_day1 / "1.rhd").touch()
+    (a10_day1 / "2.rhd").touch()
 
-    # Joint session EDF files — IDs are concatenated in the filename
-    (session_dir / "MARSH_20141125ARXROSATAM967968969418_Selection1_251125.EDF").touch()
-    (session_dir / "MARSH_20141125ARXROSATAM967968969418_Selection2_251126.EDF").touch()
+    a10_day2 = tmp_path / "A10" / "2025-01-25"
+    a10_day2.mkdir(parents=True)
+    (a10_day2 / "1.rhd").touch()
 
-    # An unrelated file that should NOT match
-    (session_dir / "UNRELATED_FILE_999999_251127.EDF").touch()
+    # A11 sessions
+    a11_day1 = tmp_path / "A11" / "2025-01-24"
+    a11_day1.mkdir(parents=True)
+    (a11_day1 / "1.rhd").touch()
 
-    return session_dir
+    return tmp_path
 
 
-def test_ao_animal_file_match_pattern_regex(mock_joint_session_structure, monkeypatch):
+@pytest.fixture
+def multi_file_structure(tmp_path):
     """
-    Test animal_file_match_pattern with a regex pattern for joint sessions.
-    Without animal_file_match_pattern, AO would fail because 'ArxRosa-967' is not
-    a substring of 'MARSH_20141125ARXROSATAM967968969418_Selection1_251125.EDF'.
-    With animal_file_match_pattern="967|968|969|418", the regex matches '967' in the filename.
+    Create a structure with dual files (bin + csv):
+    tmp_path/
+      A10/
+        session1/
+          data.bin
+          meta.csv
+        session2/
+          data.bin
+          meta.csv
     """
+    session1 = tmp_path / "A10" / "session1"
+    session1.mkdir(parents=True)
+    (session1 / "data.bin").touch()
+    (session1 / "meta.csv").touch()
+
+    session2 = tmp_path / "A10" / "session2"
+    session2.mkdir(parents=True)
+    (session2 / "data.bin").touch()
+    (session2 / "meta.csv").touch()
+
+    return tmp_path
+
+
+def test_single_pattern_discovery(simple_structure, monkeypatch):
+    """Test basic pattern matching with {animal}/{session}/{index}."""
     monkeypatch.setattr(results.AnimalOrganizer, "_create_long_recordings", lambda self, kw: None)
 
-    day_parse_kwargs = {"date_patterns": [(r"\d{6}", "%y%m%d")]}
+    pattern = str(simple_structure) + "/{animal}/{session}/{index}.rhd"
+    ao = results.AnimalOrganizer(
+        pattern=pattern,
+        animal_id="A10",
+    )
 
-    # Without animal_file_match_pattern: should fail
-    with pytest.raises(ValueError, match="No directories found"):
+    # Should find 2 sessions for A10
+    assert len(ao._animalday_folder_groups) == 2
+    assert "2025-01-24" in ao._animalday_folder_groups
+    assert "2025-01-25" in ao._animalday_folder_groups
+
+    # Session 2025-01-24 should have 2 files
+    assert len(ao._animalday_folder_groups["2025-01-24"]) == 2
+
+    # Session 2025-01-25 should have 1 file
+    assert len(ao._animalday_folder_groups["2025-01-25"]) == 1
+
+    # Should NOT find A11 files
+    for files in ao._animalday_folder_groups.values():
+        for file_path in files:
+            assert "A11" not in str(file_path)
+
+
+def test_no_animal_filter(simple_structure, monkeypatch):
+    """Test discovery without animal_id filter (should find all animals)."""
+    monkeypatch.setattr(results.AnimalOrganizer, "_create_long_recordings", lambda self, kw: None)
+
+    pattern = str(simple_structure) + "/{animal}/{session}/{index}.rhd"
+    ao = results.AnimalOrganizer(
+        pattern=pattern,
+        animal_id=None,
+    )
+
+    # Should find sessions from both A10 and A11
+    # Since we're not filtering by animal, sessions might overlap
+    assert len(ao._animalday_folder_groups) >= 1
+
+    # Should have discovered files from both animals
+    all_files = [f for files in ao._animalday_folder_groups.values() for f in files]
+    has_a10 = any("A10" in str(f) for f in all_files)
+    has_a11 = any("A11" in str(f) for f in all_files)
+    assert has_a10 and has_a11
+
+
+def test_skip_sessions(simple_structure, monkeypatch):
+    """Test skipping specific sessions."""
+    monkeypatch.setattr(results.AnimalOrganizer, "_create_long_recordings", lambda self, kw: None)
+
+    pattern = str(simple_structure) + "/{animal}/{session}/{index}.rhd"
+    ao = results.AnimalOrganizer(
+        pattern=pattern,
+        animal_id="A10",
+        skip_sessions=["2025-01-24"],
+    )
+
+    # Should only find 2025-01-25
+    assert len(ao._animalday_folder_groups) == 1
+    assert "2025-01-25" in ao._animalday_folder_groups
+    assert "2025-01-24" not in ao._animalday_folder_groups
+
+
+def test_truncate_sessions(simple_structure, monkeypatch):
+    """Test truncating to first n sessions."""
+    monkeypatch.setattr(results.AnimalOrganizer, "_create_long_recordings", lambda self, kw: None)
+
+    pattern = str(simple_structure) + "/{animal}/{session}/{index}.rhd"
+    ao = results.AnimalOrganizer(
+        pattern=pattern,
+        animal_id="A10",
+        truncate=1,
+    )
+
+    # Should only find 1 session
+    assert len(ao._animalday_folder_groups) == 1
+
+
+def test_multi_pattern_discovery(multi_file_structure, monkeypatch):
+    """Test multi-file discovery (bin + csv)."""
+    monkeypatch.setattr(results.AnimalOrganizer, "_create_long_recordings", lambda self, kw: None)
+
+    base = str(multi_file_structure)
+    patterns = [
+        base + "/{animal}/{session}/data.bin",
+        base + "/{animal}/{session}/meta.csv",
+    ]
+
+    ao = results.AnimalOrganizer(
+        pattern=patterns,
+        animal_id="A10",
+    )
+
+    # Should find 2 sessions
+    assert len(ao._animalday_folder_groups) == 2
+    assert "session1" in ao._animalday_folder_groups
+    assert "session2" in ao._animalday_folder_groups
+
+    # Each session should have a DiscoveredFile with 2 files
+    for session_files in ao._animalday_folder_groups.values():
+        assert len(session_files) == 1
+        from neurodent.core.discovery import DiscoveredFile
+        assert isinstance(session_files[0], DiscoveredFile)
+        assert session_files[0].is_multi_file
+        assert len(session_files[0].paths) == 2
+
+
+def test_pattern_without_session(tmp_path, monkeypatch):
+    """Test pattern without {session} placeholder."""
+    monkeypatch.setattr(results.AnimalOrganizer, "_create_long_recordings", lambda self, kw: None)
+
+    # Create structure: tmp_path/A10/1.edf
+    a10_dir = tmp_path / "A10"
+    a10_dir.mkdir(parents=True)
+    (a10_dir / "1.edf").touch()
+    (a10_dir / "2.edf").touch()
+
+    pattern = str(tmp_path) + "/{animal}/{index}.edf"
+    ao = results.AnimalOrganizer(
+        pattern=pattern,
+        animal_id="A10",
+    )
+
+    # Should group all files under "unknown" session
+    assert len(ao._animalday_folder_groups) == 1
+    assert "unknown" in ao._animalday_folder_groups
+    assert len(ao._animalday_folder_groups["unknown"]) == 2
+
+
+def test_pattern_without_index(tmp_path, monkeypatch):
+    """Test pattern without {index} placeholder (single file per session)."""
+    monkeypatch.setattr(results.AnimalOrganizer, "_create_long_recordings", lambda self, kw: None)
+
+    # Create structure: tmp_path/A10/2025-01-24.edf
+    a10_dir = tmp_path / "A10"
+    a10_dir.mkdir(parents=True)
+    (a10_dir / "2025-01-24.edf").touch()
+    (a10_dir / "2025-01-25.edf").touch()
+
+    pattern = str(tmp_path) + "/{animal}/{session}.edf"
+    ao = results.AnimalOrganizer(
+        pattern=pattern,
+        animal_id="A10",
+    )
+
+    # Should find 2 sessions, each with 1 file
+    assert len(ao._animalday_folder_groups) == 2
+    assert "2025-01-24" in ao._animalday_folder_groups
+    assert "2025-01-25" in ao._animalday_folder_groups
+    assert len(ao._animalday_folder_groups["2025-01-24"]) == 1
+    assert len(ao._animalday_folder_groups["2025-01-25"]) == 1
+
+
+def test_complex_pattern(tmp_path, monkeypatch):
+    """Test pattern with different ordering using underscores instead of dashes to avoid ambiguity"""
+    monkeypatch.setattr(results.AnimalOrganizer, "_create_long_recordings", lambda self, kw: None)
+
+    # Create structure: tmp_path/data/A10_20250124_1.rhd (no dashes in date to avoid ambiguity)
+    data_dir = tmp_path / "data"
+    data_dir.mkdir(parents=True)
+    (data_dir / "A10_20250124_1.rhd").touch()
+    (data_dir / "A10_20250124_2.rhd").touch()
+    (data_dir / "A10_20250125_1.rhd").touch()
+
+    pattern = str(tmp_path / "data") + "/{animal}_{session}_{index}.rhd"
+    ao = results.AnimalOrganizer(
+        pattern=pattern,
+        animal_id="A10",
+    )
+
+    # Should find 2 sessions
+    assert len(ao._animalday_folder_groups) == 2
+    assert "20250124" in ao._animalday_folder_groups
+    assert "20250125" in ao._animalday_folder_groups
+    assert len(ao._animalday_folder_groups["20250124"]) == 2
+    assert len(ao._animalday_folder_groups["20250125"]) == 1
+
+
+def test_unique_animaldays_format(simple_structure, monkeypatch):
+    """Test that unique_animaldays has correct format: {animal}_{session}."""
+    monkeypatch.setattr(results.AnimalOrganizer, "_create_long_recordings", lambda self, kw: None)
+
+    pattern = str(simple_structure) + "/{animal}/{session}/{index}.rhd"
+    ao = results.AnimalOrganizer(
+        pattern=pattern,
+        animal_id="A10",
+    )
+
+    # unique_animaldays should have format "{animal}_{session}"
+    assert len(ao.unique_animaldays) == 2
+    assert "A10_2025-01-24" in ao.unique_animaldays
+    assert "A10_2025-01-25" in ao.unique_animaldays
+
+    # animaldays should be alias
+    assert ao.animaldays == ao.unique_animaldays
+
+
+def test_no_files_found(tmp_path, monkeypatch):
+    """Test error when no files match the pattern."""
+    monkeypatch.setattr(results.AnimalOrganizer, "_create_long_recordings", lambda self, kw: None)
+
+    pattern = str(tmp_path) + "/{animal}/{session}/{index}.rhd"
+
+    with pytest.raises(ValueError, match="No items discovered"):
         results.AnimalOrganizer(
-            pattern=f"{mock_joint_session_structure}/*{anim_id}*",
-            animal_id="ArxRosa-967",
-                                            )
-
-    # With animal_file_match_pattern: should succeed
-    ao = results.AnimalOrganizer(
-        pattern=f"{mock_joint_session_structure}/*{anim_id}*",
-        animal_id="ArxRosa-967",
-                                    )
-
-    found_files = [Path(f).name for f in ao._bin_folders]
-
-    # Should find the joint session files
-    assert "MARSH_20141125ARXROSATAM967968969418_Selection1_251125.EDF" in found_files
-    assert "MARSH_20141125ARXROSATAM967968969418_Selection2_251126.EDF" in found_files
-
-    # Should NOT find the unrelated file
-    assert "UNRELATED_FILE_999999_251127.EDF" not in found_files
-
-    # animal_id should still be the original ID
-    assert ao.animal_id == "ArxRosa-967"
+            pattern=pattern,
+            animal_id="A10",
+        )
 
 
-def test_ao_animal_file_match_pattern_none_default(mock_production_structure, monkeypatch):
-    """
-    Test that animal_file_match_pattern=None (default) preserves existing behavior.
-    """
-    monkeypatch.setattr("neurodent.constants.GENOTYPE_ALIASES", MOCK_ALIASES)
+def test_pattern_with_wildcards(tmp_path, monkeypatch):
+    """Test that plain wildcards (no placeholders) still work but extract no metadata."""
     monkeypatch.setattr(results.AnimalOrganizer, "_create_long_recordings", lambda self, kw: None)
 
-    day_parse_kwargs = {"date_patterns": [(r"\d{6}", "%y%m%d")]}
+    # Create some files
+    subdir = tmp_path / "data"
+    subdir.mkdir(parents=True)
+    (subdir / "file1.rhd").touch()
+    (subdir / "file2.rhd").touch()
+
+    # Use plain wildcard pattern (no placeholders)
+    pattern = str(tmp_path) + "/*/*.rhd"
     ao = results.AnimalOrganizer(
-        pattern=f"{mock_production_structure}/*{anim_id}*",
-        animal_id="AP3B2homo-240-M",
-                                # animal_file_match_pattern not passed — should default to [animal_id]
+        pattern=pattern,
+        animal_id=None,
     )
 
-    found_files = [Path(f).name for f in ao._bin_folders]
-    assert "AP3B2homo-240-M_Correct_HOMO_251127.nwb" in found_files
-    assert ao.animal_file_match_pattern == ["AP3B2homo-240-M"]
-
-
-def test_ao_animal_file_match_pattern_with_manual_datetimes(mock_joint_session_structure, monkeypatch):
-    """
-    Test that manual_datetimes flows through _process_manual_datetimes correctly
-    when animal_file_match_pattern is used (joint session scenario).
-
-    Mocks _compute_global_timeline to avoid needing real data files, but verifies
-    the full path: __init__ -> _process_manual_datetimes -> _compute_global_timeline
-    receives the correct lro_kwargs (including mode override from 'si' to 'mne').
-    """
-    monkeypatch.setattr(results.AnimalOrganizer, "_create_long_recordings", lambda self, kw: None)
-
-    day_parse_kwargs = {"date_patterns": [(r"\d{6}", "%y%m%d")]}
-
-    # Track what _compute_global_timeline receives
-    captured_calls = []
-
-    def mock_compute_global_timeline(self, start_dt, animalday_to_folders, base_lro_kwargs, original_manual_datetimes=None):
-        captured_calls.append({
-            "start_dt": start_dt,
-            "base_lro_kwargs": base_lro_kwargs.copy(),
-            "n_folders": sum(len(v) for v in animalday_to_folders.values()),
-        })
-        # Return a mock folder->timestamp mapping for each file
-        out = {}
-        for folders in animalday_to_folders.values():
-            for folder in folders:
-                out[Path(folder).name] = start_dt
-        return out
-
-    monkeypatch.setattr(results.AnimalOrganizer, "_compute_global_timeline", mock_compute_global_timeline)
-
-    # Simulate what generate_wars.py does: pass manual_datetimes as a string
-    # and lro_kwargs with (the EDF override)
-    ao = results.AnimalOrganizer(
-        pattern=f"{mock_joint_session_structure}/*{anim_id}*",
-        animal_id="ArxRosa-967",
-                                        lro_kwargs={
-            "mode": "mne",
-            "input_type": "files",
-            "extract_func": "read_raw_edf",
-            "manual_datetimes": "2014-11-26 09:37:10",
-        },
-    )
-
-    # _compute_global_timeline should have been called
-    assert len(captured_calls) == 1
-    call = captured_calls[0]
-
-    # Verify the start datetime was parsed correctly
-    assert call["start_dt"] == datetime(2014, 11, 26, 9, 37, 10)
-
-    # Verify lro_kwargs passed to _compute_global_timeline contain the MNE mode
-    assert call["base_lro_kwargs"]["mode"] == "mne"
-    assert call["base_lro_kwargs"]["extract_func"] == "read_raw_edf"
-    assert call["base_lro_kwargs"]["input_type"] == "files"
-
-    # Verify 2 files were discovered (the joint session EDF files, not the unrelated one)
-    assert call["n_folders"] == 2
-
-    # Verify _processed_timestamps was populated
-    assert ao._processed_timestamps is not None
-    assert len(ao._processed_timestamps) == 2
-
-    # animal_id should still be the original
-    assert ao.animal_id == "ArxRosa-967"
-
-
-def test_ao_animal_file_match_pattern_si_mode(mock_joint_session_structure, monkeypatch):
-    """
-    Test that SI mode (RHD sessions) also works with animal_file_match_pattern
-    and manual_datetimes. Verifies the lro_kwargs preserve .
-    """
-    monkeypatch.setattr(results.AnimalOrganizer, "_create_long_recordings", lambda self, kw: None)
-
-    day_parse_kwargs = {"date_patterns": [(r"\d{6}", "%y%m%d")]}
-
-    captured_calls = []
-
-    def mock_compute_global_timeline(self, start_dt, animalday_to_folders, base_lro_kwargs, original_manual_datetimes=None):
-        captured_calls.append({
-            "start_dt": start_dt,
-            "base_lro_kwargs": base_lro_kwargs.copy(),
-        })
-        out = {}
-        for folders in animalday_to_folders.values():
-            for folder in folders:
-                out[Path(folder).name] = start_dt
-        return out
-
-    monkeypatch.setattr(results.AnimalOrganizer, "_compute_global_timeline", mock_compute_global_timeline)
-
-    ao = results.AnimalOrganizer(
-        pattern=f"{mock_joint_session_structure}/*{anim_id}*",
-        animal_id="ArxRosa-967",
-                                        lro_kwargs={
-            "mode": "si",
-            "input_type": "files",
-            "extract_func": "read_intan",
-            "manual_datetimes": "2020-08-04 08:48:59",
-        },
-    )
-
-    assert len(captured_calls) == 1
-    call = captured_calls[0]
-
-    # Verify SI mode is preserved in lro_kwargs
-    assert call["base_lro_kwargs"]["mode"] == "si"
-    assert call["base_lro_kwargs"]["extract_func"] == "read_intan"
-    assert call["start_dt"] == datetime(2020, 8, 4, 8, 48, 59)
+    # Should discover files but group under "unknown" session
+    assert len(ao._animalday_folder_groups) == 1
+    assert "unknown" in ao._animalday_folder_groups
+    assert len(ao._animalday_folder_groups["unknown"]) == 2

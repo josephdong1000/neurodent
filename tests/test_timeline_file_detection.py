@@ -239,7 +239,7 @@ class TestComputeGlobalTimelineIntegration:
             error_msg = str(e)
             if "No files found matching pattern" in error_msg or "Unacceptable pattern" in error_msg:
                 pytest.fail(f"Fix did not work - still getting pattern error: {e}")
-            elif "No directories found" in error_msg or "does not have any matching values" in error_msg:
+            elif "No items discovered" in error_msg or "does not have any matching values" in error_msg:
                 # Genotype validation failure - not related to the file detection fix
                 pytest.skip(f"Genotype validation failed (expected for test data): {e}")
             raise

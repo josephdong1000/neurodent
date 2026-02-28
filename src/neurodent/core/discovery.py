@@ -5,6 +5,67 @@ from typing import Union, Dict, List, Tuple, Optional
 import warnings
 
 
+class DiscoveredFile:
+    """Represents discovered file(s) with associated metadata.
+
+    This unified class handles both single files and groups of files that must
+    be loaded together. It replaces the previous dict/MultiFileGroup split behavior.
+
+    Attributes:
+        path (str | None): Single file path (for single-pattern discoveries)
+        paths (tuple[str, ...] | None): Multiple file paths (for multi-pattern discoveries)
+        metadata (dict): Extracted metadata from pattern placeholders (e.g., {animal, session, index})
+
+    Examples:
+        Single file: DiscoveredFile(path="/data/A10/session1/001.rhd", metadata={"animal": "A10", "session": "session1", "index": "001"})
+        Multiple files: DiscoveredFile(paths=("/data/A10/s1/data.bin", "/data/A10/s1/meta.csv"), metadata={"animal": "A10", "session": "s1"})
+    """
+    def __init__(self, path: str = None, paths: tuple[str, ...] = None, metadata: dict = None):
+        if path is None and paths is None:
+            raise ValueError("Either path or paths must be provided")
+        if path is not None and paths is not None:
+            raise ValueError("Cannot provide both path and paths")
+
+        self.path = path
+        self.paths = paths
+        self.metadata = metadata or {}
+
+    @property
+    def is_multi_file(self) -> bool:
+        """Returns True if this represents multiple files that should be loaded together."""
+        return self.paths is not None
+
+    def get_path_list(self) -> List[str]:
+        """Returns all paths as a list, whether single or multiple files."""
+        if self.paths is not None:
+            return list(self.paths)
+        return [self.path] if self.path else []
+
+    def __iter__(self):
+        """Iterate over paths (useful for backward compatibility with MultiFileGroup)."""
+        return iter(self.get_path_list())
+
+    def __repr__(self):
+        if self.is_multi_file:
+            return f"DiscoveredFile(paths={self.paths}, metadata={self.metadata})"
+        return f"DiscoveredFile(path={self.path!r}, metadata={self.metadata})"
+
+
+# Deprecated: Keep MultiFileGroup for backward compatibility
+class MultiFileGroup(DiscoveredFile):
+    """Deprecated: Use DiscoveredFile instead.
+
+    This class is maintained for backward compatibility but will be removed in a future version.
+    """
+    def __init__(self, paths: tuple[str, ...], metadata: dict):
+        warnings.warn(
+            "MultiFileGroup is deprecated. Use DiscoveredFile(paths=..., metadata=...) instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        super().__init__(paths=paths, metadata=metadata)
+
+
 class FileDiscoverer:
     """
     Utility class for discovering files based on wildcard pattern strings.
@@ -39,24 +100,23 @@ class FileDiscoverer:
         parts = re.split(r"\{[^}]+\}", pattern)
         regex_string = "^" + re.escape(parts[0])
         for i, placeholder in enumerate(placeholders):
-            # Match anything except slashes. This ensures {animal} doesn't span multiple directories.
-            regex_string += f"(?P<{placeholder}>[^/]+)"
+            # Match anything except slashes and backslashes.
+            # This ensures placeholders don't span multiple directories.
+            regex_string += f"(?P<{placeholder}>[^/\\\\]+)"
             regex_string += re.escape(parts[i + 1])
         regex_string += "$"
 
         return re.compile(regex_string), glob_pattern
 
-    def discover(self, **filter_kwargs) -> List[Dict]:
+    def discover(self, **filter_kwargs) -> List["DiscoveredFile"]:
         """
-        Discovers files matching patterns, returning a list of dictionaries.
+        Discovers files matching patterns, returning a list of DiscoveredFile objects.
         Keyword args like `animal="A10"` can strictly filter the returned files.
 
         Returns:
-            A list of dicts.
-            If a single pattern was provided, dicts look like:
-                {'path': '...', 'animal': 'A10', 'session': '1'}
-            If multiple patterns were provided, dicts group them by metadata:
-                {'paths': ('..._data.bin', '..._meta.json'), 'animal': 'A10', 'session': '1'}
+            A list of DiscoveredFile objects.
+            For single pattern: DiscoveredFile(path='...', metadata={'animal': 'A10', 'session': '1'})
+            For multiple patterns: DiscoveredFile(paths=('..._data.bin', '..._meta.json'), metadata={'animal': 'A10', 'session': '1'})
         """
         is_single = len(self.patterns) == 1
         return_list = []
@@ -68,7 +128,11 @@ class FileDiscoverer:
         ]
 
         if is_single:
-            return all_discovered[0]
+            # Convert dicts to DiscoveredFile objects
+            for item in all_discovered[0]:
+                path = item.pop("path")
+                return_list.append(DiscoveredFile(path=path, metadata=item))
+            return return_list
 
         # Grouping for multiple patterns.
         # Find the intersection of metadata keys across all found files.
@@ -107,13 +171,11 @@ class FileDiscoverer:
                             f"Duplicate or out-of-order match found for metadata {key} in pattern {self.patterns[pattern_idx]}"
                         )
 
-        # Filter for complete groups and construct final dictionaries
+        # Filter for complete groups and construct DiscoveredFile objects
         for key, paths in grouped_results.items():
             if len(paths) == len(self.patterns):
-                res = {"paths": tuple(paths)}
-                for k, v in zip(keys_to_group, key):
-                    res[k] = v
-                return_list.append(res)
+                metadata = {k: v for k, v in zip(keys_to_group, key)}
+                return_list.append(DiscoveredFile(paths=tuple(paths), metadata=metadata))
 
         return return_list
 
@@ -121,31 +183,38 @@ class FileDiscoverer:
         """Discovers files for a single pattern."""
         regex, glob_str = self._pattern_to_regex_and_glob(pattern)
 
+        # Check if pattern has any placeholders
+        has_placeholders = bool(re.findall(r"\{([^}]+)\}", pattern))
+
         # Handle tilde and resolve to absolute just in case, though user can pass absolute.
         # For glob to work nicely with absolute/relative, we just pass the string.
         discovered_paths = glob.glob(glob_str, recursive=True)
 
         results = []
         for path in discovered_paths:
-            # Normalize path for regex matching
-            normalized_path = str(Path(path)).replace("\\", "/")
+            if has_placeholders:
+                # Normalize path for regex matching
+                normalized_path = str(Path(path)).replace("\\", "/")
 
-            match = regex.match(normalized_path)
-            if match:
-                meta = match.groupdict()
+                match = regex.match(normalized_path)
+                if match:
+                    meta = match.groupdict()
 
-                # Apply filters
-                skip = False
-                for k, v in filter_kwargs.items():
-                    if k in meta and meta[k] != v:
-                        skip = True
-                        break
+                    # Apply filters
+                    skip = False
+                    for k, v in filter_kwargs.items():
+                        if k in meta and meta[k] != v:
+                            skip = True
+                            break
 
-                if skip:
-                    continue
+                    if skip:
+                        continue
 
-                meta["path"] = path
-                results.append(meta)
+                    meta["path"] = path
+                    results.append(meta)
+            else:
+                # No placeholders - just return paths with no metadata
+                results.append({"path": path})
 
         # Sort results by path for deterministic ordering (like old filepath_to_index)
         results.sort(key=lambda x: x["path"])

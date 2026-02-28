@@ -421,6 +421,8 @@ def parse_path_to_animalday(
     **day_parse_kwargs,
 ):
     """
+    DEPRECATED: Use FileDiscoverer with pattern-based discovery instead.
+
     Parses the filename of a binfolder to get the animalday identifier (animal id, genotype, and day).
 
     Args:
@@ -450,6 +452,11 @@ def parse_path_to_animalday(
         ValueError: If mode is invalid or required components cannot be extracted
         TypeError: If filepath is not str or Path
     """
+    warnings.warn(
+        "parse_path_to_animalday is deprecated. Use FileDiscoverer with pattern-based discovery instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
     filepath = Path(filepath)
     match mode:
         case "nest":
@@ -506,6 +513,8 @@ def parse_str_to_genotype(string: str, strict_matching: bool = False) -> str:
 
 def parse_str_to_animal(string: str, animal_param: tuple[int, str] | str | list[str] = (0, None)) -> str:
     """
+    DEPRECATED: Use FileDiscoverer with {animal} placeholder in pattern instead.
+
     Parses the filename of a binfolder to get the animal id.
 
     Args:
@@ -526,9 +535,9 @@ def parse_str_to_animal(string: str, animal_param: tuple[int, str] | str | list[
         'A10'
 
         # Regex pattern format
-        >>> parse_str_to_animal("WT_A10_2023-01-01_data.bin", r"A\\d+")
+        >>> parse_str_to_animal("WT_A10_2023-01-01_data.bin", r"A\\\\d+")
         'A10'
-        >>> parse_str_to_animal("subject_123_data.bin", r"\\d+")
+        >>> parse_str_to_animal("subject_123_data.bin", r"\\\\d+")
         '123'
 
         # List format: possible IDs to match
@@ -537,6 +546,11 @@ def parse_str_to_animal(string: str, animal_param: tuple[int, str] | str | list[
         >>> parse_str_to_animal("WT_A10_data.bin", ["B15", "C20"])  # No match
         ValueError: No matching ID found in WT_A10_data.bin from possible IDs: ['B15', 'C20']
     """
+    warnings.warn(
+        "parse_str_to_animal is deprecated. Use FileDiscoverer with {animal} placeholder in pattern instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
     if isinstance(animal_param, tuple):
         index, sep = animal_param
         animid = string.split(sep)
@@ -566,6 +580,8 @@ def parse_str_to_day(
     date_patterns: list[tuple[str, str]] = None,
 ) -> datetime:
     """
+    DEPRECATED: Use FileDiscoverer with {session} placeholder in pattern instead.
+
     Parses the filename of a binfolder to get the day.
 
     Args:
@@ -591,12 +607,12 @@ def parse_str_to_day(
 
     Examples:
         >>> # Handle ambiguous date formats with explicit patterns
-        >>> patterns = [(r'(19\d{2}|20\d{2})-(\d{1,2})-(\d{1,2})', '%Y-%m-%d')]
+        >>> patterns = [(r'(19\\d{2}|20\\d{2})-(\\d{1,2})-(\\d{1,2})', '%Y-%m-%d')]
         >>> parse_str_to_day('2001_2023-07-04_data', date_patterns=patterns)
         datetime.datetime(2023, 7, 4, 0, 0)
 
         >>> # European format pattern
-        >>> patterns = [(r'(\d{1,2})/(\d{1,2})/(19\d{2}|20\d{2})', '%d/%m/%Y')]
+        >>> patterns = [(r'(\\d{1,2})/(\\d{1,2})/(19\\d{2}|20\\d{2})', '%d/%m/%Y')]
         >>> parse_str_to_day('04/07/2023_data', date_patterns=patterns)
         datetime.datetime(2023, 7, 4, 0, 0)  # July 4th, not April 7th
 
@@ -605,6 +621,11 @@ def parse_str_to_day(
         Without date_patterns, the function falls back to token-based parsing which may
         be ambiguous for formats like MM/DD/YYYY vs DD/MM/YYYY.
     """
+    warnings.warn(
+        "parse_str_to_day is deprecated. Use FileDiscoverer with {session} placeholder in pattern instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
     if parse_params is None:
         parse_params = {"fuzzy": True}
     elif not isinstance(parse_params, dict):
