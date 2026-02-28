@@ -195,8 +195,7 @@ class AnimalOrganizer(AnimalFeatureParser):
 
             # Normalize session by stripping (N) suffixes so overlapping sessions
             # like "2023-01-15", "2023-01-15(1)", "2023-01-15(2)" get grouped
-            import re as _re
-            normalized_session = _re.sub(r"\(\d+\)$", "", session)
+            normalized_session = re.sub(r"\(\d+\)$", "", session)
 
             if normalized_session in skip_sessions:
                 continue
