@@ -320,6 +320,12 @@ class AnimalOrganizer(AnimalFeatureParser):
 
     def _is_item_file(self, item):
         """Helper to check if an item represents a file(s) rather than a directory."""
+        from ..core.discovery import DiscoveredFile
+
+        if isinstance(item, DiscoveredFile):
+            if item.is_multi_file:
+                return Path(item.paths[0]).is_file()
+            return Path(item.path).is_file()
         if isinstance(item, (list, tuple)):
             return Path(item[0]).is_file()
         return Path(item).is_file()

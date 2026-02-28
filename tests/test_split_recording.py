@@ -224,10 +224,10 @@ class TestSplitEdgeCases:
         core_module = sys.modules['neurodent.core.core']
         LRO = sys.modules['neurodent.core.core'].LongRecordingOrganizer
         
-        monkeypatch.setattr(core_module, 'si', None)
-        
-        lro = LRO(item='.', mode='mne')
+        lro = LRO(item='.', mode=None)
         lro.LongRecording = "dummy"
+        
+        monkeypatch.setattr(core_module, 'si', None)
         
         with pytest.raises(ImportError, match="SpikeInterface is required for split"):
             lro.split({"A": ["Ch0"]})
@@ -240,10 +240,10 @@ class TestSplitEdgeCases:
         core_module = sys.modules['neurodent.core.core']
         LRO = sys.modules['neurodent.core.core'].LongRecordingOrganizer
         
-        monkeypatch.setattr(core_module, 'si', None)
-        
-        lro = LRO(item='.', mode='mne')
+        lro = LRO(item='.', mode=None)
         lro.LongRecording = "dummy"
+        
+        monkeypatch.setattr(core_module, 'si', None)
         
         with pytest.raises(ImportError, match="SpikeInterface is required for persist"):
             lro.persist(tmp_path / "output")

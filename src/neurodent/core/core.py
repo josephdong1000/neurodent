@@ -522,6 +522,7 @@ class LongRecordingOrganizer:
         datetimes_are_start: bool = True,
         n_jobs: int = 1,
         recording: "si.BaseRecording" = None,
+        labels: dict = None,
         **kwargs,
     ):
         # Import DiscoveredFile here to avoid circular imports
@@ -540,6 +541,14 @@ class LongRecordingOrganizer:
             self.data_files = None
             self.item = item
 
+        # Derive base_folder_path from item
+        if isinstance(item, (str, Path)):
+            self.base_folder_path = Path(item)
+        elif isinstance(item, DiscoveredFile) and item.path is not None:
+            self.base_folder_path = Path(item.path)
+        else:
+            self.base_folder_path = None
+
         self.n_truncate = parse_truncate(truncate)
         self.truncate = True if self.n_truncate > 0 else False
         if self.truncate:
@@ -550,6 +559,7 @@ class LongRecordingOrganizer:
         self.manual_datetimes = manual_datetimes
         self.datetimes_are_start = datetimes_are_start
         self.n_jobs = n_jobs
+        self.labels = dict(labels) if labels else {}
 
         self.meta = None
         self.channel_names = None
@@ -1243,6 +1253,10 @@ class LongRecordingOrganizer:
                 child_lro.file_durations = self.file_durations
                 child_lro.cumulative_file_durations = self.cumulative_file_durations
 
+            # Inherit base_folder_path from parent
+            if hasattr(self, "base_folder_path"):
+                child_lro.base_folder_path = self.base_folder_path
+
             # Inherit bad channels that are present in this split
             if self.bad_channel_names:
                 child_lro.bad_channel_names = [
@@ -1254,6 +1268,10 @@ class LongRecordingOrganizer:
                 child_lro.meta = copy.deepcopy(self.meta)
                 child_lro.meta.n_channels = len(valid_names)
                 child_lro.meta.channel_names = valid_names
+
+            # Inherit labels (as a copy)
+            if hasattr(self, "labels") and self.labels:
+                child_lro.labels = dict(self.labels)
 
             lros[group_name] = child_lro
 
@@ -1988,6 +2006,17 @@ class LongRecordingOrganizer:
                 )
 
         # Note: Channel names, sampling rate, etc. should already be validated as identical
+
+        # Merge labels
+        if hasattr(other_lro, "labels") and other_lro.labels:
+            for key, value in other_lro.labels.items():
+                if key in self.labels and self.labels[key] != value:
+                    warnings.warn(
+                        f"Label conflict during merge for key '{key}': "
+                        f"'{self.labels[key]}' vs '{value}'. Using value from merged LRO.",
+                        UserWarning,
+                    )
+                self.labels[key] = value
 
     def __repr__(self):
         """Return a detailed string representation for debugging."""

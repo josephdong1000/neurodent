@@ -1,3 +1,4 @@
+import os
 import re
 import glob
 from pathlib import Path
@@ -5,11 +6,15 @@ from typing import Union, Dict, List, Tuple, Optional
 import warnings
 
 
-class DiscoveredFile:
+class DiscoveredFile(os.PathLike):
     """Represents discovered file(s) with associated metadata.
 
     This unified class handles both single files and groups of files that must
     be loaded together. It replaces the previous dict/MultiFileGroup split behavior.
+
+    Implements ``os.PathLike`` so that ``Path(discovered_file)`` works for
+    single-file discoveries, and provides dict-style access (``obj["animal"]``,
+    ``"path" in obj``) for backward compatibility with the old dict-based API.
 
     Attributes:
         path (str | None): Single file path (for single-pattern discoveries)
@@ -29,6 +34,36 @@ class DiscoveredFile:
         self.path = path
         self.paths = paths
         self.metadata = metadata or {}
+
+    # -- os.PathLike protocol --------------------------------------------------
+
+    def __fspath__(self) -> str:
+        """Return the file-system path string.
+
+        For single-file discoveries returns ``self.path``.
+        For multi-file discoveries returns the first path in ``self.paths``.
+        """
+        if self.path is not None:
+            return self.path
+        if self.paths is not None and len(self.paths) > 0:
+            return self.paths[0]
+        raise TypeError("DiscoveredFile has no path to return")
+
+    # -- dict-style backward compatibility ------------------------------------
+
+    def __contains__(self, key):
+        """Support ``'animal' in discovered_file`` for backward compat."""
+        if key in ("path", "paths"):
+            return getattr(self, key) is not None
+        return key in self.metadata
+
+    def __getitem__(self, key):
+        """Support ``discovered_file['animal']`` for backward compat."""
+        if key == "path":
+            return self.path
+        if key == "paths":
+            return self.paths
+        return self.metadata[key]
 
     @property
     def is_multi_file(self) -> bool:
