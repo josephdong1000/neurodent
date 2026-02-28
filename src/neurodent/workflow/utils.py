@@ -218,7 +218,9 @@ def deep_merge_dict(base: dict, override: dict) -> dict:
     Note:
         This function does NOT mutate the input dictionaries - it returns a new dict.
     """
-    result = base.copy()
+    import copy
+
+    result = copy.deepcopy(base)
     for key, value in override.items():
         if key in result and isinstance(result[key], dict) and isinstance(value, dict):
             # Recursively merge nested dictionaries
