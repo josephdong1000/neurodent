@@ -25,6 +25,8 @@ dist/
 /.venv/
 /venv-*/
 **/.*/
+!.github/
+!.github/**
 **/__pycache__/
 **/__pycache__/*
 /__pycache__/

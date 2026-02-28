@@ -277,6 +277,47 @@ class TestFrequencyDomainSpikeAnalysisResult:
             if sum(counts.values()) > 0:
                 assert len(saved_files) > 0
 
+    def test_plot_spike_averaged_traces_empty_epochs(self, detection_params):
+        """Test that plot_spike_averaged_traces handles empty epochs gracefully.
+
+        When spike annotations are at recording edges, the epoch window may
+        extend beyond the recording, causing MNE to drop all epochs. The method
+        should log a warning and continue instead of raising.
+        """
+        n_channels = 2
+        fs = 1000.0
+        duration = 1.0  # Short recording
+        n_samples = int(duration * fs)
+
+        info = mne.create_info(ch_names=[f"ch{i}" for i in range(n_channels)], sfreq=fs, ch_types="eeg")
+        data = np.random.randn(n_channels, n_samples) * 0.1
+        raw = mne.io.RawArray(data, info)
+
+        # Place spikes at the very start (index 0) so epoch window extends
+        # before recording start, causing MNE to drop all epochs
+        annotations = mne.Annotations(
+            onset=[0.0, 0.0],
+            duration=[0.0, 0.0],
+            description=["Spike_Ch0", "Spike_Ch1"],
+        )
+        raw.set_annotations(annotations)
+
+        fdsar = FrequencyDomainSpikeAnalysisResult(
+            result_mne=raw,
+            detection_params=detection_params,
+            channel_names=raw.ch_names,
+        )
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=RuntimeWarning)
+
+            # Use a wide window so epochs are dropped (tmin=-0.5 extends before t=0)
+            counts = fdsar.plot_spike_averaged_traces(tmin=-0.5, tmax=0.5)
+
+        # Should return without raising
+        assert isinstance(counts, dict)
+        assert len(counts) == n_channels
+
     def test_convert_to_mne(self, mock_sorting_analyzer, detection_params):
         """Test conversion to MNE format."""
         fdsar = FrequencyDomainSpikeAnalysisResult(
@@ -284,7 +325,7 @@ class TestFrequencyDomainSpikeAnalysisResult:
         )
 
         # Mock the conversion method
-        with patch("neurodent.visualization.results.SpikeAnalysisResult.convert_sas_to_mne") as mock_convert:
+        with patch("neurodent.visualization.frequency_domain_results.FrequencyDomainSpikeAnalysisResult.convert_sas_to_mne") as mock_convert:
             mock_mne = MagicMock()
             mock_convert.return_value = mock_mne
 
@@ -312,6 +353,159 @@ class TestFrequencyDomainSpikeAnalysisResult:
         assert "day1" in str_repr
 
         assert repr(fdsar) == str_repr
+
+
+def _make_mock_sorting_analyzer(traces_uv, sfreq, channel_id, spike_samples):
+    """Build a mock SortingAnalyzer backed by a real numpy array.
+
+    Args:
+        traces_uv: 1-D numpy array of trace values in micro-volts.
+        sfreq: Sampling frequency (Hz).
+        channel_id: Channel identifier string.
+        spike_samples: 1-D numpy array of spike sample indices.
+    """
+    n_samples = len(traces_uv)
+    duration = n_samples / sfreq
+
+    rec = MagicMock()
+    rec.get_sampling_frequency.return_value = sfreq
+    rec.get_duration.return_value = duration
+    rec.get_channel_ids.return_value = np.array([channel_id])
+
+    def _get_traces(start_frame=0, end_frame=None, return_scaled=True):
+        end = end_frame if end_frame is not None else n_samples
+        return traces_uv[start_frame:end].reshape(-1, 1).copy()
+
+    rec.get_traces = _get_traces
+
+    sorting = MagicMock()
+    if len(spike_samples) > 0:
+        sorting.get_unit_ids.return_value = ["0"]
+        sorting.get_sampling_frequency.return_value = sfreq
+        sorting.get_unit_spike_train.return_value = spike_samples
+    else:
+        sorting.get_unit_ids.return_value = []
+        sorting.get_sampling_frequency.return_value = sfreq
+
+    sa = MagicMock()
+    sa.recording = rec
+    sa.sorting = sorting
+    return sa
+
+
+@pytest.mark.unit
+class TestConvertDaskParallelization:
+    """Test that Dask multiprocess mode produces the same results as serial."""
+
+    @pytest.fixture
+    def generated_sorting_analyzers(self):
+        """Generate a list of mock SortingAnalyzers with deterministic data.
+
+        Returns three channels each with 120 s of data at 1000 Hz (long enough
+        to exercise the chunking logic at the default chunk_len=60).
+        """
+        rng = np.random.default_rng(42)
+        sfreq = 1000.0
+        duration_s = 120.0
+        n_samples = int(duration_s * sfreq)
+
+        sas = []
+        for ch_idx in range(3):
+            traces = rng.standard_normal(n_samples).astype(np.float64) * 100  # µV
+            spikes = np.sort(rng.choice(n_samples, size=10, replace=False))
+            sa = _make_mock_sorting_analyzer(traces, sfreq, f"ch{ch_idx}", spikes)
+            sas.append(sa)
+        return sas
+
+    @pytest.fixture
+    def single_sorting_analyzer(self):
+        """Generate a single mock SortingAnalyzer for convert_sa_to_np tests."""
+        rng = np.random.default_rng(99)
+        sfreq = 1000.0
+        duration_s = 180.0  # 3 chunks at default chunk_len=60
+        n_samples = int(duration_s * sfreq)
+        traces = rng.standard_normal(n_samples).astype(np.float64) * 100
+        spikes = np.sort(rng.choice(n_samples, size=5, replace=False))
+        return _make_mock_sorting_analyzer(traces, sfreq, "ch0", spikes)
+
+    # --- convert_sas_to_mne tests ---
+
+    def test_convert_sas_to_mne_serial_equals_dask(self, generated_sorting_analyzers):
+        """Serial and Dask modes should produce identical MNE RawArrays."""
+        raw_serial = FrequencyDomainSpikeAnalysisResult.convert_sas_to_mne(
+            generated_sorting_analyzers, multiprocess_mode="serial"
+        )
+        raw_dask = FrequencyDomainSpikeAnalysisResult.convert_sas_to_mne(
+            generated_sorting_analyzers, multiprocess_mode="dask"
+        )
+
+        # Data must be identical
+        np.testing.assert_array_equal(raw_serial.get_data(), raw_dask.get_data())
+        assert raw_serial.ch_names == raw_dask.ch_names
+        assert raw_serial.info["sfreq"] == raw_dask.info["sfreq"]
+
+        # Annotations must match
+        assert len(raw_serial.annotations) == len(raw_dask.annotations)
+        np.testing.assert_array_almost_equal(
+            raw_serial.annotations.onset, raw_dask.annotations.onset
+        )
+
+    def test_convert_sas_to_mne_correct_shape(self, generated_sorting_analyzers):
+        """Output should have the correct number of channels and samples."""
+        raw = FrequencyDomainSpikeAnalysisResult.convert_sas_to_mne(
+            generated_sorting_analyzers, multiprocess_mode="dask"
+        )
+        assert raw.get_data().shape[0] == 3  # 3 channels
+        assert raw.get_data().shape[1] == 120_000  # 120 s * 1000 Hz
+
+    def test_convert_sas_to_mne_empty_list(self):
+        """Empty input should return None in both modes."""
+        assert FrequencyDomainSpikeAnalysisResult.convert_sas_to_mne(
+            [], multiprocess_mode="serial"
+        ) is None
+        assert FrequencyDomainSpikeAnalysisResult.convert_sas_to_mne(
+            [], multiprocess_mode="dask"
+        ) is None
+
+    # --- convert_sa_to_np tests ---
+
+    def test_convert_sa_to_np_serial_equals_dask(self, single_sorting_analyzer):
+        """Serial and Dask modes should produce identical numpy arrays."""
+        traces_serial = FrequencyDomainSpikeAnalysisResult.convert_sa_to_np(
+            single_sorting_analyzer, multiprocess_mode="serial"
+        )
+        traces_dask = FrequencyDomainSpikeAnalysisResult.convert_sa_to_np(
+            single_sorting_analyzer, multiprocess_mode="dask"
+        )
+        np.testing.assert_array_equal(traces_serial, traces_dask)
+
+    def test_convert_sa_to_np_correct_length(self, single_sorting_analyzer):
+        """Output length should equal total_frames."""
+        traces = FrequencyDomainSpikeAnalysisResult.convert_sa_to_np(
+            single_sorting_analyzer, multiprocess_mode="dask"
+        )
+        assert len(traces) == 180_000  # 180 s * 1000 Hz
+
+    def test_convert_sa_to_np_uv_to_v_scaling(self, single_sorting_analyzer):
+        """Traces should be scaled from µV to V (×1e-6)."""
+        traces = FrequencyDomainSpikeAnalysisResult.convert_sa_to_np(
+            single_sorting_analyzer, multiprocess_mode="serial"
+        )
+        # Raw mock data has std ~100 µV → after scaling std ~1e-4 V
+        assert np.abs(traces).max() < 1.0  # definitely in V, not µV
+
+    def test_convert_sa_to_np_multi_channel_raises(self):
+        """Should raise ValueError when SortingAnalyzer has more than 1 channel."""
+        sa = MagicMock()
+        sa.recording.get_channel_ids.return_value = np.array(["ch0", "ch1"])
+        with pytest.raises(ValueError, match="Expected SortingAnalyzer to have 1 channel"):
+            FrequencyDomainSpikeAnalysisResult.convert_sa_to_np(
+                sa, multiprocess_mode="serial"
+            )
+        with pytest.raises(ValueError, match="Expected SortingAnalyzer to have 1 channel"):
+            FrequencyDomainSpikeAnalysisResult.convert_sa_to_np(
+                sa, multiprocess_mode="dask"
+            )
 
 
 @pytest.mark.unit

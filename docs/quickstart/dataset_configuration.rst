@@ -38,14 +38,14 @@ How It Works
 **How dataset selection works:**
 
 1. Main config (``config.yaml``) contains shared settings for all datasets
-2. Active dataset is specified via ``active_dataset`` parameter or ``NEURODENT_DATASET`` environment variable
-3. Dataset config is loaded from ``config/datasets/{active_dataset}.yaml``
-4. Dataset config is deep-merged into main config
-5. Local overrides (``config.local.yaml``) are applied last
+2. Local overrides (``config.local.yaml``) are merged if the file exists (can set ``active_dataset``)
+3. Active dataset is resolved via ``NEURODENT_DATASET`` env var or the ``active_dataset`` key
+4. Dataset config is loaded from ``config/datasets/{active_dataset}.yaml``
+5. Dataset config is deep-merged on top of the combined config
 
 **Merge order** (later configs override earlier ones)::
 
-   config.yaml → datasets/{active}.yaml → config.local.yaml
+   config.yaml → config.local.yaml → datasets/{active}.yaml
 
 Switching Datasets
 ------------------

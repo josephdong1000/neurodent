@@ -94,14 +94,14 @@ for data_folder, animal_ids in tqdm(data_folders_to_animal_ids.items(), desc="Pr
                 logging.info(f"No bad channels defined for {data_folder} {animal_id}, skipping filtering")
             # !SECTION
 
-        # SECTION 3: Make SARs, save SARs and load into WAR
+        # SECTION 3: Make FDSARs, save FDSARs and load into WAR
         # with Client(cluster_spike) as client:
         #     client.run(lambda: os.system(f"pip install -e {base_folder}"))
 
-        #     sars = ao.compute_spike_analysis(multiprocess_mode='dask')
-        #     for sar in sars:
-        #         sar.save_fif_and_json(base_folder / 'notebooks' / 'tests' / 'test-sars-full' / f'{data_folder} {slugify(sar.animal_day, allow_unicode=True)}', overwrite=True) # animal_day not unique for Sox5 rec sessions, so add bin_folder_name
-        #     war.read_sars_spikes(sars)
+        #     fdsars = ao.compute_frequency_domain_spike_analysis(multiprocess_mode='dask')
+        #     for fdsar in fdsars:
+        #         fdsar.save_fif_and_json(base_folder / 'notebooks' / 'tests' / 'test-sars-full' / f'{data_folder} {slugify(fdsar.animal_day, allow_unicode=True)}', overwrite=True) # animal_day not unique for Sox5 rec sessions, so add bin_folder_name
+        #     war.read_sars_spikes(fdsars)
         # !SECTION
 
         # SECTION 4: Save WARs and cleanup
