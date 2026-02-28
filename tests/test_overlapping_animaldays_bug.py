@@ -9,6 +9,7 @@ as a single LongRecordingOrganizer, not overwritten.
 """
 
 import pytest
+import re
 import numpy as np
 from unittest.mock import Mock, patch
 from pathlib import Path
@@ -24,20 +25,10 @@ class TestOverlappingAnimaldaysBug:
 
     def test_overlapping_animaldays_lof_overwrite_bug(self):
         """
-        This test demonstrates the bug where multiple folders parsing to the same
-        animalday cause LOF scores to be overwritten.
+        Test that multiple folders parsing to the same animalday are merged into
+        a single LRO, preventing LOF score overwrites.
 
-        Expected behavior (not yet implemented):
-        - Multiple folders for same day should be merged into single LRO
-        - LOF computed once on combined data
-        - lof_scores_dict should have one entry per unique animalday
-
-        Current buggy behavior:
-        - Multiple folders create separate LROs with same animalday key
-        - LOF scores get overwritten, only last folder survives
-        - lof_scores_dict length < number of folders processed
-
-        This test should FAIL until the bug is fixed.
+        Folders with (1), (2) suffixes should be grouped together and merged.
         """
 
         # Setup: Create mock folders that parse to same animalday
@@ -86,19 +77,21 @@ class TestOverlappingAnimaldaysBug:
 
                 mock_lros.append(mock_lro)
 
-            # Patch glob.glob to return our test folders
-            with patch("glob.glob") as mock_glob:
-                mock_glob.return_value = [str(folder1), str(folder2), str(folder3)]
+            # Patch glob.glob in the discovery module to return our test files
+            with patch("neurodent.core.discovery.glob.glob") as mock_glob:
+                mock_glob.return_value = [
+                    str(folder1 / "dummy_ColMajor_001.bin"),
+                    str(folder2 / "dummy_ColMajor_001.bin"),
+                    str(folder3 / "dummy_ColMajor_001.bin"),
+                ]
 
                 # Patch LongRecordingOrganizer creation - will be called multiple times for sorting + final creation
                 with patch.object(core, "LongRecordingOrganizer") as mock_lro_class:
-                    # Return different mocks each time, cycling through our prepared LROs
-                    call_count = 0
 
                     def mock_lro_side_effect(*args, **kwargs):
-                        nonlocal call_count
                         # Map folder paths to their corresponding mock LROs
-                        folder_path = str(args[0])
+                        # args[0] may be a DiscoveredFile object
+                        folder_path = str(args[0]) if args else ""
                         if "WT_A10_2023-01-15(2)" in folder_path:
                             return mock_lros[2]  # Highest median time (150.0)
                         elif "WT_A10_2023-01-15(1)" in folder_path:
@@ -108,83 +101,16 @@ class TestOverlappingAnimaldaysBug:
 
                     mock_lro_class.side_effect = mock_lro_side_effect
 
-                    # Create AnimalOrganizer - this should trigger the bug
-                    ao = results.AnimalOrganizer(animal_id="A10", pattern=f"{temp_path}/WT_{{animal}}_*/dummy_ColMajor_*.bin", )
-
-                    # Verify that all folders parse to same animalday
-                    parsed_animaldays = []
-                    for folder in [folder1, folder2, folder3]:
-                        parsed = core.parse_path_to_animalday(folder, animal_param=["A10"], )
-                        parsed_animaldays.append(parsed["animalday"])
-
-                    # All should parse to same animalday (parentheses removed)
-                    assert len(set(parsed_animaldays)) == 1, f"Expected same animalday, got: {parsed_animaldays}"
-                    expected_animalday = parsed_animaldays[0]
-
-                    # Create a simple DataFrame to simulate windowed analysis results
-                    import pandas as pd
-
-                    mock_df = pd.DataFrame(
-                        {
-                            "timestamp": [pd.Timestamp("2023-01-15 10:00:00")] * 3,
-                            "animalday": [expected_animalday] * 3,  # All same animalday
-                            "rms": [1.0, 1.1, 1.2],
-                        }
-                    )
-
-                    # Create WindowAnalysisResult directly to test LOF collection bug
-                    # This simulates what happens in compute_windowed_analysis
-                    war = results.WindowAnalysisResult(
-                        result=mock_df,
+                    # Create AnimalOrganizer - overlapping sessions should be merged via normalize_session
+                    ao = results.AnimalOrganizer(
                         animal_id="A10",
-                        genotype="WT",
-                        channel_names=["LMot", "RMot", "LAud"],
-                        lof_scores_dict={},  # Empty initially
+                        pattern=f"{temp_path}/WT_{{animal}}_{{session}}/dummy_ColMajor_{{index}}.bin",
+                        normalize_session=lambda s: re.sub(r"\(\d+\)$", "", s),
                     )
-
-                    # Manually trigger the LOF collection that happens in compute_windowed_analysis
-                    # This is where the bug occurs (results.py:345-355)
-                    lof_scores_dict = {}
-                    for animalday, lrec in zip(ao.animaldays, ao.long_recordings):
-                        if hasattr(lrec, "lof_scores") and lrec.lof_scores is not None:
-                            lof_scores_dict[animalday] = {  # BUG: Direct overwrite!
-                                "lof_scores": lrec.lof_scores.tolist(),
-                                "channel_names": lrec.channel_names,
-                            }
-
-                    # Apply the collected LOF scores to the WAR
-                    war.lof_scores_dict = lof_scores_dict
-
-                    # BUG DEMONSTRATION: Check that LOF data was lost
-                    print(f"Number of folders: {len(ao.long_recordings)}")
-                    print(f"Animaldays: {ao.animaldays}")
-                    print(f"LOF scores dict length: {len(war.lof_scores_dict)}")
-                    print(f"LOF scores dict keys: {list(war.lof_scores_dict.keys())}")
 
                     # After fix: We expect 1 LRO per unique animalday (not per folder)
                     assert len(ao.long_recordings) == 1, f"Expected 1 merged LRO, got {len(ao.long_recordings)}"
-                    assert len(war.lof_scores_dict) == 1, (
-                        f"Expected 1 LOF entry (no collision), got {len(war.lof_scores_dict)}"
-                    )
-
-                    # The LOF scores should be computed on concatenated data from all 3 folders
-                    # This is more comprehensive than any single folder's LOF scores
-                    surviving_scores = war.lof_scores_dict[expected_animalday]["lof_scores"]
-
-                    # Verify the LOF scores are valid (should be different from individual folder scores)
-                    # The concatenated data should produce different LOF scores than any single folder
-                    assert len(surviving_scores) == 3, f"Expected 3 channel LOF scores, got {len(surviving_scores)}"
-
-                    # Success: No data loss, single LRO handles all folders
-                    folder_count = 3  # We created 3 test folders
-                    print(
-                        f"SUCCESS: Fix implemented correctly. "
-                        f"Merged {folder_count} overlapping folders into 1 LRO with 1 comprehensive LOF analysis."
-                    )
-
-                    # Verify temporal ordering: folders should be processed in median time order (50.0, 100.0, 150.0)
-                    # This means folder2 (50.0), folder1 (100.0), folder3 (150.0)
-                    # The actual merging and final LOF scores should reflect this temporal ordering
+                    assert len(ao.animaldays) == 1, f"Expected 1 animalday, got {len(ao.animaldays)}"
 
     def test_folder_sorting_by_median_time(self):
         """
@@ -248,21 +174,25 @@ class TestOverlappingAnimaldaysBug:
                 mock_recording.get_duration.return_value = 3600.0  # 1 hour duration
                 mock_lro.LongRecording = mock_recording
 
-            # Patch glob to return folders
-            with patch("glob.glob") as mock_glob:
-                mock_glob.return_value = [str(folder_a), str(folder_b), str(folder_c)]
+            # Patch glob in the discovery module to return our test files
+            with patch("neurodent.core.discovery.glob.glob") as mock_glob:
+                mock_glob.return_value = [
+                    str(folder_a / "dummy_ColMajor_001.bin"),
+                    str(folder_b / "dummy_ColMajor_001.bin"),
+                    str(folder_c / "dummy_ColMajor_001.bin"),
+                ]
 
                 # Patch LongRecordingOrganizer to return specific mocks
                 with patch.object(core, "LongRecordingOrganizer") as mock_lro_class:
 
                     def mock_lro_side_effect(*args, **kwargs):
-                        folder_path = str(args[0])
-                        if folder_path.endswith("WT_A10_2023-01-15"):
-                            return mock_lro_a  # Middle time (100.0s)
-                        elif folder_path.endswith("WT_A10_2023-01-15(1)"):
-                            return mock_lro_b  # Earliest time (50.0s)
-                        elif folder_path.endswith("WT_A10_2023-01-15(2)"):
+                        folder_path = str(args[0]) if args else ""
+                        if "WT_A10_2023-01-15(2)" in folder_path:
                             return mock_lro_c  # Latest time (150.0s)
+                        elif "WT_A10_2023-01-15(1)" in folder_path:
+                            return mock_lro_b  # Earliest time (50.0s)
+                        elif "WT_A10_2023-01-15" in folder_path:
+                            return mock_lro_a  # Middle time (100.0s)
                         return Mock()
 
                     mock_lro_class.side_effect = mock_lro_side_effect
@@ -280,7 +210,11 @@ class TestOverlappingAnimaldaysBug:
                     mock_lro_c.merge = mock_merge
 
                     # Create AnimalOrganizer which should trigger temporal sorting and merging
-                    ao = results.AnimalOrganizer(animal_id="A10", pattern=f"{temp_path}/WT_{{animal}}_*/dummy_ColMajor_*.bin", )
+                    ao = results.AnimalOrganizer(
+                        animal_id="A10",
+                        pattern=f"{temp_path}/WT_{{animal}}_{{session}}/dummy_ColMajor_{{index}}.bin",
+                        normalize_session=lambda s: re.sub(r"\(\d+\)$", "", s),
+                    )
 
                     # Verify that we have one merged LRO (overlapping folders)
                     assert len(ao.long_recordings) == 1
@@ -310,9 +244,13 @@ class TestOverlappingAnimaldaysBug:
                 (folder / "dummy_ColMajor_001.bin").touch()
                 (folder / "dummy_Meta_001.json").touch()
 
-            # Mock glob to return test folders
-            with patch("glob.glob") as mock_glob:
-                mock_glob.return_value = [str(folder1), str(folder2), str(folder3)]
+            # Mock glob in the discovery module to return test files
+            with patch("neurodent.core.discovery.glob.glob") as mock_glob:
+                mock_glob.return_value = [
+                    str(folder1 / "dummy_ColMajor_001.bin"),
+                    str(folder2 / "dummy_ColMajor_001.bin"),
+                    str(folder3 / "dummy_ColMajor_001.bin"),
+                ]
 
                 # Mock LRO creation to avoid file processing
                 with patch.object(core, "LongRecordingOrganizer") as mock_lro_class:
@@ -336,7 +274,7 @@ class TestOverlappingAnimaldaysBug:
                     mock_lro3.LongRecording = Mock()
 
                     def mock_lro_side_effect(*args, **kwargs):
-                        folder_path = str(args[0])
+                        folder_path = str(args[0]) if args else ""
                         if "WT_A10_2023-01-15(1)" in folder_path:
                             return mock_lro2
                         elif "WT_A10_2023-01-16" in folder_path:
@@ -346,7 +284,11 @@ class TestOverlappingAnimaldaysBug:
 
                     mock_lro_class.side_effect = mock_lro_side_effect
 
-                    ao = results.AnimalOrganizer(animal_id="A10", pattern=f"{temp_path}/WT_{{animal}}_*/dummy_ColMajor_*.bin", )
+                    ao = results.AnimalOrganizer(
+                        animal_id="A10",
+                        pattern=f"{temp_path}/WT_{{animal}}_{{session}}/dummy_ColMajor_{{index}}.bin",
+                        normalize_session=lambda s: re.sub(r"\(\d+\)$", "", s),
+                    )
 
                     # Should have 2 unique animaldays, not 3 folders
                     assert len(ao.animaldays) == 2
@@ -373,36 +315,32 @@ class TestOverlappingAnimaldaysBug:
             for folder in [folder1, folder2]:
                 folder.mkdir(parents=True)
 
-            # Mock LRO creation and setup - patch the entire mode processing
-            with patch.object(core.LongRecordingOrganizer, "convert_colbins_rowbins_to_rec"):
-                with patch.object(core.LongRecordingOrganizer, "prepare_colbins_rowbins_metas"):
-                    # Create two mock LROs
-                    lro1 = core.LongRecordingOrganizer(item=folder1, mode=None
-                    )  # Use None to skip processing
-                    lro2 = core.LongRecordingOrganizer(item=folder2, mode=None)
+            # Create two LROs with mode=None to skip processing
+            lro1 = core.LongRecordingOrganizer(item=folder1, mode=None)
+            lro2 = core.LongRecordingOrganizer(item=folder2, mode=None)
 
-                # Mock the recordings and metadata
-                mock_recording1 = Mock()
-                mock_recording2 = Mock()
-                mock_merged_recording = Mock()
+            # Mock the recordings and metadata
+            mock_recording1 = Mock()
+            mock_recording2 = Mock()
+            mock_merged_recording = Mock()
 
-                lro1.LongRecording = mock_recording1
-                lro2.LongRecording = mock_recording2
-                lro1.channel_names = ["LMot", "RMot", "LAud"]
-                lro2.channel_names = ["LMot", "RMot", "LAud"]
-                lro1.meta = Mock(f_s=1000, n_channels=3)
-                lro2.meta = Mock(f_s=1000, n_channels=3)
+            lro1.LongRecording = mock_recording1
+            lro2.LongRecording = mock_recording2
+            lro1.channel_names = ["LMot", "RMot", "LAud"]
+            lro2.channel_names = ["LMot", "RMot", "LAud"]
+            lro1.meta = Mock(f_s=1000, n_channels=3)
+            lro2.meta = Mock(f_s=1000, n_channels=3)
 
-                # Mock si.concatenate_recordings at the module level
-                with patch("neurodent.core.core.si.concatenate_recordings") as mock_concat:
-                    mock_concat.return_value = mock_merged_recording
+            # Mock si.concatenate_recordings at the module level
+            with patch("neurodent.core.core.si.concatenate_recordings") as mock_concat:
+                mock_concat.return_value = mock_merged_recording
 
-                    # Test merge functionality
-                    lro1.merge(lro2)
+                # Test merge functionality
+                lro1.merge(lro2)
 
-                    # Verify concatenation was called
-                    mock_concat.assert_called_once_with([mock_recording1, mock_recording2])
-                    assert lro1.LongRecording == mock_merged_recording
+                # Verify concatenation was called
+                mock_concat.assert_called_once_with([mock_recording1, mock_recording2])
+                assert lro1.LongRecording == mock_merged_recording
 
 
 

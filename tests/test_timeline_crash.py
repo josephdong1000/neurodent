@@ -20,6 +20,8 @@ class TestTimelineSortingCrash:
         ao._sort_lros_by_median_time = AnimalOrganizer._sort_lros_by_median_time.__get__(ao, AnimalOrganizer)
         ao._resolve_timestamp_input = MagicMock(side_effect=lambda ts, path: ts if isinstance(ts, pd.Timestamp) else pd.to_datetime(ts))
         ao._get_folder_duration = MagicMock(return_value=3600.0)
+        ao._get_item_name = AnimalOrganizer._get_item_name.__get__(ao, AnimalOrganizer)
+        ao._is_item_file = AnimalOrganizer._is_item_file.__get__(ao, AnimalOrganizer)
 
         animalday_to_folders = {
             "Day1": ["/data/filename_20250101.rhd", "/data/filename_20250102.rhd"]

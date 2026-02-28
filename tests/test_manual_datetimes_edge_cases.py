@@ -13,11 +13,11 @@ class TestManualDatetimesEdgeCases:
         """Set up test fixtures."""
         self.temp_dir = tempfile.mkdtemp()
         self.base_path = Path(self.temp_dir)
-        animal_id = "A123"
+        self.animal_id = "A123"
 
         # Create test folders
-        self.folder1 = self.base_path / f"WT_{animal_id}_2023-01-15"
-        self.folder2 = self.base_path / f"WT_{animal_id}_2023-01-16"
+        self.folder1 = self.base_path / f"WT_{self.animal_id}_2023-01-15"
+        self.folder2 = self.base_path / f"WT_{self.animal_id}_2023-01-16"
 
         for folder in [self.folder1, self.folder2]:
             folder.mkdir(parents=True)
@@ -42,7 +42,7 @@ class TestManualDatetimesEdgeCases:
         return mock_lro
 
     @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
-    @patch("glob.glob")
+    @patch("neurodent.core.discovery.glob.glob")
     def test_mixed_bag_configuration(self, mock_glob, mock_lro_class):
         """
         Test Case 3: The 'Mixed Bag'.
@@ -56,26 +56,26 @@ class TestManualDatetimesEdgeCases:
         # - "WT_A123_2023-01-15" uses flat folder key (used by fallback)
         mixed_config = {
             "Start_Animal": {"SomeFolder": datetime(2023, 1, 1)},  # Different animal
-            f"WT_{animal_id}_2023-01-15": datetime(
+            f"WT_{self.animal_id}_2023-01-15": datetime(
                 2023, 2, 1, 10, 0
             ),  # Flat key for A123
-            f"WT_{animal_id}_2023-01-16": datetime(2023, 2, 1, 11, 0),
+            f"WT_{self.animal_id}_2023-01-16": datetime(2023, 2, 1, 11, 0),
         }
 
         # Run for A123
         ao = results.AnimalOrganizer(
-            pattern=f"{self.base_path}/*{animal_id}*",
-            animal_id=animal_id,  # "A123"
+            pattern=f"{self.base_path}/WT_{{animal}}_{{session}}",
+            animal_id=self.animal_id,  # "A123"
             lro_kwargs={"manual_datetimes": mixed_config},
         )
 
         # Should successfully fallback to using the flat folder keys
-        assert ao._processed_timestamps[f"WT_{animal_id}_2023-01-15"] == datetime(
+        assert ao._processed_timestamps[f"WT_{self.animal_id}_2023-01-15"] == datetime(
             2023, 2, 1, 10, 0
         )
 
     @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
-    @patch("glob.glob")
+    @patch("neurodent.core.discovery.glob.glob")
     def test_shadowing_trap_error(self, mock_glob, mock_lro_class):
         """
         Test Case 4: The 'Shadowing Trap'.
@@ -86,24 +86,24 @@ class TestManualDatetimesEdgeCases:
 
         shadowing_config = {
             # 1. The Priority: Found ID key, used exclusively.
-            animal_id: {
-                f"WT_{animal_id}_2023-01-15": datetime(2023, 1, 1, 10, 0)
+            self.animal_id: {
+                f"WT_{self.animal_id}_2023-01-15": datetime(2023, 1, 1, 10, 0)
             },
             # 2. The Shadowed Key: Flat folder key.
             # This should be IGNORED because key #1 exists.
             # Thus, folder2 will be considered "missing" from the spec.
-            f"WT_{animal_id}_2023-01-16": datetime(2023, 1, 1, 11, 0),
+            f"WT_{self.animal_id}_2023-01-16": datetime(2023, 1, 1, 11, 0),
         }
 
         # Should raise ValueError because folder2 is missing from the explicit ID spec
         # and the flat key providing it is ignored.
         with pytest.raises(ValueError) as exc_info:
             results.AnimalOrganizer(
-                pattern=f"{self.base_path}/*{animal_id}*",
-                animal_id=animal_id,
+                pattern=f"{self.base_path}/WT_{{animal}}_{{session}}",
+                animal_id=self.animal_id,
                 lro_kwargs={"manual_datetimes": shadowing_config},
             )
 
         error_msg = str(exc_info.value)
         assert "Ambiguous manual_datetimes configuration" in error_msg
-        assert "Please nest all folder keys" in error_msg
+        assert "Both the Animal ID" in error_msg and "individual item keys are present" in error_msg

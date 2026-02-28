@@ -10,7 +10,7 @@ import warnings
 import dateutil.parser
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Literal, Union, TYPE_CHECKING
+from typing import Callable, Literal, Optional, Union, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .frequency_domain_results import FrequencyDomainSpikeAnalysisResult
@@ -126,6 +126,10 @@ class AnimalOrganizer(AnimalFeatureParser):
         lro_kwargs (dict, optional): Keyword arguments passed to each LongRecordingOrganizer
             instance. Common options include 'mode', 'extract_func', 'manual_datetimes'.
             Defaults to {}.
+        normalize_session (callable | None, optional): A function that transforms session
+            keys before grouping. For example, to merge split-day folders like
+            "2023-01-15", "2023-01-15(1)", "2023-01-15(2)" into one session, pass
+            ``lambda s: re.sub(r"\(\d+\)$", "", s)``. Defaults to None (no normalization).
 
     Attributes:
         pattern (str | list[str]): The file pattern(s) used for discovery.
@@ -166,6 +170,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         truncate: bool | int = False,
         assume_from_number: bool = False,
         lro_kwargs: dict = {},
+        normalize_session: Optional[Callable[[str], str]] = None,
     ) -> None:
         self.pattern = pattern
         self.animal_id = animal_id
@@ -173,6 +178,18 @@ class AnimalOrganizer(AnimalFeatureParser):
         self.animal_file_match_pattern = [animal_id] if animal_id else []
         self.day_sep = None
         self.read_mode = "pattern"  # Legacy compat; new pattern-based discovery
+        self._normalize_session = normalize_session
+
+        # Warn if pattern(s) don't contain placeholders — metadata extraction won't work
+        patterns = [pattern] if isinstance(pattern, (str, Path)) else pattern
+        for p in patterns:
+            if not re.search(r"\{\w+\}", str(p)):
+                warnings.warn(
+                    f"Pattern has no placeholders (e.g., '{{animal}}', '{{session}}'). "
+                    f"Metadata extraction will be limited. Got: '{p}'",
+                    UserWarning,
+                    stacklevel=2,
+                )
 
         from neurodent.core.discovery import FileDiscoverer, MultiFileGroup
 
@@ -193,6 +210,10 @@ class AnimalOrganizer(AnimalFeatureParser):
             animal_val = item.metadata.get("animal", animal_id if animal_id else "unknown")
             path_val = item  # Pass the entire DiscoveredFile object
 
+            # Optionally normalize session keys (e.g., strip "(N)" suffixes)
+            if self._normalize_session is not None:
+                session = self._normalize_session(session)
+
             if session in skip_sessions:
                 continue
 
@@ -207,7 +228,6 @@ class AnimalOrganizer(AnimalFeatureParser):
             raise ValueError(f"No items discovered for pattern: {pattern}")
 
         if truncate:
-            import warnings
             from neurodent import core
 
             truncate = core.utils.parse_truncate(truncate)
@@ -256,70 +276,29 @@ class AnimalOrganizer(AnimalFeatureParser):
         self.long_recordings: list[core.LongRecordingOrganizer] = []
         self._create_long_recordings(lro_kwargs)
 
-    def _validate_discovery(self, folders, day_parse_kwargs):
-        """
-        Validates discovered folders/files by attempting to parse them.
-        Filters out 'ghost' files that match the glob pattern but do not contain the correct Animal ID.
-
-        When file_match_pattern was explicitly provided, only validates the animal ID match
-        (skipping genotype/date parsing which may not work for joint session filenames).
-        """
-        valid_folders = []
-        for folder in folders:
-            try:
-                if self._has_custom_match_rule:
-                    # Custom match rule: only validate that the file matches the pattern
-                    core.utils.parse_str_to_animal(
-                        Path(folder).name, animal_param=self.animal_file_match_pattern
-                    )
-                else:
-                    # Default: full validation (animal + genotype + date)
-                    core.parse_path_to_animalday(
-                        folder,
-                        animal_param=self.animal_file_match_pattern,
-                        day_sep=self.day_sep,
-                        mode=self.read_mode,
-                        **day_parse_kwargs,
-                    )
-                valid_folders.append(folder)
-            except ValueError as e:
-                # Differentiate between "Filtering" (mismatch) and "Parsing Error" (bad config/date)
-                msg = str(e)
-                is_filter_error = (
-                    "No matching ID found" in msg
-                    or "No match found for pattern" in msg
-                    or "does not have any matching values" in msg
-                )
-
-                if is_filter_error:
-                    # This file/folder does not match the animal ID parsing rules (Ghost/Sibling).
-                    logging.warning(
-                        f"file/folder '{Path(folder).name}' captured by glob but failed ID/Genotype validation (mode='{self.read_mode}'). Skipping. Reason: {msg}"
-                    )
-                    continue
-
-                # If we get here, the ID/Genotype matched, but something else failed (likely Date).
-                # This suggests a configuration error or a valid file with a malformed date.
-                # We should NOT silence this.
-                raise ValueError(
-                    f"File '{Path(folder).name}' matched Animal ID/Genotype but failed parsing (likely Date/Config error): {e}"
-                ) from e
-        return valid_folders
+        # Set and validate channel_names across all LROs
+        self.channel_names = self._validate_channel_names(self.long_recordings)
 
     def _get_item_name(self, item):
         """Helper to get a representative name for an item which could be a string, Path, list of strings, or DiscoveredFile."""
         from ..core.discovery import DiscoveredFile
 
         if isinstance(item, DiscoveredFile):
-            if item.is_multi_file:
-                return Path(item.paths[0]).name + "..."
-            return Path(item.path).name
+            paths = item.get_path_list()
+            if len(paths) > 1:
+                return Path(paths[0]).name + "..."
+            return Path(paths[0]).name if paths else "unknown"
         if isinstance(item, (list, tuple)):
             return Path(item[0]).name
         return Path(item).name
 
     def _is_item_file(self, item):
         """Helper to check if an item represents a file(s) rather than a directory."""
+        from ..core.discovery import DiscoveredFile
+
+        if isinstance(item, DiscoveredFile):
+            paths = item.get_path_list()
+            return Path(paths[0]).is_file() if paths else False
         if isinstance(item, (list, tuple)):
             return Path(item[0]).is_file()
         return Path(item).is_file()
@@ -1481,23 +1460,27 @@ class AnimalOrganizer(AnimalFeatureParser):
     ):
         row = {}
 
-        # The session labels (animal, day, genotype) are formally attached to the LongRecording object
-        session_labels = getattr(lan.LongRecording, "labels", {})
+        # Build session labels from LRO's DiscoveredFile metadata
+        from neurodent.core.discovery import DiscoveredFile
+        from neurodent import constants
 
-        # Fallback for old recordings without formal labels
-        if not session_labels:
-            lan_folder = lan.LongRecording.base_folder_path
-            session_labels = core.parse_path_to_animalday(
-                lan_folder,
-                animal_param=self.animal_file_match_pattern,
-                day_sep=self.day_sep,
-                mode=self.read_mode,
-            )
+        lro = lan.LongRecording
+        item = getattr(lro, "item", None)
 
-        row["animalday"] = session_labels["animalday"]
-        row["animal"] = session_labels["animal"]
-        row["day"] = session_labels["day"]
-        row["genotype"] = session_labels["genotype"]
+        animal = self.animal_id or "unknown"
+        session = "unknown"
+        genotype = self.genotype or "Unknown"
+
+        if isinstance(item, DiscoveredFile) and item.metadata:
+            meta = item.metadata
+            animal = meta.get("animal", animal)
+            session = meta.get("session", session)
+            genotype = constants.ANIMAL_METADATA.get(animal, {}).get("gene", genotype)
+
+        row["animalday"] = f"{animal} {genotype} {session}"
+        row["animal"] = animal
+        row["day"] = session
+        row["genotype"] = genotype
         row["duration"] = lan.LongRecording.get_dur_fragment(window_s, idx)
         row["endfile"] = lan.get_file_end(idx)
 
