@@ -43,7 +43,7 @@ The lower-level classes can also be used directly:
 
 - **Power features**: RMS, amplitude variance, band power (delta, theta, alpha, beta, gamma)
 - **Connectivity**: Coherence, imaginary coherence, Pearson correlation between channels
-- **Spikes**: Spike counts via MountainSort5 or frequency-domain detection
+- **Spikes**: Spike counts via frequency-domain detection
 
 **See Also:**
 
@@ -69,7 +69,6 @@ from .core import (
 )
 from .analysis import LongRecordingAnalyzer
 from .analyze_frag import FragmentAnalyzer
-from .analyze_sort import MountainSortAnalyzer
 from .frequency_domain_spike_detection import FrequencyDomainSpikeDetector
 from .utils import (
     get_temp_directory,
@@ -103,7 +102,6 @@ __all__ = [
     # Analysis
     "LongRecordingAnalyzer",
     "FragmentAnalyzer",
-    "MountainSortAnalyzer",
     "FrequencyDomainSpikeDetector",
     "ZeitgeberAnalysisResult",
     "run_zeitgeber_pipeline",
