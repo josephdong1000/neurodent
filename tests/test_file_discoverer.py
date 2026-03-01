@@ -219,3 +219,72 @@ class TestFileDiscovererEdgeCases:
         results = fd.discover()
         paths = [r["path"] for r in results]
         assert paths == sorted(paths)
+
+    # -- exotic placeholder patterns -----------------------------------------
+
+    def test_session_before_animal_placeholder_order(self, tmp_path):
+        """Placeholders in {session}/{animal}/{index} order."""
+        (tmp_path / "s1" / "A10").mkdir(parents=True)
+        (tmp_path / "s1" / "A10" / "001.rhd").touch()
+        (tmp_path / "s2" / "B20").mkdir(parents=True)
+        (tmp_path / "s2" / "B20" / "002.rhd").touch()
+        fd = FileDiscoverer(str(tmp_path / "{session}" / "{animal}" / "{index}.rhd"))
+        results = fd.discover()
+        assert len(results) == 2
+        meta = {r.metadata["animal"] for r in results}
+        assert meta == {"A10", "B20"}
+        for r in results:
+            assert "session" in r.metadata
+            assert "index" in r.metadata
+
+    def test_index_animal_session_reversed_order(self, tmp_path):
+        """Fully reversed: {index}/{animal}/{session}.edf"""
+        (tmp_path / "001" / "A10" / "baseline").mkdir(parents=True)
+        (tmp_path / "001" / "A10" / "baseline" / "data.edf").write_text("")
+        fd = FileDiscoverer(
+            str(tmp_path / "{index}" / "{animal}" / "{session}" / "data.edf")
+        )
+        results = fd.discover()
+        assert len(results) == 1
+        assert results[0].metadata == {"index": "001", "animal": "A10", "session": "baseline"}
+
+    def test_placeholder_in_filename_and_directory(self, tmp_path):
+        """Placeholder embedded in filename: {animal}_{session}.nwb"""
+        (tmp_path / "A10_s1.nwb").touch()
+        (tmp_path / "B20_s2.nwb").touch()
+        fd = FileDiscoverer(str(tmp_path / "{animal}_{session}.nwb"))
+        results = fd.discover()
+        assert len(results) == 2
+        animals = {r.metadata["animal"] for r in results}
+        sessions = {r.metadata["session"] for r in results}
+        assert animals == {"A10", "B20"}
+        assert sessions == {"s1", "s2"}
+
+    def test_deeply_nested_pattern(self, tmp_path):
+        """Four-level nesting: {project}/{animal}/{session}/{index}.bin"""
+        (tmp_path / "proj1" / "A10" / "day1" / "rec001").mkdir(parents=True)
+        (tmp_path / "proj1" / "A10" / "day1" / "rec001" / "trace.bin").touch()
+        fd = FileDiscoverer(
+            str(tmp_path / "{project}" / "{animal}" / "{session}" / "{index}" / "trace.bin")
+        )
+        results = fd.discover()
+        assert len(results) == 1
+        m = results[0].metadata
+        assert m == {"project": "proj1", "animal": "A10", "session": "day1", "index": "rec001"}
+
+    def test_adjacent_placeholders_in_filename(self, tmp_path):
+        """Two placeholders separated by hyphen in file name: {animal}-{session}.rhd"""
+        (tmp_path / "A10-baseline.rhd").touch()
+        fd = FileDiscoverer(str(tmp_path / "{animal}-{session}.rhd"))
+        results = fd.discover()
+        assert len(results) == 1
+        assert results[0].metadata == {"animal": "A10", "session": "baseline"}
+
+    def test_single_placeholder_only(self, tmp_path):
+        """Pattern with just one placeholder: {animal}.csv"""
+        (tmp_path / "A10.csv").touch()
+        (tmp_path / "B20.csv").touch()
+        fd = FileDiscoverer(str(tmp_path / "{animal}.csv"))
+        results = fd.discover()
+        assert len(results) == 2
+        assert {r.metadata["animal"] for r in results} == {"A10", "B20"}

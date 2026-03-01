@@ -320,7 +320,8 @@ class TestFragmentAnalyzer:
         features = ["rms", "ampvar"]
         kwargs = {}
 
-        result = FragmentAnalyzer._process_fragment_features_dask(sample_rec_2d, f_s, features, kwargs)
+        with pytest.warns(DeprecationWarning, match="_process_fragment_features_dask is deprecated"):
+            result = FragmentAnalyzer._process_fragment_features_dask(sample_rec_2d, f_s, features, kwargs)
 
         # Check that result is a dictionary with requested features
         assert isinstance(result, dict)
@@ -1366,14 +1367,22 @@ class TestFragmentDependencyResolution:
 
     def test_legacy_process_matches_deps(self, synthetic_fragment):
         """Legacy _process_fragment_features_dask gives same results for base features."""
-        legacy = FragmentAnalyzer._process_fragment_features_dask(
-            synthetic_fragment, f_s=1000, features=["rms", "ampvar"], kwargs={}
-        )
+        with pytest.warns(DeprecationWarning, match="_process_fragment_features_dask is deprecated"):
+            legacy = FragmentAnalyzer._process_fragment_features_dask(
+                synthetic_fragment, f_s=1000, features=["rms", "ampvar"], kwargs={}
+            )
         dep = FragmentAnalyzer.process_fragment_with_dependencies(
             synthetic_fragment, f_s=1000, features=["rms", "ampvar"], kwargs={}
         )
         np.testing.assert_allclose(legacy["rms"], dep["rms"])
         np.testing.assert_allclose(legacy["ampvar"], dep["ampvar"])
+
+    def test_legacy_emits_deprecation_warning(self, synthetic_fragment):
+        """Legacy method should emit DeprecationWarning."""
+        with pytest.warns(DeprecationWarning, match="Use process_fragment_with_dependencies"):
+            FragmentAnalyzer._process_fragment_features_dask(
+                synthetic_fragment, f_s=1000, features=["rms"], kwargs={}
+            )
 
     def test_invalid_feature_raises(self, synthetic_fragment):
         with pytest.raises(AttributeError):
