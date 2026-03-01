@@ -269,19 +269,14 @@ class TestPipelineSteps:
             constants.ANIMAL_METADATA = orig_metadata
             constants.GENOTYPE_ALIASES = orig_aliases
 
-    @pytest.mark.xfail(
-        reason="WAR generation with SI-loaded NWB needs manual_datetimes; "
-               "the global-timeline code path passes input_type to the NWB "
-               "extractor. Fix tracked in base branch.",
-        strict=False,
-    )
     def test_war_generation(self, example_pipeline_env):
         """compute_windowed_analysis produces a WindowAnalysisResult.
 
-        Uses a single-session dataset to avoid the manual_datetimes
-        code path that has a pre-existing input_type leak issue.
+        Uses a single-session dataset with an explicit manual_datetimes
+        timestamp so that the timeline / fragment-metadata path works.
         """
-        from tests.example_data.generate import create_synthetic_dataset
+        from datetime import datetime
+        from dateutil.tz import tzlocal
         from neurodent import constants
         from neurodent.workflow import inject_config_aliases
         from neurodent.visualization import AnimalOrganizer
@@ -298,12 +293,17 @@ class TestPipelineSteps:
             pattern = f"{base_path}/{cfg['pattern']}"
             animal_id = ds["animals"][0]
 
+            # Provide manual_datetimes so the SI-loaded recording has
+            # file_end_datetimes populated (required for WAR fragment timestamps).
+            lro_kwargs = dict(cfg["lro_kwargs"])
+            lro_kwargs["manual_datetimes"] = datetime(2025, 1, 15, 10, 0, 0, tzinfo=tzlocal())
+
             ao = AnimalOrganizer(
                 pattern,
                 animal_id=animal_id,
-                skip_sessions=["day2"],  # use only 1 session to avoid timestamp issues
+                skip_sessions=["day2"],  # use only 1 session
                 assume_from_number=cfg["assume_from_number"],
-                lro_kwargs=cfg["lro_kwargs"],
+                lro_kwargs=lro_kwargs,
             )
 
             # base_folder_path is normally set during persist_recording in the
@@ -320,8 +320,8 @@ class TestPipelineSteps:
             )
 
             assert war is not None
-            # WAR should have a features DataFrame
-            assert hasattr(war, "features_df") or hasattr(war, "df")
+            # WAR should have a result DataFrame
+            assert hasattr(war, "result") and war.result is not None
         finally:
             constants.ANIMAL_METADATA = orig_metadata
             constants.GENOTYPE_ALIASES = orig_aliases

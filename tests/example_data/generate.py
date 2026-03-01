@@ -33,10 +33,14 @@ SAMPLING_RATE = 1000          # Hz  (neurodent.constants.GLOBAL_SAMPLING_RATE)
 N_CHANNELS = 8
 DURATION_SECONDS = 5          # tiny: just enough for one analysis window
 DTYPE = np.float32            # neurodent.constants.GLOBAL_DTYPE
+# Use standard abbreviations recognised by parse_chname_to_abbrev / DEFAULT_ID_TO_NAME.
+# IDs correspond to 8 of the 10 default channels (drop LMot/RMot for brevity).
 CHANNEL_NAMES = [
-    "C-001", "C-002", "C-003", "C-004",
-    "C-005", "C-006", "C-007", "C-008",
+    "LAud", "LVis", "LHip", "LBar",
+    "RBar", "RHip", "RVis", "RAud",
 ]
+# NWB electrode table IDs matching the pipeline's DEFAULT_ID_TO_NAME keys.
+CHANNEL_IDS = [9, 10, 12, 14, 17, 19, 21, 22]
 
 
 def _write_nwb_file(
@@ -46,6 +50,7 @@ def _write_nwb_file(
     sampling_rate: int = SAMPLING_RATE,
     duration_s: float = DURATION_SECONDS,
     channel_names: list[str] | None = None,
+    channel_ids: list[int] | None = None,
     seed: int = 42,
 ) -> dict:
     """Write a single NWB file with synthetic EEG data.
@@ -58,7 +63,10 @@ def _write_nwb_file(
         n_channels: Number of EEG channels.
         sampling_rate: Sampling rate in Hz.
         duration_s: Recording duration in seconds.
-        channel_names: Channel label list.  Defaults to ``C-001`` … ``C-008``.
+        channel_names: Channel label list.  Defaults to standard abbreviations.
+        channel_ids: Integer electrode IDs for the NWB electrode table.
+            Defaults to ``CHANNEL_IDS`` so that SpikeInterface reads them
+            as IDs matching ``DEFAULT_ID_TO_NAME``.
         seed: NumPy RNG seed for reproducibility.
 
     Returns:
@@ -73,6 +81,7 @@ def _write_nwb_file(
     filepath = Path(filepath)
     filepath.parent.mkdir(parents=True, exist_ok=True)
     channel_names = channel_names or CHANNEL_NAMES[:n_channels]
+    channel_ids = channel_ids or CHANNEL_IDS[:n_channels]
     rng = np.random.default_rng(seed)
 
     n_samples = int(duration_s * sampling_rate)
@@ -103,6 +112,7 @@ def _write_nwb_file(
 
     for i, ch_name in enumerate(channel_names):
         nwbfile.add_electrode(
+            id=channel_ids[i],
             x=0.0, y=0.0, z=float(i),
             imp=0.0, filtering="none",
             group=group, location="brain",
