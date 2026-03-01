@@ -268,3 +268,29 @@ def mock_long_recording_organizer():
     return _create_mock_lro
 
 
+# ============================================================================
+# EXAMPLE DATASET FIXTURE
+# ============================================================================
+# Provides a minimal synthetic EEG dataset on disk for integration testing
+# the Snakemake pipeline without requiring real recordings.
+# ============================================================================
+
+
+@pytest.fixture
+def example_dataset(tmp_path):
+    """Generate a minimal synthetic NWB dataset for pipeline integration tests.
+
+    Creates a directory tree under ``tmp_path`` with two animals
+    (ExWT, ExKO), each with one 5-second NWB recording session. The returned
+    dict contains the data root path and a ``samples_config`` dict ready
+    to be used with ``inject_config_aliases`` or pipeline scripts.
+
+    Yields:
+        dict with keys ``data_root``, ``samples_config``, ``animals``,
+        ``session_folder``.
+    """
+    from tests.data.generate import create_synthetic_dataset
+
+    return create_synthetic_dataset(tmp_path)
+
+

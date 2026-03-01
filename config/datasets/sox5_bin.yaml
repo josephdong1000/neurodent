@@ -7,6 +7,6 @@ samples:
 
 analysis:
   war_generation:
-    mode: "nest"    # folder structure: session_folder/*{animal_id}*/day_subfolders/
+    pattern: "{animal}/{session}/{index}"   # nest layout: session_folder/{animal}/{session}/files
     lro_kwargs:
       mode: "bin"   # load binary .bin files from each day subfolder

@@ -1,0 +1,20 @@
+# Example / Integration-Test Dataset
+# ===================================
+# A minimal dataset configuration for integration-testing the Snakemake pipeline.
+# Activate with:  NEURODENT_DATASET=example snakemake ...
+#
+# For programmatic synthetic data the test fixtures override data_parent_folder
+# at runtime, so the path below is only used for manual / local testing.
+
+samples:
+  samples_file: "config/samples_example.json"
+
+analysis:
+  war_generation:
+    pattern: "{animal}/{session}/{index}.nwb"   # layout: session_folder/{animal}/{session}/*.nwb
+    assume_from_number: true
+    skip_sessions: []
+    lro_kwargs:
+      mode: "si"              # load NWB files via SpikeInterface
+      extract_func: "read_nwb_recording"  # NWB-specific SI extractor
+      multiprocess_mode: "serial"   # serial is fine for tiny datasets

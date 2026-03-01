@@ -126,30 +126,34 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
                             session_lro_kwargs["manual_datetimes"] = spec
                             logger.info(f"  -> Using manual datetime: {spec}")
 
-                logger.info(f"  -> File pattern: {session_analysis_config.get('file_pattern')}")
+                logger.info(f"  -> File pattern: {session_analysis_config.get('pattern')}")
 
-                # For joint sessions, build a regex to match any animal's numeric ID in filenames
-                # e.g. "ArxRosa-967", "ArxRosa-968" -> regex "967|968|969|418"
-                if is_joint:
-                    all_ids = list(samples_config["joint_sessions"][session_key].keys())
-                    numeric_ids = [aid.split("-")[-1] for aid in all_ids]
-                    animal_file_match_pattern = "|".join(numeric_ids)
-                    logger.info(f"  -> Joint session file match pattern: {animal_file_match_pattern}")
+                # Build absolute discovery pattern from the config's relative pattern
+                if "pattern" not in session_analysis_config:
+                    raise KeyError(
+                        f"Missing 'pattern' key in war_generation config for session '{session_key}'. "
+                        "Each dataset config must specify 'pattern' (e.g. '{{animal}}/{{session}}/{{index}}.nwb' "
+                        "or '{{index}}.rhd')."
+                    )
+                base_path = str(data_parent_folder / folder_path)
+                relative_pattern = session_analysis_config["pattern"]
+                if isinstance(relative_pattern, list):
+                    discovery_pattern = [f"{base_path}/{p}" for p in relative_pattern]
                 else:
-                    animal_file_match_pattern = None
+                    discovery_pattern = f"{base_path}/{relative_pattern}"
+                logger.info(f"  -> Discovery pattern: {discovery_pattern}")
 
-                # Create AO for this session with overridden parameters
+                # For joint sessions, don't filter by animal_id during discovery
+                # since all files belong to all animals in the joint session
+                ao_animal_id = None if is_joint else source_animal_id
+
+                # Create AO for this session using pattern-based discovery
                 session_ao = visualization.AnimalOrganizer(
-                    data_parent_folder / folder_path,
-                    source_animal_id,
-                    mode=session_analysis_config["mode"],
-                    file_pattern=session_analysis_config.get("file_pattern"),
-                    day_sep=session_analysis_config.get("day_sep"),
+                    discovery_pattern,
+                    animal_id=ao_animal_id,
+                    skip_sessions=session_analysis_config.get("skip_sessions", session_analysis_config.get("skip_days", [])),
                     assume_from_number=session_analysis_config["assume_from_number"],
-                    skip_days=session_analysis_config["skip_days"],
                     lro_kwargs=session_lro_kwargs,
-                    day_parse_kwargs=session_analysis_config.get("day_parse_kwargs", {}),
-                    animal_file_match_pattern=animal_file_match_pattern,
                 )
 
                 

@@ -19,6 +19,48 @@ Run with coverage:
 
    uv run pytest --cov=neurodent
 
+Run integration tests only:
+
+.. code-block:: bash
+
+   uv run pytest tests/integration/ -v -m integration
+
+
+Example Dataset for Pipeline Testing
+-------------------------------------
+
+The repository includes infrastructure for testing the Snakemake pipeline
+without processing full production-scale recordings.
+
+**Programmatic synthetic data (CI-friendly)**
+
+A ``create_synthetic_dataset()`` helper in ``tests/data/generate.py``
+builds a tiny directory tree with 8-channel NWB files that can be read back
+by SpikeInterface.  The ``example_dataset`` pytest fixture in
+``tests/conftest.py`` wraps this for convenient use:
+
+.. code-block:: python
+
+   def test_my_pipeline_step(example_dataset):
+       data_root = example_dataset["data_root"]
+       samples_config = example_dataset["samples_config"]
+       # ...
+
+Integration tests in ``tests/integration/test_snakemake_flow.py`` demonstrate
+discovery, filtering, and config-alias injection against this data.
+
+**User-provided real data (local development)**
+
+Place small real recordings under ``tests/data/raw/`` following the
+directory layout described in ``tests/data/README.md``, then run:
+
+.. code-block:: bash
+
+   NEURODENT_DATASET=example snakemake --cores 1 --dryrun
+
+See ``config/datasets/example.yaml`` and ``config/samples_example.json`` for
+the corresponding configuration.
+
 
 Building Documentation
 ----------------------

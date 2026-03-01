@@ -2,73 +2,618 @@
 Integration Tests for Snakemake Workflow
 ========================================
 
-This module contains the structure for integration testing the Snakemake workflow.
-Currently, these tests are placeholders as we lack a small dummy dataset.
+Tests that validate the pipeline's data-loading path using a minimal
+synthetic NWB dataset generated on the fly.  These tests exercise the real
+``FileDiscoverer``, ``AnimalOrganizer``, and analysis pipeline against actual
+files on disk, without requiring production-scale recordings.
 
-To enable these tests:
-1.  Generate a small, representative dummy dataset (WAR pickle files).
-2.  Place them in `tests/integration/data`.
-3.  Update the `config` fixture to point to this data.
-4.  Remove the `@pytest.mark.skip` decorator.
+Running
+-------
+Run only integration tests::
+
+    uv run pytest tests/integration/ -v -m integration
+
+Or include them in the full suite::
+
+    uv run pytest tests/ -v
 """
 
-import pytest
-import subprocess
+import json
 from pathlib import Path
-import shutil
+
+import numpy as np
+import pytest
+
+
+# ---------------------------------------------------------------------------
+# Custom extractor for dual .bin/.csv tests
+# ---------------------------------------------------------------------------
+
+
+def _bin_csv_extractor(discovered_file, **kwargs):
+    """Custom extractor that reads paired .bin + .csv files into a recording.
+
+    This is the kind of function a user would write when their data
+    consists of multiple files per recording segment (e.g. sox5 format).
+    ``AnimalOrganizer`` passes the multi-file ``DiscoveredFile`` object
+    directly to this callable.
+    """
+    import csv
+    import spikeinterface.core as si_core
+
+    bin_path = [p for p in discovered_file.paths if p.endswith(".bin")][0]
+    csv_path = [p for p in discovered_file.paths if p.endswith(".csv")][0]
+
+    with open(csv_path) as f:
+        reader = csv.DictReader(f)
+        rows = list(reader)
+
+    n_channels = len(rows)
+    sampling_rate = float(rows[0]["sampling_rate"])
+    data = np.fromfile(bin_path, dtype=np.float32).reshape(-1, n_channels)
+
+    return si_core.NumpyRecording(
+        traces_list=[data],
+        sampling_frequency=sampling_rate,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
 
 @pytest.fixture
-def integration_data_dir(tmp_path):
-    """
-    Setup a temporary directory with dummy data for integration testing.
-    """
-    data_dir = tmp_path / "data"
-    data_dir.mkdir()
-    
-    # TODO: Copy dummy WAR files to data_dir
-    # source_dir = Path("tests/integration/data")
-    # shutil.copytree(source_dir, data_dir, dirs_exist_ok=True)
-    
-    return data_dir
+def example_pipeline_env(tmp_path):
+    """Create a complete, tiny pipeline environment under tmp_path.
 
-@pytest.fixture
-def output_dir(tmp_path):
+    Returns a dict with ``data_root``, ``samples_config``, ``animals``,
+    ``session_folder``, and the full ``config`` dict that would normally
+    come from Snakemake.
     """
-    Setup a temporary directory for workflow outputs.
-    """
-    out_dir = tmp_path / "results"
-    out_dir.mkdir()
-    return out_dir
+    from tests.data.generate import create_synthetic_dataset
 
-@pytest.mark.skip(reason="Requires dummy dataset")
-def test_zeitgeber_plots_workflow(integration_data_dir, output_dir):
+    ds = create_synthetic_dataset(tmp_path, n_sessions=2, duration_s=3)
+
+    # Build a minimal pipeline config (mirrors config/config.yaml + example.yaml)
+    pipeline_config = {
+        "temp_directory": str(tmp_path / "tmp"),
+        "analysis": {
+            "war_generation": {
+                "pattern": "{animal}/{session}/{index}.nwb",
+                "assume_from_number": True,
+                "skip_sessions": [],
+                "lro_kwargs": {
+                    "mode": "si",
+                    "extract_func": "read_nwb_recording",
+                    "multiprocess_mode": "serial",
+                },
+            },
+        },
+        "cluster": {
+            "war_generation": {"interface": None},
+        },
+        "overrides": {},
+    }
+
+    ds["config"] = pipeline_config
+    return ds
+
+
+# ---------------------------------------------------------------------------
+# Tests — Dataset Generation
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.integration
+class TestExampleDatasetGeneration:
+    """Verify that the synthetic dataset generator produces valid NWB files."""
+
+    def test_creates_directory_tree(self, example_dataset):
+        """The generated dataset has the expected directory structure."""
+        root = example_dataset["data_root"]
+        session = example_dataset["session_folder"]
+
+        for animal_id in example_dataset["animals"]:
+            day_dir = root / session / animal_id / "day1"
+            assert day_dir.is_dir(), f"Missing directory: {day_dir}"
+
+            nwb_files = list(day_dir.glob("*.nwb"))
+            assert len(nwb_files) == 1, f"Expected 1 NWB file, got {nwb_files}"
+
+    def test_nwb_file_readable_by_spikeinterface(self, example_dataset):
+        """NWB file can be loaded by SpikeInterface."""
+        import spikeinterface.extractors as se
+
+        root = example_dataset["data_root"]
+        session = example_dataset["session_folder"]
+        animal_id = example_dataset["animals"][0]
+
+        nwb_file = next((root / session / animal_id / "day1").glob("*.nwb"))
+        rec = se.read_nwb_recording(str(nwb_file))
+
+        assert rec.get_num_channels() == 8
+        # example_dataset fixture uses default duration_s=5, sr=1000
+        assert rec.get_num_samples() == 5 * 1000
+
+    def test_samples_config_structure(self, example_dataset):
+        """samples_config contains all required keys."""
+        sc = example_dataset["samples_config"]
+        assert "data_parent_folder" in sc
+        assert "ANIMAL_METADATA" in sc
+        assert "data_folders_to_animal_ids" in sc
+        assert "GENOTYPE_ALIASES" in sc
+
+
+# ---------------------------------------------------------------------------
+# Tests — File Discovery
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.integration
+class TestFileDiscoveryWithExampleData:
+    """Test that FileDiscoverer works with the generated synthetic data."""
+
+    def test_discovers_all_animals(self, example_pipeline_env):
+        """Pattern discovers files for all animals in the dataset."""
+        from neurodent.core.discovery import FileDiscoverer
+
+        ds = example_pipeline_env
+        cfg = ds["config"]["analysis"]["war_generation"]
+
+        # Build absolute pattern the same way generate_wars.py does
+        base_path = str(ds["data_root"] / ds["session_folder"])
+        pattern = f"{base_path}/{cfg['pattern']}"
+
+        discoverer = FileDiscoverer(pattern)
+        all_files = discoverer.discover()
+
+        # 2 animals × 2 sessions = at least 4 discovered items
+        assert len(all_files) >= 4
+
+        found_animals = {f.metadata["animal"] for f in all_files}
+        for animal_id in ds["animals"]:
+            assert animal_id in found_animals, f"{animal_id} not discovered"
+
+    def test_discovers_sessions_per_animal(self, example_pipeline_env):
+        """Pattern discovers multiple sessions for a single animal."""
+        from neurodent.core.discovery import FileDiscoverer
+
+        ds = example_pipeline_env
+        cfg = ds["config"]["analysis"]["war_generation"]
+
+        base_path = str(ds["data_root"] / ds["session_folder"])
+        pattern = f"{base_path}/{cfg['pattern']}"
+
+        animal_id = ds["animals"][0]
+        discoverer = FileDiscoverer(pattern)
+        animal_files = discoverer.discover(animal=animal_id)
+
+        sessions = {f.metadata["session"] for f in animal_files}
+        assert "day1" in sessions
+        assert "day2" in sessions
+
+    def test_filter_by_animal_id(self, example_pipeline_env):
+        """Filtering by animal_id returns only that animal's files."""
+        from neurodent.core.discovery import FileDiscoverer
+
+        ds = example_pipeline_env
+        cfg = ds["config"]["analysis"]["war_generation"]
+
+        base_path = str(ds["data_root"] / ds["session_folder"])
+        pattern = f"{base_path}/{cfg['pattern']}"
+
+        discoverer = FileDiscoverer(pattern)
+        for animal_id in ds["animals"]:
+            filtered = discoverer.discover(animal=animal_id)
+            for f in filtered:
+                assert f.metadata["animal"] == animal_id
+
+
+# ---------------------------------------------------------------------------
+# Tests — Config Integration
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.integration
+class TestSamplesConfigIntegration:
+    """Test that the generated samples_config works with neurodent utilities."""
+
+    def test_inject_config_aliases(self, example_dataset):
+        """inject_config_aliases succeeds with the synthetic config."""
+        from neurodent.workflow import inject_config_aliases
+        from neurodent import constants
+
+        # Save original state to restore after test
+        orig_genotype_aliases = constants.GENOTYPE_ALIASES
+        orig_animal_metadata = constants.ANIMAL_METADATA
+
+        try:
+            sc = example_dataset["samples_config"]
+            inject_config_aliases(sc)
+
+            # Verify metadata was injected
+            assert "ExWT" in constants.ANIMAL_METADATA
+            assert constants.ANIMAL_METADATA["ExWT"]["gene"] == "WT"
+            assert "ExKO" in constants.ANIMAL_METADATA
+            assert constants.ANIMAL_METADATA["ExKO"]["gene"] == "KO"
+        finally:
+            # Restore original global state to avoid leaking into other tests
+            constants.GENOTYPE_ALIASES = orig_genotype_aliases
+            constants.ANIMAL_METADATA = orig_animal_metadata
+
+    def test_samples_config_serializable(self, example_dataset):
+        """samples_config can be serialized to JSON (for writing to disk)."""
+        sc = example_dataset["samples_config"]
+        dumped = json.dumps(sc, indent=2)
+        reloaded = json.loads(dumped)
+        assert reloaded["ANIMAL_METADATA"] == sc["ANIMAL_METADATA"]
+
+
+# ---------------------------------------------------------------------------
+# Tests — Pipeline Steps (data loading → analysis)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.integration
+class TestPipelineSteps:
+    """Test actual pipeline stages end-to-end with synthetic NWB data.
+
+    These tests exercise the real AnimalOrganizer → LongRecordingOrganizer →
+    analysis pipeline, not just file discovery.
     """
-    Integration test for the generate_zeitgeber_plots rule.
-    
-    This test simulates running the actual snakemake command (or the python script directly)
-    on dummy data and verifies that output files are creating.
+
+    def test_animal_organizer_loads_data(self, example_pipeline_env):
+        """AnimalOrganizer successfully loads NWB data for a single animal."""
+        from neurodent import constants
+        from neurodent.workflow import inject_config_aliases
+        from neurodent.visualization import AnimalOrganizer
+
+        ds = example_pipeline_env
+        cfg = ds["config"]["analysis"]["war_generation"]
+
+        # Inject metadata so genotype resolution works
+        orig_metadata = constants.ANIMAL_METADATA
+        orig_aliases = constants.GENOTYPE_ALIASES
+        try:
+            inject_config_aliases(ds["samples_config"])
+
+            base_path = str(ds["data_root"] / ds["session_folder"])
+            pattern = f"{base_path}/{cfg['pattern']}"
+            animal_id = ds["animals"][0]
+
+            ao = AnimalOrganizer(
+                pattern,
+                animal_id=animal_id,
+                skip_sessions=cfg.get("skip_sessions", []),
+                assume_from_number=cfg["assume_from_number"],
+                lro_kwargs=cfg["lro_kwargs"],
+            )
+
+            assert ao.animal_id == animal_id
+            assert len(ao.long_recordings) >= 1
+            # Verify sessions were created
+            assert len(ao.unique_animaldays) >= 1
+
+            # Verify the underlying SI recording was loaded correctly
+            for lro in ao.long_recordings:
+                assert hasattr(lro, "LongRecording")
+                assert lro.LongRecording is not None
+                assert lro.LongRecording.get_num_channels() == 8
+        finally:
+            constants.ANIMAL_METADATA = orig_metadata
+            constants.GENOTYPE_ALIASES = orig_aliases
+
+    def test_war_generation(self, example_pipeline_env):
+        """compute_windowed_analysis produces a WindowAnalysisResult.
+
+        Uses a single-session dataset with an explicit manual_datetimes
+        timestamp so that the timeline / fragment-metadata path works.
+        """
+        from datetime import datetime
+        from dateutil.tz import tzlocal
+        from neurodent import constants
+        from neurodent.workflow import inject_config_aliases
+        from neurodent.visualization import AnimalOrganizer
+
+        ds = example_pipeline_env
+        cfg = ds["config"]["analysis"]["war_generation"]
+
+        orig_metadata = constants.ANIMAL_METADATA
+        orig_aliases = constants.GENOTYPE_ALIASES
+        try:
+            inject_config_aliases(ds["samples_config"])
+
+            base_path = str(ds["data_root"] / ds["session_folder"])
+            pattern = f"{base_path}/{cfg['pattern']}"
+            animal_id = ds["animals"][0]
+
+            # Provide manual_datetimes so the SI-loaded recording has
+            # file_end_datetimes populated (required for WAR fragment timestamps).
+            lro_kwargs = dict(cfg["lro_kwargs"])
+            lro_kwargs["manual_datetimes"] = datetime(2025, 1, 15, 10, 0, 0, tzinfo=tzlocal())
+
+            ao = AnimalOrganizer(
+                pattern,
+                animal_id=animal_id,
+                skip_sessions=["day2"],  # use only 1 session
+                assume_from_number=cfg["assume_from_number"],
+                lro_kwargs=lro_kwargs,
+            )
+
+            # base_folder_path is normally set during persist_recording in the
+            # full pipeline; set it here so compute_windowed_analysis logging works
+            for lro in ao.long_recordings:
+                if not hasattr(lro, "base_folder_path"):
+                    lro.base_folder_path = "synthetic_test"
+
+            war = ao.compute_windowed_analysis(
+                ["all"],
+                multiprocess_mode="serial",
+                window_s=1,  # small windows for tiny data
+                apply_notch_filter=False,  # skip filtering for speed
+            )
+
+            assert war is not None
+            # WAR should have a result DataFrame
+            assert hasattr(war, "result") and war.result is not None
+        finally:
+            constants.ANIMAL_METADATA = orig_metadata
+            constants.GENOTYPE_ALIASES = orig_aliases
+
+
+# ---------------------------------------------------------------------------
+# Tests — Pipeline Continuation (WAR → Plotters / FDSAR)
+# ---------------------------------------------------------------------------
+
+
+def _build_war(ds):
+    """Helper: build a WAR for a single animal from a pipeline environment.
+
+    Shared by continuation tests that start from an already-computed WAR.
     """
-    
-    # Construct command to run the script
-    # In a real scenario, we might invoke 'snakemake' via subprocess
-    # Or run the script python file directly with mocked arguments
-    
-    script_path = Path("workflow/scripts/generate_zeitgeber_plots.py").resolve()
-    
-    # Mock Snakemake execution by setting necessary environment variables or args
-    # For now, we'll demonstrate the intent with a direct script call if we could mock snakemake object
-    # But running snakemake itself is cleaner for integration tests.
-    
-    cmd = [
-        "snakemake",
-        "--cores", "1",
-        "results/figures/zeitgeber_plots/00_logrms.png", # Target output
-        "--directory", str(integration_data_dir.parent), # run in temp dir
-        "--config", f"data_dir={integration_data_dir}",
-        "--dryrun" # Remove this for actual test
-    ]
-    
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    
-    assert result.returncode == 0
-    # assert (output_dir / "00_logrms.png").exists()
+    from datetime import datetime
+    from dateutil.tz import tzlocal
+    from neurodent.visualization import AnimalOrganizer
+
+    cfg = ds["config"]["analysis"]["war_generation"]
+    base_path = str(ds["data_root"] / ds["session_folder"])
+    pattern = f"{base_path}/{cfg['pattern']}"
+    animal_id = ds["animals"][0]
+
+    lro_kwargs = dict(cfg["lro_kwargs"])
+    lro_kwargs["manual_datetimes"] = datetime(2025, 1, 15, 10, 0, 0, tzinfo=tzlocal())
+
+    ao = AnimalOrganizer(
+        pattern,
+        animal_id=animal_id,
+        skip_sessions=["day2"],
+        assume_from_number=cfg["assume_from_number"],
+        lro_kwargs=lro_kwargs,
+    )
+
+    for lro in ao.long_recordings:
+        if not hasattr(lro, "base_folder_path"):
+            lro.base_folder_path = "synthetic_test"
+
+    war = ao.compute_windowed_analysis(
+        ["all"],
+        multiprocess_mode="serial",
+        window_s=1,
+        apply_notch_filter=False,
+    )
+    return ao, war
+
+
+@pytest.mark.integration
+class TestPipelineContinuation:
+    """Test downstream pipeline stages that consume a WAR.
+
+    Validates that WAR output can be fed into AnimalPlotter,
+    ExperimentPlotter, and that FDSAR generation runs on the
+    same synthetic data.
+    """
+
+    @pytest.fixture
+    def war_env(self, example_pipeline_env):
+        """Return (ao, war, ds) with constants injected for the test scope."""
+        from neurodent import constants
+        from neurodent.workflow import inject_config_aliases
+
+        ds = example_pipeline_env
+        orig_metadata = constants.ANIMAL_METADATA
+        orig_aliases = constants.GENOTYPE_ALIASES
+        inject_config_aliases(ds["samples_config"])
+
+        ao, war = _build_war(ds)
+        yield ao, war, ds
+
+        constants.ANIMAL_METADATA = orig_metadata
+        constants.GENOTYPE_ALIASES = orig_aliases
+
+    def test_animal_plotter_instantiation(self, war_env):
+        """AnimalPlotter can be created from the generated WAR."""
+        from neurodent.visualization.plotting import AnimalPlotter
+
+        _ao, war, _ds = war_env
+        ap = AnimalPlotter(war)
+
+        assert ap.window_result is war
+        assert ap.genotype is not None
+        assert ap.n_channels == 8
+
+    def test_experiment_plotter_instantiation(self, war_env):
+        """ExperimentPlotter can be created from the generated WAR."""
+        from neurodent.visualization.plotting import ExperimentPlotter
+
+        _ao, war, _ds = war_env
+        ep = ExperimentPlotter(war, features=["all"])
+
+        assert len(ep.results) == 1
+        assert ep.results[0] is war
+        assert ep.concat_df_wars is not None
+        assert not ep.concat_df_wars.empty
+
+    def test_experiment_plotter_multiple_wars(self, example_pipeline_env):
+        """ExperimentPlotter accepts WARs from multiple animals."""
+        from neurodent import constants
+        from neurodent.workflow import inject_config_aliases
+        from neurodent.visualization.plotting import ExperimentPlotter
+
+        ds = example_pipeline_env
+        orig_metadata = constants.ANIMAL_METADATA
+        orig_aliases = constants.GENOTYPE_ALIASES
+        try:
+            inject_config_aliases(ds["samples_config"])
+            _ao1, war1 = _build_war(ds)
+
+            # Build a second WAR for the other animal
+            from datetime import datetime
+            from dateutil.tz import tzlocal
+            from neurodent.visualization import AnimalOrganizer
+
+            cfg = ds["config"]["analysis"]["war_generation"]
+            base_path = str(ds["data_root"] / ds["session_folder"])
+            pattern = f"{base_path}/{cfg['pattern']}"
+            lro_kwargs = dict(cfg["lro_kwargs"])
+            lro_kwargs["manual_datetimes"] = datetime(2025, 1, 15, 10, 0, 0, tzinfo=tzlocal())
+
+            ao2 = AnimalOrganizer(
+                pattern,
+                animal_id=ds["animals"][1],
+                skip_sessions=["day2"],
+                assume_from_number=cfg["assume_from_number"],
+                lro_kwargs=lro_kwargs,
+            )
+            for lro in ao2.long_recordings:
+                if not hasattr(lro, "base_folder_path"):
+                    lro.base_folder_path = "synthetic_test"
+
+            war2 = ao2.compute_windowed_analysis(
+                ["all"],
+                multiprocess_mode="serial",
+                window_s=1,
+                apply_notch_filter=False,
+            )
+
+            ep = ExperimentPlotter([war1, war2], features=["all"])
+            assert len(ep.results) == 2
+            assert not ep.concat_df_wars.empty
+        finally:
+            constants.ANIMAL_METADATA = orig_metadata
+            constants.GENOTYPE_ALIASES = orig_aliases
+
+    def test_fdsar_generation(self, war_env):
+        """Frequency-domain spike analysis runs on the same AO data."""
+        ao, _war, _ds = war_env
+
+        fdsars = ao.compute_frequency_domain_spike_analysis(
+            multiprocess_mode="serial",
+        )
+
+        assert len(fdsars) >= 1
+        for fdsar in fdsars:
+            assert fdsar.animal_id == ao.animal_id
+            assert fdsar.genotype is not None
+
+
+# ---------------------------------------------------------------------------
+# Tests — Dual .bin/.csv format (sox5-style with multi-pattern discovery)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.integration
+class TestBinCsvMultiPatternDiscovery:
+    """Test multi-pattern discovery with paired .bin/.csv files (sox5-style format).
+
+    This validates that ``FileDiscoverer`` correctly groups dual-file
+    recordings when given a list of patterns, and that a custom extractor
+    can load the paired files through the pipeline.
+    """
+
+    @pytest.fixture
+    def bin_csv_env(self, tmp_path):
+        """Create a dual .bin/.csv dataset under tmp_path."""
+        from tests.data.generate import create_synthetic_bin_csv_dataset
+
+        return create_synthetic_bin_csv_dataset(
+            tmp_path, n_sessions=2, duration_s=3,
+        )
+
+    def test_discovers_paired_files(self, bin_csv_env):
+        """Multi-pattern discovers grouped .bin/.csv pairs."""
+        from neurodent.core.discovery import FileDiscoverer
+
+        ds = bin_csv_env
+        base_path = str(ds["data_root"] / ds["session_folder"])
+        patterns = [f"{base_path}/{p}" for p in ds["pattern"]]
+
+        discoverer = FileDiscoverer(patterns)
+        groups = discoverer.discover()
+
+        # 2 animals × 2 sessions = 4 groups
+        assert len(groups) == 4
+        for g in groups:
+            assert g.is_multi_file
+            assert len(g.paths) == 2
+            assert any(p.endswith("_ColMajor.bin") for p in g.paths)
+            assert any(p.endswith("_Meta.csv") for p in g.paths)
+
+    def test_filter_by_animal(self, bin_csv_env):
+        """Multi-pattern discovery filters correctly by animal."""
+        from neurodent.core.discovery import FileDiscoverer
+
+        ds = bin_csv_env
+        base_path = str(ds["data_root"] / ds["session_folder"])
+        patterns = [f"{base_path}/{p}" for p in ds["pattern"]]
+
+        discoverer = FileDiscoverer(patterns)
+        filtered = discoverer.discover(animal="ExWT")
+
+        # 1 animal × 2 sessions = 2 groups
+        assert len(filtered) == 2
+        for g in filtered:
+            assert g.metadata["animal"] == "ExWT"
+
+    def test_custom_extractor_via_animal_organizer(self, bin_csv_env):
+        """AnimalOrganizer loads paired .bin/.csv files via a custom extract_func.
+
+        This verifies that the pipeline correctly passes multi-file
+        ``DiscoveredFile`` objects to a user-defined extractor function
+        when using a list of patterns.
+        """
+        from neurodent import constants
+        from neurodent.workflow import inject_config_aliases
+        from neurodent.visualization import AnimalOrganizer
+
+        ds = bin_csv_env
+        base_path = str(ds["data_root"] / ds["session_folder"])
+        patterns = [f"{base_path}/{p}" for p in ds["pattern"]]
+
+        orig_metadata = constants.ANIMAL_METADATA
+        orig_aliases = constants.GENOTYPE_ALIASES
+        try:
+            inject_config_aliases(ds["samples_config"])
+
+            ao = AnimalOrganizer(
+                patterns,
+                animal_id="ExWT",
+                assume_from_number=True,
+                lro_kwargs={
+                    "mode": "si",
+                    "extract_func": _bin_csv_extractor,
+                    "multiprocess_mode": "serial",
+                },
+            )
+
+            assert ao.animal_id == "ExWT"
+            assert len(ao.long_recordings) >= 1
+
+            for lro in ao.long_recordings:
+                rec = lro.LongRecording
+                assert rec is not None
+                assert rec.get_num_channels() == 8
+                assert rec.get_num_samples() == int(3 * 1000)  # 3s @ 1kHz
+        finally:
+            constants.ANIMAL_METADATA = orig_metadata
+            constants.GENOTYPE_ALIASES = orig_aliases
+
