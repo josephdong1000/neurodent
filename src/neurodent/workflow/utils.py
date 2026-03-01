@@ -230,6 +230,81 @@ def deep_merge_dict(base: dict, override: dict) -> dict:
     return result
 
 
+def build_discovery_pattern(
+    base_path: str | Path,
+    mode: str | None = None,
+    file_pattern: str | None = None,
+    pattern: str | list[str] | None = None,
+) -> str | list[str]:
+    """Convert pipeline config to AnimalOrganizer discovery pattern.
+
+    Supports both the new ``pattern`` config key and backward-compatible
+    conversion from the old ``mode`` + ``file_pattern`` style.
+
+    When ``pattern`` is provided it takes precedence: the template is
+    prepended with *base_path* and returned directly.
+
+    Otherwise the function builds a pattern string from the legacy *mode*
+    and *file_pattern* parameters.
+
+    Args:
+        base_path: Root folder for this session (e.g.
+            ``data_parent_folder / folder_path``).
+        mode: Legacy AnimalOrganizer mode (``"nest"``, ``"base"``,
+            ``"concat"``).  Used only when *pattern* is ``None``.
+        file_pattern: Legacy file glob (e.g. ``"*.rhd"``).  Used only
+            when *pattern* is ``None``.
+        pattern: New-style pattern template **relative** to *base_path*.
+            May contain ``{animal}``, ``{session}``, ``{index}``
+            placeholders.  May be a list for multi-file patterns.
+
+    Returns:
+        A discovery pattern string (or list of strings) suitable for
+        ``AnimalOrganizer(pattern=...)``.
+
+    Examples:
+        New-style with explicit pattern::
+
+            >>> build_discovery_pattern("/data/session1", pattern="{animal}/{session}/*.bin")
+            '/data/session1/{animal}/{session}/*.bin'
+
+        Legacy nest mode::
+
+            >>> build_discovery_pattern("/data/session1", mode="nest")
+            '/data/session1/{animal}/{session}/*'
+
+        Legacy base mode with file filter::
+
+            >>> build_discovery_pattern("/data/session1", mode="base", file_pattern="*.rhd")
+            '/data/session1/*.rhd'
+
+    Raises:
+        ValueError: If neither *pattern* nor *mode* is provided.
+    """
+    base = str(base_path).rstrip("/")
+
+    # New-style: explicit pattern template
+    if pattern is not None:
+        if isinstance(pattern, list):
+            return [f"{base}/{p}" for p in pattern]
+        return f"{base}/{pattern}"
+
+    # Legacy conversion
+    fp = file_pattern or "*"
+
+    if mode == "nest":
+        return f"{base}/{{animal}}/{{session}}/{fp}"
+    elif mode in ("base", "concat"):
+        return f"{base}/{fp}"
+    elif mode is not None:
+        return f"{base}/{fp}"
+    else:
+        raise ValueError(
+            "Either 'pattern' or 'mode' must be provided in the "
+            "war_generation config to build a discovery pattern."
+        )
+
+
 def apply_path_overrides(base_config: dict, overrides: dict) -> dict:
     """Apply path-based overrides to a config dictionary using deep merge.
 

@@ -19,7 +19,7 @@ from dask.distributed import Client, LocalCluster
 
 from neurodent import constants, core, visualization
 from neurodent.workflow import setup_snakemake_logging, inject_config_aliases
-from neurodent.workflow.utils import apply_path_overrides
+from neurodent.workflow.utils import apply_path_overrides, build_discovery_pattern
 
 
 def load_samples_and_config():
@@ -128,28 +128,26 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
 
                 logger.info(f"  -> File pattern: {session_analysis_config.get('file_pattern')}")
 
-                # For joint sessions, build a regex to match any animal's numeric ID in filenames
-                # e.g. "ArxRosa-967", "ArxRosa-968" -> regex "967|968|969|418"
-                if is_joint:
-                    all_ids = list(samples_config["joint_sessions"][session_key].keys())
-                    numeric_ids = [aid.split("-")[-1] for aid in all_ids]
-                    animal_file_match_pattern = "|".join(numeric_ids)
-                    logger.info(f"  -> Joint session file match pattern: {animal_file_match_pattern}")
-                else:
-                    animal_file_match_pattern = None
-
-                # Create AO for this session with overridden parameters
-                session_ao = visualization.AnimalOrganizer(
+                # Build discovery pattern for the new pattern-based AnimalOrganizer API
+                discovery_pattern = build_discovery_pattern(
                     data_parent_folder / folder_path,
-                    source_animal_id,
-                    mode=session_analysis_config["mode"],
+                    mode=session_analysis_config.get("mode"),
                     file_pattern=session_analysis_config.get("file_pattern"),
-                    day_sep=session_analysis_config.get("day_sep"),
+                    pattern=session_analysis_config.get("pattern"),
+                )
+                logger.info(f"  -> Discovery pattern: {discovery_pattern}")
+
+                # For joint sessions, don't filter by animal_id during discovery
+                # since all files belong to all animals in the joint session
+                ao_animal_id = None if is_joint else source_animal_id
+
+                # Create AO for this session using pattern-based discovery
+                session_ao = visualization.AnimalOrganizer(
+                    discovery_pattern,
+                    animal_id=ao_animal_id,
+                    skip_sessions=session_analysis_config.get("skip_sessions", session_analysis_config.get("skip_days", [])),
                     assume_from_number=session_analysis_config["assume_from_number"],
-                    skip_days=session_analysis_config["skip_days"],
                     lro_kwargs=session_lro_kwargs,
-                    day_parse_kwargs=session_analysis_config.get("day_parse_kwargs", {}),
-                    animal_file_match_pattern=animal_file_match_pattern,
                 )
 
                 
