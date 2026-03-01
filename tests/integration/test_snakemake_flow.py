@@ -36,7 +36,7 @@ def example_pipeline_env(tmp_path):
     ``session_folder``, and the full ``config`` dict that would normally
     come from Snakemake.
     """
-    from tests.example_data.generate import create_synthetic_dataset
+    from tests.data.generate import create_synthetic_dataset
 
     ds = create_synthetic_dataset(tmp_path, n_sessions=2, duration_s=3)
 

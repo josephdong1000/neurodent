@@ -1,5 +1,5 @@
 {
-    "data_parent_folder": "tests/example_data/raw",
+    "data_parent_folder": "tests/data/raw",
     "GENOTYPE_ALIASES": {
         "WT": ["WT", "ExWT"],
         "KO": ["KO", "ExKO"]

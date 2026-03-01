@@ -34,7 +34,7 @@ without processing full production-scale recordings.
 
 **Programmatic synthetic data (CI-friendly)**
 
-A ``create_synthetic_dataset()`` helper in ``tests/example_data/generate.py``
+A ``create_synthetic_dataset()`` helper in ``tests/data/generate.py``
 builds a tiny directory tree with 8-channel NWB files that can be read back
 by SpikeInterface.  The ``example_dataset`` pytest fixture in
 ``tests/conftest.py`` wraps this for convenient use:
@@ -51,8 +51,8 @@ discovery, filtering, and config-alias injection against this data.
 
 **User-provided real data (local development)**
 
-Place small real recordings under ``tests/example_data/raw/`` following the
-directory layout described in ``tests/example_data/README.md``, then run:
+Place small real recordings under ``tests/data/raw/`` following the
+directory layout described in ``tests/data/README.md``, then run:
 
 .. code-block:: bash
 

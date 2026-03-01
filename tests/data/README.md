@@ -26,7 +26,7 @@ If you have a small real recording you'd like to test with, place it here
 following the nested directory layout:
 
 ```
-tests/example_data/
+tests/data/
 └── raw/
     └── session_folder/          # e.g. "example_session"
         └── AnimalA/             # animal ID
@@ -56,7 +56,7 @@ To keep the repository lean:
 
 ## Adding your own example data
 
-1. Place raw files under `tests/example_data/raw/` using the structure above.
+1. Place raw files under `tests/data/raw/` using the structure above.
 2. Update `config/samples_example.json` with the correct folder→animal mapping
    and `ANIMAL_METADATA` entries.
 3. Run with `NEURODENT_DATASET=example snakemake --cores 1`.

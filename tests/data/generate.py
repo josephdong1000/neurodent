@@ -12,7 +12,7 @@ uses ``{animal}/{session}/{index}.nwb`` placeholders, matching the
 
 Usage from tests::
 
-    from tests.example_data.generate import create_synthetic_dataset
+    from tests.data.generate import create_synthetic_dataset
 
     def test_pipeline(tmp_path):
         ds = create_synthetic_dataset(tmp_path)

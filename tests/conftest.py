@@ -289,7 +289,7 @@ def example_dataset(tmp_path):
         dict with keys ``data_root``, ``samples_config``, ``animals``,
         ``session_folder``.
     """
-    from tests.example_data.generate import create_synthetic_dataset
+    from tests.data.generate import create_synthetic_dataset
 
     return create_synthetic_dataset(tmp_path)
 
