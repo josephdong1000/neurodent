@@ -6,7 +6,7 @@
     },
     "ANIMAL_METADATA": [
         {"id": "ExWT", "sex": "M", "gene": "WT"},
-        {"id": "ExKO", "sex": "M", "gene": "KO"}
+        {"id": "ExKO", "sex": "F", "gene": "KO"}
     ],
     "data_folders_to_animal_ids": {
         "example_session": ["ExWT", "ExKO"]

@@ -102,7 +102,7 @@ class TestExampleDatasetGeneration:
         bin_file = next((root / session / animal_id / "day1").glob("*_ColMajor.bin"))
         file_size = bin_file.stat().st_size
 
-        # Default: 5 s × 1000 Hz × 8 ch × 4 bytes = 160_000 bytes
+        # example_dataset fixture uses default duration_s=5
         n_samples = 5 * 1000
         n_channels = 8
         expected = n_samples * n_channels * np.dtype(np.float32).itemsize
@@ -148,8 +148,8 @@ class TestFileDiscoveryWithExampleData:
         discoverer = FileDiscoverer(pattern)
         all_files = discoverer.discover()
 
-        # 2 animals × 2 sessions × 2 files each = 8 discovered items
-        # (ColMajor.bin and Meta.csv are separate matches)
+        # 2 animals × 2 sessions, each session has multiple files (bin + meta)
+        # discovered independently as DiscoveredFile objects
         assert len(all_files) >= 4  # at least 2 animals × 2 sessions
 
         found_animals = {f.metadata["animal"] for f in all_files}

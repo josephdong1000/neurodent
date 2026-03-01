@@ -148,7 +148,7 @@ def create_synthetic_dataset(
     if animals is None:
         animals = [
             {"id": "ExWT", "sex": "M", "gene": "WT"},
-            {"id": "ExKO", "sex": "M", "gene": "KO"},
+            {"id": "ExKO", "sex": "F", "gene": "KO"},
         ]
 
     data_root = root / "raw"
@@ -161,6 +161,7 @@ def create_synthetic_dataset(
             _write_bin_and_meta(
                 day_folder,
                 duration_s=duration_s,
+                # Modulo 2^31 ensures the hash fits within NumPy's RNG seed range
                 seed=hash(animal["id"]) % (2**31) + day_idx,
             )
 
