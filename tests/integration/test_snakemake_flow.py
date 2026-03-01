@@ -4,8 +4,8 @@ Integration Tests for Snakemake Workflow
 
 Tests that validate the pipeline's data-loading path using a minimal
 synthetic dataset generated on the fly.  These tests exercise the real
-``FileDiscoverer`` and ``build_discovery_pattern`` code against actual
-files on disk, without requiring production-scale recordings.
+``FileDiscoverer`` code against actual files on disk, without requiring
+production-scale recordings.
 
 Running
 -------
@@ -23,8 +23,6 @@ import subprocess
 from pathlib import Path
 
 import pytest
-
-from neurodent.workflow.utils import build_discovery_pattern
 
 
 # ---------------------------------------------------------------------------
@@ -48,8 +46,7 @@ def example_pipeline_env(tmp_path):
         "temp_directory": str(tmp_path / "tmp"),
         "analysis": {
             "war_generation": {
-                "mode": "nest",
-                "file_pattern": "*",
+                "pattern": "{animal}/{session}/{index}",
                 "assume_from_number": True,
                 "skip_sessions": [],
                 "lro_kwargs": {
@@ -139,11 +136,9 @@ class TestFileDiscoveryWithExampleData:
         ds = example_pipeline_env
         cfg = ds["config"]["analysis"]["war_generation"]
 
-        pattern = build_discovery_pattern(
-            str(ds["data_root"] / ds["session_folder"]),
-            mode=cfg["mode"],
-            file_pattern=cfg.get("file_pattern"),
-        )
+        # Build absolute pattern the same way generate_wars.py does
+        base_path = str(ds["data_root"] / ds["session_folder"])
+        pattern = f"{base_path}/{cfg['pattern']}"
 
         discoverer = FileDiscoverer(pattern)
         all_files = discoverer.discover()
@@ -163,11 +158,8 @@ class TestFileDiscoveryWithExampleData:
         ds = example_pipeline_env
         cfg = ds["config"]["analysis"]["war_generation"]
 
-        pattern = build_discovery_pattern(
-            str(ds["data_root"] / ds["session_folder"]),
-            mode=cfg["mode"],
-            file_pattern=cfg.get("file_pattern"),
-        )
+        base_path = str(ds["data_root"] / ds["session_folder"])
+        pattern = f"{base_path}/{cfg['pattern']}"
 
         animal_id = ds["animals"][0]
         discoverer = FileDiscoverer(pattern)
@@ -184,11 +176,8 @@ class TestFileDiscoveryWithExampleData:
         ds = example_pipeline_env
         cfg = ds["config"]["analysis"]["war_generation"]
 
-        pattern = build_discovery_pattern(
-            str(ds["data_root"] / ds["session_folder"]),
-            mode=cfg["mode"],
-            file_pattern=cfg.get("file_pattern"),
-        )
+        base_path = str(ds["data_root"] / ds["session_folder"])
+        pattern = f"{base_path}/{cfg['pattern']}"
 
         discoverer = FileDiscoverer(pattern)
         for animal_id in ds["animals"]:
@@ -206,14 +195,23 @@ class TestSamplesConfigIntegration:
         from neurodent.workflow import inject_config_aliases
         from neurodent import constants
 
-        sc = example_dataset["samples_config"]
-        inject_config_aliases(sc)
+        # Save original state to restore after test
+        orig_genotype_aliases = constants.GENOTYPE_ALIASES
+        orig_animal_metadata = constants.ANIMAL_METADATA
 
-        # Verify metadata was injected
-        assert "ExWT" in constants.ANIMAL_METADATA
-        assert constants.ANIMAL_METADATA["ExWT"]["gene"] == "WT"
-        assert "ExKO" in constants.ANIMAL_METADATA
-        assert constants.ANIMAL_METADATA["ExKO"]["gene"] == "KO"
+        try:
+            sc = example_dataset["samples_config"]
+            inject_config_aliases(sc)
+
+            # Verify metadata was injected
+            assert "ExWT" in constants.ANIMAL_METADATA
+            assert constants.ANIMAL_METADATA["ExWT"]["gene"] == "WT"
+            assert "ExKO" in constants.ANIMAL_METADATA
+            assert constants.ANIMAL_METADATA["ExKO"]["gene"] == "KO"
+        finally:
+            # Restore original global state to avoid leaking into other tests
+            constants.GENOTYPE_ALIASES = orig_genotype_aliases
+            constants.ANIMAL_METADATA = orig_animal_metadata
 
     def test_samples_config_serializable(self, example_dataset):
         """samples_config can be serialized to JSON (for writing to disk)."""

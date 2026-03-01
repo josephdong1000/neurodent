@@ -7,8 +7,7 @@ samples:
 
 analysis:
   war_generation:
-    mode: "concat"
-    file_pattern: "*.nwb"
+    pattern: "*.nwb"  # Flat: NWB files directly in session folder
     lro_kwargs:
       mode: "si"
 

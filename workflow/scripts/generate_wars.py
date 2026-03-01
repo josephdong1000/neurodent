@@ -19,7 +19,7 @@ from dask.distributed import Client, LocalCluster
 
 from neurodent import constants, core, visualization
 from neurodent.workflow import setup_snakemake_logging, inject_config_aliases
-from neurodent.workflow.utils import apply_path_overrides, build_discovery_pattern
+from neurodent.workflow.utils import apply_path_overrides
 
 
 def load_samples_and_config():
@@ -126,15 +126,21 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
                             session_lro_kwargs["manual_datetimes"] = spec
                             logger.info(f"  -> Using manual datetime: {spec}")
 
-                logger.info(f"  -> File pattern: {session_analysis_config.get('file_pattern')}")
+                logger.info(f"  -> File pattern: {session_analysis_config.get('pattern')}")
 
-                # Build discovery pattern for the new pattern-based AnimalOrganizer API
-                discovery_pattern = build_discovery_pattern(
-                    data_parent_folder / folder_path,
-                    mode=session_analysis_config.get("mode"),
-                    file_pattern=session_analysis_config.get("file_pattern"),
-                    pattern=session_analysis_config.get("pattern"),
-                )
+                # Build absolute discovery pattern from the config's relative pattern
+                if "pattern" not in session_analysis_config:
+                    raise KeyError(
+                        f"Missing 'pattern' key in war_generation config for session '{session_key}'. "
+                        "Each dataset config must specify 'pattern' (e.g. '{{animal}}/{{session}}/{{index}}' "
+                        "or '*.rhd')."
+                    )
+                base_path = str(data_parent_folder / folder_path)
+                relative_pattern = session_analysis_config["pattern"]
+                if isinstance(relative_pattern, list):
+                    discovery_pattern = [f"{base_path}/{p}" for p in relative_pattern]
+                else:
+                    discovery_pattern = f"{base_path}/{relative_pattern}"
                 logger.info(f"  -> Discovery pattern: {discovery_pattern}")
 
                 # For joint sessions, don't filter by animal_id during discovery

@@ -11,8 +11,7 @@ samples:
 
 analysis:
   war_generation:
-    mode: "nest"              # folder layout: session_folder/{animal}/{session}/*
-    file_pattern: "*"         # match all files in the day subfolders
+    pattern: "{animal}/{session}/{index}"   # nest layout: session_folder/{animal}/{session}/files
     assume_from_number: true
     skip_sessions: []
     lro_kwargs:
