@@ -321,6 +321,12 @@ def _glob_to_index_placeholder(file_pattern: str) -> str:
     This is needed when the pattern already contains ``{animal}``/``{session}``
     placeholders because ``FileDiscoverer`` escapes literal ``*`` in the regex.
 
+    Only the **first** ``*`` in *file_pattern* is replaced.  Patterns with
+    multiple wildcards (e.g. ``*_data_*.bin``) are uncommon in practice;
+    use an explicit ``pattern`` config key with named placeholders for
+    such cases instead of relying on the legacy ``mode`` + ``file_pattern``
+    conversion.
+
     Examples:
         >>> _glob_to_index_placeholder("*")
         '{index}'
