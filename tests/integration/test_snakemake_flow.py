@@ -326,3 +326,96 @@ class TestPipelineSteps:
             constants.ANIMAL_METADATA = orig_metadata
             constants.GENOTYPE_ALIASES = orig_aliases
 
+
+# ---------------------------------------------------------------------------
+# Tests — Dual .bin/.csv format (sox5-style with multi-pattern discovery)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.integration
+class TestBinCsvMultiPatternDiscovery:
+    """Test multi-pattern discovery with paired .bin/.csv files (sox5-style format).
+
+    This validates that ``FileDiscoverer`` correctly groups dual-file
+    recordings when given a list of patterns, and that a custom extractor
+    can load the paired files through the pipeline.
+    """
+
+    @pytest.fixture
+    def bin_csv_env(self, tmp_path):
+        """Create a dual .bin/.csv dataset under tmp_path."""
+        from tests.data.generate import create_synthetic_bin_csv_dataset
+
+        return create_synthetic_bin_csv_dataset(
+            tmp_path, n_sessions=2, duration_s=3,
+        )
+
+    def test_discovers_paired_files(self, bin_csv_env):
+        """Multi-pattern discovers grouped .bin/.csv pairs."""
+        from neurodent.core.discovery import FileDiscoverer
+
+        ds = bin_csv_env
+        base_path = str(ds["data_root"] / ds["session_folder"])
+        patterns = [f"{base_path}/{p}" for p in ds["pattern"]]
+
+        discoverer = FileDiscoverer(patterns)
+        groups = discoverer.discover()
+
+        # 2 animals × 2 sessions = 4 groups
+        assert len(groups) == 4
+        for g in groups:
+            assert g.is_multi_file
+            assert len(g.paths) == 2
+            assert any(p.endswith("_ColMajor.bin") for p in g.paths)
+            assert any(p.endswith("_Meta.csv") for p in g.paths)
+
+    def test_filter_by_animal(self, bin_csv_env):
+        """Multi-pattern discovery filters correctly by animal."""
+        from neurodent.core.discovery import FileDiscoverer
+
+        ds = bin_csv_env
+        base_path = str(ds["data_root"] / ds["session_folder"])
+        patterns = [f"{base_path}/{p}" for p in ds["pattern"]]
+
+        discoverer = FileDiscoverer(patterns)
+        filtered = discoverer.discover(animal="ExWT")
+
+        # 1 animal × 2 sessions = 2 groups
+        assert len(filtered) == 2
+        for g in filtered:
+            assert g.metadata["animal"] == "ExWT"
+
+    def test_custom_extractor_loads_pair(self, bin_csv_env):
+        """A custom extractor can load paired .bin/.csv into a recording."""
+        import numpy as np
+        import spikeinterface.core as si_core
+        from neurodent.core.discovery import FileDiscoverer
+
+        ds = bin_csv_env
+        base_path = str(ds["data_root"] / ds["session_folder"])
+        patterns = [f"{base_path}/{p}" for p in ds["pattern"]]
+
+        discoverer = FileDiscoverer(patterns)
+        groups = discoverer.discover(animal="ExWT")
+        group = groups[0]
+
+        # Custom extractor: read .bin data + .csv metadata
+        bin_path = [p for p in group.paths if p.endswith(".bin")][0]
+        csv_path = [p for p in group.paths if p.endswith(".csv")][0]
+
+        import csv
+        with open(csv_path) as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+        n_channels = len(rows)
+        sampling_rate = float(rows[0]["sampling_rate"])
+
+        data = np.fromfile(bin_path, dtype=np.float32).reshape(-1, n_channels)
+        rec = si_core.NumpyRecording(
+            traces_list=[data],
+            sampling_frequency=sampling_rate,
+        )
+
+        assert rec.get_num_channels() == 8
+        assert rec.get_num_samples() == int(3 * sampling_rate)
+

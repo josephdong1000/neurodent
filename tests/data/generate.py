@@ -216,3 +216,145 @@ def create_synthetic_dataset(
         "session_folder": session_folder,
     }
 
+
+# ---------------------------------------------------------------------------
+# Dual .bin/.csv format (sox5-style) generator
+# ---------------------------------------------------------------------------
+
+
+def _write_bin_csv_pair(
+    bin_path: Path,
+    csv_path: Path,
+    *,
+    n_channels: int = N_CHANNELS,
+    sampling_rate: int = SAMPLING_RATE,
+    duration_s: float = DURATION_SECONDS,
+    channel_names: list[str] | None = None,
+    seed: int = 42,
+) -> dict:
+    """Write a paired ``.bin`` + ``.csv`` file (sox5-style format).
+
+    The ``.bin`` file is a column-major ``float32`` matrix (samples × channels).
+    The ``.csv`` file contains per-channel metadata (name, sampling rate).
+
+    Args:
+        bin_path: Output ``.bin`` path.
+        csv_path: Output ``.csv`` path (same stem, different suffix).
+        n_channels: Number of EEG channels.
+        sampling_rate: Sampling rate in Hz.
+        duration_s: Recording duration in seconds.
+        channel_names: Channel label list.
+        seed: NumPy RNG seed.
+
+    Returns:
+        Dict with ``"bin_path"``, ``"csv_path"``, and ``"n_samples"``.
+    """
+    import csv as csv_mod
+
+    bin_path = Path(bin_path)
+    csv_path = Path(csv_path)
+    bin_path.parent.mkdir(parents=True, exist_ok=True)
+
+    channel_names = channel_names or CHANNEL_NAMES[:n_channels]
+    rng = np.random.default_rng(seed)
+    n_samples = int(duration_s * sampling_rate)
+
+    data = np.zeros((n_samples, n_channels), dtype=DTYPE)
+    for ch in range(n_channels):
+        freq = 2 + ch * 3
+        t = np.linspace(0, duration_s, n_samples, endpoint=False)
+        data[:, ch] = (
+            50 * np.sin(2 * np.pi * freq * t)
+            + 5 * rng.standard_normal(n_samples)
+        ).astype(DTYPE)
+
+    # Write column-major binary
+    data.tofile(str(bin_path))
+
+    # Write CSV metadata
+    with open(csv_path, "w", newline="") as f:
+        writer = csv_mod.writer(f)
+        writer.writerow(["channel_name", "sampling_rate"])
+        for ch_name in channel_names:
+            writer.writerow([ch_name, sampling_rate])
+
+    return {"bin_path": bin_path, "csv_path": csv_path, "n_samples": n_samples}
+
+
+def create_synthetic_bin_csv_dataset(
+    root: Path,
+    *,
+    animals: list[dict] | None = None,
+    n_sessions: int = 1,
+    duration_s: float = DURATION_SECONDS,
+) -> dict:
+    """Create a synthetic dataset using paired ``.bin`` / ``.csv`` files.
+
+    This mimics the sox5 dual-file layout where each recording segment
+    consists of a ``*_ColMajor.bin`` data file and a ``*_Meta.csv``
+    metadata file.  The directory layout uses
+    ``{animal}/{session}/{index}_ColMajor.bin`` placeholders::
+
+        root/
+        └── example_session/
+            └── ExWT/
+                └── day1/
+                    ├── recording_ColMajor.bin
+                    └── recording_Meta.csv
+
+    Args:
+        root: Top-level directory (typically ``tmp_path``).
+        animals: List of ``{"id": str, "sex": str, "gene": str}`` dicts.
+        n_sessions: Number of day-sessions per animal.
+        duration_s: Duration per session in seconds.
+
+    Returns:
+        Dict with keys ``"data_root"``, ``"samples_config"``, ``"animals"``,
+        ``"session_folder"``, ``"pattern"`` (the multi-pattern list).
+    """
+    if animals is None:
+        animals = [
+            {"id": "ExWT", "sex": "M", "gene": "WT"},
+            {"id": "ExKO", "sex": "F", "gene": "KO"},
+        ]
+
+    data_root = root / "raw"
+    session_folder = "example_session"
+    animal_ids = [a["id"] for a in animals]
+
+    for animal in animals:
+        for day_idx in range(1, n_sessions + 1):
+            base = data_root / session_folder / animal["id"] / f"day{day_idx}"
+            _write_bin_csv_pair(
+                base / "recording_ColMajor.bin",
+                base / "recording_Meta.csv",
+                duration_s=duration_s,
+                seed=hash(animal["id"]) % (2**31) + day_idx,
+            )
+
+    # Multi-pattern: one for data, one for metadata
+    pattern = [
+        "{animal}/{session}/{index}_ColMajor.bin",
+        "{animal}/{session}/{index}_Meta.csv",
+    ]
+
+    samples_config = {
+        "data_parent_folder": str(data_root),
+        "GENOTYPE_ALIASES": {
+            "WT": ["WT", "ExWT"],
+            "KO": ["KO", "ExKO"],
+        },
+        "ANIMAL_METADATA": animals,
+        "data_folders_to_animal_ids": {
+            session_folder: animal_ids,
+        },
+    }
+
+    return {
+        "data_root": data_root,
+        "samples_config": samples_config,
+        "animals": animal_ids,
+        "session_folder": session_folder,
+        "pattern": pattern,
+    }
+
