@@ -21,7 +21,41 @@ Or include them in the full suite::
 import json
 from pathlib import Path
 
+import numpy as np
 import pytest
+
+
+# ---------------------------------------------------------------------------
+# Custom extractor for dual .bin/.csv tests
+# ---------------------------------------------------------------------------
+
+
+def _bin_csv_extractor(discovered_file, **kwargs):
+    """Custom extractor that reads paired .bin + .csv files into a recording.
+
+    This is the kind of function a user would write when their data
+    consists of multiple files per recording segment (e.g. sox5 format).
+    ``AnimalOrganizer`` passes the multi-file ``DiscoveredFile`` object
+    directly to this callable.
+    """
+    import csv
+    import spikeinterface.core as si_core
+
+    bin_path = [p for p in discovered_file.paths if p.endswith(".bin")][0]
+    csv_path = [p for p in discovered_file.paths if p.endswith(".csv")][0]
+
+    with open(csv_path) as f:
+        reader = csv.DictReader(f)
+        rows = list(reader)
+
+    n_channels = len(rows)
+    sampling_rate = float(rows[0]["sampling_rate"])
+    data = np.fromfile(bin_path, dtype=np.float32).reshape(-1, n_channels)
+
+    return si_core.NumpyRecording(
+        traces_list=[data],
+        sampling_frequency=sampling_rate,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -328,6 +362,161 @@ class TestPipelineSteps:
 
 
 # ---------------------------------------------------------------------------
+# Tests — Pipeline Continuation (WAR → Plotters / FDSAR)
+# ---------------------------------------------------------------------------
+
+
+def _build_war(ds):
+    """Helper: build a WAR for a single animal from a pipeline environment.
+
+    Shared by continuation tests that start from an already-computed WAR.
+    """
+    from datetime import datetime
+    from dateutil.tz import tzlocal
+    from neurodent.visualization import AnimalOrganizer
+
+    cfg = ds["config"]["analysis"]["war_generation"]
+    base_path = str(ds["data_root"] / ds["session_folder"])
+    pattern = f"{base_path}/{cfg['pattern']}"
+    animal_id = ds["animals"][0]
+
+    lro_kwargs = dict(cfg["lro_kwargs"])
+    lro_kwargs["manual_datetimes"] = datetime(2025, 1, 15, 10, 0, 0, tzinfo=tzlocal())
+
+    ao = AnimalOrganizer(
+        pattern,
+        animal_id=animal_id,
+        skip_sessions=["day2"],
+        assume_from_number=cfg["assume_from_number"],
+        lro_kwargs=lro_kwargs,
+    )
+
+    for lro in ao.long_recordings:
+        if not hasattr(lro, "base_folder_path"):
+            lro.base_folder_path = "synthetic_test"
+
+    war = ao.compute_windowed_analysis(
+        ["all"],
+        multiprocess_mode="serial",
+        window_s=1,
+        apply_notch_filter=False,
+    )
+    return ao, war
+
+
+@pytest.mark.integration
+class TestPipelineContinuation:
+    """Test downstream pipeline stages that consume a WAR.
+
+    Validates that WAR output can be fed into AnimalPlotter,
+    ExperimentPlotter, and that FDSAR generation runs on the
+    same synthetic data.
+    """
+
+    @pytest.fixture
+    def war_env(self, example_pipeline_env):
+        """Return (ao, war, ds) with constants injected for the test scope."""
+        from neurodent import constants
+        from neurodent.workflow import inject_config_aliases
+
+        ds = example_pipeline_env
+        orig_metadata = constants.ANIMAL_METADATA
+        orig_aliases = constants.GENOTYPE_ALIASES
+        inject_config_aliases(ds["samples_config"])
+
+        ao, war = _build_war(ds)
+        yield ao, war, ds
+
+        constants.ANIMAL_METADATA = orig_metadata
+        constants.GENOTYPE_ALIASES = orig_aliases
+
+    def test_animal_plotter_instantiation(self, war_env):
+        """AnimalPlotter can be created from the generated WAR."""
+        from neurodent.visualization.plotting import AnimalPlotter
+
+        _ao, war, _ds = war_env
+        ap = AnimalPlotter(war)
+
+        assert ap.window_result is war
+        assert ap.genotype is not None
+        assert ap.n_channels == 8
+
+    def test_experiment_plotter_instantiation(self, war_env):
+        """ExperimentPlotter can be created from the generated WAR."""
+        from neurodent.visualization.plotting import ExperimentPlotter
+
+        _ao, war, _ds = war_env
+        ep = ExperimentPlotter(war, features=["all"])
+
+        assert len(ep.results) == 1
+        assert ep.results[0] is war
+        assert ep.concat_df_wars is not None
+        assert not ep.concat_df_wars.empty
+
+    def test_experiment_plotter_multiple_wars(self, example_pipeline_env):
+        """ExperimentPlotter accepts WARs from multiple animals."""
+        from neurodent import constants
+        from neurodent.workflow import inject_config_aliases
+        from neurodent.visualization.plotting import ExperimentPlotter
+
+        ds = example_pipeline_env
+        orig_metadata = constants.ANIMAL_METADATA
+        orig_aliases = constants.GENOTYPE_ALIASES
+        try:
+            inject_config_aliases(ds["samples_config"])
+            _ao1, war1 = _build_war(ds)
+
+            # Build a second WAR for the other animal
+            from datetime import datetime
+            from dateutil.tz import tzlocal
+            from neurodent.visualization import AnimalOrganizer
+
+            cfg = ds["config"]["analysis"]["war_generation"]
+            base_path = str(ds["data_root"] / ds["session_folder"])
+            pattern = f"{base_path}/{cfg['pattern']}"
+            lro_kwargs = dict(cfg["lro_kwargs"])
+            lro_kwargs["manual_datetimes"] = datetime(2025, 1, 15, 10, 0, 0, tzinfo=tzlocal())
+
+            ao2 = AnimalOrganizer(
+                pattern,
+                animal_id=ds["animals"][1],
+                skip_sessions=["day2"],
+                assume_from_number=cfg["assume_from_number"],
+                lro_kwargs=lro_kwargs,
+            )
+            for lro in ao2.long_recordings:
+                if not hasattr(lro, "base_folder_path"):
+                    lro.base_folder_path = "synthetic_test"
+
+            war2 = ao2.compute_windowed_analysis(
+                ["all"],
+                multiprocess_mode="serial",
+                window_s=1,
+                apply_notch_filter=False,
+            )
+
+            ep = ExperimentPlotter([war1, war2], features=["all"])
+            assert len(ep.results) == 2
+            assert not ep.concat_df_wars.empty
+        finally:
+            constants.ANIMAL_METADATA = orig_metadata
+            constants.GENOTYPE_ALIASES = orig_aliases
+
+    def test_fdsar_generation(self, war_env):
+        """Frequency-domain spike analysis runs on the same AO data."""
+        ao, _war, _ds = war_env
+
+        fdsars = ao.compute_frequency_domain_spike_analysis(
+            multiprocess_mode="serial",
+        )
+
+        assert len(fdsars) >= 1
+        for fdsar in fdsars:
+            assert fdsar.animal_id == ao.animal_id
+            assert fdsar.genotype is not None
+
+
+# ---------------------------------------------------------------------------
 # Tests — Dual .bin/.csv format (sox5-style with multi-pattern discovery)
 # ---------------------------------------------------------------------------
 
@@ -385,37 +574,46 @@ class TestBinCsvMultiPatternDiscovery:
         for g in filtered:
             assert g.metadata["animal"] == "ExWT"
 
-    def test_custom_extractor_loads_pair(self, bin_csv_env):
-        """A custom extractor can load paired .bin/.csv into a recording."""
-        import numpy as np
-        import spikeinterface.core as si_core
-        from neurodent.core.discovery import FileDiscoverer
+    def test_custom_extractor_via_animal_organizer(self, bin_csv_env):
+        """AnimalOrganizer loads paired .bin/.csv files via a custom extract_func.
+
+        This verifies that the pipeline correctly passes multi-file
+        ``DiscoveredFile`` objects to a user-defined extractor function
+        when using a list of patterns.
+        """
+        from neurodent import constants
+        from neurodent.workflow import inject_config_aliases
+        from neurodent.visualization import AnimalOrganizer
 
         ds = bin_csv_env
         base_path = str(ds["data_root"] / ds["session_folder"])
         patterns = [f"{base_path}/{p}" for p in ds["pattern"]]
 
-        discoverer = FileDiscoverer(patterns)
-        groups = discoverer.discover(animal="ExWT")
-        group = groups[0]
+        orig_metadata = constants.ANIMAL_METADATA
+        orig_aliases = constants.GENOTYPE_ALIASES
+        try:
+            inject_config_aliases(ds["samples_config"])
 
-        # Custom extractor: read .bin data + .csv metadata
-        bin_path = [p for p in group.paths if p.endswith(".bin")][0]
-        csv_path = [p for p in group.paths if p.endswith(".csv")][0]
+            ao = AnimalOrganizer(
+                patterns,
+                animal_id="ExWT",
+                assume_from_number=True,
+                lro_kwargs={
+                    "mode": "si",
+                    "extract_func": _bin_csv_extractor,
+                    "multiprocess_mode": "serial",
+                },
+            )
 
-        import csv
-        with open(csv_path) as f:
-            reader = csv.DictReader(f)
-            rows = list(reader)
-        n_channels = len(rows)
-        sampling_rate = float(rows[0]["sampling_rate"])
+            assert ao.animal_id == "ExWT"
+            assert len(ao.long_recordings) >= 1
 
-        data = np.fromfile(bin_path, dtype=np.float32).reshape(-1, n_channels)
-        rec = si_core.NumpyRecording(
-            traces_list=[data],
-            sampling_frequency=sampling_rate,
-        )
-
-        assert rec.get_num_channels() == 8
-        assert rec.get_num_samples() == int(3 * sampling_rate)
+            for lro in ao.long_recordings:
+                rec = lro.LongRecording
+                assert rec is not None
+                assert rec.get_num_channels() == 8
+                assert rec.get_num_samples() == int(3 * 1000)  # 3s @ 1kHz
+        finally:
+            constants.ANIMAL_METADATA = orig_metadata
+            constants.GENOTYPE_ALIASES = orig_aliases
 
