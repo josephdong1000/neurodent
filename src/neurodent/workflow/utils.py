@@ -247,6 +247,11 @@ def build_discovery_pattern(
     Otherwise the function builds a pattern string from the legacy *mode*
     and *file_pattern* parameters.
 
+    For ``"nest"`` mode the file-name portion uses an ``{index}`` placeholder
+    so that the ``FileDiscoverer`` regex can match discovered paths.  For
+    ``"base"``/``"concat"`` modes, plain globs (no placeholders) are used
+    instead, which lets ``FileDiscoverer`` return paths without metadata.
+
     Args:
         base_path: Root folder for this session (e.g.
             ``data_parent_folder / folder_path``).
@@ -265,18 +270,18 @@ def build_discovery_pattern(
     Examples:
         New-style with explicit pattern::
 
-            >>> build_discovery_pattern("/data/session1", pattern="{animal}/{session}/*.bin")
-            '/data/session1/{animal}/{session}/*.bin'
+            >>> build_discovery_pattern("/data/s1", pattern="{animal}/{session}/{index}.bin")
+            '/data/s1/{animal}/{session}/{index}.bin'
 
         Legacy nest mode::
 
-            >>> build_discovery_pattern("/data/session1", mode="nest")
-            '/data/session1/{animal}/{session}/*'
+            >>> build_discovery_pattern("/data/s1", mode="nest")
+            '/data/s1/{animal}/{session}/{index}'
 
         Legacy base mode with file filter::
 
-            >>> build_discovery_pattern("/data/session1", mode="base", file_pattern="*.rhd")
-            '/data/session1/*.rhd'
+            >>> build_discovery_pattern("/data/s1", mode="base", file_pattern="*.rhd")
+            '/data/s1/*.rhd'
 
     Raises:
         ValueError: If neither *pattern* nor *mode* is provided.
@@ -293,8 +298,13 @@ def build_discovery_pattern(
     fp = file_pattern or "*"
 
     if mode == "nest":
-        return f"{base}/{{animal}}/{{session}}/{fp}"
+        # Nest mode uses {animal}/{session} placeholders, so the file-name
+        # portion must also be a placeholder for the regex to work.
+        # Convert glob wildcards (e.g. "*.rhd") to "{index}.rhd".
+        fp_placeholder = _glob_to_index_placeholder(fp)
+        return f"{base}/{{animal}}/{{session}}/{fp_placeholder}"
     elif mode in ("base", "concat"):
+        # Flat modes: no placeholders needed, pure glob
         return f"{base}/{fp}"
     elif mode is not None:
         return f"{base}/{fp}"
@@ -303,6 +313,25 @@ def build_discovery_pattern(
             "Either 'pattern' or 'mode' must be provided in the "
             "war_generation config to build a discovery pattern."
         )
+
+
+def _glob_to_index_placeholder(file_pattern: str) -> str:
+    """Convert a file glob pattern to use an ``{index}`` placeholder.
+
+    This is needed when the pattern already contains ``{animal}``/``{session}``
+    placeholders because ``FileDiscoverer`` escapes literal ``*`` in the regex.
+
+    Examples:
+        >>> _glob_to_index_placeholder("*")
+        '{index}'
+        >>> _glob_to_index_placeholder("*.rhd")
+        '{index}.rhd'
+        >>> _glob_to_index_placeholder("*_ColMajor.bin")
+        '{index}_ColMajor.bin'
+    """
+    if "*" in file_pattern:
+        return file_pattern.replace("*", "{index}", 1)
+    return file_pattern
 
 
 def apply_path_overrides(base_config: dict, overrides: dict) -> dict:

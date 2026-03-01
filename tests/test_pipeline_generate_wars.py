@@ -55,14 +55,14 @@ class TestBuildDiscoveryPattern:
     # --- Legacy mode conversion ---
 
     def test_nest_mode_default_file_pattern(self):
-        """Nest mode without file_pattern uses wildcard."""
+        """Nest mode without file_pattern uses {index} placeholder."""
         result = build_discovery_pattern("/data/session1", mode="nest")
-        assert result == "/data/session1/{animal}/{session}/*"
+        assert result == "/data/session1/{animal}/{session}/{index}"
 
     def test_nest_mode_with_file_pattern(self):
-        """Nest mode with file_pattern uses the given glob."""
+        """Nest mode with file_pattern converts glob to {index} placeholder."""
         result = build_discovery_pattern("/data/session1", mode="nest", file_pattern="*.bin")
-        assert result == "/data/session1/{animal}/{session}/*.bin"
+        assert result == "/data/session1/{animal}/{session}/{index}.bin"
 
     def test_base_mode_default(self):
         """Base mode without file_pattern uses wildcard."""
@@ -97,6 +97,11 @@ class TestBuildDiscoveryPattern:
         result = build_discovery_pattern("/data/session1/", mode="base", file_pattern="*.rhd")
         assert result == "/data/session1/*.rhd"
 
+    def test_nest_mode_glob_to_index_conversion(self):
+        """Nest mode converts * in file_pattern to {index} placeholder."""
+        result = build_discovery_pattern("/data/s1", mode="nest", file_pattern="*_ColMajor.bin")
+        assert result == "/data/s1/{animal}/{session}/{index}_ColMajor.bin"
+
     def test_path_object_as_base(self):
         """Path object is accepted as base_path."""
         result = build_discovery_pattern(
@@ -122,7 +127,7 @@ class TestBuildDiscoveryPatternDatasetConfigs:
         )
         assert "{animal}" in result
         assert "{session}" in result
-        assert result == "/mnt/data/Sox5/010822_cohort4/{animal}/{session}/*"
+        assert result == "/mnt/data/Sox5/010822_cohort4/{animal}/{session}/{index}"
 
     def test_ap3b2_rhd_config(self):
         """ap3b2_rhd: mode='base', file_pattern='*.rhd'."""
@@ -192,7 +197,7 @@ class TestGenerateWarsParameterConstruction:
         }
 
     def test_pattern_for_nest_mode(self):
-        """Nest mode produces pattern with {animal}/{session} placeholders."""
+        """Nest mode produces pattern with {animal}/{session}/{index} placeholders."""
         config = self._build_mock_config(mode="nest")
         analysis_cfg = config["analysis"]["war_generation"]
 
@@ -202,7 +207,7 @@ class TestGenerateWarsParameterConstruction:
             file_pattern=analysis_cfg.get("file_pattern"),
             pattern=analysis_cfg.get("pattern"),
         )
-        assert pattern == "/data/parent/session_folder/{animal}/{session}/*"
+        assert pattern == "/data/parent/session_folder/{animal}/{session}/{index}"
 
     def test_pattern_for_base_mode_with_rhd(self):
         """Base mode with *.rhd produces flat glob pattern."""
@@ -265,3 +270,162 @@ class TestGenerateWarsParameterConstruction:
         source_animal_id = "M3_MHET"
         ao_animal_id = None if is_joint else source_animal_id
         assert ao_animal_id == "M3_MHET"
+
+
+class TestPipelineIntegrationWithSyntheticData:
+    """Integration-style tests using synthetic file structures on disk.
+
+    These tests create temporary directory trees that mimic real dataset
+    layouts, then verify that build_discovery_pattern + FileDiscoverer
+    correctly discover files. This validates the end-to-end pattern
+    construction without needing real EEG data.
+    """
+
+    def test_nest_mode_file_discovery(self, tmp_path):
+        """Nest mode pattern discovers files organized as animal/session/files."""
+        # Create synthetic nest-mode directory structure
+        animal_dir = tmp_path / "A10"
+        for day in ["day1", "day2"]:
+            day_dir = animal_dir / day
+            day_dir.mkdir(parents=True)
+            (day_dir / "data_ColMajor.bin").write_bytes(b"\x00" * 100)
+            (day_dir / "data_Meta.csv").write_text("header\n")
+
+        # Also create another animal to verify filtering
+        other_dir = tmp_path / "B20"
+        other_day = other_dir / "day1"
+        other_day.mkdir(parents=True)
+        (other_day / "data_ColMajor.bin").write_bytes(b"\x00" * 100)
+
+        # Build pattern using pipeline helper
+        pattern = build_discovery_pattern(str(tmp_path), mode="nest")
+        assert "{animal}" in pattern
+        assert "{session}" in pattern
+        assert "{index}" in pattern
+
+        # Verify FileDiscoverer finds the right files
+        from neurodent.core.discovery import FileDiscoverer
+
+        discoverer = FileDiscoverer(pattern)
+        all_files = discoverer.discover()
+        assert len(all_files) > 0
+
+        # Filter for A10 only
+        a10_files = discoverer.discover(animal="A10")
+        for f in a10_files:
+            assert f.metadata["animal"] == "A10"
+
+        # Verify sessions are discovered
+        sessions = {f.metadata["session"] for f in a10_files}
+        assert "day1" in sessions
+        assert "day2" in sessions
+
+    def test_base_mode_file_discovery(self, tmp_path):
+        """Base mode pattern discovers files flat in the session folder."""
+        # Create synthetic base-mode directory: flat files
+        (tmp_path / "recording_001.rhd").write_bytes(b"\x00" * 100)
+        (tmp_path / "recording_002.rhd").write_bytes(b"\x00" * 100)
+        (tmp_path / "notes.txt").write_text("notes")  # Should be excluded by pattern
+
+        # Build pattern
+        pattern = build_discovery_pattern(str(tmp_path), mode="base", file_pattern="*.rhd")
+        assert pattern == f"{tmp_path}/*.rhd"
+
+        # Verify FileDiscoverer finds only .rhd files
+        from neurodent.core.discovery import FileDiscoverer
+
+        discoverer = FileDiscoverer(pattern)
+        files = discoverer.discover()
+        assert len(files) == 2
+        for f in files:
+            assert f.path.endswith(".rhd")
+
+    def test_explicit_pattern_file_discovery(self, tmp_path):
+        """Explicit pattern with {animal} and {session} placeholders."""
+        # Create structure matching explicit pattern
+        session_dir = tmp_path / "MouseA" / "2025-01-15"
+        session_dir.mkdir(parents=True)
+        (session_dir / "trace_001.edf").write_bytes(b"\x00" * 100)
+        (session_dir / "trace_002.edf").write_bytes(b"\x00" * 100)
+
+        # Build pattern from explicit template (uses {index} for filename)
+        pattern = build_discovery_pattern(
+            str(tmp_path),
+            pattern="{animal}/{session}/{index}.edf",
+        )
+
+        from neurodent.core.discovery import FileDiscoverer
+
+        discoverer = FileDiscoverer(pattern)
+        files = discoverer.discover()
+        assert len(files) == 2
+        assert files[0].metadata["animal"] == "MouseA"
+        assert files[0].metadata["session"] == "2025-01-15"
+
+    def test_multi_pattern_file_discovery(self, tmp_path):
+        """Multi-pattern discovery groups data+metadata file pairs."""
+        # Create paired files: data.bin + meta.csv
+        session = tmp_path / "AnimalX" / "session1"
+        session.mkdir(parents=True)
+        (session / "rec_ColMajor.bin").write_bytes(b"\x00" * 100)
+        (session / "rec_Meta.csv").write_text("header\n")
+
+        # Build multi-pattern using {index} placeholders for file stems
+        patterns = build_discovery_pattern(
+            str(tmp_path),
+            pattern=[
+                "{animal}/{session}/{index}_ColMajor.bin",
+                "{animal}/{session}/{index}_Meta.csv",
+            ],
+        )
+        assert isinstance(patterns, list)
+        assert len(patterns) == 2
+
+        from neurodent.core.discovery import FileDiscoverer
+
+        discoverer = FileDiscoverer(patterns)
+        groups = discoverer.discover()
+        assert len(groups) == 1
+        assert groups[0].is_multi_file
+        assert len(groups[0].paths) == 2
+        assert groups[0].metadata["animal"] == "AnimalX"
+        assert groups[0].metadata["session"] == "session1"
+
+    def test_pipeline_pattern_with_session_overrides(self, tmp_path):
+        """Test that session-specific config overrides produce correct patterns."""
+        from neurodent.workflow.utils import apply_path_overrides
+
+        # Base config (arx_rosa-like)
+        base_config = {
+            "analysis": {
+                "war_generation": {
+                    "mode": "base",
+                    "file_pattern": "*",
+                    "assume_from_number": True,
+                    "skip_sessions": [],
+                    "lro_kwargs": {"mode": "si", "input_type": "files"},
+                }
+            }
+        }
+
+        # Session-specific override for EDF format
+        session_overrides = {
+            "analysis.war_generation.file_pattern": "*.EDF",
+            "analysis.war_generation.lro_kwargs.mode": "mne",
+            "analysis.war_generation.lro_kwargs.extract_func": "read_raw_edf",
+        }
+
+        overridden = apply_path_overrides(base_config, session_overrides)
+        cfg = overridden["analysis"]["war_generation"]
+
+        # Build pattern from overridden config
+        pattern = build_discovery_pattern(
+            str(tmp_path / "edf_session"),
+            mode=cfg.get("mode"),
+            file_pattern=cfg.get("file_pattern"),
+            pattern=cfg.get("pattern"),
+        )
+
+        assert pattern.endswith("/*.EDF")
+        assert cfg["lro_kwargs"]["mode"] == "mne"
+        assert cfg["lro_kwargs"]["extract_func"] == "read_raw_edf"
