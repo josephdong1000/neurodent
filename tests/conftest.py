@@ -278,10 +278,10 @@ def mock_long_recording_organizer():
 
 @pytest.fixture
 def example_dataset(tmp_path):
-    """Generate a minimal synthetic EEG dataset for pipeline integration tests.
+    """Generate a minimal synthetic NWB dataset for pipeline integration tests.
 
-    Creates a nest-mode directory tree under ``tmp_path`` with two animals
-    (ExWT, ExKO), each with one 5-second recording session. The returned
+    Creates a directory tree under ``tmp_path`` with two animals
+    (ExWT, ExKO), each with one 5-second NWB recording session. The returned
     dict contains the data root path and a ``samples_config`` dict ready
     to be used with ``inject_config_aliases`` or pipeline scripts.
 

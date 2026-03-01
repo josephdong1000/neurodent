@@ -1,12 +1,14 @@
 """
 Generate a minimal synthetic dataset for integration testing.
 
-This module creates a tiny but structurally valid dataset that mirrors the
-``sox5_bin`` (nest-mode) layout so that the full Snakemake pipeline can be
-exercised end-to-end without requiring real EEG recordings.
+This module creates a tiny but structurally valid NWB dataset so that the
+full Snakemake pipeline can be exercised end-to-end without requiring real
+EEG recordings.
 
-The generated data lives entirely inside a temporary directory and is
-suitable for use in pytest fixtures.
+The generated data uses the SpikeInterface-compatible NWB format: each
+session segment is stored as a single ``.nwb`` file.  The directory layout
+uses ``{animal}/{session}/{index}.nwb`` placeholders, matching the
+``example`` dataset config.
 
 Usage from tests::
 
@@ -19,8 +21,6 @@ Usage from tests::
         # ds["animals"]          → list of animal id strings
 """
 
-import json
-import struct
 from pathlib import Path
 
 import numpy as np
@@ -39,25 +39,22 @@ CHANNEL_NAMES = [
 ]
 
 
-def _write_bin_and_meta(
-    folder: Path,
+def _write_nwb_file(
+    filepath: Path,
     *,
-    file_stem: str = "rec",
     n_channels: int = N_CHANNELS,
     sampling_rate: int = SAMPLING_RATE,
     duration_s: float = DURATION_SECONDS,
     channel_names: list[str] | None = None,
     seed: int = 42,
 ) -> dict:
-    """Write a column-major .bin file and companion _Meta.csv.
+    """Write a single NWB file with synthetic EEG data.
 
-    This produces the same format consumed by neurodent's ``"bin"`` loader
-    (``LongRecordingOrganizer(item, mode="bin")``).
+    The file can be loaded back with ``spikeinterface.extractors.read_nwb_recording``
+    or any NWB-compatible reader.
 
     Args:
-        folder: Directory to write into (created if absent).
-        file_stem: Base filename (files will be ``{stem}_ColMajor.bin`` and
-            ``{stem}_Meta.csv``).
+        filepath: Output ``.nwb`` path (parent directories created if absent).
         n_channels: Number of EEG channels.
         sampling_rate: Sampling rate in Hz.
         duration_s: Recording duration in seconds.
@@ -65,9 +62,16 @@ def _write_bin_and_meta(
         seed: NumPy RNG seed for reproducibility.
 
     Returns:
-        Dict with ``"bin_path"``, ``"meta_path"``, ``"n_samples"``.
+        Dict with ``"nwb_path"`` and ``"n_samples"``.
     """
-    folder.mkdir(parents=True, exist_ok=True)
+    import pynwb
+    from pynwb import NWBFile, NWBHDF5IO
+    from pynwb.ecephys import ElectricalSeries
+    from datetime import datetime
+    from dateutil.tz import tzlocal
+
+    filepath = Path(filepath)
+    filepath.parent.mkdir(parents=True, exist_ok=True)
     channel_names = channel_names or CHANNEL_NAMES[:n_channels]
     rng = np.random.default_rng(seed)
 
@@ -75,34 +79,51 @@ def _write_bin_and_meta(
 
     # Realistic EEG: sum of sine waves + noise (µV scale)
     t = np.linspace(0, duration_s, n_samples, endpoint=False)
-    data = np.zeros((n_channels, n_samples), dtype=DTYPE)
+    data = np.zeros((n_samples, n_channels), dtype=DTYPE)
     for ch in range(n_channels):
         freq = 2 + ch * 3  # spread across delta → beta
-        data[ch] = (
+        data[:, ch] = (
             50 * np.sin(2 * np.pi * freq * t)
             + 20 * np.sin(2 * np.pi * (freq + 8) * t)
             + 5 * rng.standard_normal(n_samples)
         ).astype(DTYPE)
 
-    # Column-major binary: shape (n_samples, n_channels) in Fortran order
-    bin_path = folder / f"{file_stem}_ColMajor.bin"
-    col_major = np.asfortranarray(data.T)  # (n_samples, n_channels)
-    col_major.tofile(str(bin_path))
+    # Build NWB file
+    nwbfile = NWBFile(
+        session_description="synthetic EEG for integration testing",
+        identifier=f"test_{filepath.stem}_{seed}",
+        session_start_time=datetime(2025, 1, 15, 10, 0, 0, tzinfo=tzlocal()),
+    )
 
-    # Companion metadata CSV
-    meta_path = folder / f"{file_stem}_Meta.csv"
-    timestamp = "2025-01-15T10:00:00"
-    lines = [
-        "Entity,BinColumn,Label,ProbeInfo,SampleRate,Units,Precision,LastEdit"
-    ]
-    for i, ch_name in enumerate(channel_names, start=1):
-        probe = f"Probe/{ch_name}"
-        lines.append(
-            f"{i},{i},{ch_name},{probe},{sampling_rate},µV,float32,{timestamp}"
+    device = nwbfile.create_device(name="test_device")
+    group = nwbfile.create_electrode_group(
+        name="test_group", description="synthetic channels",
+        device=device, location="brain",
+    )
+
+    for i, ch_name in enumerate(channel_names):
+        nwbfile.add_electrode(
+            x=0.0, y=0.0, z=float(i),
+            imp=0.0, filtering="none",
+            group=group, location="brain",
         )
-    meta_path.write_text("\n".join(lines) + "\n")
 
-    return {"bin_path": bin_path, "meta_path": meta_path, "n_samples": n_samples}
+    electrode_region = nwbfile.create_electrode_table_region(
+        list(range(n_channels)), "all channels",
+    )
+
+    es = ElectricalSeries(
+        name="ElectricalSeries",
+        data=data,
+        electrodes=electrode_region,
+        rate=float(sampling_rate),
+    )
+    nwbfile.add_acquisition(es)
+
+    with NWBHDF5IO(str(filepath), "w") as io:
+        io.write(nwbfile)
+
+    return {"nwb_path": filepath, "n_samples": n_samples}
 
 
 def create_synthetic_dataset(
@@ -112,20 +133,18 @@ def create_synthetic_dataset(
     n_sessions: int = 1,
     duration_s: float = DURATION_SECONDS,
 ) -> dict:
-    """Create a full synthetic dataset under *root*.
+    """Create a full synthetic NWB dataset under *root*.
 
-    The layout follows the **nest** convention expected by ``sox5_bin``::
+    The layout uses ``{animal}/{session}/{index}.nwb`` placeholders::
 
         root/
         └── example_session/
             ├── ExWT/
             │   └── day1/
-            │       ├── rec_ColMajor.bin
-            │       └── rec_Meta.csv
+            │       └── recording.nwb
             └── ExKO/
                 └── day1/
-                    ├── rec_ColMajor.bin
-                    └── rec_Meta.csv
+                    └── recording.nwb
 
     A matching ``samples_config`` dict (equivalent to ``samples_example.json``)
     is also returned so that tests can feed it directly into the Snakemake
@@ -157,9 +176,12 @@ def create_synthetic_dataset(
 
     for animal in animals:
         for day_idx in range(1, n_sessions + 1):
-            day_folder = data_root / session_folder / animal["id"] / f"day{day_idx}"
-            _write_bin_and_meta(
-                day_folder,
+            nwb_path = (
+                data_root / session_folder / animal["id"]
+                / f"day{day_idx}" / "recording.nwb"
+            )
+            _write_nwb_file(
+                nwb_path,
                 duration_s=duration_s,
                 # Modulo 2^31 ensures the hash fits within NumPy's RNG seed range
                 seed=hash(animal["id"]) % (2**31) + day_idx,
@@ -183,3 +205,4 @@ def create_synthetic_dataset(
         "animals": animal_ids,
         "session_folder": session_folder,
     }
+

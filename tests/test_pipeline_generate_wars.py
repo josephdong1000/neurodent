@@ -23,7 +23,7 @@ class TestGenerateWarsParameterConstruction:
     without requiring any real data or Snakemake.
     """
 
-    def _build_mock_config(self, pattern="{animal}/{session}/{index}"):
+    def _build_mock_config(self, pattern="{animal}/{session}/{index}.nwb"):
         """Helper to build a realistic pipeline config dict."""
         war_gen = {
             "pattern": pattern,
@@ -41,13 +41,13 @@ class TestGenerateWarsParameterConstruction:
         }
 
     def test_pattern_for_nest_layout(self):
-        """Nest layout config produces pattern with {animal}/{session}/{index} placeholders."""
-        config = self._build_mock_config(pattern="{animal}/{session}/{index}")
+        """Nested layout config produces pattern with {animal}/{session}/{index} placeholders."""
+        config = self._build_mock_config(pattern="{animal}/{session}/{index}.nwb")
         analysis_cfg = config["analysis"]["war_generation"]
 
         base_path = "/data/parent/session_folder"
         pattern = f"{base_path}/{analysis_cfg['pattern']}"
-        assert pattern == "/data/parent/session_folder/{animal}/{session}/{index}"
+        assert pattern == "/data/parent/session_folder/{animal}/{session}/{index}.nwb"
 
     def test_pattern_for_flat_layout_with_rhd(self):
         """Flat layout with *.rhd produces glob pattern."""
@@ -102,24 +102,23 @@ class TestPipelineIntegrationWithSyntheticData:
     """
 
     def test_nest_layout_file_discovery(self, tmp_path):
-        """Nest layout pattern discovers files organized as animal/session/files."""
-        # Create synthetic nest-mode directory structure
+        """Nested layout pattern discovers files organized as animal/session/files."""
+        # Create synthetic directory structure with NWB files
         animal_dir = tmp_path / "A10"
         for day in ["day1", "day2"]:
             day_dir = animal_dir / day
             day_dir.mkdir(parents=True)
-            (day_dir / "data_ColMajor.bin").write_bytes(b"\x00" * 100)
-            (day_dir / "data_Meta.csv").write_text("header\n")
+            (day_dir / "recording.nwb").write_bytes(b"\x00" * 100)
 
         # Also create another animal to verify filtering
         other_dir = tmp_path / "B20"
         other_day = other_dir / "day1"
         other_day.mkdir(parents=True)
-        (other_day / "data_ColMajor.bin").write_bytes(b"\x00" * 100)
+        (other_day / "recording.nwb").write_bytes(b"\x00" * 100)
 
         # Build pattern the same way generate_wars.py does:
         # base_path / relative_pattern from config
-        pattern = f"{tmp_path}/{{animal}}/{{session}}/{{index}}"
+        pattern = f"{tmp_path}/{{animal}}/{{session}}/{{index}}.nwb"
         assert "{animal}" in pattern
         assert "{session}" in pattern
         assert "{index}" in pattern

@@ -11,9 +11,10 @@ samples:
 
 analysis:
   war_generation:
-    pattern: "{animal}/{session}/{index}"   # nest layout: session_folder/{animal}/{session}/files
+    pattern: "{animal}/{session}/{index}.nwb"   # layout: session_folder/{animal}/{session}/*.nwb
     assume_from_number: true
     skip_sessions: []
     lro_kwargs:
-      mode: "bin"             # load column-major binary files
+      mode: "si"              # load NWB files via SpikeInterface
+      extract_func: "read_nwb_recording"  # NWB-specific SI extractor
       multiprocess_mode: "serial"   # serial is fine for tiny datasets

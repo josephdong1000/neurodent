@@ -1,8 +1,7 @@
 # Example Dataset for Pipeline Integration Testing
 
-This directory contains (or will contain) a minimal example dataset used for
-integration-testing the Snakemake pipeline **without** processing full
-production-scale recordings.
+This directory contains infrastructure for testing the Snakemake pipeline
+**without** processing full production-scale recordings.
 
 ## Quick start
 
@@ -10,8 +9,8 @@ There are two ways to use example data for pipeline tests:
 
 ### 1. Programmatic synthetic data (CI-friendly, no files to commit)
 
-The test fixtures in `tests/conftest.py` provide a
-`example_dataset` fixture that **generates** a tiny synthetic
+The test fixtures in `tests/conftest.py` provide an
+`example_dataset` fixture that **generates** a tiny synthetic NWB
 dataset on the fly inside a `tmp_path` directory.  Tests in
 `tests/integration/test_snakemake_flow.py` use this fixture.
 
@@ -24,8 +23,7 @@ uv run pytest tests/integration/ -v -m integration
 ### 2. User-provided real data (for local development)
 
 If you have a small real recording you'd like to test with, place it here
-following the **nest** directory convention used by the default `sox5_bin`
-dataset:
+following the nested directory layout:
 
 ```
 tests/example_data/
@@ -33,8 +31,7 @@ tests/example_data/
     └── session_folder/          # e.g. "example_session"
         └── AnimalA/             # animal ID
             └── day1/            # session / day folder
-                ├── rec_ColMajor.bin   # column-major binary data
-                └── rec_Meta.csv       # metadata CSV
+                └── recording.nwb    # NWB file
 ```
 
 Then set `NEURODENT_DATASET=example` before running the pipeline:
@@ -52,11 +49,10 @@ The matching configuration files are:
 To keep the repository lean:
 
 - **Raw EEG files** should be ≤ 5 MB per animal-day.  A few seconds of
-  8-channel 1 kHz `float32` data (~32 kB/s) is sufficient.
+  8-channel 1 kHz `float32` data is sufficient.
 - **WAR pickle files** are generated, not committed.
-- Binary files (`*.bin`, `*.pkl`, `*.npy.gz`) in this directory are
-  git-ignored by default.  If you want to track specific files, add an
-  exception to `.gitignore` (similar to the `notebooks/tests/` pattern).
+- Binary files (`*.nwb`, `*.pkl`, `*.npy.gz`) in this directory are
+  git-ignored by default.
 
 ## Adding your own example data
 
