@@ -203,3 +203,49 @@ class TestApplyPathOverrides:
         assert result["analysis"]["war_generation"]["file_pattern"] == "*.EDF"
         assert result["analysis"]["war_generation"]["lro_kwargs"]["mode"] == "si"
         assert result["analysis"]["war_generation"]["lro_kwargs"]["extract_func"] == "read_edf"
+
+
+# ---------------------------------------------------------------------------
+# inject_config_aliases edge cases
+# ---------------------------------------------------------------------------
+from neurodent.workflow.utils import inject_config_aliases
+
+
+class TestInjectConfigAliases:
+    """Tests for inject_config_aliases covering alias injection."""
+
+    def test_genotype_aliases_set(self):
+        from neurodent import constants
+
+        orig = getattr(constants, "GENOTYPE_ALIASES", None)
+        try:
+            inject_config_aliases({"GENOTYPE_ALIASES": {"wt": "WT"}})
+            assert constants.GENOTYPE_ALIASES == {"wt": "WT"}
+        finally:
+            if orig is not None:
+                constants.GENOTYPE_ALIASES = orig
+
+    def test_chname_aliases_set(self):
+        from neurodent import constants
+
+        orig = getattr(constants, "CHNAME_ALIASES", None)
+        try:
+            inject_config_aliases({"CHNAME_ALIASES": {"motor": "mot"}})
+            assert constants.CHNAME_ALIASES == {"motor": "mot"}
+        finally:
+            if orig is not None:
+                constants.CHNAME_ALIASES = orig
+
+    def test_lr_aliases_set(self):
+        from neurodent import constants
+
+        orig = getattr(constants, "LR_ALIASES", None)
+        try:
+            inject_config_aliases({"LR_ALIASES": {"Left": "L"}})
+            assert constants.LR_ALIASES == {"Left": "L"}
+        finally:
+            if orig is not None:
+                constants.LR_ALIASES = orig
+
+    def test_empty_config_no_error(self):
+        inject_config_aliases({})

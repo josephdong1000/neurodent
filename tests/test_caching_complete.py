@@ -790,3 +790,87 @@ if __name__ == "__main__":
     test = TestUnifiedCachingSystem()
     test.test_cache_policies_basic()
     print("✅ Basic unified caching tests passed!")
+
+
+# ---------------------------------------------------------------------------
+# Edge-case policy tests for should_use_cached_file / should_use_cache_unified
+# ---------------------------------------------------------------------------
+from neurodent.core.utils import should_use_cached_file, should_use_cache_unified
+
+
+class TestCacheValidationEdgeCases:
+    """Additional edge-case coverage for cache validation helpers."""
+
+    def test_never_returns_false(self, tmp_path):
+        cache = tmp_path / "cache.pkl"
+        cache.touch()
+        assert should_use_cached_file(cache, [], "never") is False
+
+    def test_error_missing_raises(self, tmp_path):
+        with pytest.raises(FileNotFoundError, match="Cache file required"):
+            should_use_cached_file(tmp_path / "missing.pkl", [], "error")
+
+    def test_error_exists_returns_true(self, tmp_path):
+        cache = tmp_path / "cache.pkl"
+        cache.touch()
+        assert should_use_cached_file(cache, [], "error") is True
+
+    def test_always_exists(self, tmp_path):
+        cache = tmp_path / "cache.pkl"
+        cache.touch()
+        assert should_use_cached_file(cache, [], "always") is True
+
+    def test_always_missing(self, tmp_path):
+        assert should_use_cached_file(tmp_path / "x.pkl", [], "always") is False
+
+    def test_auto_cache_missing(self, tmp_path):
+        assert should_use_cached_file(tmp_path / "x.pkl", [], "auto") is False
+
+    def test_auto_cache_newer_than_sources(self, tmp_path):
+        source = tmp_path / "source.nwb"
+        source.touch()
+        time.sleep(0.05)
+        cache = tmp_path / "cache.pkl"
+        cache.touch()
+        assert should_use_cached_file(cache, [source], "auto") is True
+
+    def test_auto_cache_older_than_source(self, tmp_path):
+        cache = tmp_path / "cache.pkl"
+        cache.touch()
+        time.sleep(0.05)
+        source = tmp_path / "source.nwb"
+        source.touch()
+        assert should_use_cached_file(cache, [source], "auto") is False
+
+    def test_auto_missing_source_skipped(self, tmp_path):
+        cache = tmp_path / "cache.pkl"
+        cache.touch()
+        missing_source = tmp_path / "nonexistent.nwb"
+        assert should_use_cached_file(cache, [missing_source], "auto") is True
+
+    def test_invalid_policy_raises(self, tmp_path):
+        with pytest.raises(ValueError, match="Invalid use_cached value"):
+            should_use_cached_file(tmp_path / "x.pkl", [], "invalid_policy")
+
+    # should_use_cache_unified
+    def test_unified_force_regenerate(self, tmp_path):
+        cache = tmp_path / "cache.pkl"
+        cache.touch()
+        assert should_use_cache_unified(cache, [], "force_regenerate") is False
+
+    def test_unified_always(self, tmp_path):
+        cache = tmp_path / "cache.pkl"
+        cache.touch()
+        assert should_use_cache_unified(cache, [], "always") is True
+
+    def test_unified_always_missing(self, tmp_path):
+        assert should_use_cache_unified(tmp_path / "x.pkl", [], "always") is False
+
+    def test_unified_auto_delegates(self, tmp_path):
+        cache = tmp_path / "cache.pkl"
+        cache.touch()
+        assert should_use_cache_unified(cache, [], "auto") is True
+
+    def test_unified_invalid_raises(self, tmp_path):
+        with pytest.raises(ValueError, match="Invalid cache_policy"):
+            should_use_cache_unified(tmp_path / "x.pkl", [], "bad")
