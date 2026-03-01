@@ -132,8 +132,8 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
                 if "pattern" not in session_analysis_config:
                     raise KeyError(
                         f"Missing 'pattern' key in war_generation config for session '{session_key}'. "
-                        "Each dataset config must specify 'pattern' (e.g. '{{animal}}/{{session}}/{{index}}' "
-                        "or '*.rhd')."
+                        "Each dataset config must specify 'pattern' (e.g. '{{animal}}/{{session}}/{{index}}.nwb' "
+                        "or '{{index}}.rhd')."
                     )
                 base_path = str(data_parent_folder / folder_path)
                 relative_pattern = session_analysis_config["pattern"]

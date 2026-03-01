@@ -40,8 +40,8 @@ class TestGenerateWarsParameterConstruction:
             "overrides": {},
         }
 
-    def test_pattern_for_nest_layout(self):
-        """Nested layout config produces pattern with {animal}/{session}/{index} placeholders."""
+    def test_pattern_with_hierarchical_placeholders(self):
+        """Pattern with {animal}/{session}/{index} placeholders extracts all metadata."""
         config = self._build_mock_config(pattern="{animal}/{session}/{index}.nwb")
         analysis_cfg = config["analysis"]["war_generation"]
 
@@ -49,14 +49,14 @@ class TestGenerateWarsParameterConstruction:
         pattern = f"{base_path}/{analysis_cfg['pattern']}"
         assert pattern == "/data/parent/session_folder/{animal}/{session}/{index}.nwb"
 
-    def test_pattern_for_flat_layout_with_rhd(self):
-        """Flat layout with *.rhd produces glob pattern."""
-        config = self._build_mock_config(pattern="*.rhd")
+    def test_pattern_with_index_placeholder(self):
+        """Pattern with {index} placeholder discovers files in session folder."""
+        config = self._build_mock_config(pattern="{index}.rhd")
         analysis_cfg = config["analysis"]["war_generation"]
 
         base_path = "/data/parent/session_folder"
         pattern = f"{base_path}/{analysis_cfg['pattern']}"
-        assert pattern == "/data/parent/session_folder/*.rhd"
+        assert pattern == "/data/parent/session_folder/{index}.rhd"
 
     def test_skip_sessions_backward_compat(self):
         """skip_sessions falls back to skip_days for backward compatibility."""
@@ -101,8 +101,8 @@ class TestPipelineIntegrationWithSyntheticData:
     end-to-end pattern construction without needing real EEG data.
     """
 
-    def test_nest_layout_file_discovery(self, tmp_path):
-        """Nested layout pattern discovers files organized as animal/session/files."""
+    def test_hierarchical_pattern_file_discovery(self, tmp_path):
+        """Pattern with {animal}/{session}/{index} discovers files in nested directories."""
         # Create synthetic directory structure with NWB files
         animal_dir = tmp_path / "A10"
         for day in ["day1", "day2"]:
@@ -140,17 +140,17 @@ class TestPipelineIntegrationWithSyntheticData:
         assert "day1" in sessions
         assert "day2" in sessions
 
-    def test_flat_layout_file_discovery(self, tmp_path):
-        """Flat layout pattern discovers files in the session folder."""
-        # Create synthetic base-mode directory: flat files
+    def test_index_only_pattern_file_discovery(self, tmp_path):
+        """Pattern with {index} placeholder discovers files in session folder."""
+        # Create synthetic directory: files in session folder
         (tmp_path / "recording_001.rhd").write_bytes(b"\x00" * 100)
         (tmp_path / "recording_002.rhd").write_bytes(b"\x00" * 100)
         (tmp_path / "notes.txt").write_text("notes")  # Should be excluded by pattern
 
-        # Build pattern
-        pattern = f"{tmp_path}/*.rhd"
+        # Build pattern with {index} placeholder
+        pattern = f"{tmp_path}/{{index}}.rhd"
 
-        # Verify FileDiscoverer finds only .rhd files
+        # Verify FileDiscoverer finds only .rhd files and extracts index
         from neurodent.core.discovery import FileDiscoverer
 
         discoverer = FileDiscoverer(pattern)
@@ -158,6 +158,7 @@ class TestPipelineIntegrationWithSyntheticData:
         assert len(files) == 2
         for f in files:
             assert f.path.endswith(".rhd")
+            assert "index" in f.metadata
 
     def test_explicit_pattern_file_discovery(self, tmp_path):
         """Explicit pattern with {animal} and {session} placeholders."""
@@ -210,7 +211,7 @@ class TestPipelineIntegrationWithSyntheticData:
         base_config = {
             "analysis": {
                 "war_generation": {
-                    "pattern": "*",
+                    "pattern": "{index}",
                     "assume_from_number": True,
                     "skip_sessions": [],
                     "lro_kwargs": {"mode": "si", "input_type": "files"},
@@ -220,7 +221,7 @@ class TestPipelineIntegrationWithSyntheticData:
 
         # Session-specific override for EDF format
         session_overrides = {
-            "analysis.war_generation.pattern": "*.EDF",
+            "analysis.war_generation.pattern": "{index}.EDF",
             "analysis.war_generation.lro_kwargs.mode": "mne",
             "analysis.war_generation.lro_kwargs.extract_func": "read_raw_edf",
         }
@@ -232,6 +233,6 @@ class TestPipelineIntegrationWithSyntheticData:
         base_path = str(tmp_path / "edf_session")
         pattern = f"{base_path}/{cfg['pattern']}"
 
-        assert pattern.endswith("/*.EDF")
+        assert pattern.endswith("/{index}.EDF")
         assert cfg["lro_kwargs"]["mode"] == "mne"
         assert cfg["lro_kwargs"]["extract_func"] == "read_raw_edf"
