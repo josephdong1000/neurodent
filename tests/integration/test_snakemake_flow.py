@@ -2,73 +2,223 @@
 Integration Tests for Snakemake Workflow
 ========================================
 
-This module contains the structure for integration testing the Snakemake workflow.
-Currently, these tests are placeholders as we lack a small dummy dataset.
+Tests that validate the pipeline's data-loading path using a minimal
+synthetic dataset generated on the fly.  These tests exercise the real
+``FileDiscoverer`` and ``build_discovery_pattern`` code against actual
+files on disk, without requiring production-scale recordings.
 
-To enable these tests:
-1.  Generate a small, representative dummy dataset (WAR pickle files).
-2.  Place them in `tests/integration/data`.
-3.  Update the `config` fixture to point to this data.
-4.  Remove the `@pytest.mark.skip` decorator.
+Running
+-------
+Run only integration tests::
+
+    uv run pytest tests/integration/ -v -m integration
+
+Or include them in the full suite::
+
+    uv run pytest tests/ -v
 """
 
-import pytest
+import json
 import subprocess
 from pathlib import Path
-import shutil
+
+import pytest
+
+from neurodent.workflow.utils import build_discovery_pattern
+
+
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
 
 @pytest.fixture
-def integration_data_dir(tmp_path):
-    """
-    Setup a temporary directory with dummy data for integration testing.
-    """
-    data_dir = tmp_path / "data"
-    data_dir.mkdir()
-    
-    # TODO: Copy dummy WAR files to data_dir
-    # source_dir = Path("tests/integration/data")
-    # shutil.copytree(source_dir, data_dir, dirs_exist_ok=True)
-    
-    return data_dir
+def example_pipeline_env(tmp_path):
+    """Create a complete, tiny pipeline environment under tmp_path.
 
-@pytest.fixture
-def output_dir(tmp_path):
+    Returns a dict with ``data_root``, ``samples_config``, ``animals``,
+    ``session_folder``, and the full ``config`` dict that would normally
+    come from Snakemake.
     """
-    Setup a temporary directory for workflow outputs.
-    """
-    out_dir = tmp_path / "results"
-    out_dir.mkdir()
-    return out_dir
+    from tests.example_data.generate import create_synthetic_dataset
 
-@pytest.mark.skip(reason="Requires dummy dataset")
-def test_zeitgeber_plots_workflow(integration_data_dir, output_dir):
-    """
-    Integration test for the generate_zeitgeber_plots rule.
-    
-    This test simulates running the actual snakemake command (or the python script directly)
-    on dummy data and verifies that output files are creating.
-    """
-    
-    # Construct command to run the script
-    # In a real scenario, we might invoke 'snakemake' via subprocess
-    # Or run the script python file directly with mocked arguments
-    
-    script_path = Path("workflow/scripts/generate_zeitgeber_plots.py").resolve()
-    
-    # Mock Snakemake execution by setting necessary environment variables or args
-    # For now, we'll demonstrate the intent with a direct script call if we could mock snakemake object
-    # But running snakemake itself is cleaner for integration tests.
-    
-    cmd = [
-        "snakemake",
-        "--cores", "1",
-        "results/figures/zeitgeber_plots/00_logrms.png", # Target output
-        "--directory", str(integration_data_dir.parent), # run in temp dir
-        "--config", f"data_dir={integration_data_dir}",
-        "--dryrun" # Remove this for actual test
-    ]
-    
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    
-    assert result.returncode == 0
-    # assert (output_dir / "00_logrms.png").exists()
+    ds = create_synthetic_dataset(tmp_path, n_sessions=2, duration_s=3)
+
+    # Build a minimal pipeline config (mirrors config/config.yaml + example.yaml)
+    pipeline_config = {
+        "temp_directory": str(tmp_path / "tmp"),
+        "analysis": {
+            "war_generation": {
+                "mode": "nest",
+                "file_pattern": "*",
+                "assume_from_number": True,
+                "skip_sessions": [],
+                "lro_kwargs": {
+                    "mode": "bin",
+                    "multiprocess_mode": "serial",
+                },
+            },
+        },
+        "cluster": {
+            "war_generation": {"interface": None},
+        },
+        "overrides": {},
+    }
+
+    ds["config"] = pipeline_config
+    return ds
+
+
+# ---------------------------------------------------------------------------
+# Tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.integration
+class TestExampleDatasetGeneration:
+    """Verify that the synthetic dataset generator produces valid files."""
+
+    def test_creates_directory_tree(self, example_dataset):
+        """The generated dataset has the expected nest-mode structure."""
+        root = example_dataset["data_root"]
+        session = example_dataset["session_folder"]
+
+        for animal_id in example_dataset["animals"]:
+            day_dir = root / session / animal_id / "day1"
+            assert day_dir.is_dir(), f"Missing directory: {day_dir}"
+
+            bin_files = list(day_dir.glob("*_ColMajor.bin"))
+            meta_files = list(day_dir.glob("*_Meta.csv"))
+            assert len(bin_files) == 1, f"Expected 1 bin file, got {bin_files}"
+            assert len(meta_files) == 1, f"Expected 1 meta file, got {meta_files}"
+
+    def test_bin_file_has_correct_size(self, example_dataset):
+        """Binary file size matches n_samples × n_channels × sizeof(float32)."""
+        import numpy as np
+
+        root = example_dataset["data_root"]
+        session = example_dataset["session_folder"]
+        animal_id = example_dataset["animals"][0]
+
+        bin_file = next((root / session / animal_id / "day1").glob("*_ColMajor.bin"))
+        file_size = bin_file.stat().st_size
+
+        # Default: 5 s × 1000 Hz × 8 ch × 4 bytes = 160_000 bytes
+        n_samples = 5 * 1000
+        n_channels = 8
+        expected = n_samples * n_channels * np.dtype(np.float32).itemsize
+        assert file_size == expected
+
+    def test_meta_csv_has_correct_channels(self, example_dataset):
+        """Meta CSV lists the right number of channels."""
+        root = example_dataset["data_root"]
+        session = example_dataset["session_folder"]
+        animal_id = example_dataset["animals"][0]
+
+        meta_file = next((root / session / animal_id / "day1").glob("*_Meta.csv"))
+        lines = meta_file.read_text().strip().splitlines()
+        # 1 header + 8 channel rows
+        assert len(lines) == 9, f"Expected 9 lines, got {len(lines)}"
+
+    def test_samples_config_structure(self, example_dataset):
+        """samples_config contains all required keys."""
+        sc = example_dataset["samples_config"]
+        assert "data_parent_folder" in sc
+        assert "ANIMAL_METADATA" in sc
+        assert "data_folders_to_animal_ids" in sc
+        assert "GENOTYPE_ALIASES" in sc
+
+
+@pytest.mark.integration
+class TestFileDiscoveryWithExampleData:
+    """Test that FileDiscoverer works with the generated synthetic data."""
+
+    def test_discovers_all_animals(self, example_pipeline_env):
+        """Pattern discovers files for all animals in the dataset."""
+        from neurodent.core.discovery import FileDiscoverer
+
+        ds = example_pipeline_env
+        cfg = ds["config"]["analysis"]["war_generation"]
+
+        pattern = build_discovery_pattern(
+            str(ds["data_root"] / ds["session_folder"]),
+            mode=cfg["mode"],
+            file_pattern=cfg.get("file_pattern"),
+        )
+
+        discoverer = FileDiscoverer(pattern)
+        all_files = discoverer.discover()
+
+        # 2 animals × 2 sessions × 2 files each = 8 discovered items
+        # (ColMajor.bin and Meta.csv are separate matches)
+        assert len(all_files) >= 4  # at least 2 animals × 2 sessions
+
+        found_animals = {f.metadata["animal"] for f in all_files}
+        for animal_id in ds["animals"]:
+            assert animal_id in found_animals, f"{animal_id} not discovered"
+
+    def test_discovers_sessions_per_animal(self, example_pipeline_env):
+        """Pattern discovers multiple sessions for a single animal."""
+        from neurodent.core.discovery import FileDiscoverer
+
+        ds = example_pipeline_env
+        cfg = ds["config"]["analysis"]["war_generation"]
+
+        pattern = build_discovery_pattern(
+            str(ds["data_root"] / ds["session_folder"]),
+            mode=cfg["mode"],
+            file_pattern=cfg.get("file_pattern"),
+        )
+
+        animal_id = ds["animals"][0]
+        discoverer = FileDiscoverer(pattern)
+        animal_files = discoverer.discover(animal=animal_id)
+
+        sessions = {f.metadata["session"] for f in animal_files}
+        assert "day1" in sessions
+        assert "day2" in sessions
+
+    def test_filter_by_animal_id(self, example_pipeline_env):
+        """Filtering by animal_id returns only that animal's files."""
+        from neurodent.core.discovery import FileDiscoverer
+
+        ds = example_pipeline_env
+        cfg = ds["config"]["analysis"]["war_generation"]
+
+        pattern = build_discovery_pattern(
+            str(ds["data_root"] / ds["session_folder"]),
+            mode=cfg["mode"],
+            file_pattern=cfg.get("file_pattern"),
+        )
+
+        discoverer = FileDiscoverer(pattern)
+        for animal_id in ds["animals"]:
+            filtered = discoverer.discover(animal=animal_id)
+            for f in filtered:
+                assert f.metadata["animal"] == animal_id
+
+
+@pytest.mark.integration
+class TestSamplesConfigIntegration:
+    """Test that the generated samples_config works with neurodent utilities."""
+
+    def test_inject_config_aliases(self, example_dataset):
+        """inject_config_aliases succeeds with the synthetic config."""
+        from neurodent.workflow import inject_config_aliases
+        from neurodent import constants
+
+        sc = example_dataset["samples_config"]
+        inject_config_aliases(sc)
+
+        # Verify metadata was injected
+        assert "ExWT" in constants.ANIMAL_METADATA
+        assert constants.ANIMAL_METADATA["ExWT"]["gene"] == "WT"
+        assert "ExKO" in constants.ANIMAL_METADATA
+        assert constants.ANIMAL_METADATA["ExKO"]["gene"] == "KO"
+
+    def test_samples_config_serializable(self, example_dataset):
+        """samples_config can be serialized to JSON (for writing to disk)."""
+        sc = example_dataset["samples_config"]
+        dumped = json.dumps(sc, indent=2)
+        reloaded = json.loads(dumped)
+        assert reloaded["ANIMAL_METADATA"] == sc["ANIMAL_METADATA"]
+

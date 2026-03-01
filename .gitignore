@@ -15,6 +15,12 @@ notebooks/tests/test-data/*_mne-to-rec.*
 !notebooks/tests/test-wars/A10*
 !notebooks/tests/test-wars/F22*
 
+# Example data for integration testing — track scaffolding, ignore raw data
+!tests/example_data/README.md
+!tests/example_data/__init__.py
+!tests/example_data/generate.py
+tests/example_data/raw/
+
 /build/*
 /ddfs/*
 /dist/*
