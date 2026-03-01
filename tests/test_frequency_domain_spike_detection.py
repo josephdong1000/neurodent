@@ -642,7 +642,7 @@ class TestSpikeDetectorBaselineEdge:
         )
         assert isinstance(result, np.ndarray)
 
-    def test_empty_candidates_refine(self):
+    def test_empty_candidates_returns_empty(self):
         """Empty candidates should return empty array."""
         signal = np.random.randn(100)
         result = FrequencyDomainSpikeDetector._enforce_downward_and_refine_minimal(
