@@ -243,6 +243,22 @@ class TestNaturalNeighbor:
         assert nn.data.shape == (3, 2)
         assert nn.target == ["classA", "classB", "classA"]
 
+    def test_load_csv_empty_file(self, tmp_path):
+        """Empty CSV should yield empty data."""
+        csv_path = tmp_path / "empty.csv"
+        csv_path.write_text("")
+        nn = Natural_Neighbor()
+        nn.load(str(csv_path))
+        assert len(nn.data) == 0
+
+    def test_load_csv_invalid_numeric(self, tmp_path):
+        """Non-numeric attribute values should raise ValueError."""
+        csv_path = tmp_path / "bad.csv"
+        csv_path.write_text("abc,def,classA\n")
+        nn = Natural_Neighbor()
+        with pytest.raises(ValueError):
+            nn.load(str(csv_path))
+
 
 # ---------------------------------------------------------------------------
 # Cache validation  (utils.py)
@@ -570,6 +586,11 @@ class TestSpikeDetectorBaselineEdge:
             )
             # Function should not crash; result is an array
             assert isinstance(result, np.ndarray)
+            # Verify the short-baseline warning was emitted
+            baseline_warnings = [
+                x for x in w if "baseline window length" in str(x.message)
+            ]
+            assert len(baseline_warnings) > 0, "Expected a warning about short baseline"
 
     def test_spike_at_signal_edge(self):
         """Spike at index 0 should not crash."""
