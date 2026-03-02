@@ -604,12 +604,17 @@ class LongRecordingOrganizer:
 
     @staticmethod
     def _resolve_dotted_path(path_str: str) -> Callable:
-        """Import and return a callable from a dotted path.
+        """Import and return a callable from a dotted path or file path.
+
+        Supports two formats:
+
+        - Dotted path: ``"mypackage.readers.read_bin_csv"``
+        - File path:   ``"path/to/readers.py:read_bin_csv"``
 
         Parameters
         ----------
         path_str : str
-            Fully-qualified dotted path, e.g. ``"mypackage.readers.read_bin_csv"``.
+            Dotted import path or ``"filepath:attribute"`` string.
 
         Returns
         -------
@@ -625,11 +630,24 @@ class LongRecordingOrganizer:
         """
         import importlib
 
+        # File-path syntax: "path/to/file.py:function_name"
+        if ":" in path_str:
+            import importlib.util
+
+            file_path, _, attr_name = path_str.rpartition(":")
+            spec = importlib.util.spec_from_file_location("_user_module", file_path)
+            if spec is None or spec.loader is None:
+                raise ImportError(f"Cannot load module from file: {file_path}")
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            return getattr(module, attr_name)
+
+        # Dotted path: "mypackage.readers.read_func"
         module_path, _, attr_name = path_str.rpartition(".")
         if not module_path:
             raise ImportError(
                 f"Cannot resolve '{path_str}' as a dotted import path "
-                "(expected 'module.attr' format)"
+                "(expected 'module.attr' or 'path/to/file.py:attr' format)"
             )
         module = importlib.import_module(module_path)
         return getattr(module, attr_name)
@@ -644,7 +662,34 @@ class LongRecordingOrganizer:
         ] = None,
         **kwargs,
     ):
-        """Load in recording based on mode."""
+        """Load in recording based on mode.
+
+        Parameters
+        ----------
+        mode : {"si", "mne", None}
+            Backend to use for loading recordings.
+        cache_policy : {"auto", "always", "force_regenerate"}
+            Caching strategy for loaded recordings.
+        multiprocess_mode : {"dask", "serial"}
+            Parallelism strategy.
+        extract_func : callable or str, optional
+            Function (or reference to one) used to load each discovered file
+            into a recording object. When a string, resolved in this order:
+
+            1. **Short name** — looked up in ``spikeinterface.extractors`` /
+               ``spikeinterface`` (for ``mode="si"``) or ``mne.io``
+               (for ``mode="mne"``).  Example: ``"read_intan"``.
+            2. **File path** (contains ``:``) — loads a function directly from
+               a Python file.  The ``.py`` extension is required.
+               Example: ``"tests/data/readers.py:read_bin_csv_pair"`` or
+               ``"/absolute/path/to/readers.py:my_func"``.
+            3. **Dotted import path** (contains ``.``) — resolved via
+               ``importlib.import_module``.  The module's package must be on
+               ``sys.path`` (e.g. set ``PYTHONPATH``).
+               Example: ``"mypackage.readers.read_custom"``.
+        **kwargs
+            Forwarded to the backend loading method.
+        """
         if mode == "si":
             if si is None:
                 raise ImportError("SpikeInterface is required for mode='si'")
@@ -653,13 +698,15 @@ class LongRecordingOrganizer:
                 func_name = extract_func
                 # Try SpikeInterface namespaces first
                 extract_func = getattr(se, func_name, getattr(si, func_name, None))
-                # Resolve dotted import path (e.g. "mypackage.readers.read_custom")
-                if extract_func is None and "." in func_name:
+                # Resolve dotted import path or file path
+                # e.g. "mypackage.readers.read_custom" or "path/to/readers.py:read_custom"
+                if extract_func is None and ("." in func_name or ":" in func_name):
                     extract_func = self._resolve_dotted_path(func_name)
                 if extract_func is None:
                     raise ValueError(
                         f"Could not resolve extractor function: {func_name}. "
-                        "Provide a SpikeInterface extractor name or a dotted import path."
+                        "Provide a SpikeInterface extractor name, a dotted import path, "
+                        "or a file path (e.g. 'path/to/readers.py:func_name')."
                     )
             elif extract_func is None:
                 extract_func = si.load_extractor
@@ -674,13 +721,14 @@ class LongRecordingOrganizer:
             if isinstance(extract_func, str):
                 func_name = extract_func
                 extract_func = getattr(mne.io, func_name, None)
-                # Resolve dotted import path
-                if extract_func is None and "." in func_name:
+                # Resolve dotted import path or file path
+                if extract_func is None and ("." in func_name or ":" in func_name):
                     extract_func = self._resolve_dotted_path(func_name)
                 if extract_func is None:
                     raise ValueError(
                         f"Could not resolve extractor function: {func_name}. "
-                        "Provide an MNE extractor name or a dotted import path."
+                        "Provide an MNE extractor name, a dotted import path, "
+                        "or a file path (e.g. 'path/to/readers.py:func_name')."
                     )
 
             self.convert_file_with_mne_to_recording(
