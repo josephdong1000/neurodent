@@ -19,6 +19,8 @@ Or include them in the full suite::
 """
 
 import json
+import os
+import subprocess
 from pathlib import Path
 
 import numpy as np
@@ -837,8 +839,6 @@ class TestSnakemakeDryRun:
             ``subprocess.CompletedProcess`` — caller should check
             ``result.returncode``.
         """
-        import subprocess
-
         cmd = [
             "uv", "run", "snakemake",
             "--dryrun",
@@ -849,7 +849,7 @@ class TestSnakemakeDryRun:
             cmd.extend(targets)
 
         env = {
-            **__import__("os").environ,
+            **os.environ,
             "NEURODENT_DATASET": dataset,
         }
 

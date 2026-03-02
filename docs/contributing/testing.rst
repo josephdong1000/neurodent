@@ -58,7 +58,7 @@ pytest integration tests for functional validation instead.
 .. code-block:: bash
 
    # Quick: validate DAG only (seconds)
-   NEURODENT_DATASET=example  uv run snakemake --dryrun --cores 1
+   NEURODENT_DATASET=example uv run snakemake --dryrun --cores 1
    NEURODENT_DATASET=mini_real uv run snakemake --dryrun --cores 1
 
    # Full: run the component integration tests (seconds)
