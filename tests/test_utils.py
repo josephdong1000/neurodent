@@ -283,7 +283,7 @@ class TestParsePathToAnimalday:
         """Test filepath that doesn't contain valid genotype."""
         filepath = Path("/path/INVALID_A10_2023-01-1")
 
-        with pytest.raises(ValueError, match="does not have any matching values"):
+        with pytest.raises(ValueError, match="does not match any alias"):
             utils.parse_path_to_animalday(filepath, animal_param=(1, "_"), )
 
     def test_filepath_without_valid_animal_id(self):
@@ -410,7 +410,7 @@ class TestParseStrToGenotype:
     @patch("neurodent.constants.GENOTYPE_ALIASES", {})
     def test_empty_aliases(self):
         """Test parsing with empty genotype aliases."""
-        with pytest.raises(ValueError, match="does not have any matching values"):
+        with pytest.raises(ValueError, match="does not match any alias"):
             utils.parse_str_to_genotype("WT_A10_data")
 
     def test_genotype_backward_compatibility(self):
@@ -1586,7 +1586,7 @@ class TestParseChnameToAbbrev:
         with pytest.raises(ValueError, match="Ambiguous match in 'left auditory visual'. Multiple alias types matched"):
             utils.parse_chname_to_abbrev("left auditory visual", strict_matching=True)
 
-        with pytest.raises(ValueError, match="Aud Vis does not have any matching values"):
+        with pytest.raises(ValueError, match="'Aud Vis' does not match any alias"):
             utils.parse_chname_to_abbrev("Aud Vis", strict_matching=True)  # Fails because no L/R prefix
 
         with pytest.raises(ValueError, match="Ambiguous match in 'left Aud Vis'. Multiple alias types matched"):
@@ -1650,7 +1650,7 @@ class TestParseChnameToAbbrev:
         """Test that error messages are more helpful."""
         # Test improved no-match error message
         with pytest.raises(
-            ValueError, match="InvalidChannel does not have any matching values. Available aliases \\(examples\\):"
+            ValueError, match="'InvalidChannel' does not match any alias"
         ):
             utils.parse_chname_to_abbrev("InvalidChannel")
 
@@ -1659,7 +1659,7 @@ class TestParseChnameToAbbrev:
             utils.parse_chname_to_abbrev("NoMatch")
         except ValueError as e:
             error_msg = str(e)
-            assert "Available aliases (examples)" in error_msg
+            assert "Available aliases:" in error_msg
             assert "L" in error_msg and "R" in error_msg  # Should show L/R examples
 
     def test_backward_compatibility(self):
@@ -3202,12 +3202,12 @@ class TestGetKeyFromMatchValues:
         """Test that no matches raises ValueError."""
         test_dict = {"A": ["apple", "apricot"], "B": ["banana", "berry"]}
 
-        with pytest.raises(ValueError, match="does not have any matching values"):
+        with pytest.raises(ValueError, match="does not match any alias"):
             utils._get_key_from_match_values("orange_fruit", test_dict)
 
     def test_empty_dict_raises_error(self):
         """Test that empty dictionary raises error."""
-        with pytest.raises(ValueError, match="does not have any matching values"):
+        with pytest.raises(ValueError, match="does not match any alias"):
             utils._get_key_from_match_values("test_string", {})
 
     def test_with_real_genotype_aliases(self):
