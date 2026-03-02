@@ -1501,7 +1501,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                 date_str = lro.get_date_string()
             except ValueError as e:
                 raise ValueError(
-                    f"Could not determine date for LRO at index {i} (path: {lro.base_folder_path}). "
+                    f"Could not determine date for LRO at index {i} (path: {getattr(lro, 'base_folder_path', 'unknown')}). "
                     f"Ensure LRO has valid timestamps via metadata or manual_datetimes. Error: {e}"
                 )
 
