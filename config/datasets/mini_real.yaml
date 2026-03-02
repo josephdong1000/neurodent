@@ -7,10 +7,11 @@ samples:
 analysis:
   war_generation:
     pattern:
-      - "{index}_ColMajor.bin"
-      - "{index}_Meta.csv"
+      - "{animal}/{index}_ColMajor.bin"
+      - "{animal}/{index}_Meta.csv"
     assume_from_number: true
     skip_sessions: []
     lro_kwargs:
-      mode: "bin"
+      mode: "si"
+      extract_func: "tests.data.readers.read_bin_csv_pair"
       multiprocess_mode: "serial"

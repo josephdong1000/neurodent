@@ -23,7 +23,7 @@ uv run pytest tests/integration/ -v -m integration
 ### 2. Mini real dataset (committed bin/csv recordings)
 
 Small real recordings are committed under `tests/data/raw/` for local
-smoke-testing.  The layout is flat (files directly in session folders):
+smoke-testing.  The layout uses `{animal}/{index}` placeholders:
 
 ```
 tests/data/
