@@ -673,6 +673,8 @@ class TestPerAnimalPatternDict:
 
     def test_per_animal_dict_with_heterogeneous_patterns(self, tmp_path):
         """Animals can have different pattern structures (e.g. NWB vs bin/csv)."""
+        from neurodent.workflow.utils import resolve_animal_pattern
+
         # Per-animal pattern dict with heterogeneous patterns
         pattern_config = {
             "A10": "{animal}/{session}/{index}.rhd",
@@ -683,33 +685,49 @@ class TestPerAnimalPatternDict:
             "C9": "{animal}/{session}/{index}.rhd",
         }
 
-        # Verify structure: some animals have string patterns, others have lists
-        assert isinstance(pattern_config["A10"], str)
-        assert isinstance(pattern_config["B5"], list)
-        assert isinstance(pattern_config["C9"], str)
+        # Verify string pattern resolves to string
+        result = resolve_animal_pattern(pattern_config, "A10", "/data")
+        assert isinstance(result, str)
+        assert result == "/data/{animal}/{session}/{index}.rhd"
 
-        # Verify per-animal resolution works for each type
-        for animal_id, pattern in pattern_config.items():
-            if isinstance(pattern, list):
-                resolved = [f"/data/{p}" for p in pattern]
-                assert len(resolved) == 2
-            else:
-                resolved = f"/data/{pattern}"
-                assert isinstance(resolved, str)
+        # Verify list pattern resolves to list
+        result = resolve_animal_pattern(pattern_config, "B5", "/data")
+        assert isinstance(result, list)
+        assert len(result) == 2
+
+        # Verify another string pattern
+        result = resolve_animal_pattern(pattern_config, "C9", "/data")
+        assert isinstance(result, str)
 
     def test_per_animal_dict_missing_animal_raises(self):
         """Accessing a missing animal in the pattern dict raises KeyError."""
+        from neurodent.workflow.utils import resolve_animal_pattern
+
         pattern_config = {
             "A10": "{animal}/{session}/{index}.rhd",
             "B5": ["{animal}/{session}/{index}.bin", "{animal}/{session}/{index}.csv"],
         }
 
         with pytest.raises(KeyError, match="C9"):
-            if "C9" not in pattern_config:
-                raise KeyError(
-                    f"Animal 'C9' not found in per-animal pattern config. "
-                    f"Available animals: {list(pattern_config.keys())}"
-                )
+            resolve_animal_pattern(pattern_config, "C9", "/data")
+
+    def test_shared_pattern_backward_compatible(self):
+        """Shared string/list pattern still works (backward compatibility)."""
+        from neurodent.workflow.utils import resolve_animal_pattern
+
+        # String pattern
+        result = resolve_animal_pattern("{animal}/{index}.nwb", "A10", "/data")
+        assert result == "/data/{animal}/{index}.nwb"
+
+        # List pattern
+        result = resolve_animal_pattern(
+            ["{animal}/{index}.bin", "{animal}/{index}.csv"],
+            "A10",
+            "/data",
+        )
+        assert isinstance(result, list)
+        assert len(result) == 2
+        assert result[0] == "/data/{animal}/{index}.bin"
 
 
 # ---------------------------------------------------------------------------

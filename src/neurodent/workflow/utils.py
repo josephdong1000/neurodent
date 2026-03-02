@@ -230,6 +230,73 @@ def deep_merge_dict(base: dict, override: dict) -> dict:
     return result
 
 
+def resolve_animal_pattern(
+    pattern_config,
+    animal_id: str,
+    base_path: str,
+) -> "str | list[str]":
+    """Resolve a discovery pattern for a specific animal.
+
+    Supports two formats for ``pattern_config``:
+
+    * **Shared** (``str`` or ``list[str]``): every animal uses the same pattern(s).
+    * **Per-animal** (``dict[str, str | list[str]]``): each animal has its own
+      pattern(s), enabling heterogeneous file structures in a single dataset.
+
+    Parameters
+    ----------
+    pattern_config : str | list[str] | dict[str, str | list[str]]
+        Either a shared pattern (string or list), or a dict mapping
+        ``animal_id → pattern(s)``.
+    animal_id : str
+        The animal to resolve the pattern for.
+    base_path : str
+        Absolute base path to prepend to relative patterns.
+
+    Returns
+    -------
+    str | list[str]
+        Absolute discovery pattern(s) for the given animal.
+
+    Raises
+    ------
+    KeyError
+        If ``pattern_config`` is a dict and ``animal_id`` is not found.
+
+    Examples
+    --------
+    Shared pattern (backward compatible)::
+
+        >>> resolve_animal_pattern("{animal}/{index}.nwb", "A10", "/data")
+        '/data/{animal}/{index}.nwb'
+
+    Per-animal pattern dict::
+
+        >>> resolve_animal_pattern(
+        ...     {"A10": "{animal}/{index}.rhd", "B5": ["{animal}/{index}.bin", "{animal}/{index}.csv"]},
+        ...     "A10",
+        ...     "/data",
+        ... )
+        '/data/{animal}/{index}.rhd'
+    """
+    # Per-animal patterns: dict mapping animal_id → pattern(s)
+    if isinstance(pattern_config, dict):
+        if animal_id not in pattern_config:
+            raise KeyError(
+                f"Animal '{animal_id}' not found in per-animal pattern config. "
+                f"Available animals: {list(pattern_config.keys())}"
+            )
+        relative_pattern = pattern_config[animal_id]
+    else:
+        # Shared pattern (string or list) — backward compatible
+        relative_pattern = pattern_config
+
+    if isinstance(relative_pattern, list):
+        return [f"{base_path}/{p}" for p in relative_pattern]
+    else:
+        return f"{base_path}/{relative_pattern}"
+
+
 def apply_path_overrides(base_config: dict, overrides: dict) -> dict:
     """Apply path-based overrides to a config dictionary using deep merge.
 
