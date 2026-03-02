@@ -687,14 +687,27 @@ class AnimalOrganizer(AnimalFeatureParser):
         self.long_recordings: list[core.LongRecordingOrganizer] = []
         for animalday, items in self._animalday_folder_groups.items():
             kwargs = lro_kwargs.copy()
-            if (
-                getattr(self, "_processed_timestamps", None) is not None
-                and animalday in self._processed_timestamps
-            ):
-                kwargs["manual_datetimes"] = self._processed_timestamps[animalday]
-                logging.debug(
-                    f"Using processed timestamps for {animalday}: {kwargs['manual_datetimes']}"
-                )
+            if getattr(self, "_processed_timestamps", None) is not None:
+                # _processed_timestamps is keyed by item name, not animalday
+                if len(items) == 1:
+                    item_name = self._get_item_name(items[0])
+                    if item_name in self._processed_timestamps:
+                        kwargs["manual_datetimes"] = self._processed_timestamps[item_name]
+                        logging.debug(
+                            f"Using processed timestamp for {item_name}: {kwargs['manual_datetimes']}"
+                        )
+                else:
+                    # For multi-item animaldays, collect per-item timestamps as a list
+                    item_timestamps = []
+                    for item in items:
+                        item_name = self._get_item_name(item)
+                        if item_name in self._processed_timestamps:
+                            item_timestamps.append(self._processed_timestamps[item_name])
+                    if item_timestamps:
+                        kwargs["manual_datetimes"] = item_timestamps
+                        logging.debug(
+                            f"Using processed timestamps for {animalday}: {item_timestamps}"
+                        )
 
             if len(items) == 1:
                 item_to_pass = items[0]
@@ -1391,14 +1404,20 @@ class AnimalOrganizer(AnimalFeatureParser):
         item = getattr(lro, "item", None)
 
         animal = self.animal_id or "unknown"
-        session = "unknown"
         genotype = self.genotype or "Unknown"
+        session = None
 
         if isinstance(item, DiscoveredFile) and item.metadata:
             meta = item.metadata
             animal = meta.get("animal", animal)
-            session = meta.get("session", session)
+            session = meta.get("session")
             genotype = constants.ANIMAL_METADATA.get(animal, {}).get("gene", genotype)
+
+        if session is None:
+            try:
+                session = lro.get_date_string()
+            except (ValueError, AttributeError):
+                session = "unknown"
 
         row["animalday"] = f"{animal} {genotype} {session}"
         row["animal"] = animal
@@ -1968,10 +1987,15 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     f"It will be excluded from LOF-based analysis."
                 )
 
-        self.channel_abbrevs = [
-            core.parse_chname_to_abbrev(x, assume_from_number=self.assume_from_number)
-            for x in self.channel_names
-        ]
+        try:
+            self.channel_abbrevs = [
+                core.parse_chname_to_abbrev(x, assume_from_number=self.assume_from_number)
+                for x in self.channel_names
+            ]
+        except (ValueError, KeyError) as e:
+            raise type(e)(
+                f"{e}\n\nChannel names in data: {self.channel_names}"
+            ) from e
 
     def reorder_and_pad_channels(
         self, target_channels: list[str], use_abbrevs: bool = True, inplace: bool = True
