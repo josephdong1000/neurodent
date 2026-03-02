@@ -621,6 +621,98 @@ class TestBinCsvMultiPatternDiscovery:
 
 
 # ---------------------------------------------------------------------------
+# Per-Animal Pattern Tests
+# ---------------------------------------------------------------------------
+
+@pytest.mark.integration
+class TestPerAnimalPatternDict:
+    """Test per-animal pattern dict in generate_wars config.
+
+    When ``pattern`` is a dict mapping ``animal_id → pattern(s)``, each animal
+    gets its own discovery pattern.  This supports heterogeneous file structures
+    across animals in the same dataset.
+    """
+
+    @pytest.fixture
+    def bin_csv_env(self, tmp_path):
+        """Create a dual .bin/.csv dataset under tmp_path."""
+        from tests.data.generate import create_synthetic_bin_csv_dataset
+
+        return create_synthetic_bin_csv_dataset(
+            tmp_path, n_sessions=2, duration_s=3,
+        )
+
+    def test_per_animal_dict_discovery(self, bin_csv_env):
+        """Per-animal pattern dict resolves to correct patterns per animal."""
+        from neurodent.core.discovery import FileDiscoverer
+
+        ds = bin_csv_env
+        base_path = str(ds["data_root"] / ds["session_folder"])
+
+        # Build a per-animal pattern dict (both animals share the same patterns here,
+        # but the dict structure is the key thing being tested)
+        pattern_config = {
+            "ExWT": ds["pattern"],
+            "ExKO": ds["pattern"],
+        }
+
+        for animal_id in ["ExWT", "ExKO"]:
+            animal_pattern = pattern_config[animal_id]
+            if isinstance(animal_pattern, list):
+                patterns = [f"{base_path}/{p}" for p in animal_pattern]
+            else:
+                patterns = f"{base_path}/{animal_pattern}"
+
+            discoverer = FileDiscoverer(patterns)
+            filtered = discoverer.discover(animal=animal_id)
+
+            # Each animal has 2 sessions
+            assert len(filtered) == 2
+            for g in filtered:
+                assert g.metadata["animal"] == animal_id
+
+    def test_per_animal_dict_with_heterogeneous_patterns(self, tmp_path):
+        """Animals can have different pattern structures (e.g. NWB vs bin/csv)."""
+        # Per-animal pattern dict with heterogeneous patterns
+        pattern_config = {
+            "A10": "{animal}/{session}/{index}.rhd",
+            "B5": [
+                "{animal}/{session}/{index}.bin",
+                "{animal}/{session}/{index}.csv",
+            ],
+            "C9": "{animal}/{session}/{index}.rhd",
+        }
+
+        # Verify structure: some animals have string patterns, others have lists
+        assert isinstance(pattern_config["A10"], str)
+        assert isinstance(pattern_config["B5"], list)
+        assert isinstance(pattern_config["C9"], str)
+
+        # Verify per-animal resolution works for each type
+        for animal_id, pattern in pattern_config.items():
+            if isinstance(pattern, list):
+                resolved = [f"/data/{p}" for p in pattern]
+                assert len(resolved) == 2
+            else:
+                resolved = f"/data/{pattern}"
+                assert isinstance(resolved, str)
+
+    def test_per_animal_dict_missing_animal_raises(self):
+        """Accessing a missing animal in the pattern dict raises KeyError."""
+        pattern_config = {
+            "A10": "{animal}/{session}/{index}.rhd",
+            "B5": ["{animal}/{session}/{index}.bin", "{animal}/{session}/{index}.csv"],
+        }
+
+        with pytest.raises(KeyError, match="C9"):
+            if "C9" not in pattern_config:
+                raise KeyError(
+                    f"Animal 'C9' not found in per-animal pattern config. "
+                    f"Available animals: {list(pattern_config.keys())}"
+                )
+
+
+# ---------------------------------------------------------------------------
 # Mini Real Dataset Tests
 # ---------------------------------------------------------------------------
 

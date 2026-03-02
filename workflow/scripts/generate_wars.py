@@ -136,7 +136,20 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
                         "or '{{index}}.rhd')."
                     )
                 base_path = str(data_parent_folder / folder_path)
-                relative_pattern = session_analysis_config["pattern"]
+                pattern_config = session_analysis_config["pattern"]
+
+                # Per-animal patterns: dict mapping animal_id → pattern(s)
+                if isinstance(pattern_config, dict):
+                    if source_animal_id not in pattern_config:
+                        raise KeyError(
+                            f"Animal '{source_animal_id}' not found in per-animal pattern config. "
+                            f"Available animals: {list(pattern_config.keys())}"
+                        )
+                    relative_pattern = pattern_config[source_animal_id]
+                else:
+                    # Shared pattern (string or list) — backward compatible
+                    relative_pattern = pattern_config
+
                 if isinstance(relative_pattern, list):
                     discovery_pattern = [f"{base_path}/{p}" for p in relative_pattern]
                 else:
