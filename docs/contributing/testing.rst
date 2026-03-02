@@ -61,6 +61,23 @@ directory layout described in ``tests/data/README.md``, then run:
 See ``config/datasets/example.yaml`` and ``config/samples_example.json`` for
 the corresponding configuration.
 
+**Mini real dataset (committed bin/csv recordings)**
+
+Small real recordings are committed under ``tests/data/raw/`` and exercised
+by pytest integration tests in ``TestMiniRealDataset``.  The dataset uses
+``{animal}/{index}`` placeholders with paired ``.bin`` / ``.csv`` files:
+
+.. code-block:: bash
+
+   # Run mini-real integration tests
+   uv run pytest tests/integration/ -v -k TestMiniRealDataset
+
+   # Dry-run via Snakemake (requires a custom extract_func)
+   NEURODENT_DATASET=mini_real snakemake --cores 1 --dryrun
+
+See ``config/datasets/mini_real.yaml`` and ``config/samples_mini_real.json`` for
+the corresponding configuration.
+
 
 Building Documentation
 ----------------------
