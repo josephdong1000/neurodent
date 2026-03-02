@@ -1407,31 +1407,36 @@ class TestExtractFuncDottedFallbackWarning:
 
     def test_si_dotted_fallback_warns(self, lro_mode_none):
         """SI mode logs a warning when falling back to dotted import."""
+        func_name = "tests.data.readers.read_bin_csv_pair"
         with (
             patch("neurodent.core.core.logging") as mock_logging,
             patch.object(lro_mode_none, "convert_file_with_si_to_recording"),
         ):
             lro_mode_none.detect_and_load_data(
                 mode="si",
-                extract_func="tests.data.readers.read_bin_csv_pair",
+                extract_func=func_name,
             )
             mock_logging.warning.assert_called_once()
             msg = mock_logging.warning.call_args[0][0]
             assert "falling back to dotted import path" in msg
+            # func_name is passed as a %-style arg
+            assert mock_logging.warning.call_args[0][1] == func_name
 
     def test_mne_dotted_fallback_warns(self, lro_mode_none):
         """MNE mode logs a warning when falling back to dotted import."""
+        func_name = "tests.data.readers.read_bin_csv_pair"
         with (
             patch("neurodent.core.core.logging") as mock_logging,
             patch.object(lro_mode_none, "convert_file_with_mne_to_recording"),
         ):
             lro_mode_none.detect_and_load_data(
                 mode="mne",
-                extract_func="tests.data.readers.read_bin_csv_pair",
+                extract_func=func_name,
             )
             mock_logging.warning.assert_called_once()
             msg = mock_logging.warning.call_args[0][0]
             assert "falling back to dotted import path" in msg
+            assert mock_logging.warning.call_args[0][1] == func_name
 
     def test_si_builtin_extractor_no_warning(self, lro_mode_none):
         """SI mode does NOT warn when using a built-in SI extractor name."""
