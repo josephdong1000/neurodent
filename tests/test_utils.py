@@ -3271,3 +3271,85 @@ class TestGetKeyFromMatchValues:
         assert utils._get_key_from_match_values("A-009", good_aliases) == "Aud"
         assert utils._get_key_from_match_values("B-012", good_aliases) == "Hip"
 
+
+# ---------------------------------------------------------------------------
+# Additional edge-case coverage for small utilities
+# ---------------------------------------------------------------------------
+
+
+class TestGetFileStemEdgeCases:
+    """Edge cases for get_file_stem handling double extensions."""
+
+    def test_double_extension(self):
+        assert utils.get_file_stem("/data/recording.npy.gz") == "recording"
+
+    def test_single_extension(self):
+        assert utils.get_file_stem("/data/file.rhd") == "file"
+
+
+class TestLogTransformEdgeCases:
+    """Edge cases for log_transform."""
+
+    def test_none_input(self):
+        assert utils.log_transform(None) is None
+
+    def test_values(self):
+        arr = np.array([0.0, 1.0, np.e - 1])
+        result = utils.log_transform(arr)
+        np.testing.assert_allclose(result, np.log(arr + 1))
+
+
+class TestGetCacheStatusMessage:
+    """Tests for get_cache_status_message."""
+
+    def test_using_cached(self, tmp_path):
+        msg = utils.get_cache_status_message(tmp_path / "c.pkl", True)
+        assert "Using cached" in msg
+
+    def test_regenerating(self, tmp_path):
+        msg = utils.get_cache_status_message(tmp_path / "c.pkl", False)
+        assert "Regenerating" in msg
+
+
+class TestGetGroupbyKeys:
+    """Tests for _get_groupby_keys."""
+
+    def test_basic(self):
+        df = pd.DataFrame({"g": ["a", "a", "b"], "v": [1, 2, 3]})
+        keys = utils._get_groupby_keys(df, "g")
+        assert set(keys) == {"a", "b"}
+
+
+class TestGetPairwiseCombinations:
+    """Tests for _get_pairwise_combinations."""
+
+    def test_three_elements(self):
+        combos = utils._get_pairwise_combinations([1, 2, 3])
+        assert set(combos) == {(1, 2), (1, 3), (2, 3)}
+
+    def test_empty(self):
+        assert utils._get_pairwise_combinations([]) == []
+
+    def test_single(self):
+        assert utils._get_pairwise_combinations([1]) == []
+
+
+class TestNanmeanSeriesOfNpEdgeCases:
+    """Additional edge cases for nanmean_series_of_np fast path."""
+
+    def test_small_series_mean(self):
+        arr = np.array([[1, 2], [3, 4], [5, 6]], dtype=float)
+        series = pd.Series(list(arr))
+        result = utils.nanmean_series_of_np(series, axis=0)
+        expected = np.nanmean(arr, axis=0)
+        np.testing.assert_allclose(result, expected)
+
+    def test_large_series_stack_fast_path(self):
+        """Series > 1000 elements triggers np.stack fast path."""
+        np.random.seed(0)
+        arrays = [np.random.randn(5) for _ in range(1500)]
+        series = pd.Series(arrays)
+        result = utils.nanmean_series_of_np(series, axis=0)
+        expected = np.nanmean(np.stack(arrays), axis=0)
+        np.testing.assert_allclose(result, expected)
+

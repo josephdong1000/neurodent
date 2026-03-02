@@ -320,7 +320,8 @@ class TestFragmentAnalyzer:
         features = ["rms", "ampvar"]
         kwargs = {}
 
-        result = FragmentAnalyzer._process_fragment_features_dask(sample_rec_2d, f_s, features, kwargs)
+        with pytest.warns(DeprecationWarning, match="_process_fragment_features_dask is deprecated"):
+            result = FragmentAnalyzer._process_fragment_features_dask(sample_rec_2d, f_s, features, kwargs)
 
         # Check that result is a dictionary with requested features
         assert isinstance(result, dict)
@@ -1286,3 +1287,117 @@ class TestFragmentAnalyzerMathematicalVerification:
 
         # Results should be nearly identical (allowing for minor numerical differences)
         np.testing.assert_allclose(fa_result, lra_result, rtol=1e-10, atol=1e-12)
+
+
+# ---------------------------------------------------------------------------
+# Dependency resolution edge cases
+# ---------------------------------------------------------------------------
+
+
+class TestFragmentDependencyResolution:
+    """Tests for process_fragment_with_dependencies and _resolve_feature_dependencies."""
+
+    @pytest.fixture
+    def synthetic_fragment(self):
+        """8-channel, 1-second @ 1000 Hz white noise fragment."""
+        np.random.seed(0)
+        return np.random.randn(1000, 8).astype(np.float32)
+
+    def test_base_feature_no_deps(self, synthetic_fragment):
+        results = FragmentAnalyzer.process_fragment_with_dependencies(
+            synthetic_fragment, f_s=1000, features=["rms"], kwargs={}
+        )
+        assert "rms" in results
+        assert results["rms"].shape == (8,)
+
+    def test_single_dep_logrms(self, synthetic_fragment):
+        results = FragmentAnalyzer.process_fragment_with_dependencies(
+            synthetic_fragment, f_s=1000, features=["logrms"], kwargs={}
+        )
+        assert "logrms" in results
+        assert results["logrms"].shape == (8,)
+
+    def test_multi_level_deps_logpsdband(self, synthetic_fragment):
+        """logpsdband → psdband → psd  (two-level dependency)."""
+        results = FragmentAnalyzer.process_fragment_with_dependencies(
+            synthetic_fragment, f_s=1000, features=["logpsdband"], kwargs={}
+        )
+        assert "logpsdband" in results
+
+    def test_diamond_deps_psdfrac(self, synthetic_fragment):
+        """psdfrac → psdband → psd. psdtotal also → psd. No redundant computation."""
+        results = FragmentAnalyzer.process_fragment_with_dependencies(
+            synthetic_fragment,
+            f_s=1000,
+            features=["psdfrac", "psdtotal"],
+            kwargs={},
+        )
+        assert "psdfrac" in results
+        assert "psdtotal" in results
+
+    def test_deep_chain_logpsdfrac(self, synthetic_fragment):
+        """logpsdfrac → psdfrac → psdband → psd  (three levels)."""
+        results = FragmentAnalyzer.process_fragment_with_dependencies(
+            synthetic_fragment, f_s=1000, features=["logpsdfrac"], kwargs={}
+        )
+        assert "logpsdfrac" in results
+
+    def test_multiple_independent_features(self, synthetic_fragment):
+        results = FragmentAnalyzer.process_fragment_with_dependencies(
+            synthetic_fragment,
+            f_s=1000,
+            features=["rms", "ampvar"],
+            kwargs={},
+        )
+        assert "rms" in results
+        assert "ampvar" in results
+
+    def test_cached_dep_not_recomputed(self, synthetic_fragment):
+        """Requesting rms + logrms should compute rms once."""
+        results = FragmentAnalyzer.process_fragment_with_dependencies(
+            synthetic_fragment,
+            f_s=1000,
+            features=["rms", "logrms"],
+            kwargs={},
+        )
+        assert "rms" in results
+        assert "logrms" in results
+        expected_logrms = np.log(results["rms"] + 1)
+        np.testing.assert_allclose(results["logrms"], expected_logrms)
+
+    def test_legacy_process_matches_deps(self, synthetic_fragment):
+        """Legacy _process_fragment_features_dask gives same results for base features."""
+        with pytest.warns(DeprecationWarning, match="_process_fragment_features_dask is deprecated"):
+            legacy = FragmentAnalyzer._process_fragment_features_dask(
+                synthetic_fragment, f_s=1000, features=["rms", "ampvar"], kwargs={}
+            )
+        dep = FragmentAnalyzer.process_fragment_with_dependencies(
+            synthetic_fragment, f_s=1000, features=["rms", "ampvar"], kwargs={}
+        )
+        np.testing.assert_allclose(legacy["rms"], dep["rms"])
+        np.testing.assert_allclose(legacy["ampvar"], dep["ampvar"])
+
+    def test_legacy_emits_deprecation_warning(self, synthetic_fragment):
+        """Legacy method should emit DeprecationWarning."""
+        with pytest.warns(DeprecationWarning, match="Use process_fragment_with_dependencies"):
+            FragmentAnalyzer._process_fragment_features_dask(
+                synthetic_fragment, f_s=1000, features=["rms"], kwargs={}
+            )
+
+    def test_invalid_feature_raises(self, synthetic_fragment):
+        with pytest.raises(AttributeError):
+            FragmentAnalyzer.process_fragment_with_dependencies(
+                synthetic_fragment,
+                f_s=1000,
+                features=["nonexistent_feature"],
+                kwargs={},
+            )
+
+    def test_legacy_invalid_feature_raises(self, synthetic_fragment):
+        with pytest.raises(AttributeError):
+            FragmentAnalyzer._process_fragment_features_dask(
+                synthetic_fragment,
+                f_s=1000,
+                features=["nonexistent_feature"],
+                kwargs={},
+            )

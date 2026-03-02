@@ -596,3 +596,58 @@ class TestFrequencyDomainSpikeDetectorUtils:
 
         assert isinstance(result, np.ndarray)
         assert len(result) == 0
+
+
+# ---------------------------------------------------------------------------
+# Baseline window edge cases (no SpikeInterface required)
+# ---------------------------------------------------------------------------
+
+
+class TestSpikeDetectorBaselineEdge:
+    """Test short-baseline warning path in _enforce_downward_and_refine_minimal."""
+
+    def test_very_short_signal_warns(self):
+        """A spike near signal boundary may produce a baseline < 10 samples."""
+        np.random.seed(42)
+        signal = np.random.randn(50)
+        signal[2] = -20  # artificially large spike near the start
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            result = FrequencyDomainSpikeDetector._enforce_downward_and_refine_minimal(
+                signal,
+                fs=1000,
+                candidates=np.array([2]),
+                search_ms=10,
+                baseline_ms=5,  # very small baseline → likely < 10 samples
+            )
+            # Function should not crash; result is an array
+            assert isinstance(result, np.ndarray)
+            # Verify the short-baseline warning was emitted
+            baseline_warnings = [
+                x for x in w if "baseline window length" in str(x.message)
+            ]
+            assert len(baseline_warnings) > 0, "Expected a warning about short baseline"
+
+    def test_spike_at_signal_edge(self):
+        """Spike at index 0 should not crash."""
+        signal = np.zeros(100)
+        signal[0] = -10
+        result = FrequencyDomainSpikeDetector._enforce_downward_and_refine_minimal(
+            signal,
+            fs=1000,
+            candidates=np.array([0]),
+            search_ms=10,
+            baseline_ms=5,
+        )
+        assert isinstance(result, np.ndarray)
+
+    def test_empty_candidates_returns_empty(self):
+        """Empty candidates should return empty array."""
+        signal = np.random.randn(100)
+        result = FrequencyDomainSpikeDetector._enforce_downward_and_refine_minimal(
+            signal,
+            fs=1000,
+            candidates=np.array([]),
+        )
+        assert len(result) == 0

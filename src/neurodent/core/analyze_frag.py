@@ -53,9 +53,17 @@ class FragmentAnalyzer:
         """
         Legacy fragment processing method without dependency optimization.
 
-        Note: Consider using process_fragment_with_dependencies() instead for better performance
-        when computing interdependent features like PSD-based features.
+        .. deprecated::
+            Use :meth:`process_fragment_with_dependencies` instead for better
+            performance when computing interdependent features like PSD-based
+            features.
         """
+        warnings.warn(
+            "_process_fragment_features_dask is deprecated. "
+            "Use process_fragment_with_dependencies() instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         row = {}
         for feat in features:
             func = getattr(FragmentAnalyzer, f"compute_{feat}")
