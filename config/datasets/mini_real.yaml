@@ -1,0 +1,16 @@
+# Mini Real Dataset — small committed bin/csv recordings for smoke testing
+# Usage: NEURODENT_DATASET=mini_real snakemake --cores 1
+
+samples:
+  samples_file: "config/samples_mini_real.json"
+
+analysis:
+  war_generation:
+    pattern:
+      - "{animal}/{index}_ColMajor.bin"
+      - "{animal}/{index}_Meta.csv"
+    assume_from_number: true
+    skip_sessions: []
+    lro_kwargs:
+      mode: "si"
+      multiprocess_mode: "serial"

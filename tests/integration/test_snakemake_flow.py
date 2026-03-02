@@ -617,3 +617,188 @@ class TestBinCsvMultiPatternDiscovery:
             constants.ANIMAL_METADATA = orig_metadata
             constants.GENOTYPE_ALIASES = orig_aliases
 
+
+# ---------------------------------------------------------------------------
+# Mini Real Dataset Tests
+# ---------------------------------------------------------------------------
+
+def _mini_real_extractor(discovered_file, **kwargs):
+    """Custom extractor that reads paired .bin + .csv files (real mini data).
+
+    The mini real dataset uses ``SampleRate`` (capitalized) in the CSV
+    header, which differs from the synthetic ``sampling_rate`` key.
+    """
+    import csv
+    import spikeinterface.core as si_core
+
+    bin_path = [p for p in discovered_file.paths if p.endswith(".bin")][0]
+    csv_path = [p for p in discovered_file.paths if p.endswith(".csv")][0]
+
+    with open(csv_path) as f:
+        reader = csv.DictReader(f)
+        rows = list(reader)
+
+    n_channels = len(rows)
+    sampling_rate = float(rows[0]["SampleRate"])
+    data = np.fromfile(bin_path, dtype=np.float32).reshape(-1, n_channels)
+
+    return si_core.NumpyRecording(
+        traces_list=[data],
+        sampling_frequency=sampling_rate,
+    )
+
+
+@pytest.mark.integration
+class TestMiniRealDataset:
+    """Integration tests using committed mini real bin/csv recordings.
+
+    These tests exercise file discovery and data loading against the small
+    real recordings committed in ``tests/data/raw/``.  They validate that
+    the ``mini_real`` dataset config works end-to-end with pattern-based
+    discovery including the ``{animal}`` placeholder.
+    """
+
+    @pytest.fixture
+    def mini_real_config(self):
+        """Load mini real dataset configuration."""
+        import yaml
+
+        config_path = Path(__file__).resolve().parents[2] / "config" / "datasets" / "mini_real.yaml"
+        with open(config_path) as f:
+            ds_config = yaml.safe_load(f)
+
+        samples_path = Path(__file__).resolve().parents[2] / "config" / "samples_mini_real.json"
+        with open(samples_path) as f:
+            samples_config = json.load(f)
+
+        return {
+            "ds_config": ds_config,
+            "samples_config": samples_config,
+            "data_parent_folder": Path(__file__).resolve().parents[2] / samples_config["data_parent_folder"],
+        }
+
+    def test_mini_real_data_files_exist(self, mini_real_config):
+        """Verify that the committed mini real data files are present."""
+        data_dir = mini_real_config["data_parent_folder"]
+
+        for animal_dir in ["A10", "F22"]:
+            raw_dir = data_dir / "raw" / animal_dir
+            assert raw_dir.is_dir(), f"Missing animal directory: {raw_dir}"
+            bin_files = list(raw_dir.glob("*_ColMajor.bin"))
+            csv_files = list(raw_dir.glob("*_Meta.csv"))
+            assert len(bin_files) >= 1, f"No .bin files in {raw_dir}"
+            assert len(csv_files) >= 1, f"No .csv files in {raw_dir}"
+
+    def test_mini_real_discovery_with_animal_placeholder(self, mini_real_config):
+        """FileDiscoverer finds mini real files using {animal}/{index} pattern."""
+        from neurodent.core.discovery import FileDiscoverer
+
+        cfg = mini_real_config
+        ds = cfg["ds_config"]
+
+        # Build absolute patterns the same way generate_wars.py does
+        base_path = str(cfg["data_parent_folder"] / "raw")
+        patterns = [f"{base_path}/{p}" for p in ds["analysis"]["war_generation"]["pattern"]]
+
+        discoverer = FileDiscoverer(patterns)
+        groups = discoverer.discover()
+
+        # Should find 2 groups (one per animal)
+        assert len(groups) == 2
+        for g in groups:
+            assert g.is_multi_file
+            assert len(g.paths) == 2
+            assert any(p.endswith("_ColMajor.bin") for p in g.paths)
+            assert any(p.endswith("_Meta.csv") for p in g.paths)
+
+    def test_mini_real_filter_by_animal(self, mini_real_config):
+        """FileDiscoverer correctly filters by animal_id."""
+        from neurodent.core.discovery import FileDiscoverer
+
+        cfg = mini_real_config
+        ds = cfg["ds_config"]
+        base_path = str(cfg["data_parent_folder"] / "raw")
+        patterns = [f"{base_path}/{p}" for p in ds["analysis"]["war_generation"]["pattern"]]
+
+        discoverer = FileDiscoverer(patterns)
+
+        for animal_id in ["A10", "F22"]:
+            filtered = discoverer.discover(animal=animal_id)
+            assert len(filtered) == 1, f"Expected 1 group for {animal_id}, got {len(filtered)}"
+            assert filtered[0].metadata["animal"] == animal_id
+
+    def test_mini_real_animal_organizer_loads_data(self, mini_real_config):
+        """AnimalOrganizer loads mini real bin/csv data via custom extractor."""
+        from neurodent import constants
+        from neurodent.workflow import inject_config_aliases
+        from neurodent.visualization import AnimalOrganizer
+
+        cfg = mini_real_config
+        ds = cfg["ds_config"]
+        base_path = str(cfg["data_parent_folder"] / "raw")
+        patterns = [f"{base_path}/{p}" for p in ds["analysis"]["war_generation"]["pattern"]]
+
+        orig_metadata = constants.ANIMAL_METADATA
+        orig_aliases = constants.GENOTYPE_ALIASES
+        try:
+            inject_config_aliases(cfg["samples_config"])
+
+            ao = AnimalOrganizer(
+                patterns,
+                animal_id="A10",
+                assume_from_number=ds["analysis"]["war_generation"]["assume_from_number"],
+                lro_kwargs={
+                    "mode": "si",
+                    "extract_func": _mini_real_extractor,
+                    "multiprocess_mode": "serial",
+                },
+            )
+
+            assert ao.animal_id == "A10"
+            assert len(ao.long_recordings) >= 1
+
+            for lro in ao.long_recordings:
+                rec = lro.LongRecording
+                assert rec is not None
+                assert rec.get_num_channels() == 10  # 10 channels in real data
+                assert rec.get_sampling_frequency() == 1000.0
+                assert rec.get_total_duration() > 0
+        finally:
+            constants.ANIMAL_METADATA = orig_metadata
+            constants.GENOTYPE_ALIASES = orig_aliases
+
+    def test_mini_real_both_animals_loadable(self, mini_real_config):
+        """Both animals (A10, F22) can be loaded from mini real data."""
+        from neurodent import constants
+        from neurodent.workflow import inject_config_aliases
+        from neurodent.visualization import AnimalOrganizer
+
+        cfg = mini_real_config
+        ds = cfg["ds_config"]
+        base_path = str(cfg["data_parent_folder"] / "raw")
+        patterns = [f"{base_path}/{p}" for p in ds["analysis"]["war_generation"]["pattern"]]
+
+        orig_metadata = constants.ANIMAL_METADATA
+        orig_aliases = constants.GENOTYPE_ALIASES
+        try:
+            inject_config_aliases(cfg["samples_config"])
+
+            for animal_id in ["A10", "F22"]:
+                ao = AnimalOrganizer(
+                    patterns,
+                    animal_id=animal_id,
+                    assume_from_number=True,
+                    lro_kwargs={
+                        "mode": "si",
+                        "extract_func": _mini_real_extractor,
+                        "multiprocess_mode": "serial",
+                    },
+                )
+
+                assert ao.animal_id == animal_id
+                assert len(ao.long_recordings) == 1
+                assert ao.long_recordings[0].LongRecording is not None
+        finally:
+            constants.ANIMAL_METADATA = orig_metadata
+            constants.GENOTYPE_ALIASES = orig_aliases
+
