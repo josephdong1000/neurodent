@@ -1395,3 +1395,52 @@ class TestResolveDottedPath:
         """Bare name (no dots) raises ImportError."""
         with pytest.raises(ImportError, match="dotted import path"):
             LongRecordingOrganizer._resolve_dotted_path("read_nwb_recording")
+
+
+class TestExtractFuncDottedFallbackWarning:
+    """Verify that the dotted-import fallback emits a warning log."""
+
+    @pytest.fixture
+    def lro_mode_none(self, tmp_path):
+        """Create an LRO with mode=None so no data loading happens."""
+        return LongRecordingOrganizer(str(tmp_path), mode=None)
+
+    def test_si_dotted_fallback_warns(self, lro_mode_none):
+        """SI mode logs a warning when falling back to dotted import."""
+        with (
+            patch("neurodent.core.core.logging") as mock_logging,
+            patch.object(lro_mode_none, "convert_file_with_si_to_recording"),
+        ):
+            lro_mode_none.detect_and_load_data(
+                mode="si",
+                extract_func="tests.data.readers.read_bin_csv_pair",
+            )
+            mock_logging.warning.assert_called_once()
+            msg = mock_logging.warning.call_args[0][0]
+            assert "falling back to dotted import path" in msg
+
+    def test_mne_dotted_fallback_warns(self, lro_mode_none):
+        """MNE mode logs a warning when falling back to dotted import."""
+        with (
+            patch("neurodent.core.core.logging") as mock_logging,
+            patch.object(lro_mode_none, "convert_file_with_mne_to_recording"),
+        ):
+            lro_mode_none.detect_and_load_data(
+                mode="mne",
+                extract_func="tests.data.readers.read_bin_csv_pair",
+            )
+            mock_logging.warning.assert_called_once()
+            msg = mock_logging.warning.call_args[0][0]
+            assert "falling back to dotted import path" in msg
+
+    def test_si_builtin_extractor_no_warning(self, lro_mode_none):
+        """SI mode does NOT warn when using a built-in SI extractor name."""
+        with (
+            patch("neurodent.core.core.logging") as mock_logging,
+            patch.object(lro_mode_none, "convert_file_with_si_to_recording"),
+        ):
+            lro_mode_none.detect_and_load_data(
+                mode="si",
+                extract_func="read_nwb_recording",
+            )
+            mock_logging.warning.assert_not_called()

@@ -655,6 +655,11 @@ class LongRecordingOrganizer:
                 extract_func = getattr(se, func_name, getattr(si, func_name, None))
                 # Fall back to dotted import path (e.g. "mypackage.readers.read_custom")
                 if extract_func is None and "." in func_name:
+                    logging.warning(
+                        "extract_func '%s' not found in SpikeInterface; "
+                        "falling back to dotted import path resolution.",
+                        func_name,
+                    )
                     extract_func = self._resolve_dotted_path(func_name)
                 if extract_func is None:
                     raise ValueError(
@@ -676,6 +681,11 @@ class LongRecordingOrganizer:
                 extract_func = getattr(mne.io, func_name, None)
                 # Fall back to dotted import path
                 if extract_func is None and "." in func_name:
+                    logging.warning(
+                        "extract_func '%s' not found in mne.io; "
+                        "falling back to dotted import path resolution.",
+                        func_name,
+                    )
                     extract_func = self._resolve_dotted_path(func_name)
                 if extract_func is None:
                     raise ValueError(

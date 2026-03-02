@@ -45,22 +45,22 @@ CI/CD via GitHub Actions:
    JSONs, wildcard resolution, and rule definitions without processing any data.
 
 3. **Snakemake real run (GitHub Actions, mini_real)**
-   The ``test-build-docs.yml`` workflow runs a real
-   ``snakemake --until make_war`` execution on the committed mini_real
-   dataset.  This validates end-to-end WAR generation (data loading,
-   discovery, Dask cluster, analysis) on every push/PR.  The ``example``
-   dataset uses a DAG dry-run since its synthetic NWB data is generated
-   at test-fixture time, not committed to the repo.
+   The ``test-build-docs.yml`` workflow runs a real full-pipeline
+   ``snakemake`` execution on the committed mini_real dataset.  This
+   validates end-to-end processing (data loading, discovery, analysis,
+   filtering, figures) on every push/PR.  The ``example`` dataset uses a
+   DAG dry-run since its synthetic NWB data is generated at test-fixture
+   time, not committed to the repo.
 
 .. code-block:: bash
 
    # Quick: validate DAG only (seconds)
    NEURODENT_DATASET=example uv run snakemake --dryrun --cores 1
 
-   # Real run: execute WAR generation on committed mini data
-   NEURODENT_DATASET=mini_real uv run snakemake --cores 1 --until make_war
+   # Real run: execute full pipeline on committed mini data
+   NEURODENT_DATASET=mini_real uv run snakemake --cores 1
 
-   # Full: run the component integration tests (seconds)
+   # Component integration tests (seconds)
    uv run pytest tests/integration/ -v -m integration
 
 
@@ -110,11 +110,9 @@ by pytest integration tests in ``TestMiniRealDataset``.  The dataset uses
    # Run mini-real integration tests
    uv run pytest tests/integration/ -v -k TestMiniRealDataset
 
-   # Real run via Snakemake (uses extract_func: tests.data.readers.read_bin_csv_pair)
-   NEURODENT_DATASET=mini_real snakemake --cores 1 --until make_war
-
-See ``config/datasets/mini_real.yaml`` and ``config/samples_mini_real.json`` for
-the corresponding configuration.
+The full Snakemake run shown in the Pipeline Testing Strategy section above
+also exercises this dataset end-to-end.  See ``config/datasets/mini_real.yaml``
+and ``config/samples_mini_real.json`` for the corresponding configuration.
 
 
 Building Documentation

@@ -64,7 +64,7 @@ jobs:
     - name: Snakemake real run (mini_real dataset)
       if: runner.os == 'Linux'
       run: |
-        NEURODENT_DATASET=mini_real uv run snakemake --cores 1 --until make_war
+        NEURODENT_DATASET=mini_real uv run snakemake --cores 1
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v5
