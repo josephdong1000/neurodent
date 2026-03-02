@@ -602,6 +602,38 @@ class LongRecordingOrganizer:
         self.file_durations = [duration_s]
         self.cumulative_file_durations = [duration_s]
 
+    @staticmethod
+    def _resolve_dotted_path(path_str: str) -> Callable:
+        """Import and return a callable from a dotted path.
+
+        Parameters
+        ----------
+        path_str : str
+            Fully-qualified dotted path, e.g. ``"mypackage.readers.read_bin_csv"``.
+
+        Returns
+        -------
+        Callable
+            The resolved callable.
+
+        Raises
+        ------
+        ImportError
+            If the module cannot be imported.
+        AttributeError
+            If the attribute does not exist in the module.
+        """
+        import importlib
+
+        module_path, _, attr_name = path_str.rpartition(".")
+        if not module_path:
+            raise ImportError(
+                f"Cannot resolve '{path_str}' as a dotted import path "
+                "(expected 'module.attr' format)"
+            )
+        module = importlib.import_module(module_path)
+        return getattr(module, attr_name)
+
     def detect_and_load_data(
         self,
         mode: Literal["si", "mne", None] = "si",
@@ -619,10 +651,15 @@ class LongRecordingOrganizer:
 
             if isinstance(extract_func, str):
                 func_name = extract_func
+                # Try SpikeInterface namespaces first
                 extract_func = getattr(se, func_name, getattr(si, func_name, None))
+                # Fall back to dotted import path (e.g. "mypackage.readers.read_custom")
+                if extract_func is None and "." in func_name:
+                    extract_func = self._resolve_dotted_path(func_name)
                 if extract_func is None:
                     raise ValueError(
-                        f"Could not resolve SpikeInterface extractor: {func_name}"
+                        f"Could not resolve SpikeInterface extractor: {func_name}. "
+                        "Provide a SpikeInterface extractor name or a dotted import path."
                     )
             elif extract_func is None:
                 extract_func = si.load_extractor
@@ -637,8 +674,14 @@ class LongRecordingOrganizer:
             if isinstance(extract_func, str):
                 func_name = extract_func
                 extract_func = getattr(mne.io, func_name, None)
+                # Fall back to dotted import path
+                if extract_func is None and "." in func_name:
+                    extract_func = self._resolve_dotted_path(func_name)
                 if extract_func is None:
-                    raise ValueError(f"Could not resolve MNE extractor: {func_name}")
+                    raise ValueError(
+                        f"Could not resolve MNE extractor: {func_name}. "
+                        "Provide an MNE extractor name or a dotted import path."
+                    )
 
             self.convert_file_with_mne_to_recording(
                 extract_func=extract_func,

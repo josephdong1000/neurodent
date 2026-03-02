@@ -43,23 +43,22 @@ CI/CD via GitHub Actions:
    invokes ``snakemake --dryrun`` as a subprocess for both the ``example`` and
    ``mini_real`` datasets.  This validates the Snakefile, config files, sample
    JSONs, wildcard resolution, and rule definitions without processing any data.
-   In the CI workflow these are also run as explicit steps on Linux runners.
 
-3. **Snakemake dry-run CI steps (GitHub Actions)**
-   The ``test-build-docs.yml`` workflow includes dedicated
-   ``Snakemake dry-run`` steps that run ``snakemake --dryrun`` for both test
-   datasets on every push/PR.  These catch configuration regressions early.
-
-Running the *actual* Snakemake pipeline (beyond ``--dryrun``) on
-test data is **not** recommended in CI because it requires Dask, writes
-large intermediate files, and can take minutes even on tiny data.  Use the
-pytest integration tests for functional validation instead.
+3. **Snakemake real run (GitHub Actions, mini_real)**
+   The ``test-build-docs.yml`` workflow runs a real
+   ``snakemake --until make_war`` execution on the committed mini_real
+   dataset.  This validates end-to-end WAR generation (data loading,
+   discovery, Dask cluster, analysis) on every push/PR.  The ``example``
+   dataset uses a DAG dry-run since its synthetic NWB data is generated
+   at test-fixture time, not committed to the repo.
 
 .. code-block:: bash
 
    # Quick: validate DAG only (seconds)
    NEURODENT_DATASET=example uv run snakemake --dryrun --cores 1
-   NEURODENT_DATASET=mini_real uv run snakemake --dryrun --cores 1
+
+   # Real run: execute WAR generation on committed mini data
+   NEURODENT_DATASET=mini_real uv run snakemake --cores 1 --until make_war
 
    # Full: run the component integration tests (seconds)
    uv run pytest tests/integration/ -v -m integration
@@ -111,8 +110,8 @@ by pytest integration tests in ``TestMiniRealDataset``.  The dataset uses
    # Run mini-real integration tests
    uv run pytest tests/integration/ -v -k TestMiniRealDataset
 
-   # Dry-run via Snakemake (requires a custom extract_func)
-   NEURODENT_DATASET=mini_real snakemake --cores 1 --dryrun
+   # Real run via Snakemake (uses extract_func: tests.data.readers.read_bin_csv_pair)
+   NEURODENT_DATASET=mini_real snakemake --cores 1 --until make_war
 
 See ``config/datasets/mini_real.yaml`` and ``config/samples_mini_real.json`` for
 the corresponding configuration.

@@ -804,6 +804,42 @@ class TestMiniRealDataset:
             constants.ANIMAL_METADATA = orig_metadata
             constants.GENOTYPE_ALIASES = orig_aliases
 
+    def test_mini_real_loads_via_dotted_extract_func(self, mini_real_config):
+        """AnimalOrganizer resolves a dotted extract_func string from config."""
+        from neurodent import constants
+        from neurodent.workflow import inject_config_aliases
+        from neurodent.visualization import AnimalOrganizer
+
+        cfg = mini_real_config
+        ds = cfg["ds_config"]
+        base_path = str(cfg["data_parent_folder"] / "raw")
+        patterns = [f"{base_path}/{p}" for p in ds["analysis"]["war_generation"]["pattern"]]
+
+        # Use the extract_func string from the dataset config
+        lro_kwargs = dict(ds["analysis"]["war_generation"]["lro_kwargs"])
+
+        orig_metadata = constants.ANIMAL_METADATA
+        orig_aliases = constants.GENOTYPE_ALIASES
+        try:
+            inject_config_aliases(cfg["samples_config"])
+
+            ao = AnimalOrganizer(
+                patterns,
+                animal_id="A10",
+                assume_from_number=ds["analysis"]["war_generation"]["assume_from_number"],
+                lro_kwargs=lro_kwargs,
+            )
+
+            assert ao.animal_id == "A10"
+            assert len(ao.long_recordings) >= 1
+            rec = ao.long_recordings[0].LongRecording
+            assert rec is not None
+            assert rec.get_num_channels() == 10
+            assert rec.get_sampling_frequency() == 1000.0
+        finally:
+            constants.ANIMAL_METADATA = orig_metadata
+            constants.GENOTYPE_ALIASES = orig_aliases
+
 
 # ---------------------------------------------------------------------------
 # Snakemake Dry-Run Tests

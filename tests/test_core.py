@@ -1359,3 +1359,39 @@ def temp_dir():
     """Create a temporary directory for testing."""
     with tempfile.TemporaryDirectory() as tmp_dir:
         yield Path(tmp_dir)
+
+
+class TestResolveDottedPath:
+    """Test ``LongRecordingOrganizer._resolve_dotted_path``."""
+
+    def test_resolves_known_module(self):
+        """Dotted path to a stdlib function resolves correctly."""
+        func = LongRecordingOrganizer._resolve_dotted_path("os.path.join")
+        assert func is os.path.join
+
+    def test_resolves_tests_data_reader(self):
+        """Dotted path to the mini-real reader resolves correctly."""
+        func = LongRecordingOrganizer._resolve_dotted_path(
+            "tests.data.readers.read_bin_csv_pair"
+        )
+        assert callable(func)
+        assert func.__name__ == "read_bin_csv_pair"
+
+    def test_raises_on_missing_module(self):
+        """Non-existent module raises ImportError."""
+        with pytest.raises((ImportError, ModuleNotFoundError)):
+            LongRecordingOrganizer._resolve_dotted_path(
+                "nonexistent_module_xyz.some_func"
+            )
+
+    def test_raises_on_missing_attr(self):
+        """Valid module but missing attribute raises AttributeError."""
+        with pytest.raises(AttributeError):
+            LongRecordingOrganizer._resolve_dotted_path(
+                "os.path.nonexistent_function_xyz"
+            )
+
+    def test_raises_on_bare_name(self):
+        """Bare name (no dots) raises ImportError."""
+        with pytest.raises(ImportError, match="dotted import path"):
+            LongRecordingOrganizer._resolve_dotted_path("read_nwb_recording")
