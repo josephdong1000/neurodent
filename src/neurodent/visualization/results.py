@@ -301,6 +301,17 @@ class AnimalOrganizer(AnimalFeatureParser):
             return Path(item[0]).is_file()
         return Path(item).is_file()
 
+    @staticmethod
+    def _get_context_path(item) -> Path:
+        """Return a single Path from an item (str, Path, list, or DiscoveredFile)."""
+        from ..core.discovery import DiscoveredFile
+
+        if isinstance(item, DiscoveredFile):
+            return Path(item.get_path_list()[0])
+        if isinstance(item, (list, tuple)):
+            return Path(item[0])
+        return Path(item)
+
     def _resolve_timestamp_input(self, input_spec, folder_path: Path):
         """
         Recursively resolve any timestamp input type to concrete datetime(s).
@@ -445,11 +456,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                     zip(ordered_items, original_manual_datetimes)
                 ):
                     try:
-                        context_path = (
-                            Path(item[0])
-                            if isinstance(item, (list, tuple))
-                            else Path(item)
-                        )
+                        context_path = self._get_context_path(item)
                         resolved_ts = self._resolve_timestamp_input(ts, context_path)
                         item_timestamps.append((item, resolved_ts))
                     except Exception as e:
@@ -461,11 +468,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                 try:
                     if isinstance(original_manual_datetimes, str):
                         first_item = ordered_items[0] if ordered_items else "."
-                        context_path = (
-                            Path(first_item[0])
-                            if isinstance(first_item, (list, tuple))
-                            else Path(first_item)
-                        )
+                        context_path = self._get_context_path(first_item)
                         resolved_ts = self._resolve_timestamp_input(
                             original_manual_datetimes, context_path
                         )
@@ -480,9 +483,7 @@ class AnimalOrganizer(AnimalFeatureParser):
             else:
                 item_timestamps = []
                 for item in ordered_items:
-                    context_path = (
-                        Path(item[0]) if isinstance(item, (list, tuple)) else Path(item)
-                    )
+                    context_path = self._get_context_path(item)
                     resolved_ts = self._resolve_timestamp_input(
                         original_manual_datetimes, context_path
                     )
@@ -603,9 +604,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                         f"manual_datetimes list has {len(spec)} entries but animal has {len(animal_items)} items"
                     )
                 for item, ts in zip(animal_items, spec):
-                    context_path = (
-                        Path(item[0]) if isinstance(item, (list, tuple)) else Path(item)
-                    )
+                    context_path = self._get_context_path(item)
                     out[self._get_item_name(item)] = self._resolve_timestamp_input(
                         ts, context_path
                     )
@@ -613,11 +612,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                 for item in animal_items:
                     fname = self._get_item_name(item)
                     if fname in spec:
-                        context_path = (
-                            Path(item[0])
-                            if isinstance(item, (list, tuple))
-                            else Path(item)
-                        )
+                        context_path = self._get_context_path(item)
                         out[fname] = self._resolve_timestamp_input(
                             spec[fname], context_path
                         )
@@ -656,11 +651,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                     if animalday_to_items
                     else "."
                 )
-                context_path = (
-                    Path(first_item[0])
-                    if isinstance(first_item, (list, tuple))
-                    else Path(first_item)
-                )
+                context_path = self._get_context_path(first_item)
                 start_dt = self._resolve_timestamp_input(manual_datetimes, context_path)
 
             from pandas import Timestamp
@@ -685,9 +676,7 @@ class AnimalOrganizer(AnimalFeatureParser):
             for animalday, items in animalday_to_items.items():
                 for item in items:
                     item_name = self._get_item_name(item)
-                    context_path = (
-                        Path(item[0]) if isinstance(item, (list, tuple)) else Path(item)
-                    )
+                    context_path = self._get_context_path(item)
                     out[item_name] = self._resolve_timestamp_input(
                         manual_datetimes, context_path
                     )
