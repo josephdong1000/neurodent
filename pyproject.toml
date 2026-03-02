@@ -105,8 +105,18 @@ Documentation = "https://josephdong1000.github.io/neurodent/"
 Repository = "https://github.com/josephdong1000/neurodent"
 "Issue Tracker" = "https://github.com/josephdong1000/neurodent/issues"
 
+[project.scripts]
+neurodent = "neurodent.cli:main"
+
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+"neurodent.pipeline" = [
+    "Snakefile",
+    "config/**/*",
+    "workflow/**/*",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

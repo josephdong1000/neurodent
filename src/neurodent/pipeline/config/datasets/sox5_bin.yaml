@@ -1,0 +1,12 @@
+# Sox5 Project - Binary Format
+# Dataset-specific configuration overrides
+# This file is deep-merged into the main config when active_dataset="sox5_bin"
+
+samples:
+  samples_file: "config/samples.json"
+
+analysis:
+  war_generation:
+    mode: "nest"    # folder structure: session_folder/*{animal_id}*/day_subfolders/
+    lro_kwargs:
+      mode: "bin"   # load binary .bin files from each day subfolder

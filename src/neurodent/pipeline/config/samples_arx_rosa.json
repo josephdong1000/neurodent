@@ -1,0 +1,147 @@
+{
+    "data_parent_folder": "/mnt/isilon/marsh_single_unit/PythonEEG Data/Arx Rosa",
+
+    "_note_channels": "Channel structure varies by session:",
+    "_note_edf": "EDF sessions: 32 total channels split among 2-4 animals (8 or 16 channels each)",
+    "_note_rhd": "RHD sessions: 128 total channels, 3 animals using ports A/B/C (32 channels each)",
+    "_note_brain_regions": "Brain region mappings (CHNAME_ALIASES) and hemisphere mappings (LR_ALIASES) TBD - run pipeline first to examine data",
+
+    "CHNAME_ALIASES": {},
+
+    "LR_ALIASES": {},
+
+    "joint_sessions": {
+        "Arx Rosa 1017 1015": {
+            "ArxRosa-1017": [
+                "EEG E1-REF1", "EEG E2-REF1", "EEG E3-REF1", "EEG E4-REF1",
+                "EEG E5-REF1", "EEG E6-REF1", "EEG E7-REF1", "EEG E8-REF1",
+                "EEG E9-REF2", "EEG E10-REF2", "EEG E11-REF2", "EEG E12-REF2",
+                "EEG E13-REF2", "EEG E14-REF2", "EEG E15-REF2", "EEG E16-REF2"
+            ],
+            "ArxRosa-1015": [
+                "EEG E17-REF3", "EEG E18-REF3", "EEG E19-REF3", "EEG E20-REF3",
+                "EEG E21-REF3", "EEG E22-REF3", "EEG E23-REF3", "EEG E24-REF3",
+                "EEG E25-REF4", "EEG E26-REF4", "EEG E27-REF4", "EEG E28-REF4",
+                "EEG E29-REF4", "EEG E30-REF4", "EEG E31-REF4", "EEG E32-REF4"
+            ]
+        },
+        "Arx Rosa 1199 1198 1211 1201": {
+            "ArxRosa-1199": [
+                "EEG E1-REF1", "EEG E2-REF1", "EEG E3-REF1", "EEG E4-REF1",
+                "EEG E5-REF1", "EEG E6-REF1", "EEG E7-REF1", "EEG E8-REF1"
+            ],
+            "ArxRosa-1198": [
+                "EEG E9-REF2", "EEG E10-REF2", "EEG E11-REF2", "EEG E12-REF2",
+                "EEG E13-REF2", "EEG E14-REF2", "EEG E15-REF2", "EEG E16-REF2"
+            ],
+            "ArxRosa-1211": [
+                "EEG E17-REF3", "EEG E18-REF3", "EEG E19-REF3", "EEG E20-REF3",
+                "EEG E21-REF3", "EEG E22-REF3", "EEG E23-REF3", "EEG E24-REF3"
+            ],
+            "ArxRosa-1201": [
+                "EEG E25-REF4", "EEG E26-REF4", "EEG E27-REF4", "EEG E28-REF4",
+                "EEG E29-REF4", "EEG E30-REF4", "EEG E31-REF4", "EEG E32-REF4"
+            ]
+        },
+        "Arx Rosa  967 968 969 418": {
+            "ArxRosa-967": [
+                "EEG E1-REF1", "EEG E2-REF1", "EEG E3-REF1", "EEG E4-REF1",
+                "EEG E5-REF1", "EEG E6-REF1", "EEG E7-REF1", "EEG E8-REF1"
+            ],
+            "ArxRosa-968": [
+                "EEG E9-REF2", "EEG E10-REF2", "EEG E11-REF2", "EEG E12-REF2",
+                "EEG E13-REF2", "EEG E14-REF2", "EEG E15-REF2", "EEG E16-REF2"
+            ],
+            "ArxRosa-969": [
+                "EEG E17-REF3", "EEG E18-REF3", "EEG E19-REF3", "EEG E20-REF3",
+                "EEG E21-REF3", "EEG E22-REF3", "EEG E23-REF3", "EEG E24-REF3"
+            ],
+            "ArxRosa-418": [
+                "EEG E25-REF4", "EEG E26-REF4", "EEG E27-REF4", "EEG E28-REF4",
+                "EEG E29-REF4", "EEG E30-REF4", "EEG E31-REF4", "EEG E32-REF4"
+            ]
+        },
+        "Arx Rosa 2059_2063_2064": {
+            "ArxRosa-2059": [
+                "A-000", "A-001", "A-002", "A-003", "A-004", "A-005", "A-006", "A-007",
+                "A-008", "A-009", "A-010", "A-011", "A-012", "A-013", "A-014", "A-015",
+                "A-016", "A-017", "A-018", "A-019", "A-020", "A-021", "A-022", "A-023",
+                "A-024", "A-025", "A-026", "A-027", "A-028", "A-029", "A-030", "A-031"
+            ],
+            "ArxRosa-2063": [
+                "B-000", "B-001", "B-002", "B-003", "B-004", "B-005", "B-006", "B-007",
+                "B-008", "B-009", "B-010", "B-011", "B-012", "B-013", "B-014", "B-015",
+                "B-016", "B-017", "B-018", "B-019", "B-020", "B-021", "B-022", "B-023",
+                "B-024", "B-025", "B-026", "B-027", "B-028", "B-029", "B-030", "B-031"
+            ],
+            "ArxRosa-2064": [
+                "C-000", "C-001", "C-002", "C-003", "C-004", "C-005", "C-006", "C-007",
+                "C-008", "C-009", "C-010", "C-011", "C-012", "C-013", "C-014", "C-015",
+                "C-016", "C-017", "C-018", "C-019", "C-020", "C-021", "C-022", "C-023",
+                "C-024", "C-025", "C-026", "C-027", "C-028", "C-029", "C-030", "C-031"
+            ]
+        },
+        "Arx Rosa 3022 3023 3024": {
+            "ArxRosa-3022": [
+                "A-000", "A-001", "A-002", "A-003", "A-004", "A-005", "A-006", "A-007",
+                "A-008", "A-009", "A-010", "A-011", "A-012", "A-013", "A-014", "A-015",
+                "A-016", "A-017", "A-018", "A-019", "A-020", "A-021", "A-022", "A-023",
+                "A-024", "A-025", "A-026", "A-027", "A-028", "A-029", "A-030", "A-031"
+            ],
+            "ArxRosa-3023": [
+                "B-000", "B-001", "B-002", "B-003", "B-004", "B-005", "B-006", "B-007",
+                "B-008", "B-009", "B-010", "B-011", "B-012", "B-013", "B-014", "B-015",
+                "B-016", "B-017", "B-018", "B-019", "B-020", "B-021", "B-022", "B-023",
+                "B-024", "B-025", "B-026", "B-027", "B-028", "B-029", "B-030", "B-031"
+            ],
+            "ArxRosa-3024": [
+                "C-000", "C-001", "C-002", "C-003", "C-004", "C-005", "C-006", "C-007",
+                "C-008", "C-009", "C-010", "C-011", "C-012", "C-013", "C-014", "C-015",
+                "C-016", "C-017", "C-018", "C-019", "C-020", "C-021", "C-022", "C-023",
+                "C-024", "C-025", "C-026", "C-027", "C-028", "C-029", "C-030", "C-031"
+            ]
+        }
+    },
+
+    "data_folders_to_animal_ids": {},
+    "bad_channels": {},
+    "bad_folder_animalday": [],
+
+    "manual_datetimes": {
+        "ArxRosa-1017": "2015-02-25 09:52:45",
+        "ArxRosa-1015": "2015-02-25 09:52:45",
+        "ArxRosa-1199": "2016-01-20 12:11:20",
+        "ArxRosa-1198": "2016-01-20 12:11:20",
+        "ArxRosa-1211": "2016-01-20 12:11:20",
+        "ArxRosa-1201": "2016-01-20 12:11:20",
+        "ArxRosa-967": "2014-11-26 09:37:10",
+        "ArxRosa-968": "2014-11-26 09:37:10",
+        "ArxRosa-969": "2014-11-26 09:37:10",
+        "ArxRosa-418": "2014-11-26 09:37:10",
+        "ArxRosa-2059": "2020-08-04 08:48:59",
+        "ArxRosa-2063": "2020-08-04 08:48:59",
+        "ArxRosa-2064": "2020-08-04 08:48:59",
+        "ArxRosa-3022": "2020-12-29 08:30:18",
+        "ArxRosa-3023": "2020-12-29 08:30:18",
+        "ArxRosa-3024": "2020-12-29 08:30:18"
+    },
+
+    "ANIMAL_METADATA": [
+        {"id": "ArxRosa-1017", "gene": "UNKNOWN", "sex": "UNKNOWN"},
+        {"id": "ArxRosa-1015", "gene": "UNKNOWN", "sex": "UNKNOWN"},
+        {"id": "ArxRosa-1199", "gene": "UNKNOWN", "sex": "UNKNOWN"},
+        {"id": "ArxRosa-1198", "gene": "UNKNOWN", "sex": "UNKNOWN"},
+        {"id": "ArxRosa-1211", "gene": "UNKNOWN", "sex": "UNKNOWN"},
+        {"id": "ArxRosa-1201", "gene": "UNKNOWN", "sex": "UNKNOWN"},
+        {"id": "ArxRosa-967", "gene": "UNKNOWN", "sex": "UNKNOWN"},
+        {"id": "ArxRosa-968", "gene": "UNKNOWN", "sex": "UNKNOWN"},
+        {"id": "ArxRosa-969", "gene": "UNKNOWN", "sex": "UNKNOWN"},
+        {"id": "ArxRosa-418", "gene": "UNKNOWN", "sex": "UNKNOWN"},
+        {"id": "ArxRosa-2059", "gene": "UNKNOWN", "sex": "UNKNOWN"},
+        {"id": "ArxRosa-2063", "gene": "UNKNOWN", "sex": "UNKNOWN"},
+        {"id": "ArxRosa-2064", "gene": "UNKNOWN", "sex": "UNKNOWN"},
+        {"id": "ArxRosa-3022", "gene": "UNKNOWN", "sex": "UNKNOWN"},
+        {"id": "ArxRosa-3023", "gene": "UNKNOWN", "sex": "UNKNOWN"},
+        {"id": "ArxRosa-3024", "gene": "UNKNOWN", "sex": "UNKNOWN"}
+    ]
+}

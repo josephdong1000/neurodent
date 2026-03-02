@@ -1,0 +1,400 @@
+{
+    "data_parent_folder": "/mnt/isilon/marsh_single_unit/PythonEEG Data Bins/Sox5/Dr. Lefebvre Project",
+    "GENOTYPE_ALIASES": {
+        "MWT": [
+            "MWT",
+            "M4_WT",
+            "AIIM(WT)",
+            "group9_M2_Cage 3",
+
+            "AM3",
+            "BM6",
+            "CM5",
+            "AM4",
+
+            "AM2",
+            "CM9"
+        ],
+        "MHet": [
+            "MHet",
+            "MHET",
+            "M8_HET",
+            "group9_M3_Cage 4",
+
+            "mouse #3 Cage 4A",
+            "mouse M3 cage1A",
+            "mouse M3 cage3A",
+            "EM1",
+            "AM5",
+            "mouse M2 cage 3A"
+        ],
+        "MMut": [
+            "M3_MT",
+            "OLDMMT",
+            "MMUT",
+            "MMT",
+
+            "mouse #8 Cage 3A",
+            "mouse #2 Cage 2A",
+            "mouse M5 cage2A",
+            "mouse M5 cage4A"
+        ],
+        "FWT": [
+            "FWT",
+            "BF3",
+            "CF2",
+            "DF3",
+            "CF1"
+        ],
+        "FHet": [
+            "FHET",
+            "F7Het",
+            "F5 cage 1A",
+            "F6 cage 2A",
+            "mouse #8 Cage 1A",
+            "mouse F5 cage 1A",
+            "mouse F6 cage 2A",
+            "032221_cohort 2, Group 3, Mouse 6 Cage 2A Re-Recording",
+            "GF4",
+            "IF5",
+            "FF6"
+        ],
+        "FMut": [
+            "FMUT",
+            "F9Mut",
+            "mouse F10 cage 4A",
+            "040221_Group 1 Mouse 9 Recording"
+        ],
+        "Unknown": [
+            "M3_group 10_cage 1",
+            "F8_group 10_cage 3",
+            "M2_cohort4_group1",
+            "M4_cohort4_group1",
+            "group9_M1_Cage1"
+        ]
+    },
+    "data_folders_to_animal_ids": {
+        "010822_cohort4_group2_2mice_MWT_MHET": [
+            "M3_MHET_cohort4_group2",
+            "M10_MWT_cohort4_group2"
+        ],
+        "011322_cohort4_group3_4mice_AllM_MT_WT_HET_WT": [
+            "M2_AIIM(WT)_cohort4_group3",
+            "M3_MT_cohort4_group3",
+            "M4_WT_cohort4_group3",
+            "M8_HET_cohort4_group3"
+        ],
+        "011622_cohort4_group4_3mice_MMutOLD_FMUT_FMUT_FWT": [
+            "FMUT_",
+            "FMUT(2)",
+            "FWT",
+            "OLDMMT"
+        ],
+        "012022_cohort4_group5_3mice__FWT_MMUT_FMUT": [
+            "FMUT_cohort4_group5",
+            "FWT_cohort4_group5",
+            "MMUT_cohort4_group5"
+        ],
+        "012322_cohort4_group6_3mice_FMUT___MMUT_MWT": [
+            "FMUT_cohort4_group6",
+            "FHET_cohort4_group6",
+            "MHET_cohort4_group6",
+            "MMUT_cohort4_group6"
+        ],
+        "013122_cohort4_group7_2mice both_FHET": [
+            "FHET(1)",
+            "FHET(2)"
+        ],
+        "031021_cohort 2, group 3 and 4": [
+            "#8 Cage 3A",
+            "#8 Cage 1A",
+            "#2 Cage 2A",
+            "#3 Cage 4A"
+        ],
+        "031122_cohort5_group1_2mice_FHET_MWT": [
+            "F4",
+            "M2_MWT_cohort5_group1"
+        ],
+        "031621_cohort 2 group 2 and group 5": [
+            "F5",
+            "F6",
+            "F10",
+            "cohort 2 group 5 mouse M2 cage 3A"
+        ],
+        "031722_cohort_6_group1_3mice_MMUT_MMUT_MWT": [
+            "M7",
+            "MMUT(1)",
+            "MMUT(2)"
+        ],
+        "031921_cohort 2 group 5 and group 6": [
+            "mouse M3 cage1A",
+            "mouse M5 cage2A",
+            "mouse M3 cage3A",
+            "mouse M5 cage4A"
+        ],
+        "": [
+            "032221_cohort 2, Group 3, Mouse 6 Cage 2A Re-Recording",
+            "040221_Group 1 Mouse 9 Recording"
+        ],
+        "060921_Cohort 3_EM1_AM2_GF4": [
+            "AM2",
+            "EM1",
+            "GF4"
+        ],
+        "061022_group 9 M1, M2, M3": [
+            "group9_M1_Cage1",
+            "group9_M2_Cage 3",
+            "group9_M3_Cage 4"
+        ],
+        "061322_Group10 M8, M10": [
+            "M8_MMT_group 10_cage 1",
+            "M10_MWT_Group 10_cage 3"
+        ],
+        "061722_group10 M3, F8": [
+            "M3_group 10_cage 1",
+            "F8"
+        ],
+        "062122_group 10_2mice_F7Het_F9Mut": [
+            "F7",
+            "F9"
+        ],
+        "062921_Cohort 3_AM3_AM5_CM9_BM6_CM5_CF2_IF5_BF3": [
+            "AM3",
+            "AM5",
+            "BF3",
+            "BM6",
+            "CF2",
+            "CM5",
+            "CM9",
+            "IF5"
+        ],
+        "071321_Cohort 3_AM4_CF1_DF3_FF6": [
+            "AM4",
+            "CF1",
+            "DF3",
+            "FF6"
+        ],
+        "081922_cohort10_group4_2mice_FMut_FHet": [
+            "082122_FHET_cohort10_group4_files0-89",
+            "082122_FMUT_cohort10_group4_files0-89"
+        ],
+        "082922_group4_2mice_MMUT_FMUT": [
+            "082922_MMUT",
+            "090122_FMUT_cohort 10_group4_files0-36"
+        ],
+        "090122_group4_2mice_FMut_MMut": [
+            "090222_MMUT_cohort 10_group 4_files0-149",
+            "090322_FMUT_cohort 10_group 4_files0-86"
+        ],
+        "121821_cohort4_Group1_2mice": [
+            "M2_cohort4_group1",
+            "M4_cohort4_group1"
+        ]
+    },
+    "bad_channels": {
+        "010822_cohort4_group2_2mice_MWT_MHET M10_MWT_cohort4_group2": {
+            "M10 MWT Jan-08-2022": ["LHip", "RHip"],
+            "M10 MWT Jan-09-2022": ["LHip", "RHip"]
+        },
+        "010822_cohort4_group2_2mice_MWT_MHET M3_MHET_cohort4_group2": {
+            "M3 MHet Jan-08-2022": ["LMot", "RMot"],
+            "M3 MHet Jan-09-2022": ["LMot", "RMot"],
+            "M3 MHet Jan-10-2022": ["LMot", "RMot"]
+        },
+        "011322_cohort4_group3_4mice_AllM_MT_WT_HET_WT M4_WT_cohort4_group3": {
+            "M4 MWT Jan-13-2022": ["LHip", "RHip"],
+            "M4 MWT Jan-14-2022": ["LHip", "RHip"],
+            "M4 MWT Jan-15-2022": ["LHip", "RHip"]
+        },
+        "012022_cohort4_group5_3mice__FWT_MMUT_FMUT FMUT_cohort4_group5": {
+            "FMUT FMut Jan-21-2022": ["LHip", "RHip"],
+            "FMUT FMut Jan-22-2022": ["LHip", "RHip"],
+            "FMUT FMut Jan-23-2022": ["LHip", "RHip"]
+        },
+        "012022_cohort4_group5_3mice__FWT_MMUT_FMUT FWT_cohort4_group5": {
+            "FWT FWT Jan-20-2022": ["LHip", "RHip"],
+            "FWT FWT Jan-21-2022": ["LHip", "RHip"],
+            "FWT FWT Jan-22-2022": ["LHip", "RHip"],
+            "FWT FWT Jan-23-2022": ["LHip", "RHip"]
+        },
+        "012022_cohort4_group5_3mice__FWT_MMUT_FMUT MMUT_cohort4_group5": {
+            "MMUT MMut Jan-21-2022": ["LHip", "RHip"],
+            "MMUT MMut Jan-22-2022": ["LHip", "RHip"]
+        },
+        "012322_cohort4_group6_3mice_FMUT___MMUT_MWT FMUT_cohort4_group6": {
+            "FMUT FMut Jan-23-2022": ["LHip", "RHip"],
+            "FMUT FMut Jan-24-2022": ["LHip", "RHip"],
+            "FMUT FMut Jan-25-2022": ["LHip", "RHip"],
+            "FMUT FMut Jan-26-2022": ["LHip", "RHip"],
+            "FMUT FMut Jan-27-2022": ["LHip", "RHip"]
+        },
+        "013122_cohort4_group7_2mice both_FHET FHET(1)": {
+            "FHET(1) FHet Feb-01-2022": ["LHip", "RHip"],
+            "FHET(1) FHet Jan-31-2022": ["LHip", "RHip"]
+        },
+        "031021_cohort 2, group 3 and 4 #8 Cage 1A": {
+            "#8 Cage 1A FHet Mar-10-2021": ["LAud", "RAud"],
+            "#8 Cage 1A FHet Mar-11-2021": [],
+            "#8 Cage 1A FHet Mar-12-2021": []
+        },
+        "031021_cohort 2, group 3 and 4 #8 Cage 3A": {
+            "#8 Cage 3A MMut Mar-10-2021": [],
+            "#8 Cage 3A MMut Mar-11-2021": [],
+            "#8 Cage 3A MMut Mar-12-2021": ["LVis", "RVis"]
+        },
+        "031122_cohort5_group1_2mice_FHET_MWT F4": {
+            "F4 FHet Mar-11-2022": ["LHip", "RHip"],
+            "F4 FHet Mar-12-2022": ["LHip", "RHip"],
+            "F4 FHet Mar-13-2022": ["LHip", "RHip"],
+            "F4 FHet Mar-14-2022": ["LHip", "RHip"],
+            "F4 FHet Mar-15-2022": ["LHip", "RHip"],
+            "F4 FHet Mar-17-2022": ["LHip", "RHip"]
+        },
+        "031621_cohort 2 group 2 and group 5 F6": {
+            "F6 FHet Mar-16-2021": ["LAud"],
+            "F6 FHet Mar-17-2021": ["LAud"],
+            "F6 FHet Mar-18-2021": ["LAud"],
+            "F6 FHet Mar-19-2021": ["LAud"]
+        },
+        "011322_cohort4_group3_4mice_AllM_MT_WT_HET_WT M2_AIIM(WT)_cohort4_group3": {
+            "M2 MWT Jan-14-2022": ["LBar", "LHip", "LVis", "RVis"],
+            "M2 MWT Jan-15-2022": ["LBar", "LHip", "LVis", "RVis"],
+            "M2 MWT Jan-16-2022": ["LBar", "LHip", "LVis", "RVis"]
+        },
+        "011322_cohort4_group3_4mice_AllM_MT_WT_HET_WT M8_HET_cohort4_group3": {
+            "M8 MHet Jan-14-2022": ["LAud", "RAud", "RHip"],
+            "M8 MHet Jan-15-2022": ["LAud", "RAud", "RHip"],
+            "M8 MHet Jan-16-2022": ["LAud", "RAud", "RHip"]
+        },
+        "011622_cohort4_group4_3mice_MMutOLD_FMUT_FMUT_FWT FMUT(2)": {
+            "FMUT(2) FMut Jan-16-2022": ["LAud", "RAud", "RHip", "LHip"],
+            "FMUT(2) FMut Jan-17-2022": ["LAud", "RAud", "RHip", "LHip"],
+            "FMUT(2) FMut Jan-18-2022": ["LAud", "RAud", "RHip", "LHip"],
+            "FMUT(2) FMut Jan-19-2022": ["LAud", "RAud", "RHip", "LHip"]
+        },
+        "011622_cohort4_group4_3mice_MMutOLD_FMUT_FMUT_FWT FWT": {
+            "FWT FWT Jan-16-2022": ["LAud", "LHip", "LVis", "RAud", "RHip"],
+            "FWT FWT Jan-17-2022": ["LAud", "LHip", "LVis", "RAud", "RHip"],
+            "FWT FWT Jan-18-2022": ["LAud", "LHip", "LVis", "RAud", "RHip"],
+            "FWT FWT Jan-19-2022": ["LAud", "LHip", "LVis", "RAud", "RHip"]
+        },
+        "031122_cohort5_group1_2mice_FHET_MWT M2_MWT_cohort5_group1": {
+            "M2 MWT Mar-11-2022": ["LHip", "RHip", "RAud", "RMot"],
+            "M2 MWT Mar-12-2022": ["LHip", "RHip", "RAud", "RMot"],
+            "M2 MWT Mar-13-2022": ["LHip", "RHip", "RAud", "RMot"],
+            "M2 MWT Mar-14-2022": ["LHip", "RHip", "RAud", "RMot"],
+            "M2 MWT Mar-15-2022": ["LHip", "RHip", "RAud", "RMot"],
+            "M2 MWT Mar-17-2022": ["LHip", "RHip", "RAud", "RMot"]
+        },
+        "031722_cohort_6_group1_3mice_MMUT_MMUT_MWT MMUT(2)": {
+            "MMUT(2) MMut Mar-17-2022": ["LAud", "LHip", "RHip"],
+            "MMUT(2) MMut Mar-19-2022": ["LAud", "LHip", "RHip"],
+            "MMUT(2) MMut Mar-20-2022": ["LAud", "LHip", "RHip"],
+            "MMUT(2) MMut Mar-21-2022": ["LAud", "LHip", "RHip"]
+        },
+        "062122_group 10_2mice_F7Het_F9Mut F9": {
+            "F9 FMut Jun-21-2022": ["LAud", "RMot"],
+            "F9 FMut Jun-29-2022": ["LAud", "RMot"],
+            "F9 FMut Jun-30-2022": ["LAud", "RMot"]
+        }
+    },
+    "bad_folder_animalday": [
+        "012322_cohort4_group6_3mice_FMUT___MMUT_MWT MHET_cohort4_group6",
+        "012322_cohort4_group6_3mice_FMUT___MMUT_MWT MMUT_cohort4_group6",
+        "013122_cohort4_group7_2mice both_FHET FHET(2)"
+    ],
+    "joint_sessions": {},
+    "ANIMAL_METADATA": [
+        {"id": "MWT", "gene": "WT", "sex": "Male"},
+        {"id": "M4_WT", "gene": "WT", "sex": "Male"},
+        {"id": "AIIM(WT)", "gene": "WT", "sex": "Male"},
+        {"id": "group9_M2_Cage 3", "gene": "WT", "sex": "Male"},
+        {"id": "AM3", "gene": "WT", "sex": "Male"},
+        {"id": "BM6", "gene": "WT", "sex": "Male"},
+        {"id": "CM5", "gene": "WT", "sex": "Male"},
+        {"id": "AM4", "gene": "WT", "sex": "Male"},
+        {"id": "AM2", "gene": "WT", "sex": "Male"},
+        {"id": "CM9", "gene": "WT", "sex": "Male"},
+        {"id": "M7", "gene": "WT", "sex": "Male"},
+        {"id": "M3_MHET_cohort4_group2", "gene": "WT", "sex": "Male"},
+        {"id": "M3_MT_cohort4_group3", "gene": "WT", "sex": "Male"},
+        {"id": "M2_MWT_cohort5_group1", "gene": "WT", "sex": "Male"},
+        {"id": "MHet", "gene": "Het", "sex": "Male"},
+        {"id": "MHET", "gene": "Het", "sex": "Male"},
+        {"id": "M8_HET", "gene": "Het", "sex": "Male"},
+        {"id": "group9_M3_Cage 4", "gene": "Het", "sex": "Male"},
+        {"id": "mouse #3 Cage 4A", "gene": "Het", "sex": "Male"},
+        {"id": "mouse M3 cage1A", "gene": "Het", "sex": "Male"},
+        {"id": "mouse M3 cage3A", "gene": "Het", "sex": "Male"},
+        {"id": "EM1", "gene": "Het", "sex": "Male"},
+        {"id": "AM5", "gene": "Het", "sex": "Male"},
+        {"id": "mouse M2 cage 3A", "gene": "Het", "sex": "Male"},
+        {"id": "M4_WT_cohort4_group3", "gene": "Het", "sex": "Male"},
+        {"id": "M4_cohort4_group1", "gene": "Het", "sex": "Male"},
+        {"id": "M8_HET_cohort4_group3", "gene": "Het", "sex": "Male"},
+        {"id": "M8_MMT_group 10_cage 1", "gene": "Het", "sex": "Male"},
+        {"id": "M3_MT", "gene": "Mut", "sex": "Male"},
+        {"id": "OLDMMT", "gene": "Mut", "sex": "Male"},
+        {"id": "MMT", "gene": "Mut", "sex": "Male"},
+        {"id": "mouse #8 Cage 3A", "gene": "Mut", "sex": "Male"},
+        {"id": "mouse #2 Cage 2A", "gene": "Mut", "sex": "Male"},
+        {"id": "mouse M5 cage2A", "gene": "Mut", "sex": "Male"},
+        {"id": "mouse M5 cage4A", "gene": "Mut", "sex": "Male"},
+        {"id": "M2_AIIM(WT)_cohort4_group3", "gene": "Mut", "sex": "Male"},
+        {"id": "M2_cohort4_group1", "gene": "Mut", "sex": "Male"},
+        {"id": "cohort 2 group 5 mouse M2 cage 3A", "gene": "Mut", "sex": "Male"},
+        {"id": "MMUT(1)", "gene": "Mut", "sex": "Male"},
+        {"id": "MMUT(2)", "gene": "Mut", "sex": "Male"},
+        {"id": "MMUT_cohort4_group5", "gene": "Mut", "sex": "Male"},
+        {"id": "MHET_cohort4_group6", "gene": "Het", "sex": "Male"},
+        {"id": "MMUT_cohort4_group6", "gene": "Mut", "sex": "Male"},
+        {"id": "082922_MMUT", "gene": "Mut", "sex": "Male"},
+        {"id": "090222_MMUT_cohort 10_group 4_files0-149", "gene": "Mut", "sex": "Male"},
+        {"id": "FWT", "gene": "WT", "sex": "Female"},
+        {"id": "FWT_cohort4_group5", "gene": "WT", "sex": "Female"},
+        {"id": "BF3", "gene": "WT", "sex": "Female"},
+        {"id": "CF2", "gene": "WT", "sex": "Female"},
+        {"id": "DF3", "gene": "WT", "sex": "Female"},
+        {"id": "CF1", "gene": "WT", "sex": "Female"},
+        {"id": "F7Het", "gene": "Het", "sex": "Female"},
+        {"id": "F5 cage 1A", "gene": "Het", "sex": "Female"},
+        {"id": "F6 cage 2A", "gene": "Het", "sex": "Female"},
+        {"id": "mouse #8 Cage 1A", "gene": "Het", "sex": "Female"},
+        {"id": "mouse F5 cage 1A", "gene": "Het", "sex": "Female"},
+        {"id": "mouse F6 cage 2A", "gene": "Het", "sex": "Female"},
+        {"id": "032221_cohort 2, Group 3, Mouse 6 Cage 2A Re-Recording", "gene": "Het", "sex": "Female"},
+        {"id": "GF4", "gene": "Het", "sex": "Female"},
+        {"id": "IF5", "gene": "Het", "sex": "Female"},
+        {"id": "FF6", "gene": "Het", "sex": "Female"},
+        {"id": "F4", "gene": "Het", "sex": "Female"},
+        {"id": "F7", "gene": "Het", "sex": "Female"},
+        {"id": "FHET(1)", "gene": "Het", "sex": "Female"},
+        {"id": "FHET(2)", "gene": "Het", "sex": "Female"},
+        {"id": "FHET_cohort4_group6", "gene": "Het", "sex": "Female"},
+        {"id": "082122_FHET_cohort10_group4_files0-89", "gene": "Het", "sex": "Female"},
+        {"id": "F9", "gene": "Mut", "sex": "Female"},
+        {"id": "FMUT_", "gene": "Mut", "sex": "Female"},
+        {"id": "FMUT(2)", "gene": "Mut", "sex": "Female"},
+        {"id": "FMUT_cohort4_group5", "gene": "Mut", "sex": "Female"},
+        {"id": "FMUT_cohort4_group6", "gene": "Mut", "sex": "Female"},
+        {"id": "082122_FMUT_cohort10_group4_files0-89", "gene": "Mut", "sex": "Female"},
+        {"id": "090122_FMUT_cohort 10_group4_files0-36", "gene": "Mut", "sex": "Female"},
+        {"id": "090322_FMUT_cohort 10_group 4_files0-86", "gene": "Mut", "sex": "Female"},
+        {"id": "F9Mut", "gene": "Mut", "sex": "Female"},
+        {"id": "mouse F10 cage 4A", "gene": "Mut", "sex": "Female"},
+        {"id": "040221_Group 1 Mouse 9 Recording", "gene": "Mut", "sex": "Female"},
+        {"id": "M10_MWT_cohort4_group2", "gene": "WT", "sex": "Male"},
+        {"id": "M10_MWT_Group 10_cage 3", "gene": "WT", "sex": "Male"},
+        {"id": "M3_group 10_cage 1", "gene": "Unknown", "sex": "Male"},
+        {"id": "F8_group 10_cage 3", "gene": "Unknown"},
+        {"id": "group9_M1_Cage1", "gene": "Unknown"},
+        {"id": "F5", "gene": "Unknown", "sex": "Female"},
+        {"id": "F6", "gene": "Unknown", "sex": "Female"},
+        {"id": "F8", "gene": "Unknown", "sex": "Female"},
+        {"id": "F10", "gene": "Unknown", "sex": "Female"},
+        {"id": "#2 Cage 2A", "gene": "Unknown", "sex": "Male"},
+        {"id": "#3 Cage 4A", "gene": "Unknown", "sex": "Male"},
+        {"id": "#8 Cage 1A", "gene": "Unknown", "sex": "Male"},
+        {"id": "#8 Cage 3A", "gene": "Unknown", "sex": "Male"}
+    ]
+}

@@ -3,6 +3,42 @@ Pipeline & Cluster Setup
 
 NeuRodent includes a Snakemake workflow for automated analysis pipelines. This page covers installation and cluster configuration.
 
+Quick Start (pip install workflow)
+----------------------------------
+
+No git clone required.  The full pipeline is bundled with the Python package and
+can be deployed with a single command:
+
+.. code-block:: bash
+
+   # 1. Install NeuRodent with pipeline support
+   pip install "neurodent[pipeline]"
+
+   # 2. Create a new analysis directory and deploy the pipeline files
+   mkdir my_analysis && cd my_analysis
+   neurodent init-pipeline
+
+   # 3. Edit the configuration for your data
+   # (see Dataset Configuration guide)
+
+   # 4. Run the pipeline
+   snakemake --cores 4
+
+The ``neurodent init-pipeline`` command copies ``Snakefile``, ``workflow/``, and
+``config/`` into the current directory (or a specified target directory).
+
+.. code-block:: bash
+
+   # Deploy to a specific directory
+   neurodent init-pipeline /path/to/my/project
+
+   # Overwrite existing files
+   neurodent init-pipeline --overwrite
+
+.. tip::
+
+   Run ``neurodent init-pipeline --help`` for a full list of options.
+
 Installing Pipeline Dependencies
 --------------------------------
 
@@ -12,7 +48,7 @@ Install the optional pipeline dependencies:
 
 .. code-block:: bash
 
-   pip install neurodent[pipeline]
+   pip install "neurodent[pipeline]"
 
 **Using uv:**
 
