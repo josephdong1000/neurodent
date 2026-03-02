@@ -162,8 +162,27 @@ def mock_mne():
 
 @pytest.fixture(autouse=True)
 def setup_test_environment():
-    """Setup test environment before each test."""
+    """Setup test environment before each test.
+
+    Saves and restores mutable module-level constants that can be overwritten
+    by ``inject_config_aliases``.  Without this guard, tests that load
+    dataset-specific configs (e.g. mini_real with numeric channel IDs) would
+    permanently mutate the defaults and break downstream tests that expect
+    the standard text-based aliases.
+    """
+    # Snapshot mutable constants before the test
+    orig_genotype_aliases = constants.GENOTYPE_ALIASES
+    orig_chname_aliases = constants.CHNAME_ALIASES
+    orig_lr_aliases = constants.LR_ALIASES
+    orig_animal_metadata = constants.ANIMAL_METADATA
+
     yield
+
+    # Restore original values so no test can leak state
+    constants.GENOTYPE_ALIASES = orig_genotype_aliases
+    constants.CHNAME_ALIASES = orig_chname_aliases
+    constants.LR_ALIASES = orig_lr_aliases
+    constants.ANIMAL_METADATA = orig_animal_metadata
 
 
 @pytest.fixture(scope="session")
