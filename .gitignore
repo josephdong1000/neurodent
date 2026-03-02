@@ -15,12 +15,6 @@ notebooks/tests/test-data/*_mne-to-rec.*
 !notebooks/tests/test-wars/A10*
 !notebooks/tests/test-wars/F22*
 
-# Example data for integration testing — track scaffolding, ignore raw data
-!tests/data/README.md
-!tests/data/__init__.py
-!tests/data/generate.py
-tests/data/raw/
-
 /build/*
 /ddfs/*
 /dist/*
@@ -53,6 +47,12 @@ notebooks/tests/test_all_functions_Yong.ipynb
 *.gz
 .DS_Store
 *.dat
+
+# Example data for integration testing (after *.bin, *.csv so negations take effect)
+!tests/data/README.md
+!tests/data/__init__.py
+!tests/data/generate.py
+!tests/data/raw/**
 .coverage
 .coverage.*
 coverage.xml

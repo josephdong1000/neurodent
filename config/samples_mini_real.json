@@ -1,0 +1,33 @@
+{
+    "data_parent_folder": "tests/data/raw",
+    "GENOTYPE_ALIASES": {
+        "WT": [
+            "WT",
+            "A10"
+        ],
+        "KO": [
+            "KO",
+            "F22"
+        ]
+    },
+    "ANIMAL_METADATA": [
+        {
+            "id": "A10",
+            "sex": "M",
+            "gene": "WT"
+        },
+        {
+            "id": "F22",
+            "sex": "F",
+            "gene": "KO"
+        }
+    ],
+    "data_folders_to_animal_ids": {
+        "A10": [
+            "A10"
+        ],
+        "F22": [
+            "F22"
+        ]
+    }
+}
