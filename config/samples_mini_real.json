@@ -1,5 +1,5 @@
 {
-    "data_parent_folder": "tests/data",
+    "data_parent_folder": "tests/data/raw",
     "GENOTYPE_ALIASES": {
         "WT": [
             "WT",
@@ -23,8 +23,10 @@
         }
     ],
     "data_folders_to_animal_ids": {
-        "raw": [
-            "A10",
+        "A10": [
+            "A10"
+        ],
+        "F22": [
             "F22"
         ]
     }
