@@ -602,6 +602,22 @@ class LongRecordingOrganizer:
         self.file_durations = [duration_s]
         self.cumulative_file_durations = [duration_s]
 
+    @property
+    def display_name(self) -> str:
+        """Short display name for logging, derived from the item."""
+        from .discovery import DiscoveredFile
+
+        if isinstance(self.item, DiscoveredFile):
+            paths = self.item.get_path_list()
+            if paths:
+                name = Path(paths[0]).name
+                return f"{name}..." if len(paths) > 1 else name
+        if isinstance(self.item, (list, tuple)) and self.item:
+            return Path(self.item[0]).name
+        if self.item is not None:
+            return str(Path(str(self.item)).name)
+        return "unknown"
+
     @staticmethod
     def _resolve_dotted_path(path_str: str) -> Callable:
         """Import and return a callable from a dotted path or file path.
@@ -2079,7 +2095,7 @@ class LongRecordingOrganizer:
                 # OR we must drop timestamps entirely to avoid mismatch (destructive).
                 # better to raise error and let user fix input data.
                 raise ValueError(
-                    f"Merge failed: 'other_lro' ({getattr(other_lro, 'base_folder_path', 'unknown')}) "
+                    f"Merge failed: 'other_lro' ({other_lro.display_name}) "
                     "has durations but missing 'file_end_datetimes'. Cannot merge safely without corrupting metadata."
                 )
 

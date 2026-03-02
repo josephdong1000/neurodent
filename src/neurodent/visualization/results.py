@@ -844,7 +844,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                     if hasattr(lro, "file_durations") and lro.file_durations
                     else 1
                 )
-                folder_path = getattr(lro, "base_folder_path", "unknown")
+                folder_path = lro.display_name
 
                 timeline_data.append(
                     {
@@ -1138,13 +1138,13 @@ class AnimalOrganizer(AnimalFeatureParser):
 
         dataframes = []
         for lrec in self.long_recordings:  # Iterate over all long recordings
-            logging.info(f"Computing windowed analysis for {lrec.base_folder_path}")
+            logging.info(f"Computing windowed analysis for {lrec.display_name}")
             lan = core.LongRecordingAnalyzer(
                 lrec, fragment_len_s=window_s, apply_notch_filter=apply_notch_filter
             )
             if lan.n_fragments == 0:
                 logging.warning(
-                    f"No fragments found for {lrec.base_folder_path}. Skipping."
+                    f"No fragments found for {lrec.display_name}. Skipping."
                 )
                 continue
 
@@ -1490,7 +1490,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                 date_str = lro.get_date_string()
             except ValueError as e:
                 raise ValueError(
-                    f"Could not determine date for LRO at index {i} (path: {getattr(lro, 'base_folder_path', 'unknown')}). "
+                    f"Could not determine date for LRO at index {i} (item: {lro.display_name}). "
                     f"Ensure LRO has valid timestamps via metadata or manual_datetimes. Error: {e}"
                 )
 
@@ -1676,28 +1676,6 @@ class AnimalOrganizer(AnimalFeatureParser):
             animal_id: The animal identifier.
             lros: The LROs to derive metadata from.
         """
-        # Derive folder metadata from LROs where available
-        ao._bin_folders = [
-            str(lro.base_folder_path)
-            for lro in lros
-            if hasattr(lro, "base_folder_path") and lro.base_folder_path
-        ]
-        ao.bin_folder_names = [
-            Path(lro.base_folder_path).name
-            for lro in lros
-            if hasattr(lro, "base_folder_path") and lro.base_folder_path
-        ]
-
-        # Set base_folder_path to common parent if all LROs share one
-        if ao._bin_folders:
-            parents = [Path(f).parent for f in ao._bin_folders]
-            if len(set(parents)) == 1:
-                ao.base_folder_path = parents[0]
-            else:
-                ao.base_folder_path = None  # No common parent
-        else:
-            ao.base_folder_path = None
-
         # Standard attributes
         ao.animal_file_match_pattern = [animal_id]
         ao.day_sep = None
@@ -1784,10 +1762,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                 # Persist if requested
                 if persist_base is not None:
                     # Determine day folder name
-                    if hasattr(lro, "base_folder_path") and lro.base_folder_path:
-                        day_name = Path(lro.base_folder_path).name
-                    else:
-                        day_name = f"day{i}"
+                    day_name = lro.display_name or f"day{i}"
 
                     output_dir = persist_base / group_name / day_name
                     child_lro.persist(output_dir, format=format)
