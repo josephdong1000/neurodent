@@ -861,7 +861,7 @@ def _get_key_from_match_values(input_string: str, alias_dict: dict, strict_match
     if not matches:
         alias_examples = {key: aliases[:2] for key, aliases in alias_dict.items()}  # Show first 2 aliases per key
         raise ValueError(
-            f"{input_string} does not have any matching values. Available aliases (examples): {alias_examples}"
+            f"{input_string} does not have any matching values. Examples of aliases: {alias_examples}"
         )
 
     if strict_matching:
