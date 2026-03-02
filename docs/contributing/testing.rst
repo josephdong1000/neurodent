@@ -26,6 +26,45 @@ Run integration tests only:
    uv run pytest tests/integration/ -v -m integration
 
 
+Pipeline Testing Strategy
+-------------------------
+
+The Snakemake pipeline is validated at three levels, all integrated into
+CI/CD via GitHub Actions:
+
+1. **Component-level integration tests (pytest)**
+   These tests exercise the core pipeline building blocks — ``FileDiscoverer``,
+   ``AnimalOrganizer``, WAR generation, plotters, and FDSAR — against a tiny
+   synthetic NWB dataset generated on the fly.  They run as part of the
+   normal ``uv run pytest`` invocation and are the fastest feedback loop.
+
+2. **Snakemake DAG dry-run (pytest + subprocess)**
+   ``TestSnakemakeDryRun`` in ``tests/integration/test_snakemake_flow.py``
+   invokes ``snakemake --dryrun`` as a subprocess for both the ``example`` and
+   ``mini_real`` datasets.  This validates the Snakefile, config files, sample
+   JSONs, wildcard resolution, and rule definitions without processing any data.
+   In the CI workflow these are also run as explicit steps on Linux runners.
+
+3. **Snakemake dry-run CI steps (GitHub Actions)**
+   The ``test-build-docs.yml`` workflow includes dedicated
+   ``Snakemake dry-run`` steps that run ``snakemake --dryrun`` for both test
+   datasets on every push/PR.  These catch configuration regressions early.
+
+Running the *actual* Snakemake pipeline (beyond ``--dryrun``) on
+test data is **not** recommended in CI because it requires Dask, writes
+large intermediate files, and can take minutes even on tiny data.  Use the
+pytest integration tests for functional validation instead.
+
+.. code-block:: bash
+
+   # Quick: validate DAG only (seconds)
+   NEURODENT_DATASET=example  uv run snakemake --dryrun --cores 1
+   NEURODENT_DATASET=mini_real uv run snakemake --dryrun --cores 1
+
+   # Full: run the component integration tests (seconds)
+   uv run pytest tests/integration/ -v -m integration
+
+
 Example Dataset for Pipeline Testing
 -------------------------------------
 
