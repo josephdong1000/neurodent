@@ -19,7 +19,7 @@ from dask.distributed import Client, LocalCluster
 
 from neurodent import constants, core, visualization
 from neurodent.workflow import setup_snakemake_logging, inject_config_aliases
-from neurodent.workflow.utils import apply_path_overrides
+from neurodent.workflow.utils import apply_path_overrides, resolve_animal_pattern
 
 
 def load_samples_and_config():
@@ -136,11 +136,11 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
                         "or '{{index}}.rhd')."
                     )
                 base_path = str(data_parent_folder / folder_path)
-                relative_pattern = session_analysis_config["pattern"]
-                if isinstance(relative_pattern, list):
-                    discovery_pattern = [f"{base_path}/{p}" for p in relative_pattern]
-                else:
-                    discovery_pattern = f"{base_path}/{relative_pattern}"
+                discovery_pattern = resolve_animal_pattern(
+                    session_analysis_config["pattern"],
+                    source_animal_id,
+                    base_path,
+                )
                 logger.info(f"  -> Discovery pattern: {discovery_pattern}")
 
                 # For joint sessions, don't filter by animal_id during discovery

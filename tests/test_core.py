@@ -1359,3 +1359,89 @@ def temp_dir():
     """Create a temporary directory for testing."""
     with tempfile.TemporaryDirectory() as tmp_dir:
         yield Path(tmp_dir)
+
+
+class TestResolveDottedPath:
+    """Test ``LongRecordingOrganizer._resolve_dotted_path``."""
+
+    def test_resolves_known_module(self):
+        """Dotted path to a stdlib function resolves correctly."""
+        func = LongRecordingOrganizer._resolve_dotted_path("os.path.join")
+        assert func is os.path.join
+
+    def test_resolves_tests_data_reader(self):
+        """Dotted path to the mini-real reader resolves correctly."""
+        func = LongRecordingOrganizer._resolve_dotted_path(
+            "tests.data.readers.read_bin_csv_pair"
+        )
+        assert callable(func)
+        assert func.__name__ == "read_bin_csv_pair"
+
+    def test_raises_on_missing_module(self):
+        """Non-existent module raises ImportError."""
+        with pytest.raises((ImportError, ModuleNotFoundError)):
+            LongRecordingOrganizer._resolve_dotted_path(
+                "nonexistent_module_xyz.some_func"
+            )
+
+    def test_raises_on_missing_attr(self):
+        """Valid module but missing attribute raises AttributeError."""
+        with pytest.raises(AttributeError):
+            LongRecordingOrganizer._resolve_dotted_path(
+                "os.path.nonexistent_function_xyz"
+            )
+
+    def test_raises_on_bare_name(self):
+        """Bare name (no dots) raises ImportError."""
+        with pytest.raises(ImportError, match="dotted import path"):
+            LongRecordingOrganizer._resolve_dotted_path("read_nwb_recording")
+
+
+class TestExtractFuncDottedFallbackWarning:
+    """Verify that dotted-import resolution works silently (no warning/info)."""
+
+    @pytest.fixture
+    def lro_mode_none(self, tmp_path):
+        """Create an LRO with mode=None so no data loading happens."""
+        return LongRecordingOrganizer(str(tmp_path), mode=None)
+
+    def test_si_dotted_resolves_silently(self, lro_mode_none):
+        """SI mode resolves dotted import path without logging warnings."""
+        func_name = "tests.data.readers.read_bin_csv_pair"
+        with (
+            patch("neurodent.core.core.logging") as mock_logging,
+            patch.object(lro_mode_none, "convert_file_with_si_to_recording"),
+        ):
+            lro_mode_none.detect_and_load_data(
+                mode="si",
+                extract_func=func_name,
+            )
+            mock_logging.warning.assert_not_called()
+            mock_logging.info.assert_not_called()
+
+    def test_mne_dotted_resolves_silently(self, lro_mode_none):
+        """MNE mode resolves dotted import path without logging warnings."""
+        func_name = "tests.data.readers.read_bin_csv_pair"
+        with (
+            patch("neurodent.core.core.logging") as mock_logging,
+            patch.object(lro_mode_none, "convert_file_with_mne_to_recording"),
+        ):
+            lro_mode_none.detect_and_load_data(
+                mode="mne",
+                extract_func=func_name,
+            )
+            mock_logging.warning.assert_not_called()
+            mock_logging.info.assert_not_called()
+
+    def test_si_builtin_extractor_no_warning(self, lro_mode_none):
+        """SI mode does NOT warn when using a built-in SI extractor name."""
+        with (
+            patch("neurodent.core.core.logging") as mock_logging,
+            patch.object(lro_mode_none, "convert_file_with_si_to_recording"),
+        ):
+            lro_mode_none.detect_and_load_data(
+                mode="si",
+                extract_func="read_nwb_recording",
+            )
+            mock_logging.warning.assert_not_called()
+            mock_logging.info.assert_not_called()
