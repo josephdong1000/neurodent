@@ -28,8 +28,20 @@ def read_bin_csv_pair(discovered_file, **kwargs):
     """
     import spikeinterface.core as si_core
 
-    bin_path = [p for p in discovered_file.paths if p.endswith(".bin")][0]
-    csv_path = [p for p in discovered_file.paths if p.endswith(".csv")][0]
+    bin_paths = [p for p in discovered_file.paths if p.endswith(".bin")]
+    csv_paths = [p for p in discovered_file.paths if p.endswith(".csv")]
+
+    if not bin_paths:
+        raise ValueError(
+            f"No .bin file found in discovered paths: {discovered_file.paths}"
+        )
+    if not csv_paths:
+        raise ValueError(
+            f"No .csv file found in discovered paths: {discovered_file.paths}"
+        )
+
+    bin_path = bin_paths[0]
+    csv_path = csv_paths[0]
 
     with open(csv_path) as f:
         reader = csv.DictReader(f)

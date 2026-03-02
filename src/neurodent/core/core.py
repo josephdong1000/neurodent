@@ -658,7 +658,7 @@ class LongRecordingOrganizer:
                     extract_func = self._resolve_dotted_path(func_name)
                 if extract_func is None:
                     raise ValueError(
-                        f"Could not resolve SpikeInterface extractor: {func_name}. "
+                        f"Could not resolve extractor function: {func_name}. "
                         "Provide a SpikeInterface extractor name or a dotted import path."
                     )
             elif extract_func is None:
@@ -679,7 +679,7 @@ class LongRecordingOrganizer:
                     extract_func = self._resolve_dotted_path(func_name)
                 if extract_func is None:
                     raise ValueError(
-                        f"Could not resolve MNE extractor: {func_name}. "
+                        f"Could not resolve extractor function: {func_name}. "
                         "Provide an MNE extractor name or a dotted import path."
                     )
 
