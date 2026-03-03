@@ -211,6 +211,7 @@ class TestApplyPathOverrides:
 from neurodent.workflow.utils import inject_config_aliases
 
 
+@pytest.mark.mutates_constants
 class TestInjectConfigAliases:
     """Tests for inject_config_aliases covering alias injection."""
 

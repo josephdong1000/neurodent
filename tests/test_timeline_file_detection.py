@@ -203,6 +203,7 @@ class TestComputeGlobalTimelineIntegration:
             duration = lro.LongRecording.get_duration()
             assert duration > 0, f"File {nwb_file.name} should have positive duration"
 
+    @pytest.mark.mutates_constants
     def test_animal_organizer_with_manual_datetimes_and_file_pattern(
         self, synthetic_nwb_dataset
     ):

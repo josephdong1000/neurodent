@@ -8,7 +8,9 @@ import matplotlib
 
 matplotlib.use("Agg")
 
+import copy
 import tempfile
+import warnings
 from pathlib import Path
 from typing import Generator
 
@@ -18,6 +20,10 @@ import pytest
 from unittest.mock import Mock
 
 from neurodent import constants
+
+
+class ConstantsMutatedWarning(UserWarning):
+    """Emitted when a test mutates global constants without the ``mutates_constants`` marker."""
 
 
 @pytest.fixture(scope="session")
@@ -161,28 +167,44 @@ def mock_mne():
 
 
 @pytest.fixture(autouse=True)
-def setup_test_environment():
-    """Setup test environment before each test.
+def setup_test_environment(request):
+    """Save and restore mutable module-level constants around each test.
 
-    Saves and restores mutable module-level constants that can be overwritten
-    by ``inject_config_aliases``.  Without this guard, tests that load
-    dataset-specific configs (e.g. mini_real with numeric channel IDs) would
-    permanently mutate the defaults and break downstream tests that expect
-    the standard text-based aliases.
+    Uses :func:`copy.deepcopy` so that *in-place* mutations of nested
+    containers (e.g. ``constants.CHNAME_ALIASES["Aud"].append(...)``) are
+    also properly restored, not just full reassignments.
+
+    If constants are mutated during a test that is **not** decorated with
+    ``@pytest.mark.mutates_constants``, a :class:`ConstantsMutatedWarning`
+    is emitted.  This makes accidental side-effects from production code
+    visible in the test output instead of being silently masked.  Tests
+    that intentionally call :func:`~neurodent.workflow.utils.inject_config_aliases`
+    should carry the marker so the warning is suppressed.
     """
-    # Snapshot mutable constants before the test
-    orig_genotype_aliases = constants.GENOTYPE_ALIASES
-    orig_chname_aliases = constants.CHNAME_ALIASES
-    orig_lr_aliases = constants.LR_ALIASES
-    orig_animal_metadata = constants.ANIMAL_METADATA
+    orig = {
+        "GENOTYPE_ALIASES": copy.deepcopy(constants.GENOTYPE_ALIASES),
+        "CHNAME_ALIASES": copy.deepcopy(constants.CHNAME_ALIASES),
+        "LR_ALIASES": copy.deepcopy(constants.LR_ALIASES),
+        "ANIMAL_METADATA": copy.deepcopy(constants.ANIMAL_METADATA),
+    }
 
     yield
 
+    changed = [k for k, v in orig.items() if getattr(constants, k) != v]
+
     # Restore original values so no test can leak state
-    constants.GENOTYPE_ALIASES = orig_genotype_aliases
-    constants.CHNAME_ALIASES = orig_chname_aliases
-    constants.LR_ALIASES = orig_lr_aliases
-    constants.ANIMAL_METADATA = orig_animal_metadata
+    for k, v in orig.items():
+        setattr(constants, k, v)
+
+    if changed and not request.node.get_closest_marker("mutates_constants"):
+        warnings.warn(
+            f"Test mutated global constants {changed} without "
+            "@pytest.mark.mutates_constants marker. If intentional, "
+            "add the marker; otherwise check for side-effects in the "
+            "code under test.",
+            ConstantsMutatedWarning,
+            stacklevel=1,
+        )
 
 
 @pytest.fixture(scope="session")

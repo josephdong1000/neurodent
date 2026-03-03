@@ -220,6 +220,7 @@ class TestFileDiscoveryWithExampleData:
 class TestSamplesConfigIntegration:
     """Test that the generated samples_config works with neurodent utilities."""
 
+    @pytest.mark.mutates_constants
     def test_inject_config_aliases(self, example_dataset):
         """inject_config_aliases succeeds with the synthetic config."""
         from neurodent.workflow import inject_config_aliases
@@ -257,6 +258,7 @@ class TestSamplesConfigIntegration:
 
 
 @pytest.mark.integration
+@pytest.mark.mutates_constants
 class TestPipelineSteps:
     """Test actual pipeline stages end-to-end with synthetic NWB data.
 
@@ -407,6 +409,7 @@ def _build_war(ds):
 
 
 @pytest.mark.integration
+@pytest.mark.mutates_constants
 class TestPipelineContinuation:
     """Test downstream pipeline stages that consume a WAR.
 
@@ -576,6 +579,7 @@ class TestBinCsvMultiPatternDiscovery:
         for g in filtered:
             assert g.metadata["animal"] == "ExWT"
 
+    @pytest.mark.mutates_constants
     def test_custom_extractor_via_animal_organizer(self, bin_csv_env):
         """AnimalOrganizer loads paired .bin/.csv files via a custom extract_func.
 
@@ -839,6 +843,7 @@ class TestMiniRealDataset:
             assert len(filtered) == 1, f"Expected 1 group for {animal_id}, got {len(filtered)}"
             assert filtered[0].metadata["animal"] == animal_id
 
+    @pytest.mark.mutates_constants
     def test_mini_real_animal_organizer_loads_data(self, mini_real_config):
         """AnimalOrganizer loads mini real bin/csv data via custom extractor."""
         from neurodent import constants
@@ -879,6 +884,7 @@ class TestMiniRealDataset:
             constants.ANIMAL_METADATA = orig_metadata
             constants.GENOTYPE_ALIASES = orig_aliases
 
+    @pytest.mark.mutates_constants
     def test_mini_real_both_animals_loadable(self, mini_real_config):
         """Both animals (A10, F22) can be loaded from mini real data."""
         from neurodent import constants
@@ -914,6 +920,7 @@ class TestMiniRealDataset:
             constants.ANIMAL_METADATA = orig_metadata
             constants.GENOTYPE_ALIASES = orig_aliases
 
+    @pytest.mark.mutates_constants
     def test_mini_real_loads_via_dotted_extract_func(self, mini_real_config):
         """AnimalOrganizer resolves a dotted extract_func string from config."""
         from neurodent import constants
