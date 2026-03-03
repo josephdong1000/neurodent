@@ -802,12 +802,12 @@ class TestMiniRealDataset:
         data_dir = mini_real_config["data_root"]
 
         for animal_dir in ["A10", "F22"]:
-            raw_dir = data_dir / animal_dir
-            assert raw_dir.is_dir(), f"Missing animal directory: {raw_dir}"
-            bin_files = list(raw_dir.glob("*_ColMajor.bin"))
-            csv_files = list(raw_dir.glob("*_Meta.csv"))
-            assert len(bin_files) >= 1, f"No .bin files in {raw_dir}"
-            assert len(csv_files) >= 1, f"No .csv files in {raw_dir}"
+            animal_data_dir = data_dir / animal_dir
+            assert animal_data_dir.is_dir(), f"Missing animal directory: {animal_data_dir}"
+            bin_files = list(animal_data_dir.glob("*_ColMajor.bin"))
+            csv_files = list(animal_data_dir.glob("*_Meta.csv"))
+            assert len(bin_files) >= 1, f"No .bin files in {animal_data_dir}"
+            assert len(csv_files) >= 1, f"No .csv files in {animal_data_dir}"
 
     def test_mini_real_discovery_with_animal_placeholder(self, mini_real_config):
         """FileDiscoverer finds mini real files using {animal}/{index} pattern."""
