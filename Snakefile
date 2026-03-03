@@ -74,7 +74,7 @@ if os.path.exists(dataset_config_file):
         else:
             return str(value)
 
-    print(f"✓ Using dataset: {active_dataset}")
+    print(f"[ok] Using dataset: {active_dataset}")
     print(f"  Config file: {dataset_config_file}")
     print(f"\n  Dataset configuration overrides:")
     print(format_config_value(dataset_config, indent=4))
