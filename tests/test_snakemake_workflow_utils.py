@@ -130,11 +130,9 @@ class TestDeepMergeDict:
             "samples": {"samples_file": "config/samples_jess_rhd.json"},
             "analysis": {
                 "war_generation": {
-                    "mode": "base",
-                    "file_pattern": "*.rhd",
+                    "pattern": "{index}.rhd",
                     "lro_kwargs": {
                         "extract_func": "read_intan",
-                        "input_type": "files",
                         "mode": "si",
                         "stream_id": "0",
                     },
@@ -152,7 +150,7 @@ class TestDeepMergeDict:
         assert (
             result["samples"]["quality_filter"]["exclude_unknown_genotypes"] is True
         )  # preserved
-        assert result["analysis"]["war_generation"]["mode"] == "base"  # from override
+        assert result["analysis"]["war_generation"]["pattern"] == "{index}.rhd"  # from override
         assert result["analysis"]["war_generation"]["day_sep"] is None  # preserved
         assert result["analysis"]["war_generation"]["skip_days"] == ["bad"]  # preserved
         assert (

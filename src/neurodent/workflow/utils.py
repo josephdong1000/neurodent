@@ -201,7 +201,7 @@ def deep_merge_dict(base: dict, override: dict) -> dict:
                 "samples": {"samples_file": "config/custom.json"},
                 "analysis": {
                     "war_generation": {
-                        "mode": "base",
+                        "pattern": "{index}.rhd",
                         "lro_kwargs": {"extract_func": "read_intan"}
                     }
                 }
@@ -212,7 +212,7 @@ def deep_merge_dict(base: dict, override: dict) -> dict:
             # merged["samples"]["quality_filter"]["exclude_unknown"] == True (preserved)
             # merged["samples"]["samples_file"] == "config/custom.json" (added)
             # merged["analysis"]["war_generation"]["day_sep"] == None (preserved)
-            # merged["analysis"]["war_generation"]["mode"] == "base" (added)
+            # merged["analysis"]["war_generation"]["pattern"] == "{index}.rhd" (added)
             # merged["analysis"]["war_generation"]["lro_kwargs"]["multiprocess_mode"] == "dask" (preserved)
             # merged["analysis"]["war_generation"]["lro_kwargs"]["extract_func"] == "read_intan" (added)
 
@@ -483,7 +483,7 @@ def apply_path_overrides(base_config: dict, overrides: dict) -> dict:
     Args:
         base_config: Base configuration dictionary
         overrides: Dict mapping dotted paths to values
-                  e.g., {"analysis.war_generation.file_pattern": "*.EDF"}
+                  e.g., {"analysis.war_generation.pattern": "{index}.EDF"}
 
     Returns:
         Merged configuration with overrides applied
@@ -495,11 +495,11 @@ def apply_path_overrides(base_config: dict, overrides: dict) -> dict:
     Examples:
         Basic usage with nested paths::
 
-            >>> config = {"analysis": {"war_generation": {"mode": "base"}}}
-            >>> overrides = {"analysis.war_generation.file_pattern": "*.EDF"}
+            >>> config = {"analysis": {"war_generation": {"pattern": "{index}"}}}
+            >>> overrides = {"analysis.war_generation.pattern": "{index}.EDF"}
             >>> result = apply_path_overrides(config, overrides)
-            >>> result["analysis"]["war_generation"]["file_pattern"]
-            '*.EDF'
+            >>> result["analysis"]["war_generation"]["pattern"]
+            '{index}.EDF'
 
         Creating new nested keys::
 
@@ -515,22 +515,23 @@ def apply_path_overrides(base_config: dict, overrides: dict) -> dict:
             config = {
                 "analysis": {
                     "war_generation": {
-                        "mode": "base",
-                        "lro_kwargs": {"mode": "si", "input_type": "files"}
+                        "pattern": "{index}",
+                        "lro_kwargs": {"mode": "si"}
                     }
                 }
             }
 
             # Session-specific overrides for EDF format
             overrides = {
-                "analysis.war_generation.file_pattern": "*.EDF",
-                "analysis.war_generation.lro_kwargs.extract_func": "read_edf"
+                "analysis.war_generation.pattern": "{index}.EDF",
+                "analysis.war_generation.lro_kwargs.mode": "mne",
+                "analysis.war_generation.lro_kwargs.extract_func": "read_raw_edf"
             }
 
             result = apply_path_overrides(config, overrides)
-            # result["analysis"]["war_generation"]["file_pattern"] == "*.EDF"
-            # result["analysis"]["war_generation"]["lro_kwargs"]["extract_func"] == "read_edf"
-            # result["analysis"]["war_generation"]["lro_kwargs"]["mode"] == "si" (preserved)
+            # result["analysis"]["war_generation"]["pattern"] == "{index}.EDF"
+            # result["analysis"]["war_generation"]["lro_kwargs"]["extract_func"] == "read_raw_edf"
+            # result["analysis"]["war_generation"]["lro_kwargs"]["mode"] == "mne" (overridden)
 
     Note:
         This function does NOT mutate the input config - it returns a new deep copy.

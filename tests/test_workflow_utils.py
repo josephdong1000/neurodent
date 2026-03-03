@@ -185,24 +185,23 @@ class TestApplyPathOverrides:
         config = {
             "analysis": {
                 "war_generation": {
-                    "mode": "base",
+                    "pattern": "{index}",
                     "lro_kwargs": {
                         "mode": "si",
-                        "input_type": "files"
                     }
                 }
             }
         }
         overrides = {
-            "analysis.war_generation.file_pattern": "*.EDF",
-            "analysis.war_generation.lro_kwargs.extract_func": "read_edf"
+            "analysis.war_generation.pattern": "{index}.EDF",
+            "analysis.war_generation.lro_kwargs.mode": "mne",
+            "analysis.war_generation.lro_kwargs.extract_func": "read_raw_edf"
         }
         result = apply_path_overrides(config, overrides)
 
-        assert result["analysis"]["war_generation"]["mode"] == "base"
-        assert result["analysis"]["war_generation"]["file_pattern"] == "*.EDF"
-        assert result["analysis"]["war_generation"]["lro_kwargs"]["mode"] == "si"
-        assert result["analysis"]["war_generation"]["lro_kwargs"]["extract_func"] == "read_edf"
+        assert result["analysis"]["war_generation"]["pattern"] == "{index}.EDF"
+        assert result["analysis"]["war_generation"]["lro_kwargs"]["mode"] == "mne"
+        assert result["analysis"]["war_generation"]["lro_kwargs"]["extract_func"] == "read_raw_edf"
 
 
 # ---------------------------------------------------------------------------
