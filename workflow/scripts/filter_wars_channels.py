@@ -77,10 +77,7 @@ def main():
 
             if reject_channels_by_session:
                 samples_bad_channels = samples_config.get("bad_channels", {})
-                # Try composite key first (legacy), then animal_id alone (unified)
-                bad_channels_dict_manual = samples_bad_channels.get(
-                    animal_key, samples_bad_channels.get(animal_id, {})
-                )
+                bad_channels_dict_manual = samples_bad_channels.get(animal_id, {})
                 # Expand "_all" key: merge into every other session entry
                 if "_all" in bad_channels_dict_manual:
                     all_bad = bad_channels_dict_manual.pop("_all")

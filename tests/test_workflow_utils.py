@@ -531,16 +531,16 @@ class TestExpandAnimalsConfig:
                 {
                     "id": "A10", "gene": "WT", "sex": "M",
                     "bad_channels": {
-                        "A10 WT Jan-08-2022": ["LHip"],
-                        "A10 WT Jan-09-2022": ["RMot"],
+                        "Session1": ["LHip"],
+                        "Session2": ["RMot"],
                     },
                 },
             ],
         }
         result = expand_animals_config(cfg)
         assert result["bad_channels"]["A10"] == {
-            "A10 WT Jan-08-2022": ["LHip"],
-            "A10 WT Jan-09-2022": ["RMot"],
+            "Session1": ["LHip"],
+            "Session2": ["RMot"],
         }
 
     def test_bad_channels_not_in_metadata(self):

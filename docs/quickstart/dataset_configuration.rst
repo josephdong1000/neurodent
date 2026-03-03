@@ -266,7 +266,7 @@ Bad channels can be specified per animal in two ways.
 This is the simplest approach when the same channels are consistently
 noisy for a given animal.
 
-**Per-session bad channels** — use a dict mapping session labels to
+**Per-session bad channels** — use a dict mapping session identifiers to
 channel lists:
 
 .. code-block:: json
@@ -276,8 +276,8 @@ channel lists:
            {
                "id": "M1", "gene": "WT", "sex": "M",
                "bad_channels": {
-                   "M1 WT Jan-08-2022": ["LHip", "RHip"],
-                   "M1 WT Jan-09-2022": ["LHip", "RHip", "LMot"]
+                   "Session1": ["LHip", "RHip"],
+                   "Session2": ["LHip", "RHip", "LMot"]
                }
            }
        ]
@@ -329,8 +329,8 @@ A complete samples JSON file with all available parameters:
             "manual_datetime": "2025-11-27 15:39:05",
             "lro_kwargs": {"mode": "si"},
             "bad_channels": {
-                "AP3B2homo-240-M HOMO Nov-27-2025": ["LMot"],
-                "AP3B2homo-240-M HOMO Nov-28-2025": ["LMot", "RAud"]
+                "Session_Nov27": ["LMot"],
+                "Session_Nov28": ["LMot", "RAud"]
             }}
        ],
        "LR_ALIASES": {"L": ["0", "1", "2", "3", "4"],
