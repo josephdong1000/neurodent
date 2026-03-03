@@ -619,18 +619,13 @@ class LongRecordingOrganizer:
         return "unknown"
 
     @staticmethod
-    def _resolve_dotted_path(path_str: str) -> Callable:
-        """Import and return a callable from a dotted path or file path.
-
-        Supports two formats:
-
-        - Dotted path: ``"mypackage.readers.read_bin_csv"``
-        - File path:   ``"path/to/readers.py:read_bin_csv"``
+    def _resolve_func_path(path_str: str) -> Callable:
+        """Import and return a callable from a ``"file.py:function"`` path.
 
         Parameters
         ----------
         path_str : str
-            Dotted import path or ``"filepath:attribute"`` string.
+            ``"path/to/readers.py:read_bin_csv"`` format string.
 
         Returns
         -------
@@ -640,32 +635,24 @@ class LongRecordingOrganizer:
         Raises
         ------
         ImportError
-            If the module cannot be imported.
+            If the file cannot be loaded or no ``:`` separator is found.
         AttributeError
             If the attribute does not exist in the module.
         """
-        import importlib
-
-        # File-path syntax: "path/to/file.py:function_name"
-        if ":" in path_str:
-            import importlib.util
-
-            file_path, _, attr_name = path_str.rpartition(":")
-            spec = importlib.util.spec_from_file_location("_user_module", file_path)
-            if spec is None or spec.loader is None:
-                raise ImportError(f"Cannot load module from file: {file_path}")
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
-            return getattr(module, attr_name)
-
-        # Dotted path: "mypackage.readers.read_func"
-        module_path, _, attr_name = path_str.rpartition(".")
-        if not module_path:
+        if ":" not in path_str:
             raise ImportError(
-                f"Cannot resolve '{path_str}' as a dotted import path "
-                "(expected 'module.attr' or 'path/to/file.py:attr' format)"
+                f"Cannot resolve '{path_str}': expected "
+                "'path/to/file.py:func_name' format"
             )
-        module = importlib.import_module(module_path)
+
+        import importlib.util
+
+        file_path, _, attr_name = path_str.rpartition(":")
+        spec = importlib.util.spec_from_file_location("_user_module", file_path)
+        if spec is None or spec.loader is None:
+            raise ImportError(f"Cannot load module from file: {file_path}")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
         return getattr(module, attr_name)
 
     def detect_and_load_data(
@@ -699,10 +686,6 @@ class LongRecordingOrganizer:
                a Python file.  The ``.py`` extension is required.
                Example: ``"tests/data/readers.py:read_bin_csv_pair"`` or
                ``"/absolute/path/to/readers.py:my_func"``.
-            3. **Dotted import path** (contains ``.``) — resolved via
-               ``importlib.import_module``.  The module's package must be on
-               ``sys.path`` (e.g. set ``PYTHONPATH``).
-               Example: ``"mypackage.readers.read_custom"``.
         **kwargs
             Forwarded to the backend loading method.
         """
@@ -714,14 +697,13 @@ class LongRecordingOrganizer:
                 func_name = extract_func
                 # Try SpikeInterface namespaces first
                 extract_func = getattr(se, func_name, getattr(si, func_name, None))
-                # Resolve dotted import path or file path
-                # e.g. "mypackage.readers.read_custom" or "path/to/readers.py:read_custom"
-                if extract_func is None and ("." in func_name or ":" in func_name):
-                    extract_func = self._resolve_dotted_path(func_name)
+                # Resolve file path: "path/to/readers.py:read_custom"
+                if extract_func is None and ":" in func_name:
+                    extract_func = self._resolve_func_path(func_name)
                 if extract_func is None:
                     raise ValueError(
                         f"Could not resolve extractor function: {func_name}. "
-                        "Provide a SpikeInterface extractor name, a dotted import path, "
+                        "Provide a SpikeInterface extractor name "
                         "or a file path (e.g. 'path/to/readers.py:func_name')."
                     )
             elif extract_func is None:
@@ -737,13 +719,13 @@ class LongRecordingOrganizer:
             if isinstance(extract_func, str):
                 func_name = extract_func
                 extract_func = getattr(mne.io, func_name, None)
-                # Resolve dotted import path or file path
-                if extract_func is None and ("." in func_name or ":" in func_name):
-                    extract_func = self._resolve_dotted_path(func_name)
+                # Resolve file path: "path/to/readers.py:read_custom"
+                if extract_func is None and ":" in func_name:
+                    extract_func = self._resolve_func_path(func_name)
                 if extract_func is None:
                     raise ValueError(
                         f"Could not resolve extractor function: {func_name}. "
-                        "Provide an MNE extractor name, a dotted import path, "
+                        "Provide an MNE extractor name "
                         "or a file path (e.g. 'path/to/readers.py:func_name')."
                     )
 

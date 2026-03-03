@@ -1361,53 +1361,48 @@ def temp_dir():
         yield Path(tmp_dir)
 
 
-class TestResolveDottedPath:
-    """Test ``LongRecordingOrganizer._resolve_dotted_path``."""
+class TestResolveFuncPath:
+    """Test ``LongRecordingOrganizer._resolve_func_path``."""
 
-    def test_resolves_known_module(self):
-        """Dotted path to a stdlib function resolves correctly."""
-        func = LongRecordingOrganizer._resolve_dotted_path("os.path.join")
-        assert func is os.path.join
-
-    def test_resolves_tests_data_reader(self):
-        """Dotted path to the mini-real reader resolves correctly."""
-        func = LongRecordingOrganizer._resolve_dotted_path(
-            "tests.data.readers.read_bin_csv_pair"
+    def test_resolves_file_path(self):
+        """File path to the mini-real reader resolves correctly."""
+        func = LongRecordingOrganizer._resolve_func_path(
+            "tests/data/readers.py:read_bin_csv_pair"
         )
         assert callable(func)
         assert func.__name__ == "read_bin_csv_pair"
 
-    def test_raises_on_missing_module(self):
-        """Non-existent module raises ImportError."""
-        with pytest.raises((ImportError, ModuleNotFoundError)):
-            LongRecordingOrganizer._resolve_dotted_path(
-                "nonexistent_module_xyz.some_func"
+    def test_raises_on_missing_file(self):
+        """Non-existent file raises an error."""
+        with pytest.raises((ImportError, FileNotFoundError)):
+            LongRecordingOrganizer._resolve_func_path(
+                "nonexistent/path.py:some_func"
             )
 
     def test_raises_on_missing_attr(self):
-        """Valid module but missing attribute raises AttributeError."""
+        """Valid file but missing attribute raises AttributeError."""
         with pytest.raises(AttributeError):
-            LongRecordingOrganizer._resolve_dotted_path(
-                "os.path.nonexistent_function_xyz"
+            LongRecordingOrganizer._resolve_func_path(
+                "tests/data/readers.py:nonexistent_function_xyz"
             )
 
     def test_raises_on_bare_name(self):
-        """Bare name (no dots) raises ImportError."""
-        with pytest.raises(ImportError, match="dotted import path"):
-            LongRecordingOrganizer._resolve_dotted_path("read_nwb_recording")
+        """Bare name (no colon) raises ImportError."""
+        with pytest.raises(ImportError, match="file.py:func_name"):
+            LongRecordingOrganizer._resolve_func_path("read_nwb_recording")
 
 
-class TestExtractFuncDottedFallbackWarning:
-    """Verify that dotted-import resolution works silently (no warning/info)."""
+class TestExtractFuncFilePathResolution:
+    """Verify that file-path resolution works silently (no warning/info)."""
 
     @pytest.fixture
     def lro_mode_none(self, tmp_path):
         """Create an LRO with mode=None so no data loading happens."""
         return LongRecordingOrganizer(str(tmp_path), mode=None)
 
-    def test_si_dotted_resolves_silently(self, lro_mode_none):
-        """SI mode resolves dotted import path without logging warnings."""
-        func_name = "tests.data.readers.read_bin_csv_pair"
+    def test_si_file_path_resolves_silently(self, lro_mode_none):
+        """SI mode resolves file path without logging warnings."""
+        func_name = "tests/data/readers.py:read_bin_csv_pair"
         with (
             patch("neurodent.core.core.logging") as mock_logging,
             patch.object(lro_mode_none, "convert_file_with_si_to_recording"),
@@ -1419,9 +1414,9 @@ class TestExtractFuncDottedFallbackWarning:
             mock_logging.warning.assert_not_called()
             mock_logging.info.assert_not_called()
 
-    def test_mne_dotted_resolves_silently(self, lro_mode_none):
-        """MNE mode resolves dotted import path without logging warnings."""
-        func_name = "tests.data.readers.read_bin_csv_pair"
+    def test_mne_file_path_resolves_silently(self, lro_mode_none):
+        """MNE mode resolves file path without logging warnings."""
+        func_name = "tests/data/readers.py:read_bin_csv_pair"
         with (
             patch("neurodent.core.core.logging") as mock_logging,
             patch.object(lro_mode_none, "convert_file_with_mne_to_recording"),
