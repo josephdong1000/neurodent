@@ -508,7 +508,7 @@ def parse_str_to_genotype(string: str, strict_matching: bool = False) -> str:
         >>> parse_str_to_genotype("WT_KO_comparison", strict_matching=False)  # Uses longest match
         'WT'  # or 'KO' depending on which alias is longer
     """
-    return _get_key_from_match_values(string, constants.GENOTYPE_ALIASES, strict_matching)
+    return _get_key_from_match_values(string, constants.GENOTYPE_ALIASES, strict_matching, alias_name="GENOTYPE_ALIASES")
 
 
 def parse_str_to_animal(string: str, animal_param: tuple[int, str] | str | list[str] = (0, None)) -> str:
@@ -805,8 +805,8 @@ def parse_chname_to_abbrev(channel_name: str, assume_from_number=False, strict_m
         return channel_name
 
     try:
-        lr = _get_key_from_match_values(channel_name, constants.LR_ALIASES, strict_matching)
-        chname = _get_key_from_match_values(channel_name, constants.CHNAME_ALIASES, strict_matching)
+        lr = _get_key_from_match_values(channel_name, constants.LR_ALIASES, strict_matching, alias_name="LR_ALIASES")
+        chname = _get_key_from_match_values(channel_name, constants.CHNAME_ALIASES, strict_matching, alias_name="CHNAME_ALIASES")
     except ValueError as e:
         if assume_from_number:
             logging.debug(f"Channel '{channel_name}' does not match name aliases. Attempting to assume from number.")
@@ -836,7 +836,7 @@ def parse_chname_to_abbrev(channel_name: str, assume_from_number=False, strict_m
     return lr + chname
 
 
-def _get_key_from_match_values(input_string: str, alias_dict: dict, strict_matching: bool = True):
+def _get_key_from_match_values(input_string: str, alias_dict: dict, strict_matching: bool = True, alias_name: str = "alias"):
     """
     Find the best matching key from alias dictionary.
 
@@ -844,6 +844,7 @@ def _get_key_from_match_values(input_string: str, alias_dict: dict, strict_match
         input_string (str): String to search in
         alias_dict (dict): Dictionary of {key: [aliases]} to match against
         strict_matching (bool): If True, ensures only one alias matches across all keys
+        alias_name (str): Name of the alias dictionary for error messages (e.g., "CHNAME_ALIASES")
 
     Returns:
         str: The key with the best matching alias
@@ -859,12 +860,12 @@ def _get_key_from_match_values(input_string: str, alias_dict: dict, strict_match
     ]
 
     if not matches:
-        alias_examples = {key: aliases[:2] for key, aliases in alias_dict.items()}  # Show first 2 aliases per key
+        alias_examples = {key: aliases[:2] for key, aliases in alias_dict.items()}
         raise ValueError(
-            f"'{input_string}' does not match any alias. "
-            f"Available aliases: {alias_examples}. "
-            f"If your data uses non-standard channel names, set CHNAME_ALIASES "
-            f"and/or LR_ALIASES in your samples config file."
+            f"'{input_string}' does not match any {alias_name}. "
+            f"Available {alias_name} entries: {alias_examples}. "
+            f"If your data uses non-standard channel names, "
+            f"configure the appropriate aliases in your samples config file."
         )
 
     if strict_matching:
@@ -873,7 +874,9 @@ def _get_key_from_match_values(input_string: str, alias_dict: dict, strict_match
         if len(matching_keys) > 1:
             matched_aliases = {key: [alias for k, alias, _ in matches if k == key] for key in matching_keys}
             raise ValueError(
-                f"Ambiguous match in '{input_string}'. Multiple alias types matched: {matched_aliases}. Use strict_matching=False to allow ambiguous matches."
+                f"Ambiguous match in '{input_string}' for {alias_name}. "
+                f"Multiple keys matched: {matched_aliases}. "
+                f"Use strict_matching=False to allow ambiguous matches."
             )
 
     # Return the key with the longest matching alias
