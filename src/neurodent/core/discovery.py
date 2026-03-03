@@ -6,6 +6,15 @@ from typing import Union, Dict, List, Tuple, Optional
 import warnings
 
 
+def _natural_sort_key(s: str):
+    """Split *s* into text and numeric chunks for natural ordering.
+
+    ``"trace_2"`` → ``["trace_", 2, ""]`` so that numeric parts compare
+    as integers rather than lexicographically (``2 < 10``, not ``"2" > "10"``).
+    """
+    return [int(c) if c.isdigit() else c for c in re.split(r"(\d+)", s)]
+
+
 class DiscoveredFile(os.PathLike):
     """Represents discovered file(s) with associated metadata.
 
@@ -278,6 +287,11 @@ class FileDiscoverer:
                 # No placeholders - just return paths with no metadata
                 results.append({"path": path})
 
-        # Sort results by path for deterministic ordering (like old filepath_to_index)
-        results.sort(key=lambda x: x["path"])
+        # Natural-sort by index when available, otherwise by path.
+        # Natural sort splits strings into text/numeric chunks and compares
+        # numeric chunks as ints, so "2" < "10" and "trace_2" < "trace_10".
+        if results and "index" in results[0]:
+            results.sort(key=lambda x: _natural_sort_key(x["index"]))
+        else:
+            results.sort(key=lambda x: _natural_sort_key(x["path"]))
         return results
