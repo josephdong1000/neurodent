@@ -1,14 +1,7 @@
 {
-    "data_parent_folder": "tests/data/raw",
-    "GENOTYPE_ALIASES": {
-        "WT": ["WT", "ExWT"],
-        "KO": ["KO", "ExKO"]
-    },
-    "ANIMAL_METADATA": [
+    "data_root": "tests/data/raw",
+    "animals": [
         {"id": "ExWT", "sex": "M", "gene": "WT"},
         {"id": "ExKO", "sex": "F", "gene": "KO"}
-    ],
-    "data_folders_to_animal_ids": {
-        "example_session": ["ExWT", "ExKO"]
-    }
+    ]
 }

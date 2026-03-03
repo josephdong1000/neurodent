@@ -198,7 +198,7 @@ def create_synthetic_dataset(
             )
 
     samples_config = {
-        "data_parent_folder": str(data_root),
+        "data_root": str(data_root),
         "GENOTYPE_ALIASES": {
             "WT": ["WT", "ExWT"],
             "KO": ["KO", "ExKO"],
@@ -339,7 +339,7 @@ def create_synthetic_bin_csv_dataset(
     ]
 
     samples_config = {
-        "data_parent_folder": str(data_root),
+        "data_root": str(data_root),
         "GENOTYPE_ALIASES": {
             "WT": ["WT", "ExWT"],
             "KO": ["KO", "ExKO"],

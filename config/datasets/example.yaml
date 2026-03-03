@@ -3,7 +3,7 @@
 # A minimal dataset configuration for integration-testing the Snakemake pipeline.
 # Activate with:  NEURODENT_DATASET=example snakemake ...
 #
-# For programmatic synthetic data the test fixtures override data_parent_folder
+# For programmatic synthetic data the test fixtures override data_root
 # at runtime, so the path below is only used for manual / local testing.
 
 samples:
