@@ -283,7 +283,7 @@ class TestParsePathToAnimalday:
         """Test filepath that doesn't contain valid genotype."""
         filepath = Path("/path/INVALID_A10_2023-01-1")
 
-        with pytest.raises(ValueError, match="does not match any alias"):
+        with pytest.raises(ValueError, match="does not match any"):
             utils.parse_path_to_animalday(filepath, animal_param=(1, "_"), )
 
     def test_filepath_without_valid_animal_id(self):
@@ -410,7 +410,7 @@ class TestParseStrToGenotype:
     @patch("neurodent.constants.GENOTYPE_ALIASES", {})
     def test_empty_aliases(self):
         """Test parsing with empty genotype aliases."""
-        with pytest.raises(ValueError, match="does not match any alias"):
+        with pytest.raises(ValueError, match="does not match any GENOTYPE_ALIASES"):
             utils.parse_str_to_genotype("WT_A10_data")
 
     def test_genotype_backward_compatibility(self):
@@ -1571,28 +1571,28 @@ class TestParseChnameToAbbrev:
     def test_strict_matching_mode(self):
         """Test strict_matching parameter functionality."""
         # Test strict mode (default) - should reject ambiguous L/R matches
-        with pytest.raises(ValueError, match="Ambiguous match in 'left right Aud'. Multiple alias types matched"):
+        with pytest.raises(ValueError, match="Ambiguous match in 'left right Aud' for LR_ALIASES"):
             utils.parse_chname_to_abbrev("left right Aud", strict_matching=True)
 
-        with pytest.raises(ValueError, match="Ambiguous match in 'Left Right VIS'. Multiple alias types matched"):
+        with pytest.raises(ValueError, match="Ambiguous match in 'Left Right VIS' for LR_ALIASES"):
             utils.parse_chname_to_abbrev("Left Right VIS", strict_matching=True)
 
         # Test strict mode rejects ambiguous channel type matches
         with pytest.raises(
-            ValueError, match="Ambiguous match in 'right auditory hippocampus'. Multiple alias types matched"
+            ValueError, match="Ambiguous match in 'right auditory hippocampus' for CHNAME_ALIASES"
         ):
             utils.parse_chname_to_abbrev("right auditory hippocampus", strict_matching=True)
 
-        with pytest.raises(ValueError, match="Ambiguous match in 'left auditory visual'. Multiple alias types matched"):
+        with pytest.raises(ValueError, match="Ambiguous match in 'left auditory visual'"):
             utils.parse_chname_to_abbrev("left auditory visual", strict_matching=True)
 
-        with pytest.raises(ValueError, match="'Aud Vis' does not match any alias"):
+        with pytest.raises(ValueError, match="'Aud Vis' does not match any LR_ALIASES"):
             utils.parse_chname_to_abbrev("Aud Vis", strict_matching=True)  # Fails because no L/R prefix
 
-        with pytest.raises(ValueError, match="Ambiguous match in 'left Aud Vis'. Multiple alias types matched"):
+        with pytest.raises(ValueError, match="Ambiguous match in 'left Aud Vis'"):
             utils.parse_chname_to_abbrev("left Aud Vis", strict_matching=True)  # Has L/R but multiple channel types
 
-        with pytest.raises(ValueError, match="Ambiguous match in 'Right Hip Aud'. Multiple alias types matched"):
+        with pytest.raises(ValueError, match="Ambiguous match in 'Right Hip Aud'"):
             utils.parse_chname_to_abbrev("Right Hip Aud", strict_matching=True)
 
     def test_nonstrict_matching_mode(self):
@@ -1650,17 +1650,21 @@ class TestParseChnameToAbbrev:
         """Test that error messages are more helpful."""
         # Test improved no-match error message
         with pytest.raises(
-            ValueError, match="'InvalidChannel' does not match any alias"
+            ValueError, match="'InvalidChannel' does not match any LR_ALIASES"
         ):
             utils.parse_chname_to_abbrev("InvalidChannel")
 
-        # Error should show examples of available aliases
+        # Error should identify which alias dict failed and show available entries
         try:
             utils.parse_chname_to_abbrev("NoMatch")
         except ValueError as e:
             error_msg = str(e)
-            assert "Available aliases:" in error_msg
-            assert "L" in error_msg and "R" in error_msg  # Should show L/R examples
+            assert "LR_ALIASES" in error_msg  # Should name the failing alias dict
+            assert "Available LR_ALIASES entries:" in error_msg
+
+        # CHNAME_ALIASES failure (has valid LR but invalid channel name)
+        with pytest.raises(ValueError, match="does not match any CHNAME_ALIASES"):
+            utils.parse_chname_to_abbrev("left ZZZ")
 
     def test_backward_compatibility(self):
         """Test that existing code still works with new parameters."""
@@ -3204,6 +3208,10 @@ class TestGetKeyFromMatchValues:
 
         with pytest.raises(ValueError, match="does not match any alias"):
             utils._get_key_from_match_values("orange_fruit", test_dict)
+
+        # When alias_name is passed, it appears in the error
+        with pytest.raises(ValueError, match="does not match any MY_ALIASES"):
+            utils._get_key_from_match_values("orange_fruit", test_dict, alias_name="MY_ALIASES")
 
     def test_empty_dict_raises_error(self):
         """Test that empty dictionary raises error."""
