@@ -1,15 +1,21 @@
 {
-    "data_parent_folder": "tests/data",
-    "GENOTYPE_ALIASES": {
-        "WT": [
-            "WT",
-            "A10"
-        ],
-        "KO": [
-            "KO",
-            "F22"
-        ]
-    },
+    "data_root": "tests/data",
+    "animals": [
+        {
+            "id": "A10",
+            "sex": "M",
+            "gene": "WT",
+            "folders": ["raw"],
+            "manual_datetime": "2025-05-10 10:00:00"
+        },
+        {
+            "id": "F22",
+            "sex": "F",
+            "gene": "KO",
+            "folders": ["raw"],
+            "manual_datetime": "2025-05-10 10:00:00"
+        }
+    ],
     "LR_ALIASES": {
         "L": [
             "0",
@@ -32,27 +38,5 @@
         "Hip": ["2", "7"],
         "Bar": ["3", "8"],
         "Mot": ["4", "9"]
-    },
-    "ANIMAL_METADATA": [
-        {
-            "id": "A10",
-            "sex": "M",
-            "gene": "WT"
-        },
-        {
-            "id": "F22",
-            "sex": "F",
-            "gene": "KO"
-        }
-    ],
-    "data_folders_to_animal_ids": {
-        "raw": [
-            "A10",
-            "F22"
-        ]
-    },
-    "manual_datetimes": {
-        "A10": "2025-05-10 10:00:00",
-        "F22": "2025-05-10 10:00:00"
     }
 }

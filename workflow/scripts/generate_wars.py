@@ -105,6 +105,13 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
                 # Prepare kwargs for this specific session
                 session_lro_kwargs = dict(session_analysis_config.get("lro_kwargs", {}))
 
+                # Apply per-animal overrides from unified animals config
+                animal_overrides = samples_config.get("_animal_overrides", {}).get(animal_id, {})
+                if animal_overrides:
+                    logger.info(f"  -> Applying per-animal overrides: {list(animal_overrides.keys())}")
+                    if "lro_kwargs" in animal_overrides:
+                        session_lro_kwargs.update(animal_overrides["lro_kwargs"])
+
                 # Resolve manual_datetimes for this session
                 if "manual_datetimes" in samples_config:
                     all_manual_dts = samples_config["manual_datetimes"]
@@ -126,18 +133,20 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
                             session_lro_kwargs["manual_datetimes"] = spec
                             logger.info(f"  -> Using manual datetime: {spec}")
 
-                logger.info(f"  -> File pattern: {session_analysis_config.get('pattern')}")
-
                 # Build absolute discovery pattern from the config's relative pattern
-                if "pattern" not in session_analysis_config:
+                # Per-animal pattern override takes precedence over session/default config
+                effective_pattern = animal_overrides.get("pattern", session_analysis_config.get("pattern"))
+                if effective_pattern is None:
                     raise KeyError(
                         f"Missing 'pattern' key in war_generation config for session '{session_key}'. "
                         "Each dataset config must specify 'pattern' (e.g. '{{animal}}/{{session}}/{{index}}.nwb' "
                         "or '{{index}}.rhd')."
                     )
+
+                logger.info(f"  -> File pattern: {effective_pattern}")
                 base_path = str(data_parent_folder / folder_path)
                 discovery_pattern = resolve_animal_pattern(
-                    session_analysis_config["pattern"],
+                    effective_pattern,
                     source_animal_id,
                     base_path,
                 )

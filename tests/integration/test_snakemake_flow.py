@@ -778,6 +778,7 @@ class TestMiniRealDataset:
     def mini_real_config(self):
         """Load mini real dataset configuration."""
         import yaml
+        from neurodent.workflow.utils import expand_animals_config
 
         config_path = Path(__file__).resolve().parents[2] / "config" / "datasets" / "mini_real.yaml"
         with open(config_path) as f:
@@ -786,6 +787,9 @@ class TestMiniRealDataset:
         samples_path = Path(__file__).resolve().parents[2] / "config" / "samples_mini_real.json"
         with open(samples_path) as f:
             samples_config = json.load(f)
+
+        # Expand unified animals config if present
+        samples_config = expand_animals_config(samples_config)
 
         return {
             "ds_config": ds_config,

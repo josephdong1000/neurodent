@@ -250,3 +250,291 @@ class TestInjectConfigAliases:
 
     def test_empty_config_no_error(self):
         inject_config_aliases({})
+
+
+# ---------------------------------------------------------------------------
+# expand_animals_config tests
+# ---------------------------------------------------------------------------
+from neurodent.workflow.utils import expand_animals_config
+
+
+class TestExpandAnimalsConfig:
+    """Tests for expand_animals_config function."""
+
+    def test_no_animals_key_returns_copy(self):
+        """Config without 'animals' key is returned as a deep copy."""
+        original = {"data_parent_folder": "/data", "ANIMAL_METADATA": [{"id": "X"}]}
+        result = expand_animals_config(original)
+        assert result == original
+        assert result is not original
+
+    def test_data_root_alias(self):
+        """'data_root' is renamed to 'data_parent_folder'."""
+        cfg = {"data_root": "/my/root", "animals": [{"id": "A", "gene": "WT", "sex": "M"}]}
+        result = expand_animals_config(cfg)
+        assert result["data_parent_folder"] == "/my/root"
+        assert "data_root" not in result
+
+    def test_data_root_does_not_overwrite_data_parent_folder(self):
+        """If both data_root and data_parent_folder exist, data_parent_folder wins."""
+        cfg = {
+            "data_root": "/root",
+            "data_parent_folder": "/parent",
+            "animals": [{"id": "A", "gene": "WT", "sex": "M"}],
+        }
+        result = expand_animals_config(cfg)
+        assert result["data_parent_folder"] == "/parent"
+
+    def test_builds_animal_metadata(self):
+        """ANIMAL_METADATA list is built from the animals entries."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "A10", "gene": "WT", "sex": "M"},
+                {"id": "F22", "gene": "KO", "sex": "F"},
+            ],
+        }
+        result = expand_animals_config(cfg)
+        meta_ids = {e["id"] for e in result["ANIMAL_METADATA"]}
+        assert meta_ids == {"A10", "F22"}
+
+        a10 = next(e for e in result["ANIMAL_METADATA"] if e["id"] == "A10")
+        assert a10["gene"] == "WT"
+        assert a10["sex"] == "M"
+
+    def test_metadata_excludes_override_keys(self):
+        """Override keys (pattern, lro_kwargs, etc.) are NOT in ANIMAL_METADATA."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {
+                    "id": "X1", "gene": "WT", "sex": "M",
+                    "pattern": "custom/{index}.nwb",
+                    "lro_kwargs": {"mode": "si"},
+                    "manual_datetime": "2025-01-01 10:00:00",
+                    "folders": ["f1"],
+                    "day_parse_kwargs": {"date_patterns": []},
+                },
+            ],
+        }
+        result = expand_animals_config(cfg)
+        meta = result["ANIMAL_METADATA"][0]
+        assert "pattern" not in meta
+        assert "lro_kwargs" not in meta
+        assert "manual_datetime" not in meta
+        assert "folders" not in meta
+        assert "day_parse_kwargs" not in meta
+        assert meta["id"] == "X1"
+        assert meta["gene"] == "WT"
+
+    def test_builds_data_folders_to_animal_ids(self):
+        """data_folders_to_animal_ids is built from animals' folders field."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "A10", "gene": "WT", "sex": "M", "folders": ["raw"]},
+                {"id": "F22", "gene": "KO", "sex": "F", "folders": ["raw"]},
+            ],
+        }
+        result = expand_animals_config(cfg)
+        d2a = result["data_folders_to_animal_ids"]
+        assert d2a == {"raw": ["A10", "F22"]}
+
+    def test_animals_without_folders_get_empty_string_folder(self):
+        """Animals with no folders field default to empty string folder."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [{"id": "A10", "gene": "WT", "sex": "M"}],
+        }
+        result = expand_animals_config(cfg)
+        d2a = result["data_folders_to_animal_ids"]
+        assert d2a == {"": ["A10"]}
+
+    def test_multiple_folders_per_animal(self):
+        """Animals with multiple folders appear in all of them."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "A10", "gene": "WT", "sex": "M", "folders": ["session1", "session2"]},
+            ],
+        }
+        result = expand_animals_config(cfg)
+        d2a = result["data_folders_to_animal_ids"]
+        assert "A10" in d2a["session1"]
+        assert "A10" in d2a["session2"]
+
+    def test_builds_manual_datetimes(self):
+        """manual_datetimes is built from animals' manual_datetime field."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "A10", "gene": "WT", "sex": "M", "manual_datetime": "2025-01-01 10:00:00"},
+                {"id": "F22", "gene": "KO", "sex": "F"},
+            ],
+        }
+        result = expand_animals_config(cfg)
+        assert result["manual_datetimes"] == {"A10": "2025-01-01 10:00:00"}
+
+    def test_auto_generates_genotype_aliases(self):
+        """GENOTYPE_ALIASES is auto-generated from gene field."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "A10", "gene": "WT", "sex": "M"},
+                {"id": "B5", "gene": "WT", "sex": "M"},
+                {"id": "F22", "gene": "KO", "sex": "F"},
+            ],
+        }
+        result = expand_animals_config(cfg)
+        ga = result["GENOTYPE_ALIASES"]
+        assert set(ga["WT"]) == {"A10", "B5"}
+        assert ga["KO"] == ["F22"]
+
+    def test_explicit_genotype_aliases_preserved(self):
+        """Explicit GENOTYPE_ALIASES in config is not overwritten."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "A10", "gene": "WT", "sex": "M"},
+            ],
+            "GENOTYPE_ALIASES": {"MyCustom": ["A10"]},
+        }
+        result = expand_animals_config(cfg)
+        assert result["GENOTYPE_ALIASES"] == {"MyCustom": ["A10"]}
+
+    def test_builds_animal_overrides(self):
+        """_animal_overrides dict is built from per-animal override fields."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {
+                    "id": "X1", "gene": "WT", "sex": "M",
+                    "pattern": "{data_root}/custom/{animal}_{index}.rhd",
+                    "lro_kwargs": {"mode": "si"},
+                    "day_parse_kwargs": {"date_patterns": [["\\d{6}", "%y%m%d"]]},
+                },
+                {"id": "A10", "gene": "WT", "sex": "M"},
+            ],
+        }
+        result = expand_animals_config(cfg)
+        assert "X1" in result["_animal_overrides"]
+        assert result["_animal_overrides"]["X1"]["pattern"] == "{data_root}/custom/{animal}_{index}.rhd"
+        assert result["_animal_overrides"]["X1"]["lro_kwargs"] == {"mode": "si"}
+        assert "A10" not in result["_animal_overrides"]
+
+    def test_no_animal_overrides_when_none_specified(self):
+        """_animal_overrides is absent when no animals have overrides."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [{"id": "A10", "gene": "WT", "sex": "M"}],
+        }
+        result = expand_animals_config(cfg)
+        assert "_animal_overrides" not in result
+
+    def test_does_not_mutate_input(self):
+        """Original config dict is not mutated."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "A10", "gene": "WT", "sex": "M", "folders": ["raw"]},
+            ],
+        }
+        original_animals = cfg["animals"][0].copy()
+        expand_animals_config(cfg)
+        assert cfg["animals"][0] == original_animals
+        assert "data_parent_folder" not in cfg
+
+    def test_preserves_existing_data_folders_to_animal_ids(self):
+        """Existing data_folders_to_animal_ids entries are preserved."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "NewAnimal", "gene": "WT", "sex": "M", "folders": ["raw"]},
+            ],
+            "data_folders_to_animal_ids": {
+                "legacy_folder": ["LegacyAnimal"],
+            },
+        }
+        result = expand_animals_config(cfg)
+        assert "LegacyAnimal" in result["data_folders_to_animal_ids"]["legacy_folder"]
+        assert "NewAnimal" in result["data_folders_to_animal_ids"]["raw"]
+
+    def test_preserves_existing_manual_datetimes(self):
+        """Existing manual_datetimes entries are preserved."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "A10", "gene": "WT", "sex": "M", "manual_datetime": "2025-01-01"},
+            ],
+            "manual_datetimes": {"LegacyAnimal": "2020-01-01"},
+        }
+        result = expand_animals_config(cfg)
+        assert result["manual_datetimes"]["LegacyAnimal"] == "2020-01-01"
+        assert result["manual_datetimes"]["A10"] == "2025-01-01"
+
+    def test_preserves_existing_animal_metadata(self):
+        """Existing ANIMAL_METADATA entries are not duplicated."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "A10", "gene": "WT", "sex": "M"},
+            ],
+            "ANIMAL_METADATA": [
+                {"id": "A10", "gene": "KO", "sex": "F"},
+            ],
+        }
+        result = expand_animals_config(cfg)
+        # Existing entry is kept, not overwritten
+        a10_entries = [e for e in result["ANIMAL_METADATA"] if e["id"] == "A10"]
+        assert len(a10_entries) == 1
+        assert a10_entries[0]["gene"] == "KO"
+
+    def test_full_example_config(self):
+        """Test with a realistic config matching the issue's example."""
+        cfg = {
+            "data_root": "/mnt/data/project",
+            "animals": [
+                {"id": "AM3", "gene": "WT", "sex": "Male", "folders": ["session1"]},
+                {"id": "AM5", "gene": "Het", "sex": "Male", "folders": ["session1"]},
+                {
+                    "id": "AP3B2homo-240-M", "gene": "HOMO", "sex": "Male",
+                    "pattern": "{data_root}/PortA-*PortB-*/{animal}*_ColMajor_{index}.rhd",
+                    "manual_datetime": "2025-11-27 15:39:05",
+                    "lro_kwargs": {"mode": "si"},
+                },
+            ],
+            "LR_ALIASES": {"L": ["0"], "R": ["1"]},
+        }
+        result = expand_animals_config(cfg)
+
+        # data_root → data_parent_folder
+        assert result["data_parent_folder"] == "/mnt/data/project"
+
+        # ANIMAL_METADATA built
+        meta_ids = {e["id"] for e in result["ANIMAL_METADATA"]}
+        assert meta_ids == {"AM3", "AM5", "AP3B2homo-240-M"}
+
+        # data_folders_to_animal_ids built
+        d2a = result["data_folders_to_animal_ids"]
+        assert d2a["session1"] == ["AM3", "AM5"]
+        assert "AP3B2homo-240-M" in d2a[""]  # no folders specified
+
+        # manual_datetimes built
+        assert result["manual_datetimes"]["AP3B2homo-240-M"] == "2025-11-27 15:39:05"
+        assert "AM3" not in result["manual_datetimes"]
+
+        # GENOTYPE_ALIASES auto-generated
+        ga = result["GENOTYPE_ALIASES"]
+        assert "AM3" in ga["WT"]
+        assert "AM5" in ga["Het"]
+        assert "AP3B2homo-240-M" in ga["HOMO"]
+
+        # _animal_overrides built
+        ov = result["_animal_overrides"]
+        assert "AP3B2homo-240-M" in ov
+        assert ov["AP3B2homo-240-M"]["pattern"] == "{data_root}/PortA-*PortB-*/{animal}*_ColMajor_{index}.rhd"
+        assert ov["AP3B2homo-240-M"]["lro_kwargs"] == {"mode": "si"}
+        assert "AM3" not in ov
+
+        # LR_ALIASES preserved
+        assert result["LR_ALIASES"] == {"L": ["0"], "R": ["1"]}

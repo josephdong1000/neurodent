@@ -230,6 +230,143 @@ def deep_merge_dict(base: dict, override: dict) -> dict:
     return result
 
 
+def expand_animals_config(samples_config: dict) -> dict:
+    """Expand the unified ``animals`` list into legacy pipeline keys.
+
+    When the samples config contains an ``animals`` key (a list of animal
+    dicts), this function normalises it into the legacy keys the pipeline
+    already understands:
+
+    * ``ANIMAL_METADATA`` – list of ``{id, gene, sex, ...}`` dicts
+    * ``data_folders_to_animal_ids`` – folder → [animal_id, …] mapping
+    * ``manual_datetimes`` – animal_id → datetime string mapping
+    * ``GENOTYPE_ALIASES`` – gene → [animal_id, …] mapping (auto-generated
+      from ``gene`` field unless already present)
+    * ``_animal_overrides`` – animal_id → per-animal overrides dict (pattern,
+      lro_kwargs, day_parse_kwargs)
+
+    It also supports ``data_root`` as an alias for ``data_parent_folder``.
+
+    If ``animals`` is not present the config is returned unchanged (a deep
+    copy is always made so the caller never sees mutations).
+
+    Parameters
+    ----------
+    samples_config : dict
+        Samples configuration loaded from a ``samples_*.json`` file.
+
+    Returns
+    -------
+    dict
+        Expanded configuration with legacy keys populated.
+
+    Examples
+    --------
+    Minimal config with two animals::
+
+        >>> cfg = expand_animals_config({
+        ...     "data_root": "/data",
+        ...     "animals": [
+        ...         {"id": "A10", "gene": "WT", "sex": "M"},
+        ...         {"id": "F22", "gene": "KO", "sex": "F", "folders": ["raw"]},
+        ...     ],
+        ... })
+        >>> cfg["data_parent_folder"]
+        '/data'
+        >>> "A10" in dict([(e["id"], e) for e in cfg["ANIMAL_METADATA"]])
+        True
+
+    Per-animal overrides::
+
+        >>> cfg = expand_animals_config({
+        ...     "data_root": "/data",
+        ...     "animals": [
+        ...         {"id": "X1", "gene": "WT", "sex": "M",
+        ...          "pattern": "{data_root}/custom/{animal}_{index}.rhd",
+        ...          "lro_kwargs": {"mode": "si"},
+        ...          "manual_datetime": "2025-01-01 10:00:00"},
+        ...     ],
+        ... })
+        >>> cfg["_animal_overrides"]["X1"]["pattern"]
+        '{data_root}/custom/{animal}_{index}.rhd'
+        >>> cfg["manual_datetimes"]["X1"]
+        '2025-01-01 10:00:00'
+    """
+    result = copy.deepcopy(samples_config)
+
+    # data_root → data_parent_folder alias
+    if "data_root" in result and "data_parent_folder" not in result:
+        result["data_parent_folder"] = result.pop("data_root")
+
+    if "animals" not in result:
+        return result
+
+    animals_list = result["animals"]
+
+    # Keys that are per-animal overrides (not core metadata)
+    _OVERRIDE_KEYS = {"pattern", "lro_kwargs", "day_parse_kwargs", "manual_datetime", "folders"}
+    _METADATA_SKIP = _OVERRIDE_KEYS  # excluded from ANIMAL_METADATA entries
+
+    # --- Build ANIMAL_METADATA ---
+    if "ANIMAL_METADATA" not in result:
+        result["ANIMAL_METADATA"] = []
+    existing_ids = {e["id"] for e in result["ANIMAL_METADATA"]}
+
+    for animal in animals_list:
+        if animal["id"] not in existing_ids:
+            meta_entry = {k: v for k, v in animal.items() if k not in _METADATA_SKIP}
+            result["ANIMAL_METADATA"].append(meta_entry)
+            existing_ids.add(animal["id"])
+
+    # --- Build data_folders_to_animal_ids ---
+    if "data_folders_to_animal_ids" not in result:
+        result["data_folders_to_animal_ids"] = {}
+    d2a = result["data_folders_to_animal_ids"]
+
+    for animal in animals_list:
+        folders = animal.get("folders", [])
+        if not folders:
+            # Animals without explicit folders get an empty-string folder
+            # (data directly under data_parent_folder)
+            folders = [""]
+        for folder in folders:
+            if folder not in d2a:
+                d2a[folder] = []
+            if animal["id"] not in d2a[folder]:
+                d2a[folder].append(animal["id"])
+
+    # --- Build manual_datetimes ---
+    if "manual_datetimes" not in result:
+        result["manual_datetimes"] = {}
+    for animal in animals_list:
+        if "manual_datetime" in animal:
+            result["manual_datetimes"][animal["id"]] = animal["manual_datetime"]
+
+    # --- Auto-generate GENOTYPE_ALIASES from gene field ---
+    if "GENOTYPE_ALIASES" not in result:
+        gene_to_animals: dict[str, list[str]] = {}
+        for animal in animals_list:
+            gene = animal.get("gene")
+            if gene:
+                gene_to_animals.setdefault(gene, []).append(animal["id"])
+        if gene_to_animals:
+            result["GENOTYPE_ALIASES"] = gene_to_animals
+
+    # --- Build _animal_overrides ---
+    overrides: dict[str, dict] = {}
+    for animal in animals_list:
+        animal_overrides = {}
+        for key in ("pattern", "lro_kwargs", "day_parse_kwargs"):
+            if key in animal:
+                animal_overrides[key] = animal[key]
+        if animal_overrides:
+            overrides[animal["id"]] = animal_overrides
+    if overrides:
+        result["_animal_overrides"] = overrides
+
+    return result
+
+
 def resolve_animal_pattern(
     pattern_config,
     animal_id: str,

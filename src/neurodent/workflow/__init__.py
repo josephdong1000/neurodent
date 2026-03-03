@@ -10,6 +10,6 @@ This module provides:
 - :func:`load_wars`: Load multiple WindowAnalysisResult objects
 """
 
-from .utils import setup_snakemake_logging, load_wars, inject_config_aliases
+from .utils import setup_snakemake_logging, load_wars, inject_config_aliases, expand_animals_config
 
-__all__ = ["setup_snakemake_logging", "load_wars", "inject_config_aliases"]
+__all__ = ["setup_snakemake_logging", "load_wars", "inject_config_aliases", "expand_animals_config"]

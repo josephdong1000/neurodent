@@ -18,7 +18,7 @@ import sys
 import glob
 
 # Import workflow utilities
-from neurodent.workflow.utils import deep_merge_dict
+from neurodent.workflow.utils import deep_merge_dict, expand_animals_config
 
 
 # Load configuration
@@ -111,6 +111,9 @@ except ImportError:
 # Load samples config
 with open(samples_file, "r") as f:
     samples_config = json.load(f)
+
+# Expand unified "animals" list into legacy keys (if present)
+samples_config = expand_animals_config(samples_config)
 
 # Extract sample information
 DATA_FOLDERS = list(samples_config["data_folders_to_animal_ids"].keys())
