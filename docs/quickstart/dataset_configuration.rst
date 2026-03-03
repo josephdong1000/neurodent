@@ -115,15 +115,19 @@ Verify which dataset is active:
 
    uv run snakemake --dry-run 2>&1 | head -20
 
-Expected output:
+Expected output (shows the dataset-specific overrides applied):
 
 .. code-block:: text
 
-   ✓ Using dataset: sox5_bin
-     Config: config/datasets/sox5_bin.yaml
-     Samples: config/samples.json
-     Format: *.dat
-     Mode: bin
+   [ok] Using dataset: sox5_bin
+     Config file: config/datasets/sox5_bin.yaml
+
+     Dataset configuration overrides:
+       samples:
+         samples_file: "config/samples.json"
+       analysis:
+         war_generation:
+           ...
 
 Adding New Datasets
 -------------------
@@ -195,7 +199,7 @@ describes all available parameters:
      - string
      - No
      - Per-animal file discovery pattern, overriding the global
-       ``file_pattern`` in the dataset config. Supports ``{data_root}``,
+       ``pattern`` in the dataset config. Supports ``{data_root}``,
        ``{animal}``, and ``{index}`` placeholders
        (e.g. ``"{data_root}/custom/{animal}_{index}.rhd"``).
    * - ``lro_kwargs``
@@ -354,10 +358,10 @@ Create ``config/datasets/mydata_nwb.yaml``:
 
    analysis:
      war_generation:
-       mode: "concat"
-       file_pattern: "*.nwb"
+       pattern: "{animal}/{session}/{index}.nwb"
        lro_kwargs:
          mode: "si"
+         extract_func: "read_nwb_recording"
 
 You can override **any** config parameter using the same hierarchy as the main config.
 
@@ -383,23 +387,24 @@ Some datasets contain mixed file formats that require different processing param
 
    analysis:
      war_generation:
-       mode: "base"
+       pattern: "{index}"
        lro_kwargs:
          mode: "si"
 
    overrides:
      by_session:
        "Session_EDF":
-         "analysis.war_generation.file_pattern": "*.EDF"
-         "analysis.war_generation.lro_kwargs.extract_func": "read_edf"
+         "analysis.war_generation.pattern": "{index}.EDF"
+         "analysis.war_generation.lro_kwargs.mode": "mne"
+         "analysis.war_generation.lro_kwargs.extract_func": "read_raw_edf"
        "Session_RHD":
-         "analysis.war_generation.file_pattern": "*.rhd"
+         "analysis.war_generation.pattern": "{index}.rhd"
          "analysis.war_generation.lro_kwargs.extract_func": "read_intan"
          "analysis.war_generation.lro_kwargs.stream_id": "0"
 
 **How it works:**
 
-- Use dotted paths to specify which parameter to override (e.g., ``"analysis.war_generation.file_pattern"``)
+- Use dotted paths to specify which parameter to override (e.g., ``"analysis.war_generation.pattern"``)
 - Can override **any** config parameter, not just war_generation settings
 - Overrides are applied via deep merge before session processing
 - Falls back to global config if no override specified for a session
