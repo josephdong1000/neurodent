@@ -137,12 +137,20 @@ class FileDiscoverer:
         glob_pattern = re.sub(r"\{[^}]+\}", "*", pattern)
 
         parts = re.split(r"\{[^}]+\}", pattern)
-        regex_string = "^" + re.escape(parts[0])
+
+        def _escape_with_glob(segment: str) -> str:
+            """re.escape a segment, then restore glob wildcards as regex."""
+            escaped = re.escape(segment)
+            escaped = escaped.replace(r"\*", "[^/\\\\]*")
+            escaped = escaped.replace(r"\?", "[^/\\\\]")
+            return escaped
+
+        regex_string = "^" + _escape_with_glob(parts[0])
         for i, placeholder in enumerate(placeholders):
             # Match anything except slashes and backslashes.
             # This ensures placeholders don't span multiple directories.
             regex_string += f"(?P<{placeholder}>[^/\\\\]+)"
-            regex_string += re.escape(parts[i + 1])
+            regex_string += _escape_with_glob(parts[i + 1])
         regex_string += "$"
 
         return re.compile(regex_string), glob_pattern
@@ -220,6 +228,16 @@ class FileDiscoverer:
 
     def _discover_single(self, pattern: str, **filter_kwargs) -> List[Dict]:
         """Discovers files for a single pattern."""
+        # Substitute known filter values into the pattern before regex/glob
+        # compilation.  E.g. with animal="foo", the pattern
+        # "*{animal}*/{session}/*.rhd" becomes "*foo*/{session}/*.rhd".
+        # This avoids regex greediness issues when wildcards and placeholders
+        # share the same path component, and produces a tighter glob.
+        for key, value in filter_kwargs.items():
+            placeholder = "{" + key + "}"
+            if placeholder in pattern:
+                pattern = pattern.replace(placeholder, value)
+
         regex, glob_str = self._pattern_to_regex_and_glob(pattern)
 
         # Check if pattern has any placeholders
@@ -248,6 +266,11 @@ class FileDiscoverer:
 
                     if skip:
                         continue
+
+                    # Re-inject substituted filter values into metadata
+                    for k, v in filter_kwargs.items():
+                        if k not in meta:
+                            meta[k] = v
 
                     meta["path"] = path
                     results.append(meta)

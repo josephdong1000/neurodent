@@ -125,7 +125,7 @@ def test_no_animal_filter(simple_structure, monkeypatch):
 
 
 def test_skip_sessions(simple_structure, monkeypatch):
-    """Test skipping specific sessions."""
+    """Test skipping specific sessions with exact match (backward compat)."""
     monkeypatch.setattr(results.AnimalOrganizer, "_create_long_recordings", lambda self, kw: None)
 
     pattern = str(simple_structure) + "/{animal}/{session}/{index}.rhd"
@@ -139,6 +139,54 @@ def test_skip_sessions(simple_structure, monkeypatch):
     assert len(ao._animalday_folder_groups) == 1
     assert "2025-01-25" in ao._animalday_folder_groups
     assert "2025-01-24" not in ao._animalday_folder_groups
+
+
+def test_skip_sessions_glob_pattern(tmp_path, monkeypatch):
+    """Test skipping sessions with glob/wildcard patterns."""
+    monkeypatch.setattr(results.AnimalOrganizer, "_create_long_recordings", lambda self, kw: None)
+
+    # Create sessions: good_day1, good_day2, bad_day1, corrupted_day1
+    for session in ["good_day1", "good_day2", "bad_day1", "corrupted_day1"]:
+        d = tmp_path / "A10" / session
+        d.mkdir(parents=True)
+        (d / "1.rhd").touch()
+
+    pattern = str(tmp_path) + "/{animal}/{session}/{index}.rhd"
+
+    # Wildcard: skip anything containing "bad"
+    ao = results.AnimalOrganizer(
+        pattern=pattern,
+        animal_id="A10",
+        skip_sessions=["*bad*"],
+    )
+    assert "bad_day1" not in ao._animalday_folder_groups
+    assert "good_day1" in ao._animalday_folder_groups
+    assert "good_day2" in ao._animalday_folder_groups
+    assert "corrupted_day1" in ao._animalday_folder_groups
+
+
+def test_skip_sessions_multiple_glob_patterns(tmp_path, monkeypatch):
+    """Test skipping sessions with multiple glob patterns (reject if any matches)."""
+    monkeypatch.setattr(results.AnimalOrganizer, "_create_long_recordings", lambda self, kw: None)
+
+    for session in ["good_day1", "good_day2", "bad_day1", "corrupted_day1"]:
+        d = tmp_path / "A10" / session
+        d.mkdir(parents=True)
+        (d / "1.rhd").touch()
+
+    pattern = str(tmp_path) + "/{animal}/{session}/{index}.rhd"
+
+    # Multiple patterns: skip "bad" and "corrupted_*"
+    ao = results.AnimalOrganizer(
+        pattern=pattern,
+        animal_id="A10",
+        skip_sessions=["*bad*", "corrupted_*"],
+    )
+    assert "bad_day1" not in ao._animalday_folder_groups
+    assert "corrupted_day1" not in ao._animalday_folder_groups
+    assert "good_day1" in ao._animalday_folder_groups
+    assert "good_day2" in ao._animalday_folder_groups
+    assert len(ao._animalday_folder_groups) == 2
 
 
 def test_truncate_sessions(simple_structure, monkeypatch):
@@ -286,6 +334,68 @@ def test_no_files_found(tmp_path, monkeypatch):
             pattern=pattern,
             animal_id="A10",
         )
+
+
+def test_glob_wildcards_mixed_with_placeholders(tmp_path, monkeypatch):
+    """Test glob wildcards (*) mixed with {placeholders} in patterns.
+
+    Mirrors real sox5 data layout where the pattern contains a literal animal
+    name surrounded by glob wildcards: parent/*AnimalName*/{session}/...
+    The {animal} placeholder is NOT used with surrounding wildcards — instead
+    the pipeline resolves the animal name into the pattern as a literal.
+    """
+    monkeypatch.setattr(results.AnimalOrganizer, "_create_long_recordings", lambda self, kw: None)
+
+    # Structure: cohort_2mice/A10/session1/prefix-1.rhd
+    parent = tmp_path / "cohort_2mice"
+    for session in ["session1", "session2"]:
+        d = parent / "A10" / session
+        d.mkdir(parents=True)
+        (d / "prefix-1.rhd").touch()
+    (parent / "A10" / "session1" / "prefix-2.rhd").touch()
+
+    # Pattern uses literal animal name with glob wildcards (like real pipeline)
+    pattern = str(parent) + "/*A10*/{session}/*-{index}.rhd"
+    ao = results.AnimalOrganizer(
+        pattern=pattern,
+        animal_id=None,
+    )
+
+    assert len(ao._animalday_folder_groups) == 2
+    assert "session1" in ao._animalday_folder_groups
+    assert "session2" in ao._animalday_folder_groups
+    assert len(ao._animalday_folder_groups["session1"]) == 2
+    assert len(ao._animalday_folder_groups["session2"]) == 1
+
+
+def test_glob_wildcards_with_animal_placeholder(tmp_path, monkeypatch):
+    """Test *{animal}* pattern with animal_id — placeholder is substituted
+    into the pattern before regex compilation, avoiding greediness issues."""
+    monkeypatch.setattr(results.AnimalOrganizer, "_create_long_recordings", lambda self, kw: None)
+
+    # Structure: cohort/prefix-A10-suffix/session1/1.rhd
+    parent = tmp_path / "cohort"
+    for session in ["session1", "session2"]:
+        d = parent / "prefix-A10-suffix" / session
+        d.mkdir(parents=True)
+        (d / "1.rhd").touch()
+    # Also create another animal to verify filtering
+    other = parent / "prefix-B20-suffix" / "session1"
+    other.mkdir(parents=True)
+    (other / "1.rhd").touch()
+
+    pattern = str(parent) + "/*{animal}*/{session}/{index}.rhd"
+    ao = results.AnimalOrganizer(
+        pattern=pattern,
+        animal_id="A10",
+    )
+
+    assert len(ao._animalday_folder_groups) == 2
+    assert "session1" in ao._animalday_folder_groups
+    assert "session2" in ao._animalday_folder_groups
+    # Should NOT include B20's files
+    all_files = [str(f) for files in ao._animalday_folder_groups.values() for f in files]
+    assert not any("B20" in f for f in all_files)
 
 
 def test_pattern_with_wildcards(tmp_path, monkeypatch):
