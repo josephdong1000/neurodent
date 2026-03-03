@@ -201,7 +201,7 @@ def deep_merge_dict(base: dict, override: dict) -> dict:
                 "samples": {"samples_file": "config/custom.json"},
                 "analysis": {
                     "war_generation": {
-                        "mode": "base",
+                        "pattern": "{index}.rhd",
                         "lro_kwargs": {"extract_func": "read_intan"}
                     }
                 }
@@ -212,7 +212,7 @@ def deep_merge_dict(base: dict, override: dict) -> dict:
             # merged["samples"]["quality_filter"]["exclude_unknown"] == True (preserved)
             # merged["samples"]["samples_file"] == "config/custom.json" (added)
             # merged["analysis"]["war_generation"]["day_sep"] == None (preserved)
-            # merged["analysis"]["war_generation"]["mode"] == "base" (added)
+            # merged["analysis"]["war_generation"]["pattern"] == "{index}.rhd" (added)
             # merged["analysis"]["war_generation"]["lro_kwargs"]["multiprocess_mode"] == "dask" (preserved)
             # merged["analysis"]["war_generation"]["lro_kwargs"]["extract_func"] == "read_intan" (added)
 
