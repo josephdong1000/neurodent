@@ -511,3 +511,81 @@ class TestExpandAnimalsConfig:
         result = expand_animals_config(cfg)
         assert result["data_root"] == "/legacy/path"
         assert "data_parent_folder" not in result
+
+    def test_bad_channels_list_format(self):
+        """List-format bad_channels are stored under _all sentinel key."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "A10", "gene": "WT", "sex": "M", "bad_channels": ["LHip", "RHip"]},
+            ],
+        }
+        result = expand_animals_config(cfg)
+        assert result["bad_channels"]["A10"] == {"_all": ["LHip", "RHip"]}
+
+    def test_bad_channels_dict_format(self):
+        """Dict-format bad_channels (per-session) are stored as-is."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {
+                    "id": "A10", "gene": "WT", "sex": "M",
+                    "bad_channels": {
+                        "Session1": ["LHip"],
+                        "Session2": ["RMot"],
+                    },
+                },
+            ],
+        }
+        result = expand_animals_config(cfg)
+        assert result["bad_channels"]["A10"] == {
+            "Session1": ["LHip"],
+            "Session2": ["RMot"],
+        }
+
+    def test_bad_channels_not_in_metadata(self):
+        """bad_channels is excluded from ANIMAL_METADATA entries."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "A10", "gene": "WT", "sex": "M", "bad_channels": ["LHip"]},
+            ],
+        }
+        result = expand_animals_config(cfg)
+        meta = result["ANIMAL_METADATA"][0]
+        assert "bad_channels" not in meta
+
+    def test_bad_channels_preserves_existing(self):
+        """Existing top-level bad_channels entries are preserved."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "A10", "gene": "WT", "sex": "M", "bad_channels": ["LHip"]},
+            ],
+            "bad_channels": {"legacy_key X1": {"Session1": ["RAud"]}},
+        }
+        result = expand_animals_config(cfg)
+        assert result["bad_channels"]["legacy_key X1"] == {"Session1": ["RAud"]}
+        assert result["bad_channels"]["A10"] == {"_all": ["LHip"]}
+
+    def test_bad_channels_empty_when_none_specified(self):
+        """bad_channels dict is empty when no animals have bad_channels."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [{"id": "A10", "gene": "WT", "sex": "M"}],
+        }
+        result = expand_animals_config(cfg)
+        assert result["bad_channels"] == {}
+
+    def test_bad_channels_does_not_mutate_input(self):
+        """Original config dict is not mutated by bad_channels expansion."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "A10", "gene": "WT", "sex": "M", "bad_channels": ["LHip"]},
+            ],
+        }
+        original_bc = cfg["animals"][0]["bad_channels"].copy()
+        expand_animals_config(cfg)
+        assert cfg["animals"][0]["bad_channels"] == original_bc
+        assert "bad_channels" not in cfg  # top-level not added to original

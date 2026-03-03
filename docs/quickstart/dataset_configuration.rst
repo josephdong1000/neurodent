@@ -131,15 +131,213 @@ Adding New Datasets
 Step 1: Create Samples JSON
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Create ``config/samples_mydata.json``:
+The samples JSON file defines the animals in your experiment and their metadata.
+Create ``config/samples_mydata.json`` using the unified ``animals`` list format:
 
 .. code-block:: json
 
    {
-       "data_parent_folder": "/path/to/your/data",
-       "GENOTYPE_ALIASES": {...},
-       "data_folders_to_animal_ids": {...},
-       "joint_sessions": {}
+       "data_root": "/path/to/your/data",
+       "animals": [
+           {"id": "M1", "gene": "WT", "sex": "M"},
+           {"id": "F3", "gene": "KO", "sex": "F"}
+       ]
+   }
+
+.. _animals-parameter-reference:
+
+Animals Parameter Reference
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Each entry in the ``animals`` list is a dictionary. The following table
+describes all available parameters:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 15 10 55
+
+   * - Parameter
+     - Type
+     - Required
+     - Description
+   * - ``id``
+     - string
+     - Yes
+     - Unique identifier for the animal (e.g. ``"M1"``, ``"AP3B2homo-240-M"``).
+       Used as the primary key throughout the pipeline.
+   * - ``gene``
+     - string
+     - Yes
+     - Genotype label (e.g. ``"WT"``, ``"KO"``, ``"Het"``). Used to
+       auto-generate ``GENOTYPE_ALIASES`` and for downstream grouping.
+   * - ``sex``
+     - string
+     - Yes
+     - Sex of the animal (e.g. ``"M"``, ``"F"``, ``"Male"``, ``"Female"``).
+   * - ``manual_datetime``
+     - string
+     - No
+     - Recording start datetime in ``"YYYY-MM-DD HH:MM:SS"`` format.
+       Use this when automatic datetime parsing from filenames is unreliable
+       or when files lack embedded timestamps. See :ref:`manual-datetimes`.
+   * - ``bad_channels``
+     - list or dict
+     - No
+     - Channels to exclude from analysis. Accepts two formats:
+
+       * **List** — channels bad across *all* sessions:
+         ``["LHip", "RHip"]``
+       * **Dict** — per-session bad channels:
+         ``{"Session1": ["LHip"], "Session2": ["RMot"]}``
+
+       See :ref:`bad-channels` for details.
+   * - ``pattern``
+     - string
+     - No
+     - Per-animal file discovery pattern, overriding the global
+       ``file_pattern`` in the dataset config. Supports ``{data_root}``,
+       ``{animal}``, and ``{index}`` placeholders
+       (e.g. ``"{data_root}/custom/{animal}_{index}.rhd"``).
+   * - ``lro_kwargs``
+     - dict
+     - No
+     - Per-animal keyword arguments passed to
+       ``LongRecordingOrganizer``, overriding the global ``lro_kwargs``.
+       Useful when an animal's files require different loading parameters
+       (e.g. ``{"mode": "si", "extract_func": "read_intan"}``).
+   * - ``day_parse_kwargs``
+     - dict
+     - No
+     - Per-animal keyword arguments for day/date parsing from filenames,
+       overriding the global ``day_parse_kwargs``
+       (e.g. ``{"date_patterns": [["\\d{6}", "%y%m%d"]]}``).
+
+Any additional keys (beyond those listed above) are passed through to
+``ANIMAL_METADATA`` and are available for custom downstream processing.
+
+Top-Level Config Keys
+~~~~~~~~~~~~~~~~~~~~~
+
+In addition to ``animals``, the samples JSON supports these top-level keys:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 55
+
+   * - Key
+     - Description
+   * - ``data_root``
+     - **Required.** Root path containing the raw data directories.
+   * - ``LR_ALIASES``
+     - Mapping of ``"L"``/``"R"`` labels to channel indices
+       (e.g. ``{"L": ["0","1","2"], "R": ["5","6","7"]}``).
+   * - ``CHNAME_ALIASES``
+     - Mapping of brain-region abbreviations to channel indices
+       (e.g. ``{"Aud": ["0","5"], "Hip": ["2","7"]}``).
+   * - ``GENOTYPE_ALIASES``
+     - Explicit genotype → animal ID mapping. If omitted, it is
+       auto-generated from each animal's ``gene`` field.
+   * - ``bad_channels``
+     - Legacy top-level bad-channel dict (see :ref:`bad-channels`).
+       Prefer per-animal ``bad_channels`` in the ``animals`` list.
+   * - ``joint_sessions``
+     - Sessions where multiple animals were recorded simultaneously.
+
+.. _bad-channels:
+
+Bad Channels
+~~~~~~~~~~~~
+
+Bad channels can be specified per animal in two ways.
+
+**Channels bad across all sessions** — use a list:
+
+.. code-block:: json
+
+   {
+       "animals": [
+           {
+               "id": "M1", "gene": "WT", "sex": "M",
+               "bad_channels": ["LHip", "RHip"]
+           }
+       ]
+   }
+
+This is the simplest approach when the same channels are consistently
+noisy for a given animal.
+
+**Per-session bad channels** — use a dict mapping session identifiers to
+channel lists:
+
+.. code-block:: json
+
+   {
+       "animals": [
+           {
+               "id": "M1", "gene": "WT", "sex": "M",
+               "bad_channels": {
+                   "Session1": ["LHip", "RHip"],
+                   "Session2": ["LHip", "RHip", "LMot"]
+               }
+           }
+       ]
+   }
+
+You can also combine both approaches: use the list for channels that are
+broadly bad across sessions and add per-session entries for channels that
+are only bad in specific recordings. When both ``_all`` (from a list) and
+per-session entries are present, the pipeline merges them automatically.
+
+.. _manual-datetimes:
+
+Manual Datetimes
+~~~~~~~~~~~~~~~~
+
+Recording start times are specified via the ``manual_datetime`` field on
+each animal entry:
+
+.. code-block:: json
+
+   {
+       "animals": [
+           {
+               "id": "M1", "gene": "WT", "sex": "M",
+               "manual_datetime": "2025-05-10 10:00:00"
+           }
+       ]
+   }
+
+This manual approach avoids the complexity and fragility of automatic
+datetime parsing from heterogeneous filename formats. Provide the
+datetime as a string in ``"YYYY-MM-DD HH:MM:SS"`` format.
+
+Full Example
+~~~~~~~~~~~~
+
+A complete samples JSON file with all available parameters:
+
+.. code-block:: json
+
+   {
+       "data_root": "/mnt/data/project",
+       "animals": [
+           {"id": "AM3", "gene": "WT", "sex": "Male"},
+           {"id": "AM5", "gene": "Het", "sex": "Male",
+            "bad_channels": ["LHip", "RHip"]},
+           {"id": "AP3B2homo-240-M", "gene": "HOMO", "sex": "Male",
+            "pattern": "{data_root}/PortA-*PortB-*/{animal}*_ColMajor_{index}.rhd",
+            "manual_datetime": "2025-11-27 15:39:05",
+            "lro_kwargs": {"mode": "si"},
+            "bad_channels": {
+                "Session_Nov27": ["LMot"],
+                "Session_Nov28": ["LMot", "RAud"]
+            }}
+       ],
+       "LR_ALIASES": {"L": ["0", "1", "2", "3", "4"],
+                       "R": ["5", "6", "7", "8", "9"]},
+       "CHNAME_ALIASES": {"Aud": ["0", "5"], "Vis": ["1", "6"],
+                          "Hip": ["2", "7"], "Bar": ["3", "8"],
+                          "Mot": ["4", "9"]}
    }
 
 Step 2: Create Dataset Config
