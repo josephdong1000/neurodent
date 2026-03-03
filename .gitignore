@@ -66,4 +66,4 @@ config/config.local.yaml
 
 docs/_build/
 docs/quickstart/output/
-**/generated/
+**/generated/.snakemake/
