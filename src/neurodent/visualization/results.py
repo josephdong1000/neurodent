@@ -1,4 +1,5 @@
 import copy
+import fnmatch
 import glob
 import json
 import logging
@@ -116,7 +117,9 @@ class AnimalOrganizer(AnimalFeatureParser):
 
         animal_id (str | None, optional): Animal ID to filter discovered files.
             If provided, only files matching this animal ID will be included.
-        skip_sessions (list[str], optional): Session identifiers to exclude. Defaults to [].
+        skip_sessions (list[str], optional): Glob patterns for sessions to exclude.
+            Uses fnmatch-style wildcards (``*``, ``?``, ``[seq]``).
+            E.g. ``["*bad*", "corrupted_*"]``. Defaults to [].
         truncate (bool | int, optional): If True, truncate to first 10 sessions.
             If an integer, truncate to first n sessions. Defaults to False.
         assume_from_number (bool, optional): Whether to parse channel names as numbers
@@ -212,7 +215,7 @@ class AnimalOrganizer(AnimalFeatureParser):
             if self._normalize_session is not None:
                 session = self._normalize_session(session)
 
-            if session in skip_sessions:
+            if any(fnmatch.fnmatch(session, pat) for pat in skip_sessions):
                 continue
 
             if session not in self._animalday_folder_groups:
