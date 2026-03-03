@@ -43,7 +43,7 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
     """
 
     # Set up paths and parameters
-    data_parent_folder = Path(samples_config["data_parent_folder"])
+    data_root = Path(samples_config.get("data_root", samples_config.get("data_parent_folder", "")))
 
     # Set temp directory
     core.set_temp_directory(config["temp_directory"])
@@ -144,7 +144,7 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
                     )
 
                 logger.info(f"  -> File pattern: {effective_pattern}")
-                base_path = str(data_parent_folder / folder_path)
+                base_path = str(data_root / folder_path)
                 discovery_pattern = resolve_animal_pattern(
                     effective_pattern,
                     source_animal_id,

@@ -263,27 +263,37 @@ class TestExpandAnimalsConfig:
 
     def test_no_animals_key_returns_copy(self):
         """Config without 'animals' key is returned as a deep copy."""
-        original = {"data_parent_folder": "/data", "ANIMAL_METADATA": [{"id": "X"}]}
+        original = {"data_root": "/data", "ANIMAL_METADATA": [{"id": "X"}]}
         result = expand_animals_config(original)
         assert result == original
         assert result is not original
 
-    def test_data_root_alias(self):
-        """'data_root' is renamed to 'data_parent_folder'."""
+    def test_data_root_is_canonical(self):
+        """'data_root' remains as 'data_root' (canonical key)."""
         cfg = {"data_root": "/my/root", "animals": [{"id": "A", "gene": "WT", "sex": "M"}]}
         result = expand_animals_config(cfg)
-        assert result["data_parent_folder"] == "/my/root"
-        assert "data_root" not in result
+        assert result["data_root"] == "/my/root"
+        assert "data_parent_folder" not in result
 
-    def test_data_root_does_not_overwrite_data_parent_folder(self):
-        """If both data_root and data_parent_folder exist, data_parent_folder wins."""
+    def test_data_parent_folder_migrated_to_data_root(self):
+        """Legacy 'data_parent_folder' is migrated to 'data_root'."""
         cfg = {
-            "data_root": "/root",
-            "data_parent_folder": "/parent",
+            "data_parent_folder": "/legacy/path",
             "animals": [{"id": "A", "gene": "WT", "sex": "M"}],
         }
         result = expand_animals_config(cfg)
-        assert result["data_parent_folder"] == "/parent"
+        assert result["data_root"] == "/legacy/path"
+        assert "data_parent_folder" not in result
+
+    def test_data_root_takes_precedence_over_legacy(self):
+        """If both data_root and data_parent_folder exist, data_root wins."""
+        cfg = {
+            "data_root": "/new",
+            "data_parent_folder": "/legacy",
+            "animals": [{"id": "A", "gene": "WT", "sex": "M"}],
+        }
+        result = expand_animals_config(cfg)
+        assert result["data_root"] == "/new"
 
     def test_builds_animal_metadata(self):
         """ANIMAL_METADATA list is built from the animals entries."""
@@ -312,7 +322,6 @@ class TestExpandAnimalsConfig:
                     "pattern": "custom/{index}.nwb",
                     "lro_kwargs": {"mode": "si"},
                     "manual_datetime": "2025-01-01 10:00:00",
-                    "folders": ["f1"],
                     "day_parse_kwargs": {"date_patterns": []},
                 },
             ],
@@ -322,46 +331,20 @@ class TestExpandAnimalsConfig:
         assert "pattern" not in meta
         assert "lro_kwargs" not in meta
         assert "manual_datetime" not in meta
-        assert "folders" not in meta
         assert "day_parse_kwargs" not in meta
         assert meta["id"] == "X1"
         assert meta["gene"] == "WT"
 
-    def test_builds_data_folders_to_animal_ids(self):
-        """data_folders_to_animal_ids is built from animals' folders field."""
+    def test_no_data_folders_to_animal_ids_generated(self):
+        """Unified format does NOT produce data_folders_to_animal_ids."""
         cfg = {
             "data_root": "/data",
             "animals": [
-                {"id": "A10", "gene": "WT", "sex": "M", "folders": ["raw"]},
-                {"id": "F22", "gene": "KO", "sex": "F", "folders": ["raw"]},
+                {"id": "A10", "gene": "WT", "sex": "M"},
             ],
         }
         result = expand_animals_config(cfg)
-        d2a = result["data_folders_to_animal_ids"]
-        assert d2a == {"raw": ["A10", "F22"]}
-
-    def test_animals_without_folders_get_empty_string_folder(self):
-        """Animals with no folders field default to empty string folder."""
-        cfg = {
-            "data_root": "/data",
-            "animals": [{"id": "A10", "gene": "WT", "sex": "M"}],
-        }
-        result = expand_animals_config(cfg)
-        d2a = result["data_folders_to_animal_ids"]
-        assert d2a == {"": ["A10"]}
-
-    def test_multiple_folders_per_animal(self):
-        """Animals with multiple folders appear in all of them."""
-        cfg = {
-            "data_root": "/data",
-            "animals": [
-                {"id": "A10", "gene": "WT", "sex": "M", "folders": ["session1", "session2"]},
-            ],
-        }
-        result = expand_animals_config(cfg)
-        d2a = result["data_folders_to_animal_ids"]
-        assert "A10" in d2a["session1"]
-        assert "A10" in d2a["session2"]
+        assert "data_folders_to_animal_ids" not in result
 
     def test_builds_manual_datetimes(self):
         """manual_datetimes is built from animals' manual_datetime field."""
@@ -436,28 +419,13 @@ class TestExpandAnimalsConfig:
         cfg = {
             "data_root": "/data",
             "animals": [
-                {"id": "A10", "gene": "WT", "sex": "M", "folders": ["raw"]},
+                {"id": "A10", "gene": "WT", "sex": "M"},
             ],
         }
         original_animals = cfg["animals"][0].copy()
         expand_animals_config(cfg)
         assert cfg["animals"][0] == original_animals
-        assert "data_parent_folder" not in cfg
-
-    def test_preserves_existing_data_folders_to_animal_ids(self):
-        """Existing data_folders_to_animal_ids entries are preserved."""
-        cfg = {
-            "data_root": "/data",
-            "animals": [
-                {"id": "NewAnimal", "gene": "WT", "sex": "M", "folders": ["raw"]},
-            ],
-            "data_folders_to_animal_ids": {
-                "legacy_folder": ["LegacyAnimal"],
-            },
-        }
-        result = expand_animals_config(cfg)
-        assert "LegacyAnimal" in result["data_folders_to_animal_ids"]["legacy_folder"]
-        assert "NewAnimal" in result["data_folders_to_animal_ids"]["raw"]
+        assert "data_root" in cfg
 
     def test_preserves_existing_manual_datetimes(self):
         """Existing manual_datetimes entries are preserved."""
@@ -494,8 +462,8 @@ class TestExpandAnimalsConfig:
         cfg = {
             "data_root": "/mnt/data/project",
             "animals": [
-                {"id": "AM3", "gene": "WT", "sex": "Male", "folders": ["session1"]},
-                {"id": "AM5", "gene": "Het", "sex": "Male", "folders": ["session1"]},
+                {"id": "AM3", "gene": "WT", "sex": "Male"},
+                {"id": "AM5", "gene": "Het", "sex": "Male"},
                 {
                     "id": "AP3B2homo-240-M", "gene": "HOMO", "sex": "Male",
                     "pattern": "{data_root}/PortA-*PortB-*/{animal}*_ColMajor_{index}.rhd",
@@ -507,17 +475,15 @@ class TestExpandAnimalsConfig:
         }
         result = expand_animals_config(cfg)
 
-        # data_root → data_parent_folder
-        assert result["data_parent_folder"] == "/mnt/data/project"
+        # data_root stays as data_root
+        assert result["data_root"] == "/mnt/data/project"
 
         # ANIMAL_METADATA built
         meta_ids = {e["id"] for e in result["ANIMAL_METADATA"]}
         assert meta_ids == {"AM3", "AM5", "AP3B2homo-240-M"}
 
-        # data_folders_to_animal_ids built
-        d2a = result["data_folders_to_animal_ids"]
-        assert d2a["session1"] == ["AM3", "AM5"]
-        assert "AP3B2homo-240-M" in d2a[""]  # no folders specified
+        # No data_folders_to_animal_ids
+        assert "data_folders_to_animal_ids" not in result
 
         # manual_datetimes built
         assert result["manual_datetimes"]["AP3B2homo-240-M"] == "2025-11-27 15:39:05"
@@ -538,3 +504,10 @@ class TestExpandAnimalsConfig:
 
         # LR_ALIASES preserved
         assert result["LR_ALIASES"] == {"L": ["0"], "R": ["1"]}
+
+    def test_legacy_data_parent_folder_without_animals(self):
+        """Legacy config with data_parent_folder (no animals list) gets migrated."""
+        cfg = {"data_parent_folder": "/legacy/path"}
+        result = expand_animals_config(cfg)
+        assert result["data_root"] == "/legacy/path"
+        assert "data_parent_folder" not in result

@@ -140,7 +140,7 @@ class TestExampleDatasetGeneration:
     def test_samples_config_structure(self, example_dataset):
         """samples_config contains all required keys."""
         sc = example_dataset["samples_config"]
-        assert "data_parent_folder" in sc
+        assert "data_root" in sc
         assert "ANIMAL_METADATA" in sc
         assert "data_folders_to_animal_ids" in sc
         assert "GENOTYPE_ALIASES" in sc
@@ -794,15 +794,15 @@ class TestMiniRealDataset:
         return {
             "ds_config": ds_config,
             "samples_config": samples_config,
-            "data_parent_folder": Path(__file__).resolve().parents[2] / samples_config["data_parent_folder"],
+            "data_root": Path(__file__).resolve().parents[2] / samples_config["data_root"],
         }
 
     def test_mini_real_data_files_exist(self, mini_real_config):
         """Verify that the committed mini real data files are present."""
-        data_dir = mini_real_config["data_parent_folder"]
+        data_dir = mini_real_config["data_root"]
 
         for animal_dir in ["A10", "F22"]:
-            raw_dir = data_dir / "raw" / animal_dir
+            raw_dir = data_dir / animal_dir
             assert raw_dir.is_dir(), f"Missing animal directory: {raw_dir}"
             bin_files = list(raw_dir.glob("*_ColMajor.bin"))
             csv_files = list(raw_dir.glob("*_Meta.csv"))
@@ -817,7 +817,7 @@ class TestMiniRealDataset:
         ds = cfg["ds_config"]
 
         # Build absolute patterns the same way generate_wars.py does
-        base_path = str(cfg["data_parent_folder"] / "raw")
+        base_path = str(cfg["data_root"])
         patterns = [f"{base_path}/{p}" for p in ds["analysis"]["war_generation"]["pattern"]]
 
         discoverer = FileDiscoverer(patterns)
@@ -837,7 +837,7 @@ class TestMiniRealDataset:
 
         cfg = mini_real_config
         ds = cfg["ds_config"]
-        base_path = str(cfg["data_parent_folder"] / "raw")
+        base_path = str(cfg["data_root"])
         patterns = [f"{base_path}/{p}" for p in ds["analysis"]["war_generation"]["pattern"]]
 
         discoverer = FileDiscoverer(patterns)
@@ -856,7 +856,7 @@ class TestMiniRealDataset:
 
         cfg = mini_real_config
         ds = cfg["ds_config"]
-        base_path = str(cfg["data_parent_folder"] / "raw")
+        base_path = str(cfg["data_root"])
         patterns = [f"{base_path}/{p}" for p in ds["analysis"]["war_generation"]["pattern"]]
 
         orig_metadata = constants.ANIMAL_METADATA
@@ -897,7 +897,7 @@ class TestMiniRealDataset:
 
         cfg = mini_real_config
         ds = cfg["ds_config"]
-        base_path = str(cfg["data_parent_folder"] / "raw")
+        base_path = str(cfg["data_root"])
         patterns = [f"{base_path}/{p}" for p in ds["analysis"]["war_generation"]["pattern"]]
 
         orig_metadata = constants.ANIMAL_METADATA
@@ -933,7 +933,7 @@ class TestMiniRealDataset:
 
         cfg = mini_real_config
         ds = cfg["ds_config"]
-        base_path = str(cfg["data_parent_folder"] / "raw")
+        base_path = str(cfg["data_root"])
         patterns = [f"{base_path}/{p}" for p in ds["analysis"]["war_generation"]["pattern"]]
 
         # Use the extract_func string from the dataset config

@@ -1,7 +1,7 @@
 {
     "data_root": "tests/data/raw",
     "animals": [
-        {"id": "ExWT", "sex": "M", "gene": "WT", "folders": ["example_session"]},
-        {"id": "ExKO", "sex": "F", "gene": "KO", "folders": ["example_session"]}
+        {"id": "ExWT", "sex": "M", "gene": "WT"},
+        {"id": "ExKO", "sex": "F", "gene": "KO"}
     ]
 }

@@ -112,28 +112,45 @@ except ImportError:
 with open(samples_file, "r") as f:
     samples_config = json.load(f)
 
-# Expand unified "animals" list into legacy keys (if present)
+# Expand unified "animals" list into pipeline keys (if present)
 samples_config = expand_animals_config(samples_config)
 
 # Extract sample information
-DATA_FOLDERS = list(samples_config["data_folders_to_animal_ids"].keys())
+# Support both unified (animals list) and legacy (data_folders_to_animal_ids) formats
 ANIMALS = []
 ANIMAL_TO_FOLDERS_MAP = {}  # Maps slugified animal_id -> list of (folder, animal_id, original_session_key)
 ANIMAL_TO_FULL_ID_MAP = {} # Maps slugified animal_id -> original animal_id string
 
-for folder, animals in samples_config["data_folders_to_animal_ids"].items():
-    for animal in animals:
-        # We group by the animal ID to merge split sessions
+if "animals" in samples_config:
+    # Unified format: iterate directly from animals list
+    for animal_entry in samples_config["animals"]:
+        animal = animal_entry["id"]
         slugified_name = slugify(animal, allow_unicode=True)
 
         if slugified_name not in ANIMALS:
             ANIMALS.append(slugified_name)
             ANIMAL_TO_FOLDERS_MAP[slugified_name] = []
             ANIMAL_TO_FULL_ID_MAP[slugified_name] = animal
-        
-        # Store tuple of (real_folder_path, original_animal_id, config_session_key)
-        # config_session_key is 'folder' here
-        ANIMAL_TO_FOLDERS_MAP[slugified_name].append((folder, animal, folder))
+
+        # Each animal gets a single entry; pattern handles discovery
+        ANIMAL_TO_FOLDERS_MAP[slugified_name].append(("", animal, ""))
+elif "data_folders_to_animal_ids" in samples_config:
+    # Legacy format: iterate from data_folders_to_animal_ids
+    for folder, animals in samples_config["data_folders_to_animal_ids"].items():
+        for animal in animals:
+            slugified_name = slugify(animal, allow_unicode=True)
+
+            if slugified_name not in ANIMALS:
+                ANIMALS.append(slugified_name)
+                ANIMAL_TO_FOLDERS_MAP[slugified_name] = []
+                ANIMAL_TO_FULL_ID_MAP[slugified_name] = animal
+
+            ANIMAL_TO_FOLDERS_MAP[slugified_name].append((folder, animal, folder))
+else:
+    raise KeyError(
+        "Samples config must contain either 'animals' (unified format) "
+        "or 'data_folders_to_animal_ids' (legacy format)"
+    )
 
 # Build mapping for animals from joint sessions
 # These animals will have their data read from split output folders
@@ -388,7 +405,7 @@ localrules: graphs, rulegraph, filegraph, dag
 # Configuration validation
 # FIXME better to define in a json/yaml schema
 def validate_config():
-    required_keys = ["temp_directory"]  # base_folder and data_parent_folder now in samples.json
+    required_keys = ["temp_directory"]  # data_root now in samples.json
     for key in required_keys:
         if key not in config:
             raise ValueError(f"Missing required config key: {key}")

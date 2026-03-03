@@ -231,21 +231,20 @@ def deep_merge_dict(base: dict, override: dict) -> dict:
 
 
 def expand_animals_config(samples_config: dict) -> dict:
-    """Expand the unified ``animals`` list into legacy pipeline keys.
+    """Expand the unified ``animals`` list into pipeline keys.
 
     When the samples config contains an ``animals`` key (a list of animal
-    dicts), this function normalises it into the legacy keys the pipeline
-    already understands:
+    dicts), this function produces:
 
     * ``ANIMAL_METADATA`` – list of ``{id, gene, sex, ...}`` dicts
-    * ``data_folders_to_animal_ids`` – folder → [animal_id, …] mapping
     * ``manual_datetimes`` – animal_id → datetime string mapping
     * ``GENOTYPE_ALIASES`` – gene → [animal_id, …] mapping (auto-generated
       from ``gene`` field unless already present)
     * ``_animal_overrides`` – animal_id → per-animal overrides dict (pattern,
       lro_kwargs, day_parse_kwargs)
 
-    It also supports ``data_root`` as an alias for ``data_parent_folder``.
+    ``data_root`` is the canonical path key.  If the legacy key
+    ``data_parent_folder`` is present it is migrated to ``data_root``.
 
     If ``animals`` is not present the config is returned unchanged (a deep
     copy is always made so the caller never sees mutations).
@@ -258,7 +257,7 @@ def expand_animals_config(samples_config: dict) -> dict:
     Returns
     -------
     dict
-        Expanded configuration with legacy keys populated.
+        Expanded configuration with pipeline keys populated.
 
     Examples
     --------
@@ -268,10 +267,10 @@ def expand_animals_config(samples_config: dict) -> dict:
         ...     "data_root": "/data",
         ...     "animals": [
         ...         {"id": "A10", "gene": "WT", "sex": "M"},
-        ...         {"id": "F22", "gene": "KO", "sex": "F", "folders": ["raw"]},
+        ...         {"id": "F22", "gene": "KO", "sex": "F"},
         ...     ],
         ... })
-        >>> cfg["data_parent_folder"]
+        >>> cfg["data_root"]
         '/data'
         >>> "A10" in dict([(e["id"], e) for e in cfg["ANIMAL_METADATA"]])
         True
@@ -294,9 +293,9 @@ def expand_animals_config(samples_config: dict) -> dict:
     """
     result = copy.deepcopy(samples_config)
 
-    # data_root → data_parent_folder alias
-    if "data_root" in result and "data_parent_folder" not in result:
-        result["data_parent_folder"] = result.pop("data_root")
+    # Migrate legacy data_parent_folder → data_root
+    if "data_parent_folder" in result and "data_root" not in result:
+        result["data_root"] = result.pop("data_parent_folder")
 
     if "animals" not in result:
         return result
@@ -304,7 +303,7 @@ def expand_animals_config(samples_config: dict) -> dict:
     animals_list = result["animals"]
 
     # Keys that are per-animal overrides (not core metadata)
-    _OVERRIDE_KEYS = {"pattern", "lro_kwargs", "day_parse_kwargs", "manual_datetime", "folders"}
+    _OVERRIDE_KEYS = {"pattern", "lro_kwargs", "day_parse_kwargs", "manual_datetime"}
     _METADATA_SKIP = _OVERRIDE_KEYS  # excluded from ANIMAL_METADATA entries
 
     # --- Build ANIMAL_METADATA ---
@@ -317,23 +316,6 @@ def expand_animals_config(samples_config: dict) -> dict:
             meta_entry = {k: v for k, v in animal.items() if k not in _METADATA_SKIP}
             result["ANIMAL_METADATA"].append(meta_entry)
             existing_ids.add(animal["id"])
-
-    # --- Build data_folders_to_animal_ids ---
-    if "data_folders_to_animal_ids" not in result:
-        result["data_folders_to_animal_ids"] = {}
-    d2a = result["data_folders_to_animal_ids"]
-
-    for animal in animals_list:
-        folders = animal.get("folders", [])
-        if not folders:
-            # Animals without explicit folders get an empty-string folder
-            # (data directly under data_parent_folder)
-            folders = [""]
-        for folder in folders:
-            if folder not in d2a:
-                d2a[folder] = []
-            if animal["id"] not in d2a[folder]:
-                d2a[folder].append(animal["id"])
 
     # --- Build manual_datetimes ---
     if "manual_datetimes" not in result:
