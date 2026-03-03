@@ -144,11 +144,10 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
                     )
 
                 logger.info(f"  -> File pattern: {effective_pattern}")
-                base_path = str(data_root / folder_path)
                 discovery_pattern = resolve_animal_pattern(
                     effective_pattern,
                     source_animal_id,
-                    base_path,
+                    data_root=str(data_root),
                 )
                 logger.info(f"  -> Discovery pattern: {discovery_pattern}")
 

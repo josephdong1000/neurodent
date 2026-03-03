@@ -681,12 +681,12 @@ class TestPerAnimalPatternDict:
 
         # Per-animal pattern dict with heterogeneous patterns
         pattern_config = {
-            "A10": "{animal}/{session}/{index}.rhd",
+            "A10": "{data_root}/{animal}/{session}/{index}.rhd",
             "B5": [
-                "{animal}/{session}/{index}.bin",
-                "{animal}/{session}/{index}.csv",
+                "{data_root}/{animal}/{session}/{index}.bin",
+                "{data_root}/{animal}/{session}/{index}.csv",
             ],
-            "C9": "{animal}/{session}/{index}.rhd",
+            "C9": "{data_root}/{animal}/{session}/{index}.rhd",
         }
 
         # Verify string pattern resolves to string
@@ -708,30 +708,37 @@ class TestPerAnimalPatternDict:
         from neurodent.workflow.utils import resolve_animal_pattern
 
         pattern_config = {
-            "A10": "{animal}/{session}/{index}.rhd",
-            "B5": ["{animal}/{session}/{index}.bin", "{animal}/{session}/{index}.csv"],
+            "A10": "{data_root}/{animal}/{session}/{index}.rhd",
+            "B5": ["{data_root}/{animal}/{session}/{index}.bin", "{data_root}/{animal}/{session}/{index}.csv"],
         }
 
         with pytest.raises(KeyError, match="C9"):
             resolve_animal_pattern(pattern_config, "C9", "/data")
 
-    def test_shared_pattern_backward_compatible(self):
-        """Shared string/list pattern still works (backward compatibility)."""
+    def test_shared_pattern_with_data_root(self):
+        """Shared string/list pattern with {data_root} substitution."""
         from neurodent.workflow.utils import resolve_animal_pattern
 
         # String pattern
-        result = resolve_animal_pattern("{animal}/{index}.nwb", "A10", "/data")
+        result = resolve_animal_pattern("{data_root}/{animal}/{index}.nwb", "A10", "/data")
         assert result == "/data/{animal}/{index}.nwb"
 
         # List pattern
         result = resolve_animal_pattern(
-            ["{animal}/{index}.bin", "{animal}/{index}.csv"],
+            ["{data_root}/{animal}/{index}.bin", "{data_root}/{animal}/{index}.csv"],
             "A10",
             "/data",
         )
         assert isinstance(result, list)
         assert len(result) == 2
         assert result[0] == "/data/{animal}/{index}.bin"
+
+    def test_pattern_without_data_root_unchanged(self):
+        """Patterns without {data_root} are returned as-is."""
+        from neurodent.workflow.utils import resolve_animal_pattern
+
+        result = resolve_animal_pattern("{animal}/{index}.nwb", "A10", "/data")
+        assert result == "{animal}/{index}.nwb"
 
 
 # ---------------------------------------------------------------------------
