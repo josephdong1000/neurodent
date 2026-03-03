@@ -2,6 +2,6 @@
     "data_root": "tests/data/raw",
     "animals": [
         {"id": "ExWT", "sex": "M", "gene": "WT"},
-        {"id": "ExKO", "sex": "F", "gene": "KO"}
+        {"id": "ExKO", "sex": "F", "gene": "KO", "bad_channels": ["LHip", "RHip"]}
     ]
 }

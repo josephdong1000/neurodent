@@ -240,6 +240,8 @@ def expand_animals_config(samples_config: dict) -> dict:
     * ``manual_datetimes`` – animal_id → datetime string mapping
     * ``GENOTYPE_ALIASES`` – gene → [animal_id, …] mapping (auto-generated
       from ``gene`` field unless already present)
+    * ``bad_channels`` – animal_id → {session → [channels]} mapping
+      (built from per-animal ``bad_channels`` entries)
     * ``_animal_overrides`` – animal_id → per-animal overrides dict (pattern,
       lro_kwargs, day_parse_kwargs)
 
@@ -290,6 +292,30 @@ def expand_animals_config(samples_config: dict) -> dict:
         '{data_root}/custom/{animal}_{index}.rhd'
         >>> cfg["manual_datetimes"]["X1"]
         '2025-01-01 10:00:00'
+
+    Bad channels (list format for all sessions)::
+
+        >>> cfg = expand_animals_config({
+        ...     "data_root": "/data",
+        ...     "animals": [
+        ...         {"id": "A10", "gene": "WT", "sex": "M",
+        ...          "bad_channels": ["LHip", "RHip"]},
+        ...     ],
+        ... })
+        >>> cfg["bad_channels"]["A10"]
+        {'_all': ['LHip', 'RHip']}
+
+    Bad channels (dict format for per-session)::
+
+        >>> cfg = expand_animals_config({
+        ...     "data_root": "/data",
+        ...     "animals": [
+        ...         {"id": "A10", "gene": "WT", "sex": "M",
+        ...          "bad_channels": {"Session1": ["LHip"], "Session2": ["RMot"]}},
+        ...     ],
+        ... })
+        >>> cfg["bad_channels"]["A10"]
+        {'Session1': ['LHip'], 'Session2': ['RMot']}
     """
     result = copy.deepcopy(samples_config)
 
@@ -303,7 +329,7 @@ def expand_animals_config(samples_config: dict) -> dict:
     animals_list = result["animals"]
 
     # Keys that are per-animal overrides (not core metadata)
-    _OVERRIDE_KEYS = {"pattern", "lro_kwargs", "day_parse_kwargs", "manual_datetime"}
+    _OVERRIDE_KEYS = {"pattern", "lro_kwargs", "day_parse_kwargs", "manual_datetime", "bad_channels"}
     _METADATA_SKIP = _OVERRIDE_KEYS  # excluded from ANIMAL_METADATA entries
 
     # --- Build ANIMAL_METADATA ---
@@ -333,6 +359,19 @@ def expand_animals_config(samples_config: dict) -> dict:
                 gene_to_animals.setdefault(gene, []).append(animal["id"])
         if gene_to_animals:
             result["GENOTYPE_ALIASES"] = gene_to_animals
+
+    # --- Build bad_channels ---
+    if "bad_channels" not in result:
+        result["bad_channels"] = {}
+    for animal in animals_list:
+        if "bad_channels" in animal:
+            bc = animal["bad_channels"]
+            if isinstance(bc, list):
+                # List format: channels bad across all sessions
+                result["bad_channels"][animal["id"]] = {"_all": bc}
+            elif isinstance(bc, dict):
+                # Dict format: session → bad channels mapping
+                result["bad_channels"][animal["id"]] = bc
 
     # --- Build _animal_overrides ---
     overrides: dict[str, dict] = {}
