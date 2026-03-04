@@ -98,9 +98,12 @@ class TestManualDatetimesEdgeCases:
 
         # Should raise ValueError because folder1's item name is not in the dict
         # (the animal ID key is no longer unwrapped)
-        with pytest.raises(ValueError, match="Missing entries in manual_datetimes for items"):
+        with pytest.raises(ValueError, match="Missing entries in manual_datetimes for items") as exc_info:
             results.AnimalOrganizer(
                 pattern=f"{self.base_path}/WT_{{animal}}_{{session}}",
                 animal_id=self.animal_id,
                 lro_kwargs={"manual_datetimes": shadowing_config},
             )
+
+        # Verify the missing item is the one whose key was only under the animal ID
+        assert f"WT_{self.animal_id}_2023-01-15" in str(exc_info.value)

@@ -581,27 +581,25 @@ class AnimalOrganizer(AnimalFeatureParser):
                 logging.info(
                     f"manual_datetimes keys match items for {self.animal_id}. Treating as item mapping."
                 )
-                out = {}
                 if not animal_items:
                     raise ValueError(
                         f"Manual timestamps provided for '{self.animal_id}' but no items found."
                     )
+                missing = [
+                    name for name in item_names
+                    if name not in manual_datetimes
+                ]
+                if missing:
+                    raise ValueError(
+                        f"Missing entries in manual_datetimes for items: {missing}."
+                    )
+                out = {}
                 for item in animal_items:
                     fname = self._get_item_name(item)
-                    if fname in manual_datetimes:
-                        context_path = self._get_context_path(item)
-                        out[fname] = self._resolve_timestamp_input(
-                            manual_datetimes[fname], context_path
-                        )
-                    else:
-                        missing = [
-                            self._get_item_name(f)
-                            for f in animal_items
-                            if self._get_item_name(f) not in manual_datetimes
-                        ]
-                        raise ValueError(
-                            f"Missing entries in manual_datetimes for items: {missing}."
-                        )
+                    context_path = self._get_context_path(item)
+                    out[fname] = self._resolve_timestamp_input(
+                        manual_datetimes[fname], context_path
+                    )
                 return out
 
             elif has_session_keys:
