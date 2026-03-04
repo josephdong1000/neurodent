@@ -820,5 +820,101 @@ class TestAnimalOrganizerTimestampHandling:
             )
 
 
+class TestComputeGlobalTimelineNaturalSort:
+    """Regression tests for natural-sort ordering in _compute_global_timeline.
+
+    Issue: files named with numeric suffixes (e.g. MHET-0 through MHET-12) were
+    ordered alphabetically ('MHET-10' < 'MHET-1_') instead of numerically
+    (MHET-0, MHET-1, ..., MHET-12), causing manual timestamps to be assigned
+    to the wrong recordings.
+    """
+
+    def test_natural_sort_order_with_numeric_suffixes(self):
+        """Verify items are ordered numerically (0,1,...,12) not alphabetically (0,10,11,12,1,...)."""
+        from neurodent.core.discovery import _natural_sort_key
+
+        # Simulate 13 item names matching the real-world pattern from the bug report
+        item_names = [f"MHET-{i}_ColMajor.bin..." for i in range(13)]
+
+        # Alphabetical order differs from numerical: "MHET-10" < "MHET-1_"
+        alphabetical_order = sorted(item_names)
+        natural_order = sorted(item_names, key=_natural_sort_key)
+
+        # Confirm the orders differ — this is the precondition for the bug
+        assert alphabetical_order != natural_order, (
+            "Precondition failed: alphabetical and natural orders should differ for these names"
+        )
+
+        # Build an animalday_to_items dict keyed by item name (as _compute_global_timeline receives)
+        # Use simple string sentinels as "items"
+        animalday_to_items = {name: [name] for name in item_names}
+
+        # Create a minimal mock AnimalOrganizer that supports _compute_global_timeline
+        with patch("neurodent.visualization.results.core.LongRecordingOrganizer") as mock_lro_class:
+            mock_lro_class.side_effect = lambda item, **kwargs: _make_mock_lro(1800.0)
+
+            ao = _make_minimal_ao()
+            # Patch _get_item_name to return the item string itself (items are already strings)
+            ao._get_item_name = lambda item: item
+
+            base_dt = datetime(2025, 5, 10, 10, 0, 0)
+            processed = ao._compute_global_timeline(
+                base_dt,
+                animalday_to_items,
+                {},
+                original_manual_datetimes=base_dt,
+            )
+
+        # Verify every item got a timestamp
+        assert set(processed.keys()) == set(item_names)
+
+        # Timestamps must increase in natural (numeric) order, not alphabetical order
+        natural_sorted_names = sorted(item_names, key=_natural_sort_key)
+        timestamps_in_natural_order = [processed[n] for n in natural_sorted_names]
+
+        for i in range(len(timestamps_in_natural_order) - 1):
+            assert timestamps_in_natural_order[i] < timestamps_in_natural_order[i + 1], (
+                f"Timestamp for {natural_sorted_names[i]} ({timestamps_in_natural_order[i]}) "
+                f"is not before {natural_sorted_names[i+1]} ({timestamps_in_natural_order[i+1]}). "
+                "Items may be ordered alphabetically instead of numerically."
+            )
+
+        # The item after MHET-9 must be MHET-10, not MHET-1
+        # (i.e. MHET-1 timestamp < MHET-10 timestamp)
+        assert processed["MHET-1_ColMajor.bin..."] < processed["MHET-10_ColMajor.bin..."], (
+            "MHET-1 should be assigned an earlier timestamp than MHET-10 (natural sort), "
+            "but got the reverse (alphabetical sort bug)."
+        )
+
+        # The actual ordering in processed timestamps should match natural_order
+        timestamps_sorted_by_value = sorted(processed.keys(), key=lambda k: processed[k])
+        assert timestamps_sorted_by_value == natural_order, (
+            f"Timestamps assigned in wrong order.\n"
+            f"  Expected (natural): {natural_order}\n"
+            f"  Got:                {timestamps_sorted_by_value}"
+        )
+
+
+def _make_mock_lro(duration_seconds=1800.0):
+    """Return a minimal mock LRO with a fixed recording duration."""
+    mock_lro = Mock()
+    mock_lro.channel_names = ["ch1"]
+    mock_lro.meta = Mock(f_s=1000, n_channels=1)
+    mock_lro.file_durations = [duration_seconds]
+    mock_recording = Mock()
+    mock_recording.get_duration.return_value = duration_seconds
+    mock_lro.LongRecording = mock_recording
+    mock_lro.file_end_datetimes = [None]
+    return mock_lro
+
+
+def _make_minimal_ao():
+    """Return a bare AnimalOrganizer-like object with the methods _compute_global_timeline needs."""
+    ao = object.__new__(results.AnimalOrganizer)
+    # Provide the minimum attributes used by _compute_global_timeline / _sort_lros_by_median_time
+    ao.animal_id = "test_animal"
+    return ao
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
