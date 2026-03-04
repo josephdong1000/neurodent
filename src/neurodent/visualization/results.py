@@ -408,19 +408,21 @@ class AnimalOrganizer(AnimalFeatureParser):
             f"starting at {base_datetime}"
         )
 
+        from ..core.discovery import _natural_sort_key
+
         ordered_items = []
         if original_manual_datetimes is not None:
             if isinstance(original_manual_datetimes, list):
-                for animalday in sorted(animalday_to_items.keys()):
+                for animalday in sorted(animalday_to_items.keys(), key=_natural_sort_key):
                     items = animalday_to_items[animalday]
                     ordered_items.extend(items)
             else:
-                for animalday in sorted(animalday_to_items.keys()):
+                for animalday in sorted(animalday_to_items.keys(), key=_natural_sort_key):
                     items = animalday_to_items[animalday]
-                    sorted_items = sorted(items, key=lambda f: self._get_item_name(f))
+                    sorted_items = sorted(items, key=lambda f: _natural_sort_key(self._get_item_name(f)))
                     ordered_items.extend(sorted_items)
         else:
-            for animalday in sorted(animalday_to_items.keys()):
+            for animalday in sorted(animalday_to_items.keys(), key=_natural_sort_key):
                 items = animalday_to_items[animalday]
                 if len(items) > 1:
                     item_lro_pairs = []
