@@ -192,7 +192,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                     stacklevel=2,
                 )
 
-        from neurodent.core.discovery import FileDiscoverer, MultiFileGroup
+        from neurodent.core.discovery import FileDiscoverer
 
         self.discoverer = FileDiscoverer(pattern)
 

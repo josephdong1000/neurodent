@@ -1,9 +1,8 @@
 import os
-import warnings
 
 import pytest
 from pathlib import Path
-from neurodent.core.discovery import DiscoveredFile, FileDiscoverer, MultiFileGroup
+from neurodent.core.discovery import DiscoveredFile, FileDiscoverer
 
 
 def test_single_file_discovery(tmp_path):
@@ -156,16 +155,6 @@ class TestDiscoveredFileEdgeCases:
         with pytest.raises(KeyError):
             _ = df["nonexistent"]
 
-
-class TestMultiFileGroupDeprecation:
-    """MultiFileGroup should emit DeprecationWarning."""
-
-    def test_deprecation_warning(self):
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            mfg = MultiFileGroup(paths=("/a.bin", "/b.csv"), metadata={"animal": "A10"})
-            assert any(issubclass(x.category, DeprecationWarning) for x in w)
-            assert mfg.paths == ("/a.bin", "/b.csv")
 
 
 # ---------------------------------------------------------------------------
