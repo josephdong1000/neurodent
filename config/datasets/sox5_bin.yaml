@@ -11,6 +11,7 @@ analysis:
       - "{data_root}/*/*{animal}*/{session}/*-{index}_ColMajor.bin"
       - "{data_root}/*/*{animal}*/{session}/*-{index}_Meta.csv"
     assume_from_number: true
+    datetimes_are_start: false
     lro_kwargs:
       mode: "si"
       extract_func: "tests/data/readers.py:read_bin_csv_pair"
