@@ -727,7 +727,17 @@ class AnimalOrganizer(AnimalFeatureParser):
                 )
                 item_lro_pairs = []
                 for item in items:
-                    individual_lro = core.LongRecordingOrganizer(item, **kwargs)
+                    individual_kwargs = kwargs.copy()
+                    # Distribute per-item timestamp so each LRO gets its own
+                    if getattr(self, "_processed_timestamps", None) is not None:
+                        item_name = self._get_item_name(item)
+                        if item_name in self._processed_timestamps:
+                            individual_kwargs["manual_datetimes"] = (
+                                self._processed_timestamps[item_name]
+                            )
+                    individual_lro = core.LongRecordingOrganizer(
+                        item, **individual_kwargs
+                    )
                     item_lro_pairs.append((item, individual_lro))
 
                 sorted_folder_lro_pairs = self._sort_lros_by_median_time(item_lro_pairs)

@@ -752,5 +752,73 @@ class TestAnimalOrganizerTimestampHandling:
             )
 
 
+    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    @patch("glob.glob")
+    def test_multi_item_animalday_passes_per_item_timestamp(
+        self, mock_glob, mock_lro_class
+    ):
+        """Each individual LRO in a multi-item animalday gets its own timestamp.
+
+        Regression test: previously the full list of timestamps was passed to
+        every individual LRO, causing ``manual_datetimes length (N) must match
+        number of input files (1)`` errors in SI mode.
+        """
+        # Setup: three folders that normalize into ONE animalday
+        overlap_dir = self.base_path / "multi_item_test"
+        overlap_dir.mkdir(parents=True, exist_ok=True)
+
+        folder_a = overlap_dir / f"WT_{self.animal_id}_2023-01-15"
+        folder_b = overlap_dir / f"WT_{self.animal_id}_2023-01-15(1)"
+        folder_c = overlap_dir / f"WT_{self.animal_id}_2023-01-15(2)"
+
+        for folder in [folder_a, folder_b, folder_c]:
+            folder.mkdir(parents=True, exist_ok=True)
+            (folder / "dummy_ColMajor_001.bin").touch()
+
+        mock_glob.return_value = [str(folder_a), str(folder_b), str(folder_c)]
+
+        # Track the kwargs each LRO receives
+        lro_init_kwargs = []
+
+        def mock_lro_side_effect(*args, **kwargs):
+            lro_init_kwargs.append(kwargs.copy())
+            mock_lro = Mock()
+            mock_lro.channel_names = ["LMot", "RMot"]
+            mock_lro.meta = Mock()
+            mock_recording = Mock()
+            mock_recording.get_num_samples.return_value = 100_000
+            mock_recording.get_sampling_frequency.return_value = 1000.0
+            mock_recording.get_duration.return_value = 100.0
+            mock_lro.LongRecording = mock_recording
+            base_time = datetime(2023, 1, 15, 8, 0, 0)
+            mock_lro.file_end_datetimes = [base_time + timedelta(seconds=100)]
+            mock_lro.merge = Mock()
+            return mock_lro
+
+        mock_lro_class.side_effect = mock_lro_side_effect
+
+        # Single global start time — this is the scenario from the issue
+        global_start = datetime(2023, 1, 15, 10, 0, 0)
+
+        ao = results.AnimalOrganizer(
+            pattern=str(overlap_dir) + "/WT_{animal}_{session}",
+            animal_id=self.animal_id,
+            lro_kwargs={"manual_datetimes": global_start},
+            normalize_session=lambda s: re.sub(r"\(\d+\)$", "", s),
+        )
+
+        # Should produce 1 merged LRO (3 items collapsed into 1 animalday)
+        assert len(ao.long_recordings) == 1
+
+        # Each of the 3 individual LRO creations must receive a single
+        # datetime, NOT a list of 3 timestamps.
+        for kw in lro_init_kwargs:
+            md = kw.get("manual_datetimes")
+            assert not isinstance(md, list), (
+                f"Individual LRO received a list of timestamps ({md!r}) instead "
+                "of a single datetime; this would cause a length-mismatch error"
+            )
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
