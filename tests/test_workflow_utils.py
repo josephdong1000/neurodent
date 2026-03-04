@@ -357,6 +357,41 @@ class TestExpandAnimalsConfig:
         result = expand_animals_config(cfg)
         assert result["manual_datetimes"] == {"A10": "2025-01-01 10:00:00"}
 
+    def test_datetimes_are_start_propagated_to_lro_kwargs(self):
+        """datetimes_are_start on animal entry propagates to lro_kwargs override."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {
+                    "id": "A10", "gene": "WT", "sex": "M",
+                    "manual_datetime": "2025-01-01 10:00:00",
+                    "datetimes_are_start": False,
+                },
+                {"id": "F22", "gene": "KO", "sex": "F"},
+            ],
+        }
+        result = expand_animals_config(cfg)
+        assert result["_animal_overrides"]["A10"]["lro_kwargs"]["datetimes_are_start"] is False
+        # datetimes_are_start should not appear in ANIMAL_METADATA
+        a10_meta = [e for e in result["ANIMAL_METADATA"] if e["id"] == "A10"][0]
+        assert "datetimes_are_start" not in a10_meta
+
+    def test_datetimes_are_start_does_not_override_explicit_lro_kwargs(self):
+        """Explicit lro_kwargs.datetimes_are_start takes precedence."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {
+                    "id": "A10", "gene": "WT", "sex": "M",
+                    "datetimes_are_start": False,
+                    "lro_kwargs": {"datetimes_are_start": True},
+                },
+            ],
+        }
+        result = expand_animals_config(cfg)
+        # Explicit lro_kwargs value should take precedence via setdefault
+        assert result["_animal_overrides"]["A10"]["lro_kwargs"]["datetimes_are_start"] is True
+
     def test_auto_generates_genotype_aliases(self):
         """GENOTYPE_ALIASES is auto-generated from gene field."""
         cfg = {

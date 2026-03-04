@@ -329,7 +329,7 @@ def expand_animals_config(samples_config: dict) -> dict:
     animals_list = result["animals"]
 
     # Keys that are per-animal overrides (not core metadata)
-    _OVERRIDE_KEYS = {"pattern", "lro_kwargs", "day_parse_kwargs", "manual_datetime", "bad_channels"}
+    _OVERRIDE_KEYS = {"pattern", "lro_kwargs", "day_parse_kwargs", "manual_datetime", "datetimes_are_start", "bad_channels"}
     _METADATA_SKIP = _OVERRIDE_KEYS  # excluded from ANIMAL_METADATA entries
 
     # --- Build ANIMAL_METADATA ---
@@ -380,6 +380,10 @@ def expand_animals_config(samples_config: dict) -> dict:
         for key in ("pattern", "lro_kwargs", "day_parse_kwargs"):
             if key in animal:
                 animal_overrides[key] = animal[key]
+        # Propagate datetimes_are_start into lro_kwargs override
+        if "datetimes_are_start" in animal:
+            lro_kw = animal_overrides.setdefault("lro_kwargs", {})
+            lro_kw.setdefault("datetimes_are_start", animal["datetimes_are_start"])
         if animal_overrides:
             overrides[animal["id"]] = animal_overrides
     if overrides:

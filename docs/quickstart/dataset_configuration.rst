@@ -181,9 +181,17 @@ describes all available parameters:
    * - ``manual_datetime``
      - string
      - No
-     - Recording start datetime in ``"YYYY-MM-DD HH:MM:SS"`` format.
+     - Recording **start** datetime. Accepts any standard datetime format
+       including ISO 8601 (e.g. ``"2025-05-10T10:00:00"``) and
+       ``"YYYY-MM-DD HH:MM:SS"``.
        Use this when automatic datetime parsing from filenames is unreliable
        or when files lack embedded timestamps. See :ref:`manual-datetimes`.
+   * - ``datetimes_are_start``
+     - bool
+     - No
+     - Whether ``manual_datetime`` represents the recording **start** time
+       (``true``, default) or **end** time (``false``).
+       See :ref:`manual-datetimes`.
    * - ``bad_channels``
      - list or dict
      - No
@@ -297,8 +305,8 @@ per-session entries are present, the pipeline merges them automatically.
 Manual Datetimes
 ~~~~~~~~~~~~~~~~
 
-Recording start times are specified via the ``manual_datetime`` field on
-each animal entry:
+Recording timestamps are specified via the ``manual_datetime`` field on
+each animal entry. **By default this is the recording start time.**
 
 .. code-block:: json
 
@@ -306,14 +314,38 @@ each animal entry:
        "animals": [
            {
                "id": "M1", "gene": "WT", "sex": "M",
-               "manual_datetime": "2025-05-10 10:00:00"
+               "manual_datetime": "2025-05-10T10:00:00"
            }
        ]
    }
 
 This manual approach avoids the complexity and fragility of automatic
-datetime parsing from heterogeneous filename formats. Provide the
-datetime as a string in ``"YYYY-MM-DD HH:MM:SS"`` format.
+datetime parsing from heterogeneous filename formats. The value is parsed
+by ``dateutil.parser.parse``, so any standard format is accepted:
+
+* ISO 8601: ``"2025-05-10T10:00:00"`` (recommended)
+* Spaced: ``"2025-05-10 10:00:00"``
+* Date only: ``"2025-05-10"`` (midnight assumed)
+
+**Start vs. end time.** By default ``manual_datetime`` is treated as the
+recording **start** time.  To indicate an **end** time instead, set
+``datetimes_are_start`` to ``false`` on the same animal entry:
+
+.. code-block:: json
+
+   {
+       "animals": [
+           {
+               "id": "M1", "gene": "WT", "sex": "M",
+               "manual_datetime": "2025-05-10T22:00:00",
+               "datetimes_are_start": false
+           }
+       ]
+   }
+
+Alternatively, ``datetimes_are_start`` can be set inside the ``lro_kwargs``
+dict on the animal entry or in the global ``lro_kwargs`` of the dataset
+config YAML.
 
 Full Example
 ~~~~~~~~~~~~
@@ -330,7 +362,7 @@ A complete samples JSON file with all available parameters:
             "bad_channels": ["LHip", "RHip"]},
            {"id": "AP3B2homo-240-M", "gene": "HOMO", "sex": "Male",
             "pattern": "{data_root}/PortA-*PortB-*/{animal}*_ColMajor_{index}.rhd",
-            "manual_datetime": "2025-11-27 15:39:05",
+            "manual_datetime": "2025-11-27T15:39:05",
             "lro_kwargs": {"mode": "si"},
             "bad_channels": {
                 "Session_Nov27": ["LMot"],
