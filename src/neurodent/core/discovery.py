@@ -6,6 +6,7 @@ from typing import Union, Dict, List, Tuple, Optional
 import warnings
 
 
+
 def _natural_sort_key(s: str):
     """Split *s* into text and numeric chunks for natural ordering.
 
@@ -97,21 +98,6 @@ class DiscoveredFile(os.PathLike):
         if self.is_multi_file:
             return f"DiscoveredFile(paths={self.paths}, metadata={self.metadata})"
         return f"DiscoveredFile(path={self.path!r}, metadata={self.metadata})"
-
-
-# Deprecated: Keep MultiFileGroup for backward compatibility
-class MultiFileGroup(DiscoveredFile):
-    """Deprecated: Use DiscoveredFile instead.
-
-    This class is maintained for backward compatibility but will be removed in a future version.
-    """
-    def __init__(self, paths: tuple[str, ...], metadata: dict):
-        warnings.warn(
-            "MultiFileGroup is deprecated. Use DiscoveredFile(paths=..., metadata=...) instead.",
-            DeprecationWarning,
-            stacklevel=2
-        )
-        super().__init__(paths=paths, metadata=metadata)
 
 
 class FileDiscoverer:

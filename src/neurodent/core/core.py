@@ -467,10 +467,10 @@ class LongRecordingOrganizer:
     Construct a long recording from various file formats or an existing recording object.
 
     Args:
-        item (str | Path | list[str] | MultiFileGroup | None): Input data specification.
+        item (str | Path | list[str] | DiscoveredFile | None): Input data specification.
             - str/Path: Single file or directory path
             - list[str]: Multiple files to concatenate
-            - MultiFileGroup: Multiple files that should be loaded together as one unit
+            - DiscoveredFile: File(s) discovered by FileDiscoverer (single or multi-file)
             - None: Used when initializing from an existing recording object
         mode (Literal['si', 'mne', None], optional): Data loading mode. Defaults to 'si'.
             - 'si': Use SpikeInterface extractors
@@ -510,7 +510,7 @@ class LongRecordingOrganizer:
 
     def __init__(
         self,
-        item: Union[str, Path, list[str], tuple[str], "MultiFileGroup"],
+        item: Union[str, Path, list[str], tuple[str], "DiscoveredFile"],
         mode: Literal["si", "mne", None] = "si",
         truncate: Union[bool, int] = False,
         cache_policy: Literal["auto", "always", "force_regenerate"] = "auto",
@@ -747,15 +747,13 @@ class LongRecordingOrganizer:
         multiprocess_mode: Literal["dask", "serial"] = "serial",
         **kwargs,
     ):
-        from .discovery import MultiFileGroup
+        from .discovery import DiscoveredFile
 
         if si is None:
             raise ImportError("SpikeInterface is required")
 
         # Determine number of files being processed
-        if isinstance(self.item, MultiFileGroup):
-            n_processed_files = 1  # MultiFileGroup is one recording unit
-        elif isinstance(self.item, list):
+        if isinstance(self.item, list):
             n_processed_files = len(self.item)
         else:
             n_processed_files = 1
@@ -763,7 +761,6 @@ class LongRecordingOrganizer:
         self._validate_timestamps_for_mode("si", n_processed_files)
 
         # Handle different item types
-        from .discovery import DiscoveredFile
         if isinstance(self.item, DiscoveredFile):
             # DiscoveredFile: handle both single and multi-file cases
             if self.item.is_multi_file:
