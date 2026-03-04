@@ -24,7 +24,7 @@ analysis:
   # The settings below are shared across all datasets or serve as defaults
   war_generation:
     assume_from_number: true
-    skip_sessions: ["bad"]
+    skip_sessions: ["*bad*"]
     lro_kwargs:
       multiprocess_mode: "dask"
       overwrite_rowbins: false # REVIEW function of this parameter when mode is not "bin"
