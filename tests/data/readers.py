@@ -49,9 +49,11 @@ def read_bin_csv_pair(discovered_file, **kwargs):
 
     n_channels = len(rows)
     sampling_rate = float(rows[0]["SampleRate"])
+    channel_names = [row["Label"] for row in rows]
     data = np.fromfile(bin_path, dtype=np.float32).reshape(-1, n_channels)
 
     return si_core.NumpyRecording(
         traces_list=[data],
         sampling_frequency=sampling_rate,
+        channel_ids=channel_names,
     )
