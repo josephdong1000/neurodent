@@ -13,7 +13,7 @@ temp_directory: "/scr1/users/dongjp"
 # Note: samples_file is set by active_dataset (see datasets section above)
 samples:
   # Limit to first N animals (null = no limit, useful for testing)
-  num_animals: null
+  truncate_animals: null
 
   # Quality filtering parameters
   quality_filter:

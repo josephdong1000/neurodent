@@ -106,15 +106,15 @@ The ``config/config.local.yaml`` file is included in ``.gitignore`` and will not
 Testing with a Subset of Animals
 ---------------------------------
 
-When testing the pipeline, you may want to run only a small number of animals instead of the full dataset. Use the ``num_animals`` setting under ``samples`` to limit processing to the first *N* animals in the samples file:
+When testing the pipeline, you may want to run only a small number of animals instead of the full dataset. Use the ``truncate_animals`` setting under ``samples`` to limit processing to the first *N* animals in the samples file:
 
 .. code-block:: yaml
 
    # config/config.local.yaml
    samples:
-     num_animals: 2   # only process the first 2 animals
+     truncate_animals: 2   # only process the first 2 animals
 
-Set ``num_animals`` to ``null`` (the default) to process all animals.
+Set ``truncate_animals`` to ``null`` (the default) to process all animals.
 
 .. tip::
 
