@@ -12,6 +12,9 @@ temp_directory: "/scr1/users/dongjp"
 # Sample configuration
 # Note: samples_file is set by active_dataset (see datasets section above)
 samples:
+  # Limit to first N animals (null = no limit, useful for testing)
+  num_animals: null
+
   # Quality filtering parameters
   quality_filter:
     exclude_unknown_genotypes: true
