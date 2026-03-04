@@ -1073,6 +1073,25 @@ class AnimalOrganizer(AnimalFeatureParser):
         for lrec in self.long_recordings:
             lrec.cleanup_rec()
 
+    def _iter_valid_recordings(self):
+        """Yield (index, lrec) pairs, skipping recordings with zero samples.
+
+        This centralizes empty-recording validation so that compute_bad_channels,
+        compute_windowed_analysis, and compute_frequency_domain_spike_analysis
+        all share the same guard.
+        """
+        for i, lrec in enumerate(self.long_recordings):
+            if (
+                hasattr(lrec, "LongRecording")
+                and lrec.LongRecording is not None
+                and lrec.LongRecording.get_total_samples() == 0
+            ):
+                logging.warning(
+                    f"Skipping recording {i} ({lrec.display_name}): 0 total samples"
+                )
+                continue
+            yield i, lrec
+
     def compute_bad_channels(
         self, lof_threshold: float = None, force_recompute: bool = False
     ):
@@ -1086,7 +1105,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         logging.info(
             f"Computing bad channels for {len(self.long_recordings)} recordings with threshold={lof_threshold}"
         )
-        for i, lrec in enumerate(self.long_recordings):
+        for i, lrec in self._iter_valid_recordings():
             logging.debug(
                 f"Computing bad channels for recording {i}: {self.animaldays[i]}"
             )
@@ -1158,7 +1177,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         features = _sanitize_feature_request(features, exclude)
 
         dataframes = []
-        for lrec in self.long_recordings:  # Iterate over all long recordings
+        for _i, lrec in self._iter_valid_recordings():
             logging.info(f"Computing windowed analysis for {lrec.display_name}")
             lan = core.LongRecordingAnalyzer(
                 lrec, fragment_len_s=window_s, apply_notch_filter=apply_notch_filter
@@ -1332,17 +1351,14 @@ class AnimalOrganizer(AnimalFeatureParser):
         from .frequency_domain_results import FrequencyDomainSpikeAnalysisResult
 
         fdsar_list = []
-        recs = [lrec.LongRecording for lrec in self.long_recordings]
 
         logging.info(
-            f"Running frequency-domain spike detection on {len(recs)} recordings"
+            f"Running frequency-domain spike detection on {len(self.long_recordings)} recordings"
         )
         logging.info(f"Detection parameters: {detection_params}")
 
-        for i, rec in enumerate(recs):
-            if rec.get_total_samples() == 0:
-                logging.warning(f"Skipping {rec} because it has no samples")
-                continue
+        for i, lrec in self._iter_valid_recordings():
+            rec = lrec.LongRecording
 
             try:
                 # Run frequency domain spike detection
@@ -1364,7 +1380,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                     genotype=self.genotype,
                     animal_day=self.animaldays[i],
                     bin_folder_name=(
-                        getattr(self, "base_folder_names", [None] * len(recs))[i]
+                        getattr(self, "base_folder_names", [None] * len(self.long_recordings))[i]
                         if hasattr(self, "base_folder_names")
                         else None
                     ),
@@ -1377,11 +1393,11 @@ class AnimalOrganizer(AnimalFeatureParser):
                 # Log results
                 total_spikes = sum(len(spikes) for spikes in spike_indices_per_channel)
                 logging.info(
-                    f"Recording {i + 1}/{len(recs)}: Detected {total_spikes} spikes across {len(spike_indices_per_channel)} channels"
+                    f"Recording {i + 1}/{len(self.long_recordings)}: Detected {total_spikes} spikes across {len(spike_indices_per_channel)} channels"
                 )
 
             except Exception as e:
-                logging.error(f"Error processing recording {i + 1}/{len(recs)}: {e}")
+                logging.error(f"Error processing recording {i + 1}/{len(self.long_recordings)}: {e}")
                 raise
 
         # Store results for later access

@@ -1551,12 +1551,6 @@ class LongRecordingOrganizer:
 
             logging.debug(f"Computing LOF scores for {rec.__str__()}")
             rec_np = rec.get_traces(return_scaled=True)  # (n_samples, n_channels)
-
-            if rec_np is None or rec_np.size == 0:
-                logging.error(
-                    "Failed to get traces from recording - data is None or empty"
-                )
-                raise ValueError("Recording traces are None or empty")
             logging.debug(f"Got recording shape: {rec_np.shape}")
 
             if limit_memory:
