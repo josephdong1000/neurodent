@@ -8,11 +8,14 @@ samples:
 analysis:
   war_generation:
     pattern:
-      - "{animal}/{session}/{index}_ColMajor.bin"
-      - "{animal}/{session}/{index}_Meta.csv"
+      - "{data_root}/*/*{animal}*/{session}/*-{index}_ColMajor.bin"
+      - "{data_root}/*/*{animal}*/{session}/*-{index}_Meta.csv"
     assume_from_number: true
-    skip_sessions: []
     lro_kwargs:
       mode: "si"
-      extract_func: "tests.data.readers.read_bin_csv_pair"
+      extract_func: "tests/data/readers.py:read_bin_csv_pair"
       multiprocess_mode: "serial"
+
+cluster:
+  war_generation:
+    retries: 0
