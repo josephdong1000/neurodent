@@ -79,31 +79,28 @@ class TestManualDatetimesEdgeCases:
     def test_shadowing_trap_error(self, mock_glob, mock_lro_class):
         """
         Test Case 4: The 'Shadowing Trap'.
-        Dictionary has both valid Animal ID key and ignored flat folder keys.
+        Dictionary has an animal ID key (deprecated, no longer recognized) alongside
+        a flat folder key. Since animal-ID-keyed dicts are no longer supported,
+        the animal ID key is not recognized as an item or session name, and the
+        missing item raises an error.
         """
         mock_glob.return_value = [str(self.folder1), str(self.folder2)]
         mock_lro_class.return_value = self._create_mock_lro()
 
         shadowing_config = {
-            # 1. The Priority: Found ID key, used exclusively.
+            # Animal ID key — no longer recognized as a special key
             self.animal_id: {
                 f"WT_{self.animal_id}_2023-01-15": datetime(2023, 1, 1, 10, 0)
             },
-            # 2. The Shadowed Key: Flat folder key.
-            # This should be IGNORED because key #1 exists.
-            # Thus, folder2 will be considered "missing" from the spec.
+            # Flat folder key matching one item
             f"WT_{self.animal_id}_2023-01-16": datetime(2023, 1, 1, 11, 0),
         }
 
-        # Should raise ValueError because folder2 is missing from the explicit ID spec
-        # and the flat key providing it is ignored.
-        with pytest.raises(ValueError) as exc_info:
+        # Should raise ValueError because folder1's item name is not in the dict
+        # (the animal ID key is no longer unwrapped)
+        with pytest.raises(ValueError, match="Missing entries in manual_datetimes for items"):
             results.AnimalOrganizer(
                 pattern=f"{self.base_path}/WT_{{animal}}_{{session}}",
                 animal_id=self.animal_id,
                 lro_kwargs={"manual_datetimes": shadowing_config},
             )
-
-        error_msg = str(exc_info.value)
-        assert "Ambiguous manual_datetimes configuration" in error_msg
-        assert "Both the Animal ID" in error_msg and "individual item keys are present" in error_msg

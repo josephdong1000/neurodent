@@ -572,114 +572,76 @@ class AnimalOrganizer(AnimalFeatureParser):
             for items in animalday_to_items.values():
                 animal_items.extend(items)
 
-            has_id_key = self.animal_id in manual_datetimes
             item_names = {self._get_item_name(f) for f in animal_items}
             has_item_keys = any(k in item_names for k in manual_datetimes.keys())
             session_keys = set(animalday_to_items.keys())
             has_session_keys = any(k in session_keys for k in manual_datetimes.keys())
 
-            if has_id_key and has_item_keys:
-                raise ValueError(
-                    f"Ambiguous manual_datetimes configuration for '{self.animal_id}'. "
-                    f"Both the Animal ID '{self.animal_id}' and individual item keys are present."
+            if has_item_keys:
+                logging.info(
+                    f"manual_datetimes keys match items for {self.animal_id}. Treating as item mapping."
                 )
-
-            spec = manual_datetimes.get(self.animal_id)
-
-            if spec is None:
-                if has_item_keys:
-                    logging.info(
-                        f"manual_datetimes keys match items for {self.animal_id}. Treating as item mapping spec."
-                    )
-                    spec = manual_datetimes
-                elif has_session_keys:
-                    logging.info(
-                        f"manual_datetimes keys match sessions for {self.animal_id}. "
-                        "Computing per-session timelines."
-                    )
-                    out = {}
-                    missing_sessions = [
-                        k for k in animalday_to_items
-                        if k not in manual_datetimes
-                    ]
-                    if missing_sessions:
-                        raise ValueError(
-                            f"Missing entries in manual_datetimes for sessions: {missing_sessions}."
-                        )
-                    for sess_key, sess_items in animalday_to_items.items():
-                        sess_ts = manual_datetimes[sess_key]
-                        context_path = self._get_context_path(sess_items[0])
-                        resolved_dt = self._resolve_timestamp_input(
-                            sess_ts, context_path
-                        )
-                        sess_item_dict = {
-                            self._get_item_name(f): [f] for f in sess_items
-                        }
-                        sess_timeline = self._compute_global_timeline(
-                            resolved_dt,
-                            sess_item_dict,
-                            base_lro_kwargs,
-                            original_manual_datetimes=sess_ts,
-                        )
-                        out.update(sess_timeline)
-                    return out
-                else:
+                out = {}
+                if not animal_items:
                     raise ValueError(
-                        f"manual_datetimes dictionary provided, but no entry for '{self.animal_id}'."
+                        f"Manual timestamps provided for '{self.animal_id}' but no items found."
                     )
-
-            logging.info(f"Processing manual datetimes for animal '{self.animal_id}'")
-            out = {}
-
-            if not animal_items:
-                raise ValueError(
-                    f"Manual timestamps provided for '{self.animal_id}' but no items found."
-                )
-
-            if isinstance(spec, list):
-                if len(spec) != len(animal_items):
-                    raise ValueError(
-                        f"manual_datetimes list has {len(spec)} entries but animal has {len(animal_items)} items"
-                    )
-                for item, ts in zip(animal_items, spec):
-                    context_path = self._get_context_path(item)
-                    out[self._get_item_name(item)] = self._resolve_timestamp_input(
-                        ts, context_path
-                    )
-            elif isinstance(spec, dict):
                 for item in animal_items:
                     fname = self._get_item_name(item)
-                    if fname in spec:
+                    if fname in manual_datetimes:
                         context_path = self._get_context_path(item)
                         out[fname] = self._resolve_timestamp_input(
-                            spec[fname], context_path
+                            manual_datetimes[fname], context_path
                         )
                     else:
                         missing = [
                             self._get_item_name(f)
                             for f in animal_items
-                            if self._get_item_name(f) not in spec
+                            if self._get_item_name(f) not in manual_datetimes
                         ]
                         raise ValueError(
                             f"Missing entries in manual_datetimes for items: {missing}."
                         )
-            else:
-                context_path = (
-                    Path(animal_items[0][0])
-                    if isinstance(animal_items[0], (list, tuple))
-                    else Path(animal_items[0])
-                )
-                resolved_dt = self._resolve_timestamp_input(spec, context_path)
-                animalday_dict = {self._get_item_name(f): [f] for f in animal_items}
-                animal_timeline = self._compute_global_timeline(
-                    resolved_dt,
-                    animalday_dict,
-                    base_lro_kwargs,
-                    original_manual_datetimes=spec,
-                )
-                out.update(animal_timeline)
+                return out
 
-            return out
+            elif has_session_keys:
+                logging.info(
+                    f"manual_datetimes keys match sessions for {self.animal_id}. "
+                    "Computing per-session timelines."
+                )
+                out = {}
+                missing_sessions = [
+                    k for k in animalday_to_items
+                    if k not in manual_datetimes
+                ]
+                if missing_sessions:
+                    raise ValueError(
+                        f"Missing entries in manual_datetimes for sessions: {missing_sessions}."
+                    )
+                for sess_key, sess_items in animalday_to_items.items():
+                    sess_ts = manual_datetimes[sess_key]
+                    context_path = self._get_context_path(sess_items[0])
+                    resolved_dt = self._resolve_timestamp_input(
+                        sess_ts, context_path
+                    )
+                    sess_item_dict = {
+                        self._get_item_name(f): [f] for f in sess_items
+                    }
+                    sess_timeline = self._compute_global_timeline(
+                        resolved_dt,
+                        sess_item_dict,
+                        base_lro_kwargs,
+                        original_manual_datetimes=sess_ts,
+                    )
+                    out.update(sess_timeline)
+                return out
+
+            else:
+                raise ValueError(
+                    f"manual_datetimes dictionary keys don't match any item names or "
+                    f"session names for '{self.animal_id}'. "
+                    f"Keys: {list(manual_datetimes.keys())}"
+                )
 
         elif isinstance(manual_datetimes, (datetime, str)):
             start_dt = manual_datetimes
