@@ -415,6 +415,48 @@ class TestFromLros:
         actual_dates = {day.split()[-1] for day in ao.unique_animaldays}
         assert actual_dates == expected_dates
 
+    def test_from_lros_assume_from_number_propagates(self):
+        """Regression: assume_from_number=True must be passed to from_lros.
+
+        When channel names are integers ('0', '1', ...) and assume_from_number=True
+        is set in the analysis config, generate_wars.py consolidates session AOs via
+        from_lros(). Previously, assume_from_number was not forwarded to from_lros(),
+        so the resulting AnimalOrganizer had assume_from_number=False. This caused
+        WindowAnalysisResult (created by compute_windowed_analysis) to fail when calling
+        parse_chname_to_abbrev with assume_from_number=False, producing the LR_ALIASES error.
+        """
+        lro = MagicMock(spec=LongRecordingOrganizer)
+        lro.channel_names = [str(i) for i in range(10)]
+        lro.base_folder_path = Path("/mock/path/day1")
+        lro.get_date_string.return_value = "Jan-01-2023"
+
+        # from_lros without assume_from_number must default to False
+        ao_default = AnimalOrganizer.from_lros(
+            lros=[lro],
+            animal_id="TestAnimal",
+        )
+        assert ao_default.assume_from_number is False
+
+        # from_lros with assume_from_number=True must propagate the flag
+        ao_numeric = AnimalOrganizer.from_lros(
+            lros=[lro],
+            animal_id="TestAnimal",
+            assume_from_number=True,
+        )
+        assert ao_numeric.assume_from_number is True
+
+        # Document the failure mode: calling parse_chname_to_abbrev on a numeric
+        # channel name without assume_from_number raises a LR_ALIASES ValueError
+        # (this is the exact error the user saw in the bug report).
+        from neurodent.core.utils import parse_chname_to_abbrev
+        with pytest.raises(ValueError, match="LR_ALIASES"):
+            parse_chname_to_abbrev("0", assume_from_number=False)
+
+        # With assume_from_number=True and a channel name that embeds a valid ID
+        # (e.g. "channel_9" → ID 9 → 'LAud'), parsing succeeds.
+        result = parse_chname_to_abbrev("channel_9", assume_from_number=True)
+        assert isinstance(result, str)
+
 
 # =============================================================================
 # Tests: split()

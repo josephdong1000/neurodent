@@ -184,6 +184,7 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
                 all_lros,
                 animal_id=animal_id,
                 genotype=genotype,
+                assume_from_number=analysis_config.get("assume_from_number", False),
             )
 
             # Compute bad channels
