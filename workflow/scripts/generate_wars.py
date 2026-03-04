@@ -105,6 +105,11 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
                 # Prepare kwargs for this specific session
                 session_lro_kwargs = dict(session_analysis_config.get("lro_kwargs", {}))
 
+                # Propagate datetimes_are_start from war_generation config into lro_kwargs
+                # (it lives at the war_generation level, not inside lro_kwargs)
+                if "datetimes_are_start" in session_analysis_config:
+                    session_lro_kwargs.setdefault("datetimes_are_start", session_analysis_config["datetimes_are_start"])
+
                 # Apply per-animal overrides from unified animals config
                 animal_overrides = samples_config.get("_animal_overrides", {}).get(animal_id, {})
                 if animal_overrides:
