@@ -990,7 +990,7 @@ class AnimalOrganizer(AnimalFeatureParser):
 
             logging.info("LRO temporal sorting details:")
             for i, (folder, lro) in enumerate(sorted_folder_lro_pairs):
-                folder_name = Path(folder).name
+                folder_name = self._get_item_name(folder)
 
                 # Get median time for logging
                 try:

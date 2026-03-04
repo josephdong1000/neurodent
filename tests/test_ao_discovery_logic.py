@@ -12,7 +12,7 @@ These tests verify that FileDiscoverer correctly:
 import pytest
 from pathlib import Path
 from datetime import datetime
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 import neurodent.visualization.results as results
 import neurodent.core.core as core
 
@@ -419,3 +419,46 @@ def test_pattern_with_wildcards(tmp_path, monkeypatch):
     assert len(ao._animalday_folder_groups) == 1
     assert "unknown" in ao._animalday_folder_groups
     assert len(ao._animalday_folder_groups["unknown"]) == 2
+
+
+def test_sort_lros_handles_multifile_discovered_files():
+    """Regression test: _sort_lros_by_median_time must not raise TypeError when
+    items are multi-file DiscoveredFile objects (e.g. .bin + .csv pairs).
+
+    Previously, the logging code called ``Path(folder).name`` which invoked
+    ``DiscoveredFile.__fspath__`` and raised::
+
+        TypeError: Multi-file DiscoveredFile cannot be converted to a single path.
+    """
+    from neurodent.core.discovery import DiscoveredFile
+
+    ao = MagicMock(spec=results.AnimalOrganizer)
+    ao._get_item_name = results.AnimalOrganizer._get_item_name.__get__(ao, results.AnimalOrganizer)
+    ao._sort_lros_by_median_time = results.AnimalOrganizer._sort_lros_by_median_time.__get__(ao, results.AnimalOrganizer)
+    ao._sort_lros_by_median_time_static = results.AnimalOrganizer._sort_lros_by_median_time_static
+
+    # Two multi-file DiscoveredFile objects (bin + csv pairs) for the same session
+    df1 = DiscoveredFile(
+        paths=("/data/A10/session1/001_ColMajor.bin", "/data/A10/session1/001_Meta.csv"),
+        metadata={"animal": "A10", "session": "session1", "index": "001"},
+    )
+    df2 = DiscoveredFile(
+        paths=("/data/A10/session1/002_ColMajor.bin", "/data/A10/session1/002_Meta.csv"),
+        metadata={"animal": "A10", "session": "session1", "index": "002"},
+    )
+
+    mock_lro1 = MagicMock()
+    mock_lro1.file_end_datetimes = [datetime(2025, 1, 1, 13, 0, 0)]
+    mock_lro1.LongRecording.get_duration.return_value = 3600.0
+
+    mock_lro2 = MagicMock()
+    mock_lro2.file_end_datetimes = [datetime(2025, 1, 1, 14, 0, 0)]
+    mock_lro2.LongRecording.get_duration.return_value = 3600.0
+
+    # This must not raise TypeError
+    result = ao._sort_lros_by_median_time([(df1, mock_lro1), (df2, mock_lro2)])
+
+    assert len(result) == 2
+    # df1 (earlier timestamp) should come first
+    assert result[0][0] is df1
+    assert result[1][0] is df2
