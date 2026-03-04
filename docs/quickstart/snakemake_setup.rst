@@ -103,6 +103,27 @@ If you want to change the analysis sampling rate but keep all other settings:
 
 The ``config/config.local.yaml`` file is included in ``.gitignore`` and will not be pushed to the repository.
 
+Testing with a Subset of Animals
+---------------------------------
+
+When testing the pipeline, you may want to run only a small number of animals instead of the full dataset. Use the ``truncate_animals`` setting under ``samples`` to limit processing to the first *N* animals in the samples file:
+
+.. code-block:: yaml
+
+   # config/config.local.yaml
+   samples:
+     truncate_animals: 2   # only process the first 2 animals
+
+Set ``truncate_animals`` to ``null`` (the default) to process all animals.
+
+.. tip::
+
+   Combine this with a fast dataset such as ``mini_real`` for quick smoke-testing:
+
+   .. code-block:: bash
+
+      NEURODENT_DATASET=mini_real uv run snakemake --cores 1
+
 Running the Pipeline
 --------------------
 

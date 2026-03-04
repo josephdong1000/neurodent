@@ -180,3 +180,68 @@ class TestDeepMergeDict:
         assert override == override_copy
         # But result is different
         assert result == {"a": {"b": 1, "c": 2}}
+
+
+class TestTruncateAnimalsSlicing:
+    """Test the truncate_animals config reading and slicing logic used in Snakefile."""
+
+    def _apply_truncate_animals(self, config, animals):
+        """Replicate the Snakefile slicing logic."""
+        truncate_animals = config.get("samples", {}).get("truncate_animals", None)
+        if truncate_animals is not None:
+            return animals[:truncate_animals]
+        return animals
+
+    def test_truncate_animals_limits_list(self):
+        """When truncate_animals=N, only the first N animals are kept."""
+        config = {"samples": {"truncate_animals": 2}}
+        animals = ["a", "b", "c", "d", "e"]
+        result = self._apply_truncate_animals(config, animals)
+        assert result == ["a", "b"]
+
+    def test_truncate_animals_null_keeps_all(self):
+        """When truncate_animals=null (None), all animals are kept."""
+        config = {"samples": {"truncate_animals": None}}
+        animals = ["a", "b", "c"]
+        result = self._apply_truncate_animals(config, animals)
+        assert result == ["a", "b", "c"]
+
+    def test_truncate_animals_missing_keeps_all(self):
+        """When truncate_animals key is absent, all animals are kept."""
+        config = {"samples": {}}
+        animals = ["a", "b", "c"]
+        result = self._apply_truncate_animals(config, animals)
+        assert result == ["a", "b", "c"]
+
+    def test_truncate_animals_samples_missing_keeps_all(self):
+        """When samples section is absent, all animals are kept."""
+        config = {}
+        animals = ["a", "b", "c"]
+        result = self._apply_truncate_animals(config, animals)
+        assert result == ["a", "b", "c"]
+
+    def test_truncate_animals_larger_than_list(self):
+        """When truncate_animals > len(animals), all animals are kept."""
+        config = {"samples": {"truncate_animals": 10}}
+        animals = ["a", "b"]
+        result = self._apply_truncate_animals(config, animals)
+        assert result == ["a", "b"]
+
+    def test_truncate_animals_one(self):
+        """When truncate_animals=1, only the first animal is kept."""
+        config = {"samples": {"truncate_animals": 1}}
+        animals = ["x", "y", "z"]
+        result = self._apply_truncate_animals(config, animals)
+        assert result == ["x"]
+
+    def test_truncate_animals_merges_via_deep_merge(self):
+        """truncate_animals set in an override config is correctly merged."""
+        base_config = {"samples": {"quality_filter": {"exclude_unknown_genotypes": True}}}
+        override_config = {"samples": {"truncate_animals": 3}}
+        merged = deep_merge_dict(base_config, override_config)
+
+        animals = ["a", "b", "c", "d", "e"]
+        result = self._apply_truncate_animals(merged, animals)
+        assert result == ["a", "b", "c"]
+        # Ensure existing samples keys are preserved
+        assert merged["samples"]["quality_filter"]["exclude_unknown_genotypes"] is True

@@ -170,6 +170,15 @@ for session, animals_dict in samples_config.get("joint_sessions", {}).items():
         # For joint sessions, 'session' is the folder
         ANIMAL_TO_FOLDERS_MAP[slugified_name].append((session, animal_id, session))
 
+# Optionally limit to first N animals (useful for testing)
+_truncate_animals = config.get("samples", {}).get("truncate_animals", None)
+if _truncate_animals is not None:
+    ANIMALS = ANIMALS[:_truncate_animals]
+    ANIMAL_TO_FOLDERS_MAP = {k: v for k, v in ANIMAL_TO_FOLDERS_MAP.items() if k in ANIMALS}
+    ANIMAL_TO_FULL_ID_MAP = {k: v for k, v in ANIMAL_TO_FULL_ID_MAP.items() if k in ANIMALS}
+    JOINT_ANIMAL_TO_SESSION = {k: v for k, v in JOINT_ANIMAL_TO_SESSION.items() if k in ANIMALS}
+    print(f"[info] truncate_animals={_truncate_animals}: running first {len(ANIMALS)} animal(s): {ANIMALS}")
+
 
 def get_animal_folders(wildcards):
     """Get the list of (data_folder, animal_id, config_key) tuples for an animal."""
