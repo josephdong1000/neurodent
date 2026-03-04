@@ -819,13 +819,17 @@ class TestMiniRealDataset:
     def test_mini_real_discovery_with_animal_placeholder(self, mini_real_config):
         """FileDiscoverer finds mini real files using {animal}/{index} pattern."""
         from neurodent.core.discovery import FileDiscoverer
+        from neurodent.workflow.utils import resolve_animal_pattern
 
         cfg = mini_real_config
         ds = cfg["ds_config"]
 
         # Build absolute patterns the same way generate_wars.py does
-        base_path = str(cfg["data_root"])
-        patterns = [f"{base_path}/{p}" for p in ds["analysis"]["war_generation"]["pattern"]]
+        patterns = resolve_animal_pattern(
+            ds["analysis"]["war_generation"]["pattern"],
+            "",
+            data_root=str(cfg["data_root"]),
+        )
 
         discoverer = FileDiscoverer(patterns)
         groups = discoverer.discover()
@@ -841,11 +845,15 @@ class TestMiniRealDataset:
     def test_mini_real_filter_by_animal(self, mini_real_config):
         """FileDiscoverer correctly filters by animal_id."""
         from neurodent.core.discovery import FileDiscoverer
+        from neurodent.workflow.utils import resolve_animal_pattern
 
         cfg = mini_real_config
         ds = cfg["ds_config"]
-        base_path = str(cfg["data_root"])
-        patterns = [f"{base_path}/{p}" for p in ds["analysis"]["war_generation"]["pattern"]]
+        patterns = resolve_animal_pattern(
+            ds["analysis"]["war_generation"]["pattern"],
+            "",
+            data_root=str(cfg["data_root"]),
+        )
 
         discoverer = FileDiscoverer(patterns)
 
@@ -859,12 +867,16 @@ class TestMiniRealDataset:
         """AnimalOrganizer loads mini real bin/csv data via custom extractor."""
         from neurodent import constants
         from neurodent.workflow import inject_config_aliases
+        from neurodent.workflow.utils import resolve_animal_pattern
         from neurodent.visualization import AnimalOrganizer
 
         cfg = mini_real_config
         ds = cfg["ds_config"]
-        base_path = str(cfg["data_root"])
-        patterns = [f"{base_path}/{p}" for p in ds["analysis"]["war_generation"]["pattern"]]
+        patterns = resolve_animal_pattern(
+            ds["analysis"]["war_generation"]["pattern"],
+            "A10",
+            data_root=str(cfg["data_root"]),
+        )
 
         orig_metadata = constants.ANIMAL_METADATA
         orig_aliases = constants.GENOTYPE_ALIASES
@@ -900,12 +912,11 @@ class TestMiniRealDataset:
         """Both animals (A10, F22) can be loaded from mini real data."""
         from neurodent import constants
         from neurodent.workflow import inject_config_aliases
+        from neurodent.workflow.utils import resolve_animal_pattern
         from neurodent.visualization import AnimalOrganizer
 
         cfg = mini_real_config
         ds = cfg["ds_config"]
-        base_path = str(cfg["data_root"])
-        patterns = [f"{base_path}/{p}" for p in ds["analysis"]["war_generation"]["pattern"]]
 
         orig_metadata = constants.ANIMAL_METADATA
         orig_aliases = constants.GENOTYPE_ALIASES
@@ -913,6 +924,11 @@ class TestMiniRealDataset:
             inject_config_aliases(cfg["samples_config"])
 
             for animal_id in ["A10", "F22"]:
+                patterns = resolve_animal_pattern(
+                    ds["analysis"]["war_generation"]["pattern"],
+                    animal_id,
+                    data_root=str(cfg["data_root"]),
+                )
                 ao = AnimalOrganizer(
                     patterns,
                     animal_id=animal_id,
@@ -936,12 +952,16 @@ class TestMiniRealDataset:
         """AnimalOrganizer resolves a dotted extract_func string from config."""
         from neurodent import constants
         from neurodent.workflow import inject_config_aliases
+        from neurodent.workflow.utils import resolve_animal_pattern
         from neurodent.visualization import AnimalOrganizer
 
         cfg = mini_real_config
         ds = cfg["ds_config"]
-        base_path = str(cfg["data_root"])
-        patterns = [f"{base_path}/{p}" for p in ds["analysis"]["war_generation"]["pattern"]]
+        patterns = resolve_animal_pattern(
+            ds["analysis"]["war_generation"]["pattern"],
+            "A10",
+            data_root=str(cfg["data_root"]),
+        )
 
         # Use the extract_func string from the dataset config
         lro_kwargs = dict(ds["analysis"]["war_generation"]["lro_kwargs"])
