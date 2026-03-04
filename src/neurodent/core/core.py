@@ -780,7 +780,20 @@ class LongRecordingOrganizer:
             else:
                 logging.info(f"Loading {len(self.item)} files serially")
                 recs = [extract_func(x, **kwargs) for x in self.item]
-            rec = si.concatenate_recordings(recs)
+            # Filter out empty recordings before concatenation to avoid
+            # spikeinterface crashes on empty segments (e.g. 0-byte files)
+            valid_recs = []
+            for r in recs:
+                try:
+                    if r.get_total_samples() == 0:
+                        logging.warning("Skipping empty recording (0 samples) during concatenation")
+                        continue
+                except (TypeError, AttributeError):
+                    pass  # Non-SI recording or mock — keep it
+                valid_recs.append(r)
+            if not valid_recs:
+                raise ValueError("All recordings in this session have 0 samples")
+            rec = si.concatenate_recordings(valid_recs)
         else:
             # Single file/path
             rec: "si.BaseRecording" = extract_func(self.item, **kwargs)
