@@ -575,6 +575,8 @@ class AnimalOrganizer(AnimalFeatureParser):
             has_id_key = self.animal_id in manual_datetimes
             item_names = {self._get_item_name(f) for f in animal_items}
             has_item_keys = any(k in item_names for k in manual_datetimes.keys())
+            session_keys = set(animalday_to_items.keys())
+            has_session_keys = any(k in session_keys for k in manual_datetimes.keys())
 
             if has_id_key and has_item_keys:
                 raise ValueError(
@@ -590,6 +592,37 @@ class AnimalOrganizer(AnimalFeatureParser):
                         f"manual_datetimes keys match items for {self.animal_id}. Treating as item mapping spec."
                     )
                     spec = manual_datetimes
+                elif has_session_keys:
+                    logging.info(
+                        f"manual_datetimes keys match sessions for {self.animal_id}. "
+                        "Computing per-session timelines."
+                    )
+                    out = {}
+                    missing_sessions = [
+                        k for k in animalday_to_items
+                        if k not in manual_datetimes
+                    ]
+                    if missing_sessions:
+                        raise ValueError(
+                            f"Missing entries in manual_datetimes for sessions: {missing_sessions}."
+                        )
+                    for sess_key, sess_items in animalday_to_items.items():
+                        sess_ts = manual_datetimes[sess_key]
+                        context_path = self._get_context_path(sess_items[0])
+                        resolved_dt = self._resolve_timestamp_input(
+                            sess_ts, context_path
+                        )
+                        sess_item_dict = {
+                            self._get_item_name(f): [f] for f in sess_items
+                        }
+                        sess_timeline = self._compute_global_timeline(
+                            resolved_dt,
+                            sess_item_dict,
+                            base_lro_kwargs,
+                            original_manual_datetimes=sess_ts,
+                        )
+                        out.update(sess_timeline)
+                    return out
                 else:
                     raise ValueError(
                         f"manual_datetimes dictionary provided, but no entry for '{self.animal_id}'."
