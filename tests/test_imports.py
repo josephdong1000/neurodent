@@ -135,7 +135,7 @@ class TestIDEFunctionality:
         import neurodent.core
 
         dir_contents = dir(neurodent.core)
-        expected_classes = ["LongRecordingOrganizer", "LongRecordingAnalyzer", "FragmentAnalyzer", "DDFBinaryMetadata"]
+        expected_classes = ["LongRecordingOrganizer", "LongRecordingAnalyzer", "FragmentAnalyzer", "RecordingMetadata", "DDFBinaryMetadata"]
         expected_functions = [
             "get_temp_directory",
             "nanaverage",
@@ -275,14 +275,12 @@ class TestVisualizationImports:
         from neurodent.visualization import (
             WindowAnalysisResult,
             AnimalOrganizer,
-            SpikeAnalysisResult,
             AnimalPlotter,
             ExperimentPlotter,
         )
 
         assert WindowAnalysisResult is not None
         assert AnimalOrganizer is not None
-        assert SpikeAnalysisResult is not None
         assert AnimalPlotter is not None
         assert ExperimentPlotter is not None
 

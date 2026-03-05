@@ -194,7 +194,7 @@ html_static_path = ["_static"]
 
 html_theme_options = {
     "github_url": "https://github.com/josephdong1000/neurodent",
-    "show_nav_level": 3,
+    "show_nav_level": 2,  # Show siblings in navigation
     "navigation_depth": 4,
     "show_toc_level": 2,
     "navbar_align": "left",
@@ -213,6 +213,7 @@ html_theme_options = {
         "version_match": release,
     },
     "navbar_end": ["version-switcher", "theme-switcher", "navbar-icon-links"],
+    "collapse_navigation": False,  # Keep navigation expanded
 }
 
 # Force all pages to use the main navigation sidebar

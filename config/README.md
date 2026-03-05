@@ -20,6 +20,20 @@ snakemake --configfile config/config.yaml --cores <N> --sdm conda
 
 For cluster (SLURM) execution, see the [Snakemake cluster execution documentation](https://snakemake.readthedocs.io/en/stable/executing/cluster.html).
 
+### Dataset selection
+
+The pipeline supports multiple datasets. To select a dataset, either:
+
+- Set the `NEURODENT_DATASET` environment variable:
+  ```bash
+  NEURODENT_DATASET=mini_real snakemake --cores <N>
+  ```
+- Or change the `active_dataset` value in `config/config.yaml`.
+
+Dataset-specific configurations are stored in `config/datasets/{dataset_name}.yaml`. These override any matching keys in the main `config/config.yaml`.
+
+Available datasets can be found in the `config/datasets/` directory.
+
 ### Local configuration overrides
 
 To customize settings without modifying `config/config.yaml`, create a `config/config.local.yaml` file. Any values in the local config will override the defaults. This file is not tracked by version control and is intended for site-specific settings (e.g., `temp_directory` paths).
@@ -27,6 +41,13 @@ To customize settings without modifying `config/config.yaml`, create a `config/c
 ---
 
 ## Configuration parameters
+
+### `active_dataset`
+
+- **Type:** string
+- **Required:** no
+- **Default:** `"sox5_bin"`
+- **Description:** Name of the active dataset. Can be overridden by the `NEURODENT_DATASET` environment variable. The corresponding dataset config file must exist at `config/datasets/{active_dataset}.yaml`.
 
 ### `temp_directory`
 
@@ -39,8 +60,15 @@ To customize settings without modifying `config/config.yaml`, create a `config/c
 #### `samples.samples_file`
 
 - **Type:** string (path)
-- **Required:** yes
-- **Description:** Path to a JSON file containing sample metadata (data folder paths, animal IDs, joint session definitions, etc.).
+- **Required:** yes (typically set by dataset config)
+- **Description:** Path to a JSON file containing sample metadata (data folder paths, animal IDs, joint session definitions, etc.). This is usually set in the dataset-specific config file (e.g., `config/datasets/sox5_bin.yaml`).
+
+#### `samples.truncate_animals`
+
+- **Type:** integer or null
+- **Required:** no
+- **Default:** `null`
+- **Description:** Limit processing to the first N animals. Useful for testing. Set to `null` to process all animals.
 
 #### `samples.quality_filter.exclude_unknown_genotypes`
 
@@ -60,17 +88,17 @@ To customize settings without modifying `config/config.yaml`, create a `config/c
 
 #### `analysis.war_generation`
 
-Parameters for Windowed Analysis Result (WAR) generation.
+Parameters for Windowed Analysis Result (WAR) generation. Note that `mode`, `file_pattern`, and some `lro_kwargs` are typically set by the active dataset config (see `config/datasets/`).
 
 | Parameter | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `mode` | string | no | `"concat"` | WAR generation mode. |
-| `file_pattern` | string | no | `"*.nwb"` | Glob pattern for input data files. |
+| `mode` | string | no | dataset-specific | WAR generation mode (set by dataset config). |
+| `file_pattern` | string | no | dataset-specific | Glob pattern for input data files (set by dataset config). |
 | `day_sep` | string or null | no | `null` | Day separator for multi-day recordings. |
 | `assume_from_number` | boolean | no | `true` | Whether to infer session ordering from file numbering. |
-| `skip_days` | list of strings | no | `["bad"]` | Day labels to skip during processing. |
+| `skip_sessions` | list of strings | no | `["*bad*"]` | Session patterns to skip during processing (glob-style matching). |
 | `day_parse_kwargs.date_patterns` | list of [pattern, format] | no | see config | Regex patterns and date format strings for parsing dates from filenames. |
-| `lro_kwargs.mode` | string | no | `"si"` | LongRecordingOrganizer mode. |
+| `lro_kwargs.mode` | string | no | dataset-specific | LongRecordingOrganizer mode (set by dataset config). |
 | `lro_kwargs.multiprocess_mode` | string | no | `"dask"` | Parallelization strategy (`"dask"` or `"serial"`). |
 | `lro_kwargs.overwrite_rowbins` | boolean | no | `false` | Whether to overwrite existing row bins. |
 

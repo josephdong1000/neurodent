@@ -11,25 +11,89 @@ This pipeline processes raw EEG data through multiple analysis stages:
 
 from pathlib import Path
 import pandas as pd
-
-
-# Load configuration
-configfile: "config/config.yaml"
-
-# Load local override if it exists
-if os.path.exists("config/config.local.yaml"):
-    configfile: "config/config.local.yaml"
-
-
-samples_file = config["samples"]["samples_file"]
-
-
-# Load sample definitions
 import json
 import re
 import os
 import sys
 import glob
+
+# Import workflow utilities
+from neurodent.workflow.utils import deep_merge_dict, expand_animals_config
+
+
+# Load configuration
+configfile: "config/config.yaml"
+
+# Load local override if it exists (skip if file is empty/comment-only)
+if os.path.exists("config/config.local.yaml"):
+    import yaml as _yaml
+    with open("config/config.local.yaml") as _f:
+        _local_config = _yaml.safe_load(_f)
+    if isinstance(_local_config, dict):
+        configfile: "config/config.local.yaml"
+
+
+# Apply dataset-specific configuration
+active_dataset = os.environ.get("NEURODENT_DATASET", config.get("active_dataset", "sox5_bin"))
+dataset_config_file = f"config/datasets/{active_dataset}.yaml"
+
+if os.path.exists(dataset_config_file):
+    # Load dataset-specific config from file
+    import yaml
+    with open(dataset_config_file, 'r') as f:
+        dataset_config = yaml.safe_load(f) or {}
+
+    # Deep merge dataset config into main config
+    # This allows datasets to override ANY configuration, not just specific keys
+    config = deep_merge_dict(config, dataset_config)
+
+    # Report dataset configuration in user-readable format
+    def format_config_value(value, indent=4):
+        """Format a config value for display (handles nested dicts, lists, etc.)."""
+        spaces = " " * indent
+        if isinstance(value, dict):
+            if not value:
+                return "{}"
+            lines = []
+            for k, v in value.items():
+                formatted_val = format_config_value(v, indent + 2)
+                if "\n" in formatted_val:
+                    lines.append(f"{spaces}{k}:")
+                    lines.append(formatted_val)
+                else:
+                    lines.append(f"{spaces}{k}: {formatted_val}")
+            return "\n".join(lines)
+        elif isinstance(value, list):
+            if not value:
+                return "[]"
+            return f"[{', '.join(repr(v) for v in value)}]"
+        elif isinstance(value, str):
+            return f'"{value}"'
+        elif value is None:
+            return "null"
+        else:
+            return str(value)
+
+    print(f"[ok] Using dataset: {active_dataset}")
+    print(f"  Config file: {dataset_config_file}")
+    print(f"\n  Dataset configuration overrides:")
+    print(format_config_value(dataset_config, indent=4))
+    print()
+else:
+    # List available datasets by scanning config/datasets/ directory
+    available_datasets = []
+    if os.path.exists("config/datasets"):
+        available_datasets = [f.replace('.yaml', '') for f in os.listdir("config/datasets") if f.endswith('.yaml')]
+
+    raise FileNotFoundError(
+        f"Dataset config file not found: {dataset_config_file}\n"
+        f"Available datasets: {', '.join(available_datasets) if available_datasets else 'None'}"
+    )
+
+samples_file = config["samples"]["samples_file"]
+
+
+# Load sample definitions
 from datetime import datetime
 from django.utils.text import slugify
 
@@ -48,25 +112,45 @@ except ImportError:
 with open(samples_file, "r") as f:
     samples_config = json.load(f)
 
+# Expand unified "animals" list into pipeline keys (if present)
+samples_config = expand_animals_config(samples_config)
+
 # Extract sample information
-DATA_FOLDERS = list(samples_config["data_folders_to_animal_ids"].keys())
+# Support both unified (animals list) and legacy (data_folders_to_animal_ids) formats
 ANIMALS = []
 ANIMAL_TO_FOLDERS_MAP = {}  # Maps slugified animal_id -> list of (folder, animal_id, original_session_key)
 ANIMAL_TO_FULL_ID_MAP = {} # Maps slugified animal_id -> original animal_id string
 
-for folder, animals in samples_config["data_folders_to_animal_ids"].items():
-    for animal in animals:
-        # We group by the animal ID to merge split sessions
+if "animals" in samples_config:
+    # Unified format: iterate directly from animals list
+    for animal_entry in samples_config["animals"]:
+        animal = animal_entry["id"]
         slugified_name = slugify(animal, allow_unicode=True)
 
         if slugified_name not in ANIMALS:
             ANIMALS.append(slugified_name)
             ANIMAL_TO_FOLDERS_MAP[slugified_name] = []
             ANIMAL_TO_FULL_ID_MAP[slugified_name] = animal
-        
-        # Store tuple of (real_folder_path, original_animal_id, config_session_key)
-        # config_session_key is 'folder' here
-        ANIMAL_TO_FOLDERS_MAP[slugified_name].append((folder, animal, folder))
+
+        # Each animal gets a single entry; pattern handles discovery
+        ANIMAL_TO_FOLDERS_MAP[slugified_name].append(("", animal, ""))
+elif "data_folders_to_animal_ids" in samples_config:
+    # Legacy format: iterate from data_folders_to_animal_ids
+    for folder, animals in samples_config["data_folders_to_animal_ids"].items():
+        for animal in animals:
+            slugified_name = slugify(animal, allow_unicode=True)
+
+            if slugified_name not in ANIMALS:
+                ANIMALS.append(slugified_name)
+                ANIMAL_TO_FOLDERS_MAP[slugified_name] = []
+                ANIMAL_TO_FULL_ID_MAP[slugified_name] = animal
+
+            ANIMAL_TO_FOLDERS_MAP[slugified_name].append((folder, animal, folder))
+else:
+    raise KeyError(
+        "Samples config must contain either 'animals' (unified format) "
+        "or 'data_folders_to_animal_ids' (legacy format)"
+    )
 
 # Build mapping for animals from joint sessions
 # These animals will have their data read from split output folders
@@ -85,6 +169,15 @@ for session, animals_dict in samples_config.get("joint_sessions", {}).items():
             
         # For joint sessions, 'session' is the folder
         ANIMAL_TO_FOLDERS_MAP[slugified_name].append((session, animal_id, session))
+
+# Optionally limit to first N animals (useful for testing)
+_truncate_animals = config.get("samples", {}).get("truncate_animals", None)
+if _truncate_animals is not None:
+    ANIMALS = ANIMALS[:_truncate_animals]
+    ANIMAL_TO_FOLDERS_MAP = {k: v for k, v in ANIMAL_TO_FOLDERS_MAP.items() if k in ANIMALS}
+    ANIMAL_TO_FULL_ID_MAP = {k: v for k, v in ANIMAL_TO_FULL_ID_MAP.items() if k in ANIMALS}
+    JOINT_ANIMAL_TO_SESSION = {k: v for k, v in JOINT_ANIMAL_TO_SESSION.items() if k in ANIMALS}
+    print(f"[info] truncate_animals={_truncate_animals}: running first {len(ANIMALS)} animal(s): {ANIMALS}")
 
 
 def get_animal_folders(wildcards):
@@ -257,18 +350,17 @@ include: "rules/notebook.smk"
 
 rule all:
     input:
-        # Pipeline visualization
-        'results/graphs/rulegraph.png',
-        'results/graphs/filegraph.png',
-        'results/graphs/dag.png',
-
+        # Pipeline visualization (run `snakemake graphs` separately — nested snakemake hits directory lock)
+        # 'results/graphs/rulegraph.png',
+        # 'results/graphs/filegraph.png',
+        # 'results/graphs/dag.png',
         # WAR generation and prefiltering (includes spike detection)
         expand("results/wars_quality_filtered/{animal}", animal=ANIMALS),
 
         # FDSAR spike detection diagnostics
-        # expand("results/fdsar_diagnostics/{animal}", animal=ANIMALS), # FIXME this crashes my VDI - perhaps a logic issue
+        expand("results/fdsar_diagnostics/{animal}", animal=ANIMALS), # FIXME this crashes my VDI - perhaps a logic issue
+        
         # WAR per-animal diagnostic plots (unfiltered)
-        # NOTE also trigger fragment filtering + diagnostic figures filter unfiltered
         get_diagnostic_figures_unfiltered,
 
         # WAR per-animal diagnostic plots (filtered)
@@ -315,12 +407,14 @@ rule dag:
     output: "results/graphs/dag.png"
     shell: "snakemake --dag --forceall | dot -Tpng > {output}"
 
+localrules: graphs, rulegraph, filegraph, dag
+
 
 
 # Configuration validation
 # FIXME better to define in a json/yaml schema
 def validate_config():
-    required_keys = ["temp_directory"]  # base_folder and data_parent_folder now in samples.json
+    required_keys = ["temp_directory"]  # data_root now in samples.json
     for key in required_keys:
         if key not in config:
             raise ValueError(f"Missing required config key: {key}")

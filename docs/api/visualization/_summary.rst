@@ -5,7 +5,6 @@
 
    AnimalOrganizer
    WindowAnalysisResult
-   SpikeAnalysisResult
    FrequencyDomainSpikeAnalysisResult
    AnimalPlotter
    ExperimentPlotter

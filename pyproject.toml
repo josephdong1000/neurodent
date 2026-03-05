@@ -123,6 +123,7 @@ markers = [
     "mne: marks tests that require MNE",
     "visualization: marks tests for visualization modules",
     "core: marks tests for core functionality",
+    "mutates_constants: test intentionally mutates neurodent.constants (e.g. via inject_config_aliases)",
 ]
 
 [tool.coverage.run]

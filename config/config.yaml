@@ -1,14 +1,20 @@
 # NeuRodent Snakemake Pipeline Configuration
 # =====================================
 
+# Dataset selection
+# Set NEURODENT_DATASET environment variable or change active_dataset below
+# Dataset configs are in config/datasets/{dataset_name}.yaml
+active_dataset: "sox5_bin"
+
 # Core directories and paths
 temp_directory: "/scr1/users/dongjp"
 
 # Sample configuration
+# Note: samples_file is set by active_dataset (see datasets section above)
 samples:
-  # Sample metadata file path
-  samples_file: "config/samples.json"
-  
+  # Limit to first N animals (null = no limit, useful for testing)
+  truncate_animals: null
+
   # Quality filtering parameters
   quality_filter:
     exclude_unknown_genotypes: true
@@ -17,17 +23,12 @@ samples:
 # Analysis parameters
 analysis:
   # WAR generation parameters
+  # Note: mode, file_pattern, and some lro_kwargs are set by active_dataset (see datasets section above)
+  # The settings below are shared across all datasets or serve as defaults
   war_generation:
-    mode: "concat"
-    file_pattern: "*.nwb"
-    day_sep: null
     assume_from_number: true
-    skip_days: ["bad"]
-    day_parse_kwargs:
-      date_patterns:
-        - ["\\d{6}", "%y%m%d"]
+    skip_sessions: ["*bad*"]
     lro_kwargs:
-      mode: "si"
       multiprocess_mode: "dask"
       overwrite_rowbins: false # REVIEW function of this parameter when mode is not "bin"
 
