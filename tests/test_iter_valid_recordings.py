@@ -270,3 +270,79 @@ class TestDatetimesAreStartPropagation:
             )
 
         assert session_lro_kwargs["datetimes_are_start"] is False  # Now present
+
+
+class TestComputeBadChannelsGracefulFailure:
+    """Tests that AnimalOrganizer.compute_bad_channels handles LOF failures gracefully.
+
+    When one recording fails LOF computation (e.g. due to an empty 0-sample file),
+    other recordings should still be processed and the animal should not crash.
+    """
+
+    _date_counter = 1000
+
+    def _make_mock_lro(self, total_samples=1000, display_name="mock_lro", date=None,
+                       lof_fail=False):
+        """Create a mock LRO with configurable behavior."""
+        lro = MagicMock(spec=LongRecordingOrganizer)
+        lro.channel_names = ["ch1", "ch2"]
+        lro.base_folder_path = "/tmp/mock"
+        lro.labels = {}
+        lro.display_name = display_name
+        lro.bad_channel_names = []
+
+        mock_rec = MagicMock()
+        mock_rec.get_total_samples.return_value = total_samples
+        lro.LongRecording = mock_rec
+
+        if date is None:
+            TestComputeBadChannelsGracefulFailure._date_counter += 1
+            date = f"Jan-{TestComputeBadChannelsGracefulFailure._date_counter:02d}-2022"
+        lro.get_date_string.return_value = date
+
+        if lof_fail:
+            lro.compute_bad_channels.side_effect = ValueError(
+                "can't extend empty axis 0 using modes other than 'constant' or 'empty'"
+            )
+        else:
+            lro.compute_bad_channels.return_value = None
+            lro.lof_scores = [1.0, 1.0]
+
+        return lro
+
+    def _make_ao(self, lros):
+        return AnimalOrganizer.from_lros(
+            lros, animal_id="TestAnimal", genotype="WT"
+        )
+
+    def test_one_failing_recording_does_not_crash_animal(self, caplog):
+        """One failing LOF does not prevent other recordings from completing."""
+        lros = [
+            self._make_mock_lro(1000, "good_1"),
+            self._make_mock_lro(1000, "failing", lof_fail=True),
+            self._make_mock_lro(1000, "good_2"),
+        ]
+        ao = self._make_ao(lros)
+
+        with caplog.at_level(logging.WARNING):
+            ao.compute_bad_channels(lof_threshold=1.5)
+
+        # Good recordings should have their compute_bad_channels called
+        lros[0].compute_bad_channels.assert_called_once()
+        lros[2].compute_bad_channels.assert_called_once()
+
+        # Failing recording was attempted
+        lros[1].compute_bad_channels.assert_called_once()
+
+        # Warning was logged for the failing recording
+        assert any("Skipping LOF computation" in msg for msg in caplog.messages)
+
+    def test_all_recordings_succeed(self):
+        """When all recordings succeed, no warnings and all get LOF scores."""
+        lros = [self._make_mock_lro(1000, f"good_{i}") for i in range(3)]
+        ao = self._make_ao(lros)
+
+        ao.compute_bad_channels(lof_threshold=1.5)
+
+        for lro in lros:
+            lro.compute_bad_channels.assert_called_once()

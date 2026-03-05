@@ -1109,9 +1109,16 @@ class AnimalOrganizer(AnimalFeatureParser):
             logging.debug(
                 f"Computing bad channels for recording {i}: {self.animaldays[i]}"
             )
-            lrec.compute_bad_channels(
-                lof_threshold=lof_threshold, force_recompute=force_recompute
-            )
+            try:
+                lrec.compute_bad_channels(
+                    lof_threshold=lof_threshold, force_recompute=force_recompute
+                )
+            except Exception as e:
+                logging.warning(
+                    f"Skipping LOF computation for recording {i} "
+                    f"({lrec.display_name}): {e}"
+                )
+                continue
             logging.debug(
                 f"Recording {i} LOF scores computed: {hasattr(lrec, 'lof_scores') and lrec.lof_scores is not None}"
             )

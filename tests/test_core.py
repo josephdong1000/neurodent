@@ -1440,3 +1440,114 @@ class TestExtractFuncFilePathResolution:
             )
             mock_logging.warning.assert_not_called()
             mock_logging.info.assert_not_called()
+
+
+class TestEmptyRecordingGuards:
+    """Tests for guards against 0-sample (empty/corrupt) recordings.
+
+    These ensure that a 0-duration file (valid header but no data) does not crash
+    the pipeline with a numpy pad error in SpikeInterface's resampler.
+    """
+
+    def test_apply_resampling_zero_samples_skips_resampling(self, temp_dir):
+        """_apply_resampling returns the recording as-is when it has 0 samples."""
+        organizer = LongRecordingOrganizer(temp_dir, mode=None)
+
+        mock_recording = Mock()
+        mock_recording.get_total_samples.return_value = 0
+        mock_recording.get_dtype.return_value = constants.GLOBAL_DTYPE
+        mock_recording.get_sampling_frequency.return_value = 2000.0
+
+        result = organizer._apply_resampling(mock_recording)
+
+        # Should return the original recording without calling resample
+        assert result is mock_recording
+
+    @patch("spikeinterface.preprocessing.resample")
+    def test_apply_resampling_nonzero_samples_still_resamples(
+        self, mock_resample, temp_dir
+    ):
+        """_apply_resampling still resamples when the recording has samples."""
+        organizer = LongRecordingOrganizer(temp_dir, mode=None)
+        organizer.meta = Mock()
+        organizer.meta.update_sampling_rate = Mock()
+
+        mock_recording = Mock()
+        mock_recording.get_total_samples.return_value = 5000
+        mock_recording.get_dtype.return_value = constants.GLOBAL_DTYPE
+        mock_recording.get_sampling_frequency.return_value = 2000.0
+
+        mock_resampled = Mock()
+        mock_resample.return_value = mock_resampled
+
+        result = organizer._apply_resampling(mock_recording)
+
+        mock_resample.assert_called_once()
+        assert result == mock_resampled
+
+    def test_compute_lof_scores_zero_samples_raises(self, temp_dir):
+        """_compute_lof_scores raises ValueError for a 0-sample recording."""
+        organizer = LongRecordingOrganizer(temp_dir, mode=None)
+        organizer.channel_names = ["ch1", "ch2"]
+
+        mock_recording = Mock()
+        mock_recording.get_total_samples.return_value = 0
+        organizer.LongRecording = mock_recording
+
+        with pytest.raises(ValueError, match="Recording has 0 samples"):
+            organizer._compute_lof_scores()
+
+    def test_convert_file_with_si_discovered_file_zero_samples_warns(self, temp_dir):
+        """DiscoveredFile branch logs a warning when extract_func returns 0-sample recording."""
+        from neurodent.core.discovery import DiscoveredFile
+
+        df = DiscoveredFile(paths=("/tmp/a.bin", "/tmp/a.csv"), metadata={"session": "s1"})
+        organizer = LongRecordingOrganizer(None, mode=None)
+        organizer.item = df
+        organizer.n_truncate = 0
+        organizer.truncate = False
+        organizer.manual_datetimes = None
+        organizer.datetimes_are_start = True
+
+        mock_rec = Mock()
+        mock_rec.get_total_samples.return_value = 0
+        mock_rec.get_num_channels.return_value = 2
+        mock_rec.get_channel_ids.return_value = ["ch1", "ch2"]
+        mock_rec.get_sampling_frequency.return_value = 1000.0
+        mock_rec.get_duration.return_value = 0.0
+        mock_rec.get_dtype.return_value = constants.GLOBAL_DTYPE
+        mock_rec.get_total_duration.return_value = 0.0
+        mock_rec.has_scaleable_traces.return_value = False
+
+        extract_func = Mock(return_value=mock_rec)
+
+        organizer.convert_file_with_si_to_recording(extract_func)
+
+        # Recording should still be set (with 0 samples), but warning logged
+        assert organizer.LongRecording is not None
+
+    def test_convert_file_with_si_single_file_zero_samples_warns(self, temp_dir):
+        """Single-file branch logs a warning when extract_func returns 0-sample recording."""
+        organizer = LongRecordingOrganizer(None, mode=None)
+        organizer.item = "/tmp/test.bin"
+        organizer.n_truncate = 0
+        organizer.truncate = False
+        organizer.manual_datetimes = None
+        organizer.datetimes_are_start = True
+
+        mock_rec = Mock()
+        mock_rec.get_total_samples.return_value = 0
+        mock_rec.get_num_channels.return_value = 2
+        mock_rec.get_channel_ids.return_value = ["ch1", "ch2"]
+        mock_rec.get_sampling_frequency.return_value = 1000.0
+        mock_rec.get_duration.return_value = 0.0
+        mock_rec.get_dtype.return_value = constants.GLOBAL_DTYPE
+        mock_rec.get_total_duration.return_value = 0.0
+        mock_rec.has_scaleable_traces.return_value = False
+
+        extract_func = Mock(return_value=mock_rec)
+
+        organizer.convert_file_with_si_to_recording(extract_func)
+
+        # Recording should still be set (with 0 samples)
+        assert organizer.LongRecording is not None
