@@ -740,6 +740,25 @@ class LongRecordingOrganizer:
         else:
             raise ValueError(f"Invalid mode: {mode}")
 
+    @staticmethod
+    def _warn_if_empty_recording(rec, source):
+        """Log a warning if *rec* has 0 total samples.
+
+        A 0-duration file with a valid header can slip through the normal
+        loading path and later crash SpikeInterface's resampler (numpy pad
+        on an empty axis).  This helper centralises the check for the
+        DiscoveredFile and single-file branches of
+        ``convert_file_with_si_to_recording``.
+        """
+        try:
+            if rec.get_total_samples() == 0:
+                logging.warning(
+                    f"Loaded 0-sample recording from {source}. "
+                    f"Downstream processing may skip this recording."
+                )
+        except (TypeError, AttributeError):
+            pass  # Non-SI recording or mock — keep it
+
     def convert_file_with_si_to_recording(
         self,
         extract_func: Callable[..., "si.BaseRecording"],
@@ -769,17 +788,7 @@ class LongRecordingOrganizer:
             else:
                 # Single file
                 rec: "si.BaseRecording" = extract_func(self.item.path, **kwargs)
-            # Filter out empty recordings (0 samples) — same guard as the list branch.
-            # A 0-duration file with a valid header can slip through here and later
-            # crash SpikeInterface's resampler (numpy pad on empty axis).
-            try:
-                if rec.get_total_samples() == 0:
-                    logging.warning(
-                        f"DiscoveredFile produced 0-sample recording "
-                        f"({self.item}). Wrapping as empty."
-                    )
-            except (TypeError, AttributeError):
-                pass  # Non-SI recording or mock — keep it
+            self._warn_if_empty_recording(rec, self.item)
         elif isinstance(self.item, list):
             # List of files: concatenate individually using multiprocess_mode
             if multiprocess_mode == "dask":
@@ -808,15 +817,7 @@ class LongRecordingOrganizer:
         else:
             # Single file/path
             rec: "si.BaseRecording" = extract_func(self.item, **kwargs)
-            # Filter out empty recordings — same guard as list and DiscoveredFile
-            try:
-                if rec.get_total_samples() == 0:
-                    logging.warning(
-                        f"Single file produced 0-sample recording ({self.item}). "
-                        f"Wrapping as empty."
-                    )
-            except (TypeError, AttributeError):
-                pass  # Non-SI recording or mock — keep it
+            self._warn_if_empty_recording(rec, self.item)
 
         self._n_processed_files = n_processed_files
         self.LongRecording = self._apply_resampling(rec)
@@ -1592,7 +1593,7 @@ class LongRecordingOrganizer:
             # resampler.  This gives a clear message instead of the opaque numpy error.
             try:
                 total_samples = rec.get_total_samples()
-            except Exception:
+            except (TypeError, AttributeError):
                 total_samples = None
             if total_samples is not None and total_samples == 0:
                 raise ValueError(

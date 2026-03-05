@@ -1497,8 +1497,9 @@ class TestEmptyRecordingGuards:
         with pytest.raises(ValueError, match="Recording has 0 samples"):
             organizer._compute_lof_scores()
 
-    def test_convert_file_with_si_discovered_file_zero_samples_warns(self, temp_dir):
+    def test_convert_file_with_si_discovered_file_zero_samples_warns(self, temp_dir, caplog):
         """DiscoveredFile branch logs a warning when extract_func returns 0-sample recording."""
+        import logging as _logging
         from neurodent.core.discovery import DiscoveredFile
 
         df = DiscoveredFile(paths=("/tmp/a.bin", "/tmp/a.csv"), metadata={"session": "s1"})
@@ -1521,13 +1522,17 @@ class TestEmptyRecordingGuards:
 
         extract_func = Mock(return_value=mock_rec)
 
-        organizer.convert_file_with_si_to_recording(extract_func)
+        with caplog.at_level(_logging.WARNING):
+            organizer.convert_file_with_si_to_recording(extract_func)
 
         # Recording should still be set (with 0 samples), but warning logged
         assert organizer.LongRecording is not None
+        assert any("0-sample recording" in msg for msg in caplog.messages)
 
-    def test_convert_file_with_si_single_file_zero_samples_warns(self, temp_dir):
+    def test_convert_file_with_si_single_file_zero_samples_warns(self, temp_dir, caplog):
         """Single-file branch logs a warning when extract_func returns 0-sample recording."""
+        import logging as _logging
+
         organizer = LongRecordingOrganizer(None, mode=None)
         organizer.item = "/tmp/test.bin"
         organizer.n_truncate = 0
@@ -1547,7 +1552,9 @@ class TestEmptyRecordingGuards:
 
         extract_func = Mock(return_value=mock_rec)
 
-        organizer.convert_file_with_si_to_recording(extract_func)
+        with caplog.at_level(_logging.WARNING):
+            organizer.convert_file_with_si_to_recording(extract_func)
 
-        # Recording should still be set (with 0 samples)
+        # Recording should still be set (with 0 samples), warning logged
         assert organizer.LongRecording is not None
+        assert any("0-sample recording" in msg for msg in caplog.messages)
