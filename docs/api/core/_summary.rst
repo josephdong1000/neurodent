@@ -3,7 +3,7 @@
 .. autosummary::
    :nosignatures:
 
-   DDFBinaryMetadata
+   RecordingMetadata
    LongRecordingOrganizer
    LongRecordingAnalyzer
    FragmentAnalyzer

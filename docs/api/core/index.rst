@@ -15,6 +15,7 @@ Classes
    :maxdepth: 1
    :hidden:
 
+   recording_metadata
    ddf_binary_metadata
    long_recording_organizer
    long_recording_analyzer

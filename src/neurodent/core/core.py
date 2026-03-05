@@ -349,7 +349,7 @@ def _convert_ddfrowbin_to_si_no_resample(bin_rowmajor_path, metadata):
 
     Args:
         bin_rowmajor_path (str): Path to the row-major binary file
-        metadata (DDFBinaryMetadata): Metadata object containing information about the recording
+        metadata (RecordingMetadata): Metadata object containing information about the recording
 
     Returns:
         tuple: A tuple containing:
@@ -361,8 +361,8 @@ def _convert_ddfrowbin_to_si_no_resample(bin_rowmajor_path, metadata):
             "SpikeInterface is required for _convert_ddfrowbin_to_si_no_resample"
         )
     assert isinstance(
-        metadata, DDFBinaryMetadata
-    ), "Metadata needs to be of type DDFBinaryMetadata"
+        metadata, RecordingMetadata
+    ), "Metadata needs to be of type RecordingMetadata"
 
     bin_rowmajor_path = Path(bin_rowmajor_path)
     params = {
@@ -953,7 +953,7 @@ class LongRecordingOrganizer:
             tuple: (recording, raw_object, metadata) where:
                 - recording: SpikeInterface recording object
                 - raw_object: MNE Raw object (None if using cache)
-                - metadata: DDFBinaryMetadata object
+                - metadata: RecordingMetadata object
         """
         # Define metadata sidecar file path
         meta_fname = fname.with_suffix(fname.suffix + ".meta.json")
@@ -1004,7 +1004,7 @@ class LongRecordingOrganizer:
 
                 # Load metadata from sidecar file
                 try:
-                    metadata = DDFBinaryMetadata.from_json(meta_fname)
+                    metadata = RecordingMetadata.from_json(meta_fname)
                     logging.info(
                         f"Loaded cached metadata: {metadata.n_channels} channels, {metadata.f_s} Hz"
                     )
