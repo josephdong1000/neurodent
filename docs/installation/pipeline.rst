@@ -3,11 +3,11 @@ Pipeline & Cluster Setup
 
 NeuRodent includes a Snakemake workflow for automated analysis pipelines. This page covers installation and cluster configuration.
 
-Quick Start
------------
+Quick Start (pip install workflow)
+----------------------------------
 
 No git clone required.  The full pipeline is bundled with the Python package and
-can be deployed by copying the files from the installed package:
+can be deployed with a single command:
 
 .. code-block:: bash
 
@@ -16,13 +16,7 @@ can be deployed by copying the files from the installed package:
 
    # 2. Create a new analysis directory and deploy the pipeline files
    mkdir my_analysis && cd my_analysis
-   python -c "
-   import shutil
-   from importlib.resources import files
-   src = files('neurodent.pipeline')
-   for item in ('Snakefile', 'workflow', 'config'):
-       shutil.copytree(src / item, item) if (src / item).is_dir() else shutil.copy2(src / item, item)
-   "
+   neurodent init-pipeline
 
    # 3. Edit the configuration for your data
    # (see Dataset Configuration guide)
@@ -30,16 +24,20 @@ can be deployed by copying the files from the installed package:
    # 4. Run the pipeline
    snakemake --cores 4
 
-Alternatively, deploy with `snakedeploy <https://snakedeploy.readthedocs.io>`_
-for version-pinned reproducibility:
+The ``neurodent init-pipeline`` command copies ``Snakefile``, ``workflow/``, and
+``config/`` into the current directory (or a specified target directory).
 
 .. code-block:: bash
 
-   pip install snakedeploy
-   snakedeploy deploy-workflow \
-       https://github.com/josephdong1000/neurodent \
-       /path/to/my/analysis \
-       --tag v0.2.4
+   # Deploy to a specific directory
+   neurodent init-pipeline /path/to/my/project
+
+   # Overwrite existing files
+   neurodent init-pipeline --overwrite
+
+.. tip::
+
+   Run ``neurodent init-pipeline --help`` for a full list of options.
 
 Installing Pipeline Dependencies
 --------------------------------
@@ -146,3 +144,4 @@ Next Steps
 
 - **Snakemake Setup**: See :doc:`../quickstart/snakemake_setup` for running the pipeline, SLURM configuration, and workflow commands
 - **Dataset Configuration**: See :doc:`../quickstart/dataset_configuration` for switching between datasets and file formats
+- **Version-pinned deployment**: You can also deploy a tagged release with `snakedeploy <https://snakedeploy.readthedocs.io>`_ — see :doc:`../quickstart/snakemake_setup` for details
