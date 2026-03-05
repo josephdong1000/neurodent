@@ -77,7 +77,23 @@ def main():
 
             if reject_channels_by_session:
                 samples_bad_channels = samples_config.get("bad_channels", {})
-                bad_channels_dict_manual = samples_bad_channels.get(animal_key, {})
+                bad_channels_dict_manual = samples_bad_channels.get(animal_id, {})
+                # Expand "_all" key: merge into every other session entry
+                if "_all" in bad_channels_dict_manual:
+                    all_bad = bad_channels_dict_manual.pop("_all")
+                    if bad_channels_dict_manual:
+                        # Merge _all channels into each per-session list
+                        for session_key in bad_channels_dict_manual:
+                            merged = list(dict.fromkeys(
+                                bad_channels_dict_manual[session_key] + all_bad
+                            ))
+                            bad_channels_dict_manual[session_key] = merged
+                    else:
+                        # Only _all present: add to global reject_channels instead
+                        existing = filter_config["reject_channels"].get("bad_channels", [])
+                        filter_config["reject_channels"]["bad_channels"] = list(
+                            dict.fromkeys(existing + all_bad)
+                        )
                 logger.info(f"{filter_type} - Reject channels by session: {bad_channels_dict_manual}")
                 filter_config["reject_channels_by_session"] = {"bad_channels_dict": bad_channels_dict_manual}
 

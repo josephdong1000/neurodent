@@ -1,10 +1,10 @@
-
 import pytest
 import tempfile
 from pathlib import Path
 from datetime import datetime
 from unittest.mock import Mock, patch
 from neurodent.visualization import results
+
 
 class TestManualDatetimesEdgeCases:
     """Test extreme edge cases for manual_datetimes configuration."""
@@ -18,7 +18,7 @@ class TestManualDatetimesEdgeCases:
         # Create test folders
         self.folder1 = self.base_path / f"WT_{self.animal_id}_2023-01-15"
         self.folder2 = self.base_path / f"WT_{self.animal_id}_2023-01-16"
-        
+
         for folder in [self.folder1, self.folder2]:
             folder.mkdir(parents=True)
             (folder / "dummy_ColMajor_001.bin").touch()
@@ -27,6 +27,7 @@ class TestManualDatetimesEdgeCases:
     def teardown_method(self):
         """Clean up test fixtures."""
         import shutil
+
         shutil.rmtree(self.temp_dir)
 
     def _create_mock_lro(self, folder_name="test"):
@@ -41,7 +42,7 @@ class TestManualDatetimesEdgeCases:
         return mock_lro
 
     @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
-    @patch("glob.glob")
+    @patch("neurodent.core.discovery.glob.glob")
     def test_mixed_bag_configuration(self, mock_glob, mock_lro_class):
         """
         Test Case 3: The 'Mixed Bag'.
@@ -50,58 +51,59 @@ class TestManualDatetimesEdgeCases:
         mock_glob.return_value = [str(self.folder1), str(self.folder2)]
         mock_lro_class.return_value = self._create_mock_lro()
 
-        # Config: 
+        # Config:
         # - "Start_Animal" uses explicit ID key (ignored by our current A123 run)
         # - "WT_A123_2023-01-15" uses flat folder key (used by fallback)
         mixed_config = {
-            "Start_Animal": { "SomeFolder": datetime(2023, 1, 1) }, # Different animal
-            f"WT_{self.animal_id}_2023-01-15": datetime(2023, 2, 1, 10, 0), # Flat key for A123
-             f"WT_{self.animal_id}_2023-01-16": datetime(2023, 2, 1, 11, 0)
+            "Start_Animal": {"SomeFolder": datetime(2023, 1, 1)},  # Different animal
+            f"WT_{self.animal_id}_2023-01-15": datetime(
+                2023, 2, 1, 10, 0
+            ),  # Flat key for A123
+            f"WT_{self.animal_id}_2023-01-16": datetime(2023, 2, 1, 11, 0),
         }
 
         # Run for A123
         ao = results.AnimalOrganizer(
-            base_folder_path=str(self.base_path),
+            pattern=f"{self.base_path}/WT_{{animal}}_{{session}}",
             animal_id=self.animal_id,  # "A123"
-            mode="concat",
-            lro_kwargs={"manual_datetimes": mixed_config}
+            lro_kwargs={"manual_datetimes": mixed_config},
         )
 
         # Should successfully fallback to using the flat folder keys
-        assert ao._processed_timestamps[f"WT_{self.animal_id}_2023-01-15"] == datetime(2023, 2, 1, 10, 0)
+        assert ao._processed_timestamps[f"WT_{self.animal_id}_2023-01-15"] == datetime(
+            2023, 2, 1, 10, 0
+        )
 
     @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
-    @patch("glob.glob")
+    @patch("neurodent.core.discovery.glob.glob")
     def test_shadowing_trap_error(self, mock_glob, mock_lro_class):
         """
         Test Case 4: The 'Shadowing Trap'.
-        Dictionary has both valid Animal ID key and ignored flat folder keys.
+        Dictionary has an animal ID key (deprecated, no longer recognized) alongside
+        a flat folder key. Since animal-ID-keyed dicts are no longer supported,
+        the animal ID key is not recognized as an item or session name, and the
+        missing item raises an error.
         """
         mock_glob.return_value = [str(self.folder1), str(self.folder2)]
         mock_lro_class.return_value = self._create_mock_lro()
 
         shadowing_config = {
-            # 1. The Priority: Found ID key, used exclusively.
+            # Animal ID key — no longer recognized as a special key
             self.animal_id: {
                 f"WT_{self.animal_id}_2023-01-15": datetime(2023, 1, 1, 10, 0)
             },
-            
-            # 2. The Shadowed Key: Flat folder key.
-            # This should be IGNORED because key #1 exists.
-            # Thus, folder2 will be considered "missing" from the spec.
-            f"WT_{self.animal_id}_2023-01-16": datetime(2023, 1, 1, 11, 0)
+            # Flat folder key matching one item
+            f"WT_{self.animal_id}_2023-01-16": datetime(2023, 1, 1, 11, 0),
         }
 
-        # Should raise ValueError because folder2 is missing from the explicit ID spec
-        # and the flat key providing it is ignored.
-        with pytest.raises(ValueError) as exc_info:
+        # Should raise ValueError because folder1's item name is not in the dict
+        # (the animal ID key is no longer unwrapped)
+        with pytest.raises(ValueError, match="Missing entries in manual_datetimes for items") as exc_info:
             results.AnimalOrganizer(
-                base_folder_path=str(self.base_path),
+                pattern=f"{self.base_path}/WT_{{animal}}_{{session}}",
                 animal_id=self.animal_id,
-                mode="concat",
-                lro_kwargs={"manual_datetimes": shadowing_config}
+                lro_kwargs={"manual_datetimes": shadowing_config},
             )
-        
-        error_msg = str(exc_info.value)
-        assert "Ambiguous manual_datetimes configuration" in error_msg
-        assert "Please nest all folder keys" in error_msg
+
+        # Verify the missing item is the one whose key was only under the animal ID
+        assert f"WT_{self.animal_id}_2023-01-15" in str(exc_info.value)

@@ -135,7 +135,7 @@ class TestIDEFunctionality:
         import neurodent.core
 
         dir_contents = dir(neurodent.core)
-        expected_classes = ["LongRecordingOrganizer", "LongRecordingAnalyzer", "FragmentAnalyzer", "DDFBinaryMetadata"]
+        expected_classes = ["LongRecordingOrganizer", "LongRecordingAnalyzer", "FragmentAnalyzer", "RecordingMetadata", "DDFBinaryMetadata"]
         expected_functions = [
             "get_temp_directory",
             "nanaverage",

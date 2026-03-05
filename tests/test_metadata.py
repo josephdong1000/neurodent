@@ -166,6 +166,7 @@ class TestLoadAnimalMetadataEdgeCases:
         assert result["M1"]["gene"] is None
 
 
+@pytest.mark.mutates_constants
 class TestInjectConfigAliases:
     """Tests for inject_config_aliases function."""
 

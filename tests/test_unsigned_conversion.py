@@ -44,7 +44,7 @@ class TestUnsignedConversion(unittest.TestCase):
             mock_scaled.get_sampling_frequency.return_value = 2000.0
             mock_spre.scale_to_uV.return_value = mock_scaled
 
-            organizer = LongRecordingOrganizer(base_folder_path=".", mode=None)
+            organizer = LongRecordingOrganizer(item=".", mode=None)
             organizer._apply_resampling(mock_recording)
 
             # scale_to_uV should be called, unsigned_to_signed should NOT
@@ -64,7 +64,7 @@ class TestUnsignedConversion(unittest.TestCase):
             mock_recording.get_dtype.return_value = 'uint16'
             mock_recording.has_scaleable_traces.return_value = False
 
-            organizer = LongRecordingOrganizer(base_folder_path=".", mode=None)
+            organizer = LongRecordingOrganizer(item=".", mode=None)
             organizer._apply_resampling(mock_recording)
 
             # unsigned_to_signed should be called, scale_to_uV should NOT
@@ -89,7 +89,7 @@ class TestUnsignedConversion(unittest.TestCase):
             mock_scaled.get_sampling_frequency.return_value = 2000.0
             mock_spre.scale_to_uV.return_value = mock_scaled
 
-            organizer = LongRecordingOrganizer(base_folder_path=".", mode=None)
+            organizer = LongRecordingOrganizer(item=".", mode=None)
             organizer._apply_resampling(mock_recording)
 
             mock_spre.scale_to_uV.assert_called_once_with(mock_recording)
@@ -106,7 +106,7 @@ class TestUnsignedConversion(unittest.TestCase):
             mock_recording.get_sampling_frequency.return_value = 2000.0 
             mock_recording.get_dtype.return_value = 'int16'
             
-            organizer = LongRecordingOrganizer(base_folder_path=".", mode=None)
+            organizer = LongRecordingOrganizer(item=".", mode=None)
             
             organizer._apply_resampling(mock_recording)
             
@@ -124,7 +124,7 @@ class TestUnsignedConversion(unittest.TestCase):
             mock_recording.get_sampling_frequency.return_value = 2000.0 
             mock_recording.get_dtype.return_value = np.dtype('float32')
             
-            organizer = LongRecordingOrganizer(base_folder_path=".", mode=None)
+            organizer = LongRecordingOrganizer(item=".", mode=None)
             
             organizer._apply_resampling(mock_recording)
             

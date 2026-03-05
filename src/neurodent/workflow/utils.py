@@ -201,7 +201,7 @@ def deep_merge_dict(base: dict, override: dict) -> dict:
                 "samples": {"samples_file": "config/custom.json"},
                 "analysis": {
                     "war_generation": {
-                        "mode": "base",
+                        "pattern": "{index}.rhd",
                         "lro_kwargs": {"extract_func": "read_intan"}
                     }
                 }
@@ -212,7 +212,7 @@ def deep_merge_dict(base: dict, override: dict) -> dict:
             # merged["samples"]["quality_filter"]["exclude_unknown"] == True (preserved)
             # merged["samples"]["samples_file"] == "config/custom.json" (added)
             # merged["analysis"]["war_generation"]["day_sep"] == None (preserved)
-            # merged["analysis"]["war_generation"]["mode"] == "base" (added)
+            # merged["analysis"]["war_generation"]["pattern"] == "{index}.rhd" (added)
             # merged["analysis"]["war_generation"]["lro_kwargs"]["multiprocess_mode"] == "dask" (preserved)
             # merged["analysis"]["war_generation"]["lro_kwargs"]["extract_func"] == "read_intan" (added)
 
@@ -230,6 +230,253 @@ def deep_merge_dict(base: dict, override: dict) -> dict:
     return result
 
 
+def expand_animals_config(samples_config: dict) -> dict:
+    """Expand the unified ``animals`` list into pipeline keys.
+
+    When the samples config contains an ``animals`` key (a list of animal
+    dicts), this function produces:
+
+    * ``ANIMAL_METADATA`` – list of ``{id, gene, sex, ...}`` dicts
+    * ``manual_datetimes`` – animal_id → datetime string mapping
+    * ``GENOTYPE_ALIASES`` – gene → [animal_id, …] mapping (auto-generated
+      from ``gene`` field unless already present)
+    * ``bad_channels`` – animal_id → {session → [channels]} mapping
+      (built from per-animal ``bad_channels`` entries)
+    * ``_animal_overrides`` – animal_id → per-animal overrides dict (pattern,
+      lro_kwargs, day_parse_kwargs)
+
+    ``data_root`` is the canonical path key.  If the legacy key
+    ``data_parent_folder`` is present it is migrated to ``data_root``.
+
+    If ``animals`` is not present the config is returned unchanged (a deep
+    copy is always made so the caller never sees mutations).
+
+    Parameters
+    ----------
+    samples_config : dict
+        Samples configuration loaded from a ``samples_*.json`` file.
+
+    Returns
+    -------
+    dict
+        Expanded configuration with pipeline keys populated.
+
+    Examples
+    --------
+    Minimal config with two animals::
+
+        >>> cfg = expand_animals_config({
+        ...     "data_root": "/data",
+        ...     "animals": [
+        ...         {"id": "A10", "gene": "WT", "sex": "M"},
+        ...         {"id": "F22", "gene": "KO", "sex": "F"},
+        ...     ],
+        ... })
+        >>> cfg["data_root"]
+        '/data'
+        >>> "A10" in dict([(e["id"], e) for e in cfg["ANIMAL_METADATA"]])
+        True
+
+    Per-animal overrides::
+
+        >>> cfg = expand_animals_config({
+        ...     "data_root": "/data",
+        ...     "animals": [
+        ...         {"id": "X1", "gene": "WT", "sex": "M",
+        ...          "pattern": "{data_root}/custom/{animal}_{index}.rhd",
+        ...          "lro_kwargs": {"mode": "si"},
+        ...          "manual_datetime": "2025-01-01 10:00:00"},
+        ...     ],
+        ... })
+        >>> cfg["_animal_overrides"]["X1"]["pattern"]
+        '{data_root}/custom/{animal}_{index}.rhd'
+        >>> cfg["manual_datetimes"]["X1"]
+        '2025-01-01 10:00:00'
+
+    Bad channels (list format for all sessions)::
+
+        >>> cfg = expand_animals_config({
+        ...     "data_root": "/data",
+        ...     "animals": [
+        ...         {"id": "A10", "gene": "WT", "sex": "M",
+        ...          "bad_channels": ["LHip", "RHip"]},
+        ...     ],
+        ... })
+        >>> cfg["bad_channels"]["A10"]
+        {'_all': ['LHip', 'RHip']}
+
+    Bad channels (dict format for per-session)::
+
+        >>> cfg = expand_animals_config({
+        ...     "data_root": "/data",
+        ...     "animals": [
+        ...         {"id": "A10", "gene": "WT", "sex": "M",
+        ...          "bad_channels": {"Session1": ["LHip"], "Session2": ["RMot"]}},
+        ...     ],
+        ... })
+        >>> cfg["bad_channels"]["A10"]
+        {'Session1': ['LHip'], 'Session2': ['RMot']}
+    """
+    result = copy.deepcopy(samples_config)
+
+    # Migrate legacy data_parent_folder → data_root
+    if "data_parent_folder" in result and "data_root" not in result:
+        result["data_root"] = result.pop("data_parent_folder")
+
+    if "animals" not in result:
+        return result
+
+    animals_list = result["animals"]
+
+    # Keys that are per-animal overrides (not core metadata)
+    _OVERRIDE_KEYS = {"pattern", "lro_kwargs", "day_parse_kwargs", "manual_datetime", "datetimes_are_start", "bad_channels"}
+    _METADATA_SKIP = _OVERRIDE_KEYS  # excluded from ANIMAL_METADATA entries
+
+    # --- Build ANIMAL_METADATA ---
+    if "ANIMAL_METADATA" not in result:
+        result["ANIMAL_METADATA"] = []
+    existing_ids = {e["id"] for e in result["ANIMAL_METADATA"]}
+
+    for animal in animals_list:
+        if animal["id"] not in existing_ids:
+            meta_entry = {k: v for k, v in animal.items() if k not in _METADATA_SKIP}
+            result["ANIMAL_METADATA"].append(meta_entry)
+            existing_ids.add(animal["id"])
+
+    # --- Build manual_datetimes ---
+    if "manual_datetimes" not in result:
+        result["manual_datetimes"] = {}
+    for animal in animals_list:
+        if "manual_datetime" in animal:
+            result["manual_datetimes"][animal["id"]] = animal["manual_datetime"]
+
+    # --- Auto-generate GENOTYPE_ALIASES from gene field ---
+    if "GENOTYPE_ALIASES" not in result:
+        gene_to_animals: dict[str, list[str]] = {}
+        for animal in animals_list:
+            gene = animal.get("gene")
+            if gene:
+                gene_to_animals.setdefault(gene, []).append(animal["id"])
+        if gene_to_animals:
+            result["GENOTYPE_ALIASES"] = gene_to_animals
+
+    # --- Build bad_channels ---
+    if "bad_channels" not in result:
+        result["bad_channels"] = {}
+    for animal in animals_list:
+        if "bad_channels" in animal:
+            bc = animal["bad_channels"]
+            if isinstance(bc, list):
+                # List format: channels bad across all sessions
+                result["bad_channels"][animal["id"]] = {"_all": bc}
+            elif isinstance(bc, dict):
+                # Dict format: session → bad channels mapping
+                result["bad_channels"][animal["id"]] = bc
+
+    # --- Build _animal_overrides ---
+    overrides: dict[str, dict] = {}
+    for animal in animals_list:
+        animal_overrides = {}
+        for key in ("pattern", "lro_kwargs", "day_parse_kwargs"):
+            if key in animal:
+                animal_overrides[key] = animal[key]
+        # Propagate datetimes_are_start into lro_kwargs override
+        if "datetimes_are_start" in animal:
+            lro_kw = animal_overrides.setdefault("lro_kwargs", {})
+            lro_kw.setdefault("datetimes_are_start", animal["datetimes_are_start"])
+        if animal_overrides:
+            overrides[animal["id"]] = animal_overrides
+    if overrides:
+        result["_animal_overrides"] = overrides
+
+    return result
+
+
+def resolve_animal_pattern(
+    pattern_config,
+    animal_id: str,
+    data_root: str,
+) -> "str | list[str]":
+    """Resolve a discovery pattern for a specific animal.
+
+    Substitutes ``{data_root}`` in patterns with the actual data root path.
+
+    Supports two formats for ``pattern_config``:
+
+    * **Shared** (``str`` or ``list[str]``): every animal uses the same pattern(s).
+    * **Per-animal** (``dict[str, str | list[str]]``): each animal has its own
+      pattern(s), enabling heterogeneous file structures in a single dataset.
+
+    Parameters
+    ----------
+    pattern_config : str | list[str] | dict[str, str | list[str]]
+        Either a shared pattern (string or list), or a dict mapping
+        ``animal_id → pattern(s)``.  Patterns may contain ``{data_root}``
+        which will be replaced with the *data_root* value.
+    animal_id : str
+        The animal to resolve the pattern for.
+    data_root : str
+        Absolute path to the data root directory, substituted for
+        ``{data_root}`` in patterns.
+
+    Returns
+    -------
+    str | list[str]
+        Absolute discovery pattern(s) for the given animal.
+
+    Raises
+    ------
+    KeyError
+        If ``pattern_config`` is a dict and ``animal_id`` is not found.
+
+    Examples
+    --------
+    Pattern with ``{data_root}``::
+
+        >>> resolve_animal_pattern(
+        ...     "{data_root}/session1/{animal}/{index}.nwb", "A10", "/data"
+        ... )
+        '/data/session1/{animal}/{index}.nwb'
+
+    List of patterns::
+
+        >>> resolve_animal_pattern(
+        ...     ["{data_root}/{animal}/{index}.bin", "{data_root}/{animal}/{index}.csv"],
+        ...     "A10",
+        ...     "/data",
+        ... )
+        ['/data/{animal}/{index}.bin', '/data/{animal}/{index}.csv']
+
+    Per-animal pattern dict::
+
+        >>> resolve_animal_pattern(
+        ...     {"A10": "{data_root}/{animal}/{index}.rhd"},
+        ...     "A10",
+        ...     "/data",
+        ... )
+        '/data/{animal}/{index}.rhd'
+    """
+    # Per-animal patterns: dict mapping animal_id → pattern(s)
+    if isinstance(pattern_config, dict):
+        if animal_id not in pattern_config:
+            raise KeyError(
+                f"Animal '{animal_id}' not found in per-animal pattern config. "
+                f"Available animals: {list(pattern_config.keys())}"
+            )
+        pattern = pattern_config[animal_id]
+    else:
+        # Shared pattern (string or list)
+        pattern = pattern_config
+
+    def _resolve(p: str) -> str:
+        return p.replace("{data_root}", data_root)
+
+    if isinstance(pattern, list):
+        return [_resolve(p) for p in pattern]
+    else:
+        return _resolve(pattern)
+
+
 def apply_path_overrides(base_config: dict, overrides: dict) -> dict:
     """Apply path-based overrides to a config dictionary using deep merge.
 
@@ -240,7 +487,7 @@ def apply_path_overrides(base_config: dict, overrides: dict) -> dict:
     Args:
         base_config: Base configuration dictionary
         overrides: Dict mapping dotted paths to values
-                  e.g., {"analysis.war_generation.file_pattern": "*.EDF"}
+                  e.g., {"analysis.war_generation.pattern": "{index}.EDF"}
 
     Returns:
         Merged configuration with overrides applied
@@ -252,11 +499,11 @@ def apply_path_overrides(base_config: dict, overrides: dict) -> dict:
     Examples:
         Basic usage with nested paths::
 
-            >>> config = {"analysis": {"war_generation": {"mode": "base"}}}
-            >>> overrides = {"analysis.war_generation.file_pattern": "*.EDF"}
+            >>> config = {"analysis": {"war_generation": {"pattern": "{index}"}}}
+            >>> overrides = {"analysis.war_generation.pattern": "{index}.EDF"}
             >>> result = apply_path_overrides(config, overrides)
-            >>> result["analysis"]["war_generation"]["file_pattern"]
-            '*.EDF'
+            >>> result["analysis"]["war_generation"]["pattern"]
+            '{index}.EDF'
 
         Creating new nested keys::
 
@@ -272,22 +519,23 @@ def apply_path_overrides(base_config: dict, overrides: dict) -> dict:
             config = {
                 "analysis": {
                     "war_generation": {
-                        "mode": "base",
-                        "lro_kwargs": {"mode": "si", "input_type": "files"}
+                        "pattern": "{index}",
+                        "lro_kwargs": {"mode": "si"}
                     }
                 }
             }
 
             # Session-specific overrides for EDF format
             overrides = {
-                "analysis.war_generation.file_pattern": "*.EDF",
-                "analysis.war_generation.lro_kwargs.extract_func": "read_edf"
+                "analysis.war_generation.pattern": "{index}.EDF",
+                "analysis.war_generation.lro_kwargs.mode": "mne",
+                "analysis.war_generation.lro_kwargs.extract_func": "read_raw_edf"
             }
 
             result = apply_path_overrides(config, overrides)
-            # result["analysis"]["war_generation"]["file_pattern"] == "*.EDF"
-            # result["analysis"]["war_generation"]["lro_kwargs"]["extract_func"] == "read_edf"
-            # result["analysis"]["war_generation"]["lro_kwargs"]["mode"] == "si" (preserved)
+            # result["analysis"]["war_generation"]["pattern"] == "{index}.EDF"
+            # result["analysis"]["war_generation"]["lro_kwargs"]["extract_func"] == "read_raw_edf"
+            # result["analysis"]["war_generation"]["lro_kwargs"]["mode"] == "mne" (overridden)
 
     Note:
         This function does NOT mutate the input config - it returns a new deep copy.
