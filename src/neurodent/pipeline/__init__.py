@@ -1,7 +1,7 @@
 """
 Bundled Snakemake pipeline files for NeuRodent.
 
-The files in this package can be copied to a working directory using
-``neurodent.pipeline.copy_pipeline()`` or by manually copying from the
-installed package location.
+The files in this package can be copied to a working directory by using
+``importlib.resources.files('neurodent.pipeline')`` to locate them and
+then copying ``Snakefile``, ``workflow/``, and ``config/`` to the target.
 """
