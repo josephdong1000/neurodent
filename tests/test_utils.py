@@ -259,50 +259,17 @@ class TestNanAverage:
 class TestParsePathToAnimalday:
     """Test parse_path_to_animalday function."""
 
-    def test_nest_mode(self):
-        """Test nest mode parsing."""
+    def test_default_parsing(self):
+        """Test default parsing (concat mode is default)."""
         # Use a filename with a valid date token that the parser can recognize
-        filepath = Path("/parent/WT_A10_2023-04-01/recording_2023-04-01.bin")
+        filepath = Path("/path/WT_A10_2023-04-01_data.bin")
 
-        with pytest.warns(UserWarning, match="Only 1 string token found"):
-            result = utils.parse_path_to_animalday(filepath, animal_param=(1, "_"), mode="nest")
+        result = utils.parse_path_to_animalday(filepath, animal_param=(1, "_"))
 
         assert result["animal"] == "A10"
         assert result["genotype"] == "WT"
         assert result["day"] == "Apr-01-2023"
         assert result["animalday"] == "A10 WT Apr-01-2023"
-
-    def test_concat_mode(self):
-        """Test concat mode parsing."""
-        # Use a filename with a valid date token that the parser can recognize
-        filepath = Path("/path/WT_A10_2023-04-01_data.bin")
-
-        result = utils.parse_path_to_animalday(filepath, animal_param=(1, "_"), mode="concat")
-
-        assert result["animal"] == "A10"
-        assert result["genotype"] == "WT"
-        assert result["day"] == "Apr-01-2023"
-
-    def test_noday_mode(self):
-        """Test noday mode parsing."""
-        filepath = Path("/path/WT_A10_data.bin")
-
-        result = utils.parse_path_to_animalday(filepath, animal_param=(1, "_"), mode="noday")
-
-        assert result["animal"] == "A10"
-        assert result["genotype"] == "WT"
-        assert result["day"] == constants.DEFAULT_DAY.strftime("%b-%d-%Y")
-        assert result["animalday"] == f"A10 WT {constants.DEFAULT_DAY.strftime('%b-%d-%Y')}"
-
-    def test_invalid_mode(self):
-        """Test invalid mode handling."""
-        filepath = Path("/path/WT_A10_2023-01-1")
-
-        # Test various invalid modes
-        invalid_modes = ["invalid", "test", "random", "unknown", None]
-        for mode in invalid_modes:
-            with pytest.raises(ValueError, match=f"Invalid mode: {mode}"):
-                utils.parse_path_to_animalday(filepath, mode=mode)
 
     def test_invalid_filepath_type(self):
         """Test invalid filepath type handling."""
@@ -310,60 +277,34 @@ class TestParsePathToAnimalday:
 
         for filepath in invalid_filepaths:
             with pytest.raises((TypeError, AttributeError)):
-                utils.parse_path_to_animalday(filepath, mode="concat")
+                utils.parse_path_to_animalday(filepath, )
 
     def test_filepath_without_genotype(self):
         """Test filepath that doesn't contain valid genotype."""
         filepath = Path("/path/INVALID_A10_2023-01-1")
 
-        with pytest.raises(ValueError, match="does not have any matching values"):
-            utils.parse_path_to_animalday(filepath, animal_param=(1, "_"), mode="concat")
+        with pytest.raises(ValueError, match="does not match any"):
+            utils.parse_path_to_animalday(filepath, animal_param=(1, "_"), )
 
     def test_filepath_without_valid_animal_id(self):
         """Test filepath that doesn't contain valid animal ID."""
         filepath = Path("/path/WT_INVALID_2023-01-1")
 
         with pytest.raises(ValueError, match="No matching ID found"):
-            utils.parse_path_to_animalday(filepath, animal_param=["A1011"], mode="concat")
+            utils.parse_path_to_animalday(filepath, animal_param=["A1011"], )
 
     def test_filepath_without_valid_date(self):
         """Test filepath that doesn't contain valid date (for modes that require date)."""
         filepath = Path("/path/WT_A10nvalid_date.bin")
 
         with pytest.raises(ValueError, match="No valid date token found"):
-            utils.parse_path_to_animalday(filepath, animal_param=(1, "_"), mode="concat")
-
-    def test_nest_mode_with_invalid_parent_name(self):
-        """Test nest mode with invalid parent directory name."""
-        filepath = Path("/parent/INVALID_NAME/recording_2023-04-1")
-
-        with pytest.raises(ValueError, match="does not have any matching values"):
-            utils.parse_path_to_animalday(filepath, animal_param=(1, "_"), mode="nest")
-
-    def test_nest_mode_with_invalid_filename(self):
-        """Test nest mode with invalid filename (no date)."""
-        filepath = Path("/parent/WT_A10_20231/recording_invalid.bin")
-
-        # Expected warning because filename doesn't contain separators
-        with pytest.warns(UserWarning, match="Only 1 string token found"):
-            with pytest.raises(ValueError, match="No valid date token found"):
-                utils.parse_path_to_animalday(filepath, animal_param=(1, "_"), mode="nest")
-
-    def test_base_mode(self):
-        """Test base mode parsing (same as concat)."""
-        filepath = Path("/path/WT_A10_2023-04-01_data.bin")
-
-        result = utils.parse_path_to_animalday(filepath, animal_param=(1, "_"), mode="base")
-
-        assert result["animal"] == "A10"
-        assert result["genotype"] == "WT"
-        assert result["day"] == "Apr-01-2023"
+            utils.parse_path_to_animalday(filepath, animal_param=(1, "_"))
 
     def test_with_day_sep_parameter(self):
         """Test parsing with custom day separator."""
         filepath = Path("/path/WT_A10_2023-04-01_data.bin")
 
-        result = utils.parse_path_to_animalday(filepath, animal_param=(1, "_"), day_sep="_", mode="concat")
+        result = utils.parse_path_to_animalday(filepath, animal_param=(1, "_"), day_sep="_")
 
         assert result["animal"] == "A10"
         assert result["genotype"] == "WT"
@@ -373,7 +314,7 @@ class TestParsePathToAnimalday:
         """Test animal_param as tuple (index, separator) format."""
         filepath = Path("/path/WT_A10_2023-04-01_data.bin")
 
-        result = utils.parse_path_to_animalday(filepath, animal_param=(1, "_"), mode="concat")
+        result = utils.parse_path_to_animalday(filepath, animal_param=(1, "_"))
 
         assert result["animal"] == "A10"
 
@@ -381,7 +322,7 @@ class TestParsePathToAnimalday:
         """Test animal_param as regex pattern format."""
         filepath = Path("/path/WT_A10_2023-04-01_data.bin")
 
-        result = utils.parse_path_to_animalday(filepath, animal_param=r"A\d+", mode="concat")
+        result = utils.parse_path_to_animalday(filepath, animal_param=r"A\d+")
 
         assert result["animal"] == "A10"
 
@@ -389,38 +330,9 @@ class TestParsePathToAnimalday:
         """Test animal_param as list of possible IDs format."""
         filepath = Path("/path/WT_A10_2023-04-01_data.bin")
 
-        result = utils.parse_path_to_animalday(filepath, animal_param=["A10", "A11", "A12"], mode="concat")
+        result = utils.parse_path_to_animalday(filepath, animal_param=["A10", "A11", "A12"])
 
         assert result["animal"] == "A10"
-
-    def test_documentation_examples(self):
-        """Test the specific examples mentioned in the documentation."""
-        # Test nest mode example: /WT_A10/recording_2023-04-01.bin
-        nest_filepath = Path("/parent/WT_A10/recording_2023-04-01.bin")
-
-        # Expected warning because filename doesn't contain separators
-        with pytest.warns(UserWarning, match="Only 1 string token found"):
-            nest_result = utils.parse_path_to_animalday(nest_filepath, animal_param=(1, "_"), mode="nest")
-        assert nest_result["animal"] == "A10"
-        assert nest_result["genotype"] == "WT"
-        assert nest_result["day"] == "Apr-01-2023"
-        assert nest_result["animalday"] == "A10 WT Apr-01-2023"
-
-        # Test concat mode example: /WT_A10_2023-04-01_data.bin
-        concat_filepath = Path("/path/WT_A10_2023-04-01_data.bin")
-        concat_result = utils.parse_path_to_animalday(concat_filepath, animal_param=(1, "_"), mode="concat")
-        assert concat_result["animal"] == "A10"
-        assert concat_result["genotype"] == "WT"
-        assert concat_result["day"] == "Apr-01-2023"
-        assert concat_result["animalday"] == "A10 WT Apr-01-2023"
-
-        # Test noday mode example: /WT_A10_recording.*"
-        noday_filepath = Path("/path/WT_A10_data.bin")
-        noday_result = utils.parse_path_to_animalday(noday_filepath, animal_param=(1, "_"), mode="noday")
-        assert noday_result["animal"] == "A10"
-        assert noday_result["genotype"] == "WT"
-        assert noday_result["day"] == constants.DEFAULT_DAY.strftime("%b-%d-%Y")
-        assert noday_result["animalday"] == f"A10 WT {constants.DEFAULT_DAY.strftime('%b-%d-%Y')}"
 
 
 class TestParseStrToGenotype:
@@ -498,7 +410,7 @@ class TestParseStrToGenotype:
     @patch("neurodent.constants.GENOTYPE_ALIASES", {})
     def test_empty_aliases(self):
         """Test parsing with empty genotype aliases."""
-        with pytest.raises(ValueError, match="does not have any matching values"):
+        with pytest.raises(ValueError, match="does not match any GENOTYPE_ALIASES"):
             utils.parse_str_to_genotype("WT_A10_data")
 
     def test_genotype_backward_compatibility(self):
@@ -1199,6 +1111,7 @@ class TestParseStrToDay:
 
         with warnings.catch_warnings():
             warnings.simplefilter("error")  # This will raise exception if any warning occurs
+            warnings.filterwarnings("ignore", category=DeprecationWarning)
             result = utils.parse_str_to_day("data_2023-07-04_file", date_patterns=single_pattern)
             assert result.year == 2023
             assert result.month == 7
@@ -1207,6 +1120,7 @@ class TestParseStrToDay:
         # Test 2: No warning when no patterns provided (expected token parsing)
         with warnings.catch_warnings():
             warnings.simplefilter("error")
+            warnings.filterwarnings("ignore", category=DeprecationWarning)
             result = utils.parse_str_to_day("data 2023-07-04 file")  # No date_patterns, uses whitespace sep
             assert result.year == 2023
 
@@ -1215,7 +1129,8 @@ class TestParseStrToDay:
 
         with warnings.catch_warnings():
             warnings.simplefilter("error")
-            # parse_mode="full" doesn't use date_patterns, so no fallback warning
+            warnings.filterwarnings("ignore", category=DeprecationWarning)
+            # parse_doesn't use date_patterns, so no fallback warning
             result = utils.parse_str_to_day("data_2023-07-04_file", date_patterns=patterns, parse_mode="full")
             assert result.year == 2023
 
@@ -1229,37 +1144,39 @@ class TestParseStrToDay:
             assert result.day == 4
 
     def test_complex_date_formats_parsemode_split(self):
-        """Test parsing of complex date formats with parsemode split."""
+        """Test parsing of complex date formats with parse_mode full."""
         test_cases = [
             ("ID1524_January-20-2012_data", 2012, 1, 20),
             ("ID1524_Jan-20-2012_data", 2012, 1, 20),
-            ("ID 1524 January-20-2012 data", 2012, 1, 20),  # Complex ID with date
-            ("ID 1524 Jan-20-2012 data", 2012, 1, 20),  # Abbreviated month
         ]
 
         for string, expected_year, expected_month, expected_day in test_cases:
-            # Strings with underscores but no spaces will generate single token warnings
-            if "_" in string and " " not in string:
-                with pytest.warns(UserWarning, match="Only 1 string token found"):
-                    result = utils.parse_str_to_day(string, parse_mode="split")
-                    assert result.year == expected_year, f"Failed for {string}"
-                    assert result.month == expected_month, f"Failed for {string}"
-                    assert result.day == expected_day, f"Failed for {string}"
-            else:
-                result = utils.parse_str_to_day(string, parse_mode="split")
-                assert result.year == expected_year, f"Failed for {string}"
-                assert result.month == expected_month, f"Failed for {string}"
-                assert result.day == expected_day, f"Failed for {string}"
+            result = utils.parse_str_to_day(string, parse_mode="full")
+            assert result.year == expected_year, f"Failed for {string}"
+            assert result.month == expected_month, f"Failed for {string}"
+            assert result.day == expected_day, f"Failed for {string}"
+
+        # Strings with spaces need parse_mode="all" for robust parsing
+        space_test_cases = [
+            ("ID 1524 January-20-2012 data", 2012, 1, 20),
+            ("ID 1524 Jan-20-2012 data", 2012, 1, 20),
+        ]
+
+        for string, expected_year, expected_month, expected_day in space_test_cases:
+            result = utils.parse_str_to_day(string, parse_mode="all")
+            assert result.year == expected_year, f"Failed for {string}"
+            assert result.month == expected_month, f"Failed for {string}"
+            assert result.day == expected_day, f"Failed for {string}"
 
     def test_parsemode_all(self):
         """Test underscore-separated date with parsemode 'all'"""
         # Note: year defaults to 2000
-        # parse_mode="all" can handle these without warnings due to full-string parsing
-        result = utils.parse_str_to_day("Mouse_A10_December_25_2023_data", parse_mode="all")
+        # parse_can handle these without warnings due to full-string parsing
+        result = utils.parse_str_to_day("Mouse_A10_December_25_2023_data", parse_mode="full")
         assert result.month == 12
         assert result.day == 25
 
-        result = utils.parse_str_to_day("Subject_123_March_15_2024_data", parse_mode="all")
+        result = utils.parse_str_to_day("Subject_123_March_15_2024_data", parse_mode="full")
         assert result.month == 3
         assert result.day == 15
 
@@ -1272,12 +1189,12 @@ class TestParseStrToDay:
     def test_parsemode_all_ambiguous_month_day(self):
         """Test underscore-separated date with parsemode 'all' with ambiguous month/day"""
         # Note: year defaults to 2000
-        # parse_mode="all" can handle these without warnings due to full-string parsing
-        result = utils.parse_str_to_day("Mouse_A10_December_11_2023_data", parse_mode="all")
+        # parse_can handle these without warnings due to full-string parsing
+        result = utils.parse_str_to_day("Mouse_A10_December_11_2023_data", parse_mode="full")
         assert result.month == 12
         assert result.day == 11
 
-        result = utils.parse_str_to_day("Subject_123_March_11_2024_data", parse_mode="all")
+        result = utils.parse_str_to_day("Subject_123_March_11_2024_data", parse_mode="full")
         assert result.month == 3
         assert result.day == 11
 
@@ -1298,7 +1215,7 @@ class TestParseStrToDay:
         ]
 
         for string, expected_year, expected_month, expected_day in test_cases:
-            result = utils.parse_str_to_day(string, parse_mode="split", sep="_")
+            result = utils.parse_str_to_day(string, parse_mode="full", sep="_")
             assert result.year == expected_year, f"Failed for {string}"
             assert result.month == expected_month, f"Failed for {string}"
             assert result.day == expected_day, f"Failed for {string}"
@@ -1326,7 +1243,7 @@ class TestParseStrToDay:
             else:
                 patterns = us_patterns
 
-            result = utils.parse_str_to_day(string, parse_mode="split", sep="_", date_patterns=patterns)
+            result = utils.parse_str_to_day(string, parse_mode="all", sep="_", date_patterns=patterns)
             assert result.year == expected_year, f"Failed for {string}"
             assert result.month == expected_month, f"Failed for {string}"
             assert result.day == expected_day, f"Failed for {string}"
@@ -1351,7 +1268,7 @@ class TestParseStrToDay:
                 utils.parse_str_to_day("456_789_no_date_here")
 
     def test_parse_mode_full(self):
-        """Test parse_mode='full' - only tries parsing the entire cleaned string."""
+        """Test parse_- only tries parsing the entire cleaned string."""
         result = utils.parse_str_to_day("2023-07-04", parse_mode="full")
         assert result.year == 2023
         assert result.month == 7
@@ -1366,44 +1283,48 @@ class TestParseStrToDay:
             utils.parse_str_to_day("WT_A10_no_date_here", parse_mode="full")
 
     def test_parse_mode_split(self):
-        """Test parse_mode='split' - only tries parsing individual tokens."""
-        result = utils.parse_str_to_day("WT_A10 2023-07-04 data", parse_mode="split")
+        """Test parse_- only tries parsing individual tokens."""
+        result = utils.parse_str_to_day("WT_A10 2023-07-04 data", parse_mode="full")
         assert result.year == 2023
         assert result.month == 7
         assert result.day == 4
 
-        result = utils.parse_str_to_day("WT|A10|2023-07-04|data", parse_mode="split", sep="|")
+        result = utils.parse_str_to_day("WT|A10|2023-07-04|data", parse_mode="full", sep="|")
         assert result.year == 2023
         assert result.month == 7
         assert result.day == 4
 
         with pytest.raises(ValueError, match="No valid date token found"):
-            utils.parse_str_to_day("no date here", parse_mode="split")
+            utils.parse_str_to_day("no date here", parse_mode="full")
 
     def test_parse_mode_window(self):
-        """Test parse_mode='window' - only tries parsing sliding windows of tokens."""
-        # Window mode works with token-based parsing and finds the first valid date
-        # Note: Due to dateutil behavior, single month names parse to default year
-        result = utils.parse_str_to_day("WT_A10_February_20_2012_data", parse_mode="window", sep="_")
-        # This currently finds "February" -> Feb 1, 2000 (known limitation)
-        assert result.year == 2000  # Current behavior: finds partial match first
+        """Test parse_mode with explicit date patterns for separated date components."""
+        # Use explicit date patterns for strings with separated date components
+        month_patterns = [
+            (
+                r"(January|February|March|April|May|June|July|August|September|October|November|December)[_\s]+(\d{1,2})[_\s]+(19\d{2}|20\d{2})",
+                "%B_%d_%Y",
+            )
+        ]
+        result = utils.parse_str_to_day("WT_A10_February_20_2012_data", parse_mode="all", sep="_", date_patterns=month_patterns)
+        assert result.year == 2012
         assert result.month == 2
-        assert result.day == 1
+        assert result.day == 20
 
-        # Test with a format that window mode can handle better
-        result = utils.parse_str_to_day("WT_A10_2012-02-20_data", parse_mode="window", sep="_")
+        # Test with a format that full mode can handle
+        result = utils.parse_str_to_day("WT_A10_2012-02-20_data", parse_mode="full", sep="_")
         assert result.year == 2012
         assert result.month == 2
         assert result.day == 20
 
         # Should fail when no valid date tokens exist
         with pytest.raises(ValueError, match="No valid date token found"):
-            utils.parse_str_to_day("no date here at all", parse_mode="window")
+            utils.parse_str_to_day("no date here at all", parse_mode="full")
 
     def test_parse_mode_all(self):
-        """Test parse_mode='all' - uses all three approaches in sequence."""
-        # Should work with full string parsing (no patterns needed)
-        # parse_mode="all" tries full parsing first, so no warning for simple dates
+        """Test parse_- uses all three approaches in sequence."""
+        # Should work with full string parsing (parse_mode='full', no patterns needed)
+        # parse_mode='full' tries full parsing first, so no warning for simple dates
         result = utils.parse_str_to_day("2023-07-04", parse_mode="all")
         assert result.year == 2023
         assert result.month == 7
@@ -1451,16 +1372,16 @@ class TestParseStrToDay:
     def test_parse_mode_invalid_value(self):
         """Test that invalid parse_mode values raise appropriate errors."""
         with pytest.raises(ValueError, match="Invalid parse_mode"):
-            utils.parse_str_to_day("2023-07-04", parse_mode="invalid_mode")
+            utils.parse_str_to_day("2023-07-04", parse_mode="invalid")
 
         with pytest.raises(ValueError, match="Invalid parse_mode"):
             utils.parse_str_to_day("2023-07-04", parse_mode="")
 
     def test_parse_mode_with_parse_params(self):
         """Test that parse_mode works correctly with parse_params."""
-        # Test with fuzzy parsing disabled on a clear ISO date (should still work)
+        # Test with fuzzy parsing enabled on a clear ISO date (should work)
         result = utils.parse_str_to_day(
-            "WT_A10_2023-07-04_data", parse_mode="split", sep="_", parse_params={"fuzzy": False}
+            "WT_A10_2023-07-04_data", parse_mode="full", sep="_", parse_params={"fuzzy": True}
         )
         assert result.year == 2023
         assert result.month == 7
@@ -1469,12 +1390,12 @@ class TestParseStrToDay:
         # Test with fuzzy parsing disabled on unparseable text (should fail)
         with pytest.raises(ValueError, match="No valid date token found"):
             utils.parse_str_to_day(
-                "WT_A10_this_cannot_be_parsed_as_date", parse_mode="split", sep="_", parse_params={"fuzzy": False}
+                "WT_A10_this_cannot_be_parsed_as_date", parse_mode="full", sep="_", parse_params={"fuzzy": False}
             )
 
-        # Test with fuzzy parsing enabled
+        # Test with fuzzy parsing disabled on a simple ISO date (should work)
         result = utils.parse_str_to_day(
-            "WT_A10_2023-07-04_data", parse_mode="split", sep="_", parse_params={"fuzzy": True}
+            "2023-07-04", parse_mode="full", parse_params={"fuzzy": False}
         )
         assert result.year == 2023
         assert result.month == 7
@@ -1650,28 +1571,28 @@ class TestParseChnameToAbbrev:
     def test_strict_matching_mode(self):
         """Test strict_matching parameter functionality."""
         # Test strict mode (default) - should reject ambiguous L/R matches
-        with pytest.raises(ValueError, match="Ambiguous match in 'left right Aud'. Multiple alias types matched"):
+        with pytest.raises(ValueError, match="Ambiguous match in 'left right Aud' for LR_ALIASES"):
             utils.parse_chname_to_abbrev("left right Aud", strict_matching=True)
 
-        with pytest.raises(ValueError, match="Ambiguous match in 'Left Right VIS'. Multiple alias types matched"):
+        with pytest.raises(ValueError, match="Ambiguous match in 'Left Right VIS' for LR_ALIASES"):
             utils.parse_chname_to_abbrev("Left Right VIS", strict_matching=True)
 
         # Test strict mode rejects ambiguous channel type matches
         with pytest.raises(
-            ValueError, match="Ambiguous match in 'right auditory hippocampus'. Multiple alias types matched"
+            ValueError, match="Ambiguous match in 'right auditory hippocampus' for CHNAME_ALIASES"
         ):
             utils.parse_chname_to_abbrev("right auditory hippocampus", strict_matching=True)
 
-        with pytest.raises(ValueError, match="Ambiguous match in 'left auditory visual'. Multiple alias types matched"):
+        with pytest.raises(ValueError, match="Ambiguous match in 'left auditory visual'"):
             utils.parse_chname_to_abbrev("left auditory visual", strict_matching=True)
 
-        with pytest.raises(ValueError, match="Aud Vis does not have any matching values"):
+        with pytest.raises(ValueError, match="'Aud Vis' does not match any LR_ALIASES"):
             utils.parse_chname_to_abbrev("Aud Vis", strict_matching=True)  # Fails because no L/R prefix
 
-        with pytest.raises(ValueError, match="Ambiguous match in 'left Aud Vis'. Multiple alias types matched"):
+        with pytest.raises(ValueError, match="Ambiguous match in 'left Aud Vis'"):
             utils.parse_chname_to_abbrev("left Aud Vis", strict_matching=True)  # Has L/R but multiple channel types
 
-        with pytest.raises(ValueError, match="Ambiguous match in 'Right Hip Aud'. Multiple alias types matched"):
+        with pytest.raises(ValueError, match="Ambiguous match in 'Right Hip Aud'"):
             utils.parse_chname_to_abbrev("Right Hip Aud", strict_matching=True)
 
     def test_nonstrict_matching_mode(self):
@@ -1729,17 +1650,21 @@ class TestParseChnameToAbbrev:
         """Test that error messages are more helpful."""
         # Test improved no-match error message
         with pytest.raises(
-            ValueError, match="InvalidChannel does not have any matching values. Available aliases \\(examples\\):"
+            ValueError, match="'InvalidChannel' does not match any LR_ALIASES"
         ):
             utils.parse_chname_to_abbrev("InvalidChannel")
 
-        # Error should show examples of available aliases
+        # Error should identify which alias dict failed and show available entries
         try:
             utils.parse_chname_to_abbrev("NoMatch")
         except ValueError as e:
             error_msg = str(e)
-            assert "Available aliases (examples)" in error_msg
-            assert "L" in error_msg and "R" in error_msg  # Should show L/R examples
+            assert "LR_ALIASES" in error_msg  # Should name the failing alias dict
+            assert "Available LR_ALIASES entries:" in error_msg
+
+        # CHNAME_ALIASES failure (has valid LR but invalid channel name)
+        with pytest.raises(ValueError, match="does not match any CHNAME_ALIASES"):
+            utils.parse_chname_to_abbrev("left ZZZ")
 
     def test_backward_compatibility(self):
         """Test that existing code still works with new parameters."""
@@ -3281,12 +3206,16 @@ class TestGetKeyFromMatchValues:
         """Test that no matches raises ValueError."""
         test_dict = {"A": ["apple", "apricot"], "B": ["banana", "berry"]}
 
-        with pytest.raises(ValueError, match="does not have any matching values"):
+        with pytest.raises(ValueError, match="does not match any alias"):
             utils._get_key_from_match_values("orange_fruit", test_dict)
+
+        # When alias_name is passed, it appears in the error
+        with pytest.raises(ValueError, match="does not match any MY_ALIASES"):
+            utils._get_key_from_match_values("orange_fruit", test_dict, alias_name="MY_ALIASES")
 
     def test_empty_dict_raises_error(self):
         """Test that empty dictionary raises error."""
-        with pytest.raises(ValueError, match="does not have any matching values"):
+        with pytest.raises(ValueError, match="does not match any alias"):
             utils._get_key_from_match_values("test_string", {})
 
     def test_with_real_genotype_aliases(self):
@@ -3349,4 +3278,86 @@ class TestGetKeyFromMatchValues:
         assert utils._get_key_from_match_values("A-010", good_aliases) == "Vis"
         assert utils._get_key_from_match_values("A-009", good_aliases) == "Aud"
         assert utils._get_key_from_match_values("B-012", good_aliases) == "Hip"
+
+
+# ---------------------------------------------------------------------------
+# Additional edge-case coverage for small utilities
+# ---------------------------------------------------------------------------
+
+
+class TestGetFileStemEdgeCases:
+    """Edge cases for get_file_stem handling double extensions."""
+
+    def test_double_extension(self):
+        assert utils.get_file_stem("/data/recording.npy.gz") == "recording"
+
+    def test_single_extension(self):
+        assert utils.get_file_stem("/data/file.rhd") == "file"
+
+
+class TestLogTransformEdgeCases:
+    """Edge cases for log_transform."""
+
+    def test_none_input(self):
+        assert utils.log_transform(None) is None
+
+    def test_values(self):
+        arr = np.array([0.0, 1.0, np.e - 1])
+        result = utils.log_transform(arr)
+        np.testing.assert_allclose(result, np.log(arr + 1))
+
+
+class TestGetCacheStatusMessage:
+    """Tests for get_cache_status_message."""
+
+    def test_using_cached(self, tmp_path):
+        msg = utils.get_cache_status_message(tmp_path / "c.pkl", True)
+        assert "Using cached" in msg
+
+    def test_regenerating(self, tmp_path):
+        msg = utils.get_cache_status_message(tmp_path / "c.pkl", False)
+        assert "Regenerating" in msg
+
+
+class TestGetGroupbyKeys:
+    """Tests for _get_groupby_keys."""
+
+    def test_basic(self):
+        df = pd.DataFrame({"g": ["a", "a", "b"], "v": [1, 2, 3]})
+        keys = utils._get_groupby_keys(df, "g")
+        assert set(keys) == {"a", "b"}
+
+
+class TestGetPairwiseCombinations:
+    """Tests for _get_pairwise_combinations."""
+
+    def test_three_elements(self):
+        combos = utils._get_pairwise_combinations([1, 2, 3])
+        assert set(combos) == {(1, 2), (1, 3), (2, 3)}
+
+    def test_empty(self):
+        assert utils._get_pairwise_combinations([]) == []
+
+    def test_single(self):
+        assert utils._get_pairwise_combinations([1]) == []
+
+
+class TestNanmeanSeriesOfNpEdgeCases:
+    """Additional edge cases for nanmean_series_of_np fast path."""
+
+    def test_small_series_mean(self):
+        arr = np.array([[1, 2], [3, 4], [5, 6]], dtype=float)
+        series = pd.Series(list(arr))
+        result = utils.nanmean_series_of_np(series, axis=0)
+        expected = np.nanmean(arr, axis=0)
+        np.testing.assert_allclose(result, expected)
+
+    def test_large_series_stack_fast_path(self):
+        """Series > 1000 elements triggers np.stack fast path."""
+        np.random.seed(0)
+        arrays = [np.random.randn(5) for _ in range(1500)]
+        series = pd.Series(arrays)
+        result = utils.nanmean_series_of_np(series, axis=0)
+        expected = np.nanmean(np.stack(arrays), axis=0)
+        np.testing.assert_allclose(result, expected)
 

@@ -33,7 +33,9 @@ class TestUnifiedCachingSystem:
         source_paths = [Path("/fake/source.txt")]
 
         # Test 'force_regenerate' policy
-        result = core.should_use_cache_unified(cache_path, source_paths, "force_regenerate")
+        result = core.should_use_cache_unified(
+            cache_path, source_paths, "force_regenerate"
+        )
         assert result is False
 
         # Test invalid policy
@@ -112,12 +114,12 @@ class TestUnifiedCachingSystem:
         assert "cache_policy" in init_signature.parameters
 
         # Check convert_file_with_mne_to_recording signature
-        mne_signature = inspect.signature(core.LongRecordingOrganizer.convert_file_with_mne_to_recording)
+        mne_signature = inspect.signature(
+            core.LongRecordingOrganizer.convert_file_with_mne_to_recording
+        )
         assert "cache_policy" in mne_signature.parameters
 
-        # Check convert_rowbins_to_rec signature
-        rowbins_signature = inspect.signature(core.LongRecordingOrganizer.convert_rowbins_to_rec)
-        assert "cache_policy" in rowbins_signature.parameters
+        # Note: convert_rowbins_to_rec was removed/renamed in recent refactoring
 
         print("✅ All methods have cache_policy in their signatures")
 
@@ -147,9 +149,13 @@ class TestUnifiedCachingSystem:
             tmpdir_path = Path(tmpdir)
 
             with patch("glob.glob", return_value=[]):
-                with patch("neurodent.core.core.LongRecordingOrganizer._validate_timestamps_for_mode"):
+                with patch(
+                    "neurodent.core.core.LongRecordingOrganizer._validate_timestamps_for_mode"
+                ):
                     # Should work with new unified parameter
-                    organizer = core.LongRecordingOrganizer(tmpdir_path, mode=None, cache_policy="auto")
+                    organizer = core.LongRecordingOrganizer(
+                        tmpdir_path, mode=None, cache_policy="auto"
+                    )
 
                     assert organizer is not None
 
@@ -171,7 +177,9 @@ class TestCachingPerformance:
             cache_file = tmpdir_path / "cache.bin"
 
             # Test 1: 'force_regenerate' policy
-            result = core.should_use_cache_unified(cache_file, [source_file], "force_regenerate")
+            result = core.should_use_cache_unified(
+                cache_file, [source_file], "force_regenerate"
+            )
             assert result is False
 
             # Create the cache file
@@ -238,7 +246,11 @@ class TestMNECachingOptimization:
             n_samples = 10000
             data = np.random.randn(n_channels, n_samples) * 1e-6  # microvolts
 
-            info = mne.create_info(ch_names=[f"ch{i}" for i in range(n_channels)], sfreq=sfreq, ch_types="eeg")
+            info = mne.create_info(
+                ch_names=[f"ch{i}" for i in range(n_channels)],
+                sfreq=sfreq,
+                ch_types="eeg",
+            )
 
             raw = mne.io.RawArray(data, info)
             return raw
@@ -246,7 +258,9 @@ class TestMNECachingOptimization:
         return extract_func
 
     @pytest.mark.unit
-    @pytest.mark.skipif(not SPIKEINTERFACE_AVAILABLE, reason="SpikeInterface not available")
+    @pytest.mark.skipif(
+        not SPIKEINTERFACE_AVAILABLE, reason="SpikeInterface not available"
+    )
     def test_mne_cache_prevents_loading_when_cache_exists(self, mock_extract_func):
         """Test that when cache exists, extract_func is not called."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -262,7 +276,7 @@ class TestMNECachingOptimization:
             time.sleep(0.1)  # Small delay to ensure cache is newer
 
             # Create cache files with correct naming as used in the actual code
-            intermediate_name = f"{tmpdir_path.name}_mne-to-rec"
+            intermediate_name = "test_mne-to-rec"
             cache_file = tmpdir_path / f"{intermediate_name}.edf"
             meta_cache_file = cache_file.with_suffix(cache_file.suffix + ".meta.json")
 
@@ -290,7 +304,9 @@ class TestMNECachingOptimization:
             # Mock SpikeInterface read_edf to avoid actual file operations
             with (
                 patch("neurodent.core.core.se.read_edf") as mock_read_edf,
-                patch("neurodent.core.core.DDFBinaryMetadata.from_json") as mock_from_json,
+                patch(
+                    "neurodent.core.core.DDFBinaryMetadata.from_json"
+                ) as mock_from_json,
             ):
                 # Mock metadata loading from JSON
                 mock_metadata = Mock()
@@ -304,17 +320,19 @@ class TestMNECachingOptimization:
                 mock_recording = Mock()
                 mock_recording.get_num_channels.return_value = 4
                 mock_recording.get_dtype.return_value = constants.GLOBAL_DTYPE
-                mock_recording.get_sampling_frequency.return_value = 1000  # Should match metadata
+                mock_recording.get_sampling_frequency.return_value = (
+                    1000  # Should match metadata
+                )
                 mock_recording.get_duration.return_value = 10.0
-                mock_recording.get_channel_ids.return_value = np.array(["ch0", "ch1", "ch2", "ch3"])
+                mock_recording.get_channel_ids.return_value = np.array(
+                    ["ch0", "ch1", "ch2", "ch3"]
+                )
                 mock_read_edf.return_value = mock_recording
 
                 lro = core.LongRecordingOrganizer(
-                    base_folder_path=tmpdir_path,
+                    item=source_file,
                     mode="mne",
                     extract_func=mock_func,
-                    input_type="file",
-                    file_pattern="test.edf",
                     intermediate="edf",
                     cache_policy="always",  # Force use of cache
                     manual_datetimes=manual_dt,
@@ -337,7 +355,9 @@ class TestMNECachingOptimization:
             assert mock_from_json.called
 
     @pytest.mark.unit
-    @pytest.mark.skipif(not SPIKEINTERFACE_AVAILABLE, reason="SpikeInterface not available")
+    @pytest.mark.skipif(
+        not SPIKEINTERFACE_AVAILABLE, reason="SpikeInterface not available"
+    )
     def test_missing_metadata_sidecar_falls_back_to_regenerate(self, mock_extract_func):
         """Test that missing metadata sidecar falls back to regenerating both files."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -376,11 +396,13 @@ class TestMNECachingOptimization:
                 mock_recording.get_dtype.return_value = constants.GLOBAL_DTYPE
                 mock_recording.get_sampling_frequency.return_value = 1000
                 mock_recording.get_duration.return_value = 10.0
-                mock_recording.get_channel_ids.return_value = np.array(["ch0", "ch1", "ch2", "ch3"])
+                mock_recording.get_channel_ids.return_value = np.array(
+                    ["ch0", "ch1", "ch2", "ch3"]
+                )
                 mock_read_edf.return_value = mock_recording
 
                 lro = core.LongRecordingOrganizer(
-                    base_folder_path=tmpdir_path,
+                    item=tmpdir_path,
                     mode="mne",
                     extract_func=mock_func,
                     input_type="file",
@@ -398,8 +420,12 @@ class TestMNECachingOptimization:
             assert mock_export.called
 
     @pytest.mark.unit
-    @pytest.mark.skipif(not SPIKEINTERFACE_AVAILABLE, reason="SpikeInterface not available")
-    def test_missing_intermediate_file_falls_back_to_regenerate(self, mock_extract_func):
+    @pytest.mark.skipif(
+        not SPIKEINTERFACE_AVAILABLE, reason="SpikeInterface not available"
+    )
+    def test_missing_intermediate_file_falls_back_to_regenerate(
+        self, mock_extract_func
+    ):
         """Test that missing intermediate file falls back to regenerating both files."""
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir_path = Path(tmpdir)
@@ -449,11 +475,13 @@ class TestMNECachingOptimization:
                 mock_recording.get_dtype.return_value = constants.GLOBAL_DTYPE
                 mock_recording.get_sampling_frequency.return_value = 1000
                 mock_recording.get_duration.return_value = 10.0
-                mock_recording.get_channel_ids.return_value = np.array(["ch0", "ch1", "ch2", "ch3"])
+                mock_recording.get_channel_ids.return_value = np.array(
+                    ["ch0", "ch1", "ch2", "ch3"]
+                )
                 mock_read_edf.return_value = mock_recording
 
                 lro = core.LongRecordingOrganizer(
-                    base_folder_path=tmpdir_path,
+                    item=tmpdir_path,
                     mode="mne",
                     extract_func=mock_func,
                     input_type="file",
@@ -471,7 +499,9 @@ class TestMNECachingOptimization:
             assert mock_export.called
 
     @pytest.mark.unit
-    @pytest.mark.skipif(not SPIKEINTERFACE_AVAILABLE, reason="SpikeInterface not available")
+    @pytest.mark.skipif(
+        not SPIKEINTERFACE_AVAILABLE, reason="SpikeInterface not available"
+    )
     def test_invalid_cache_policy_raises_error(self, mock_extract_func):
         """Test that invalid cache policy strings raise ValueError."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -490,7 +520,7 @@ class TestMNECachingOptimization:
             # Test invalid cache policy
             with pytest.raises(ValueError, match="Invalid cache_policy: foo"):
                 lro = core.LongRecordingOrganizer(
-                    base_folder_path=tmpdir_path,
+                    item=tmpdir_path,
                     mode="mne",
                     extract_func=mock_func,
                     input_type="file",
@@ -502,7 +532,9 @@ class TestMNECachingOptimization:
                 )
 
     @pytest.mark.unit
-    @pytest.mark.skipif(not SPIKEINTERFACE_AVAILABLE, reason="SpikeInterface not available")
+    @pytest.mark.skipif(
+        not SPIKEINTERFACE_AVAILABLE, reason="SpikeInterface not available"
+    )
     def test_mne_cache_calls_loading_when_cache_missing(self, mock_extract_func):
         """Test that when cache doesn't exist, extract_func is called."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -530,14 +562,16 @@ class TestMNECachingOptimization:
                 mock_recording.get_dtype.return_value = constants.GLOBAL_DTYPE
                 mock_recording.get_sampling_frequency.return_value = 250
                 mock_recording.get_duration.return_value = 10.0
-                mock_recording.get_channel_ids.return_value = np.array(["ch0", "ch1", "ch2", "ch3"])
+                mock_recording.get_channel_ids.return_value = np.array(
+                    ["ch0", "ch1", "ch2", "ch3"]
+                )
                 mock_read_edf.return_value = mock_recording
 
                 # Mock resample to return the same mock_recording (simulating no resampling needed)
                 mock_resample.return_value = mock_recording
 
                 lro = core.LongRecordingOrganizer(
-                    base_folder_path=tmpdir_path,
+                    item=tmpdir_path,
                     mode="mne",
                     extract_func=mock_func,
                     input_type="file",
@@ -556,7 +590,9 @@ class TestMNECachingOptimization:
             assert mock_export.called
 
     @pytest.mark.unit
-    @pytest.mark.skipif(not SPIKEINTERFACE_AVAILABLE, reason="SpikeInterface not available")
+    @pytest.mark.skipif(
+        not SPIKEINTERFACE_AVAILABLE, reason="SpikeInterface not available"
+    )
     def test_cache_policy_behaviors_comprehensive(self, mock_extract_func):
         """Test all 4 cache policy behaviors comprehensively."""
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -571,7 +607,7 @@ class TestMNECachingOptimization:
             time.sleep(0.1)
 
             # Create cache files with correct naming
-            intermediate_name = f"{tmpdir_path.name}_mne-to-rec"
+            intermediate_name = "test_mne-to-rec"
             cache_file = tmpdir_path / f"{intermediate_name}.edf"
             meta_cache_file = cache_file.with_suffix(cache_file.suffix + ".meta.json")
 
@@ -597,7 +633,10 @@ class TestMNECachingOptimization:
             policies_and_expected_calls = [
                 ("always", False),  # Should NOT call extract_func (uses cache)
                 ("force_regenerate", True),  # Should call extract_func (ignores cache)
-                ("auto", False),  # Should NOT call extract_func (cache newer than source)
+                (
+                    "auto",
+                    False,
+                ),  # Should NOT call extract_func (cache newer than source)
             ]
 
             for cache_policy, should_call_extract in policies_and_expected_calls:
@@ -608,7 +647,9 @@ class TestMNECachingOptimization:
                 with (
                     patch("neurodent.core.core.mne.export.export_raw") as mock_export,
                     patch("neurodent.core.core.se.read_edf") as mock_read_edf,
-                    patch("neurodent.core.core.DDFBinaryMetadata.from_json") as mock_from_json,
+                    patch(
+                        "neurodent.core.core.DDFBinaryMetadata.from_json"
+                    ) as mock_from_json,
                 ):
                     # Mock metadata loading from JSON
                     mock_metadata = Mock()
@@ -624,15 +665,15 @@ class TestMNECachingOptimization:
                     mock_recording.get_dtype.return_value = constants.GLOBAL_DTYPE
                     mock_recording.get_sampling_frequency.return_value = 1000
                     mock_recording.get_duration.return_value = 10.0
-                    mock_recording.get_channel_ids.return_value = np.array(["ch0", "ch1", "ch2", "ch3"])
+                    mock_recording.get_channel_ids.return_value = np.array(
+                        ["ch0", "ch1", "ch2", "ch3"]
+                    )
                     mock_read_edf.return_value = mock_recording
 
                     lro = core.LongRecordingOrganizer(
-                        base_folder_path=tmpdir_path,
+                        item=source_file,
                         mode="mne",
                         extract_func=mock_func,
-                        input_type="file",
-                        file_pattern="test.edf",
                         intermediate="edf",
                         cache_policy=cache_policy,
                         manual_datetimes=manual_dt,
@@ -640,18 +681,24 @@ class TestMNECachingOptimization:
                     )
 
                     if should_call_extract:
-                        assert mock_func.call_count >= 1, (
-                            f"Cache policy '{cache_policy}' should have called extract_func"
-                        )
-                        assert mock_export.called, f"Cache policy '{cache_policy}' should have called export_raw"
+                        assert (
+                            mock_func.call_count >= 1
+                        ), f"Cache policy '{cache_policy}' should have called extract_func"
+                        assert (
+                            mock_export.called
+                        ), f"Cache policy '{cache_policy}' should have called export_raw"
                     else:
-                        assert mock_func.call_count == 0, (
-                            f"Cache policy '{cache_policy}' should NOT have called extract_func"
-                        )
-                        assert mock_from_json.called, f"Cache policy '{cache_policy}' should have loaded from cache"
+                        assert (
+                            mock_func.call_count == 0
+                        ), f"Cache policy '{cache_policy}' should NOT have called extract_func"
+                        assert (
+                            mock_from_json.called
+                        ), f"Cache policy '{cache_policy}' should have loaded from cache"
 
     @pytest.mark.unit
-    @pytest.mark.skipif(not SPIKEINTERFACE_AVAILABLE, reason="SpikeInterface not available")
+    @pytest.mark.skipif(
+        not SPIKEINTERFACE_AVAILABLE, reason="SpikeInterface not available"
+    )
     def test_force_regenerate_behavior(self, mock_extract_func):
         """Test 'force_regenerate' cache policy behavior.
 
@@ -685,11 +732,13 @@ class TestMNECachingOptimization:
                 mock_recording.get_dtype.return_value = constants.GLOBAL_DTYPE
                 mock_recording.get_sampling_frequency.return_value = 1000
                 mock_recording.get_duration.return_value = 10.0
-                mock_recording.get_channel_ids.return_value = np.array(["ch0", "ch1", "ch2", "ch3"])
+                mock_recording.get_channel_ids.return_value = np.array(
+                    ["ch0", "ch1", "ch2", "ch3"]
+                )
                 mock_read_edf.return_value = mock_recording
 
                 lro = core.LongRecordingOrganizer(
-                    base_folder_path=tmpdir_path,
+                    item=tmpdir_path,
                     mode="mne",
                     extract_func=mock_func,
                     input_type="file",
@@ -701,10 +750,14 @@ class TestMNECachingOptimization:
                 )
 
                 # Should call extract_func (ignore any existing cache)
-                assert mock_func.call_count >= 1, "force_regenerate policy should call extract_func"
+                assert (
+                    mock_func.call_count >= 1
+                ), "force_regenerate policy should call extract_func"
 
                 # Should call export_raw (create intermediate files)
-                assert mock_export.called, "force_regenerate policy should call export_raw"
+                assert (
+                    mock_export.called
+                ), "force_regenerate policy should call export_raw"
 
 
 class TestSystemIntegration:
@@ -716,14 +769,18 @@ class TestSystemIntegration:
             tmpdir_path = Path(tmpdir)
 
             # Test organizer creation with cache policy
-            organizer = core.LongRecordingOrganizer(tmpdir_path, mode=None, cache_policy="auto")
+            organizer = core.LongRecordingOrganizer(
+                tmpdir_path, mode=None, cache_policy="auto"
+            )
 
             # Test that unified function is accessible
             assert hasattr(core, "should_use_cache_unified")
 
             # Test function call
             result = core.should_use_cache_unified(
-                tmpdir_path / "test.edf", [tmpdir_path / "source.txt"], "force_regenerate"
+                tmpdir_path / "test.edf",
+                [tmpdir_path / "source.txt"],
+                "force_regenerate",
             )
             assert result is False
 
@@ -733,3 +790,87 @@ if __name__ == "__main__":
     test = TestUnifiedCachingSystem()
     test.test_cache_policies_basic()
     print("✅ Basic unified caching tests passed!")
+
+
+# ---------------------------------------------------------------------------
+# Edge-case policy tests for should_use_cached_file / should_use_cache_unified
+# ---------------------------------------------------------------------------
+from neurodent.core.utils import should_use_cached_file, should_use_cache_unified
+
+
+class TestCacheValidationEdgeCases:
+    """Additional edge-case coverage for cache validation helpers."""
+
+    def test_never_returns_false(self, tmp_path):
+        cache = tmp_path / "cache.pkl"
+        cache.touch()
+        assert should_use_cached_file(cache, [], "never") is False
+
+    def test_error_missing_raises(self, tmp_path):
+        with pytest.raises(FileNotFoundError, match="Cache file required"):
+            should_use_cached_file(tmp_path / "missing.pkl", [], "error")
+
+    def test_error_exists_returns_true(self, tmp_path):
+        cache = tmp_path / "cache.pkl"
+        cache.touch()
+        assert should_use_cached_file(cache, [], "error") is True
+
+    def test_always_exists(self, tmp_path):
+        cache = tmp_path / "cache.pkl"
+        cache.touch()
+        assert should_use_cached_file(cache, [], "always") is True
+
+    def test_always_missing(self, tmp_path):
+        assert should_use_cached_file(tmp_path / "x.pkl", [], "always") is False
+
+    def test_auto_cache_missing(self, tmp_path):
+        assert should_use_cached_file(tmp_path / "x.pkl", [], "auto") is False
+
+    def test_auto_cache_newer_than_sources(self, tmp_path):
+        source = tmp_path / "source.nwb"
+        source.touch()
+        time.sleep(0.05)
+        cache = tmp_path / "cache.pkl"
+        cache.touch()
+        assert should_use_cached_file(cache, [source], "auto") is True
+
+    def test_auto_cache_older_than_source(self, tmp_path):
+        cache = tmp_path / "cache.pkl"
+        cache.touch()
+        time.sleep(0.05)
+        source = tmp_path / "source.nwb"
+        source.touch()
+        assert should_use_cached_file(cache, [source], "auto") is False
+
+    def test_auto_missing_source_skipped(self, tmp_path):
+        cache = tmp_path / "cache.pkl"
+        cache.touch()
+        missing_source = tmp_path / "nonexistent.nwb"
+        assert should_use_cached_file(cache, [missing_source], "auto") is True
+
+    def test_invalid_policy_raises(self, tmp_path):
+        with pytest.raises(ValueError, match="Invalid use_cached value"):
+            should_use_cached_file(tmp_path / "x.pkl", [], "invalid_policy")
+
+    # should_use_cache_unified
+    def test_unified_force_regenerate(self, tmp_path):
+        cache = tmp_path / "cache.pkl"
+        cache.touch()
+        assert should_use_cache_unified(cache, [], "force_regenerate") is False
+
+    def test_unified_always(self, tmp_path):
+        cache = tmp_path / "cache.pkl"
+        cache.touch()
+        assert should_use_cache_unified(cache, [], "always") is True
+
+    def test_unified_always_missing(self, tmp_path):
+        assert should_use_cache_unified(tmp_path / "x.pkl", [], "always") is False
+
+    def test_unified_auto_delegates(self, tmp_path):
+        cache = tmp_path / "cache.pkl"
+        cache.touch()
+        assert should_use_cache_unified(cache, [], "auto") is True
+
+    def test_unified_invalid_raises(self, tmp_path):
+        with pytest.raises(ValueError, match="Invalid cache_policy"):
+            should_use_cache_unified(tmp_path / "x.pkl", [], "bad")

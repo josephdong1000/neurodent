@@ -19,7 +19,7 @@ from dask.distributed import Client, LocalCluster
 
 from neurodent import constants, core, visualization
 from neurodent.workflow import setup_snakemake_logging, inject_config_aliases
-from neurodent.workflow.utils import apply_path_overrides
+from neurodent.workflow.utils import apply_path_overrides, resolve_animal_pattern
 
 
 def load_samples_and_config():
@@ -43,7 +43,7 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
     """
 
     # Set up paths and parameters
-    data_parent_folder = Path(samples_config["data_parent_folder"])
+    data_root = Path(samples_config.get("data_root", samples_config.get("data_parent_folder", "")))
 
     # Set temp directory
     core.set_temp_directory(config["temp_directory"])
@@ -105,6 +105,18 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
                 # Prepare kwargs for this specific session
                 session_lro_kwargs = dict(session_analysis_config.get("lro_kwargs", {}))
 
+                # Propagate datetimes_are_start from war_generation config into lro_kwargs
+                # (it lives at the war_generation level, not inside lro_kwargs)
+                if "datetimes_are_start" in session_analysis_config:
+                    session_lro_kwargs.setdefault("datetimes_are_start", session_analysis_config["datetimes_are_start"])
+
+                # Apply per-animal overrides from unified animals config
+                animal_overrides = samples_config.get("_animal_overrides", {}).get(animal_id, {})
+                if animal_overrides:
+                    logger.info(f"  -> Applying per-animal overrides: {list(animal_overrides.keys())}")
+                    if "lro_kwargs" in animal_overrides:
+                        session_lro_kwargs.update(animal_overrides["lro_kwargs"])
+
                 # Resolve manual_datetimes for this session
                 if "manual_datetimes" in samples_config:
                     all_manual_dts = samples_config["manual_datetimes"]
@@ -126,30 +138,35 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
                             session_lro_kwargs["manual_datetimes"] = spec
                             logger.info(f"  -> Using manual datetime: {spec}")
 
-                logger.info(f"  -> File pattern: {session_analysis_config.get('file_pattern')}")
+                # Build absolute discovery pattern from the config's relative pattern
+                # Per-animal pattern override takes precedence over session/default config
+                effective_pattern = animal_overrides.get("pattern", session_analysis_config.get("pattern"))
+                if effective_pattern is None:
+                    raise KeyError(
+                        f"Missing 'pattern' key in war_generation config for session '{session_key}'. "
+                        "Each dataset config must specify 'pattern' (e.g. '{{animal}}/{{session}}/{{index}}.nwb' "
+                        "or '{{index}}.rhd')."
+                    )
 
-                # For joint sessions, build a regex to match any animal's numeric ID in filenames
-                # e.g. "ArxRosa-967", "ArxRosa-968" -> regex "967|968|969|418"
-                if is_joint:
-                    all_ids = list(samples_config["joint_sessions"][session_key].keys())
-                    numeric_ids = [aid.split("-")[-1] for aid in all_ids]
-                    animal_file_match_pattern = "|".join(numeric_ids)
-                    logger.info(f"  -> Joint session file match pattern: {animal_file_match_pattern}")
-                else:
-                    animal_file_match_pattern = None
-
-                # Create AO for this session with overridden parameters
-                session_ao = visualization.AnimalOrganizer(
-                    data_parent_folder / folder_path,
+                logger.info(f"  -> File pattern: {effective_pattern}")
+                discovery_pattern = resolve_animal_pattern(
+                    effective_pattern,
                     source_animal_id,
-                    mode=session_analysis_config["mode"],
-                    file_pattern=session_analysis_config.get("file_pattern"),
-                    day_sep=session_analysis_config.get("day_sep"),
+                    data_root=str(data_root),
+                )
+                logger.info(f"  -> Discovery pattern: {discovery_pattern}")
+
+                # For joint sessions, don't filter by animal_id during discovery
+                # since all files belong to all animals in the joint session
+                ao_animal_id = None if is_joint else source_animal_id
+
+                # Create AO for this session using pattern-based discovery
+                session_ao = visualization.AnimalOrganizer(
+                    discovery_pattern,
+                    animal_id=ao_animal_id,
+                    skip_sessions=session_analysis_config.get("skip_sessions", session_analysis_config.get("skip_days", [])),
                     assume_from_number=session_analysis_config["assume_from_number"],
-                    skip_days=session_analysis_config["skip_days"],
                     lro_kwargs=session_lro_kwargs,
-                    day_parse_kwargs=session_analysis_config.get("day_parse_kwargs", {}),
-                    animal_file_match_pattern=animal_file_match_pattern,
                 )
 
                 
@@ -172,6 +189,7 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
                 all_lros,
                 animal_id=animal_id,
                 genotype=genotype,
+                assume_from_number=analysis_config.get("assume_from_number", False),
             )
 
             # Compute bad channels

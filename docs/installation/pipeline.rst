@@ -142,7 +142,6 @@ The ``config/config.local.yaml`` file is included in ``.gitignore`` and will not
 Next Steps
 ----------
 
-For detailed pipeline configuration guides:
-
 - **Snakemake Setup**: See :doc:`../quickstart/snakemake_setup` for running the pipeline, SLURM configuration, and workflow commands
 - **Dataset Configuration**: See :doc:`../quickstart/dataset_configuration` for switching between datasets and file formats
+- **Version-pinned deployment**: You can also deploy a tagged release with `snakedeploy <https://snakedeploy.readthedocs.io>`_ — see :doc:`../quickstart/snakemake_setup` for details
