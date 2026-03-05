@@ -2014,6 +2014,16 @@ class LongRecordingOrganizer:
         # Validate merge compatibility
         self._validate_merge_compatibility(other_lro)
 
+        # Skip merging if other_lro has 0 samples (e.g. empty tail file).
+        # Still update metadata so file_durations/dt_end remain consistent.
+        if other_lro.LongRecording.get_total_samples() == 0:
+            logging.warning(
+                f"Skipping merge of {getattr(other_lro, 'item', 'unknown')}: "
+                "0 samples. Metadata updated but recording not extended."
+            )
+            self._update_metadata_after_merge(other_lro)
+            return
+
         # Concatenate recordings using SpikeInterface
         logging.info(
             f"Merging LRO {getattr(other_lro, 'item', 'unknown')} into {getattr(self, 'item', 'unknown')}"
