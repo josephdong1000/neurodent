@@ -151,13 +151,11 @@ class FrequencyDomainSpikeDetector:
         recording: "si.BaseRecording", params: dict
     ) -> "si.BaseRecording":
         """Apply bandpass and notch filtering to the recording."""
-        rec = recording.clone()
-
         # Get raw data for scipy filtering (SpikeInterface preprocessing can be complex)
-        raw_data = rec.get_traces(return_in_uV=True)  # (samples, channels)
+        raw_data = recording.get_traces(return_in_uV=True)  # (samples, channels)
         raw_data = raw_data.T  # (channels, samples)
 
-        sampling_freq = rec.get_sampling_frequency()
+        sampling_freq = recording.get_sampling_frequency()
 
         # Apply bandpass filter
         bp_lo, bp_hi = params["bp"]
@@ -191,7 +189,7 @@ class FrequencyDomainSpikeDetector:
         filtered_rec = si.NumpyRecording(
             raw_notch.T,
             sampling_frequency=sampling_freq,
-            channel_ids=rec.get_channel_ids(),
+            channel_ids=recording.get_channel_ids(),  # Use original, not clone (clone resets string IDs to integers)
         )
 
         return filtered_rec

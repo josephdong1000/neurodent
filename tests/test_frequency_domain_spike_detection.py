@@ -253,7 +253,6 @@ class TestFrequencyDomainSpikeDetector:
 
         # Should return a recording-like object
         assert result is not None
-        mock_recording.clone.assert_called_once()
         mock_recording.get_traces.assert_called()
         # Verify NumpyRecording was created with filtered data
         mock_numpy_recording.assert_called_once()
