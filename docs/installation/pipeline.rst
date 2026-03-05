@@ -146,3 +146,27 @@ For detailed pipeline configuration guides:
 
 - **Snakemake Setup**: See :doc:`../quickstart/snakemake_setup` for running the pipeline, SLURM configuration, and workflow commands
 - **Dataset Configuration**: See :doc:`../quickstart/dataset_configuration` for switching between datasets and file formats
+
+
+Alternative: Deploying with ``snakedeploy``
+-------------------------------------------
+
+For reproducible, version-pinned deployments, the
+`Snakemake documentation <https://snakemake.readthedocs.io/en/stable/snakefiles/deployment.html>`_
+recommends `snakedeploy <https://snakedeploy.readthedocs.io>`_.  Instead of
+copying bundled files, ``snakedeploy`` generates a thin ``Snakefile`` that
+references a specific tagged release on GitHub:
+
+.. code-block:: bash
+
+   pip install snakedeploy
+   snakedeploy deploy-workflow \
+       https://github.com/josephdong1000/neurodent \
+       /path/to/my/analysis \
+       --tag v0.2.4
+
+This is the approach used by workflows in the
+`Snakemake Workflow Catalog <https://snakemake.github.io/snakemake-workflow-catalog/>`_
+and ensures exact version reproducibility.
+
+See :doc:`../quickstart/snakemake_setup` for more details.

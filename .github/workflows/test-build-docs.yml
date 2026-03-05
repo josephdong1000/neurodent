@@ -48,6 +48,11 @@ jobs:
         uv pip install --reinstall --no-binary :all: isosplit6
         uv pip install --reinstall mountainsort5
         
+    - name: Check bundled pipeline is in sync
+      if: runner.os == 'Linux'
+      run: |
+        scripts/sync_pipeline.sh --check
+
     - name: Test package import
       run: |
         uv run python -c "import neurodent; print('Package imports successfully')"
