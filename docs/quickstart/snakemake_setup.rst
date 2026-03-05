@@ -176,41 +176,21 @@ Useful Commands
    # Force re-run specific rule
    uv run snakemake --forcerun rule_name
 
-Alternative: Deploying with ``snakedeploy``
---------------------------------------------
+Deploying with ``snakedeploy``
+-------------------------------
 
-The `Snakemake documentation <https://snakemake.readthedocs.io/en/stable/snakefiles/deployment.html>`_
-recommends distributing workflows via the
-`Snakemake module system <https://snakemake.readthedocs.io/en/stable/snakefiles/modularization.html>`_
-and `snakedeploy <https://snakedeploy.readthedocs.io>`_.  This approach references
-a specific tagged release on GitHub rather than copying files, which eliminates
-duplication and makes version pinning explicit.
-
-Install ``snakedeploy``:
+You can also deploy a specific tagged release of the pipeline using
+`snakedeploy <https://snakedeploy.readthedocs.io>`_:
 
 .. code-block:: bash
 
    pip install snakedeploy
-
-Deploy a tagged release of the NeuRodent pipeline:
-
-.. code-block:: bash
-
    snakedeploy deploy-workflow \
        https://github.com/josephdong1000/neurodent \
        /path/to/my/analysis \
        --tag v0.2.4
 
-This generates a thin ``workflow/Snakefile`` that references the remote
-workflow and copies the ``config/`` directory as a local template.  You can then
-customise the configuration and run the pipeline as usual.
-
-.. note::
-
-   Well-established Snakemake workflows in the
-   `Snakemake Workflow Catalog <https://snakemake.github.io/snakemake-workflow-catalog/>`_
-   (e.g. ``snakemake-workflows/rna-seq-star-deseq2``) use this approach
-   exclusively.  For fully reproducible analyses, ``snakedeploy`` is preferred
-   over ``neurodent init-pipeline`` because it pins the exact workflow version.
+This pins the exact workflow version and copies the ``config/`` directory as a
+local template.
 
 See also: :doc:`dataset_configuration` for selecting and configuring different datasets.
