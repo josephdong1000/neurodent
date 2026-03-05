@@ -1440,3 +1440,101 @@ class TestExtractFuncFilePathResolution:
             )
             mock_logging.warning.assert_not_called()
             mock_logging.info.assert_not_called()
+
+
+class TestZeroSampleRecordingCheck:
+    """Tests for the unified 0-sample check in convert_file_with_si_to_recording.
+
+    Ensures that a 0-duration file (valid header but no data) is detected and
+    logged, so that _iter_valid_recordings() can skip it downstream.
+    """
+
+    def test_discovered_file_zero_samples_logs_warning(self, temp_dir, caplog):
+        """DiscoveredFile branch logs warning for 0-sample recording."""
+        import logging as _logging
+        from neurodent.core.discovery import DiscoveredFile
+
+        df = DiscoveredFile(
+            paths=("/tmp/a.bin", "/tmp/a.csv"), metadata={"session": "s1"}
+        )
+        organizer = LongRecordingOrganizer(None, mode=None)
+        organizer.item = df
+        organizer.n_truncate = 0
+        organizer.truncate = False
+        organizer.manual_datetimes = None
+        organizer.datetimes_are_start = True
+
+        mock_rec = Mock()
+        mock_rec.get_total_samples.return_value = 0
+        mock_rec.get_num_channels.return_value = 2
+        mock_rec.get_channel_ids.return_value = ["ch1", "ch2"]
+        mock_rec.get_sampling_frequency.return_value = 1000.0
+        mock_rec.get_duration.return_value = 0.0
+        mock_rec.get_dtype.return_value = constants.GLOBAL_DTYPE
+        mock_rec.get_total_duration.return_value = 0.0
+        mock_rec.has_scaleable_traces.return_value = False
+
+        extract_func = Mock(return_value=mock_rec)
+
+        with caplog.at_level(_logging.WARNING):
+            organizer.convert_file_with_si_to_recording(extract_func)
+
+        assert organizer.LongRecording is not None
+        assert any("0-sample recording" in msg for msg in caplog.messages)
+
+    def test_single_file_zero_samples_logs_warning(self, temp_dir, caplog):
+        """Single-file branch logs warning for 0-sample recording."""
+        import logging as _logging
+
+        organizer = LongRecordingOrganizer(None, mode=None)
+        organizer.item = "/tmp/test.bin"
+        organizer.n_truncate = 0
+        organizer.truncate = False
+        organizer.manual_datetimes = None
+        organizer.datetimes_are_start = True
+
+        mock_rec = Mock()
+        mock_rec.get_total_samples.return_value = 0
+        mock_rec.get_num_channels.return_value = 2
+        mock_rec.get_channel_ids.return_value = ["ch1", "ch2"]
+        mock_rec.get_sampling_frequency.return_value = 1000.0
+        mock_rec.get_duration.return_value = 0.0
+        mock_rec.get_dtype.return_value = constants.GLOBAL_DTYPE
+        mock_rec.get_total_duration.return_value = 0.0
+        mock_rec.has_scaleable_traces.return_value = False
+
+        extract_func = Mock(return_value=mock_rec)
+
+        with caplog.at_level(_logging.WARNING):
+            organizer.convert_file_with_si_to_recording(extract_func)
+
+        assert organizer.LongRecording is not None
+        assert any("0-sample recording" in msg for msg in caplog.messages)
+
+    def test_nonzero_samples_no_warning(self, temp_dir, caplog):
+        """No warning for recordings with samples."""
+        import logging as _logging
+
+        organizer = LongRecordingOrganizer(None, mode=None)
+        organizer.item = "/tmp/test.bin"
+        organizer.n_truncate = 0
+        organizer.truncate = False
+        organizer.manual_datetimes = None
+        organizer.datetimes_are_start = True
+
+        mock_rec = Mock()
+        mock_rec.get_total_samples.return_value = 5000
+        mock_rec.get_num_channels.return_value = 2
+        mock_rec.get_channel_ids.return_value = ["ch1", "ch2"]
+        mock_rec.get_sampling_frequency.return_value = 1000.0
+        mock_rec.get_duration.return_value = 5.0
+        mock_rec.get_dtype.return_value = constants.GLOBAL_DTYPE
+        mock_rec.get_total_duration.return_value = 5.0
+        mock_rec.has_scaleable_traces.return_value = False
+
+        extract_func = Mock(return_value=mock_rec)
+
+        with caplog.at_level(_logging.WARNING):
+            organizer.convert_file_with_si_to_recording(extract_func)
+
+        assert not any("0-sample recording" in msg for msg in caplog.messages)

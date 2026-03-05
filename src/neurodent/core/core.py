@@ -798,6 +798,19 @@ class LongRecordingOrganizer:
             # Single file/path
             rec: "si.BaseRecording" = extract_func(self.item, **kwargs)
 
+        # Unified 0-sample check for DiscoveredFile and single-file branches.
+        # The list branch already filters individual 0-sample files above;
+        # this catches the remaining cases so _iter_valid_recordings() can
+        # skip this LRO downstream instead of crashing in the resampler.
+        try:
+            if rec.get_total_samples() == 0:
+                logging.warning(
+                    f"Loaded 0-sample recording ({self.display_name}). "
+                    f"This recording will be skipped by downstream processing."
+                )
+        except (TypeError, AttributeError):
+            pass  # Non-SI recording or mock — keep it
+
         self._n_processed_files = n_processed_files
         self.LongRecording = self._apply_resampling(rec)
 
