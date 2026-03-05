@@ -7,19 +7,20 @@ Deploying the Pipeline
 -----------------------
 
 The pipeline is bundled with the NeuRodent Python package, so no git clone is
-required.  Deploy the pipeline files to your working directory with:
+required.  Deploy the pipeline files to your working directory with Python:
 
 .. code-block:: bash
 
-   neurodent init-pipeline
+   python -c "
+   import shutil
+   from importlib.resources import files
+   src = files('neurodent.pipeline')
+   for item in ('Snakefile', 'workflow', 'config'):
+       shutil.copytree(src / item, item) if (src / item).is_dir() else shutil.copy2(src / item, item)
+   "
 
 This copies ``Snakefile``, ``workflow/``, and ``config/`` into the current
-directory.  To deploy to a different location:
-
-.. code-block:: bash
-
-   neurodent init-pipeline /path/to/my/analysis
-   neurodent init-pipeline --overwrite   # replace existing files
+directory.
 
 Installing Pipeline Dependencies
 ---------------------------------
