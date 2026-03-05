@@ -1029,6 +1029,7 @@ class LongRecordingOrganizer:
                     "offset_to_uV": 0,
                     "time_axis": 0,
                     "is_filtered": False,
+                    "channel_ids": metadata.channel_names,
                 }
 
                 logging.info(f"Reading from cached binary file {fname}")
@@ -1138,6 +1139,7 @@ class LongRecordingOrganizer:
                     "offset_to_uV": 0,
                     "time_axis": 0,
                     "is_filtered": False,
+                    "channel_ids": raw_info["ch_names"],
                 }
 
                 logging.info(f"Exporting raw to {fname}")
