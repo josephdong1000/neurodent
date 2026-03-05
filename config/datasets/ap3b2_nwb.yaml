@@ -1,0 +1,16 @@
+# AP3B2 Project - NWB Format
+# Dataset-specific configuration overrides
+# This file is deep-merged into the main config when active_dataset="ap3b2_nwb"
+
+samples:
+  samples_file: "config/samples_jess.json"
+
+analysis:
+  war_generation:
+    pattern: "{index}.nwb"  # NWB files directly in session folder
+    lro_kwargs:
+      mode: "si"
+
+cluster:
+  war_generation:
+    retries: 0

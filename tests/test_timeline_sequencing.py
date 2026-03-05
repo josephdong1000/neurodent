@@ -19,6 +19,9 @@ class TestTimelineSequencing:
         ao._compute_global_timeline = AnimalOrganizer._compute_global_timeline.__get__(ao, AnimalOrganizer)
         # Also need to bind _sort_lros_by_median_time because _compute_global_timeline uses it
         ao._sort_lros_by_median_time = AnimalOrganizer._sort_lros_by_median_time.__get__(ao, AnimalOrganizer)
+        # Bind helpers that _compute_global_timeline uses
+        ao._get_item_name = AnimalOrganizer._get_item_name.__get__(ao, AnimalOrganizer)
+        ao._is_item_file = AnimalOrganizer._is_item_file.__get__(ao, AnimalOrganizer)
         
         # Mock dependencies
         ao._resolve_timestamp_input = MagicMock(side_effect=lambda x, y: pd.to_datetime(x))
@@ -160,5 +163,112 @@ class TestTimelineSequencing:
         # Keys in result are folder names
         assert result["folder1"] == pd.to_datetime("2025-01-01 12:00:00")
         assert result["folder2"] == pd.to_datetime("2025-01-01 14:00:00")
+
+    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    def test_session_keyed_dict(self, mock_lro_cls, ao):
+        """
+        Test that a dict keyed by session names (matching animalday_to_items keys)
+        is correctly handled — each session gets its own timestamp as the start time
+        and a timeline is computed for items within each session.
+
+        This is the format used when per-animal manual_datetime is a dict in the
+        unified config, e.g.:
+            "manual_datetime": {
+                "010822_cohort4_group2_M3_MHET_files0-12": "2022-01-08 18:55:02",
+                "010822_cohort4_group2_M3_MHET_files13-21": "2022-01-08 23:25:03"
+            }
+        """
+        # Mock LRO so _compute_global_timeline can estimate durations
+        def side_effect(*args, **kwargs):
+            m = MagicMock()
+            m.LongRecording.get_duration.return_value = 3600.0
+            return m
+
+        mock_lro_cls.side_effect = side_effect
+
+        # Each session has one item (folder), session keys match manual_datetimes keys
+        animalday_to_items = {
+            "010822_files0-12": ["/data/010822_files0-12"],
+            "010822_files13-21": ["/data/010822_files13-21"],
+        }
+
+        manual_datetimes = {
+            "010822_files0-12": "2022-01-08 18:55:02",
+            "010822_files13-21": "2022-01-08 23:25:03",
+        }
+        base_lro_kwargs = {"datetimes_are_start": True}
+
+        result = ao._process_manual_datetimes(
+            manual_datetimes, animalday_to_items, base_lro_kwargs
+        )
+
+        # Each session's single item should get a timeline-computed timestamp
+        assert "010822_files0-12" in result
+        assert "010822_files13-21" in result
+        # Start time matches the session's manual timestamp
+        assert result["010822_files0-12"] == pd.to_datetime("2022-01-08 18:55:02")
+        assert result["010822_files13-21"] == pd.to_datetime("2022-01-08 23:25:03")
+
+    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    def test_session_keyed_dict_multi_item_sessions(self, mock_lro_cls, ao):
+        """
+        Test session-keyed dict when sessions contain multiple items.
+        Each session's timestamp is used as the start for its items,
+        and a per-session timeline is computed.
+        """
+        durations = {
+            "/data/sess1/file_a": 1800.0,
+            "/data/sess1/file_b": 1800.0,
+            "/data/sess2/file_c": 3600.0,
+        }
+
+        def side_effect(folder, **kwargs):
+            m = MagicMock()
+            m.LongRecording.get_duration.return_value = durations.get(str(folder), 3600.0)
+            return m
+
+        mock_lro_cls.side_effect = side_effect
+
+        animalday_to_items = {
+            "session1": ["/data/sess1/file_a", "/data/sess1/file_b"],
+            "session2": ["/data/sess2/file_c"],
+        }
+
+        manual_datetimes = {
+            "session1": "2022-01-08 10:00:00",
+            "session2": "2022-01-08 14:00:00",
+        }
+        base_lro_kwargs = {"datetimes_are_start": True}
+
+        result = ao._process_manual_datetimes(
+            manual_datetimes, animalday_to_items, base_lro_kwargs
+        )
+
+        # session1 items: file_a at 10:00, file_b at 10:00 + 1800s = 10:30
+        assert result["file_a"] == pd.to_datetime("2022-01-08 10:00:00")
+        assert result["file_b"] == pd.to_datetime("2022-01-08 10:30:00")
+        # session2 item: file_c at 14:00
+        assert result["file_c"] == pd.to_datetime("2022-01-08 14:00:00")
+
+    def test_session_keyed_dict_missing_session_raises(self, ao):
+        """
+        Test that a session-keyed dict raises ValueError if some sessions
+        are missing from the manual_datetimes dict.
+        """
+        animalday_to_items = {
+            "session1": ["/data/sess1/file_a"],
+            "session2": ["/data/sess2/file_b"],
+        }
+
+        # Only one session covered
+        manual_datetimes = {
+            "session1": "2022-01-08 10:00:00",
+        }
+        base_lro_kwargs = {}
+
+        with pytest.raises(ValueError, match="Missing entries in manual_datetimes for sessions"):
+            ao._process_manual_datetimes(
+                manual_datetimes, animalday_to_items, base_lro_kwargs
+            )
 
 

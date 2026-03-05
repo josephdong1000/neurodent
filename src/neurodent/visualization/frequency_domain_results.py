@@ -10,8 +10,10 @@ import json
 import logging
 import warnings
 from pathlib import Path
-from typing import Union
+from typing import Literal, Union
 
+import dask
+import dask.delayed
 import numpy as np
 import matplotlib.pyplot as plt
 import mne
@@ -25,7 +27,7 @@ except ImportError:  # pragma: no cover
     SPIKEINTERFACE_AVAILABLE = False
 
 from .. import core
-from .results import AnimalFeatureParser, SpikeAnalysisResult
+from .results import AnimalFeatureParser
 
 
 class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
@@ -231,22 +233,27 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
 
         return sorting_analyzers
 
-    def convert_to_mne(self, chunk_len: float = 60, save_raw=True) -> mne.io.RawArray:
+    def convert_to_mne(
+        self, chunk_len: float = 60, save_raw=True,
+        multiprocess_mode: Literal["dask", "serial"] = "serial",
+    ) -> mne.io.RawArray:
         """
-        Convert SortingAnalyzers to MNE RawArray (mirrors SpikeAnalysisResult interface).
+        Convert SortingAnalyzers to MNE RawArray.
 
         Args:
             chunk_len: Chunk length for processing (compatibility parameter)
             save_raw: Whether to save the result internally
+            multiprocess_mode: Whether to use Dask for parallel per-channel conversion.
+                Defaults to "serial".
 
         Returns:
             mne.io.RawArray: MNE RawArray with spike annotations
         """
         if self.result_mne is None:
             if self.result_sas:
-                # Use existing conversion method from SpikeAnalysisResult
-                # REVIEW this could possibly be refactored into utilities
-                result_mne = SpikeAnalysisResult.convert_sas_to_mne(self.result_sas, chunk_len)
+                result_mne = FrequencyDomainSpikeAnalysisResult.convert_sas_to_mne(
+                    self.result_sas, chunk_len, multiprocess_mode=multiprocess_mode,
+                )
                 if save_raw:
                     self.result_mne = result_mne
                 else:
@@ -263,6 +270,7 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
         slugify_filebase=True,
         save_abbrevs_as_chnames=False,
         overwrite=False,
+        multiprocess_mode: Literal["dask", "serial"] = "serial",
     ):
         """
         Archive frequency domain spike analysis result as fif and json files.
@@ -275,10 +283,14 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
             slugify_filebase: If True, slugify the filename base
             save_abbrevs_as_chnames: If True, save abbreviations as channel names
             overwrite: If True, overwrite existing files
+            multiprocess_mode: Whether to use Dask for parallel conversion.
+                Defaults to "serial".
         """
         if self.result_mne is None:
             if convert_to_mne and self.result_sas:
-                result_mne = self.convert_to_mne(save_raw=True)
+                result_mne = self.convert_to_mne(
+                    save_raw=True, multiprocess_mode=multiprocess_mode,
+                )
                 if result_mne is None:
                     warnings.warn("No data found for saving")
                     return
@@ -447,6 +459,13 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
                 picks=[ch_idx], preload=True, event_repeated='merge'
             )
 
+            if len(epochs) == 0:
+                logging.warning(
+                    f"No valid epochs for {event_name} after windowing "
+                    f"(tmin={tmin}, tmax={tmax}). Skipping plot."
+                )
+                continue
+
             # Save epoch data if requested
             if save_epoch and animal_id and save_dir:
                 saveFile_MNE = f"{animal_id}_fdsar_epoch_{ch_idx}.fif"
@@ -520,6 +539,140 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
     def get_total_spike_count(self) -> int:
         """Get total number of detected spikes across all channels."""
         return sum(self.get_spike_counts_per_channel())
+
+    @staticmethod
+    def convert_sas_to_mne(
+        sas: list[si.SortingAnalyzer], chunk_len: float = 60,
+        multiprocess_mode: Literal["dask", "serial"] = "serial",
+    ) -> mne.io.RawArray:
+        """Convert a list of SortingAnalyzers to a MNE RawArray.
+
+        Args:
+            sas (list[si.SortingAnalyzer]): The list of SortingAnalyzers to convert
+            chunk_len (float, optional): The length of the chunks to use for the conversion. Defaults to 60.
+            multiprocess_mode (Literal["dask", "serial"], optional): Whether to use Dask for parallel
+                per-channel conversion. Defaults to "serial".
+
+        Returns:
+            mne.io.RawArray: The converted RawArray, with spikes labeled as annotations
+        """
+        if len(sas) == 0:
+            return None
+
+        # Check that all SortingAnalyzers have the same sampling frequency
+        sfreqs = [sa.recording.get_sampling_frequency() for sa in sas]
+        if not all(sf == sfreqs[0] for sf in sfreqs):
+            raise ValueError(
+                f"All SortingAnalyzers must have the same sampling frequency. Got frequencies: {sfreqs}"
+            )
+
+        # Preallocate data array
+        total_frames = int(sas[0].recording.get_duration() * sfreqs[0])
+        n_channels = len(sas)
+        data = np.empty((n_channels, total_frames))
+        logging.debug(f"Data shape: {data.shape}")
+
+        # Fill data array one channel at a time
+        match multiprocess_mode:
+            case "dask":
+                delayed_traces = [
+                    dask.delayed(FrequencyDomainSpikeAnalysisResult.convert_sa_to_np)(sa, chunk_len)
+                    for sa in sas
+                ]
+                traces_list = dask.compute(*delayed_traces)
+                for i, traces in enumerate(traces_list):
+                    data[i, :] = traces
+            case "serial":
+                for i, sa in enumerate(sas):
+                    logging.debug(f"Converting channel {i + 1} of {n_channels}")
+                    data[i, :] = FrequencyDomainSpikeAnalysisResult.convert_sa_to_np(sa, chunk_len)
+
+        channel_names = [str(sa.recording.get_channel_ids().item()) for sa in sas]
+        logging.debug(f"Channel names: {channel_names}")
+        sfreq = sfreqs[0]
+
+        # Extract spike times for each unit and create annotations
+        onset = []
+        description = []
+        for sa in sas:
+            for unit_id in sa.sorting.get_unit_ids():
+                spike_train = sa.sorting.get_unit_spike_train(unit_id)
+                # Convert to seconds and filter to recording duration
+                spike_times = spike_train / sa.sorting.get_sampling_frequency()
+                mask = spike_times < sa.recording.get_duration()
+                spike_times = spike_times[mask]
+
+                # Create annotation for each spike
+                onset.extend(spike_times)
+                description.extend(
+                    [sa.recording.get_channel_ids().item()] * len(spike_times)
+                )  # collapse all units into 1 spike train
+        annotations = mne.Annotations(onset, duration=0, description=description)
+
+        info = mne.create_info(ch_names=channel_names, sfreq=sfreq, ch_types="eeg")
+        raw = mne.io.RawArray(data=data, info=info)
+        raw = raw.set_annotations(annotations)
+        return raw
+
+    @staticmethod
+    def convert_sa_to_np(
+        sa: si.SortingAnalyzer, chunk_len: float = 60,
+        multiprocess_mode: Literal["dask", "serial"] = "serial",
+    ) -> np.ndarray:
+        """Convert a SortingAnalyzer to a numpy array of traces.
+
+        Args:
+            sa (si.SortingAnalyzer): The SortingAnalyzer to convert. Must have only 1 channel.
+            chunk_len (float, optional): The length of the chunks to use for the conversion. Defaults to 60.
+            multiprocess_mode (Literal["dask", "serial"], optional): Whether to use Dask for parallel
+                per-chunk reads. Defaults to "serial". Note: avoid using "dask" when this method is
+                already called from ``convert_sas_to_mne`` in Dask mode, as that parallelizes across
+                channels and nested Dask may not improve performance.
+        Returns:
+            np.ndarray: The converted traces
+        """
+        # Check that SortingAnalyzer only has 1 channel
+        if len(sa.recording.get_channel_ids()) != 1:
+            raise ValueError(
+                f"Expected SortingAnalyzer to have 1 channel, but got {len(sa.recording.get_channel_ids())} channels"
+            )
+
+        rec = sa.recording
+        logging.debug(f"Recording info: {rec}")
+
+        # Calculate total number of frames and chunks
+        total_frames = int(rec.get_duration() * rec.get_sampling_frequency())
+        frames_per_chunk = round(chunk_len * rec.get_sampling_frequency())
+        n_chunks = total_frames // frames_per_chunk
+
+        def _read_chunk(recording, start, end):
+            return recording.get_traces(
+                start_frame=start, end_frame=end, return_scaled=True
+            ).flatten()
+
+        chunk_ranges = []
+        for j in range(n_chunks):
+            start_frame = j * frames_per_chunk
+            end_frame = total_frames if j == n_chunks - 1 else (j + 1) * frames_per_chunk
+            chunk_ranges.append((start_frame, end_frame))
+
+        traces = np.empty(total_frames)
+
+        match multiprocess_mode:
+            case "dask":
+                delayed_chunks = [
+                    dask.delayed(_read_chunk)(rec, start, end)
+                    for start, end in chunk_ranges
+                ]
+                chunk_results = dask.compute(*delayed_chunks)
+                for (start, end), chunk_data in zip(chunk_ranges, chunk_results):
+                    traces[start:end] = chunk_data
+            case "serial":
+                for start, end in chunk_ranges:
+                    traces[start:end] = _read_chunk(rec, start, end)
+
+        traces *= 1e-6  # convert from uV to V
+        return traces
 
     def __str__(self):
         """String representation of the result object."""

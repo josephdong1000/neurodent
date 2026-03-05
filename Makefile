@@ -1,4 +1,4 @@
-.PHONY: setup test docs docs-live clean
+.PHONY: setup test docs docs-live docs-linkcheck clean
 
 # Development setup - run this after cloning
 setup:
@@ -17,6 +17,11 @@ docs:
 # Serve docs with auto-reload
 docs-live:
 	cd docs && uv run sphinx-autobuild . _build/html
+
+# Check documentation links
+docs-linkcheck:
+	cd docs && uv run sphinx-build -b linkcheck . _build/linkcheck
+	@echo "✅ Link check complete! See docs/_build/linkcheck/output.txt for results"
 
 # Clean build artifacts
 clean:

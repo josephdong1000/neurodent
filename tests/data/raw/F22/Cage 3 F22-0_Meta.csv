@@ -1,0 +1,11 @@
+Entity,BinColumn,Label,ProbeInfo,SampleRate,Units,Precision,LastEdit
+1,1,D-009,Intan Input (1)/PortD D-009,1000,µV,float32,2023-12-12T12:57:00
+2,2,D-010,Intan Input (1)/PortD D-010,1000,µV,float32,2023-12-12T12:57:00
+3,3,D-012,Intan Input (1)/PortD D-012,1000,µV,float32,2023-12-12T12:57:00
+4,4,D-014,Intan Input (1)/PortD D-014,1000,µV,float32,2023-12-12T12:57:00
+5,5,D-015,Intan Input (1)/PortD D-015,1000,µV,float32,2023-12-12T12:57:00
+6,6,D-016,Intan Input (1)/PortD D-016,1000,µV,float32,2023-12-12T12:57:00
+7,7,D-017,Intan Input (1)/PortD D-017,1000,µV,float32,2023-12-12T12:57:00
+8,8,D-019,Intan Input (1)/PortD D-019,1000,µV,float32,2023-12-12T12:57:00
+9,9,D-021,Intan Input (1)/PortD D-021,1000,µV,float32,2023-12-12T12:57:00
+10,10,D-022,Intan Input (1)/PortD D-022,1000,µV,float32,2023-12-12T12:57:00

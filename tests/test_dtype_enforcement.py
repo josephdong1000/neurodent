@@ -45,8 +45,7 @@ def test_lro_enforces_global_dtype():
     assert rec_int16.get_dtype() != constants.GLOBAL_DTYPE
     
     # 3. Create LRO
-    lro = LongRecordingOrganizer(
-        base_folder_path=None, 
+    lro = LongRecordingOrganizer(item=None, 
         recording=rec_int16,
         mode=None # In-memory mode
     )
@@ -68,8 +67,7 @@ def test_lro_handles_unsigned_conversion():
     traces = np.zeros((1000, 2), dtype=np.uint16)
     rec_uint16 = si.NumpyRecording(traces, sampling_frequency=1000.0)
     
-    lro = LongRecordingOrganizer(
-        base_folder_path=None, 
+    lro = LongRecordingOrganizer(item=None, 
         recording=rec_uint16,
         mode=None
     )

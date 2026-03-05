@@ -6,8 +6,10 @@ from neurodent.core import LongRecordingOrganizer
 
 def test_lro_label_merging_success():
     """Test that labels are correctly merged when there are no conflicts."""
-    lro1 = LongRecordingOrganizer(base_folder_path=None, recording=None, labels={"animal": "A1", "genotype": "WT"})
-    lro2 = LongRecordingOrganizer(base_folder_path=None, recording=None, labels={"day": "Jan-01-2023"})
+    lro1 = LongRecordingOrganizer(item=None, recording=None)
+    lro1.labels = {"animal": "A1", "genotype": "WT"}
+    lro2 = LongRecordingOrganizer(item=None, recording=None)
+    lro2.labels = {"day": "Jan-01-2023"}
     
     # Mocking necessary attributes for merge to work
     lro1.LongRecording = type('MockRecording', (), {'get_num_channels': lambda: 1, 'get_sampling_frequency': lambda: 1000})()
@@ -23,8 +25,10 @@ def test_lro_label_merging_success():
 
 def test_lro_label_merging_conflict_warning():
     """Test that a warning is issued when labels conflict during merge."""
-    lro1 = LongRecordingOrganizer(base_folder_path=None, recording=None, labels={"animal": "A1", "genotype": "WT"})
-    lro2 = LongRecordingOrganizer(base_folder_path=None, recording=None, labels={"animal": "A1", "genotype": "KO"})
+    lro1 = LongRecordingOrganizer(item=None, recording=None)
+    lro1.labels = {"animal": "A1", "genotype": "WT"}
+    lro2 = LongRecordingOrganizer(item=None, recording=None)
+    lro2.labels = {"animal": "A1", "genotype": "KO"}
     
     # Mocking necessary attributes
     lro1.meta = type('MockMeta', (), {'n_channels': 1, 'dt_end': None})()
@@ -40,7 +44,8 @@ def test_lro_label_merging_conflict_warning():
 def test_lro_labels_inheritance_on_split():
     """Test that labels are inherited when an LRO is split."""
     parent_labels = {"animal": "A1", "genotype": "WT"}
-    lro = LongRecordingOrganizer(base_folder_path=None, recording=None, labels=parent_labels)
+    lro = LongRecordingOrganizer(item=None, recording=None)
+    lro.labels = parent_labels
     
     # Mocking necessary attributes for split
     mock_rec = type('MockRecording', (), {

@@ -11,7 +11,7 @@ def test_split_creates_mismatch_for_multifile_recording():
     file_durations (len 1) and file_end_datetimes (len N) if the parent had multiple files.
     """
     # 1. Mock a parent LRO with 2 files (segments)
-    lro = LongRecordingOrganizer(base_folder_path=None, recording=None)
+    lro = LongRecordingOrganizer(item=None, recording=None)
     
     # Mock the LongRecording to have 2 segments
     class MockRecording:
@@ -74,7 +74,7 @@ def test_split_with_real_multisegment_recording():
     rec = si.generate_recording(durations=[1.0, 1.0], num_channels=4, sampling_frequency=1000.0)
     
     # Create LRO from the recording
-    lro = LongRecordingOrganizer(base_folder_path=None, recording=rec)
+    lro = LongRecordingOrganizer(item=None, recording=rec)
     
     # Manually set metadata to match multifile scenario
     lro.file_durations = [1.0, 1.0]

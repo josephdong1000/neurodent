@@ -43,7 +43,7 @@ The lower-level classes can also be used directly:
 
 - **Power features**: RMS, amplitude variance, band power (delta, theta, alpha, beta, gamma)
 - **Connectivity**: Coherence, imaginary coherence, Pearson correlation between channels
-- **Spikes**: Spike counts via MountainSort5 or frequency-domain detection
+- **Spikes**: Spike counts via frequency-domain detection
 
 **See Also:**
 
@@ -62,14 +62,14 @@ if not os.environ.get("TMPDIR"):
 # Core classes
 from .core import (
     LongRecordingOrganizer,
-    DDFBinaryMetadata,
+    RecordingMetadata,
+    DDFBinaryMetadata,  # Deprecated, kept for backward compatibility
     convert_ddfcolbin_to_ddfrowbin,
     convert_ddfrowbin_to_si,
     split_recording,
 )
 from .analysis import LongRecordingAnalyzer
 from .analyze_frag import FragmentAnalyzer
-from .analyze_sort import MountainSortAnalyzer
 from .frequency_domain_spike_detection import FrequencyDomainSpikeDetector
 from .utils import (
     get_temp_directory,
@@ -92,10 +92,12 @@ from .zeitgeber import (
     transform_time_axis,
 )
 from . import utils
+from . import discovery
 
 __all__ = [
     # Data loading
-    "DDFBinaryMetadata",
+    "RecordingMetadata",
+    "DDFBinaryMetadata",  # Deprecated, kept for backward compatibility
     "convert_ddfcolbin_to_ddfrowbin",
     "convert_ddfrowbin_to_si",
     "split_recording",
@@ -103,7 +105,6 @@ __all__ = [
     # Analysis
     "LongRecordingAnalyzer",
     "FragmentAnalyzer",
-    "MountainSortAnalyzer",
     "FrequencyDomainSpikeDetector",
     "ZeitgeberAnalysisResult",
     "run_zeitgeber_pipeline",

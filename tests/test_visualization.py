@@ -13,7 +13,6 @@ from unittest.mock import Mock, patch, MagicMock
 from neurodent.visualization import (
     WindowAnalysisResult,
     AnimalFeatureParser,
-    SpikeAnalysisResult,
     AnimalPlotter,
     ExperimentPlotter,
 )
@@ -1243,61 +1242,6 @@ class TestExperimentPlotter:
     def test_plot_qqplot_invalid_feature(self, plotter):
         with pytest.raises(ValueError):
             plotter.plot_qqplot(feature="cohere", groupby=["genotype", "channel"])
-
-
-class TestSpikeAnalysisResult:
-    """Test SpikeAnalysisResult class."""
-
-    @pytest.fixture
-    def mock_sas(self):
-        """Create mock SortingAnalyzer objects."""
-        sa1 = MagicMock()
-        sa2 = MagicMock()
-        # Mock sampling frequencies to be the same
-        sa1.recording.get_sampling_frequency.return_value = 1000.0
-        sa2.recording.get_sampling_frequency.return_value = 1000.0
-        # Mock channel count and IDs
-        sa1.recording.get_num_channels.return_value = 1
-        sa2.recording.get_num_channels.return_value = 1
-        sa1.recording.get_channel_ids.return_value = np.array(["0"])
-        sa2.recording.get_channel_ids.return_value = np.array(["1"])
-        # Mock spike times
-        sa1.get_spike_times.return_value = [0.1, 0.2, 0.3]
-        sa2.get_spike_times.return_value = [0.1, 0.2, 0.3]
-        return [sa1, sa2]
-
-    @pytest.fixture
-    def sar(self, mock_sas):
-        """Create a SpikeAnalysisResult instance."""
-        return SpikeAnalysisResult(
-            result_sas=mock_sas,
-            animal_id="test_animal",
-            genotype="WT",
-            animal_day="20230101",
-            channel_names=["LMot", "RMot"],
-        )
-
-    def test_init(self, sar, mock_sas):
-        """Test SpikeAnalysisResult initialization."""
-        assert sar.animal_id == "test_animal"
-        assert sar.genotype == "WT"
-        assert sar.animal_day == "20230101"
-        assert sar.channel_names == ["LMot", "RMot"]
-        assert len(sar.result_sas) == 2
-
-    @patch("mne.io.RawArray")
-    def test_convert_to_mne(self, mock_raw, sar):
-        """Test conversion to MNE format."""
-        mock_raw_instance = Mock()
-        mock_set_annotations = Mock()
-        mock_raw_instance.set_annotations.return_value = mock_set_annotations
-        mock_raw.return_value = mock_raw_instance
-
-        result = sar.convert_to_mne(chunk_len=60)
-
-        assert result == mock_set_annotations
-        mock_raw.assert_called()
-        mock_raw_instance.set_annotations.assert_called_once()
 
 
 class TestDataProcessingForVisualization:
