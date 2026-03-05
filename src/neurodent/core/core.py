@@ -1211,6 +1211,18 @@ class LongRecordingOrganizer:
         self.channel_names = self.meta.channel_names
         self.LongRecording = self._apply_resampling(rec)
 
+        # Rename channel IDs on the recording to match metadata channel names.
+        # Binary intermediate files lose original channel names (read_binary uses
+        # default integer IDs), so we restore them from the saved metadata.
+        if (
+            self.channel_names
+            and len(self.channel_names) == self.LongRecording.get_num_channels()
+            and list(self.LongRecording.get_channel_ids()) != self.channel_names
+        ):
+            self.LongRecording = self.LongRecording.rename_channels(
+                new_channel_ids=self.channel_names
+            )
+
         if not hasattr(self, "file_durations") or not self.file_durations:
             if hasattr(self, "_n_processed_files") and self._n_processed_files > 1:
                 avg_duration = (

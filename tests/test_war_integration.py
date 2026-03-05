@@ -41,7 +41,6 @@ TEST_DETECTION_PARAMS = {
 
 @pytest.mark.skipif(not SPIKEINTERFACE_AVAILABLE, reason="SpikeInterface not available")
 @pytest.mark.skipif(len(TEST_ANIMALS) == 0, reason="Test data not available")
-@pytest.mark.xfail(reason="WAR integration tests need fixture updates for FileDiscoverer-based AnimalOrganizer")
 @pytest.mark.integration
 class TestWARIntegration:
     """Test integration between frequency domain spike detection and WAR analysis."""
@@ -59,7 +58,7 @@ class TestWARIntegration:
             mne = None
             
         dummy_extract = lambda x, **kw: mne.io.RawArray(
-            np.random.randn(4, 10000), mne.create_info(ch_names=["CH1", "CH2", "CH3", "CH4"], sfreq=1000., ch_types="eeg")
+            np.random.randn(4, 10000), mne.create_info(ch_names=["CH9", "CH10", "CH12", "CH14"], sfreq=1000., ch_types="eeg")
         ) if mne else None
 
         with warnings.catch_warnings():
@@ -68,7 +67,7 @@ class TestWARIntegration:
             warnings.filterwarnings("ignore", category=DeprecationWarning)
 
             ao = visualization.AnimalOrganizer(
-                str(TEST_DATA_BASE) + "/{animal} KO {session}",
+                str(TEST_DATA_BASE) + "/{animal} KO {session}/{index}_ColMajor.bin",
                 animal_id,
                 assume_from_number=True,
                 lro_kwargs={
@@ -76,7 +75,7 @@ class TestWARIntegration:
                     "extract_func": dummy_extract,
                     "multiprocess_mode": "serial",
                     "intermediate": "bin",
-                    "manual_datetimes": {"A10 KO 12_13_2023": dt(2023, 12, 13, 12, 0, 0)},
+                    "manual_datetimes": {"12_13_2023": dt(2023, 12, 13, 12, 0, 0)},
                     "datetimes_are_start": True,
                 },
             )
@@ -154,7 +153,7 @@ class TestWARIntegration:
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=RuntimeWarning)
 
-            enhanced_war = war.read_sars_spikes(fdsar_list, read_mode="concat", inplace=False)
+            enhanced_war = war.read_sars_spikes(fdsar_list, read_mode="sa", inplace=False)
 
         # Verify integration results
         assert enhanced_war is not None
@@ -217,7 +216,7 @@ class TestWARIntegration:
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=RuntimeWarning)
 
-            result = war.read_sars_spikes(fdsar_list, read_mode="concat", inplace=True)
+            result = war.read_sars_spikes(fdsar_list, read_mode="sa", inplace=True)
 
         # Verify in-place modification
         assert result is war  # Should return self
@@ -249,7 +248,7 @@ class TestWARIntegration:
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=RuntimeWarning)
 
-            enhanced_war = war.read_sars_spikes(fdsar_list, read_mode="concat", inplace=False)
+            enhanced_war = war.read_sars_spikes(fdsar_list, read_mode="sa", inplace=False)
 
         # Verify results for each recording session
         unique_animaldays = enhanced_war.result["animalday"].unique()
@@ -274,14 +273,16 @@ class TestWARIntegration:
             fdsar_list = animal_organizer_with_war.compute_frequency_domain_spike_analysis(
                 detection_params=TEST_DETECTION_PARAMS, max_length=max_length, multiprocess_mode="auto")
 
-            enhanced_war = war.read_sars_spikes(fdsar_list, read_mode="concat", inplace=False)
+            enhanced_war = war.read_sars_spikes(fdsar_list, read_mode="sa", inplace=False)
 
         # Compare total spike counts
+        war_animaldays = enhanced_war.result["animalday"].unique()
         for i, fdsar in enumerate(fdsar_list):
             original_total = fdsar.get_total_spike_count()
 
-            # Find corresponding animalday in WAR
-            animalday = fdsar.animal_day
+            # Find corresponding animalday in WAR by index (names may differ
+            # between FDSAR and WAR due to genotype enrichment)
+            animalday = war_animaldays[i]
             war_data = enhanced_war.result[enhanced_war.result["animalday"] == animalday]
 
             # Sum spikes across all windows for this animalday
@@ -311,7 +312,7 @@ class TestWARIntegration:
             fdsar_list = animal_organizer_with_war.compute_frequency_domain_spike_analysis(
                 detection_params=TEST_DETECTION_PARAMS, max_length=max_length, multiprocess_mode="auto")
 
-            enhanced_war = war.read_sars_spikes(fdsar_list, read_mode="concat", inplace=False)
+            enhanced_war = war.read_sars_spikes(fdsar_list, read_mode="sa", inplace=False)
 
         # Check log transformation
         for _, row in enhanced_war.result.iterrows():
@@ -349,7 +350,7 @@ class TestWARIntegration:
             fdsar_list = animal_organizer_with_war.compute_frequency_domain_spike_analysis(
                 detection_params=TEST_DETECTION_PARAMS, max_length=max_length, multiprocess_mode="auto")
 
-            enhanced_war = war.read_sars_spikes(fdsar_list, read_mode="concat", inplace=False)
+            enhanced_war = war.read_sars_spikes(fdsar_list, read_mode="sa", inplace=False)
 
         # Test that enhanced WAR works with existing methods
 
