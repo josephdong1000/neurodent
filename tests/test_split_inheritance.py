@@ -12,7 +12,7 @@ def test_split_inherits_all_critical_metadata():
     for downstream processing, not just timestamps.
     """
     # 1. Setup Parent LRO with rich metadata
-    lro = LongRecordingOrganizer(base_folder_path=None, recording=None)
+    lro = LongRecordingOrganizer(item=None, recording=None)
     
     # Mock Recording
     # Mock Recording (Real SI object for robustness)
@@ -105,7 +105,7 @@ def test_split_handles_empty_metadata_gracefully():
     rec = si.NumpyRecording(full_traces, sampling_frequency=1000.0)
     
     # Create LRO from this recording
-    lro = LongRecordingOrganizer(base_folder_path=None, recording=rec)
+    lro = LongRecordingOrganizer(item=None, recording=rec)
     
     # Manually populate metadata being tested
     lro.channel_names = ["Ch1"]

@@ -33,8 +33,8 @@ def dummy_long_recording(tmp_path):
     recording.save(folder=rec_folder, format="binary")
     
     lro = LongRecordingOrganizer(
-        base_folder_path=rec_folder,
-        mode="si",
+        item=rec_folder,
+        
         manual_datetimes=datetime(2023, 1, 1, 12, 0),
     )
     
@@ -64,8 +64,6 @@ class TestSplitInMemory:
         splits = dummy_long_recording.split(groups)
 
         assert splits["GroupA"]._is_in_memory is True
-        # Split children now inherit base_folder_path from parent
-        assert splits["GroupA"].base_folder_path == dummy_long_recording.base_folder_path
 
     def test_split_preserves_channel_names(self, dummy_long_recording):
         """Test that channel names are preserved in split LROs."""
@@ -141,7 +139,7 @@ class TestSplitRecordingFunction:
             input_path=input_folder,
             groups=groups,
             output_base=output_base,
-            mode="si",
+            
             format="zarr",
             manual_datetimes=datetime.now(),
         )
@@ -165,7 +163,7 @@ class TestSplitRecordingFunction:
             input_path=input_folder,
             groups=groups,
             persist=False,
-            mode="si",
+            
             manual_datetimes=datetime.now(),
         )
         
@@ -204,14 +202,14 @@ class TestSplitEdgeCases:
 
     def test_persist_no_recording_raises_error(self, tmp_path):
         """Test that persist() raises error when no recording is loaded."""
-        lro = LongRecordingOrganizer(base_folder_path=None, mode=None)
+        lro = LongRecordingOrganizer(item=None)
         
         with pytest.raises(ValueError, match="No recording to persist"):
             lro.persist(tmp_path / "output")
 
     def test_split_no_recording_raises_error(self):
         """Test that split() raises error when no recording is loaded."""
-        lro = LongRecordingOrganizer(base_folder_path=None, mode=None)
+        lro = LongRecordingOrganizer(item=None)
         
         with pytest.raises(ValueError, match="No recording loaded"):
             lro.split({"GroupA": ["Ch0"]})
@@ -224,10 +222,10 @@ class TestSplitEdgeCases:
         core_module = sys.modules['neurodent.core.core']
         LRO = sys.modules['neurodent.core.core'].LongRecordingOrganizer
         
-        monkeypatch.setattr(core_module, 'si', None)
-        
-        lro = LRO(base_folder_path=None, mode=None)
+        lro = LRO(item='.', mode=None)
         lro.LongRecording = "dummy"
+        
+        monkeypatch.setattr(core_module, 'si', None)
         
         with pytest.raises(ImportError, match="SpikeInterface is required for split"):
             lro.split({"A": ["Ch0"]})
@@ -240,10 +238,10 @@ class TestSplitEdgeCases:
         core_module = sys.modules['neurodent.core.core']
         LRO = sys.modules['neurodent.core.core'].LongRecordingOrganizer
         
-        monkeypatch.setattr(core_module, 'si', None)
-        
-        lro = LRO(base_folder_path=None, mode=None)
+        lro = LRO(item='.', mode=None)
         lro.LongRecording = "dummy"
+        
+        monkeypatch.setattr(core_module, 'si', None)
         
         with pytest.raises(ImportError, match="SpikeInterface is required for persist"):
             lro.persist(tmp_path / "output")
@@ -260,13 +258,12 @@ class TestInitFromRecording:
         recording = si.NumpyRecording(traces_list=[traces], sampling_frequency=1000.0)
         
         lro = LongRecordingOrganizer(
-            base_folder_path=None,
-            mode=None,
+            item=None,
+            
             recording=recording,
         )
         
         assert lro._is_in_memory is True
-        assert lro.base_folder_path is None
 
     def test_init_from_recording_sets_channel_names(self, tmp_path):
         """Test that channel_names are extracted from recording."""
@@ -274,8 +271,8 @@ class TestInitFromRecording:
         recording = si.NumpyRecording(traces_list=[traces], sampling_frequency=1000.0)
         
         lro = LongRecordingOrganizer(
-            base_folder_path=None,
-            mode=None,
+            item=None,
+            
             recording=recording,
         )
         
@@ -288,8 +285,8 @@ class TestInitFromRecording:
         recording = si.NumpyRecording(traces_list=[traces], sampling_frequency=500.0)
         
         lro = LongRecordingOrganizer(
-            base_folder_path=None,
-            mode=None,
+            item=None,
+            
             recording=recording,
         )
         
@@ -304,8 +301,8 @@ class TestInitFromRecording:
         recording = si.NumpyRecording(traces_list=[traces], sampling_frequency=1000.0)
         
         lro = LongRecordingOrganizer(
-            base_folder_path=None,
-            mode=None,
+            item=None,
+            
             recording=recording,
         )
         
@@ -364,8 +361,8 @@ class TestChannelNameInheritance:
         recording.save(folder=input_folder, format="binary")
         
         lro = LongRecordingOrganizer(
-            base_folder_path=input_folder,
-            mode="si",
+            item=input_folder,
+            
             manual_datetimes=datetime(2023, 1, 1, 12, 0),
         )
         
@@ -393,8 +390,8 @@ class TestChannelNameInheritance:
         
         # Loading should trigger warning about integer channel IDs
         lro = LongRecordingOrganizer(
-            base_folder_path=input_folder,
-            mode="si",
+            item=input_folder,
+            
             manual_datetimes=datetime(2023, 1, 1),
         )
         
@@ -406,8 +403,8 @@ class TestChannelNameInheritance:
         recording = si.NumpyRecording(traces_list=[traces], sampling_frequency=1000.0)
         
         lro = LongRecordingOrganizer(
-            base_folder_path=None,
-            mode=None,
+            item=None,
+            
             recording=recording,
         )
         lro.channel_names = None
@@ -421,8 +418,8 @@ class TestChannelNameInheritance:
         recording = si.NumpyRecording(traces_list=[traces], sampling_frequency=1000.0)
         
         lro = LongRecordingOrganizer(
-            base_folder_path=None,
-            mode=None,
+            item=None,
+            
             recording=recording,
         )
         lro.channel_names = []
@@ -439,8 +436,8 @@ class TestChannelNameInheritance:
         recording = si.NumpyRecording(traces_list=[traces], sampling_frequency=1000.0)
         
         lro = LongRecordingOrganizer(
-            base_folder_path=None,
-            mode=None,
+            item=None,
+            
             recording=recording,
         )
         lro.channel_names = ["Ch0", "Ch1"]  # Mismatched: 2 names for 4 channels
@@ -477,8 +474,8 @@ class TestBoundaryConditions:
         recording = si.NumpyRecording(traces_list=[traces], sampling_frequency=1000.0)
         
         lro = LongRecordingOrganizer(
-            base_folder_path=None,
-            mode=None,
+            item=None,
+            
             recording=recording,
         )
         lro.channel_names = [f"Ch{i}" for i in range(10)]
@@ -529,7 +526,7 @@ class TestSplitRecordingFunctionEdgeCases:
                 input_path=input_folder,
                 groups={"A": ["0"]},
                 persist=True,
-                mode="si",
+                
                 manual_datetimes=datetime.now(),
             )
 
@@ -545,7 +542,7 @@ class TestSplitRecordingFunctionEdgeCases:
             groups={"A": ["0"]},
             output_base=tmp_path / "output",
             format="binary",
-            mode="si",
+            
             manual_datetimes=datetime.now(),
         )
         
@@ -570,8 +567,8 @@ class TestDataVerification:
         
         # Reload
         reloaded = LongRecordingOrganizer(
-            base_folder_path=actual_path,
-            mode="si",
+            item=actual_path,
+            
             manual_datetimes=datetime(2023, 1, 1),
         )
         reloaded_traces = reloaded.LongRecording.get_traces()
