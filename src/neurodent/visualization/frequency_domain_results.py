@@ -48,7 +48,7 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
         genotype: str = None,
         animal_day: str = None,
         bin_folder_name: str = None,
-        metadata: core.DDFBinaryMetadata = None,
+        metadata: core.RecordingMetadata = None,
         channel_names: list[str] = None,
         assume_from_number=False,
     ) -> None:
@@ -64,7 +64,7 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
             genotype (str, optional): Genotype of animal
             animal_day (str, optional): Recording day identifier
             bin_folder_name (str, optional): Binary folder name
-            metadata (core.DDFBinaryMetadata, optional): Recording metadata
+            metadata (core.RecordingMetadata, optional): Recording metadata
             channel_names (list[str], optional): List of channel names
             assume_from_number (bool, optional): Assume channel names from numbers
         """
@@ -111,7 +111,7 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
         genotype: str = None,
         animal_day: str = None,
         bin_folder_name: str = None,
-        metadata: core.DDFBinaryMetadata = None,
+        metadata: core.RecordingMetadata = None,
         assume_from_number: bool = False,
     ):
         """

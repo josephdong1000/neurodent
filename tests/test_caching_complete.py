@@ -305,7 +305,7 @@ class TestMNECachingOptimization:
             with (
                 patch("neurodent.core.core.se.read_edf") as mock_read_edf,
                 patch(
-                    "neurodent.core.core.DDFBinaryMetadata.from_json"
+                    "neurodent.core.core.RecordingMetadata.from_json"
                 ) as mock_from_json,
             ):
                 # Mock metadata loading from JSON
@@ -648,7 +648,7 @@ class TestMNECachingOptimization:
                     patch("neurodent.core.core.mne.export.export_raw") as mock_export,
                     patch("neurodent.core.core.se.read_edf") as mock_read_edf,
                     patch(
-                        "neurodent.core.core.DDFBinaryMetadata.from_json"
+                        "neurodent.core.core.RecordingMetadata.from_json"
                     ) as mock_from_json,
                 ):
                     # Mock metadata loading from JSON
