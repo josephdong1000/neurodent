@@ -740,25 +740,6 @@ class LongRecordingOrganizer:
         else:
             raise ValueError(f"Invalid mode: {mode}")
 
-    @staticmethod
-    def _warn_if_empty_recording(rec, source):
-        """Log a warning if *rec* has 0 total samples.
-
-        A 0-duration file with a valid header can slip through the normal
-        loading path and later crash SpikeInterface's resampler (numpy pad
-        on an empty axis).  This helper centralises the check for the
-        DiscoveredFile and single-file branches of
-        ``convert_file_with_si_to_recording``.
-        """
-        try:
-            if rec.get_total_samples() == 0:
-                logging.warning(
-                    f"Loaded 0-sample recording from {source}. "
-                    f"Downstream processing may skip this recording."
-                )
-        except (TypeError, AttributeError):
-            pass  # Non-SI recording or mock — keep it
-
     def convert_file_with_si_to_recording(
         self,
         extract_func: Callable[..., "si.BaseRecording"],
@@ -788,7 +769,6 @@ class LongRecordingOrganizer:
             else:
                 # Single file
                 rec: "si.BaseRecording" = extract_func(self.item.path, **kwargs)
-            self._warn_if_empty_recording(rec, self.item)
         elif isinstance(self.item, list):
             # List of files: concatenate individually using multiprocess_mode
             if multiprocess_mode == "dask":
@@ -817,7 +797,6 @@ class LongRecordingOrganizer:
         else:
             # Single file/path
             rec: "si.BaseRecording" = extract_func(self.item, **kwargs)
-            self._warn_if_empty_recording(rec, self.item)
 
         self._n_processed_files = n_processed_files
         self.LongRecording = self._apply_resampling(rec)
@@ -1580,26 +1559,10 @@ class LongRecordingOrganizer:
 
         Returns:
             np.ndarray: LOF scores for each channel.
-
-        Raises:
-            ValueError: If the recording has 0 samples (e.g. empty/corrupt file).
         """
         try:
             nn = Natural_Neighbor()
             rec = self.LongRecording
-
-            # Guard: reject 0-sample recordings before get_traces() to avoid
-            # numpy pad crash ("can't extend empty axis 0") in SpikeInterface's
-            # resampler.  This gives a clear message instead of the opaque numpy error.
-            try:
-                total_samples = rec.get_total_samples()
-            except (TypeError, AttributeError):
-                total_samples = None
-            if total_samples is not None and total_samples == 0:
-                raise ValueError(
-                    "Recording has 0 samples — cannot compute LOF scores. "
-                    "This typically means the source file is empty (0-duration)."
-                )
 
             logging.debug(f"Computing LOF scores for {rec.__str__()}")
             rec_np = rec.get_traces(return_scaled=True)  # (n_samples, n_channels)
@@ -1929,18 +1892,6 @@ class LongRecordingOrganizer:
         # Guard clause: return early if recording is None or invalid
         if recording is None:
             return recording
-
-        # Guard clause: skip all preprocessing for 0-sample recordings to avoid
-        # numpy pad crash ("can't extend empty axis 0") in SpikeInterface's resampler
-        try:
-            if recording.get_total_samples() == 0:
-                logging.warning(
-                    "Skipping resampling for 0-sample recording to avoid "
-                    "numpy pad crash on empty data"
-                )
-                return recording
-        except (TypeError, AttributeError):
-            pass  # Non-SI recording or mock — continue with normal processing
 
         if spre is None:
             raise ImportError("SpikeInterface preprocessing is required for resampling")
