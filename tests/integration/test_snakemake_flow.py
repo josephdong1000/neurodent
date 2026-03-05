@@ -1026,6 +1026,7 @@ class TestSnakemakeDryRun:
         cmd = [
             "uv", "run", "snakemake",
             "--dryrun",
+            "--ignore-incomplete",
             "--cores", "1",
             "--quiet",
         ]
