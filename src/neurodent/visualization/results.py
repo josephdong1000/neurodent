@@ -809,7 +809,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                         name = "unknown"
 
                     lines.append(
-                        f"LRO {i}: {start_time} → {end_time} "
+                        f"LRO {i}: {start_time} -> {end_time} "
                         f"(duration: {duration:.1f}s, items: {n_files}, item: {name})"
                     )
                 except Exception as e:
@@ -1615,7 +1615,7 @@ class AnimalOrganizer(AnimalFeatureParser):
             )
 
         logging.info(
-            f"✓ Validated: {len(ao.long_recordings)} LROs match "
+            f"Validated: {len(ao.long_recordings)} LROs match "
             f"{len(ao.unique_animaldays)} unique animaldays (no duplicates)"
         )
 
