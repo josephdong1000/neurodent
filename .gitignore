@@ -27,6 +27,9 @@ dist/
 **/.*/
 !.github/
 !.github/**
+!.tests/
+!.tests/**
+!.snakemake-workflow-catalog.yml
 **/__pycache__/
 **/__pycache__/*
 /__pycache__/
