@@ -16,7 +16,3 @@ analysis:
       mode: "si"
       extract_func: "tests/data/readers.py:read_bin_csv_pair"
       multiprocess_mode: "serial"
-
-cluster:
-  war_generation:
-    retries: 0
