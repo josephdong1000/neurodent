@@ -1538,3 +1538,98 @@ class TestZeroSampleRecordingCheck:
             organizer.convert_file_with_si_to_recording(extract_func)
 
         assert not any("0-sample recording" in msg for msg in caplog.messages)
+
+
+@pytest.mark.core
+@pytest.mark.spikeinterface
+class TestZeroSampleMerge:
+    """Tests that merging a 0-sample LRO updates general metadata but filters file metadata.
+
+    When a 0-sample LRO is merged, _update_metadata_after_merge is still called
+    so that dt_end etc. are updated, but 0-duration entries are filtered out of
+    file_end_datetimes/file_durations to avoid corrupting TimestampMapper.
+    """
+
+    def _make_lro(self, total_samples, channel_names, file_end_datetimes=None, file_durations=None):
+        """Create a mock LRO with the given properties."""
+        lro = LongRecordingOrganizer(None, mode=None)
+        lro.channel_names = channel_names
+
+        mock_rec = Mock()
+        mock_rec.get_total_samples.return_value = total_samples
+        lro.LongRecording = mock_rec
+
+        lro.meta = Mock()
+        lro.meta.f_s = 1000.0
+        lro.meta.n_channels = len(channel_names)
+        lro.meta.dt_end = datetime(2023, 1, 1, 12, 0)
+        lro.item = "test_item"
+
+        lro.file_end_datetimes = file_end_datetimes or []
+        lro.file_durations = file_durations or []
+
+        return lro
+
+    def test_zero_sample_merge_filters_zero_duration_but_updates_dt_end(self, caplog):
+        """Merging a 0-sample LRO should update dt_end but not extend file_end_datetimes/file_durations."""
+        import logging as _logging
+
+        base_lro = self._make_lro(
+            total_samples=5000,
+            channel_names=["ch1", "ch2"],
+            file_end_datetimes=[datetime(2023, 1, 1, 12, 0)],
+            file_durations=[5.0],
+        )
+
+        zero_lro = self._make_lro(
+            total_samples=0,
+            channel_names=["ch1", "ch2"],
+            file_end_datetimes=[datetime(2023, 1, 1, 12, 5)],
+            file_durations=[0.0],
+        )
+        zero_lro.meta.dt_end = datetime(2023, 1, 1, 12, 5)
+
+        with caplog.at_level(_logging.WARNING):
+            base_lro.merge(zero_lro)
+
+        # dt_end SHOULD have been updated
+        assert base_lro.meta.dt_end == datetime(2023, 1, 1, 12, 5)
+
+        # file_end_datetimes/file_durations should NOT have been extended
+        # (0-duration entries are filtered out)
+        assert len(base_lro.file_end_datetimes) == 1, (
+            f"Expected 1 file_end_datetime, got {len(base_lro.file_end_datetimes)}"
+        )
+        assert len(base_lro.file_durations) == 1, (
+            f"Expected 1 file_duration, got {len(base_lro.file_durations)}"
+        )
+        assert base_lro.file_durations[0] == 5.0
+
+        # Warning should be logged
+        assert any("0 samples" in msg for msg in caplog.messages)
+
+    def test_nonzero_sample_merge_extends_metadata(self):
+        """Merging a non-zero LRO should extend file_end_datetimes and file_durations."""
+        base_lro = self._make_lro(
+            total_samples=5000,
+            channel_names=["ch1", "ch2"],
+            file_end_datetimes=[datetime(2023, 1, 1, 12, 0)],
+            file_durations=[5.0],
+        )
+
+        other_lro = self._make_lro(
+            total_samples=3000,
+            channel_names=["ch1", "ch2"],
+            file_end_datetimes=[datetime(2023, 1, 1, 12, 10)],
+            file_durations=[3.0],
+        )
+
+        with patch("neurodent.core.core.si") as mock_si:
+            mock_concat = Mock()
+            mock_si.concatenate_recordings.return_value = mock_concat
+            base_lro.merge(other_lro)
+
+        # Metadata SHOULD have been extended
+        assert len(base_lro.file_end_datetimes) == 2
+        assert len(base_lro.file_durations) == 2
+        assert base_lro.file_durations == [5.0, 3.0]

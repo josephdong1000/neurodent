@@ -2014,12 +2014,14 @@ class LongRecordingOrganizer:
         # Validate merge compatibility
         self._validate_merge_compatibility(other_lro)
 
-        # Skip merging if other_lro has 0 samples (e.g. empty tail file).
-        # Still update metadata so file_durations/dt_end remain consistent.
+        # Skip recording concatenation if other_lro has 0 samples (e.g. empty
+        # tail file), but still update metadata so dt_end etc. stay correct.
+        # _update_metadata_after_merge filters out 0-duration entries from
+        # file_end_datetimes/file_durations to avoid corrupting TimestampMapper.
         if other_lro.LongRecording.get_total_samples() == 0:
             logging.warning(
-                f"Skipping merge of {getattr(other_lro, 'item', 'unknown')}: "
-                "0 samples. Metadata updated but recording not extended."
+                f"Skipping recording concatenation of {getattr(other_lro, 'item', 'unknown')}: "
+                "0 samples. Updating metadata only."
             )
             self._update_metadata_after_merge(other_lro)
             return
@@ -2099,8 +2101,14 @@ class LongRecordingOrganizer:
 
         if has_durs:
             if has_dates:
-                self.file_end_datetimes.extend(other_lro.file_end_datetimes)
-                self.file_durations.extend(other_lro.file_durations)
+                # Filter out 0-duration entries (from 0-sample recordings) to
+                # avoid corrupting TimestampMapper with degenerate mappings.
+                for dt, dur in zip(
+                    other_lro.file_end_datetimes, other_lro.file_durations
+                ):
+                    if dur > 0:
+                        self.file_end_datetimes.append(dt)
+                        self.file_durations.append(dur)
             else:
                 # If we are merging durations, we must be able to merge timestamps
                 # OR we must drop timestamps entirely to avoid mismatch (destructive).
