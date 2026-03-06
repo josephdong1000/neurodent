@@ -22,7 +22,34 @@ Install the optional pipeline dependencies:
 
 .. note::
 
-   The ``pipeline`` extra includes Snakemake and related dependencies needed for running the automated analysis workflow. If you only need the core NeuRodent library for Python-based analysis, the basic installation is sufficient.
+   The ``pipeline`` extra includes Snakemake and related dependencies needed for running
+   the automated analysis workflow. If you only need the core NeuRodent library for
+   Python-based analysis, the basic installation is sufficient.
+
+Deploying the Pipeline
+----------------------
+
+The recommended way to use the NeuRodent pipeline is with
+`snakedeploy <https://snakedeploy.readthedocs.io>`_, which sets up the workflow
+in your analysis directory without cloning the full repository. Install it separately
+(requires Python 3.11+):
+
+.. code-block:: bash
+
+   pip install snakedeploy
+
+.. code-block:: bash
+
+   mkdir my-eeg-analysis && cd my-eeg-analysis
+   snakedeploy deploy-workflow https://github.com/josephdong1000/neurodent . --tag v0.2.4
+
+After deployment, edit ``config/config.yaml`` and your dataset config, then run:
+
+.. code-block:: bash
+
+   NEURODENT_DATASET=my_dataset snakemake --snakefile workflow/Snakefile --cores 4
+
+See :doc:`../quickstart/snakemake_setup` for full deployment and configuration details.
 
 SLURM Cluster Configuration
 ---------------------------
@@ -46,7 +73,7 @@ Run the workflow with:
 
 .. code-block:: bash
 
-   snakemake --profile your-profile
+   snakemake --snakefile workflow/Snakefile --profile your-profile
 
 Snakemake 8+ (Python 3.11+)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^

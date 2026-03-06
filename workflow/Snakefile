@@ -331,21 +331,21 @@ wildcard_constraints:
 
 
 # Include rule definitions
-include: "workflow/rules/war_generation.smk"
-include: "workflow/rules/fdsar_diagnostics.smk"
-include: "workflow/rules/war_quality_filter.smk"
-include: "workflow/rules/war_standardize.smk"
-include: "workflow/rules/war_fragment_filtering.smk"
-include: "workflow/rules/war_channel_filtering.smk"
-include: "workflow/rules/diagnostic_figures.smk"
-include: "workflow/rules/war_flattening.smk"
-include: "workflow/rules/war_zeitgeber.smk"
-include: "workflow/rules/zeitgeber_plots.smk"
-include: "workflow/rules/war_relfreq_plots.smk"
-include: "workflow/rules/ep_analysis.smk"
-include: "workflow/rules/lof_evaluation.smk"
-include: "workflow/rules/filtering_comparison.smk"
-include: "workflow/rules/notebook.smk"
+include: "rules/war_generation.smk"
+include: "rules/fdsar_diagnostics.smk"
+include: "rules/war_quality_filter.smk"
+include: "rules/war_standardize.smk"
+include: "rules/war_fragment_filtering.smk"
+include: "rules/war_channel_filtering.smk"
+include: "rules/diagnostic_figures.smk"
+include: "rules/war_flattening.smk"
+include: "rules/war_zeitgeber.smk"
+include: "rules/zeitgeber_plots.smk"
+include: "rules/war_relfreq_plots.smk"
+include: "rules/ep_analysis.smk"
+include: "rules/lof_evaluation.smk"
+include: "rules/filtering_comparison.smk"
+include: "rules/notebook.smk"
 
 
 rule all:
@@ -395,17 +395,17 @@ rule graphs:
 
 rule rulegraph:
     output: "results/graphs/rulegraph.png"
-    shell: "snakemake --rulegraph --forceall | dot -Tpng > {output}"
+    shell: "snakemake --snakefile workflow/Snakefile --rulegraph --forceall | dot -Tpng > {output}"
 
 
 rule filegraph:
     output: "results/graphs/filegraph.png"
-    shell: "snakemake --filegraph --forceall | dot -Tpng > {output}"
+    shell: "snakemake --snakefile workflow/Snakefile --filegraph --forceall | dot -Tpng > {output}"
 
 
 rule dag:
     output: "results/graphs/dag.png"
-    shell: "snakemake --dag --forceall | dot -Tpng > {output}"
+    shell: "snakemake --snakefile workflow/Snakefile --dag --forceall | dot -Tpng > {output}"
 
 localrules: graphs, rulegraph, filegraph, dag
 

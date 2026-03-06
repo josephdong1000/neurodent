@@ -55,10 +55,10 @@ CI/CD via GitHub Actions:
 .. code-block:: bash
 
    # Quick: validate DAG only (seconds)
-   NEURODENT_DATASET=example uv run snakemake --dryrun --cores 1
+   NEURODENT_DATASET=example uv run snakemake --snakefile workflow/Snakefile --dryrun --cores 1
 
    # Real run: execute full pipeline on committed mini data
-   NEURODENT_DATASET=mini_real uv run snakemake --cores 1
+   NEURODENT_DATASET=mini_real uv run snakemake --snakefile workflow/Snakefile --cores 1
 
    # Component integration tests (seconds)
    uv run pytest tests/integration/ -v -m integration
@@ -94,7 +94,7 @@ directory layout described in ``tests/data/README.md``, then run:
 
 .. code-block:: bash
 
-   NEURODENT_DATASET=example snakemake --cores 1 --dryrun
+   NEURODENT_DATASET=example snakemake --snakefile workflow/Snakefile --cores 1 --dryrun
 
 See ``config/datasets/example.yaml`` and ``config/samples_example.json`` for
 the corresponding configuration.

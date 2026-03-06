@@ -24,6 +24,47 @@ Install the optional pipeline dependencies:
 
    The ``pipeline`` extra includes Snakemake and related dependencies needed for running the automated analysis workflow. If you only need the core NeuRodent library for Python-based analysis, the basic installation is sufficient.
 
+Deploying the Pipeline with snakedeploy
+-----------------------------------------
+
+The recommended way to deploy the NeuRodent pipeline for a new analysis project is with
+`snakedeploy <https://snakedeploy.readthedocs.io>`_. Install it separately (requires Python 3.11+):
+
+.. code-block:: bash
+
+   pip install snakedeploy
+
+**Step 1 — Create your analysis directory:**
+
+.. code-block:: bash
+
+   mkdir my-eeg-analysis && cd my-eeg-analysis
+
+**Step 2 — Deploy the workflow:**
+
+.. code-block:: bash
+
+   snakedeploy deploy-workflow https://github.com/josephdong1000/neurodent . --tag v0.2.4
+
+This command copies ``workflow/Snakefile`` and the ``config/`` directory into your project,
+pinned to the specified release tag.
+
+**Step 3 — Edit the configuration:**
+
+Adjust ``config/config.yaml`` and add a dataset configuration file under ``config/datasets/``
+to match your data. See :doc:`dataset_configuration` for details.
+
+**Step 4 — Run the pipeline:**
+
+.. code-block:: bash
+
+   NEURODENT_DATASET=my_dataset snakemake --snakefile workflow/Snakefile --cores 4
+
+.. tip::
+
+   With Snakemake 8+, the entry point ``workflow/Snakefile`` is discovered automatically,
+   so you can omit ``--snakefile workflow/Snakefile`` if you have Snakemake 8 installed.
+
 SLURM Cluster Configuration
 ----------------------------
 
@@ -46,7 +87,7 @@ Run the workflow with:
 
 .. code-block:: bash
 
-   uv run snakemake --profile your-profile
+   uv run snakemake --snakefile workflow/Snakefile --profile your-profile
 
 Snakemake 8+ (Python 3.11+)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -122,7 +163,7 @@ Set ``truncate_animals`` to ``null`` (the default) to process all animals.
 
    .. code-block:: bash
 
-      NEURODENT_DATASET=mini_real uv run snakemake --cores 1
+      NEURODENT_DATASET=mini_real uv run snakemake --snakefile workflow/Snakefile --cores 1
 
 Running the Pipeline
 --------------------
@@ -133,13 +174,13 @@ Basic Usage
 .. code-block:: bash
 
    # Dry run to see what would be executed
-   uv run snakemake --dry-run
+   uv run snakemake --snakefile workflow/Snakefile --dry-run
 
    # Run pipeline locally (for testing)
-   uv run snakemake --cores 4
+   uv run snakemake --snakefile workflow/Snakefile --cores 4
 
    # Run on SLURM cluster
-   uv run snakemake --profile your-profile
+   uv run snakemake --snakefile workflow/Snakefile --profile your-profile
 
 Useful Commands
 ^^^^^^^^^^^^^^^
@@ -147,15 +188,15 @@ Useful Commands
 .. code-block:: bash
 
    # Generate workflow visualization
-   uv run snakemake --rulegraph | dot -Tpng > workflow.png
+   uv run snakemake --snakefile workflow/Snakefile --rulegraph | dot -Tpng > workflow.png
 
    # Clean results (be careful!)
-   uv run snakemake --delete-all-output
+   uv run snakemake --snakefile workflow/Snakefile --delete-all-output
 
    # Unlock workflow (if interrupted)
-   uv run snakemake --unlock
+   uv run snakemake --snakefile workflow/Snakefile --unlock
 
    # Force re-run specific rule
-   uv run snakemake --forcerun rule_name
+   uv run snakemake --snakefile workflow/Snakefile --forcerun rule_name
 
 See also: :doc:`dataset_configuration` for selecting and configuring different datasets.

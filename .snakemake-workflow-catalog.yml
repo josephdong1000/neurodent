@@ -1,0 +1,14 @@
+usage:
+  mandatory-flags:
+    desc: >
+      Set the active dataset by exporting the NEURODENT_DATASET environment variable
+      before running (e.g. `export NEURODENT_DATASET=my_dataset`).
+      Ensure config/config.yaml and the matching config/datasets/<dataset>.yaml are present.
+    args: ""
+  report:
+    desc: >
+      Generate an HTML report of the workflow execution.
+    args: "--report report.html"
+  software-stack-deployment:
+    conda: false
+    singularity: false
