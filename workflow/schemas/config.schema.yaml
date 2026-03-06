@@ -1,4 +1,6 @@
 $schema: "https://json-schema.org/draft/2020-12/schema"
+# TODO: This schema is a work in progress and should be extended to cover
+# all supported configuration keys as the pipeline evolves.
 description: Configuration schema for the neurodent Snakemake pipeline
 type: object
 required:

@@ -6,20 +6,20 @@ on:
     branches: [main]
 
 jobs:
-  dry-run:
+  integration-test:
     runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@v4
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
         with:
+          enable-cache: true
           python-version: "3.12"
       - name: Install dependencies
         run: |
-          pip install snakemake
-          pip install neurodent[pipeline]
-      - name: Snakemake dry run
+          uv sync --all-extras
+      - name: Snakemake integration run (mini_real dataset)
         run: |
-          snakemake --snakefile workflow/Snakefile --configfile config/config.yaml --dry-run --cores 1 2>&1 || echo "Dry run completed (may fail without data, which is expected)"
+          NEURODENT_DATASET=mini_real uv run snakemake --snakefile workflow/Snakefile --cores 1

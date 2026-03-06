@@ -50,35 +50,13 @@ A companion [Snakemake workflow](https://josephdong1000.github.io/neurodent/main
 
 The pipeline follows the [Snakemake Workflow Catalog](https://snakemake.github.io/snakemake-workflow-catalog/) standardized layout, with `workflow/Snakefile` as the single entry point.
 
-### Deploy via snakedeploy
-
 ```bash
+# Deploy via snakedeploy
 pip install snakedeploy
 snakedeploy deploy-workflow https://github.com/josephdong1000/neurodent . --tag <version>
-```
 
-### Run manually
-
-```bash
-# Dry run
-snakemake --snakefile workflow/Snakefile --configfile config/config.yaml --dry-run --cores 1
-
-# Full run
-snakemake --snakefile workflow/Snakefile --configfile config/config.yaml --cores 4
-```
-
-### Layout
-
-```
-workflow/
-├── Snakefile           ← pipeline entry point
-├── rules/              ← modular rule definitions
-├── scripts/            ← Python scripts called by rules
-├── envs/               ← conda environment specifications
-└── schemas/            ← config validation schemas
-config/
-├── config.yaml         ← main configuration
-└── datasets/           ← per-dataset configuration overrides
+# Run manually
+snakemake --snakefile workflow/Snakefile --configfile config/config.yaml
 ```
 
 ## Acknowledgements
