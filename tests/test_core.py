@@ -1633,3 +1633,63 @@ class TestZeroSampleMerge:
         assert len(base_lro.file_end_datetimes) == 2
         assert len(base_lro.file_durations) == 2
         assert base_lro.file_durations == [5.0, 3.0]
+
+
+class TestMergeChannelNameAbbreviation:
+    """Tests that merge validation compares channel names by abbreviation."""
+
+    def _make_lro(self, total_samples, channel_names):
+        """Create a mock LRO with the given properties."""
+        lro = LongRecordingOrganizer(None, mode=None)
+        lro.channel_names = channel_names
+
+        mock_rec = Mock()
+        mock_rec.get_total_samples.return_value = total_samples
+        lro.LongRecording = mock_rec
+
+        lro.meta = Mock()
+        lro.meta.f_s = 1000.0
+        lro.meta.n_channels = len(channel_names)
+        lro.meta.dt_end = datetime(2023, 1, 1, 12, 0)
+        lro.item = "test_item"
+
+        lro.file_end_datetimes = []
+        lro.file_durations = []
+
+        return lro
+
+    def test_same_abbreviation_different_raw_names_succeeds(self):
+        """Merging LROs with different raw names but same abbreviations should succeed."""
+        base_lro = self._make_lro(5000, ["L Barrel", "L Motor"])
+        other_lro = self._make_lro(3000, ["L Barrel Ctx", "L Motor Ctx"])
+
+        with patch("neurodent.core.core.si") as mock_si:
+            mock_si.concatenate_recordings.return_value = Mock()
+            # Should not raise
+            base_lro.merge(other_lro)
+
+    def test_different_abbreviations_raises(self):
+        """Merging LROs with genuinely different channels should fail."""
+        base_lro = self._make_lro(5000, ["L Barrel", "L Motor"])
+        other_lro = self._make_lro(3000, ["L Hipp", "L Motor"])
+
+        with pytest.raises(ValueError, match="Channel names mismatch"):
+            base_lro.merge(other_lro)
+
+    def test_unparseable_names_falls_back_to_exact_match(self):
+        """When abbreviation parsing fails, fall back to exact string comparison."""
+        # Same unparseable names — should succeed
+        base_lro = self._make_lro(5000, ["weird_ch1", "weird_ch2"])
+        other_lro = self._make_lro(3000, ["weird_ch1", "weird_ch2"])
+
+        with patch("neurodent.core.core.si") as mock_si:
+            mock_si.concatenate_recordings.return_value = Mock()
+            base_lro.merge(other_lro)
+
+    def test_unparseable_names_different_raises(self):
+        """When abbreviation parsing fails and names differ, should raise."""
+        base_lro = self._make_lro(5000, ["weird_ch1", "weird_ch2"])
+        other_lro = self._make_lro(3000, ["weird_ch1", "weird_ch3"])
+
+        with pytest.raises(ValueError, match="Channel names mismatch"):
+            base_lro.merge(other_lro)
