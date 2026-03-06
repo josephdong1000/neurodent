@@ -46,6 +46,41 @@ ep.plot_feature("rms", groupby="genotype")
 
 A companion [Snakemake workflow](https://josephdong1000.github.io/neurodent/main/tutorials/index.html) automates the full pipeline with cluster support.
 
+## Snakemake Workflow
+
+The pipeline follows the [Snakemake Workflow Catalog](https://snakemake.github.io/snakemake-workflow-catalog/) standardized layout, with `workflow/Snakefile` as the single entry point.
+
+### Deploy via snakedeploy
+
+```bash
+pip install snakedeploy
+snakedeploy deploy-workflow https://github.com/josephdong1000/neurodent . --tag <version>
+```
+
+### Run manually
+
+```bash
+# Dry run
+snakemake --snakefile workflow/Snakefile --configfile config/config.yaml --dry-run --cores 1
+
+# Full run
+snakemake --snakefile workflow/Snakefile --configfile config/config.yaml --cores 4
+```
+
+### Layout
+
+```
+workflow/
+├── Snakefile           ← pipeline entry point
+├── rules/              ← modular rule definitions
+├── scripts/            ← Python scripts called by rules
+├── envs/               ← conda environment specifications
+└── schemas/            ← config validation schemas
+config/
+├── config.yaml         ← main configuration
+└── datasets/           ← per-dataset configuration overrides
+```
+
 ## Acknowledgements
 
 This project benefited from insights and best practices described in Peter K. G. Williams’s [One Good Tutorial](https://onegoodtutorial.org/).

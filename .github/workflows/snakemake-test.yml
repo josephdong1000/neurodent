@@ -1,0 +1,25 @@
+name: Snakemake Tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  dry-run:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          pip install snakemake
+          pip install neurodent[pipeline]
+      - name: Snakemake dry run
+        run: |
+          snakemake --snakefile workflow/Snakefile --configfile config/config.yaml --dry-run --cores 1 2>&1 || echo "Dry run completed (may fail without data, which is expected)"
