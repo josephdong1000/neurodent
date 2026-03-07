@@ -55,7 +55,8 @@ notebooks/tests/test_all_functions_Yong.ipynb
 !tests/data/README.md
 !tests/data/__init__.py
 !tests/data/generate.py
-!tests/data/raw/**
+!tests/data/readers.py
+!.tests/integration/data/**
 .coverage
 .coverage.*
 coverage.xml
