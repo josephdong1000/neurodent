@@ -1368,7 +1368,7 @@ class TestResolveFuncPath:
     def test_resolves_file_path(self):
         """File path to the mini-real reader resolves correctly."""
         func = LongRecordingOrganizer._resolve_func_path(
-            "tests/data/readers.py:read_bin_csv_pair"
+            "tests/integration/readers.py:read_bin_csv_pair"
         )
         assert callable(func)
         assert func.__name__ == "read_bin_csv_pair"
@@ -1384,7 +1384,7 @@ class TestResolveFuncPath:
         """Valid file but missing attribute raises AttributeError."""
         with pytest.raises(AttributeError):
             LongRecordingOrganizer._resolve_func_path(
-                "tests/data/readers.py:nonexistent_function_xyz"
+                "tests/integration/readers.py:nonexistent_function_xyz"
             )
 
     def test_raises_on_bare_name(self):
@@ -1403,7 +1403,7 @@ class TestExtractFuncFilePathResolution:
 
     def test_si_file_path_resolves_silently(self, lro_mode_none):
         """SI mode resolves file path without logging warnings."""
-        func_name = "tests/data/readers.py:read_bin_csv_pair"
+        func_name = "tests/integration/readers.py:read_bin_csv_pair"
         with (
             patch("neurodent.core.core.logging") as mock_logging,
             patch.object(lro_mode_none, "convert_file_with_si_to_recording"),
@@ -1417,7 +1417,7 @@ class TestExtractFuncFilePathResolution:
 
     def test_mne_file_path_resolves_silently(self, lro_mode_none):
         """MNE mode resolves file path without logging warnings."""
-        func_name = "tests/data/readers.py:read_bin_csv_pair"
+        func_name = "tests/integration/readers.py:read_bin_csv_pair"
         with (
             patch("neurodent.core.core.logging") as mock_logging,
             patch.object(lro_mode_none, "convert_file_with_mne_to_recording"),

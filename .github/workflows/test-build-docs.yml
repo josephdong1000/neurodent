@@ -59,12 +59,12 @@ jobs:
     - name: Snakemake dry-run (example dataset)
       if: runner.os == 'Linux'
       run: |
-        NEURODENT_DATASET=example uv run snakemake --dryrun --cores 1 --quiet
+        NEURODENT_DATASET=example uv run snakemake --snakefile workflow/Snakefile --dryrun --cores 1 --quiet
 
     - name: Snakemake real run (mini_real dataset)
       if: runner.os == 'Linux'
       run: |
-        NEURODENT_DATASET=mini_real uv run snakemake --cores 1
+        NEURODENT_DATASET=mini_real uv run snakemake --snakefile workflow/Snakefile --cores 1
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v5
