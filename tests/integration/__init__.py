@@ -1,1 +1,1 @@
-"""Integration tests for the Snakemake workflow."""
+"""Integration tests for the NeuRodent workflow."""
