@@ -70,7 +70,7 @@ def example_pipeline_env(tmp_path):
     ``session_folder``, and the full ``config`` dict that would normally
     come from Snakemake.
     """
-    from tests.data.generate import create_synthetic_dataset
+    from tests.integration.generate import create_synthetic_dataset
 
     ds = create_synthetic_dataset(tmp_path, n_sessions=2, duration_s=3)
 
@@ -536,7 +536,7 @@ class TestBinCsvMultiPatternDiscovery:
     @pytest.fixture
     def bin_csv_env(self, tmp_path):
         """Create a dual .bin/.csv dataset under tmp_path."""
-        from tests.data.generate import create_synthetic_bin_csv_dataset
+        from tests.integration.generate import create_synthetic_bin_csv_dataset
 
         return create_synthetic_bin_csv_dataset(
             tmp_path, n_sessions=2, duration_s=3,
@@ -638,7 +638,7 @@ class TestPerAnimalPatternDict:
     @pytest.fixture
     def bin_csv_env(self, tmp_path):
         """Create a dual .bin/.csv dataset under tmp_path."""
-        from tests.data.generate import create_synthetic_bin_csv_dataset
+        from tests.integration.generate import create_synthetic_bin_csv_dataset
 
         return create_synthetic_bin_csv_dataset(
             tmp_path, n_sessions=2, duration_s=3,
@@ -774,7 +774,7 @@ class TestMiniRealDataset:
     """Integration tests using committed mini real bin/csv recordings.
 
     These tests exercise file discovery and data loading against the small
-    real recordings committed in ``.tests/integration/data/raw/``.  They validate
+    real recordings committed in ``.tests/integration/data/``.  They validate
     that the ``mini_real`` dataset config works end-to-end with pattern-based
     discovery including the ``{animal}`` placeholder.
     """

@@ -1,5 +1,5 @@
 {
-    "data_root": ".tests/integration/data/raw",
+    "data_root": ".tests/integration/data",
     "animals": [
         {
             "id": "A10",

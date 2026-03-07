@@ -255,7 +255,7 @@ class TestDatetimesAreStartPropagation:
             "datetimes_are_start": False,  # At war_generation level, NOT inside lro_kwargs
             "lro_kwargs": {
                 "mode": "si",
-                "extract_func": "tests/data/readers.py:read_bin_csv_pair",
+                "extract_func": "tests/integration/readers.py:read_bin_csv_pair",
                 "multiprocess_mode": "serial",
             },
         }

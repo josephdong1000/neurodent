@@ -14,7 +14,7 @@ analysis:
     assume_from_number: true
     lro_kwargs:
       mode: "si"
-      extract_func: "tests/data/readers.py:read_bin_csv_pair"
+      extract_func: "tests/integration/readers.py:read_bin_csv_pair"
       multiprocess_mode: "serial"
 
 cluster:

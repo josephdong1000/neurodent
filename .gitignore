@@ -52,10 +52,8 @@ notebooks/tests/test_all_functions_Yong.ipynb
 *.dat
 
 # Example data for integration testing (after *.bin, *.csv so negations take effect)
-!tests/data/README.md
-!tests/data/__init__.py
-!tests/data/generate.py
-!tests/data/readers.py
+!tests/integration/generate.py
+!tests/integration/readers.py
 !.tests/integration/data/**
 .coverage
 .coverage.*
