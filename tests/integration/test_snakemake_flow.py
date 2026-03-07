@@ -19,8 +19,6 @@ Or include them in the full suite::
 """
 
 import json
-import os
-import subprocess
 from pathlib import Path
 
 import numpy as np
@@ -72,7 +70,7 @@ def example_pipeline_env(tmp_path):
     ``session_folder``, and the full ``config`` dict that would normally
     come from Snakemake.
     """
-    from tests.data.generate import create_synthetic_dataset
+    from tests.integration.generate import create_synthetic_dataset
 
     ds = create_synthetic_dataset(tmp_path, n_sessions=2, duration_s=3)
 
@@ -538,7 +536,7 @@ class TestBinCsvMultiPatternDiscovery:
     @pytest.fixture
     def bin_csv_env(self, tmp_path):
         """Create a dual .bin/.csv dataset under tmp_path."""
-        from tests.data.generate import create_synthetic_bin_csv_dataset
+        from tests.integration.generate import create_synthetic_bin_csv_dataset
 
         return create_synthetic_bin_csv_dataset(
             tmp_path, n_sessions=2, duration_s=3,
@@ -640,7 +638,7 @@ class TestPerAnimalPatternDict:
     @pytest.fixture
     def bin_csv_env(self, tmp_path):
         """Create a dual .bin/.csv dataset under tmp_path."""
-        from tests.data.generate import create_synthetic_bin_csv_dataset
+        from tests.integration.generate import create_synthetic_bin_csv_dataset
 
         return create_synthetic_bin_csv_dataset(
             tmp_path, n_sessions=2, duration_s=3,
@@ -776,8 +774,8 @@ class TestMiniRealDataset:
     """Integration tests using committed mini real bin/csv recordings.
 
     These tests exercise file discovery and data loading against the small
-    real recordings committed in ``tests/data/raw/``.  They validate that
-    the ``mini_real`` dataset config works end-to-end with pattern-based
+    real recordings committed in ``.tests/integration/data/``.  They validate
+    that the ``mini_real`` dataset config works end-to-end with pattern-based
     discovery including the ``{animal}`` placeholder.
     """
 
@@ -988,80 +986,4 @@ class TestMiniRealDataset:
             constants.ANIMAL_METADATA = orig_metadata
             constants.GENOTYPE_ALIASES = orig_aliases
 
-
-# ---------------------------------------------------------------------------
-# Snakemake Dry-Run Tests
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.integration
-class TestSnakemakeDryRun:
-    """Validate Snakemake DAG construction via ``--dryrun`` for test datasets.
-
-    These tests invoke ``snakemake --dryrun`` as a subprocess to ensure
-    that the Snakefile, dataset configs, and sample JSONs are all
-    consistent and produce a valid execution plan.  No data is actually
-    processed — only the DAG is built and validated.
-
-    This is the recommended way to smoke-test the Snakemake pipeline in
-    CI: it catches config typos, missing keys, broken imports, and
-    invalid wildcard resolution without the cost of running the full
-    pipeline.
-    """
-
-    @staticmethod
-    def _run_snakemake_dryrun(dataset: str, targets: list[str] | None = None):
-        """Run ``snakemake --dryrun`` for *dataset* and return the result.
-
-        Args:
-            dataset: Name of the dataset config (e.g. ``"example"``).
-            targets: Optional list of target rules/files.  When ``None``,
-                only ``make_war`` for the first animal is requested so the
-                dry-run stays fast.
-
-        Returns:
-            ``subprocess.CompletedProcess`` — caller should check
-            ``result.returncode``.
-        """
-        cmd = [
-            "uv", "run", "snakemake",
-            "--dryrun",
-            "--ignore-incomplete",
-            "--cores", "1",
-            "--quiet",
-        ]
-        if targets:
-            cmd.extend(targets)
-
-        env = {
-            **os.environ,
-            "NEURODENT_DATASET": dataset,
-        }
-
-        return subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            cwd=str(Path(__file__).resolve().parents[2]),
-            env=env,
-            timeout=60,
-        )
-
-    def test_example_dataset_dryrun(self):
-        """``snakemake --dryrun`` succeeds for the *example* dataset."""
-        result = self._run_snakemake_dryrun("example")
-        assert result.returncode == 0, (
-            f"Snakemake dry-run failed for 'example' dataset.\n"
-            f"stdout:\n{result.stdout}\n"
-            f"stderr:\n{result.stderr}"
-        )
-
-    def test_mini_real_dataset_dryrun(self):
-        """``snakemake --dryrun`` succeeds for the *mini_real* dataset."""
-        result = self._run_snakemake_dryrun("mini_real")
-        assert result.returncode == 0, (
-            f"Snakemake dry-run failed for 'mini_real' dataset.\n"
-            f"stdout:\n{result.stdout}\n"
-            f"stderr:\n{result.stderr}"
-        )
 

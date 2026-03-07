@@ -72,7 +72,7 @@ without processing full production-scale recordings.
 
 **Programmatic synthetic data (CI-friendly)**
 
-A ``create_synthetic_dataset()`` helper in ``tests/data/generate.py``
+A ``create_synthetic_dataset()`` helper in ``tests/integration/generate.py``
 builds a tiny directory tree with 8-channel NWB files that can be read back
 by SpikeInterface.  The ``example_dataset`` pytest fixture in
 ``tests/conftest.py`` wraps this for convenient use:
@@ -87,31 +87,19 @@ by SpikeInterface.  The ``example_dataset`` pytest fixture in
 Integration tests in ``tests/integration/test_snakemake_flow.py`` demonstrate
 discovery, filtering, and config-alias injection against this data.
 
-**User-provided real data (local development)**
-
-Place small real recordings under ``tests/data/raw/`` following the
-directory layout described in ``tests/data/README.md``, then run:
-
-.. code-block:: bash
-
-   NEURODENT_DATASET=example snakemake --cores 1 --dryrun
-
-See ``config/datasets/example.yaml`` and ``config/samples_example.json`` for
-the corresponding configuration.
-
 **Mini real dataset (committed bin/csv recordings)**
 
-Small real recordings are committed under ``tests/data/raw/`` and exercised
-by pytest integration tests in ``TestMiniRealDataset``.  The dataset uses
-``{animal}/{index}`` placeholders with paired ``.bin`` / ``.csv`` files:
+Small real recordings are committed under ``.tests/integration/data/`` and
+exercised by pytest integration tests in ``TestMiniRealDataset``.  The dataset
+uses ``{animal}/{index}`` placeholders with paired ``.bin`` / ``.csv`` files:
 
 .. code-block:: bash
 
    # Run mini-real integration tests
    uv run pytest tests/integration/ -v -k TestMiniRealDataset
 
-The full Snakemake run shown in the Pipeline Testing Strategy section above
-also exercises this dataset end-to-end.  See ``config/datasets/mini_real.yaml``
+The full Snakemake run (via ``.github/workflows/snakemake-test.yml``) also
+exercises this dataset end-to-end.  See ``config/datasets/mini_real.yaml``
 and ``config/samples_mini_real.json`` for the corresponding configuration.
 
 

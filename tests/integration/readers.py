@@ -1,7 +1,7 @@
 """Custom reader functions for test datasets.
 
 These readers are referenced by file path in dataset config files
-(e.g. ``extract_func: "tests/data/readers.py:read_bin_csv_pair"``).
+(e.g. ``extract_func: "tests/integration/readers.py:read_bin_csv_pair"``).
 They are **not** part of the neurodent package; they exist solely to
 support pipeline testing with committed mini recordings.
 """

@@ -27,6 +27,9 @@ dist/
 **/.*/
 !.github/
 !.github/**
+!.tests/
+!.tests/**
+!.snakemake-workflow-catalog.yml
 **/__pycache__/
 **/__pycache__/*
 /__pycache__/
@@ -49,10 +52,9 @@ notebooks/tests/test_all_functions_Yong.ipynb
 *.dat
 
 # Example data for integration testing (after *.bin, *.csv so negations take effect)
-!tests/data/README.md
-!tests/data/__init__.py
-!tests/data/generate.py
-!tests/data/raw/**
+!tests/integration/generate.py
+!tests/integration/readers.py
+!.tests/integration/data/**
 .coverage
 .coverage.*
 coverage.xml
