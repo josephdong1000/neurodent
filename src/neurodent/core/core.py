@@ -51,7 +51,7 @@ from .utils import (
     should_use_cache_unified,
     get_cache_status_message,
     convert_intan_chname_mne,
-    parse_chname_to_abbrev,
+    abbreviate_channel_names,
 )
 
 
@@ -2051,24 +2051,15 @@ class LongRecordingOrganizer:
         """
         # Check channel names — compare by abbreviation to tolerate naming
         # variants (e.g. "L Barrel" vs "L Barrel Ctx" both → "LBar").
-        # Fall back to exact comparison if abbreviation parsing fails.
-        try:
-            self_abbrevs = [parse_chname_to_abbrev(ch) for ch in self.channel_names]
-            other_abbrevs = [parse_chname_to_abbrev(ch) for ch in other_lro.channel_names]
-        except (ValueError, KeyError):
-            # Abbreviation parsing failed — fall back to exact string comparison
-            if self.channel_names != other_lro.channel_names:
-                raise ValueError(
-                    f"Channel names mismatch: this LRO has {self.channel_names}, "
-                    f"other LRO has {other_lro.channel_names}"
-                )
-        else:
-            if self_abbrevs != other_abbrevs:
-                raise ValueError(
-                    f"Channel names mismatch: this LRO has {self.channel_names} "
-                    f"(abbrevs: {self_abbrevs}), other LRO has {other_lro.channel_names} "
-                    f"(abbrevs: {other_abbrevs})"
-                )
+        # Unparseable names pass through as-is for exact comparison.
+        self_abbrevs = abbreviate_channel_names(self.channel_names)
+        other_abbrevs = abbreviate_channel_names(other_lro.channel_names)
+        if self_abbrevs != other_abbrevs:
+            raise ValueError(
+                f"Channel names mismatch: this LRO has {self.channel_names} "
+                f"(abbrevs: {self_abbrevs}), other LRO has {other_lro.channel_names} "
+                f"(abbrevs: {other_abbrevs})"
+            )
 
         # Check sampling rates
         if hasattr(self.meta, "f_s") and hasattr(other_lro.meta, "f_s"):

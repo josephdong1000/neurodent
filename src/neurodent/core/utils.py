@@ -836,6 +836,36 @@ def parse_chname_to_abbrev(channel_name: str, assume_from_number=False, strict_m
     return lr + chname
 
 
+def abbreviate_channel_names(
+    names: list[str],
+    strict_matching: bool = True,
+    assume_from_number: bool = False,
+) -> list[str]:
+    """Abbreviate a list of channel names, falling back to raw names for unparseable entries.
+
+    Args:
+        names: List of channel name strings to abbreviate.
+        strict_matching: Passed to parse_chname_to_abbrev.
+        assume_from_number: Passed to parse_chname_to_abbrev.
+
+    Returns:
+        List of abbreviated channel names (same length as input).
+    """
+    result = []
+    for name in names:
+        try:
+            result.append(
+                parse_chname_to_abbrev(
+                    name,
+                    assume_from_number=assume_from_number,
+                    strict_matching=strict_matching,
+                )
+            )
+        except (ValueError, KeyError, AttributeError):
+            result.append(name)
+    return result
+
+
 def _get_key_from_match_values(input_string: str, alias_dict: dict, strict_matching: bool = True, alias_name: str = "alias"):
     """
     Find the best matching key from alias dictionary.

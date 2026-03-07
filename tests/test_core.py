@@ -29,6 +29,7 @@ from neurodent.core.core import (
     convert_ddfrowbin_to_si,
 )
 from neurodent import constants
+from neurodent.core.utils import abbreviate_channel_names
 
 
 class TestDDFBinaryMetadata:
@@ -1693,3 +1694,33 @@ class TestMergeChannelNameAbbreviation:
 
         with pytest.raises(ValueError, match="Channel names mismatch"):
             base_lro.merge(other_lro)
+
+
+class TestAbbreviateChannelNames:
+    """Tests for the abbreviate_channel_names utility."""
+
+    def test_parseable_names(self):
+        """All parseable names should be abbreviated."""
+        names = ["L Barrel", "L Motor", "R Hipp"]
+        result = abbreviate_channel_names(names)
+        assert result == ["LBar", "LMot", "RHip"]
+
+    def test_unparseable_names_pass_through(self):
+        """Unparseable names should be returned unchanged."""
+        names = ["weird_ch1", "weird_ch2"]
+        result = abbreviate_channel_names(names)
+        assert result == ["weird_ch1", "weird_ch2"]
+
+    def test_mixed_names(self):
+        """Mix of parseable and unparseable names."""
+        names = ["L Barrel", "weird_ch", "R Motor"]
+        result = abbreviate_channel_names(names)
+        assert result == ["LBar", "weird_ch", "RMot"]
+
+    def test_empty_list(self):
+        """Empty list returns empty list."""
+        assert abbreviate_channel_names([]) == []
+
+    def test_variant_names_same_abbreviation(self):
+        """Different raw names that map to the same abbreviation."""
+        assert abbreviate_channel_names(["L Barrel"]) == abbreviate_channel_names(["L Barrel Ctx"])

@@ -31,7 +31,7 @@ from tqdm import tqdm
 from .. import constants, core
 from ..core import FragmentAnalyzer, get_temp_directory
 from ..core.frequency_domain_spike_detection import FrequencyDomainSpikeDetector
-from ..core.utils import filepath_to_index, parse_chname_to_abbrev
+from ..core.utils import abbreviate_channel_names, parse_chname_to_abbrev
 
 
 class AnimalFeatureParser:
@@ -1659,23 +1659,14 @@ class AnimalOrganizer(AnimalFeatureParser):
         if not first_names:
             return []
 
-        def _abbreviate(names: list[str]) -> list[str]:
-            result = []
-            for n in names:
-                try:
-                    result.append(core.parse_chname_to_abbrev(n, strict_matching=False))
-                except ValueError:
-                    result.append(n)  # Fall back to raw name if parsing fails
-            return result
-
-        reference_abbrevs = _abbreviate(first_names)
+        reference_abbrevs = abbreviate_channel_names(first_names, strict_matching=False)
         reference_set = set(reference_abbrevs)
         # Map abbreviation -> canonical raw name from first LRO
         abbrev_to_raw = dict(zip(reference_abbrevs, first_names))
 
         for i, lro in enumerate(lros[1:], start=1):
             current_names = lro.channel_names if lro.channel_names else []
-            current_abbrevs = _abbreviate(current_names)
+            current_abbrevs = abbreviate_channel_names(current_names, strict_matching=False)
             current_set = set(current_abbrevs)
 
             if current_set != reference_set:
