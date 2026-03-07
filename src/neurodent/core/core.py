@@ -2031,8 +2031,22 @@ class LongRecordingOrganizer:
         logging.info(
             f"Merging LRO {getattr(other_lro, 'item', 'unknown')} into {getattr(self, 'item', 'unknown')}"
         )
+
+        # If channel names differ but abbreviations matched (validated above),
+        # rename other recording's channels to match self's for SI concatenation.
+        other_rec = other_lro.LongRecording
+        if self.channel_names != other_lro.channel_names:
+            logging.info(
+                f"Renaming channels {other_lro.channel_names} -> {self.channel_names} "
+                "for merge compatibility"
+            )
+            other_rec = other_rec.rename_channels(
+                new_channel_ids=self.channel_names
+            )
+            other_lro.channel_names = list(self.channel_names)
+
         self.LongRecording = si.concatenate_recordings(
-            [self.LongRecording, other_lro.LongRecording]
+            [self.LongRecording, other_rec]
         )
 
         # Update metadata after merge

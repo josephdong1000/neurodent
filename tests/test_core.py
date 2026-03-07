@@ -1660,14 +1660,27 @@ class TestMergeChannelNameAbbreviation:
         return lro
 
     def test_same_abbreviation_different_raw_names_succeeds(self):
-        """Merging LROs with different raw names but same abbreviations should succeed."""
+        """Merging LROs with different raw names but same abbreviations should rename and succeed."""
         base_lro = self._make_lro(5000, ["L Barrel", "L Motor"])
         other_lro = self._make_lro(3000, ["L Barrel Ctx", "L Motor Ctx"])
+        original_other_rec = other_lro.LongRecording
+        renamed_rec = Mock()
+        original_other_rec.rename_channels.return_value = renamed_rec
 
         with patch("neurodent.core.core.si") as mock_si:
             mock_si.concatenate_recordings.return_value = Mock()
-            # Should not raise
             base_lro.merge(other_lro)
+
+            # rename_channels should have been called with base's channel names
+            original_other_rec.rename_channels.assert_called_once_with(
+                new_channel_ids=["L Barrel", "L Motor"]
+            )
+            # The renamed rec should be passed to concatenate_recordings
+            call_args = mock_si.concatenate_recordings.call_args[0][0]
+            assert call_args[1] is renamed_rec
+
+        # other_lro's channel_names should have been updated to match base
+        assert other_lro.channel_names == ["L Barrel", "L Motor"]
 
     def test_different_abbreviations_raises(self):
         """Merging LROs with genuinely different channels should fail."""
