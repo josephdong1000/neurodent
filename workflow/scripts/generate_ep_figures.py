@@ -31,17 +31,23 @@ def infer_metadata_columns(df):
     """
     Infer metadata columns (sex, gene) from genotype and animal ID.
     This logic is isolated as it may change depending on project conventions.
+
+    If the DataFrame already has a 'sex' column (populated from WAR data),
+    it is used directly. Otherwise, sex is inferred from genotype prefixes
+    or animal ID suffixes as a fallback.
     """
     df = df.copy()
 
-    # Add categorical columns based on genotype
-    if "genotype" in df.columns:
-        # First try to map from standard genotypes
+    # Use existing sex column if present and non-null
+    if "sex" in df.columns and df["sex"].notna().all():
+        pass  # sex already populated from WAR data
+    elif "genotype" in df.columns:
+        # Fallback: try to infer sex from genotype prefix
         df["sex"] = df["genotype"].map(
             lambda x: "Male" if x in ["MWT", "MHet", "MMut"] else "Female" if x in ["FWT", "FHet", "FMut"] else None
         )
-        
-        # If sex is missing, try to infer from animal ID (e.g. "...-M" or "...-F")
+
+        # If sex is still missing, try to infer from animal ID
         if df["sex"].isnull().any() and "animal" in df.columns:
             def infer_sex_from_animal(row):
                 if pd.notna(row["sex"]):
@@ -52,17 +58,18 @@ def infer_metadata_columns(df):
                 if animal.endswith("-F") or animal.endswith("_F"):
                     return "Female"
                 return "Unknown"
-            
+
             df["sex"] = df.apply(infer_sex_from_animal, axis=1)
 
-        # Map gene/genotype
+    # Map gene from genotype — if genotype is already plain (WT/Het/Mut), use directly
+    if "genotype" in df.columns:
         df["gene"] = df["genotype"].map(
             lambda x: "WT"
-            if x in ["MWT", "FWT", "WT"]  # Added WT explicitly
+            if x in ["MWT", "FWT", "WT"]
             else "Het"
-            if x in ["MHet", "FHet"]
+            if x in ["MHet", "FHet", "Het"]
             else "Mut"
-            if x in ["MMut", "FMut", "HOMO"] # Added HOMO explicitly if possible, or just fallback
+            if x in ["MMut", "FMut", "HOMO", "Mut"]
             else x
         )
     return df
@@ -293,7 +300,7 @@ def main():
     exclude_features = ep_config.get("exclude_features", [])
 
     # Create genotype ordering - ensure we include all genotypes present in the data
-    genotype_order = ["MWT", "MHet", "MMut", "FWT", "FHet", "FMut"]
+    genotype_order = ["WT", "Het", "Mut"]
     
     # Check for genotypes in loaded WARs that aren't in the default list
     found_genotypes = set()

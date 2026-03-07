@@ -86,29 +86,24 @@ def generate_regular_heatmaps(ep, features, output_dir, data_dir, ep_config):
 
 def filter_wars_by_sex(wars, sex):
     """
-    Filter WARs by sex using genotype and animal ID.
-    This logic is subject to change.
+    Filter WARs by sex using the war.sex attribute.
+
+    Args:
+        wars: List of WindowAnalysisResult objects.
+        sex: Sex string to filter by (e.g. "Male", "Female").
+
+    Returns:
+        List of WARs matching the given sex.
     """
-    sex_wars = []
-    for war in wars:
-        # Check genotype first
-        if war.genotype.startswith(sex) and war.genotype not in ["WT", "HOMO"]: # avoid matching if genotype is just WT/HOMO unless they start with M/F (unlikely)
-                sex_wars.append(war)
-        # Fallback to animal ID
-        elif war.animal_id.upper().endswith(f"-{sex}") or war.animal_id.upper().endswith(f"_{sex}"):
-            sex_wars.append(war)
-    return sex_wars
+    return [war for war in wars if war.sex == sex]
 
 
 def determine_baseline_key(found_genotypes, sex):
     """Determine the baseline genotype key for difference maps."""
-    if f"{sex}WT" in found_genotypes:
-        return f"{sex}WT"
-    elif "WT" in found_genotypes:
+    if "WT" in found_genotypes:
         return "WT"
     else:
-        # Fallback
-        return f"{sex}WT"
+        return "WT"
 
 
 def generate_difference_heatmaps(wars, features, output_dir, config):
@@ -124,8 +119,8 @@ def generate_difference_heatmaps(wars, features, output_dir, config):
 
     if baseline_type == "sex_specific":
         # Create separate EPs for male and female, compare to sex-specific WT
-        for sex in ["M", "F"]:
-            logger.info(f"Generating difference heatmaps for {sex} vs {sex}WT")
+        for sex in ["Male", "Female"]:
+            logger.info(f"Generating difference heatmaps for {sex} vs WT")
 
             # Filter wars by sex
             sex_wars = filter_wars_by_sex(wars, sex)
@@ -135,7 +130,7 @@ def generate_difference_heatmaps(wars, features, output_dir, config):
                 continue
 
             # Create genotype ordering
-            genotype_order = ["MWT", "MHet", "MMut", "FWT", "FHet", "FMut"]
+            genotype_order = ["WT", "Het", "Mut"]
             
             # Add observed genotypes
             found_genotypes = set(w.genotype for w in sex_wars)
@@ -153,7 +148,7 @@ def generate_difference_heatmaps(wars, features, output_dir, config):
 
             # Determine baseline key
             baseline_key = determine_baseline_key(found_genotypes, sex)
-            if baseline_key not in found_genotypes and "WT" not in found_genotypes: # extra warning if really missing
+            if baseline_key not in found_genotypes:
                  logger.warning(f"Could not find exact baseline genotype for {sex}. Using {baseline_key} (might fail). Found: {found_genotypes}")
 
             for feature in features:
@@ -238,7 +233,7 @@ def main():
     features = ep_config["matrix_features"]
 
     # Create genotype ordering - ensure we include all genotypes present in the data
-    genotype_order = ["MWT", "MHet", "MMut", "FWT", "FHet", "FMut"]
+    genotype_order = ["WT", "Het", "Mut"]
     
     # Check for genotypes in loaded WARs that aren't in the default list
     found_genotypes = set()

@@ -138,6 +138,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         unique_animaldays (list[str]): List of unique session identifiers (format: "{animal}_{session}").
         animaldays (list[str]): Alias for unique_animaldays.
         genotype (str): Genotype of the animal (from ANIMAL_METADATA if available).
+        sex (str | None): Sex of the animal (from ANIMAL_METADATA if available).
         long_recordings (list[LongRecordingOrganizer]): LRO instances, one per session.
         long_analyzers (list[LongRecordingAnalyzer]): Analysis instances, one per session.
         features_df (pd.DataFrame): Aggregated feature DataFrame across all sessions.
@@ -250,6 +251,12 @@ class AnimalOrganizer(AnimalFeatureParser):
             constants.ANIMAL_METADATA.get(self.animal_id, {}).get("gene", "Unknown")
             if self.animal_id
             else "Unknown"
+        )
+
+        self.sex = (
+            constants.ANIMAL_METADATA.get(self.animal_id, {}).get("sex", None)
+            if self.animal_id
+            else None
         )
 
         self._init_containers()
@@ -1318,6 +1325,7 @@ class AnimalOrganizer(AnimalFeatureParser):
             self.features_df,
             self.animal_id,
             self.genotype,
+            self.sex,
             self.channel_names,
             self.assume_from_number,
             self.bad_channels_dict,
@@ -1429,6 +1437,7 @@ class AnimalOrganizer(AnimalFeatureParser):
 
         animal = self.animal_id or "unknown"
         genotype = self.genotype or "Unknown"
+        sex = self.sex
         session = None
 
         if isinstance(item, DiscoveredFile) and item.metadata:
@@ -1436,6 +1445,7 @@ class AnimalOrganizer(AnimalFeatureParser):
             animal = meta.get("animal", animal)
             session = meta.get("session")
             genotype = constants.ANIMAL_METADATA.get(animal, {}).get("gene", genotype)
+            sex = constants.ANIMAL_METADATA.get(animal, {}).get("sex", sex)
 
         if session is None:
             try:
@@ -1447,6 +1457,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         row["animal"] = animal
         row["day"] = session
         row["genotype"] = genotype
+        row["sex"] = sex
         row["duration"] = lan.LongRecording.get_dur_fragment(window_s, idx)
         row["endfile"] = lan.get_file_end(idx)
 
@@ -1474,6 +1485,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         lros: list[core.LongRecordingOrganizer],
         animal_id: str,
         genotype: str = "Unknown",
+        sex: str = None,
         assume_from_number: bool = False,
     ) -> "AnimalOrganizer":
         """
@@ -1488,6 +1500,7 @@ class AnimalOrganizer(AnimalFeatureParser):
             lros (list[LongRecordingOrganizer]): List of LRO instances to wrap.
             animal_id (str): Animal identifier for this organizer.
             genotype (str, optional): Genotype string. Defaults to "Unknown".
+            sex (str, optional): Sex string (e.g. "Male", "Female"). Defaults to None.
             assume_from_number (bool, optional): Whether to assume channel aliases
                 from numbers. Defaults to False.
 
@@ -1523,6 +1536,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         ao.anim_id = animal_id
         ao.animal_id = animal_id
         ao.genotype = genotype
+        ao.sex = sex
         ao.assume_from_number = assume_from_number
 
         # Step 1: Group LROs by date
@@ -1809,6 +1823,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                 lros=child_lros,
                 animal_id=group_name,
                 genotype=self.genotype,
+                sex=self.sex,
                 assume_from_number=self.assume_from_number,
             )
 
@@ -1879,6 +1894,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         result: pd.DataFrame,
         animal_id: str = None,
         genotype: str = None,
+        sex: str = None,
         channel_names: list[str] = None,
         assume_from_number=False,
         bad_channels_dict: dict[str, list[str]] = {},
@@ -1888,6 +1904,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         self.result = result
         self.animal_id = animal_id
         self.genotype = genotype
+        self.sex = sex
         self.channel_names = channel_names
         self.assume_from_number = assume_from_number
         self.bad_channels_dict = bad_channels_dict.copy()
@@ -1913,6 +1930,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             result=self.result.copy(deep=True),
             animal_id=self.animal_id,
             genotype=self.genotype,
+            sex=self.sex,
             channel_names=(
                 self.channel_names.copy() if self.channel_names is not None else None
             ),
@@ -2306,6 +2324,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         info.append(
             f"genotype: {self.result['genotype'].unique()[0] if 'genotype' in self.result.columns else self.genotype}"
         )
+        info.append(f"sex: {self.sex}")
         info.append(
             f"channel_names: {', '.join(self.channel_names) if self.channel_names else 'None'}"
         )
@@ -3228,6 +3247,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             filtered_result,
             self.animal_id,
             self.genotype,
+            self.sex,
             self.channel_names,
             self.assume_from_number,
             self.bad_channels_dict.copy(),
@@ -3249,6 +3269,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             filtered_result,
             self.animal_id,
             self.genotype,
+            self.sex,
             self.channel_names,
             self.assume_from_number,
             self.bad_channels_dict.copy(),
@@ -3573,6 +3594,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         json_dict = {
             "animal_id": self.animal_id,
             "genotype": self.genotype,
+            "sex": self.sex,
             "channel_names": (
                 self.channel_abbrevs if save_abbrevs_as_chnames else self.channel_names
             ),
