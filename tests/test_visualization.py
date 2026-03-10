@@ -1915,7 +1915,7 @@ class TestWindowAnalysisResultPickleJsonParameters:
         pd.testing.assert_frame_equal(loaded_war.result, original_war.result)
 
     def test_load_old_json_without_sex(self):
-        """Test backward compatibility: old JSON files without 'sex' load with sex=None."""
+        """Test backward compatibility: old JSON files without 'sex' load with sex='Unknown'."""
         import json
         import tempfile
         from pathlib import Path
@@ -1950,11 +1950,11 @@ class TestWindowAnalysisResultPickleJsonParameters:
             with open(tmpdir / "war.json", "w") as f:
                 json.dump(old_json, f)
 
-            # Load should succeed with sex=None
+            # Load should succeed with sex="Unknown" (the default)
             loaded_war = WindowAnalysisResult.load_pickle_and_json(folder_path=str(tmpdir))
             assert loaded_war.animal_id == "A1"
             assert loaded_war.genotype == "WT"
-            assert loaded_war.sex is None
+            assert loaded_war.sex == "Unknown"
             assert loaded_war.channel_names == ["LMot", "RMot"]
     """Test LOF functionality integration with AnimalOrganizer (mocked)."""
 

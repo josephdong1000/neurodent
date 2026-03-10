@@ -119,7 +119,7 @@ def generate_difference_heatmaps(wars, features, output_dir, config):
 
     if baseline_type == "sex_specific":
         # Create separate EPs for male and female, compare to sex-specific WT
-        for sex in ["Male", "Female"]:
+        for sex in constants.DF_SORT_ORDER.get("sex", ["Male", "Female"]):
             logger.info(f"Generating difference heatmaps for {sex} vs WT")
 
             # Filter wars by sex
@@ -129,8 +129,8 @@ def generate_difference_heatmaps(wars, features, output_dir, config):
                 logger.warning(f"No wars found for sex {sex}")
                 continue
 
-            # Create genotype ordering
-            genotype_order = ["WT", "Het", "Mut"]
+            # Create genotype ordering from constants
+            genotype_order = list(constants.DF_SORT_ORDER.get("genotype", []))
             
             # Add observed genotypes
             found_genotypes = set(w.genotype for w in sex_wars)
@@ -232,8 +232,8 @@ def main():
     ep_config = config["analysis"]["ep_heatmaps"]
     features = ep_config["matrix_features"]
 
-    # Create genotype ordering - ensure we include all genotypes present in the data
-    genotype_order = ["WT", "Het", "Mut"]
+    # Create genotype ordering from constants, adding any observed genotypes not in the default list
+    genotype_order = list(constants.DF_SORT_ORDER.get("genotype", []))
     
     # Check for genotypes in loaded WARs that aren't in the default list
     found_genotypes = set()

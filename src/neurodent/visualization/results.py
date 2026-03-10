@@ -138,7 +138,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         unique_animaldays (list[str]): List of unique session identifiers (format: "{animal}_{session}").
         animaldays (list[str]): Alias for unique_animaldays.
         genotype (str): Genotype of the animal (from ANIMAL_METADATA if available).
-        sex (str | None): Sex of the animal (from ANIMAL_METADATA if available).
+        sex (str): Sex of the animal (from ANIMAL_METADATA if available).
         long_recordings (list[LongRecordingOrganizer]): LRO instances, one per session.
         long_analyzers (list[LongRecordingAnalyzer]): Analysis instances, one per session.
         features_df (pd.DataFrame): Aggregated feature DataFrame across all sessions.
@@ -254,9 +254,9 @@ class AnimalOrganizer(AnimalFeatureParser):
         )
 
         self.sex = (
-            constants.ANIMAL_METADATA.get(self.animal_id, {}).get("sex", None)
+            constants.ANIMAL_METADATA.get(self.animal_id, {}).get("sex", "Unknown")
             if self.animal_id
-            else None
+            else "Unknown"
         )
 
         self._init_containers()
@@ -1437,7 +1437,7 @@ class AnimalOrganizer(AnimalFeatureParser):
 
         animal = self.animal_id or "unknown"
         genotype = self.genotype or "Unknown"
-        sex = self.sex
+        sex = self.sex or "Unknown"
         session = None
 
         if isinstance(item, DiscoveredFile) and item.metadata:
@@ -1485,7 +1485,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         lros: list[core.LongRecordingOrganizer],
         animal_id: str,
         genotype: str = "Unknown",
-        sex: str = None,
+        sex: str = "Unknown",
         assume_from_number: bool = False,
     ) -> "AnimalOrganizer":
         """
@@ -1500,7 +1500,7 @@ class AnimalOrganizer(AnimalFeatureParser):
             lros (list[LongRecordingOrganizer]): List of LRO instances to wrap.
             animal_id (str): Animal identifier for this organizer.
             genotype (str, optional): Genotype string. Defaults to "Unknown".
-            sex (str, optional): Sex string (e.g. "Male", "Female"). Defaults to None.
+            sex (str, optional): Sex string (e.g. "Male", "Female"). Defaults to "Unknown".
             assume_from_number (bool, optional): Whether to assume channel aliases
                 from numbers. Defaults to False.
 
@@ -1894,7 +1894,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         result: pd.DataFrame,
         animal_id: str = None,
         genotype: str = None,
-        sex: str = None,
+        sex: str = "Unknown",
         channel_names: list[str] = None,
         assume_from_number=False,
         bad_channels_dict: dict[str, list[str]] = {},
