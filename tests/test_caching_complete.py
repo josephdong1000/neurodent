@@ -680,7 +680,7 @@ class TestMNECachingOptimization:
                         mode="mne",
                         extract_func=mock_func,
                         intermediate="edf",
-                    intermediate_dir=tmpdir_path,
+                        intermediate_dir=tmpdir_path,
                         cache_policy=cache_policy,
                         manual_datetimes=manual_dt,
                         datetimes_are_start=True,

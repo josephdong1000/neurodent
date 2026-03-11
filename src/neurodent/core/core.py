@@ -1211,9 +1211,10 @@ class LongRecordingOrganizer:
         )
 
         # Determine directory for intermediate files
-        # Priority: intermediate_dir parameter > temp directory > source file directory (legacy)
+        # Priority: intermediate_dir parameter > temp directory
+        use_temp_dir = intermediate_dir is None
         if intermediate_dir is not None:
-            # User specified directory
+            # User specified directory - always keep files for reuse
             base_dir = Path(intermediate_dir)
             base_dir.mkdir(parents=True, exist_ok=True)
         else:
@@ -1241,6 +1242,21 @@ class LongRecordingOrganizer:
         self.meta = metadata
         self.channel_names = self.meta.channel_names
         self.LongRecording = self._apply_resampling(rec)
+
+        # Clean up intermediate files if using temp directory with force_regenerate policy
+        # This integrates cleanup with cache policy: files are only kept when caching is intended
+        if use_temp_dir and cache_policy == "force_regenerate":
+            # Remove intermediate files since they won't be reused
+            meta_fname = fname.with_suffix(fname.suffix + ".meta.json")
+            try:
+                if fname.exists():
+                    fname.unlink()
+                    logging.debug(f"Cleaned up intermediate file: {fname}")
+                if meta_fname.exists():
+                    meta_fname.unlink()
+                    logging.debug(f"Cleaned up metadata file: {meta_fname}")
+            except Exception as e:
+                logging.warning(f"Failed to clean up intermediate files: {e}")
 
         if not hasattr(self, "file_durations") or not self.file_durations:
             if hasattr(self, "_n_processed_files") and self._n_processed_files > 1:
