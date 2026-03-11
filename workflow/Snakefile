@@ -18,7 +18,7 @@ import sys
 import glob
 
 # Import workflow utilities
-from neurodent.workflow.utils import deep_merge_dict, expand_animals_config
+from neurodent.workflow.utils import deep_merge_dict, expand_animals_config, format_config_value, increment_memory
 
 
 # Load configuration
@@ -46,33 +46,6 @@ if os.path.exists(dataset_config_file):
     # Deep merge dataset config into main config
     # This allows datasets to override ANY configuration, not just specific keys
     config = deep_merge_dict(config, dataset_config)
-
-    # Report dataset configuration in user-readable format
-    def format_config_value(value, indent=4):
-        """Format a config value for display (handles nested dicts, lists, etc.)."""
-        spaces = " " * indent
-        if isinstance(value, dict):
-            if not value:
-                return "{}"
-            lines = []
-            for k, v in value.items():
-                formatted_val = format_config_value(v, indent + 2)
-                if "\n" in formatted_val:
-                    lines.append(f"{spaces}{k}:")
-                    lines.append(formatted_val)
-                else:
-                    lines.append(f"{spaces}{k}: {formatted_val}")
-            return "\n".join(lines)
-        elif isinstance(value, list):
-            if not value:
-                return "[]"
-            return f"[{', '.join(repr(v) for v in value)}]"
-        elif isinstance(value, str):
-            return f'"{value}"'
-        elif value is None:
-            return "null"
-        else:
-            return str(value)
 
     print(f"[ok] Using dataset: {active_dataset}")
     print(f"  Config file: {dataset_config_file}")
@@ -212,12 +185,6 @@ def get_joint_session_channels(wildcards):
 def get_animal_id(wildcards):
     """Get the original animal ID string."""
     return ANIMAL_TO_FULL_ID_MAP[wildcards.animal]
-
-
-def increment_memory(base_memory):
-    def mem(wildcards, attempt):
-        return base_memory * (2 ** (attempt - 1))
-    return mem
 
 
 def get_all_fragment_filtered_pkl(wildcards):
