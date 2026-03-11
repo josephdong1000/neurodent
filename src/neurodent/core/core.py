@@ -1228,35 +1228,42 @@ class LongRecordingOrganizer:
                 base_dir.mkdir(parents=True, exist_ok=True)
 
         fname = base_dir / f"{intermediate_name}.{intermediate}"
+        meta_fname = fname.with_suffix(fname.suffix + ".meta.json")
 
-        rec, _, metadata = self._get_or_create_intermediate_file(
-            fname=fname,
-            source_paths=source_paths,
-            cache_policy=cache_policy,
-            intermediate=intermediate,
-            extract_func=extract_func,
-            n_jobs=n_jobs,
-            **kwargs,
-        )
+        try:
+            rec, _, metadata = self._get_or_create_intermediate_file(
+                fname=fname,
+                source_paths=source_paths,
+                cache_policy=cache_policy,
+                intermediate=intermediate,
+                extract_func=extract_func,
+                n_jobs=n_jobs,
+                **kwargs,
+            )
 
-        self.meta = metadata
-        self.channel_names = self.meta.channel_names
-        self.LongRecording = self._apply_resampling(rec)
-
-        # Clean up intermediate files if using temp directory with force_regenerate policy
-        # This integrates cleanup with cache policy: files are only kept when caching is intended
-        if use_temp_dir and cache_policy == "force_regenerate":
-            # Remove intermediate files since they won't be reused
-            meta_fname = fname.with_suffix(fname.suffix + ".meta.json")
-            try:
-                if fname.exists():
+            self.meta = metadata
+            self.channel_names = self.meta.channel_names
+            self.LongRecording = self._apply_resampling(rec)
+        finally:
+            # Clean up intermediate files if using temp directory with force_regenerate policy
+            # This integrates cleanup with cache policy: files are only kept when caching is intended
+            if use_temp_dir and cache_policy == "force_regenerate":
+                # Remove intermediate files since they won't be reused
+                try:
                     fname.unlink()
                     logging.debug(f"Cleaned up intermediate file: {fname}")
-                if meta_fname.exists():
+                except FileNotFoundError:
+                    pass
+                except Exception as e:
+                    logging.warning(f"Failed to clean up intermediate file {fname}: {e}")
+
+                try:
                     meta_fname.unlink()
                     logging.debug(f"Cleaned up metadata file: {meta_fname}")
-            except Exception as e:
-                logging.warning(f"Failed to clean up intermediate files: {e}")
+                except FileNotFoundError:
+                    pass
+                except Exception as e:
+                    logging.warning(f"Failed to clean up metadata file {meta_fname}: {e}")
 
         if not hasattr(self, "file_durations") or not self.file_durations:
             if hasattr(self, "_n_processed_files") and self._n_processed_files > 1:
