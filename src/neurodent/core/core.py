@@ -1179,6 +1179,7 @@ class LongRecordingOrganizer:
         extract_func: Callable[..., mne.io.Raw],
         intermediate: Literal["edf", "bin"] = "edf",
         intermediate_name=None,
+        intermediate_dir=None,
         cache_policy: Literal["auto", "always", "force_regenerate"] = "auto",
         multiprocess_mode: Literal["dask", "serial"] = "serial",
         n_jobs: int = None,
@@ -1209,22 +1210,60 @@ class LongRecordingOrganizer:
             else intermediate_name
         )
 
-        base_dir = Path(source_paths[0]).parent
+        # Determine directory for intermediate files
+        # Priority: intermediate_dir parameter > temp directory
+        use_temp_dir = intermediate_dir is None
+        if intermediate_dir is not None:
+            # User specified directory - always keep files for reuse
+            base_dir = Path(intermediate_dir)
+            base_dir.mkdir(parents=True, exist_ok=True)
+        else:
+            # Use temp directory for intermediate files to avoid cluttering source directories
+            import tempfile
+            try:
+                base_dir = get_temp_directory()
+            except KeyError:
+                # Fall back to system temp directory if TMPDIR not set
+                base_dir = Path(tempfile.gettempdir()) / "neurodent_mne_cache"
+                base_dir.mkdir(parents=True, exist_ok=True)
+
         fname = base_dir / f"{intermediate_name}.{intermediate}"
+        meta_fname = fname.with_suffix(fname.suffix + ".meta.json")
 
-        rec, _, metadata = self._get_or_create_intermediate_file(
-            fname=fname,
-            source_paths=source_paths,
-            cache_policy=cache_policy,
-            intermediate=intermediate,
-            extract_func=extract_func,
-            n_jobs=n_jobs,
-            **kwargs,
-        )
+        try:
+            rec, _, metadata = self._get_or_create_intermediate_file(
+                fname=fname,
+                source_paths=source_paths,
+                cache_policy=cache_policy,
+                intermediate=intermediate,
+                extract_func=extract_func,
+                n_jobs=n_jobs,
+                **kwargs,
+            )
 
-        self.meta = metadata
-        self.channel_names = self.meta.channel_names
-        self.LongRecording = self._apply_resampling(rec)
+            self.meta = metadata
+            self.channel_names = self.meta.channel_names
+            self.LongRecording = self._apply_resampling(rec)
+        finally:
+            # Clean up intermediate files if using temp directory with force_regenerate policy
+            # This integrates cleanup with cache policy: files are only kept when caching is intended
+            if use_temp_dir and cache_policy == "force_regenerate":
+                # Remove intermediate files since they won't be reused
+                try:
+                    fname.unlink()
+                    logging.debug(f"Cleaned up intermediate file: {fname}")
+                except FileNotFoundError:
+                    pass
+                except (OSError, PermissionError) as e:
+                    logging.warning(f"Failed to clean up intermediate file {fname}: {e}")
+
+                try:
+                    meta_fname.unlink()
+                    logging.debug(f"Cleaned up metadata file: {meta_fname}")
+                except FileNotFoundError:
+                    pass
+                except (OSError, PermissionError) as e:
+                    logging.warning(f"Failed to clean up metadata file {meta_fname}: {e}")
 
         if not hasattr(self, "file_durations") or not self.file_durations:
             if hasattr(self, "_n_processed_files") and self._n_processed_files > 1:
