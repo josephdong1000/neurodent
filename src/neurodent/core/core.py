@@ -1179,6 +1179,7 @@ class LongRecordingOrganizer:
         extract_func: Callable[..., mne.io.Raw],
         intermediate: Literal["edf", "bin"] = "edf",
         intermediate_name=None,
+        intermediate_dir=None,
         cache_policy: Literal["auto", "always", "force_regenerate"] = "auto",
         multiprocess_mode: Literal["dask", "serial"] = "serial",
         n_jobs: int = None,
@@ -1209,7 +1210,22 @@ class LongRecordingOrganizer:
             else intermediate_name
         )
 
-        base_dir = Path(source_paths[0]).parent
+        # Determine directory for intermediate files
+        # Priority: intermediate_dir parameter > temp directory > source file directory (legacy)
+        if intermediate_dir is not None:
+            # User specified directory
+            base_dir = Path(intermediate_dir)
+            base_dir.mkdir(parents=True, exist_ok=True)
+        else:
+            # Use temp directory for intermediate files to avoid cluttering source directories
+            import tempfile
+            try:
+                base_dir = get_temp_directory()
+            except KeyError:
+                # Fall back to system temp directory if TMPDIR not set
+                base_dir = Path(tempfile.gettempdir()) / "neurodent_mne_cache"
+                base_dir.mkdir(parents=True, exist_ok=True)
+
         fname = base_dir / f"{intermediate_name}.{intermediate}"
 
         rec, _, metadata = self._get_or_create_intermediate_file(

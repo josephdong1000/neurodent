@@ -975,7 +975,7 @@ class TestLongRecordingOrganizer:
         with patch("spikeinterface.extractors.read_binary", return_value=mock_si_rec):
             organizer.item = str(test_file)
             organizer.convert_file_with_mne_to_recording(
-                extract_func=mock_extract, intermediate="bin"
+                extract_func=mock_extract, intermediate="bin", intermediate_dir=temp_dir
             )
 
         # Verify binary file was created and read
