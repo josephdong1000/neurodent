@@ -210,6 +210,11 @@ jobs:
         echo "=== Verify .nojekyll exists ==="
         ls -la build/html/.nojekyll
 
+    - name: Remove Sphinx build artifacts before deploy
+      run: |
+        find build/html -name '.doctrees' -type d -exec rm -rf {} + 2>/dev/null || true
+        find build/html -name 'environment.pickle' -delete 2>/dev/null || true
+
     - name: Deploy to GitHub Pages
       uses: peaceiris/actions-gh-pages@v4
       with:

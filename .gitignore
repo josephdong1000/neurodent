@@ -60,6 +60,8 @@ CLAUDE.md
 config/config.local.yaml
 
 docs/_build/
+*.doctree
+environment.pickle
 docs/quickstart/output/
 **/generated/
 .snakemake/
