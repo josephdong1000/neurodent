@@ -1254,7 +1254,7 @@ class LongRecordingOrganizer:
                     logging.debug(f"Cleaned up intermediate file: {fname}")
                 except FileNotFoundError:
                     pass
-                except Exception as e:
+                except (OSError, PermissionError) as e:
                     logging.warning(f"Failed to clean up intermediate file {fname}: {e}")
 
                 try:
@@ -1262,7 +1262,7 @@ class LongRecordingOrganizer:
                     logging.debug(f"Cleaned up metadata file: {meta_fname}")
                 except FileNotFoundError:
                     pass
-                except Exception as e:
+                except (OSError, PermissionError) as e:
                     logging.warning(f"Failed to clean up metadata file {meta_fname}: {e}")
 
         if not hasattr(self, "file_durations") or not self.file_durations:

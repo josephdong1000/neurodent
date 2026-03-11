@@ -432,7 +432,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                                 item, **base_lro_kwargs
                             )
                             item_lro_pairs.append((item, temp_lro))
-                        except Exception as e:
+                        except (FileNotFoundError, OSError, ValueError, ImportError, AttributeError, TypeError) as e:
                             logging.warning(
                                 f"Failed to create temp LRO for duration estimation in {self._get_item_name(item)}: {e}"
                             )
@@ -812,7 +812,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                         f"LRO {i}: {start_time} -> {end_time} "
                         f"(duration: {duration:.1f}s, items: {n_files}, item: {name})"
                     )
-                except Exception as e:
+                except (AttributeError, TypeError, IndexError, ValueError) as e:
                     lines.append(f"Failed to get timeline info for LRO {i}: {e}")
 
         logging.info("\n".join(lines))
@@ -885,7 +885,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                         ),
                     }
                 )
-            except Exception as e:
+            except (AttributeError, TypeError, ValueError) as e:
                 import logging
 
                 logging.warning(f"Failed to get timeline metrics for LRO {i}: {e}")
@@ -1019,7 +1019,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                             median_time_str = "no timestamps"
                     else:
                         median_time_str = "no timestamps"
-                except Exception:
+                except (AttributeError, TypeError, ValueError):
                     median_time_str = "error"
 
                 # Handle mock objects gracefully for duration
