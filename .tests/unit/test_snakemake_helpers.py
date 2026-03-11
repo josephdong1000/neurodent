@@ -21,52 +21,14 @@ Running
 
 """
 
-import textwrap
 from pathlib import Path
 
 import pytest
 import yaml
 
+from neurodent.workflow.utils import format_config_value, increment_memory
 
-# ---------------------------------------------------------------------------
-# Helpers copied from workflow/Snakefile so they can be tested without
-# importing the Snakefile itself (which requires Snakemake runtime).
-# Any change to these functions in the Snakefile should be reflected here.
-# ---------------------------------------------------------------------------
-
-
-def format_config_value(value, indent=4):
-    """Format a config value for display (handles nested dicts, lists, etc.)."""
-    spaces = " " * indent
-    if isinstance(value, dict):
-        if not value:
-            return "{}"
-        lines = []
-        for k, v in value.items():
-            formatted_val = format_config_value(v, indent + 2)
-            if "\n" in formatted_val:
-                lines.append(f"{spaces}{k}:")
-                lines.append(formatted_val)
-            else:
-                lines.append(f"{spaces}{k}: {formatted_val}")
-        return "\n".join(lines)
-    elif isinstance(value, list):
-        if not value:
-            return "[]"
-        return f"[{', '.join(repr(v) for v in value)}]"
-    elif isinstance(value, str):
-        return f'"{value}"'
-    elif value is None:
-        return "null"
-    else:
-        return str(value)
-
-
-def increment_memory(base_memory):
-    """Return a callable ``mem(wildcards, attempt)`` that doubles on each retry."""
-    def mem(wildcards, attempt):
-        return base_memory * (2 ** (attempt - 1))
-    return mem
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 # ---------------------------------------------------------------------------
@@ -140,8 +102,6 @@ class TestIncrementMemory:
 # Tests: config schema is well-formed YAML
 # ---------------------------------------------------------------------------
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-
 
 class TestConfigSchema:
     """Smoke-test that pipeline configuration files are valid YAML."""
@@ -167,4 +127,6 @@ class TestConfigSchema:
         path = REPO_ROOT / "config" / "datasets" / f"{dataset}.yaml"
         with open(path) as f:
             cfg = yaml.safe_load(f)
-        assert cfg is None or isinstance(cfg, dict)
+        assert isinstance(cfg, dict), (
+            f"Dataset config '{dataset}' should be a non-empty YAML mapping"
+        )
