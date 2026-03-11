@@ -168,7 +168,7 @@ class TestComputeGlobalTimelineIntegration:
     @pytest.fixture
     def synthetic_nwb_dataset(self, tmp_path):
         """Create a synthetic NWB dataset for integration testing."""
-        from tests.data.generate import create_synthetic_dataset
+        from tests.integration.generate import create_synthetic_dataset
 
         return create_synthetic_dataset(tmp_path)
 

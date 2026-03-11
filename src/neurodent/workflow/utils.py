@@ -567,3 +567,50 @@ def apply_path_overrides(base_config: dict, overrides: dict) -> dict:
         target[keys[-1]] = value
 
     return result
+
+
+# ---------------------------------------------------------------------------
+# Snakefile helpers
+# ---------------------------------------------------------------------------
+# These pure helpers are used by the Snakefile but live here so they can be
+# imported and unit-tested without requiring the Snakemake runtime.
+
+
+def format_config_value(value, indent=4):
+    """Format a config value for display (handles nested dicts, lists, etc.)."""
+    spaces = " " * indent
+    if isinstance(value, dict):
+        if not value:
+            return "{}"
+        lines = []
+        for k, v in value.items():
+            formatted_val = format_config_value(v, indent + 2)
+            if "\n" in formatted_val:
+                lines.append(f"{spaces}{k}:")
+                lines.append(formatted_val)
+            else:
+                lines.append(f"{spaces}{k}: {formatted_val}")
+        return "\n".join(lines)
+    elif isinstance(value, list):
+        if not value:
+            return "[]"
+        return f"[{', '.join(repr(v) for v in value)}]"
+    elif isinstance(value, str):
+        return f'"{value}"'
+    elif value is None:
+        return "null"
+    else:
+        return str(value)
+
+
+def increment_memory(base_memory):
+    """Return a callable ``mem(wildcards, attempt)`` that doubles on each retry.
+
+    Used by Snakemake rules to exponentially increase memory on retries::
+
+        resources:
+            mem_mb=increment_memory(4000),
+    """
+    def mem(wildcards, attempt):
+        return base_memory * (2 ** (attempt - 1))
+    return mem

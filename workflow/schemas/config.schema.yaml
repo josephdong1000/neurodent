@@ -1,0 +1,32 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+# TODO: This schema is a work in progress and should be extended to cover
+# all supported configuration keys as the pipeline evolves.
+description: Configuration schema for the neurodent Snakemake pipeline
+type: object
+required:
+  - temp_directory
+  - samples
+  - analysis
+properties:
+  temp_directory:
+    type: string
+    description: Path to temporary directory for intermediate files
+  active_dataset:
+    type: string
+    description: Name of the active dataset configuration
+  samples:
+    type: object
+    properties:
+      truncate_animals:
+        description: Limit to first N animals (null for no limit)
+        type: ["integer", "null"]
+      quality_filter:
+        type: object
+        properties:
+          exclude_unknown_genotypes:
+            type: boolean
+          exclude_bad_animaldays:
+            type: boolean
+  analysis:
+    type: object
+    description: Analysis parameters

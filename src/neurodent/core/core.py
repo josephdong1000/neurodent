@@ -684,7 +684,7 @@ class LongRecordingOrganizer:
                (for ``mode="mne"``).  Example: ``"read_intan"``.
             2. **File path** (contains ``:``) — loads a function directly from
                a Python file.  The ``.py`` extension is required.
-               Example: ``"tests/data/readers.py:read_bin_csv_pair"`` or
+               Example: ``"tests/integration/readers.py:read_bin_csv_pair"`` or
                ``"/absolute/path/to/readers.py:my_func"``.
         **kwargs
             Forwarded to the backend loading method.

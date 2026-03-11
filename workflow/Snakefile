@@ -18,7 +18,7 @@ import sys
 import glob
 
 # Import workflow utilities
-from neurodent.workflow.utils import deep_merge_dict, expand_animals_config
+from neurodent.workflow.utils import deep_merge_dict, expand_animals_config, format_config_value, increment_memory
 
 
 # Load configuration
@@ -47,33 +47,6 @@ if os.path.exists(dataset_config_file):
     # This allows datasets to override ANY configuration, not just specific keys
     config = deep_merge_dict(config, dataset_config)
 
-    # Report dataset configuration in user-readable format
-    def format_config_value(value, indent=4):
-        """Format a config value for display (handles nested dicts, lists, etc.)."""
-        spaces = " " * indent
-        if isinstance(value, dict):
-            if not value:
-                return "{}"
-            lines = []
-            for k, v in value.items():
-                formatted_val = format_config_value(v, indent + 2)
-                if "\n" in formatted_val:
-                    lines.append(f"{spaces}{k}:")
-                    lines.append(formatted_val)
-                else:
-                    lines.append(f"{spaces}{k}: {formatted_val}")
-            return "\n".join(lines)
-        elif isinstance(value, list):
-            if not value:
-                return "[]"
-            return f"[{', '.join(repr(v) for v in value)}]"
-        elif isinstance(value, str):
-            return f'"{value}"'
-        elif value is None:
-            return "null"
-        else:
-            return str(value)
-
     print(f"[ok] Using dataset: {active_dataset}")
     print(f"  Config file: {dataset_config_file}")
     print(f"\n  Dataset configuration overrides:")
@@ -89,6 +62,10 @@ else:
         f"Dataset config file not found: {dataset_config_file}\n"
         f"Available datasets: {', '.join(available_datasets) if available_datasets else 'None'}"
     )
+
+# Configuration validation (run after dataset config is merged)
+from snakemake.utils import validate
+validate(config, schema="schemas/config.schema.yaml")
 
 samples_file = config["samples"]["samples_file"]
 
@@ -210,12 +187,6 @@ def get_animal_id(wildcards):
     return ANIMAL_TO_FULL_ID_MAP[wildcards.animal]
 
 
-def increment_memory(base_memory):
-    def mem(wildcards, attempt):
-        return base_memory * (2 ** (attempt - 1))
-    return mem
-
-
 def get_all_fragment_filtered_pkl(wildcards):
     out = []
     for anim in ANIMALS:
@@ -331,21 +302,21 @@ wildcard_constraints:
 
 
 # Include rule definitions
-include: "workflow/rules/war_generation.smk"
-include: "workflow/rules/fdsar_diagnostics.smk"
-include: "workflow/rules/war_quality_filter.smk"
-include: "workflow/rules/war_standardize.smk"
-include: "workflow/rules/war_fragment_filtering.smk"
-include: "workflow/rules/war_channel_filtering.smk"
-include: "workflow/rules/diagnostic_figures.smk"
-include: "workflow/rules/war_flattening.smk"
-include: "workflow/rules/war_zeitgeber.smk"
-include: "workflow/rules/zeitgeber_plots.smk"
-include: "workflow/rules/war_relfreq_plots.smk"
-include: "workflow/rules/ep_analysis.smk"
-include: "workflow/rules/lof_evaluation.smk"
-include: "workflow/rules/filtering_comparison.smk"
-include: "workflow/rules/notebook.smk"
+include: "rules/war_generation.smk"
+include: "rules/fdsar_diagnostics.smk"
+include: "rules/war_quality_filter.smk"
+include: "rules/war_standardize.smk"
+include: "rules/war_fragment_filtering.smk"
+include: "rules/war_channel_filtering.smk"
+include: "rules/diagnostic_figures.smk"
+include: "rules/war_flattening.smk"
+include: "rules/war_zeitgeber.smk"
+include: "rules/zeitgeber_plots.smk"
+include: "rules/war_relfreq_plots.smk"
+include: "rules/ep_analysis.smk"
+include: "rules/lof_evaluation.smk"
+include: "rules/filtering_comparison.smk"
+include: "rules/notebook.smk"
 
 
 rule all:
@@ -408,16 +379,3 @@ rule dag:
     shell: "snakemake --dag --forceall | dot -Tpng > {output}"
 
 localrules: graphs, rulegraph, filegraph, dag
-
-
-
-# Configuration validation
-# FIXME better to define in a json/yaml schema
-def validate_config():
-    required_keys = ["temp_directory"]  # data_root now in samples.json
-    for key in required_keys:
-        if key not in config:
-            raise ValueError(f"Missing required config key: {key}")
-
-
-validate_config()

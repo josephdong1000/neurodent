@@ -1,0 +1,28 @@
+name: Snakemake Tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  integration-test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          uv sync --all-extras
+      - name: Snakemake unit and dry-run tests
+        run: |
+          uv run pytest .tests/ -v
+      - name: Snakemake integration run (mini_real dataset)
+        run: |
+          NEURODENT_DATASET=mini_real uv run snakemake --snakefile workflow/Snakefile --cores 1
