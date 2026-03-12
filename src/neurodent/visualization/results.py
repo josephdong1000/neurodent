@@ -3933,7 +3933,12 @@ class WindowAnalysisResult(AnimalFeatureParser):
         if "isday" not in groupby:
             agg_dict["isday"] = lambda df: None
 
-        constant_cols = ["animal", "day", "genotype"]
+        special_agg_cols = {"animalday", "isday", "duration", "endfile", "timestamp"}
+        constant_cols = [
+            col
+            for col in self._nonfeature_columns
+            if col not in groupby and col not in special_agg_cols
+        ]
         for col in constant_cols:
             if col in self.result.columns:
                 is_constant = result_grouped[col].nunique() == 1
