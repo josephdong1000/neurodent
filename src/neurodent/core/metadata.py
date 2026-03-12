@@ -9,6 +9,16 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
+# Canonical sex values used throughout the pipeline (must match DF_SORT_ORDER).
+_SEX_NORMALIZATION = {
+    "M": "Male",
+    "F": "Female",
+    "m": "Male",
+    "f": "Female",
+    "male": "Male",
+    "female": "Female",
+}
+
 
 def load_animal_metadata(samples_config: dict) -> dict:
     """
@@ -42,6 +52,10 @@ def load_animal_metadata(samples_config: dict) -> dict:
         # This preserves backward compatibility with code expecting these keys
         if "sex" not in metadata_dict[animal_id]:
             metadata_dict[animal_id]["sex"] = None
+        else:
+            # Normalize sex abbreviations to canonical form (e.g. "M" -> "Male")
+            raw_sex = metadata_dict[animal_id]["sex"]
+            metadata_dict[animal_id]["sex"] = _SEX_NORMALIZATION.get(raw_sex, raw_sex)
         if "gene" not in metadata_dict[animal_id]:
             metadata_dict[animal_id]["gene"] = None
     
