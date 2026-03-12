@@ -577,6 +577,33 @@ class LongRecordingOrganizer:
                 **kwargs,
             )
 
+    @staticmethod
+    def _extract_channel_names(recording: "si.BaseRecording") -> list[str]:
+        """Extract human-readable channel names from a SpikeInterface recording.
+
+        Prefers the ``channel_name`` property (set by extractors like
+        ``read_edf``) over raw channel IDs, which are often opaque
+        integer indices.
+
+        Args:
+            recording: A SpikeInterface recording.
+
+        Returns:
+            List of channel name strings.
+        """
+        try:
+            prop_keys = recording.get_property_keys()
+            if "channel_name" in prop_keys:
+                names = recording.get_property("channel_name")
+                return [str(n) for n in names]
+        except (AttributeError, TypeError):
+            pass
+
+        raw_ids = recording.get_channel_ids()
+        if len(raw_ids) > 0 and isinstance(raw_ids[0], (int, np.integer)):
+            logging.warning("Channel IDs are integers. Converting to strings.")
+        return [str(ch) for ch in raw_ids]
+
     def _init_from_recording(self, recording: "si.BaseRecording"):
         """Initialize LRO from an existing SpikeInterface recording object (in-memory)."""
         # Enforce global dtype and resampling
@@ -586,8 +613,7 @@ class LongRecordingOrganizer:
         self._is_in_memory = True
 
         # Extract metadata from recording
-        channel_ids = recording.get_channel_ids()
-        self.channel_names = [str(ch) for ch in channel_ids]
+        self.channel_names = self._extract_channel_names(recording)
 
         self.meta = RecordingMetadata(
             None,
@@ -815,12 +841,7 @@ class LongRecordingOrganizer:
         self.LongRecording = self._apply_resampling(rec)
 
         dt_end = None
-        raw_channel_ids = self.LongRecording.get_channel_ids()
-        if len(raw_channel_ids) > 0 and isinstance(
-            raw_channel_ids[0], (int, np.integer)
-        ):
-            logging.warning("Channel IDs are integers. Converting to strings.")
-        channel_names = [str(ch) for ch in raw_channel_ids]
+        channel_names = self._extract_channel_names(self.LongRecording)
 
         self.meta = RecordingMetadata(
             None,
@@ -1179,6 +1200,7 @@ class LongRecordingOrganizer:
         extract_func: Callable[..., mne.io.Raw],
         intermediate: Literal["edf", "bin"] = "edf",
         intermediate_name=None,
+        intermediate_dir=None,
         cache_policy: Literal["auto", "always", "force_regenerate"] = "auto",
         multiprocess_mode: Literal["dask", "serial"] = "serial",
         n_jobs: int = None,
@@ -1209,22 +1231,60 @@ class LongRecordingOrganizer:
             else intermediate_name
         )
 
-        base_dir = Path(source_paths[0]).parent
+        # Determine directory for intermediate files
+        # Priority: intermediate_dir parameter > temp directory
+        use_temp_dir = intermediate_dir is None
+        if intermediate_dir is not None:
+            # User specified directory - always keep files for reuse
+            base_dir = Path(intermediate_dir)
+            base_dir.mkdir(parents=True, exist_ok=True)
+        else:
+            # Use temp directory for intermediate files to avoid cluttering source directories
+            import tempfile
+            try:
+                base_dir = get_temp_directory()
+            except KeyError:
+                # Fall back to system temp directory if TMPDIR not set
+                base_dir = Path(tempfile.gettempdir()) / "neurodent_mne_cache"
+                base_dir.mkdir(parents=True, exist_ok=True)
+
         fname = base_dir / f"{intermediate_name}.{intermediate}"
+        meta_fname = fname.with_suffix(fname.suffix + ".meta.json")
 
-        rec, _, metadata = self._get_or_create_intermediate_file(
-            fname=fname,
-            source_paths=source_paths,
-            cache_policy=cache_policy,
-            intermediate=intermediate,
-            extract_func=extract_func,
-            n_jobs=n_jobs,
-            **kwargs,
-        )
+        try:
+            rec, _, metadata = self._get_or_create_intermediate_file(
+                fname=fname,
+                source_paths=source_paths,
+                cache_policy=cache_policy,
+                intermediate=intermediate,
+                extract_func=extract_func,
+                n_jobs=n_jobs,
+                **kwargs,
+            )
 
-        self.meta = metadata
-        self.channel_names = self.meta.channel_names
-        self.LongRecording = self._apply_resampling(rec)
+            self.meta = metadata
+            self.channel_names = self.meta.channel_names
+            self.LongRecording = self._apply_resampling(rec)
+        finally:
+            # Clean up intermediate files if using temp directory with force_regenerate policy
+            # This integrates cleanup with cache policy: files are only kept when caching is intended
+            if use_temp_dir and cache_policy == "force_regenerate":
+                # Remove intermediate files since they won't be reused
+                try:
+                    fname.unlink()
+                    logging.debug(f"Cleaned up intermediate file: {fname}")
+                except FileNotFoundError:
+                    pass
+                except (OSError, PermissionError) as e:
+                    logging.warning(f"Failed to clean up intermediate file {fname}: {e}")
+
+                try:
+                    meta_fname.unlink()
+                    logging.debug(f"Cleaned up metadata file: {meta_fname}")
+                except FileNotFoundError:
+                    pass
+                except (OSError, PermissionError) as e:
+                    logging.warning(f"Failed to clean up metadata file {meta_fname}: {e}")
 
         if not hasattr(self, "file_durations") or not self.file_durations:
             if hasattr(self, "_n_processed_files") and self._n_processed_files > 1:

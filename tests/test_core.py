@@ -730,6 +730,42 @@ class TestLongRecordingOrganizer:
             call_args = mock_decimate.call_args[0]
             assert call_args[0].dtype == np.float16
 
+    def test_extract_channel_names_prefers_channel_name_property(self):
+        """Test _extract_channel_names uses channel_name property when available."""
+        mock_recording = Mock()
+        mock_recording.get_property_keys.return_value = ["channel_name", "gain_to_uV"]
+        mock_recording.get_property.return_value = np.array(["C-009", "C-010", "C-012"])
+
+        names = LongRecordingOrganizer._extract_channel_names(mock_recording)
+        assert names == ["C-009", "C-010", "C-012"]
+
+    def test_extract_channel_names_falls_back_to_channel_ids(self):
+        """Test _extract_channel_names falls back to get_channel_ids when no channel_name property."""
+        mock_recording = Mock()
+        mock_recording.get_property_keys.return_value = ["gain_to_uV"]
+        mock_recording.get_channel_ids.return_value = np.array(["ch1", "ch2"])
+
+        names = LongRecordingOrganizer._extract_channel_names(mock_recording)
+        assert names == ["ch1", "ch2"]
+
+    def test_extract_channel_names_handles_mock_without_properties(self):
+        """Test _extract_channel_names handles recordings without get_property_keys."""
+        mock_recording = Mock()
+        # Mock's get_property_keys returns a Mock (not iterable)
+        mock_recording.get_channel_ids.return_value = np.array(["a", "b"])
+
+        names = LongRecordingOrganizer._extract_channel_names(mock_recording)
+        assert names == ["a", "b"]
+
+    def test_extract_channel_names_with_integer_ids(self):
+        """Test _extract_channel_names converts integer IDs to strings."""
+        mock_recording = Mock()
+        mock_recording.get_property_keys.return_value = []
+        mock_recording.get_channel_ids.return_value = np.array([0, 1, 2])
+
+        names = LongRecordingOrganizer._extract_channel_names(mock_recording)
+        assert names == ["0", "1", "2"]
+
     def test_convert_file_with_si_to_recording_folder_mode(self, temp_dir):
         """Test convert_file_with_si_to_recording with folder input."""
         from datetime import datetime
@@ -975,7 +1011,7 @@ class TestLongRecordingOrganizer:
         with patch("spikeinterface.extractors.read_binary", return_value=mock_si_rec):
             organizer.item = str(test_file)
             organizer.convert_file_with_mne_to_recording(
-                extract_func=mock_extract, intermediate="bin"
+                extract_func=mock_extract, intermediate="bin", intermediate_dir=temp_dir
             )
 
         # Verify binary file was created and read
@@ -1538,3 +1574,4 @@ class TestZeroSampleRecordingCheck:
             organizer.convert_file_with_si_to_recording(extract_func)
 
         assert not any("0-sample recording" in msg for msg in caplog.messages)
+
