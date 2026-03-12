@@ -1836,19 +1836,28 @@ class AnimalOrganizer(AnimalFeatureParser):
         return result
 
 
-def _sanitize_feature_request(features: list[str], exclude: list[str] = []):
+def _sanitize_feature_request(
+    features: list[str] | str | None, exclude: list[str] | str = []
+):
     """
     Sanitizes a list of requested features for WindowAnalysisResult
 
     Args:
-        features (list[str]): List of features to include. If "all", include all features in constants.FEATURES except for exclude.
-        exclude (list[str], optional): List of features to exclude. Defaults to [].
+        features (list[str] | str | None): List of features to include, a single feature
+            name as a string, or None to include all features. If ``"all"``, include all
+            features in constants.FEATURES except for those in ``exclude``.
+        exclude (list[str] | str, optional): Feature or list of features to exclude.
+            Defaults to [].
 
     Returns:
         list[str]: Sanitized list of features.
     """
+    if features is None:
+        features = ["all"]
     if isinstance(features, str):
         features = [features]
+    if isinstance(exclude, str):
+        exclude = [exclude]
     if features == ["all"]:
         feat = copy.deepcopy(constants.FEATURES)
     elif not features:
@@ -2332,13 +2341,18 @@ class WindowAnalysisResult(AnimalFeatureParser):
         return "\n".join(info)
 
     def get_result(
-        self, features: list[str], exclude: list[str] = [], allow_missing=False
+        self,
+        features: list[str] | str | None = None,
+        exclude: list[str] | str = [],
+        allow_missing=False,
     ):
         """Get windowed analysis result dataframe, with helpful filters
 
         Args:
-            features (list[str]): List of features to get from result
-            exclude (list[str], optional): List of features to exclude from result; will override the features parameter. Defaults to [].
+            features (list[str] | str | None, optional): Feature name, list of feature names,
+                or None to return all features. Defaults to None (all features).
+            exclude (list[str] | str, optional): Feature name or list of feature names to
+                exclude from result; will override the features parameter. Defaults to [].
             allow_missing (bool, optional): If True, will return all requested features as columns regardless if they exist in result. Defaults to False.
 
         Returns:
@@ -2352,16 +2366,18 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
     def get_groupavg_result(
         self,
-        features: list[str],
-        exclude: list[str] = [],
+        features: list[str] | str | None = None,
+        exclude: list[str] | str = [],
         df: pd.DataFrame = None,
         groupby="animalday",
     ):
         """Group result and average within groups. Preserves data structure and shape for each feature.
 
         Args:
-            features (list[str]): List of features to get from result
-            exclude (list[str], optional): List of features to exclude from result. Will override the features parameter. Defaults to [].
+            features (list[str] | str | None, optional): Feature name, list of feature names,
+                or None to return all features. Defaults to None (all features).
+            exclude (list[str] | str, optional): Feature name or list of feature names to
+                exclude from result. Will override the features parameter. Defaults to [].
             df (pd.DataFrame, optional): If not None, this function will use this dataframe instead of self.result. Defaults to None.
             groupby (str, optional): Feature or list of features to group by before averaging. Passed to the `by` parameter in pd.DataFrame.groupby(). Defaults to "animalday".
 
@@ -2388,8 +2404,8 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
     def __get_groups(
         self,
-        features: list[str],
-        exclude: list[str] = [],
+        features: list[str] | str | None = None,
+        exclude: list[str] | str = [],
         df: pd.DataFrame = None,
         groupby="animalday",
     ):
@@ -2399,8 +2415,8 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
     def get_grouprows_result(
         self,
-        features: list[str],
-        exclude: list[str] = [],
+        features: list[str] | str | None = None,
+        exclude: list[str] | str = [],
         df: pd.DataFrame = None,
         multiindex=["animalday", "animal", "genotype"],
         include=["duration", "endfile"],
@@ -2412,8 +2428,8 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
     def get_channel_averaged_result(
         self,
-        features: list[str],
-        exclude: list[str] = [],
+        features: list[str] | str | None = None,
+        exclude: list[str] | str = [],
         df: pd.DataFrame = None,
     ) -> pd.DataFrame:
         """Get windowed analysis result with features averaged across channels.
@@ -2431,9 +2447,11 @@ class WindowAnalysisResult(AnimalFeatureParser):
            (excluding diagonal). Creates columns like: zcohere_delta, zcohere_theta, etc.
 
         Args:
-            features (list[str]): List of feature names to extract and average.
-                Can include any combination of linear, band, or matrix features.
-            exclude (list[str], optional): List of features to exclude. Defaults to [].
+            features (list[str] | str | None, optional): Feature name, list of feature names,
+                or None to return all features. Can include any combination of linear, band,
+                or matrix features. Defaults to None (all features).
+            exclude (list[str] | str, optional): Feature name or list of feature names to
+                exclude. Defaults to [].
             df (pd.DataFrame, optional): If provided, use this dataframe instead of
                 self.result. Defaults to None.
 

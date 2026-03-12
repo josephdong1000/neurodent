@@ -176,7 +176,7 @@ class RecordingMetadata:
     def to_dict(self) -> dict:
         """Convert RecordingMetadata to a dictionary for JSON serialization."""
         return {
-            "metadata_path": str(self.metadata_path) if self.metadata_path else None,
+            "metadata_path": Path(self.metadata_path).as_posix() if self.metadata_path else None,
             "n_channels": self.n_channels,
             "f_s": self.f_s,
             "V_units": self.V_units,
