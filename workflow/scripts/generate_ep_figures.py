@@ -26,7 +26,6 @@ from seaborn import axes_style
 from neurodent import visualization, constants
 from neurodent.workflow import setup_snakemake_logging, load_wars, inject_config_aliases
 
-
 def infer_metadata_columns(df):
     """
     Add 'gene' column from genotype. Sex is expected to already be present from WAR data.
@@ -37,7 +36,6 @@ def infer_metadata_columns(df):
     if "genotype" in df.columns:
         df["gene"] = df["genotype"]
     return df
-
 
 def process_feature_dataframe(df, feature):
     """Process feature dataframe by adding categorical columns and pivoting.
@@ -98,7 +96,6 @@ def process_feature_dataframe(df, feature):
 
     return df, df_pivot
 
-
 def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config):
     """Create plots for a specific feature using seaborn objects"""
 
@@ -114,20 +111,20 @@ def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
         # Pipeline 1: Pull averaged data for traditional plots (1 point per animal)
         if feature == "normpsd":
             df_avg = ep.pull_timeseries_dataframe(
-                feature="psd", groupby=["animal", "genotype", "isday"], collapse_channels=True, average_groupby=True
+                feature="psd", groupby=["animal", "genotype", "sex", "isday"], collapse_channels=True, average_groupby=True
             )
             df_total = ep.pull_timeseries_dataframe(
                 feature="psdtotal",
-                groupby=["animal", "genotype", "isday"],
+                groupby=["animal", "genotype", "sex", "isday"],
                 collapse_channels=True,
                 average_groupby=True,
             )
 
-            df_avg = df_avg.merge(df_total, on=["animal", "genotype", "channel"], suffixes=("", "_total"))
+            df_avg = df_avg.merge(df_total, on=["animal", "genotype", "sex", "channel"], suffixes=("", "_total"))
             df_avg["normpsd"] = df_avg["psd"] / df_avg["psdtotal"]
         else:
             df_avg = ep.pull_timeseries_dataframe(
-                feature=feature, groupby=["animal", "genotype", "isday"], collapse_channels=True, average_groupby=True
+                feature=feature, groupby=["animal", "genotype", "sex", "isday"], collapse_channels=True, average_groupby=True
             )
 
         # Process averaged dataframe (adds sex and gene columns)
@@ -227,7 +224,6 @@ def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
         logger.error(f"Failed to process feature {feature}: {str(e)}")
         raise
 
-
 def main():
     """Main EP figures generation function"""
     global snakemake
@@ -295,8 +291,8 @@ def main():
         "zimcoh": "z(Imaginary Coherencey)",
         "logpsdfrac": "Log Percent Power",
         "logpsdband": "Log Band Power",
-        "psdband": "Band Power ($\\mu V^2$)",
-        "psd": "PSD ($\\mu V^2/Hz$)",
+        "psdband": "Band Power ($\mu V^2$)",
+        "psd": "PSD ($\mu V^2/Hz$)",
         "normpsd": "Normalized PSD",
         "nspike": "n_spike / t_window",
         "lognspike": "Log(n_spike / t_window)",
@@ -311,7 +307,6 @@ def main():
 
         create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
     logger.info(f"Successfully generated EP statistical figures for {len(features)} features")
-
 
 if __name__ == "__main__":
     main()
