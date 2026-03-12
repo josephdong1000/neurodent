@@ -191,10 +191,47 @@ class TestWindowAnalysisResult:
         assert "psdtotal" in result.columns
         assert "animal" in result.columns  # Metadata columns should be included
 
+    def test_get_result_default_all(self, war):
+        """Test that get_result() with no args returns all features."""
+        result = war.get_result(allow_missing=True)
+        assert "rms" in result.columns
+        assert "psdtotal" in result.columns
+        assert "animal" in result.columns
+
+    def test_get_result_string_input(self, war):
+        """Test that get_result() accepts a single string feature."""
+        result = war.get_result("rms")
+        assert "rms" in result.columns
+        assert "animal" in result.columns
+
     def test_get_groupavg_result(self, war):
         """Test getting group average results."""
         # Use groupby on 'animalday' to avoid single-group scalar reduction
         result = war.get_groupavg_result(["rms"], groupby="animalday")
+        assert isinstance(result, pd.DataFrame)
+        assert "rms" in result.columns
+
+    def test_get_groupavg_result_default_all(self, war):
+        """Test that get_groupavg_result() with no args returns all features."""
+        result = war.get_groupavg_result(groupby="animalday")
+        assert isinstance(result, pd.DataFrame)
+        assert "rms" in result.columns
+
+    def test_get_groupavg_result_string_input(self, war):
+        """Test that get_groupavg_result() accepts a single string feature."""
+        result = war.get_groupavg_result("rms", groupby="animalday")
+        assert isinstance(result, pd.DataFrame)
+        assert "rms" in result.columns
+
+    def test_get_grouprows_result_default_all(self, war):
+        """Test that get_grouprows_result() with no args returns all features."""
+        result = war.get_grouprows_result()
+        assert isinstance(result, pd.DataFrame)
+        assert "rms" in result.columns
+
+    def test_get_grouprows_result_string_input(self, war):
+        """Test that get_grouprows_result() accepts a single string feature."""
+        result = war.get_grouprows_result("rms")
         assert isinstance(result, pd.DataFrame)
         assert "rms" in result.columns
 
