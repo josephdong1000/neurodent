@@ -3244,15 +3244,22 @@ class WindowAnalysisResult(AnimalFeatureParser):
             self.lof_scores_dict.copy(),
         )
 
-    def _create_filtered_copy(self, filter_mask: np.ndarray) -> "WindowAnalysisResult":
+    def _create_filtered_copy(
+        self, filter_mask: np.ndarray, filter_name: str = None
+    ) -> "WindowAnalysisResult":
         """Create a new WindowAnalysisResult with the filter applied.
 
         Args:
             filter_mask (np.ndarray): Boolean mask of shape (n_windows, n_channels)
+            filter_name (str, optional): Name of the filter for logging. Defaults to None.
 
         Returns:
             WindowAnalysisResult: New instance with filter applied
         """
+        if filter_name is not None:
+            logging.info(
+                f"{filter_name}: filtered {filter_mask.size - np.count_nonzero(filter_mask)}/{filter_mask.size}"
+            )
         filtered_result = self._apply_filter(filter_mask)
         return WindowAnalysisResult(
             filtered_result,
@@ -3275,7 +3282,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             WindowAnalysisResult: New filtered instance
         """
         mask = self.get_filter_logrms_range(z_range=z_range)
-        return self._create_filtered_copy(mask)
+        return self._create_filtered_copy(mask, filter_name="logrms_range")
 
     def filter_high_rms(self, max_rms: float = 500) -> "WindowAnalysisResult":
         """Filter out windows with RMS above threshold.
@@ -3287,7 +3294,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             WindowAnalysisResult: New filtered instance
         """
         mask = self.get_filter_high_rms(max_rms=max_rms)
-        return self._create_filtered_copy(mask)
+        return self._create_filtered_copy(mask, filter_name="high_rms")
 
     def filter_low_rms(self, min_rms: float = 50) -> "WindowAnalysisResult":
         """Filter out windows with RMS below threshold.
@@ -3299,7 +3306,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             WindowAnalysisResult: New filtered instance
         """
         mask = self.get_filter_low_rms(min_rms=min_rms)
-        return self._create_filtered_copy(mask)
+        return self._create_filtered_copy(mask, filter_name="low_rms")
 
     def filter_high_beta(self, max_beta_prop: float = 0.4) -> "WindowAnalysisResult":
         """Filter out windows with high beta power.
@@ -3311,7 +3318,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             WindowAnalysisResult: New filtered instance
         """
         mask = self.get_filter_high_beta(max_beta_prop=max_beta_prop)
-        return self._create_filtered_copy(mask)
+        return self._create_filtered_copy(mask, filter_name="high_beta")
 
     def filter_reject_channels(
         self, bad_channels: list[str], use_abbrevs: bool = None
@@ -3328,7 +3335,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         mask = self.get_filter_reject_channels(
             bad_channels=bad_channels, use_abbrevs=use_abbrevs
         )
-        return self._create_filtered_copy(mask)
+        return self._create_filtered_copy(mask, filter_name="reject_channels")
 
     def filter_reject_channels_by_session(
         self, bad_channels_dict: dict[str, list[str]] = None, use_abbrevs: bool = None
@@ -3382,7 +3389,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         mask = self.get_filter_reject_channels_by_recording_session(
             bad_channels_dict=bad_channels_dict, use_abbrevs=use_abbrevs
         )
-        return self._create_filtered_copy(mask)
+        return self._create_filtered_copy(mask, filter_name="reject_channels_by_session")
 
     def apply_filters(
         self,
