@@ -204,6 +204,29 @@ class TestWindowAnalysisResult:
         assert "rms" in result.columns
         assert "animal" in result.columns
 
+    def test_get_result_exclude_with_none_features(self, war):
+        """Test that exclude works when features=None (all features except excluded)."""
+        result = war.get_result(exclude="rms", allow_missing=True)
+        assert "rms" not in result.columns
+        assert "psdtotal" in result.columns
+        assert "animal" in result.columns
+
+    def test_get_result_feature_fully_excluded(self, war):
+        """Test get_result when the only requested feature is also excluded returns no feature columns."""
+        result = war.get_result(features="rms", exclude="rms")
+        from neurodent import constants
+
+        for col in result.columns:
+            assert col not in constants.FEATURES
+
+    def test_get_result_exclude_superset_of_features(self, war):
+        """Test get_result when exclude contains feature(s) not in features list returns no feature columns."""
+        result = war.get_result(features="rms", exclude=["rms", "psdtotal"])
+        from neurodent import constants
+
+        for col in result.columns:
+            assert col not in constants.FEATURES
+
     def test_get_groupavg_result(self, war):
         """Test getting group average results."""
         # Use groupby on 'animalday' to avoid single-group scalar reduction
