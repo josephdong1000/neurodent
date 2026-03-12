@@ -3261,16 +3261,17 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 f"{filter_name}: filtered {filter_mask.size - np.count_nonzero(filter_mask)}/{filter_mask.size}"
             )
         filtered_result = self._apply_filter(filter_mask)
-        return WindowAnalysisResult(
-            filtered_result,
-            self.animal_id,
-            self.genotype,
-            self.channel_names,
-            self.assume_from_number,
-            self.bad_channels_dict.copy(),
-            self.suppress_short_interval_error,
-            self.lof_scores_dict.copy(),
-        )
+        new_war = object.__new__(WindowAnalysisResult)
+        new_war.result = filtered_result
+        new_war.animal_id = self.animal_id
+        new_war.genotype = self.genotype
+        new_war.channel_names = self.channel_names
+        new_war.assume_from_number = self.assume_from_number
+        new_war.bad_channels_dict = self.bad_channels_dict.copy()
+        new_war.suppress_short_interval_error = self.suppress_short_interval_error
+        new_war.lof_scores_dict = self.lof_scores_dict.copy()
+        new_war._WindowAnalysisResult__update_instance_vars()
+        return new_war
 
     def filter_logrms_range(self, z_range: float = 3) -> "WindowAnalysisResult":
         """Filter based on log(rms) z-score range.
@@ -3512,10 +3513,10 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     # FIXME The sampling rates have changed between computation passes so WARs have different shapes.
                     # Add a check for same sampling frequency, other war-relevant properties etc.
                     # The logging lines below should be removed at some point, but I'll keep it this way for now
-                    logging.info(
+                    logging.debug(
                         f"set([x[0].shape for x in result[feat].tolist()]) = {list(set([x[0].shape for x in result[feat].tolist()]))}"
                     )
-                    logging.info(
+                    logging.debug(
                         f"set([x[1].shape for x in result[feat].tolist()]) = {list(set([x[1].shape for x in result[feat].tolist()]))}"
                     )
                     coords = np.array([x[0] for x in result[feat].tolist()])
