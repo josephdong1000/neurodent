@@ -3481,9 +3481,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
         filter_tfs = np.array(filter_tfs, dtype=bool)  # (M fragments, N channels)
         for feat in constants.FEATURES:
             if feat not in result.columns:
-                logging.info(f"Skipping {feat} because it is not in result")
+                logging.debug(f"Skipping {feat} because it is not in result")
                 continue
-            logging.info(f"Filtering {feat}")
+            logging.debug(f"Filtering {feat}")
             match feat:  # NOTE refactor this to use constants
                 case (
                     "rms"
