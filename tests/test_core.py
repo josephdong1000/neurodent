@@ -730,6 +730,42 @@ class TestLongRecordingOrganizer:
             call_args = mock_decimate.call_args[0]
             assert call_args[0].dtype == np.float16
 
+    def test_extract_channel_names_prefers_channel_name_property(self, temp_dir):
+        """Test _extract_channel_names uses channel_name property when available."""
+        mock_recording = Mock()
+        mock_recording.get_property_keys.return_value = ["channel_name", "gain_to_uV"]
+        mock_recording.get_property.return_value = np.array(["C-009", "C-010", "C-012"])
+
+        names = LongRecordingOrganizer._extract_channel_names(mock_recording)
+        assert names == ["C-009", "C-010", "C-012"]
+
+    def test_extract_channel_names_falls_back_to_channel_ids(self, temp_dir):
+        """Test _extract_channel_names falls back to get_channel_ids when no channel_name property."""
+        mock_recording = Mock()
+        mock_recording.get_property_keys.return_value = ["gain_to_uV"]
+        mock_recording.get_channel_ids.return_value = np.array(["ch1", "ch2"])
+
+        names = LongRecordingOrganizer._extract_channel_names(mock_recording)
+        assert names == ["ch1", "ch2"]
+
+    def test_extract_channel_names_handles_mock_without_properties(self, temp_dir):
+        """Test _extract_channel_names handles recordings without get_property_keys."""
+        mock_recording = Mock()
+        # Mock's get_property_keys returns a Mock (not iterable)
+        mock_recording.get_channel_ids.return_value = np.array(["a", "b"])
+
+        names = LongRecordingOrganizer._extract_channel_names(mock_recording)
+        assert names == ["a", "b"]
+
+    def test_extract_channel_names_with_integer_ids(self, temp_dir):
+        """Test _extract_channel_names converts integer IDs to strings."""
+        mock_recording = Mock()
+        mock_recording.get_property_keys.return_value = []
+        mock_recording.get_channel_ids.return_value = np.array([0, 1, 2])
+
+        names = LongRecordingOrganizer._extract_channel_names(mock_recording)
+        assert names == ["0", "1", "2"]
+
     def test_convert_file_with_si_to_recording_folder_mode(self, temp_dir):
         """Test convert_file_with_si_to_recording with folder input."""
         from datetime import datetime
@@ -1538,3 +1574,45 @@ class TestZeroSampleRecordingCheck:
             organizer.convert_file_with_si_to_recording(extract_func)
 
         assert not any("0-sample recording" in msg for msg in caplog.messages)
+
+
+class TestWriteEdfFile:
+    """Test the _write_edf_file EDF generator."""
+
+    def test_write_edf_file_creates_valid_edf(self, tmp_path):
+        """Test that _write_edf_file creates an EDF with correct channel labels."""
+        from tests.integration.generate import _write_edf_file
+
+        edf_path = tmp_path / "test.edf"
+        result = _write_edf_file(edf_path, n_channels=4, port_letter="C", seed=42)
+
+        assert result["edf_path"] == edf_path
+        assert result["n_samples"] == 5000
+        assert edf_path.exists()
+
+        # Verify channel labels via pyedflib
+        import pyedflib
+
+        reader = pyedflib.EdfReader(str(edf_path))
+        try:
+            assert reader.signals_in_file == 4
+            labels = [reader.getLabel(i) for i in range(4)]
+            assert labels == ["C-009", "C-010", "C-012", "C-014"]
+        finally:
+            reader.close()
+
+    def test_write_edf_file_port_letter(self, tmp_path):
+        """Test that port_letter is correctly used in channel labels."""
+        from tests.integration.generate import _write_edf_file
+
+        edf_path = tmp_path / "test_d.edf"
+        _write_edf_file(edf_path, n_channels=2, port_letter="D")
+
+        import pyedflib
+
+        reader = pyedflib.EdfReader(str(edf_path))
+        try:
+            labels = [reader.getLabel(i) for i in range(2)]
+            assert labels == ["D-009", "D-010"]
+        finally:
+            reader.close()
