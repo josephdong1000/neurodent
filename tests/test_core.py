@@ -730,7 +730,7 @@ class TestLongRecordingOrganizer:
             call_args = mock_decimate.call_args[0]
             assert call_args[0].dtype == np.float16
 
-    def test_extract_channel_names_prefers_channel_name_property(self, temp_dir):
+    def test_extract_channel_names_prefers_channel_name_property(self):
         """Test _extract_channel_names uses channel_name property when available."""
         mock_recording = Mock()
         mock_recording.get_property_keys.return_value = ["channel_name", "gain_to_uV"]
@@ -739,7 +739,7 @@ class TestLongRecordingOrganizer:
         names = LongRecordingOrganizer._extract_channel_names(mock_recording)
         assert names == ["C-009", "C-010", "C-012"]
 
-    def test_extract_channel_names_falls_back_to_channel_ids(self, temp_dir):
+    def test_extract_channel_names_falls_back_to_channel_ids(self):
         """Test _extract_channel_names falls back to get_channel_ids when no channel_name property."""
         mock_recording = Mock()
         mock_recording.get_property_keys.return_value = ["gain_to_uV"]
@@ -748,7 +748,7 @@ class TestLongRecordingOrganizer:
         names = LongRecordingOrganizer._extract_channel_names(mock_recording)
         assert names == ["ch1", "ch2"]
 
-    def test_extract_channel_names_handles_mock_without_properties(self, temp_dir):
+    def test_extract_channel_names_handles_mock_without_properties(self):
         """Test _extract_channel_names handles recordings without get_property_keys."""
         mock_recording = Mock()
         # Mock's get_property_keys returns a Mock (not iterable)
@@ -757,7 +757,7 @@ class TestLongRecordingOrganizer:
         names = LongRecordingOrganizer._extract_channel_names(mock_recording)
         assert names == ["a", "b"]
 
-    def test_extract_channel_names_with_integer_ids(self, temp_dir):
+    def test_extract_channel_names_with_integer_ids(self):
         """Test _extract_channel_names converts integer IDs to strings."""
         mock_recording = Mock()
         mock_recording.get_property_keys.return_value = []
