@@ -122,7 +122,7 @@ Set ``truncate_animals`` to ``null`` (the default) to process all animals.
 
    .. code-block:: bash
 
-      NEURODENT_DATASET=mini_real uv run snakemake --cores 1
+      NEURODENT_DATASET=mini_real uv run snakemake
 
 Running the Pipeline
 --------------------
@@ -136,7 +136,7 @@ Basic Usage
    uv run snakemake --dry-run
 
    # Run pipeline locally (for testing)
-   uv run snakemake --cores 4
+   uv run snakemake
 
    # Run on SLURM cluster
    uv run snakemake --profile your-profile

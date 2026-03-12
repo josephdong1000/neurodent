@@ -75,7 +75,6 @@ class TestSnakemakeDryRun:
             "--snakefile", "workflow/Snakefile",
             "--dryrun",
             "--ignore-incomplete",
-            "--cores", "1",
             "--quiet",
         ]
         if targets:
@@ -158,7 +157,6 @@ class TestSnakemakePipelineRun:
         cmd = [
             "uv", "run", "snakemake",
             "--snakefile", "workflow/Snakefile",
-            "--cores", "4",
             "--rerun-incomplete",
         ]
         if extra_args:
