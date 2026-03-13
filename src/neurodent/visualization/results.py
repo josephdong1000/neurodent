@@ -3585,6 +3585,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
             filename (str, optional): Name of the file to save. Defaults to "war".
             slugify_filename (bool, optional): If True, slugify the filename (replace special characters). Defaults to False.
             save_abbrevs_as_chnames (bool, optional): If True, save the channel abbreviations as the channel names in the json file. Defaults to False.
+            write_parquet (bool, optional): If True, also write a Parquet copy of the result
+                DataFrame alongside the pickle. Parquet is stable across pandas versions.
+                Defaults to True.
         """
         folder = Path(folder)
         if make_folder:
@@ -3618,13 +3621,13 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     import pyarrow as pa
 
                     meta["pyarrow_version"] = pa.__version__
-                except Exception:
+                except ImportError:
                     pass
 
                 with open(filepath + ".parquet.meta.json", "w") as mf:
                     json.dump(meta, mf)
                 logging.info(f"Saved WAR to {filepath + '.parquet'} (with meta)")
-            except Exception as e:
+            except (OSError, TypeError, ValueError) as e:
                 logging.warning(f"Failed to write parquet WAR ({e}), continuing with pickle only")
 
         json_dict = {
@@ -3657,18 +3660,27 @@ class WindowAnalysisResult(AnimalFeatureParser):
           converted to lists. This ensures consistent cross-version serialization.
         """
         def _make_serializable(x: Any) -> Any:
-            # Convert numpy arrays to lists, tuples to lists, leave primitives
+            # Recursively convert numpy arrays, tuples, and other non-JSON types
             if isinstance(x, np.ndarray):
                 return x.tolist()
             if isinstance(x, tuple):
-                return list(x)
+                return [_make_serializable(item) for item in x]
+            if isinstance(x, list):
+                return [_make_serializable(item) for item in x]
+            if isinstance(x, dict):
+                return {k: _make_serializable(v) for k, v in x.items()}
             # Basic JSON-serializable types
-            if x is None or isinstance(x, (str, int, float, bool, list, dict)):
+            if x is None or isinstance(x, (str, int, float, bool)):
                 return x
+            # numpy scalar types
+            if isinstance(x, (np.integer, np.floating)):
+                return x.item()
+            if isinstance(x, np.bool_):
+                return bool(x)
             # Fallback: try to convert to list if iterable
             try:
-                return list(x)
-            except Exception:
+                return [_make_serializable(item) for item in x]
+            except (TypeError, ValueError):
                 return str(x)
 
         df_copy = df.copy()
@@ -3974,7 +3986,11 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 if not json_path.exists():
                     raise FileNotFoundError(f"JSON file not found: {json_path}")
             else:
-                json_files = list(folder_path.glob("*.json"))
+                json_files = [
+                    f
+                    for f in folder_path.glob("*.json")
+                    if not f.name.endswith(".parquet.meta.json")
+                ]
                 if len(json_files) != 1:
                     raise ValueError(
                         f"Expected exactly one json file in {folder_path}, found {len(json_files)}"
@@ -3996,7 +4012,8 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
         # Prefer Parquet if available (parquet is more stable across pandas versions)
         parquet_path = df_pickle_path.with_suffix(".parquet")
-        parquet_meta_path = df_pickle_path.with_suffix(".parquet.meta.json")
+        # Avoid Path.with_suffix for multi-dot extension (unsupported on Python <3.12)
+        parquet_meta_path = parquet_path.parent / (parquet_path.name + ".meta.json")
         data: pd.DataFrame
         if parquet_path.exists() and parquet_meta_path.exists():
             try:
@@ -4006,7 +4023,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 encoded_cols = pq_meta.get("encoded_columns", [])
                 data = pd.read_parquet(parquet_path, engine="pyarrow")
                 data = cls._decode_df_from_parquet(data, encoded_cols)
-            except Exception as e:
+            except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as e:
                 logging.warning(f"Failed to load parquet WAR ({parquet_path}): {e}, falling back to pickle")
                 with open(df_pickle_path, "rb") as f:
                     data = pd.read_pickle(f)
