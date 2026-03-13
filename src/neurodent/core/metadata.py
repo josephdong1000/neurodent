@@ -7,18 +7,10 @@ Functions for loading and enriching animal metadata (sex, gene) from config.
 import logging
 import pandas as pd
 
-logger = logging.getLogger(__name__)
+from .. import constants
+from .utils import normalize_value_from_aliases
 
-# Canonical sex values used throughout the pipeline.
-# The canonical forms ("Male", "Female") must match constants.DF_SORT_ORDER["sex"].
-_SEX_NORMALIZATION = {
-    "M": "Male",
-    "F": "Female",
-    "m": "Male",
-    "f": "Female",
-    "male": "Male",
-    "female": "Female",
-}
+logger = logging.getLogger(__name__)
 
 
 def load_animal_metadata(samples_config: dict) -> dict:
@@ -56,14 +48,18 @@ def load_animal_metadata(samples_config: dict) -> dict:
         else:
             # Normalize sex abbreviations to canonical form (e.g. "M" -> "Male")
             raw_sex = metadata_dict[animal_id]["sex"]
-            normalized = _SEX_NORMALIZATION.get(raw_sex, raw_sex)
-            if normalized == raw_sex and raw_sex not in _SEX_NORMALIZATION.values():
-                logger.warning(
-                    f"Unrecognized sex value '{raw_sex}' for animal '{animal_id}'; "
-                    f"expected one of {list(_SEX_NORMALIZATION.keys())} or "
-                    f"{sorted(set(_SEX_NORMALIZATION.values()))}"
-                )
-            metadata_dict[animal_id]["sex"] = normalized
+            if raw_sex is None:
+                pass  # Leave as None
+            else:
+                normalized = normalize_value_from_aliases(raw_sex, constants.SEX_ALIASES)
+                if normalized is None:
+                    logger.warning(
+                        f"Unrecognized sex value '{raw_sex}' for animal '{animal_id}'; "
+                        f"expected one of "
+                        f"{[a for aliases in constants.SEX_ALIASES.values() for a in aliases]}"
+                    )
+                else:
+                    metadata_dict[animal_id]["sex"] = normalized
         if "gene" not in metadata_dict[animal_id]:
             metadata_dict[animal_id]["gene"] = None
     
