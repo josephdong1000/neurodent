@@ -2005,9 +2005,10 @@ class TestParquetSaveLoad:
         with tempfile.TemporaryDirectory() as tmpdir:
             war.save_pickle_and_json(tmpdir, filename="war")
 
-            # Verify parquet files were created
+            # Verify parquet file was created
             assert (Path(tmpdir) / "war.parquet").exists()
-            assert (Path(tmpdir) / "war.parquet.meta.json").exists()
+            # No sidecar meta file — metadata is embedded in parquet
+            assert not (Path(tmpdir) / "war.parquet.meta.json").exists()
 
             # Load (should prefer parquet)
             loaded = WindowAnalysisResult.load_pickle_and_json(
@@ -2025,37 +2026,45 @@ class TestParquetSaveLoad:
                 assert loaded.result["rms"].iloc[i] == war.result["rms"].iloc[i]
 
     def test_auto_discovery_with_parquet_files(self, war_with_complex_columns):
-        """Test that .parquet.meta.json does not interfere with auto-discovery."""
+        """Test that auto-discovery works when parquet files are present."""
         war = war_with_complex_columns
         with tempfile.TemporaryDirectory() as tmpdir:
             war.save_pickle_and_json(tmpdir, filename="war")
 
-            # Auto-discovery should work (only war.json found, not war.parquet.meta.json)
             loaded = WindowAnalysisResult.load_pickle_and_json(folder_path=tmpdir)
             assert loaded.animal_id == war.animal_id
-
-    def test_parquet_disabled(self, war_with_complex_columns):
-        """Test that write_parquet=False skips parquet output."""
-        war = war_with_complex_columns
-        with tempfile.TemporaryDirectory() as tmpdir:
-            war.save_pickle_and_json(tmpdir, filename="war", write_parquet=False)
-
-            assert not (Path(tmpdir) / "war.parquet").exists()
-            assert not (Path(tmpdir) / "war.parquet.meta.json").exists()
-            assert (Path(tmpdir) / "war.pkl").exists()
-            assert (Path(tmpdir) / "war.json").exists()
 
     def test_fallback_to_pickle_when_no_parquet(self, war_with_complex_columns):
         """Test that loading falls back to pickle when parquet files are absent."""
         war = war_with_complex_columns
         with tempfile.TemporaryDirectory() as tmpdir:
-            war.save_pickle_and_json(tmpdir, filename="war", write_parquet=False)
+            war.save_pickle_and_json(tmpdir, filename="war")
+            # Remove parquet to force pickle fallback
+            (Path(tmpdir) / "war.parquet").unlink()
 
             loaded = WindowAnalysisResult.load_pickle_and_json(
                 folder_path=tmpdir, pickle_name="war.pkl", json_name="war.json"
             )
             assert loaded.animal_id == war.animal_id
             assert loaded.result["duration"].tolist() == war.result["duration"].tolist()
+
+    def test_metadata_embedded_in_parquet(self, war_with_complex_columns):
+        """Test that encoded column metadata is stored in parquet schema metadata."""
+        import pyarrow.parquet as pq
+
+        war = war_with_complex_columns
+        with tempfile.TemporaryDirectory() as tmpdir:
+            war.save_pickle_and_json(tmpdir, filename="war")
+
+            table = pq.read_table(Path(tmpdir) / "war.parquet")
+            schema_meta = table.schema.metadata
+            assert b"neurodent" in schema_meta
+
+            import json as _json
+
+            nd_meta = _json.loads(schema_meta[b"neurodent"])
+            assert "encoded_columns" in nd_meta
+            assert "rms" in nd_meta["encoded_columns"]
 
     def test_encode_decode_round_trip(self):
         """Test _encode_df_for_parquet and _decode_df_from_parquet directly."""
@@ -2095,16 +2104,56 @@ class TestParquetSaveLoad:
                 decoded["array_col"].iloc[i], df["array_col"].iloc[i]
             )
 
-    def test_parquet_file_smaller_or_comparable(self, war_with_complex_columns):
-        """Test that parquet files are not drastically larger than pickle."""
+    def test_parquet_file_has_content(self, war_with_complex_columns):
+        """Test that the parquet file has meaningful content matching the DataFrame."""
         war = war_with_complex_columns
         with tempfile.TemporaryDirectory() as tmpdir:
             war.save_pickle_and_json(tmpdir, filename="war")
-            pkl_size = (Path(tmpdir) / "war.pkl").stat().st_size
-            pq_size = (Path(tmpdir) / "war.parquet").stat().st_size
-            # Parquet with JSON-encoded object columns may be larger than pickle
-            # for small DataFrames, but should not be more than 10x larger
-            assert pq_size < pkl_size * 10
+            pq_path = Path(tmpdir) / "war.parquet"
+            assert pq_path.stat().st_size > 0
+
+            reloaded = pd.read_parquet(pq_path, engine="pyarrow")
+            assert len(reloaded) == len(war.result)
+            assert set(war.result.columns).issubset(set(reloaded.columns))
+
+    def test_save_load_speed(self, war_with_complex_columns):
+        """Test that parquet load time is comparable to pickle after warm-up.
+
+        For small DataFrames, parquet has more fixed overhead than pickle.
+        This test verifies that load time is within a reasonable factor,
+        which shows the overhead is bounded (not pathological).
+        """
+        import time
+
+        war = war_with_complex_columns
+        with tempfile.TemporaryDirectory() as tmpdir:
+            war.save_pickle_and_json(tmpdir, filename="war")
+
+            pkl_path = Path(tmpdir) / "war.pkl"
+            pq_path = Path(tmpdir) / "war.parquet"
+
+            # Warm-up: first load amortizes import costs
+            pd.read_pickle(pkl_path)
+            pd.read_parquet(pq_path, engine="pyarrow")
+
+            n_iters = 50
+
+            start = time.perf_counter()
+            for _ in range(n_iters):
+                pd.read_pickle(pkl_path)
+            pkl_time = time.perf_counter() - start
+
+            start = time.perf_counter()
+            for _ in range(n_iters):
+                pd.read_parquet(pq_path, engine="pyarrow")
+            pq_time = time.perf_counter() - start
+
+            # For small DataFrames parquet is slower; verify it's within 20x
+            # (real-world large WARs narrow this gap significantly)
+            assert pq_time < pkl_time * 20, (
+                f"Parquet load ({pq_time:.3f}s) is unreasonably slower "
+                f"than pickle ({pkl_time:.3f}s)"
+            )
 
 
 class TestAnimalOrganizerLOF:

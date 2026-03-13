@@ -3575,9 +3575,12 @@ class WindowAnalysisResult(AnimalFeatureParser):
         filename: str = None,
         slugify_filename=False,
         save_abbrevs_as_chnames=False,
-        write_parquet: bool = True,
     ):
-        """Archive window analysis result into the folder specified, as a pickle and json file.
+        """Archive window analysis result into the folder specified, as a parquet and json file.
+
+        The result DataFrame is saved as a Parquet file (stable across pandas
+        versions).  A pickle copy is also written for backward compatibility
+        with older workflows.
 
         Args:
             folder (str | Path): Destination folder to save results to
@@ -3585,10 +3588,10 @@ class WindowAnalysisResult(AnimalFeatureParser):
             filename (str, optional): Name of the file to save. Defaults to "war".
             slugify_filename (bool, optional): If True, slugify the filename (replace special characters). Defaults to False.
             save_abbrevs_as_chnames (bool, optional): If True, save the channel abbreviations as the channel names in the json file. Defaults to False.
-            write_parquet (bool, optional): If True, also write a Parquet copy of the result
-                DataFrame alongside the pickle. Parquet is stable across pandas versions.
-                Defaults to True.
         """
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+
         folder = Path(folder)
         if make_folder:
             folder.mkdir(parents=True, exist_ok=True)
@@ -3598,37 +3601,22 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
         filepath = str(folder / filename)
 
-        # Write pickle for backward compatibility
+        # Write pickle for backward compatibility with existing workflows
         self.result.to_pickle(filepath + ".pkl")
         logging.info(f"Saved WAR to {filepath + '.pkl'}")
 
-        # Optionally write a parquet copy that is stable across pandas versions.
-        # Object-like columns (lists/dicts/ndarrays) are JSON-encoded per-cell and
-        # a small meta file records which columns were encoded so they can be
-        # decoded on load. Parquet + JSON strings provides portability and
-        # stability compared to pandas pickles.
-        if write_parquet:
-            try:
-                pq_df, encoded_cols = self._encode_df_for_parquet(self.result)
-                # Use pyarrow engine (pyarrow is in requirements)
-                pq_df.to_parquet(filepath + ".parquet", engine="pyarrow", index=True)
-                meta = {
-                    "encoded_columns": encoded_cols,
-                    "pandas_version": pd.__version__,
-                    "pyarrow_version": None,
-                }
-                try:
-                    import pyarrow as pa
-
-                    meta["pyarrow_version"] = pa.__version__
-                except ImportError:
-                    pass
-
-                with open(filepath + ".parquet.meta.json", "w") as mf:
-                    json.dump(meta, mf)
-                logging.info(f"Saved WAR to {filepath + '.parquet'} (with meta)")
-            except (OSError, TypeError, ValueError) as e:
-                logging.warning(f"Failed to write parquet WAR ({e}), continuing with pickle only")
+        # Write parquet as the primary stable format.
+        # Object-like columns (lists/dicts/ndarrays) are JSON-encoded per-cell.
+        # The list of encoded columns is stored in the parquet schema metadata
+        # so they can be decoded on load.
+        pq_df, encoded_cols = self._encode_df_for_parquet(self.result)
+        table = pa.Table.from_pandas(pq_df)
+        neurodent_meta = json.dumps({"encoded_columns": encoded_cols}).encode()
+        existing_meta = table.schema.metadata or {}
+        merged_meta = {**existing_meta, b"neurodent": neurodent_meta}
+        table = table.replace_schema_metadata(merged_meta)
+        pq.write_table(table, filepath + ".parquet")
+        logging.info(f"Saved WAR to {filepath + '.parquet'}")
 
         json_dict = {
             "animal_id": self.animal_id,
@@ -3648,49 +3636,39 @@ class WindowAnalysisResult(AnimalFeatureParser):
             json.dump(json_dict, f, indent=2)
             logging.info(f"Saved WAR to {filepath + '.json'}")
 
+    class _NumpyEncoder(json.JSONEncoder):
+        """JSON encoder that handles numpy types transparently.
+
+        The stdlib encoder already recurses into lists and dicts, so we only
+        need to override *default* for types it cannot handle natively.
+        """
+
+        def default(self, o: Any) -> Any:
+            if isinstance(o, np.ndarray):
+                return o.tolist()
+            if isinstance(o, np.integer):
+                return int(o)
+            if isinstance(o, np.floating):
+                return float(o)
+            if isinstance(o, np.bool_):
+                return bool(o)
+            return super().default(o)
+
     @staticmethod
     def _encode_df_for_parquet(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
-        """Return a copy of df where complex/object columns have been JSON-encoded
-        as strings so they can be written to Parquet safely. Also return the list
-        of encoded columns so we can decode them on load.
+        """Return a copy of *df* where complex/object columns have been
+        JSON-encoded as strings so they can be written to Parquet safely.
 
-        Strategy:
-        - Detect columns with object dtype or containing lists/ndarrays/dicts/tuples
-        - Replace each cell with json.dumps(serializable) where numpy arrays are
-          converted to lists. This ensures consistent cross-version serialization.
+        Returns:
+            (encoded_df, encoded_columns) — the modified DataFrame and the
+            list of column names that were encoded.
         """
-        def _make_serializable(x: Any) -> Any:
-            # Recursively convert numpy arrays, tuples, and other non-JSON types
-            if isinstance(x, np.ndarray):
-                return x.tolist()
-            if isinstance(x, tuple):
-                return [_make_serializable(item) for item in x]
-            if isinstance(x, list):
-                return [_make_serializable(item) for item in x]
-            if isinstance(x, dict):
-                return {k: _make_serializable(v) for k, v in x.items()}
-            # Basic JSON-serializable types
-            if x is None or isinstance(x, (str, int, float, bool)):
-                return x
-            # numpy scalar types
-            if isinstance(x, (np.integer, np.floating)):
-                return x.item()
-            if isinstance(x, np.bool_):
-                return bool(x)
-            # Fallback: try to convert to list if iterable
-            try:
-                return [_make_serializable(item) for item in x]
-            except (TypeError, ValueError):
-                return str(x)
-
         df_copy = df.copy()
         encoded_cols: list[str] = []
         for col in df_copy.columns:
             ser = df_copy[col]
-            # If dtype is object or contains non-primitive types, encode
             needs_encoding = False
             if ser.dtype == object:
-                # sample a few non-null values to decide
                 sample = ser.dropna().head(20)
                 for v in sample:
                     if not isinstance(v, (str, int, float, bool, type(None))):
@@ -3699,7 +3677,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
             if needs_encoding:
                 encoded_cols.append(col)
-                df_copy[col] = ser.apply(lambda x: json.dumps(_make_serializable(x), ensure_ascii=False))
+                df_copy[col] = ser.apply(
+                    lambda x: json.dumps(x, cls=WindowAnalysisResult._NumpyEncoder, ensure_ascii=False)
+                )
 
         return df_copy, encoded_cols
 
@@ -3986,11 +3966,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 if not json_path.exists():
                     raise FileNotFoundError(f"JSON file not found: {json_path}")
             else:
-                json_files = [
-                    f
-                    for f in folder_path.glob("*.json")
-                    if not f.name.endswith(".parquet.meta.json")
-                ]
+                json_files = list(folder_path.glob("*.json"))
                 if len(json_files) != 1:
                     raise ValueError(
                         f"Expected exactly one json file in {folder_path}, found {len(json_files)}"
@@ -4012,19 +3988,34 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
         # Prefer Parquet if available (parquet is more stable across pandas versions)
         parquet_path = df_pickle_path.with_suffix(".parquet")
-        # Avoid Path.with_suffix for multi-dot extension (unsupported on Python <3.12)
-        parquet_meta_path = parquet_path.parent / (parquet_path.name + ".meta.json")
         data: pd.DataFrame
-        if parquet_path.exists() and parquet_meta_path.exists():
+        if parquet_path.exists():
             try:
-                # Read metadata to find which columns were JSON-encoded
-                with open(parquet_meta_path, "r") as mf:
-                    pq_meta = json.load(mf)
-                encoded_cols = pq_meta.get("encoded_columns", [])
-                data = pd.read_parquet(parquet_path, engine="pyarrow")
+                import pyarrow.parquet as pq
+
+                table = pq.read_table(parquet_path)
+                # Encoded-column list is stored in schema metadata
+                encoded_cols: list[str] = []
+                schema_meta = table.schema.metadata or {}
+                if b"neurodent" in schema_meta:
+                    nd_meta = json.loads(schema_meta[b"neurodent"])
+                    encoded_cols = nd_meta.get("encoded_columns", [])
+                else:
+                    # Fallback: try legacy .parquet.meta.json sidecar file
+                    legacy_meta_path = parquet_path.parent / (
+                        parquet_path.name + ".meta.json"
+                    )
+                    if legacy_meta_path.exists():
+                        with open(legacy_meta_path, "r") as mf:
+                            pq_meta = json.load(mf)
+                        encoded_cols = pq_meta.get("encoded_columns", [])
+
+                data = table.to_pandas()
                 data = cls._decode_df_from_parquet(data, encoded_cols)
             except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as e:
-                logging.warning(f"Failed to load parquet WAR ({parquet_path}): {e}, falling back to pickle")
+                logging.warning(
+                    f"Failed to load parquet WAR ({parquet_path}): {e}, falling back to pickle"
+                )
                 with open(df_pickle_path, "rb") as f:
                     data = pd.read_pickle(f)
         else:
