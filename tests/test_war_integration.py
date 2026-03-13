@@ -25,8 +25,8 @@ from neurodent.visualization.frequency_domain_results import FrequencyDomainSpik
 
 
 # Test data configuration
-TEST_DATA_BASE = Path(__file__).parent.parent / "notebooks" / "tests" / "test-data"
-TEST_ANIMALS = ["A10"] if TEST_DATA_BASE.exists() else []  # Use one animal for faster testing
+TEST_DATA_BASE = Path(__file__).parent.parent / ".tests" / "integration" / "data"
+TEST_ANIMALS = ["A10"] if (TEST_DATA_BASE / "A10" / "A10_recording.edf").exists() else []
 
 # Parameters for testing
 TEST_DETECTION_PARAMS = {
@@ -49,17 +49,8 @@ class TestWARIntegration:
     def animal_organizer_with_war(self):
         """Create AnimalOrganizer with both WAR and spike detection results."""
         from datetime import datetime as dt
+        from tests.integration.readers import read_bin_csv_pair
         animal_id = TEST_ANIMALS[0]
-
-        try:
-            import mne
-            import numpy as np
-        except ImportError:
-            mne = None
-            
-        dummy_extract = lambda x, **kw: mne.io.RawArray(
-            np.random.randn(4, 10000), mne.create_info(ch_names=["CH9", "CH10", "CH12", "CH14"], sfreq=1000., ch_types="eeg")
-        ) if mne else None
 
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=RuntimeWarning)
@@ -67,15 +58,17 @@ class TestWARIntegration:
             warnings.filterwarnings("ignore", category=DeprecationWarning)
 
             ao = visualization.AnimalOrganizer(
-                str(TEST_DATA_BASE) + "/{animal} KO {session}/{index}_ColMajor.bin",
+                [
+                    str(TEST_DATA_BASE / animal_id) + "/{index}_ColMajor.bin",
+                    str(TEST_DATA_BASE / animal_id) + "/{index}_Meta.csv",
+                ],
                 animal_id,
                 assume_from_number=True,
                 lro_kwargs={
-                    "mode": "mne",
-                    "extract_func": dummy_extract,
+                    "mode": "si",
+                    "extract_func": read_bin_csv_pair,
                     "multiprocess_mode": "serial",
-                    "intermediate": "bin",
-                    "manual_datetimes": {"12_13_2023": dt(2023, 12, 13, 12, 0, 0)},
+                    "manual_datetimes": dt(2023, 12, 13, 12, 0, 0),
                     "datetimes_are_start": True,
                 },
             )
