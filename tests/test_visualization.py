@@ -4,6 +4,7 @@ Unit tests for neurodent.visualization module.
 Legacy ResultsVisualizer and standalone plotting function tests have been removed because their functionality is now handled by AnimalPlotter and ExperimentPlotter.
 """
 
+import json
 import tempfile
 from pathlib import Path
 
@@ -2060,9 +2061,7 @@ class TestParquetSaveLoad:
             schema_meta = table.schema.metadata
             assert b"neurodent" in schema_meta
 
-            import json as _json
-
-            nd_meta = _json.loads(schema_meta[b"neurodent"])
+            nd_meta = json.loads(schema_meta[b"neurodent"])
             assert "encoded_columns" in nd_meta
             assert "rms" in nd_meta["encoded_columns"]
 
@@ -2148,8 +2147,11 @@ class TestParquetSaveLoad:
                 pd.read_parquet(pq_path, engine="pyarrow")
             pq_time = time.perf_counter() - start
 
-            # For small DataFrames parquet is slower; verify it's within 20x
-            # (real-world large WARs narrow this gap significantly)
+            # For small DataFrames parquet has higher per-call overhead (pyarrow
+            # table construction, schema parsing) vs pickle's simple
+            # deserialization.  On real-world WARs (thousands of rows) the gap
+            # narrows substantially.  The 20x bound here guards against
+            # regressions while accommodating the small-data worst case.
             assert pq_time < pkl_time * 20, (
                 f"Parquet load ({pq_time:.3f}s) is unreasonably slower "
                 f"than pickle ({pkl_time:.3f}s)"
