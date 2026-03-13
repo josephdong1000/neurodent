@@ -2024,7 +2024,7 @@ class TestParquetSaveLoad:
             for i in range(len(war.result)):
                 assert loaded.result["rms"].iloc[i] == war.result["rms"].iloc[i]
 
-    def test_parquet_meta_json_excluded_from_glob(self, war_with_complex_columns):
+    def test_auto_discovery_with_parquet_files(self, war_with_complex_columns):
         """Test that .parquet.meta.json does not interfere with auto-discovery."""
         war = war_with_complex_columns
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -2057,7 +2057,7 @@ class TestParquetSaveLoad:
             assert loaded.animal_id == war.animal_id
             assert loaded.result["duration"].tolist() == war.result["duration"].tolist()
 
-    def test_encode_decode_round_trip_static(self):
+    def test_encode_decode_round_trip(self):
         """Test _encode_df_for_parquet and _decode_df_from_parquet directly."""
         df = pd.DataFrame(
             {
