@@ -46,6 +46,7 @@ To override defaults, import and modify before running analysis:
 from .mappings import (
     DEFAULT_ID_TO_LR,
     GENOTYPE_ALIASES,
+    SEX_ALIASES,
     CHNAME_ALIASES,
     LR_ALIASES,
     DEFAULT_ID_TO_NAME,
@@ -90,6 +91,7 @@ __all__ = [
     # Mappings
     "DEFAULT_ID_TO_LR",
     "GENOTYPE_ALIASES",
+    "SEX_ALIASES",
     "ANIMAL_METADATA",
     "CHNAME_ALIASES",
     "LR_ALIASES",

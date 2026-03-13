@@ -24,4 +24,7 @@ jobs:
           uv run pytest .tests/ -v
       - name: Snakemake integration run (mini_real dataset)
         run: |
-          NEURODENT_DATASET=mini_real uv run snakemake --snakefile workflow/Snakefile --cores 1
+          NEURODENT_DATASET=mini_real uv run snakemake --snakefile workflow/Snakefile --cores all
+      - name: Package integration tests
+        run: |
+          uv run pytest tests/integration/ -v

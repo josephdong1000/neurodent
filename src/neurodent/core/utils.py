@@ -914,6 +914,30 @@ def _get_key_from_match_values(input_string: str, alias_dict: dict, strict_match
     return best_match_key
 
 
+def normalize_value_from_aliases(
+    value: str,
+    alias_dict: dict[str, list[str]],
+) -> str | None:
+    """Normalize a value to its canonical form using an alias dictionary.
+
+    Unlike :func:`_get_key_from_match_values` which uses substring matching for
+    parsing values embedded in filenames, this function performs exact matching
+    for normalizing standalone configuration values.
+
+    Args:
+        value: The raw value to normalize (e.g., ``"M"``, ``"female"``).
+        alias_dict: Dictionary of ``{canonical_key: [aliases]}``.
+
+    Returns:
+        The canonical key if *value* matches any alias, or ``None`` if no match.
+    """
+    # REVIEW the function name should be unified with _get_key_from_match_values
+    for canonical_key, aliases in alias_dict.items():
+        if value in aliases:
+            return canonical_key
+    return None
+
+
 def set_temp_directory(path: str | Path) -> None:
     """
     Set the temporary directory for NeuRodent operations.

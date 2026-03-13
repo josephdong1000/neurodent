@@ -9,8 +9,9 @@ import logging
 import pandas as pd
 import numpy as np
 from pathlib import Path
-from .. import visualization
+from .. import constants, visualization
 from . import metadata as metadata_module
+from .utils import normalize_value_from_aliases
 
 logger = logging.getLogger(__name__)
 
@@ -284,7 +285,9 @@ def transform_time_axis(df, time_range=(0, 48), shift=0):
     df = df.copy()
 
     if "genotype" in df.columns and "sex" not in df.columns:
-        df["sex"] = df["genotype"].str[0].map({"F": "Female", "M": "Male"})
+        df["sex"] = df["genotype"].str[0].apply(
+            lambda x: normalize_value_from_aliases(x, constants.SEX_ALIASES)
+        )
 
     if "genotype" in df.columns and "gene" not in df.columns:
         df["gene"] = df["genotype"].str[2:]
@@ -355,7 +358,7 @@ def enrich_genotype_metadata(df, genotype_pattern=None, sex_mapper=None, genotyp
             else:
                 sex_char, gene = None, genotype_key
             
-            sex = {"M": "Male", "F": "Female", "m": "Male", "f": "Female"}.get(sex_char)
+            sex = normalize_value_from_aliases(sex_char, constants.SEX_ALIASES) if sex_char else None
             animal_metadata_converted[animal_id] = {"sex": sex, "gene": gene}
         
         return metadata_module.enrich_metadata(df, animal_metadata_converted)

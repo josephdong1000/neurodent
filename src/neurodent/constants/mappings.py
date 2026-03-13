@@ -22,6 +22,12 @@ DEFAULT_ID_TO_LR = {
 GENOTYPE_ALIASES = {"WT": ["WT", "wildtype"], "KO": ["KO", "knockout"]}
 """Canonical genotype names mapped to their aliases."""
 
+SEX_ALIASES = {
+    "Male": ["Male", "male", "M", "m"],
+    "Female": ["Female", "female", "F", "f"],
+}
+"""Canonical sex values mapped to their aliases."""
+
 CHNAME_ALIASES = {
     "Aud": ["Aud", "aud", "AUD"],
     "Vis": ["Vis", "vis", "VIS"],
