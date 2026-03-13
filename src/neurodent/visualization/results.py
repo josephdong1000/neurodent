@@ -3684,6 +3684,33 @@ class WindowAnalysisResult(AnimalFeatureParser):
         return df_copy, encoded_cols
 
     @staticmethod
+    def _restore_numpy_types(obj):
+        """Recursively convert lists of numbers back to numpy arrays.
+
+        JSON round-trips numpy arrays as plain Python lists.  This walks the
+        decoded structure and converts leaf lists of numbers into
+        ``np.ndarray``, then attempts to stack arrays of identical shape into
+        higher-dimensional arrays.
+        """
+        if not isinstance(obj, list) or len(obj) == 0:
+            return obj
+
+        converted = [WindowAnalysisResult._restore_numpy_types(x) for x in obj]
+
+        # All numeric scalars → 1-D array
+        if all(isinstance(x, (int, float)) for x in converted):
+            return np.array(converted)
+
+        # All numpy arrays → try to stack into a higher-dimensional array
+        if all(isinstance(x, np.ndarray) for x in converted):
+            try:
+                return np.array(converted)
+            except (ValueError, TypeError):
+                pass
+
+        return converted
+
+    @staticmethod
     def _decode_df_from_parquet(df: pd.DataFrame, encoded_cols: list[str]) -> pd.DataFrame:
         """Decode JSON-encoded columns back into Python objects."""
         df_copy = df.copy()
@@ -3695,8 +3722,10 @@ class WindowAnalysisResult(AnimalFeatureParser):
             def _try_load(v):
                 if isinstance(v, str):
                     try:
-                        return json.loads(v)
-                    except Exception:
+                        return WindowAnalysisResult._restore_numpy_types(
+                            json.loads(v)
+                        )
+                    except (json.JSONDecodeError, ValueError, TypeError):
                         return v
                 return v
 

@@ -2024,7 +2024,9 @@ class TestParquetSaveLoad:
 
             # List columns should round-trip
             for i in range(len(war.result)):
-                assert loaded.result["rms"].iloc[i] == war.result["rms"].iloc[i]
+                np.testing.assert_array_equal(
+                    loaded.result["rms"].iloc[i], war.result["rms"].iloc[i]
+                )
 
     def test_auto_discovery_with_parquet_files(self, war_with_complex_columns):
         """Test that auto-discovery works when parquet files are present."""
@@ -2097,7 +2099,10 @@ class TestParquetSaveLoad:
         # Decode and verify round-trip
         decoded = WindowAnalysisResult._decode_df_from_parquet(encoded, cols)
         for i in range(len(df)):
-            assert decoded["list_col"].iloc[i] == df["list_col"].iloc[i]
+            # list_col values become numpy arrays after JSON round-trip
+            np.testing.assert_array_equal(
+                decoded["list_col"].iloc[i], df["list_col"].iloc[i]
+            )
             assert decoded["dict_col"].iloc[i] == df["dict_col"].iloc[i]
             np.testing.assert_array_equal(
                 decoded["array_col"].iloc[i], df["array_col"].iloc[i]
