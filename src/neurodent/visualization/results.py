@@ -3524,10 +3524,10 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     # Add a check for same sampling frequency, other war-relevant properties etc.
                     # The logging lines below should be removed at some point, but I'll keep it this way for now
                     logging.info(
-                        f"set([x[0].shape for x in result[feat].tolist()]) = {list(set([x[0].shape for x in result[feat].tolist()]))}"
+                        f"set([np.asarray(x[0]).shape for x in result[feat].tolist()]) = {list(set([np.asarray(x[0]).shape for x in result[feat].tolist()]))}"
                     )
                     logging.info(
-                        f"set([x[1].shape for x in result[feat].tolist()]) = {list(set([x[1].shape for x in result[feat].tolist()]))}"
+                        f"set([np.asarray(x[1]).shape for x in result[feat].tolist()]) = {list(set([np.asarray(x[1]).shape for x in result[feat].tolist()]))}"
                     )
                     coords = np.array([x[0] for x in result[feat].tolist()])
                     vals = np.array([x[1] for x in result[feat].tolist()])
@@ -3684,56 +3684,26 @@ class WindowAnalysisResult(AnimalFeatureParser):
         return df_copy, encoded_cols
 
     @staticmethod
-    def _restore_numpy_types(obj):
-        """Recursively convert lists of numbers back to numpy arrays.
-
-        JSON round-trips numpy arrays as plain Python lists.  This walks the
-        decoded structure and converts leaf lists of numbers into
-        ``np.ndarray``, then attempts to stack arrays of identical shape into
-        higher-dimensional arrays.
-
-        Args:
-            obj: A JSON-decoded Python object (list, dict, scalar, or None).
-
-        Returns:
-            The input with numeric lists converted to ``np.ndarray``.
-            Non-list inputs are returned unchanged.
-        """
-        if not isinstance(obj, list) or len(obj) == 0:
-            return obj
-
-        converted = [WindowAnalysisResult._restore_numpy_types(x) for x in obj]
-
-        # All numeric scalars → 1-D array
-        if all(isinstance(x, (int, float)) for x in converted):
-            return np.array(converted)
-
-        # All numpy arrays → try to stack into a higher-dimensional array.
-        # Stacking fails for ragged shapes (e.g. psd tuples) — this is
-        # expected, so the list is returned as-is.
-        if all(isinstance(x, np.ndarray) for x in converted):
-            try:
-                return np.array(converted)
-            except (ValueError, TypeError):
-                pass
-
-        return converted
-
-    @staticmethod
     def _decode_df_from_parquet(df: pd.DataFrame, encoded_cols: list[str]) -> pd.DataFrame:
-        """Decode JSON-encoded columns back into Python objects."""
+        """Decode JSON-encoded columns back into Python objects.
+
+        Values are returned as plain Python types (lists, dicts, scalars) —
+        the same representation that ``json.loads`` produces.  Consuming code
+        (e.g. ``_apply_filter``) already wraps values with ``np.array()`` /
+        ``np.asarray()`` where needed, so no eager numpy conversion is done
+        here.  This avoids over-converting list-based features and keeps the
+        per-cell cost to a single ``json.loads`` call.
+        """
         df_copy = df.copy()
         for col in encoded_cols:
             if col not in df_copy.columns:
                 continue
-            # Some parquet engines may already return Python objects for nulls; only
-            # attempt json.loads on string types
+            # Some parquet engines may already return Python objects for nulls;
+            # only attempt json.loads on actual string values.
             def _try_load(v):
                 if isinstance(v, str):
                     try:
-                        return WindowAnalysisResult._restore_numpy_types(
-                            json.loads(v)
-                        )
+                        return json.loads(v)
                     except json.JSONDecodeError:
                         return v
                 return v
