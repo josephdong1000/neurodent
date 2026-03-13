@@ -157,6 +157,7 @@ class TestSnakemakePipelineRun:
         cmd = [
             "uv", "run", "snakemake",
             "--snakefile", "workflow/Snakefile",
+            "--cores", "all",
             "--rerun-incomplete",
         ]
         if extra_args:

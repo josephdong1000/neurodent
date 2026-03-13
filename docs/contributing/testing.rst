@@ -58,7 +58,7 @@ CI/CD via GitHub Actions:
    NEURODENT_DATASET=example uv run snakemake --dryrun
 
    # Real run: execute full pipeline on committed mini data
-   NEURODENT_DATASET=mini_real uv run snakemake
+   NEURODENT_DATASET=mini_real uv run snakemake --cores all
 
    # Component integration tests (seconds)
    uv run pytest tests/integration/ -v -m integration
