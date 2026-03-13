@@ -3691,6 +3691,13 @@ class WindowAnalysisResult(AnimalFeatureParser):
         decoded structure and converts leaf lists of numbers into
         ``np.ndarray``, then attempts to stack arrays of identical shape into
         higher-dimensional arrays.
+
+        Args:
+            obj: A JSON-decoded Python object (list, dict, scalar, or None).
+
+        Returns:
+            The input with numeric lists converted to ``np.ndarray``.
+            Non-list inputs are returned unchanged.
         """
         if not isinstance(obj, list) or len(obj) == 0:
             return obj
@@ -3701,7 +3708,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
         if all(isinstance(x, (int, float)) for x in converted):
             return np.array(converted)
 
-        # All numpy arrays → try to stack into a higher-dimensional array
+        # All numpy arrays → try to stack into a higher-dimensional array.
+        # Stacking fails for ragged shapes (e.g. psd tuples) — this is
+        # expected, so the list is returned as-is.
         if all(isinstance(x, np.ndarray) for x in converted):
             try:
                 return np.array(converted)
@@ -3725,7 +3734,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                         return WindowAnalysisResult._restore_numpy_types(
                             json.loads(v)
                         )
-                    except (json.JSONDecodeError, ValueError, TypeError):
+                    except json.JSONDecodeError:
                         return v
                 return v
 
