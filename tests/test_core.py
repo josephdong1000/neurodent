@@ -1577,7 +1577,6 @@ class TestZeroSampleRecordingCheck:
         assert not any("0-sample recording" in msg for msg in caplog.messages)
 
 
-
 @pytest.mark.core
 @pytest.mark.spikeinterface
 class TestZeroSampleMerge:

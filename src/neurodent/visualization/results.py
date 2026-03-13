@@ -3291,7 +3291,16 @@ class WindowAnalysisResult(AnimalFeatureParser):
         if inplace:
             del self.result
             self.result = filtered_result
-        return WindowAnalysisResult._from_existing(self, filtered_result)
+        return WindowAnalysisResult(
+            filtered_result,
+            self.animal_id,
+            self.genotype,
+            self.channel_names,
+            self.assume_from_number,
+            self.bad_channels_dict.copy(),
+            self.suppress_short_interval_error,
+            self.lof_scores_dict.copy(),
+        )
 
     def _create_filtered_copy(
         self, filter_mask: np.ndarray, filter_name: str = None
