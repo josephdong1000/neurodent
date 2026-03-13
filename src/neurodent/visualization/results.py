@@ -439,7 +439,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                                 item, **base_lro_kwargs
                             )
                             item_lro_pairs.append((item, temp_lro))
-                        except Exception as e:
+                        except (FileNotFoundError, OSError, ValueError, ImportError, AttributeError, TypeError) as e:
                             logging.warning(
                                 f"Failed to create temp LRO for duration estimation in {self._get_item_name(item)}: {e}"
                             )
@@ -819,7 +819,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                         f"LRO {i}: {start_time} -> {end_time} "
                         f"(duration: {duration:.1f}s, items: {n_files}, item: {name})"
                     )
-                except Exception as e:
+                except (AttributeError, TypeError, IndexError, ValueError) as e:
                     lines.append(f"Failed to get timeline info for LRO {i}: {e}")
 
         logging.info("\n".join(lines))
@@ -892,7 +892,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                         ),
                     }
                 )
-            except Exception as e:
+            except (AttributeError, TypeError, ValueError) as e:
                 import logging
 
                 logging.warning(f"Failed to get timeline metrics for LRO {i}: {e}")
@@ -1026,7 +1026,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                             median_time_str = "no timestamps"
                     else:
                         median_time_str = "no timestamps"
-                except Exception:
+                except (AttributeError, TypeError, ValueError):
                     median_time_str = "error"
 
                 # Handle mock objects gracefully for duration
@@ -1920,7 +1920,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         self.suppress_short_interval_error = suppress_short_interval_error
         self.lof_scores_dict = lof_scores_dict
 
-        self.__update_instance_vars()
+        self._update_instance_vars()
 
         logging.info(f"Channel names: \t{self.channel_names}")
         logging.info(f"Channel abbreviations: \t{self.channel_abbrevs}")
@@ -1949,7 +1949,37 @@ class WindowAnalysisResult(AnimalFeatureParser):
             lof_scores_dict=copy.deepcopy(self.lof_scores_dict),
         )
 
-    def __update_instance_vars(self):
+    @classmethod
+    def _from_existing(
+        cls, source: "WindowAnalysisResult", result: pd.DataFrame
+    ) -> "WindowAnalysisResult":
+        """Create a new WindowAnalysisResult by copying metadata from an existing instance.
+
+        This is a shallow copy path: it reuses the source's metadata (animal_id, genotype,
+        channel_names, etc.) with a new result DataFrame, without re-running __init__ logging.
+        Used by filtering methods to avoid redundant log output during chained operations.
+
+        Args:
+            source: The existing WindowAnalysisResult to copy metadata from.
+            result: The new result DataFrame for the new instance.
+
+        Returns:
+            A new WindowAnalysisResult with the given result and source's metadata.
+        """
+        new_war = cls.__new__(cls)
+        new_war.result = result
+        new_war.animal_id = source.animal_id
+        new_war.genotype = source.genotype
+        new_war.sex = source.sex
+        new_war.channel_names = source.channel_names
+        new_war.assume_from_number = source.assume_from_number
+        new_war.bad_channels_dict = source.bad_channels_dict.copy()
+        new_war.suppress_short_interval_error = source.suppress_short_interval_error
+        new_war.lof_scores_dict = source.lof_scores_dict.copy()
+        new_war._update_instance_vars()
+        return new_war
+
+    def _update_instance_vars(self):
         """Run after updating self.result, or other init values"""
         if "index" in self.result.columns:
             warnings.warn("Dropping column 'index'")
@@ -2153,7 +2183,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             logging.debug(f"New channel names: {self.channel_names}")
 
             logging.debug(f"Old channel abbreviations: {self.channel_abbrevs}")
-            self.__update_instance_vars()
+            self._update_instance_vars()
             logging.debug(f"New channel abbreviations: {self.channel_abbrevs}")
 
         return result
@@ -3265,7 +3295,6 @@ class WindowAnalysisResult(AnimalFeatureParser):
             filtered_result,
             self.animal_id,
             self.genotype,
-            self.sex,
             self.channel_names,
             self.assume_from_number,
             self.bad_channels_dict.copy(),
@@ -3273,27 +3302,24 @@ class WindowAnalysisResult(AnimalFeatureParser):
             self.lof_scores_dict.copy(),
         )
 
-    def _create_filtered_copy(self, filter_mask: np.ndarray) -> "WindowAnalysisResult":
+    def _create_filtered_copy(
+        self, filter_mask: np.ndarray, filter_name: str = None
+    ) -> "WindowAnalysisResult":
         """Create a new WindowAnalysisResult with the filter applied.
 
         Args:
             filter_mask (np.ndarray): Boolean mask of shape (n_windows, n_channels)
+            filter_name (str, optional): Name of the filter for logging. Defaults to None.
 
         Returns:
             WindowAnalysisResult: New instance with filter applied
         """
+        if filter_name is not None:
+            logging.info(
+                f"{filter_name}: filtered {filter_mask.size - np.count_nonzero(filter_mask)}/{filter_mask.size}"
+            )
         filtered_result = self._apply_filter(filter_mask)
-        return WindowAnalysisResult(
-            filtered_result,
-            self.animal_id,
-            self.genotype,
-            self.sex,
-            self.channel_names,
-            self.assume_from_number,
-            self.bad_channels_dict.copy(),
-            self.suppress_short_interval_error,
-            self.lof_scores_dict.copy(),
-        )
+        return WindowAnalysisResult._from_existing(self, filtered_result)
 
     def filter_logrms_range(self, z_range: float = 3) -> "WindowAnalysisResult":
         """Filter based on log(rms) z-score range.
@@ -3305,7 +3331,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             WindowAnalysisResult: New filtered instance
         """
         mask = self.get_filter_logrms_range(z_range=z_range)
-        return self._create_filtered_copy(mask)
+        return self._create_filtered_copy(mask, filter_name="logrms_range")
 
     def filter_high_rms(self, max_rms: float = 500) -> "WindowAnalysisResult":
         """Filter out windows with RMS above threshold.
@@ -3317,7 +3343,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             WindowAnalysisResult: New filtered instance
         """
         mask = self.get_filter_high_rms(max_rms=max_rms)
-        return self._create_filtered_copy(mask)
+        return self._create_filtered_copy(mask, filter_name="high_rms")
 
     def filter_low_rms(self, min_rms: float = 50) -> "WindowAnalysisResult":
         """Filter out windows with RMS below threshold.
@@ -3329,7 +3355,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             WindowAnalysisResult: New filtered instance
         """
         mask = self.get_filter_low_rms(min_rms=min_rms)
-        return self._create_filtered_copy(mask)
+        return self._create_filtered_copy(mask, filter_name="low_rms")
 
     def filter_high_beta(self, max_beta_prop: float = 0.4) -> "WindowAnalysisResult":
         """Filter out windows with high beta power.
@@ -3341,7 +3367,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             WindowAnalysisResult: New filtered instance
         """
         mask = self.get_filter_high_beta(max_beta_prop=max_beta_prop)
-        return self._create_filtered_copy(mask)
+        return self._create_filtered_copy(mask, filter_name="high_beta")
 
     def filter_reject_channels(
         self, bad_channels: list[str], use_abbrevs: bool = None
@@ -3358,7 +3384,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         mask = self.get_filter_reject_channels(
             bad_channels=bad_channels, use_abbrevs=use_abbrevs
         )
-        return self._create_filtered_copy(mask)
+        return self._create_filtered_copy(mask, filter_name="reject_channels")
 
     def filter_reject_channels_by_session(
         self, bad_channels_dict: dict[str, list[str]] = None, use_abbrevs: bool = None
@@ -3412,7 +3438,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         mask = self.get_filter_reject_channels_by_recording_session(
             bad_channels_dict=bad_channels_dict, use_abbrevs=use_abbrevs
         )
-        return self._create_filtered_copy(mask)
+        return self._create_filtered_copy(mask, filter_name="reject_channels_by_session")
 
     def apply_filters(
         self,
@@ -3511,9 +3537,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
         filter_tfs = np.array(filter_tfs, dtype=bool)  # (M fragments, N channels)
         for feat in constants.FEATURES:
             if feat not in result.columns:
-                logging.info(f"Skipping {feat} because it is not in result")
+                logging.debug(f"Skipping {feat} because it is not in result")
                 continue
-            logging.info(f"Filtering {feat}")
+            logging.debug(f"Filtering {feat}")
             match feat:  # NOTE refactor this to use constants
                 case (
                     "rms"
@@ -3535,10 +3561,10 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     # FIXME The sampling rates have changed between computation passes so WARs have different shapes.
                     # Add a check for same sampling frequency, other war-relevant properties etc.
                     # The logging lines below should be removed at some point, but I'll keep it this way for now
-                    logging.info(
+                    logging.debug(
                         f"set([x[0].shape for x in result[feat].tolist()]) = {list(set([x[0].shape for x in result[feat].tolist()]))}"
                     )
-                    logging.info(
+                    logging.debug(
                         f"set([x[1].shape for x in result[feat].tolist()]) = {list(set([x[1].shape for x in result[feat].tolist()]))}"
                     )
                     coords = np.array([x[0] for x in result[feat].tolist()])
@@ -3997,7 +4023,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
         self.suppress_short_interval_error = True
         logging.info("Setting suppress_short_interval_error to True")
-        self.__update_instance_vars()
+        self._update_instance_vars()
 
     def add_unique_hash(self, nbytes: int | None = None):
         """Adds a hex hash to the animal ID to ensure uniqueness. This prevents collisions when, for example, multiple animals in ExperimentPlotter have the same animal ID.
@@ -4018,7 +4044,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             )
         self.animal_id = new_animal_id
 
-        self.__update_instance_vars()
+        self._update_instance_vars()
 
 
 def bin_spike_times(
