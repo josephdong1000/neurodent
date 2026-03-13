@@ -25,9 +25,13 @@ from neurodent.visualization.frequency_domain_results import (
 )
 
 
-# Test data configuration (matches the pattern from pipeline script)
-TEST_DATA_BASE = Path(__file__).parent.parent / "notebooks" / "tests" / "test-data"
-TEST_ANIMALS = ["A10", "F22"] if TEST_DATA_BASE.exists() else []
+# Test data configuration
+TEST_DATA_BASE = Path(__file__).parent.parent / ".tests" / "integration" / "data"
+TEST_ANIMALS = (
+    ["A10", "F22"]
+    if (TEST_DATA_BASE / "A10" / "A10_recording.edf").exists()
+    else []
+)
 
 # Detection parameters for testing (lowered thresholds for better detection in test data)
 TEST_DETECTION_PARAMS = {
@@ -50,32 +54,27 @@ class TestFrequencyDomainSpikeDetectionIntegration:
     @pytest.fixture(params=TEST_ANIMALS)
     def animal_organizer(self, request):
         """Create AnimalOrganizer for test animals."""
+        from datetime import datetime as dt
+        from tests.integration.readers import read_bin_csv_pair
         animal_id = request.param
-
-        # Suppress warnings for cleaner test output
-        # Mock extraction function since we don't have real raw files here or don't want to load them
-        try:
-            import mne
-        except ImportError:
-            mne = None
-            
-        dummy_extract = lambda x, **kw: mne.io.RawArray(
-            np.random.randn(4, 10000), mne.create_info(ch_names=["CH1", "CH2", "CH3", "CH4"], sfreq=1000., ch_types="eeg")
-        ) if mne else None
 
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=RuntimeWarning)
             warnings.filterwarnings("ignore", category=UserWarning)
 
             ao = visualization.AnimalOrganizer(
-                TEST_DATA_BASE,
+                [
+                    str(TEST_DATA_BASE / animal_id) + "/{index}_ColMajor.bin",
+                    str(TEST_DATA_BASE / animal_id) + "/{index}_Meta.csv",
+                ],
                 animal_id,
+                assume_from_number=True,
                 lro_kwargs={
-                    "mode": "mne",
-                    "extract_func": dummy_extract,
+                    "mode": "si",
+                    "extract_func": read_bin_csv_pair,
                     "multiprocess_mode": "serial",
-                    "overwrite_rowbins": False,
-                    "intermediate": "bin",
+                    "manual_datetimes": dt(2023, 12, 13, 12, 0, 0),
+                    "datetimes_are_start": True,
                 },
             )
 

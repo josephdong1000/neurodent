@@ -357,4 +357,3 @@ def create_synthetic_bin_csv_dataset(
         "session_folder": session_folder,
         "pattern": pattern,
     }
-

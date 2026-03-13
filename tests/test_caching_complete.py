@@ -334,6 +334,7 @@ class TestMNECachingOptimization:
                     mode="mne",
                     extract_func=mock_func,
                     intermediate="edf",
+                    intermediate_dir=tmpdir_path,
                     cache_policy="always",  # Force use of cache
                     manual_datetimes=manual_dt,
                     datetimes_are_start=True,
@@ -408,6 +409,7 @@ class TestMNECachingOptimization:
                     input_type="file",
                     file_pattern="test.edf",
                     intermediate="edf",
+                    intermediate_dir=tmpdir_path,
                     cache_policy="auto",  # 'auto' should regenerate due to missing metadata
                     manual_datetimes=manual_dt,
                     datetimes_are_start=True,
@@ -487,6 +489,7 @@ class TestMNECachingOptimization:
                     input_type="file",
                     file_pattern="test.edf",
                     intermediate="edf",
+                    intermediate_dir=tmpdir_path,
                     cache_policy="auto",  # 'auto' should regenerate due to missing intermediate file
                     manual_datetimes=manual_dt,
                     datetimes_are_start=True,
@@ -526,6 +529,7 @@ class TestMNECachingOptimization:
                     input_type="file",
                     file_pattern="test.edf",
                     intermediate="edf",
+                    intermediate_dir=tmpdir_path,
                     cache_policy="foo",  # Invalid cache policy
                     manual_datetimes=manual_dt,
                     datetimes_are_start=True,
@@ -577,6 +581,7 @@ class TestMNECachingOptimization:
                     input_type="file",
                     file_pattern="test.edf",
                     intermediate="edf",
+                    intermediate_dir=tmpdir_path,
                     cache_policy="auto",  # Will create cache since it doesn't exist
                     manual_datetimes=manual_dt,
                     datetimes_are_start=True,
@@ -675,6 +680,7 @@ class TestMNECachingOptimization:
                         mode="mne",
                         extract_func=mock_func,
                         intermediate="edf",
+                        intermediate_dir=tmpdir_path,
                         cache_policy=cache_policy,
                         manual_datetimes=manual_dt,
                         datetimes_are_start=True,
@@ -744,6 +750,7 @@ class TestMNECachingOptimization:
                     input_type="file",
                     file_pattern="test.edf",
                     intermediate="edf",
+                    intermediate_dir=tmpdir_path,
                     cache_policy="force_regenerate",
                     manual_datetimes=manual_dt,
                     datetimes_are_start=True,
