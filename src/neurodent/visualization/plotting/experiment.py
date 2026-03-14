@@ -363,7 +363,7 @@ class ExperimentPlotter:
                         [
                             (
                                 item[0]
-                                if isinstance(item, tuple) and len(item) == 2
+                                if isinstance(item, (tuple, list)) and len(item) == 2
                                 else item
                             )
                             for item in psd_data
@@ -379,7 +379,7 @@ class ExperimentPlotter:
                         [
                             (
                                 item[1]
-                                if isinstance(item, tuple) and len(item) == 2
+                                if isinstance(item, (tuple, list)) and len(item) == 2
                                 else item
                             )
                             for item in psd_data
