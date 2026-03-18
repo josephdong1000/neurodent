@@ -53,8 +53,8 @@ class AnimalFeatureParser:
 
         elif ftype.is_dict_stored:
             vals, keys = extract_band_dict(column)
-            avg = {k: core.nanaverage(vals[:, i], axis=0, weights=weights)
-                   for i, k in enumerate(keys)}
+            avg_vals = core.nanaverage(vals, axis=0, weights=weights)
+            avg = dict(zip(keys, avg_vals))
 
         elif ftype is constants.FeatureType.HIST:
             coords, values = extract_hist_data(column)
