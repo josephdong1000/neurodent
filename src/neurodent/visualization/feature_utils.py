@@ -19,24 +19,45 @@ import pandas as pd
 # ---------------------------------------------------------------------------
 
 def extract_linear_array(series: pd.Series) -> np.ndarray:
-    """Convert a Series of per-channel arrays into a 2-D numpy array.
+    """Convert a Series of per-channel arrays into a dense numpy array.
 
-    Works for LINEAR features (scalar per channel) and LINEAR_2D features
-    (multi-component per channel, e.g. psdslope).
+    Works for LINEAR features (scalar per channel), LINEAR_2D features
+    (multi-component per channel, e.g. psdslope), and matrix features
+    stored as raw arrays.
 
     Parameters
     ----------
     series : pd.Series
-        Each element is a list/array of shape ``(n_channels,)`` or
-        ``(n_channels, n_components)``.
+        Each element is a list/array of consistent shape.
 
     Returns
     -------
     np.ndarray
-        Array of shape ``(n_windows, n_channels)`` or
-        ``(n_windows, n_channels, n_components)``.
+        For LINEAR features: shape ``(n_windows, n_channels)``.
+        For LINEAR_2D features: shape ``(n_windows, n_channels, n_components)``.
+        Higher-dimensional inputs are supported as long as all rows share
+        the same shape.
+
+    Raises
+    ------
+    ValueError
+        If the per-row arrays have inconsistent shapes (ragged data).
     """
-    return np.array(series.tolist())
+    try:
+        result = np.asarray(series.tolist())
+    except ValueError:
+        shapes = {np.asarray(row).shape for row in series}
+        raise ValueError(
+            f"Ragged input: per-row shapes are not uniform ({shapes}). "
+            f"All rows must have the same shape."
+        )
+    if result.dtype == object:
+        shapes = {np.asarray(row).shape for row in series}
+        raise ValueError(
+            f"Ragged input: per-row shapes are not uniform ({shapes}). "
+            f"All rows must have the same shape."
+        )
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -57,10 +78,26 @@ def extract_band_dict(series: pd.Series) -> tuple[np.ndarray, list]:
         Array of shape ``(n_windows, n_bands, ...)``.
     keys : list
         Ordered band names extracted from the first row.
+
+    Raises
+    ------
+    ValueError
+        If band values have inconsistent shapes across windows (ragged data).
     """
     df_bands = pd.DataFrame(series.tolist())
     keys = list(df_bands.columns)
-    vals = np.array(df_bands.values.tolist())
+    try:
+        vals = np.asarray(df_bands.values.tolist())
+    except ValueError:
+        raise ValueError(
+            "Ragged input: band values have inconsistent shapes across windows. "
+            "All windows must have the same shape per band."
+        )
+    if vals.dtype == object:
+        raise ValueError(
+            "Ragged input: band values have inconsistent shapes across windows. "
+            "All windows must have the same shape per band."
+        )
     return vals, keys
 
 
@@ -106,16 +143,33 @@ def extract_hist_data(series: pd.Series) -> tuple[np.ndarray, np.ndarray]:
     values : np.ndarray
         Spectral values, shape ``(n_windows, n_freq_bins, n_channels)``
         (or similar, depending on upstream layout).
+
+    Raises
+    ------
+    ValueError
+        If histogram entries have inconsistent shapes across windows
+        (ragged data).
     """
     data = series.tolist()
-    coords = np.array([
-        np.asarray(item[0]) if isinstance(item, (tuple, list)) and len(item) == 2
-        else np.asarray(item)
-        for item in data
-    ])
-    values = np.array([
-        np.asarray(item[1]) if isinstance(item, (tuple, list)) and len(item) == 2
-        else np.asarray(item)
-        for item in data
-    ])
+    try:
+        coords = np.asarray([
+            np.asarray(item[0]) if isinstance(item, (tuple, list)) and len(item) == 2
+            else np.asarray(item)
+            for item in data
+        ])
+        values = np.asarray([
+            np.asarray(item[1]) if isinstance(item, (tuple, list)) and len(item) == 2
+            else np.asarray(item)
+            for item in data
+        ])
+    except ValueError:
+        raise ValueError(
+            "Ragged input: histogram entries have inconsistent shapes across windows. "
+            "All windows must have the same shape."
+        )
+    if coords.dtype == object or values.dtype == object:
+        raise ValueError(
+            "Ragged input: histogram entries have inconsistent shapes across windows. "
+            "All windows must have the same shape."
+        )
     return coords, values

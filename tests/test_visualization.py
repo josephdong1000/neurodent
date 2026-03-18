@@ -1951,6 +1951,36 @@ class TestFeatureUtils:
         assert values.shape == (2, 3)
         np.testing.assert_array_equal(values[0], [10.0, 20.0, 30.0])
 
+    def test_extract_linear_array_ragged_raises(self):
+        """Test that ragged input raises ValueError."""
+        from neurodent.visualization.feature_utils import extract_linear_array
+
+        series = pd.Series([[1.0, 2.0, 3.0], [4.0, 5.0]])
+        with pytest.raises(ValueError, match="Ragged input"):
+            extract_linear_array(series)
+
+    def test_extract_band_dict_ragged_raises(self):
+        """Test that ragged band values raise ValueError."""
+        from neurodent.visualization.feature_utils import extract_band_dict
+
+        series = pd.Series([
+            {"delta": [1.0, 2.0], "theta": [3.0, 4.0]},
+            {"delta": [5.0, 6.0, 7.0], "theta": [8.0]},
+        ])
+        with pytest.raises(ValueError, match="Ragged input"):
+            extract_band_dict(series)
+
+    def test_extract_hist_data_ragged_raises(self):
+        """Test that ragged histogram data raises ValueError."""
+        from neurodent.visualization.feature_utils import extract_hist_data
+
+        series = pd.Series([
+            (np.array([1.0, 2.0, 3.0]), np.array([10.0, 20.0, 30.0])),
+            (np.array([1.0, 2.0]), np.array([40.0, 50.0])),
+        ])
+        with pytest.raises(ValueError, match="Ragged input"):
+            extract_hist_data(series)
+
 
 class TestDataProcessingForVisualization:
     """Test data processing functions for visualization."""
