@@ -408,7 +408,7 @@ class ExperimentPlotter:
 
             else:
                 raise ValueError(
-                    f"{feature} is not supported in _pull_timeseries_dataframe"
+                    f"{feature} (FeatureType: {ftype}) is not supported in _pull_timeseries_dataframe"
                 )
 
             df_feature = pd.DataFrame.from_dict(vals, orient="columns")

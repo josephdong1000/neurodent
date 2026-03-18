@@ -65,7 +65,9 @@ class AnimalFeatureParser:
             avg = (coords, core.nanaverage(values, axis=0, weights=weights))
 
         else:
-            raise TypeError(f"Unrecognized type in column {colname}: {colitem}")
+            raise TypeError(
+                f"Unsupported FeatureType {ftype} for averaging column {colname}"
+            )
 
         return avg
 
@@ -2141,7 +2143,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 ]
 
             else:
-                raise ValueError(f"Invalid feature: {feature}")
+                raise ValueError(
+                    f"Unsupported FeatureType {ftype} for channel remapping: {feature}"
+                )
 
         if inplace:
             self.result = result
@@ -3558,7 +3562,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 result[feat] = vals.tolist()
 
             else:
-                raise ValueError(f"Unknown feature to filter {feat}")
+                raise ValueError(
+                    f"Unsupported FeatureType {ftype} for filtering: {feat}"
+                )
         return result
 
     def save_pickle_and_json(

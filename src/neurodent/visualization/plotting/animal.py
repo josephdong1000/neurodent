@@ -272,7 +272,10 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         elif ftype is constants.FeatureType.BAND:
             ax.set_yticks(ytick_offset, constants.BAND_NAMES)
         else:
-            raise ValueError(f"Invalid feature {feature}")
+            raise ValueError(
+                f"Unsupported FeatureType {ftype} for ytick labels: {feature} "
+                f"(expected LINEAR or BAND)"
+            )
 
         if show_endfile:
             self._plot_filediv_lines(
@@ -315,7 +318,9 @@ class AnimalPlotter(viz.AnimalFeatureParser):
             data_X = data_X.transpose()
             data_X = np.expand_dims(data_X, axis=-1)
         else:
-            raise ValueError(f"Invalid feature {feature}")
+            raise ValueError(
+                f"Unsupported FeatureType {ftype} for feature extraction: {feature}"
+            )
 
         return self._calculate_standard_data(data_X, mode=score_type, axis=0)
 
