@@ -270,3 +270,98 @@ class TestDatetimesAreStartPropagation:
             )
 
         assert session_lro_kwargs["datetimes_are_start"] is False  # Now present
+
+
+class TestValidateSamplingRates:
+    """Tests for the _validate_sampling_rates() method on AnimalOrganizer."""
+
+    _date_counter = 0
+
+    def _make_mock_lro(self, sampling_freq=1000.0, total_samples=1000, display_name="mock_lro", date=None):
+        """Create a mock LongRecordingOrganizer with configurable sampling frequency."""
+        lro = MagicMock(spec=LongRecordingOrganizer)
+        lro.channel_names = ["ch1", "ch2"]
+        lro.base_folder_path = "/tmp/mock"
+        lro.labels = {}
+        lro.display_name = display_name
+
+        mock_rec = MagicMock()
+        mock_rec.get_total_samples.return_value = total_samples
+        mock_rec.get_sampling_frequency.return_value = sampling_freq
+        lro.LongRecording = mock_rec
+
+        TestValidateSamplingRates._date_counter += 1
+        if date is None:
+            date = f"Dec-{TestValidateSamplingRates._date_counter:02d}-2025"
+        lro.get_date_string.return_value = date
+
+        return lro
+
+    def _make_ao(self, lros):
+        """Create an AnimalOrganizer from a list of mock LROs."""
+        return AnimalOrganizer.from_lros(
+            lros, animal_id="TestAnimal", genotype="WT"
+        )
+
+    def test_same_sampling_rates_no_error(self):
+        """All recordings at the same rate should pass validation."""
+        lros = [self._make_mock_lro(1000.0, display_name=f"rec_{i}") for i in range(3)]
+        ao = self._make_ao(lros)
+        # Should not raise
+        ao._validate_sampling_rates()
+
+    def test_different_sampling_rates_raises(self):
+        """Recordings with different sampling rates should raise ValueError."""
+        lros = [
+            self._make_mock_lro(1000.0, display_name="rec_1000"),
+            self._make_mock_lro(500.0, display_name="rec_500"),
+        ]
+        ao = self._make_ao(lros)
+
+        with pytest.raises(ValueError, match="same sampling rate"):
+            ao._validate_sampling_rates()
+
+    def test_error_message_includes_details(self):
+        """Error message should list recording names and their rates."""
+        lros = [
+            self._make_mock_lro(1000.0, display_name="session_A"),
+            self._make_mock_lro(2000.0, display_name="session_B"),
+        ]
+        ao = self._make_ao(lros)
+
+        with pytest.raises(ValueError, match="session_A.*1000") as exc_info:
+            ao._validate_sampling_rates()
+        assert "session_B" in str(exc_info.value)
+        assert "2000" in str(exc_info.value)
+
+    def test_single_recording_passes(self):
+        """Single recording should always pass."""
+        lros = [self._make_mock_lro(1000.0)]
+        ao = self._make_ao(lros)
+        ao._validate_sampling_rates()
+
+    def test_empty_recordings_skipped(self):
+        """Empty recordings (0 samples) should be skipped during validation."""
+        lros = [
+            self._make_mock_lro(1000.0, total_samples=1000, display_name="good_rec"),
+            self._make_mock_lro(500.0, total_samples=0, display_name="empty_rec"),
+        ]
+        ao = self._make_ao(lros)
+        # The 500 Hz recording has 0 samples and is skipped by _iter_valid_recordings
+        ao._validate_sampling_rates()
+
+    def test_three_different_rates_raises(self):
+        """Multiple different rates should all be reported."""
+        lros = [
+            self._make_mock_lro(1000.0, display_name="rec_a"),
+            self._make_mock_lro(500.0, display_name="rec_b"),
+            self._make_mock_lro(2000.0, display_name="rec_c"),
+        ]
+        ao = self._make_ao(lros)
+
+        with pytest.raises(ValueError, match="3 different rates") as exc_info:
+            ao._validate_sampling_rates()
+        msg = str(exc_info.value)
+        assert "rec_a" in msg
+        assert "rec_b" in msg
+        assert "rec_c" in msg
