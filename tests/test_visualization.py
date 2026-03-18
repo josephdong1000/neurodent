@@ -130,7 +130,7 @@ class TestWindowAnalysisResult:
     def war(self, sample_result_df):
         """Create a WindowAnalysisResult instance."""
         return WindowAnalysisResult(
-            result=sample_result_df, animal_id="A1", genotype="WT", channel_names=["LMot", "RMot"]
+            result=sample_result_df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"]
         )
 
     @pytest.fixture
@@ -140,6 +140,7 @@ class TestWindowAnalysisResult:
             result=filtering_result_df,
             animal_id="A1",
             genotype="WT",
+            sex="Male",
             channel_names=["LMot", "RMot", "LBar"],
             bad_channels_dict={"A1_20230101": ["LMot"], "A1_20230102": ["RMot"]},
         )
@@ -148,6 +149,7 @@ class TestWindowAnalysisResult:
         """Test WindowAnalysisResult initialization."""
         assert war.animal_id == "A1"
         assert war.genotype == "WT"
+        assert war.sex == "Male"
         assert war.channel_names == ["LMot", "RMot"]
         assert len(war.result) == len(sample_result_df)
 
@@ -159,6 +161,7 @@ class TestWindowAnalysisResult:
         # Check that the copy has the same attributes
         assert war_copy.animal_id == filtering_war.animal_id
         assert war_copy.genotype == filtering_war.genotype
+        assert war_copy.sex == filtering_war.sex
         assert war_copy.channel_names == filtering_war.channel_names
         assert war_copy.assume_from_number == filtering_war.assume_from_number
         assert war_copy.suppress_short_interval_error == filtering_war.suppress_short_interval_error
@@ -283,7 +286,7 @@ class TestWindowAnalysisResult:
 
         # Should generate warning and sort timestamps
         with pytest.warns(UserWarning, match="Timestamps are not sorted"):
-            war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", channel_names=["LMot", "RMot"])
+            war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"])
 
         # Verify timestamps are now sorted
         assert war.result["timestamp"].is_monotonic_increasing
@@ -312,7 +315,7 @@ class TestWindowAnalysisResult:
         # Should not generate any warnings
         with warnings.catch_warnings():
             warnings.simplefilter("error")  # Turn warnings into errors
-            war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", channel_names=["LMot", "RMot"])
+            war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"])
 
         # Verify timestamps remain sorted
         assert war.result["timestamp"].is_monotonic_increasing
@@ -341,7 +344,7 @@ class TestWindowAnalysisResult:
 
         # Should generate warning but not raise error (1/149 = 0.67% < 1% threshold)
         with pytest.warns(UserWarning, match=r"Found \d+ intervals.*shorter than the median duration"):
-            war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", channel_names=["LMot", "RMot"])
+            war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"])
 
     def test_short_intervals_error(self):
         """Test error for too many short intervals between timestamps (> 1% threshold)."""
@@ -365,7 +368,7 @@ class TestWindowAnalysisResult:
 
         # Should raise ValueError (>1% of intervals are short: 2/3 = 66.7%)
         with pytest.raises(ValueError, match=r"Found \d+ intervals.*shorter than the median duration"):
-            WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", channel_names=["LMot", "RMot"])
+            WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"])
 
     def test_suppress_short_intervals_error(self):
         """Test that suppress_short_interval_error parameter suppresses the ValueError."""
@@ -389,13 +392,14 @@ class TestWindowAnalysisResult:
 
         # Should NOT raise ValueError when suppress_short_interval_error=True
         war = WindowAnalysisResult(
-            result=df, animal_id="A1", genotype="WT", channel_names=["LMot", "RMot"], suppress_short_interval_error=True
+            result=df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"], suppress_short_interval_error=True
         )
 
         # Verify the parameter is stored correctly
         assert war.suppress_short_interval_error
         assert war.animal_id == "A1"
         assert war.genotype == "WT"
+        assert war.sex == "Male"
 
     def test_no_short_intervals_check_without_duration(self):
         """Test that short interval check is skipped when duration column is missing."""
@@ -418,7 +422,7 @@ class TestWindowAnalysisResult:
         # Should not raise error or warning about short intervals
         with warnings.catch_warnings():
             warnings.simplefilter("error")  # Turn warnings into errors
-            war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", channel_names=["LMot", "RMot"])
+            war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"])
 
     def test_no_timestamp_validation_without_timestamps(self):
         """Test that timestamp validation is skipped when timestamp column is missing."""
@@ -435,7 +439,7 @@ class TestWindowAnalysisResult:
         # Should not raise any errors or warnings
         with warnings.catch_warnings():
             warnings.simplefilter("error")  # Turn warnings into errors
-            war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", channel_names=["LMot", "RMot"])
+            war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"])
 
     def test_equal_timestamps_handled_correctly(self):
         """Test that equal timestamps (0 second intervals) are handled correctly."""
@@ -460,7 +464,7 @@ class TestWindowAnalysisResult:
         # Should handle duplicate timestamps (0 second interval is < median duration)
         # This should trigger the short interval warning/error logic
         with pytest.raises(ValueError, match=r"Found \d+ intervals.*shorter than the median duration"):
-            WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", channel_names=["LMot", "RMot"])
+            WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"])
 
     def test_edge_case_single_timestamp(self):
         """Test edge case with only one timestamp (no intervals to check)."""
@@ -477,7 +481,7 @@ class TestWindowAnalysisResult:
         # Should not raise any errors (no intervals to check)
         with warnings.catch_warnings():
             warnings.simplefilter("error")  # Turn warnings into errors
-            war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", channel_names=["LMot", "RMot"])
+            war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"])
 
     def test_mixed_duration_intervals(self):
         """Test with mixed durations and corresponding interval validation."""
@@ -504,7 +508,7 @@ class TestWindowAnalysisResult:
         # All intervals should be reasonable relative to durations - no warnings expected
         with warnings.catch_warnings():
             warnings.simplefilter("error")  # Turn warnings into errors
-            war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", channel_names=["LMot", "RMot"])
+            war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"])
 
     def test_boundary_condition_exactly_one_percent(self):
         """Test boundary condition where exactly 1% of intervals are short."""
@@ -530,7 +534,7 @@ class TestWindowAnalysisResult:
 
         # Exactly 1% should trigger warning but not error (1/100 = 1.0%)
         with pytest.warns(UserWarning, match=r"Found \d+ intervals.*shorter than the median duration"):
-            war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", channel_names=["LMot", "RMot"])
+            war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"])
 
     def test_fragment_durations_stored_and_used(self):
         """Test that fragment durations are stored and used in weighted averaging."""
@@ -547,7 +551,7 @@ class TestWindowAnalysisResult:
         }
         df = pd.DataFrame(data)
 
-        war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", channel_names=["LMot", "RMot"])
+        war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"])
 
         # Verify duration column exists
         assert "duration" in war.result.columns
@@ -579,7 +583,7 @@ class TestWindowAnalysisResult:
         }
         df = pd.DataFrame(data)
 
-        war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", channel_names=["LMot", "RMot"])
+        war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"])
 
         # Aggregate by animalday
         war.aggregate_time_windows(groupby=["animalday"])
@@ -609,7 +613,7 @@ class TestWindowAnalysisResult:
         }
         df = pd.DataFrame(data)
 
-        war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", channel_names=["LMot", "RMot"])
+        war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"])
 
         with tempfile.TemporaryDirectory() as tmpdir:
             save_path = Path(tmpdir)
@@ -636,7 +640,7 @@ class TestWindowAnalysisResult:
         }
         df = pd.DataFrame(data)
 
-        war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", channel_names=["LMot", "RMot"])
+        war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"])
 
         # Should handle missing duration gracefully (falls back to uniform weights)
         result = war.get_groupavg_result(["rms"], groupby="animalday")
@@ -697,6 +701,7 @@ class TestWindowAnalysisResultFiltering:
             result=filtering_result_df,
             animal_id="A1",
             genotype="WT",
+            sex="Male",
             channel_names=["LMot", "RMot", "LBar"],
             bad_channels_dict={"A1_20230101": ["LMot"], "A1_20230102": ["RMot"]},
         )
@@ -885,6 +890,7 @@ class TestWindowAnalysisResultFiltering:
             assert filtered is not filtering_war
             assert filtered.animal_id == filtering_war.animal_id
             assert filtered.genotype == filtering_war.genotype
+            assert filtered.sex == filtering_war.sex
             assert filtered.channel_names == filtering_war.channel_names
 
     def test_method_chaining(self, filtering_war):
@@ -912,6 +918,7 @@ class TestWindowAnalysisResultFiltering:
 
         assert filtered.animal_id == filtering_war.animal_id
         assert filtered.genotype == filtering_war.genotype
+        assert filtered.sex == filtering_war.sex
         assert filtered.channel_names == filtering_war.channel_names
         assert filtered.assume_from_number == filtering_war.assume_from_number
         assert filtered.bad_channels_dict == filtering_war.bad_channels_dict
@@ -929,7 +936,7 @@ class TestWindowAnalysisResultFiltering:
         )
 
         war = WindowAnalysisResult(
-            result=df, animal_id="A1", genotype="WT", channel_names=["LMot", "RMot"], bad_channels_dict={}
+            result=df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"], bad_channels_dict={}
         )
 
         # Empty bad_channels_dict should mean "no bad channels" and not raise an error
@@ -960,6 +967,7 @@ class TestWindowAnalysisResultFiltering:
             result=df,
             animal_id="A1",
             genotype="WT",
+            sex="Male",
             channel_names=["LMot", "RMot"],
             bad_channels_dict={"A1_20230101": ["LMot"]},  # Missing A1_20230102
         )
@@ -976,7 +984,7 @@ class TestWindowAnalysisResultFiltering:
         """Test morphological smoothing without duration column."""
         df = pd.DataFrame({"animal": ["A1"] * 5, "animalday": ["A1_20230101"] * 5, "rms": [[100, 200]] * 5})
 
-        war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", channel_names=["LMot", "RMot"])
+        war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"])
 
         config = {"high_rms": {"max_rms": 500}}
 
@@ -1395,6 +1403,7 @@ class TestWindowAnalysisResultLOF:
             result=test_df,
             animal_id="A1",
             genotype="WT",
+            sex="Male",
             channel_names=["LMot", "RMot"],
             lof_scores_dict=sample_lof_scores_dict,
         )
@@ -1479,7 +1488,7 @@ class TestWindowAnalysisResultLOF:
                 "timestamp": pd.to_datetime(["2023-01-01 10:00:00", "2023-01-01 10:04:00"]),
             }
         )
-        war = WindowAnalysisResult(result=test_df, animal_id="A1", genotype="WT", channel_names=["LMot", "RMot"])
+        war = WindowAnalysisResult(result=test_df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"])
 
         # After __init__, missing sessions should be auto-populated with empty LOF scores
         # Both lof_scores AND channel_names should be empty to maintain invariant
@@ -1500,7 +1509,7 @@ class TestWindowAnalysisResultLOF:
             }
         )
         war = WindowAnalysisResult(
-            result=test_df, animal_id="A1", genotype="WT", channel_names=["LMot", "RMot"], lof_scores_dict={}
+            result=test_df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"], lof_scores_dict={}
         )
 
         # After __init__, empty dict should be populated with all sessions
@@ -1525,6 +1534,7 @@ class TestWindowAnalysisResultLOF:
             json_dict = {
                 "animal_id": war_with_lof.animal_id,
                 "genotype": war_with_lof.genotype,
+                "sex": war_with_lof.sex,
                 "channel_names": war_with_lof.channel_names,
                 "assume_from_number": war_with_lof.assume_from_number,
                 "bad_channels_dict": getattr(war_with_lof, "bad_channels_dict", {}),
@@ -1572,6 +1582,7 @@ class TestWindowAnalysisResultLOF:
             result=test_df,
             animal_id="A1",
             genotype="WT",
+            sex="Male",
             channel_names=["LMot", "RMot"],
             lof_scores_dict=invalid_lof_dict,
         )
@@ -1730,7 +1741,7 @@ class TestWindowAnalysisResultLOF:
                 "timestamp": pd.to_datetime(["2023-01-01 10:00:00", "2023-01-01 10:04:00"]),
             }
         )
-        war = WindowAnalysisResult(result=test_df, animal_id="A1", genotype="WT", channel_names=["LMot", "RMot"])
+        war = WindowAnalysisResult(result=test_df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"])
 
         ground_truth = {"day1": {"LMot"}}
 
@@ -1798,7 +1809,7 @@ class TestWindowAnalysisResultPickleJsonParameters:
             }
         )
 
-        war = WindowAnalysisResult(result=test_df, animal_id="A1", genotype="WT", channel_names=["LMot", "RMot"])
+        war = WindowAnalysisResult(result=test_df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"])
 
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
@@ -1835,6 +1846,7 @@ class TestWindowAnalysisResultPickleJsonParameters:
 
         assert loaded_war.animal_id == original_war.animal_id
         assert loaded_war.genotype == original_war.genotype
+        assert loaded_war.sex == original_war.sex
         assert loaded_war.channel_names == original_war.channel_names
         pd.testing.assert_frame_equal(loaded_war.result, original_war.result)
 
@@ -1966,7 +1978,48 @@ class TestWindowAnalysisResultPickleJsonParameters:
         assert loaded_war.animal_id == original_war.animal_id
         pd.testing.assert_frame_equal(loaded_war.result, original_war.result)
 
+    def test_load_old_json_without_sex(self):
+        """Test backward compatibility: old JSON files without 'sex' load with sex='Unknown'."""
+        import json
+        import tempfile
+        from pathlib import Path
 
+        test_df = pd.DataFrame(
+            {
+                "animal": ["A1"] * 2,
+                "animalday": ["day1", "day1"],
+                "genotype": ["WT"] * 2,
+                "duration": [4.0] * 2,
+                "rms": [[100.0, 110.0], [200.0, 210.0]],
+                "timestamp": pd.to_datetime(["2023-01-01 10:00:00", "2023-01-01 10:04:00"]),
+            }
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+
+            # Save pickle
+            test_df.to_pickle(tmpdir / "war.pkl")
+
+            # Save JSON without sex (simulating old format)
+            old_json = {
+                "animal_id": "A1",
+                "genotype": "WT",
+                "channel_names": ["LMot", "RMot"],
+                "assume_from_number": False,
+                "bad_channels_dict": {},
+                "suppress_short_interval_error": False,
+                "lof_scores_dict": {},
+            }
+            with open(tmpdir / "war.json", "w") as f:
+                json.dump(old_json, f)
+
+            # Load should succeed with sex="Unknown" (the default)
+            loaded_war = WindowAnalysisResult.load_pickle_and_json(folder_path=str(tmpdir))
+            assert loaded_war.animal_id == "A1"
+            assert loaded_war.genotype == "WT"
+            assert loaded_war.sex == "Unknown"
+            assert loaded_war.channel_names == ["LMot", "RMot"]
 class TestParquetSaveLoad:
     """Test parquet save/load functionality for WindowAnalysisResult."""
 
@@ -2199,6 +2252,7 @@ class TestAnimalOrganizerLOF:
         ao.animaldays = ["day1", "day2"]
         ao.animal_id = "A1"
         ao.genotype = "WT"
+        ao.sex = "Male"
         ao.channel_names = ["LMot", "RMot"]
         ao.assume_from_number = False
         ao.bad_channels_dict = {}
@@ -2250,6 +2304,7 @@ class TestAnimalOrganizerLOF:
             ao.features_df,
             ao.animal_id,
             ao.genotype,
+            ao.sex,
             ao.channel_names,
             ao.assume_from_number,
             ao.bad_channels_dict,
