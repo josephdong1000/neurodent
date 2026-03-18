@@ -3361,3 +3361,60 @@ class TestNanmeanSeriesOfNpEdgeCases:
         expected = np.nanmean(np.stack(arrays), axis=0)
         np.testing.assert_allclose(result, expected)
 
+
+class TestSlugify:
+    """Test slugify function."""
+
+    def test_basic_slugification(self):
+        """Test basic string slugification."""
+        assert utils.slugify("Hello World") == "hello-world"
+
+    def test_multiple_spaces(self):
+        """Test collapsing of multiple spaces."""
+        assert utils.slugify("Multiple   Spaces") == "multiple-spaces"
+
+    def test_special_characters_removed(self):
+        """Test removal of special characters."""
+        assert utils.slugify("Hello@#$World!") == "helloworld"
+
+    def test_unicode_default(self):
+        """Test ASCII transliteration with allow_unicode=False (default)."""
+        assert utils.slugify("Café") == "cafe"
+
+    def test_unicode_allowed(self):
+        """Test unicode preservation with allow_unicode=True."""
+        assert utils.slugify("Café", allow_unicode=True) == "café"
+
+    def test_hyphens_preserved(self):
+        """Test that existing hyphens are preserved."""
+        assert utils.slugify("hello-world") == "hello-world"
+
+    def test_underscores_preserved(self):
+        """Test that underscores are preserved."""
+        assert utils.slugify("hello_world") == "hello_world"
+
+    def test_repeated_dashes_collapsed(self):
+        """Test conversion of repeated dashes to single dash."""
+        assert utils.slugify("hello---world") == "hello-world"
+
+    def test_leading_trailing_stripped(self):
+        """Test stripping of leading/trailing hyphens and underscores."""
+        assert utils.slugify("  --hello--  ") == "hello"
+
+    def test_non_string_input(self):
+        """Test that non-string values are converted to string."""
+        assert utils.slugify(42) == "42"
+
+    def test_empty_string(self):
+        """Test empty string input."""
+        assert utils.slugify("") == ""
+
+    def test_animal_id_pattern(self):
+        """Test typical animal ID pattern used in the pipeline."""
+        assert utils.slugify("A10") == "a10"
+        assert utils.slugify("test_animal-WT-day1") == "test_animal-wt-day1"
+
+    def test_animal_id_with_allow_unicode(self):
+        """Test animal ID slugification with allow_unicode."""
+        assert utils.slugify("A10", allow_unicode=True) == "a10"
+

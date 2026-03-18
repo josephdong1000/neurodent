@@ -4,6 +4,10 @@ Unit tests for neurodent.visualization module.
 Legacy ResultsVisualizer and standalone plotting function tests have been removed because their functionality is now handled by AnimalPlotter and ExperimentPlotter.
 """
 
+import json
+import tempfile
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -2016,6 +2020,200 @@ class TestWindowAnalysisResultPickleJsonParameters:
             assert loaded_war.genotype == "WT"
             assert loaded_war.sex == "Unknown"
             assert loaded_war.channel_names == ["LMot", "RMot"]
+class TestParquetSaveLoad:
+    """Test parquet save/load functionality for WindowAnalysisResult."""
+
+    @pytest.fixture
+    def war_with_complex_columns(self):
+        """Create a WAR with complex (object-type) columns typical of real usage."""
+        data = {
+            "animalday": ["A1_20230101"] * 3,
+            "genotype": ["WT"] * 3,
+            "timestamp": pd.to_datetime(
+                ["2023-01-01 10:00:00", "2023-01-01 10:04:00", "2023-01-01 10:08:00"]
+            ),
+            "duration": [240.0, 245.0, 235.0],
+            "rms": [[100.0, 110.0], [200.0, 210.0], [150.0, 160.0]],
+            "psd": [
+                (np.array([1.0, 2.0]), np.array([10.0, 20.0])),
+                (np.array([3.0, 4.0]), np.array([30.0, 40.0])),
+                (np.array([5.0, 6.0]), np.array([50.0, 60.0])),
+            ],
+            "cohere": [
+                {"ch1_ch2": np.array([0.1, 0.2])},
+                {"ch1_ch2": np.array([0.3, 0.4])},
+                {"ch1_ch2": np.array([0.5, 0.6])},
+            ],
+        }
+        df = pd.DataFrame(data)
+        return WindowAnalysisResult(
+            result=df,
+            animal_id="A1",
+            genotype="WT",
+            channel_names=["LMot", "RMot"],
+        )
+
+    def test_parquet_round_trip(self, war_with_complex_columns):
+        """Test that save with parquet + load produces equivalent data."""
+        war = war_with_complex_columns
+        with tempfile.TemporaryDirectory() as tmpdir:
+            war.save_pickle_and_json(tmpdir, filename="war")
+
+            # Verify parquet file was created
+            assert (Path(tmpdir) / "war.parquet").exists()
+            # No sidecar meta file — metadata is embedded in parquet
+            assert not (Path(tmpdir) / "war.parquet.meta.json").exists()
+
+            # Load (should prefer parquet)
+            loaded = WindowAnalysisResult.load_pickle_and_json(
+                folder_path=tmpdir, pickle_name="war.pkl", json_name="war.json"
+            )
+            assert loaded.animal_id == war.animal_id
+            assert loaded.genotype == war.genotype
+            assert loaded.channel_names == war.channel_names
+
+            # Scalar columns should match
+            assert loaded.result["duration"].tolist() == war.result["duration"].tolist()
+
+            # List columns should round-trip (values come back as plain lists)
+            for i in range(len(war.result)):
+                assert loaded.result["rms"].iloc[i] == war.result["rms"].iloc[i]
+
+    def test_auto_discovery_with_parquet_files(self, war_with_complex_columns):
+        """Test that auto-discovery works when parquet files are present."""
+        war = war_with_complex_columns
+        with tempfile.TemporaryDirectory() as tmpdir:
+            war.save_pickle_and_json(tmpdir, filename="war")
+
+            loaded = WindowAnalysisResult.load_pickle_and_json(folder_path=tmpdir)
+            assert loaded.animal_id == war.animal_id
+
+    def test_fallback_to_pickle_when_no_parquet(self, war_with_complex_columns):
+        """Test that loading falls back to pickle when parquet files are absent."""
+        war = war_with_complex_columns
+        with tempfile.TemporaryDirectory() as tmpdir:
+            war.save_pickle_and_json(tmpdir, filename="war")
+            # Remove parquet to force pickle fallback
+            (Path(tmpdir) / "war.parquet").unlink()
+
+            loaded = WindowAnalysisResult.load_pickle_and_json(
+                folder_path=tmpdir, pickle_name="war.pkl", json_name="war.json"
+            )
+            assert loaded.animal_id == war.animal_id
+            assert loaded.result["duration"].tolist() == war.result["duration"].tolist()
+
+    def test_metadata_embedded_in_parquet(self, war_with_complex_columns):
+        """Test that encoded column metadata is stored in parquet schema metadata."""
+        import pyarrow.parquet as pq
+
+        war = war_with_complex_columns
+        with tempfile.TemporaryDirectory() as tmpdir:
+            war.save_pickle_and_json(tmpdir, filename="war")
+
+            table = pq.read_table(Path(tmpdir) / "war.parquet")
+            schema_meta = table.schema.metadata
+            assert b"neurodent" in schema_meta
+
+            nd_meta = json.loads(schema_meta[b"neurodent"])
+            assert "encoded_columns" in nd_meta
+            assert "rms" in nd_meta["encoded_columns"]
+
+    def test_encode_decode_round_trip(self):
+        """Test _encode_df_for_parquet and _decode_df_from_parquet directly."""
+        df = pd.DataFrame(
+            {
+                "scalar": [1.0, 2.0, 3.0],
+                "string_col": ["a", "b", "c"],
+                "list_col": [[1, 2], [3, 4], [5, 6]],
+                "dict_col": [{"x": 1}, {"y": 2}, {"z": 3}],
+                "array_col": [np.array([1.0, 2.0]), np.array([3.0, 4.0]), np.array([5.0, 6.0])],
+                "none_col": [None, [1], None],
+            }
+        )
+
+        encoded, cols = WindowAnalysisResult._encode_df_for_parquet(df)
+
+        # Scalar and string columns should NOT be encoded
+        assert "scalar" not in cols
+        assert "string_col" not in cols
+
+        # Complex columns should be encoded
+        assert "list_col" in cols
+        assert "dict_col" in cols
+        assert "array_col" in cols
+
+        # Encoded values should be JSON strings
+        for col in cols:
+            for val in encoded[col].dropna():
+                assert isinstance(val, str)
+
+        # Decode and verify round-trip
+        decoded = WindowAnalysisResult._decode_df_from_parquet(encoded, cols)
+        for i in range(len(df)):
+            # list_col stays as plain list after JSON round-trip (no numpy conversion)
+            assert decoded["list_col"].iloc[i] == df["list_col"].iloc[i]
+            assert decoded["dict_col"].iloc[i] == df["dict_col"].iloc[i]
+            # array_col comes back as a plain list; verify values match
+            np.testing.assert_array_equal(
+                decoded["array_col"].iloc[i], df["array_col"].iloc[i]
+            )
+
+    def test_parquet_file_has_content(self, war_with_complex_columns):
+        """Test that the parquet file has meaningful content matching the DataFrame."""
+        war = war_with_complex_columns
+        with tempfile.TemporaryDirectory() as tmpdir:
+            war.save_pickle_and_json(tmpdir, filename="war")
+            pq_path = Path(tmpdir) / "war.parquet"
+            assert pq_path.stat().st_size > 0
+
+            reloaded = pd.read_parquet(pq_path, engine="pyarrow")
+            assert len(reloaded) == len(war.result)
+            assert set(war.result.columns).issubset(set(reloaded.columns))
+
+    def test_save_load_speed(self, war_with_complex_columns):
+        """Test that parquet load time is comparable to pickle after warm-up.
+
+        For small DataFrames, parquet has more fixed overhead than pickle.
+        This test verifies that load time is within a reasonable factor,
+        which shows the overhead is bounded (not pathological).
+        """
+        import time
+
+        war = war_with_complex_columns
+        with tempfile.TemporaryDirectory() as tmpdir:
+            war.save_pickle_and_json(tmpdir, filename="war")
+
+            pkl_path = Path(tmpdir) / "war.pkl"
+            pq_path = Path(tmpdir) / "war.parquet"
+
+            # Warm-up: first load amortizes import costs
+            pd.read_pickle(pkl_path)
+            pd.read_parquet(pq_path, engine="pyarrow")
+
+            n_iters = 50
+
+            start = time.perf_counter()
+            for _ in range(n_iters):
+                pd.read_pickle(pkl_path)
+            pkl_time = time.perf_counter() - start
+
+            start = time.perf_counter()
+            for _ in range(n_iters):
+                pd.read_parquet(pq_path, engine="pyarrow")
+            pq_time = time.perf_counter() - start
+
+            # For small DataFrames parquet has higher per-call overhead (pyarrow
+            # table construction, schema parsing) vs pickle's simple
+            # deserialization.  On real-world WARs (thousands of rows) the gap
+            # narrows substantially.  The 20x bound here guards against
+            # regressions while accommodating the small-data worst case.
+            assert pq_time < pkl_time * 20, (
+                f"Parquet load ({pq_time:.3f}s) is unreasonably slower "
+                f"than pickle ({pkl_time:.3f}s)"
+            )
+
+
+class TestAnimalOrganizerLOF:
     """Test LOF functionality integration with AnimalOrganizer (mocked)."""
 
     def test_animal_organizer_lof_methods_exist(self):

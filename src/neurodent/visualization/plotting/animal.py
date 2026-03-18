@@ -515,8 +515,8 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         )
         plt.subplots_adjust(wspace=0)
         for i, (idx, row) in enumerate(avg_result.iterrows()):
-            freqs = row["psd"][0]
-            psd = row["psd"][1]
+            freqs = np.asarray(row["psd"][0])
+            psd = np.asarray(row["psd"][1])
             if avg_channels:
                 psd = np.nanmean(psd, axis=-1, keepdims=True)
                 label = "Average"
@@ -572,7 +572,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
             ["psd"], multiindex=multiindex
         )
         for i, df_row in df_rowgroup.groupby(level=0):
-            freqs = df_row.iloc[0]["psd"][0]
+            freqs = np.asarray(df_row.iloc[0]["psd"][0])
             psd = np.array([x[1] for x in df_row["psd"].tolist()])
             match center_stat:
                 case "mean":

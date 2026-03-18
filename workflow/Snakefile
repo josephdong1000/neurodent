@@ -72,7 +72,7 @@ samples_file = config["samples"]["samples_file"]
 
 # Load sample definitions
 from datetime import datetime
-from django.utils.text import slugify
+from neurodent.core.utils import slugify
 
 # Verify snakemake is installed before importing from it
 try:

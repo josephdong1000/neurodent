@@ -17,8 +17,6 @@ import dask.delayed
 import numpy as np
 import matplotlib.pyplot as plt
 import mne
-from django.utils.text import slugify
-
 try:
     import spikeinterface.core as si
     SPIKEINTERFACE_AVAILABLE = True
@@ -27,7 +25,7 @@ except ImportError:  # pragma: no cover
     SPIKEINTERFACE_AVAILABLE = False
 
 from .. import core
-from ..core.utils import abbreviate_channel_names
+from ..core.utils import abbreviate_channel_names, slugify
 from .results import AnimalFeatureParser
 
 
