@@ -2078,9 +2078,13 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 else:
                     vals = extract_linear_array(result[feature])
 
+                # vals has shape (n_rows, n_channels, *extra_dims). We allocate an array
+                # with the same leading and trailing dimensions but with the channel axis
+                # sized to len(target_channels). Missing channels are padded with NaN and
+                # existing channels are copied in via channel_map below.
                 new_vals = np.full(
                     (vals.shape[0], len(target_channels), *vals.shape[2:]), np.nan
-                )  # dubious
+                )
 
                 for i, ch in enumerate(channel_names):
                     if ch in channel_map:

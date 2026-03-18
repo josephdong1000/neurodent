@@ -1843,16 +1843,16 @@ class TestExperimentPlotterFeatureDispatch:
         assert "pcorr" in df.columns
         assert (df["channel"] == "all").all()
 
-    def test_pull_banded_matrix_feature_collapsed_known_bug(self, feature_plotter):
-        """BANDED_MATRIX collapse_channels=True triggers IndexError (known bug).
-
-        vals.shape[1] is n_bands, but tril_indices expects n_chan.
-        This documents the pre-existing issue noted in test_pull_banded_matrix_feature.
-        """
-        with pytest.raises(IndexError):
-            feature_plotter.pull_timeseries_dataframe(
-                feature="cohere", groupby=["genotype"], collapse_channels=True
-            )
+    def test_pull_banded_matrix_feature_collapsed(self, feature_plotter):
+        """Test pull_timeseries_dataframe with BANDED_MATRIX, collapse_channels=True."""
+        df = feature_plotter.pull_timeseries_dataframe(
+            feature="cohere", groupby=["genotype"], collapse_channels=True
+        )
+        assert isinstance(df, pd.DataFrame)
+        assert "cohere" in df.columns
+        # Collapsed channels should be labeled as 'average', matching SIMPLE_MATRIX behavior
+        assert "channel" in df.columns
+        assert (df["channel"] == "average").all()
 
 
 class TestFeatureUtils:
