@@ -697,6 +697,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                     item_name = self._get_item_name(items[0])
                     if item_name in self._processed_timestamps:
                         kwargs["manual_datetimes"] = self._processed_timestamps[item_name]
+                        kwargs["datetimes_are_start"] = True  # _compute_global_timeline always returns start times
                         logging.debug(
                             f"Using processed timestamp for {item_name}: {kwargs['manual_datetimes']}"
                         )
@@ -709,6 +710,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                             item_timestamps.append(self._processed_timestamps[item_name])
                     if item_timestamps:
                         kwargs["manual_datetimes"] = item_timestamps
+                        kwargs["datetimes_are_start"] = True  # _compute_global_timeline always returns start times
                         logging.debug(
                             f"Using processed timestamps for {animalday}: {item_timestamps}"
                         )
@@ -736,6 +738,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                             individual_kwargs["manual_datetimes"] = (
                                 self._processed_timestamps[item_name]
                             )
+                            individual_kwargs["datetimes_are_start"] = True  # _compute_global_timeline always returns start times
                     individual_lro = core.LongRecordingOrganizer(
                         item, **individual_kwargs
                     )
