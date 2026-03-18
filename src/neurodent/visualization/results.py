@@ -2726,6 +2726,14 @@ class WindowAnalysisResult(AnimalFeatureParser):
     ) -> pd.DataFrame:
         """Average features across channels to produce scalar values.
 
+        This method operates on *expanded* feature columns (e.g.
+        ``cohere_delta``, ``psdband_theta``) that have already been unpacked
+        from their dict-stored representation by
+        :meth:`_extract_band_features` / :meth:`_extract_banded_matrix_features`.
+        Because expanded names do not exist in :data:`constants.FEATURE_TYPES`,
+        dispatch is based on array dimensionality rather than
+        :func:`classify_feature`.
+
         Handles two types of features:
         - Vector features (1D arrays): Average across channels
         - Matrix features (2D arrays): Average upper triangle (excluding diagonal)
@@ -2737,8 +2745,6 @@ class WindowAnalysisResult(AnimalFeatureParser):
         Returns:
             DataFrame with averaged features replacing original arrays
         """
-        import numpy as np
-
         for feature in features:
             if feature not in df.columns:
                 continue
@@ -2751,13 +2757,8 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
                 if first_element.ndim == 1:
                     # Vector features: Mean across channels
-                    # We use a robust approach to handle potential list formats or shape drifts
-                    feature_values = df[feature].values
-
-                    # Check if we can use vectorized approach (faster)
                     try:
-                        # This will fail efficiently if shapes don't match
-                        feature_arrays = np.vstack(feature_values)
+                        feature_arrays = extract_linear_array(df[feature])
                         feature_avg = np.nanmean(feature_arrays, axis=1)
                     except ValueError as e:
                         raise ValueError(
@@ -2771,10 +2772,6 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
                 elif first_element.ndim == 2:
                     # Matrix features: Mean of upper triangle
-                    import logging
-
-                    logger = logging.getLogger(__name__)
-
                     feature_avg = []
                     for matrix in df[feature].values:
                         if isinstance(matrix, list):
@@ -2782,7 +2779,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
                         # Validate matrix shape
                         if not isinstance(matrix, np.ndarray) or matrix.ndim != 2:
-                            logger.warning(
+                            logging.warning(
                                 f"Expected 2D matrix for {feature}, "
                                 f"got {type(matrix)} with ndim {getattr(matrix, 'ndim', 'N/A')}"
                             )
