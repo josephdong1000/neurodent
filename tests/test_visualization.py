@@ -1205,7 +1205,7 @@ class TestAnimalPlotter:
         fig, ax = plt.subplots()
         plotter._plot_linear_temporalgroup(group, "rms", ax)
         labels = [t.get_text() for t in ax.get_yticklabels()]
-        assert "rms" in labels
+        assert labels == ["rms"]
         plt.close(fig)
 
     def test_plot_linear_temporalgroup_yticks_linear_2d(self, plotter):
@@ -1219,8 +1219,7 @@ class TestAnimalPlotter:
         fig, ax = plt.subplots()
         plotter._plot_linear_temporalgroup(group, "psdslope", ax)
         labels = [t.get_text() for t in ax.get_yticklabels()]
-        assert "psdslope" in labels
-        assert "psdintercept" in labels
+        assert labels == ["psdslope", "psdintercept"]
         plt.close(fig)
 
     def test_plot_linear_temporalgroup_yticks_band(self, plotter):
@@ -1237,8 +1236,7 @@ class TestAnimalPlotter:
         fig, ax = plt.subplots()
         plotter._plot_linear_temporalgroup(group, "psdband", ax)
         labels = [t.get_text() for t in ax.get_yticklabels()]
-        for band in constants.BAND_NAMES:
-            assert band in labels
+        assert labels == constants.BAND_NAMES
         plt.close(fig)
 
 
