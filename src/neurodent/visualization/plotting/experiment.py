@@ -339,7 +339,9 @@ class ExperimentPlotter:
                 logging.debug(f"vals.shape: {vals.shape}")
 
                 if collapse_channels:
-                    tril_indices = np.tril_indices(vals.shape[1], k=-1)
+                    # vals is expected to be shaped (n_windows, n_bands, n_chan, n_chan)
+                    # Use the channel dimension (axis=2) when building triangular indices.
+                    tril_indices = np.tril_indices(vals.shape[2], k=-1)
                     vals = np.nanmean(
                         vals[:, :, tril_indices[0], tril_indices[1]], axis=-1
                     )
