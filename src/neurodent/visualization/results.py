@@ -1104,10 +1104,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         """
         sfreqs: dict[str, float] = {}
         for _i, lrec in self._iter_valid_recordings():
-            if (
-                hasattr(lrec, "LongRecording")
-                and lrec.LongRecording is not None
-            ):
+            if hasattr(lrec, "LongRecording"):
                 sf = lrec.LongRecording.get_sampling_frequency()
                 sfreqs[lrec.display_name] = sf
 
