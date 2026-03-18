@@ -1092,6 +1092,36 @@ class AnimalOrganizer(AnimalFeatureParser):
                 continue
             yield i, lrec
 
+    def _validate_sampling_rates(self):
+        """Validate that all valid recordings share the same sampling rate.
+
+        Inconsistent sampling rates across recordings lead to PSD arrays with
+        different frequency-axis lengths, which causes downstream failures in
+        ``_apply_filter`` and other operations that stack arrays across windows.
+
+        Raises:
+            ValueError: If recordings have different sampling rates.
+        """
+        sfreqs: dict[str, float] = {}
+        for _i, lrec in self._iter_valid_recordings():
+            if hasattr(lrec, "LongRecording"):
+                sf = lrec.LongRecording.get_sampling_frequency()
+                sfreqs[lrec.display_name] = sf
+
+        if not sfreqs:
+            return
+
+        unique_rates = set(sfreqs.values())
+        if len(unique_rates) > 1:
+            details = ", ".join(
+                f"{name}: {rate} Hz" for name, rate in sfreqs.items()
+            )
+            raise ValueError(
+                f"All recordings must have the same sampling rate to produce "
+                f"consistent feature shapes (e.g. PSD). "
+                f"Found {len(unique_rates)} different rates: {details}"
+            )
+
     def compute_bad_channels(
         self, lof_threshold: float = None, force_recompute: bool = False
     ):
@@ -1175,6 +1205,8 @@ class AnimalOrganizer(AnimalFeatureParser):
             WindowAnalysisResult: A WindowAnalysisResult object containing extracted features for all recordings
         """
         features = _sanitize_feature_request(features, exclude)
+
+        self._validate_sampling_rates()
 
         dataframes = []
         for _i, lrec in self._iter_valid_recordings():
@@ -3538,15 +3570,6 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     vals[~filter_tfs] = np.nan
                     result[feat] = vals.tolist()
                 case "psd":
-                    # FIXME The sampling rates have changed between computation passes so WARs have different shapes.
-                    # Add a check for same sampling frequency, other war-relevant properties etc.
-                    # The logging lines below should be removed at some point, but I'll keep it this way for now
-                    logging.debug(
-                        f"set([np.asarray(x[0]).shape for x in result[feat].tolist()]) = {list(set([np.asarray(x[0]).shape for x in result[feat].tolist()]))}"
-                    )
-                    logging.debug(
-                        f"set([np.asarray(x[1]).shape for x in result[feat].tolist()]) = {list(set([np.asarray(x[1]).shape for x in result[feat].tolist()]))}"
-                    )
                     coords = np.array([x[0] for x in result[feat].tolist()])
                     vals = np.array([x[1] for x in result[feat].tolist()])
                     mask = np.broadcast_to(filter_tfs[:, np.newaxis, :], vals.shape)

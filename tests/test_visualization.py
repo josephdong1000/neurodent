@@ -2117,27 +2117,50 @@ class TestParquetSaveLoad:
             assert len(reloaded) == len(war.result)
             assert set(war.result.columns).issubset(set(reloaded.columns))
 
-    def test_save_load_speed(self, war_with_complex_columns):
+    def test_save_load_speed(self):
         """Test that parquet load time is comparable to pickle after warm-up.
 
-        For small DataFrames, parquet has more fixed overhead than pickle.
-        This test verifies that load time is within a reasonable factor,
-        which shows the overhead is bounded (not pathological).
+        Uses a realistically-sized DataFrame (200 rows) so that pyarrow's
+        fixed per-call overhead is amortised and the comparison reflects
+        actual I/O performance rather than interpreter start-up noise.
         """
         import time
 
-        war = war_with_complex_columns
+        n_rows = 200
+        rng = np.random.default_rng(42)
+        data = {
+            "animalday": [f"A1_{i:08d}" for i in range(n_rows)],
+            "genotype": ["WT"] * n_rows,
+            "timestamp": pd.date_range("2023-01-01", periods=n_rows, freq="5min"),
+            "duration": [240.0] * n_rows,
+            "rms": [rng.uniform(100, 200, 2).tolist() for _ in range(n_rows)],
+            "psd": [
+                (rng.uniform(0, 10, 8).tolist(), rng.uniform(0, 100, 8).tolist())
+                for _ in range(n_rows)
+            ],
+            "cohere": [
+                {"ch1_ch2": rng.uniform(0, 1, 4).tolist()}
+                for _ in range(n_rows)
+            ],
+        }
+        war = WindowAnalysisResult(
+            result=pd.DataFrame(data),
+            animal_id="A1",
+            genotype="WT",
+            channel_names=["LMot", "RMot"],
+        )
+
         with tempfile.TemporaryDirectory() as tmpdir:
             war.save_pickle_and_json(tmpdir, filename="war")
 
             pkl_path = Path(tmpdir) / "war.pkl"
             pq_path = Path(tmpdir) / "war.parquet"
 
-            # Warm-up: first load amortizes import costs
+            # Warm-up: first load amortises import / JIT costs
             pd.read_pickle(pkl_path)
             pd.read_parquet(pq_path, engine="pyarrow")
 
-            n_iters = 50
+            n_iters = 20
 
             start = time.perf_counter()
             for _ in range(n_iters):
@@ -2149,12 +2172,10 @@ class TestParquetSaveLoad:
                 pd.read_parquet(pq_path, engine="pyarrow")
             pq_time = time.perf_counter() - start
 
-            # For small DataFrames parquet has higher per-call overhead (pyarrow
-            # table construction, schema parsing) vs pickle's simple
-            # deserialization.  On real-world WARs (thousands of rows) the gap
-            # narrows substantially.  The 20x bound here guards against
-            # regressions while accommodating the small-data worst case.
-            assert pq_time < pkl_time * 20, (
+            # With a realistically-sized DataFrame the gap between parquet
+            # and pickle narrows substantially.  A 10x bound guards against
+            # pathological regressions while remaining stable on CI runners.
+            assert pq_time < pkl_time * 10, (
                 f"Parquet load ({pq_time:.3f}s) is unreasonably slower "
                 f"than pickle ({pkl_time:.3f}s)"
             )
