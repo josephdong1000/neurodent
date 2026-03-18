@@ -83,6 +83,7 @@ from .utils import (
     should_use_cache_unified,
     get_feature_label,
     get_cache_status_message,
+    slugify,
 )
 
 from .zeitgeber import (
@@ -124,5 +125,6 @@ __all__ = [
     "get_feature_label",
     "get_cache_status_message",
     "should_use_cache_unified",
+    "slugify",
     "utils",
 ]

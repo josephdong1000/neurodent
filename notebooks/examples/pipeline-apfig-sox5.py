@@ -12,7 +12,7 @@ import matplotlib.colors as colors
 import mne
 from dask_jobqueue import SLURMCluster
 from dask.distributed import Client
-from django.utils.text import slugify
+from neurodent.core.utils import slugify
 
 base_folder = Path("/mnt/isilon/marsh_single_unit/NeuRodent")
 sys.path.append(str(base_folder))

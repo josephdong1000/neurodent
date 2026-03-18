@@ -22,7 +22,6 @@ import mne
 import numpy as np
 import pandas as pd
 from dask import delayed
-from django.utils.text import slugify
 from scipy.stats import zscore
 from scipy.ndimage import binary_opening, binary_closing
 from tqdm import tqdm
@@ -31,7 +30,7 @@ from tqdm import tqdm
 from .. import constants, core
 from ..core import FragmentAnalyzer, get_temp_directory
 from ..core.frequency_domain_spike_detection import FrequencyDomainSpikeDetector
-from ..core.utils import filepath_to_index, parse_chname_to_abbrev
+from ..core.utils import filepath_to_index, parse_chname_to_abbrev, slugify
 
 
 class AnimalFeatureParser:
