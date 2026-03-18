@@ -1404,6 +1404,7 @@ class TestExperimentPlotterFeatureDispatch:
     @pytest.fixture
     def feature_plotter(self):
         """Create an ExperimentPlotter with real WAR-structured DataFrames."""
+        rng = np.random.default_rng(seed=42)
         n_rows = 4
         n_chan = 2
         n_freq = 5
@@ -1417,19 +1418,19 @@ class TestExperimentPlotterFeatureDispatch:
 
         df = pd.DataFrame({
             "genotype": ["WT"] * n_rows,
-            "rms": [np.random.rand(n_chan).tolist() for _ in range(n_rows)],
-            "psdslope": [np.random.rand(n_chan, 2).tolist() for _ in range(n_rows)],
+            "rms": [rng.random(n_chan).tolist() for _ in range(n_rows)],
+            "psdslope": [rng.random((n_chan, 2)).tolist() for _ in range(n_rows)],
             "psdband": [
-                {b: np.random.rand(n_chan).tolist() for b in constants.BAND_NAMES}
+                {b: rng.random(n_chan).tolist() for b in constants.BAND_NAMES}
                 for _ in range(n_rows)
             ],
-            "pcorr": [np.random.rand(n_chan, n_chan).tolist() for _ in range(n_rows)],
+            "pcorr": [rng.random((n_chan, n_chan)).tolist() for _ in range(n_rows)],
             "cohere": [
-                {b: np.random.rand(n_chan, n_chan).tolist() for b in constants.BAND_NAMES}
+                {b: rng.random((n_chan, n_chan)).tolist() for b in constants.BAND_NAMES}
                 for _ in range(n_rows)
             ],
             "psd": [
-                (np.linspace(1, 40, n_freq), np.random.rand(n_freq, n_chan))
+                (np.linspace(1, 40, n_freq), rng.random((n_freq, n_chan)))
                 for _ in range(n_rows)
             ],
         })
