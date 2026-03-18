@@ -32,10 +32,10 @@ from .. import constants, core
 from ..core import FragmentAnalyzer, get_temp_directory
 from ..core.frequency_domain_spike_detection import FrequencyDomainSpikeDetector
 from ..core.utils import filepath_to_index, parse_chname_to_abbrev
+from .feature_utils import extract_linear_array, extract_band_dict, repack_band_dict, extract_hist_data
 
 
 class AnimalFeatureParser:
-    # REVIEW make this a utility function and refactor across codebase?
     def _average_feature(
         self, df: pd.DataFrame, colname: str, weightsname: str | None = "duration"
     ):
@@ -44,25 +44,21 @@ class AnimalFeatureParser:
             weights = np.ones(column.size)
         else:
             weights = df[weightsname]
-        colitem = column.iloc[0]
         weights = np.asarray(weights)
 
         ftype = constants.classify_feature(colname)
         if ftype in (constants.FeatureType.LINEAR, constants.FeatureType.LINEAR_2D, constants.FeatureType.SIMPLE_MATRIX):
-            col_agg = np.array(column.tolist())
+            col_agg = extract_linear_array(column)
             avg = core.nanaverage(col_agg, axis=0, weights=weights)
 
         elif ftype.is_dict_stored:
-            keys = colitem.keys()
-            avg = {}
-            for k in keys:
-                v = np.array([d[k] for d in column])
-                avg[k] = core.nanaverage(v, axis=0, weights=weights)
+            vals, keys = extract_band_dict(column)
+            avg = {k: core.nanaverage(vals[:, i], axis=0, weights=weights)
+                   for i, k in enumerate(keys)}
 
         elif ftype is constants.FeatureType.HIST:
-            coords = colitem[0]
-            values = np.array([x[1] for x in column])
-            avg = (coords, core.nanaverage(values, axis=0, weights=weights))
+            coords, values = extract_hist_data(column)
+            avg = (coords[0], core.nanaverage(values, axis=0, weights=weights))
 
         else:
             raise TypeError(
@@ -2077,12 +2073,10 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
             if ftype in (constants.FeatureType.LINEAR, constants.FeatureType.LINEAR_2D, constants.FeatureType.BAND):
                 if ftype is constants.FeatureType.BAND:
-                    df_bands = pd.DataFrame(result[feature].tolist())
-                    vals = np.array(df_bands.values.tolist())
+                    vals, keys = extract_band_dict(result[feature])
                     vals = vals.transpose((0, 2, 1))
-                    keys = df_bands.keys()
                 else:
-                    vals = np.array(result[feature].tolist())
+                    vals = extract_linear_array(result[feature])
 
                 new_vals = np.full(
                     (vals.shape[0], len(target_channels), *vals.shape[2:]), np.nan
@@ -2094,17 +2088,15 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
                 if ftype is constants.FeatureType.BAND:
                     new_vals = new_vals.transpose((0, 2, 1))
-                    result[feature] = [dict(zip(keys, vals)) for vals in new_vals]
+                    result[feature] = repack_band_dict(new_vals, keys)
                 else:
                     result[feature] = [list(x) for x in new_vals]
 
             elif ftype.is_matrix:
                 if ftype is constants.FeatureType.BANDED_MATRIX:
-                    df_bands = pd.DataFrame(result[feature].tolist())
-                    vals = np.array(df_bands.values.tolist())
-                    keys = df_bands.keys()
+                    vals, keys = extract_band_dict(result[feature])
                 else:
-                    vals = np.array(result[feature].tolist())
+                    vals = extract_linear_array(result[feature])
 
                 logging.debug(f"vals.shape: {vals.shape}")
                 new_shape = list(vals.shape[:-2]) + [
@@ -2123,13 +2115,12 @@ class WindowAnalysisResult(AnimalFeatureParser):
                                 ] = vals[..., i, j]
 
                 if ftype is constants.FeatureType.BANDED_MATRIX:
-                    result[feature] = [dict(zip(keys, vals)) for vals in new_vals]
+                    result[feature] = repack_band_dict(new_vals, keys)
                 else:
                     result[feature] = [list(x) for x in new_vals]
 
             elif ftype is constants.FeatureType.HIST:
-                coords = np.array([x[0] for x in result[feature].tolist()])
-                vals = np.array([x[1] for x in result[feature].tolist()])
+                coords, vals = extract_hist_data(result[feature])
                 new_vals = np.full(
                     (*vals.shape[0:-1], len(target_channels)), np.nan
                 )
@@ -3505,7 +3496,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             ftype = constants.classify_feature(feat)
 
             if ftype is constants.FeatureType.LINEAR:
-                vals = np.array(result[feat].tolist())
+                vals = extract_linear_array(result[feat])
                 # Convert to float to allow NaN assignment for integer features
                 if vals.dtype.kind in ("i", "u"):  # integer types
                     vals = vals.astype(float)
@@ -3513,7 +3504,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 result[feat] = vals.tolist()
 
             elif ftype is constants.FeatureType.LINEAR_2D:
-                vals = np.array(result[feat].tolist())
+                vals = extract_linear_array(result[feat])
                 mask = np.broadcast_to(filter_tfs[:, :, np.newaxis], vals.shape)
                 vals[~mask] = np.nan
                 result[feat] = vals.tolist()
@@ -3528,34 +3519,33 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 logging.debug(
                     f"set([np.asarray(x[1]).shape for x in result[feat].tolist()]) = {list(set([np.asarray(x[1]).shape for x in result[feat].tolist()]))}"
                 )
-                coords = np.array([x[0] for x in result[feat].tolist()])
-                vals = np.array([x[1] for x in result[feat].tolist()])
+                coords, vals = extract_hist_data(result[feat])
                 mask = np.broadcast_to(filter_tfs[:, np.newaxis, :], vals.shape)
                 vals[~mask] = np.nan
                 outs = [(c, vals[i, :, :]) for i, c in enumerate(coords)]
                 result[feat] = outs
 
             elif ftype is constants.FeatureType.BAND:
-                vals = pd.DataFrame(result[feat].tolist())
-                for colname in vals.columns:
-                    v = np.array(vals[colname].tolist())
+                band_vals, band_keys = extract_band_dict(result[feat])
+                for bi, colname in enumerate(band_keys):
+                    v = band_vals[:, bi]
                     v[~filter_tfs] = np.nan
-                    vals[colname] = v.tolist()
-                result[feat] = vals.to_dict("records")
+                    band_vals[:, bi] = v
+                result[feat] = repack_band_dict(band_vals, band_keys)
 
             elif ftype is constants.FeatureType.BANDED_MATRIX:
-                vals = pd.DataFrame(result[feat].tolist())
-                shape = np.array(vals.iloc[:, 0].tolist()).shape
+                band_vals, band_keys = extract_band_dict(result[feat])
+                shape = band_vals[:, 0].shape
                 mask = np.broadcast_to(filter_tfs[:, :, np.newaxis], shape)
-                for colname in vals.columns:
-                    v = np.array(vals[colname].tolist())
+                for bi, colname in enumerate(band_keys):
+                    v = band_vals[:, bi]
                     v[~mask] = np.nan
                     v[~mask.transpose(0, 2, 1)] = np.nan
-                    vals[colname] = v.tolist()
-                result[feat] = vals.to_dict("records")
+                    band_vals[:, bi] = v
+                result[feat] = repack_band_dict(band_vals, band_keys)
 
             elif ftype is constants.FeatureType.SIMPLE_MATRIX:
-                vals = np.array(result[feat].tolist())
+                vals = extract_linear_array(result[feat])
                 mask = np.broadcast_to(filter_tfs[:, :, np.newaxis], vals.shape)
                 vals[~mask] = np.nan
                 vals[~mask.transpose(0, 2, 1)] = np.nan

@@ -1514,6 +1514,103 @@ class TestExperimentPlotterFeatureDispatch:
             )
 
 
+class TestFeatureUtils:
+    """Test shared feature extraction utilities in feature_utils module."""
+
+    def test_extract_linear_array_1d(self):
+        """Test extracting 1-D (scalar per channel) linear feature."""
+        from neurodent.visualization.feature_utils import extract_linear_array
+
+        series = pd.Series([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+        result = extract_linear_array(series)
+        assert result.shape == (2, 3)
+        np.testing.assert_array_equal(result[0], [1.0, 2.0, 3.0])
+        np.testing.assert_array_equal(result[1], [4.0, 5.0, 6.0])
+
+    def test_extract_linear_array_2d(self):
+        """Test extracting 2-D (multi-component per channel) linear feature."""
+        from neurodent.visualization.feature_utils import extract_linear_array
+
+        series = pd.Series([
+            [[1.0, 2.0], [3.0, 4.0]],
+            [[5.0, 6.0], [7.0, 8.0]],
+        ])
+        result = extract_linear_array(series)
+        assert result.shape == (2, 2, 2)
+        np.testing.assert_array_equal(result[0, 0], [1.0, 2.0])
+
+    def test_extract_band_dict(self):
+        """Test extracting band-keyed dict feature to array."""
+        from neurodent.visualization.feature_utils import extract_band_dict
+
+        series = pd.Series([
+            {"delta": [1.0, 2.0], "theta": [3.0, 4.0]},
+            {"delta": [5.0, 6.0], "theta": [7.0, 8.0]},
+        ])
+        vals, keys = extract_band_dict(series)
+        assert keys == ["delta", "theta"]
+        assert vals.shape == (2, 2, 2)  # (windows, bands, channels)
+        np.testing.assert_array_equal(vals[0, 0], [1.0, 2.0])  # delta, window 0
+
+    def test_repack_band_dict(self):
+        """Test repacking array back to list of band dicts."""
+        from neurodent.visualization.feature_utils import extract_band_dict, repack_band_dict
+
+        original = pd.Series([
+            {"delta": [1.0, 2.0], "theta": [3.0, 4.0]},
+            {"delta": [5.0, 6.0], "theta": [7.0, 8.0]},
+        ])
+        vals, keys = extract_band_dict(original)
+        repacked = repack_band_dict(vals, keys)
+        assert len(repacked) == 2
+        assert list(repacked[0].keys()) == ["delta", "theta"]
+        np.testing.assert_array_equal(repacked[0]["delta"], [1.0, 2.0])
+        np.testing.assert_array_equal(repacked[1]["theta"], [7.0, 8.0])
+
+    def test_extract_band_dict_round_trip(self):
+        """Test that extract → repack round-trips correctly."""
+        from neurodent.visualization.feature_utils import extract_band_dict, repack_band_dict
+
+        original = pd.Series([
+            {"alpha": [0.1, 0.2], "beta": [0.3, 0.4], "gamma": [0.5, 0.6]},
+            {"alpha": [0.7, 0.8], "beta": [0.9, 1.0], "gamma": [1.1, 1.2]},
+        ])
+        vals, keys = extract_band_dict(original)
+        repacked = repack_band_dict(vals, keys)
+        for i in range(len(original)):
+            for k in original.iloc[i].keys():
+                np.testing.assert_array_almost_equal(
+                    repacked[i][k], original.iloc[i][k]
+                )
+
+    def test_extract_hist_data_tuples(self):
+        """Test extracting histogram data from tuple format (pickle origin)."""
+        from neurodent.visualization.feature_utils import extract_hist_data
+
+        series = pd.Series([
+            (np.array([1.0, 2.0, 3.0]), np.array([10.0, 20.0, 30.0])),
+            (np.array([1.0, 2.0, 3.0]), np.array([40.0, 50.0, 60.0])),
+        ])
+        coords, values = extract_hist_data(series)
+        assert coords.shape == (2, 3)
+        assert values.shape == (2, 3)
+        np.testing.assert_array_equal(coords[0], [1.0, 2.0, 3.0])
+        np.testing.assert_array_equal(values[1], [40.0, 50.0, 60.0])
+
+    def test_extract_hist_data_lists(self):
+        """Test extracting histogram data from list format (parquet origin)."""
+        from neurodent.visualization.feature_utils import extract_hist_data
+
+        series = pd.Series([
+            [[1.0, 2.0, 3.0], [10.0, 20.0, 30.0]],
+            [[1.0, 2.0, 3.0], [40.0, 50.0, 60.0]],
+        ])
+        coords, values = extract_hist_data(series)
+        assert coords.shape == (2, 3)
+        assert values.shape == (2, 3)
+        np.testing.assert_array_equal(values[0], [10.0, 20.0, 30.0])
+
+
 class TestDataProcessingForVisualization:
     """Test data processing functions for visualization."""
 
@@ -2323,7 +2420,7 @@ class TestParquetSaveLoad:
             assert len(reloaded) == len(war.result)
             assert set(war.result.columns).issubset(set(reloaded.columns))
 
-    def test_save_load_speed(self, war_with_complex_columns):
+    def test_save_load_both_formats(self, war_with_complex_columns):
         """Test that both parquet and pickle load paths produce valid results.
 
         Parquet has higher per-call overhead than pickle for small DataFrames

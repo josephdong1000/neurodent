@@ -11,6 +11,7 @@ from scipy.stats import gzscore, linregress, zscore
 
 from ... import constants
 from ... import visualization as viz
+from ..feature_utils import extract_linear_array, extract_band_dict
 
 
 class AnimalPlotter(viz.AnimalFeatureParser):
@@ -290,17 +291,17 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         ftype = constants.classify_feature(feature)
 
         if ftype is constants.FeatureType.LINEAR:
-            data_X = np.array(group[feature].to_list())
+            data_X = extract_linear_array(group[feature])
             data_X = np.expand_dims(data_X, axis=-1)
         elif ftype is constants.FeatureType.LINEAR_2D:
-            data_X = np.array(group[feature].to_list())
+            data_X = extract_linear_array(group[feature])
             # Keep all components (e.g. slope + intercept) for visualization
         elif ftype is constants.FeatureType.BAND:
-            data_X = np.array([list(d.values()) for d in group[feature]])
+            data_X, _keys = extract_band_dict(group[feature])
             data_X = np.stack(data_X, axis=-1)
             data_X = np.transpose(data_X)
         elif ftype is constants.FeatureType.BANDED_MATRIX:
-            data_X = np.array([list(d.values()) for d in group[feature]])
+            data_X, _keys = extract_band_dict(group[feature])
             data_X = np.stack(data_X, axis=-1)
             if triag:
                 tril = np.tril_indices(data_X.shape[1], k=-1)
@@ -308,7 +309,8 @@ class AnimalPlotter(viz.AnimalFeatureParser):
             data_X = data_X.reshape(data_X.shape[0], -1, data_X.shape[-1])
             data_X = np.transpose(data_X)
         elif ftype is constants.FeatureType.SIMPLE_MATRIX:
-            data_X = np.stack(group[feature], axis=-1)
+            data_X = extract_linear_array(group[feature])
+            data_X = np.stack(data_X, axis=-1)
             if triag:
                 tril = np.tril_indices(data_X.shape[1], k=-1)
                 data_X = data_X[tril[0], tril[1], :]

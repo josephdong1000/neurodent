@@ -15,6 +15,7 @@ from statannotations.Annotator import Annotator
 from ... import core
 from ... import visualization as viz
 from ... import constants
+from ..feature_utils import extract_linear_array, extract_band_dict, extract_hist_data
 
 
 class ExperimentPlotter:
@@ -299,11 +300,10 @@ class ExperimentPlotter:
 
             if ftype in (constants.FeatureType.LINEAR, constants.FeatureType.LINEAR_2D, constants.FeatureType.BAND):
                 if ftype is constants.FeatureType.BAND:
-                    df_bands = pd.DataFrame(df_war[feature].tolist())
-                    vals = np.array(df_bands.values.tolist())
+                    vals, _keys = extract_band_dict(df_war[feature])
                     vals = vals.transpose((0, 2, 1))
                 else:
-                    vals = np.array(df_war[feature].tolist())
+                    vals = extract_linear_array(df_war[feature])
 
                 if collapse_channels:
                     vals = np.nanmean(vals, axis=1)
@@ -319,7 +319,7 @@ class ExperimentPlotter:
                 vals = df_war[groupby].to_dict("list") | vals
 
             elif ftype is constants.FeatureType.SIMPLE_MATRIX:
-                vals = np.array(df_war[feature].tolist())
+                vals = extract_linear_array(df_war[feature])
                 if collapse_channels:
                     # Get lower triangular elements (excluding diagonal)
                     tril_indices = np.tril_indices(vals.shape[1], k=-1)
@@ -335,8 +335,7 @@ class ExperimentPlotter:
                 vals = df_war[groupby].to_dict("list") | vals
 
             elif ftype is constants.FeatureType.BANDED_MATRIX:
-                df_bands = pd.DataFrame(df_war[feature].tolist())
-                vals = np.array(df_bands.values.tolist())
+                vals, _keys = extract_band_dict(df_war[feature])
                 logging.debug(f"vals.shape: {vals.shape}")
 
                 if collapse_channels:
@@ -355,34 +354,13 @@ class ExperimentPlotter:
                 # REVIEW revise this, splitting up frequencys and values and instead making both of them independent features
                 # this way they can be averaged, processed, etc. without worrying about tuple things
                 # if freq present, explode it
-                psd_data = df_war[feature].tolist()
-
-                freq_vals = np.array(
-                    [
-                        (
-                            item[0]
-                            if isinstance(item, (tuple, list)) and len(item) == 2
-                            else item
-                        )
-                        for item in psd_data
-                    ]
-                )
+                freq_vals, psd_vals = extract_hist_data(df_war[feature])
                 n_unique_freq_vals = np.unique(freq_vals, axis=0).shape[0]
                 if n_unique_freq_vals > 1:
                     raise ValueError(
                         f"Multiple frequency bin values found in {feature}: {n_unique_freq_vals} values"
                     )
 
-                psd_vals = np.array(
-                    [
-                        (
-                            item[1]
-                            if isinstance(item, (tuple, list)) and len(item) == 2
-                            else item
-                        )
-                        for item in psd_data
-                    ]
-                )
                 psd_vals = psd_vals.transpose((0, 2, 1))
 
                 logging.debug(
