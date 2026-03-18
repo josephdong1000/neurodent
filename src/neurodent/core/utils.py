@@ -1533,6 +1533,7 @@ def should_use_cache_unified(
 def convert_intan_chname_mne(mne_obj):
     for i in range(len(mne_obj.info['ch_names'])):
         mne_obj.info['ch_names'][i] = parse_chname_to_abbrev(channel_name = mne_obj.info['ch_names'][i], assume_from_number=True, strict_matching=False)
+    return mne_obj
 
 
 def slugify(value, allow_unicode=False):
@@ -1564,4 +1565,3 @@ def slugify(value, allow_unicode=False):
         )
     value = re.sub(r"[^\w\s-]", "", value.lower())
     return re.sub(r"[-\s]+", "-", value).strip("-_")
-    return mne_obj
