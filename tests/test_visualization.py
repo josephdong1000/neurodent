@@ -1762,16 +1762,17 @@ class TestExperimentPlotterFeatureDispatch:
         return plotter
 
     def test_pull_linear_feature(self, feature_plotter):
-        """Test pull_timeseries_dataframe with LINEAR feature dispatch."""
+        """Test pull_timeseries_dataframe with LINEAR feature, collapse_channels=False."""
         df = feature_plotter.pull_timeseries_dataframe(
             feature="rms", groupby=["genotype"], channels="all"
         )
         assert isinstance(df, pd.DataFrame)
         assert "rms" in df.columns
         assert "channel" in df.columns
+        assert set(df["channel"].unique()) == {"LM", "RM"}
 
     def test_pull_linear_feature_collapsed(self, feature_plotter):
-        """Test pull_timeseries_dataframe with LINEAR feature, collapsed channels."""
+        """Test pull_timeseries_dataframe with LINEAR feature, collapse_channels=True."""
         df = feature_plotter.pull_timeseries_dataframe(
             feature="rms", groupby=["genotype"], collapse_channels=True
         )
@@ -1780,7 +1781,7 @@ class TestExperimentPlotterFeatureDispatch:
         assert (df["channel"] == "average").all()
 
     def test_pull_linear_2d_feature(self, feature_plotter):
-        """Test pull_timeseries_dataframe with LINEAR_2D feature (psdslope)."""
+        """Test pull_timeseries_dataframe with LINEAR_2D, collapse_channels=False."""
         df = feature_plotter.pull_timeseries_dataframe(
             feature="psdslope", groupby=["genotype"], channels="all"
         )
@@ -1789,8 +1790,18 @@ class TestExperimentPlotterFeatureDispatch:
         # LINEAR_2D extracts first component (slope); values should be scalar
         assert all(isinstance(v, (int, float, np.floating)) for v in df["psdslope"])
 
+    def test_pull_linear_2d_feature_collapsed(self, feature_plotter):
+        """Test pull_timeseries_dataframe with LINEAR_2D, collapse_channels=True."""
+        df = feature_plotter.pull_timeseries_dataframe(
+            feature="psdslope", groupby=["genotype"], collapse_channels=True
+        )
+        assert isinstance(df, pd.DataFrame)
+        assert "psdslope" in df.columns
+        assert (df["channel"] == "average").all()
+        assert all(isinstance(v, (int, float, np.floating)) for v in df["psdslope"])
+
     def test_pull_band_feature(self, feature_plotter):
-        """Test pull_timeseries_dataframe with BAND feature dispatch."""
+        """Test pull_timeseries_dataframe with BAND, collapse_channels=False."""
         df = feature_plotter.pull_timeseries_dataframe(
             feature="psdband", groupby=["genotype"], channels="all"
         )
@@ -1799,40 +1810,25 @@ class TestExperimentPlotterFeatureDispatch:
         assert "band" in df.columns
         assert set(df["band"].unique()) == set(constants.BAND_NAMES)
 
+    def test_pull_band_feature_collapsed(self, feature_plotter):
+        """Test pull_timeseries_dataframe with BAND, collapse_channels=True."""
+        df = feature_plotter.pull_timeseries_dataframe(
+            feature="psdband", groupby=["genotype"], collapse_channels=True
+        )
+        assert isinstance(df, pd.DataFrame)
+        assert "psdband" in df.columns
+        assert "band" in df.columns
+        assert (df["channel"] == "average").all()
+        assert set(df["band"].unique()) == set(constants.BAND_NAMES)
+
     def test_pull_simple_matrix_feature(self, feature_plotter):
-        """Test pull_timeseries_dataframe with SIMPLE_MATRIX feature dispatch."""
+        """Test pull_timeseries_dataframe with SIMPLE_MATRIX, collapse_channels=True."""
         df = feature_plotter.pull_timeseries_dataframe(
             feature="pcorr", groupby=["genotype"], collapse_channels=True
         )
         assert isinstance(df, pd.DataFrame)
         assert "pcorr" in df.columns
         assert (df["channel"] == "average").all()
-
-    def test_pull_banded_matrix_feature(self, feature_plotter):
-        """Test pull_timeseries_dataframe with BANDED_MATRIX feature dispatch."""
-        # Use non-collapsed channels to avoid triggering pre-existing tril_indices
-        # shape issue in collapse path (vals.shape[1] is n_bands not n_chan)
-        df = feature_plotter.pull_timeseries_dataframe(
-            feature="cohere", groupby=["genotype"], collapse_channels=False
-        )
-        assert isinstance(df, pd.DataFrame)
-        assert "cohere" in df.columns
-
-    def test_pull_hist_feature(self, feature_plotter):
-        """Test pull_timeseries_dataframe with HIST feature (psd) dispatch."""
-        df = feature_plotter.pull_timeseries_dataframe(
-            feature="psd", groupby=["genotype"], channels="all"
-        )
-        assert isinstance(df, pd.DataFrame)
-        assert "psd" in df.columns
-        assert "freq" in df.columns
-
-    def test_pull_missing_feature_raises(self, feature_plotter):
-        """Test that missing features raise ValueError."""
-        with pytest.raises(ValueError, match="feature not found"):
-            feature_plotter.pull_timeseries_dataframe(
-                feature="nonexistent_feature", groupby=["genotype"]
-            )
 
     def test_pull_simple_matrix_feature_not_collapsed(self, feature_plotter):
         """Test pull_timeseries_dataframe with SIMPLE_MATRIX, collapse_channels=False."""
@@ -1843,6 +1839,14 @@ class TestExperimentPlotterFeatureDispatch:
         assert "pcorr" in df.columns
         assert (df["channel"] == "all").all()
 
+    def test_pull_banded_matrix_feature(self, feature_plotter):
+        """Test pull_timeseries_dataframe with BANDED_MATRIX, collapse_channels=False."""
+        df = feature_plotter.pull_timeseries_dataframe(
+            feature="cohere", groupby=["genotype"], collapse_channels=False
+        )
+        assert isinstance(df, pd.DataFrame)
+        assert "cohere" in df.columns
+
     def test_pull_banded_matrix_feature_collapsed(self, feature_plotter):
         """Test pull_timeseries_dataframe with BANDED_MATRIX, collapse_channels=True."""
         df = feature_plotter.pull_timeseries_dataframe(
@@ -1850,9 +1854,34 @@ class TestExperimentPlotterFeatureDispatch:
         )
         assert isinstance(df, pd.DataFrame)
         assert "cohere" in df.columns
-        # Collapsed channels should be labeled as 'average', matching SIMPLE_MATRIX behavior
         assert "channel" in df.columns
         assert (df["channel"] == "average").all()
+
+    def test_pull_hist_feature(self, feature_plotter):
+        """Test pull_timeseries_dataframe with HIST, collapse_channels=False."""
+        df = feature_plotter.pull_timeseries_dataframe(
+            feature="psd", groupby=["genotype"], channels="all"
+        )
+        assert isinstance(df, pd.DataFrame)
+        assert "psd" in df.columns
+        assert "freq" in df.columns
+
+    def test_pull_hist_feature_collapsed(self, feature_plotter):
+        """Test pull_timeseries_dataframe with HIST, collapse_channels=True."""
+        df = feature_plotter.pull_timeseries_dataframe(
+            feature="psd", groupby=["genotype"], collapse_channels=True
+        )
+        assert isinstance(df, pd.DataFrame)
+        assert "psd" in df.columns
+        assert "freq" in df.columns
+        assert (df["channel"] == "average").all()
+
+    def test_pull_missing_feature_raises(self, feature_plotter):
+        """Test that missing features raise ValueError."""
+        with pytest.raises(ValueError, match="feature not found"):
+            feature_plotter.pull_timeseries_dataframe(
+                feature="nonexistent_feature", groupby=["genotype"]
+            )
 
 
 class TestFeatureUtils:
@@ -1980,6 +2009,123 @@ class TestFeatureUtils:
         ])
         with pytest.raises(ValueError, match="Ragged input"):
             extract_hist_data(series)
+
+
+class TestFlattenFeatureForPlotting:
+    """Test flatten_feature_for_plotting utility."""
+
+    def test_flatten_linear(self):
+        from neurodent.visualization.feature_utils import flatten_feature_for_plotting
+        vals = np.random.rand(4, 3)  # (n_time, n_chan)
+        result = flatten_feature_for_plotting(vals, constants.FeatureType.LINEAR)
+        assert result.shape == (4, 3, 1)
+
+    def test_flatten_linear_2d(self):
+        from neurodent.visualization.feature_utils import flatten_feature_for_plotting
+        vals = np.random.rand(4, 3, 2)  # (n_time, n_chan, n_comp)
+        result = flatten_feature_for_plotting(vals, constants.FeatureType.LINEAR_2D)
+        assert result.shape == (4, 3, 2)
+
+    def test_flatten_band(self):
+        from neurodent.visualization.feature_utils import flatten_feature_for_plotting
+        vals = np.random.rand(4, 5, 3)  # (n_time, n_bands, n_chan)
+        result = flatten_feature_for_plotting(vals, constants.FeatureType.BAND)
+        # (n_time, n_chan, n_bands)
+        assert result.shape == (4, 3, 5)
+
+    def test_flatten_simple_matrix_triag(self):
+        from neurodent.visualization.feature_utils import flatten_feature_for_plotting
+        n_chan = 3
+        vals = np.random.rand(4, n_chan, n_chan)  # (n_time, n_chan, n_chan)
+        result = flatten_feature_for_plotting(vals, constants.FeatureType.SIMPLE_MATRIX, triag=True)
+        n_pairs = n_chan * (n_chan - 1) // 2
+        assert result.shape == (4, n_pairs, 1)
+
+    def test_flatten_simple_matrix_no_triag(self):
+        from neurodent.visualization.feature_utils import flatten_feature_for_plotting
+        n_chan = 3
+        vals = np.random.rand(4, n_chan, n_chan)
+        result = flatten_feature_for_plotting(vals, constants.FeatureType.SIMPLE_MATRIX, triag=False)
+        assert result.shape == (4, n_chan * n_chan, 1)
+
+    def test_flatten_banded_matrix_triag(self):
+        from neurodent.visualization.feature_utils import flatten_feature_for_plotting
+        n_chan = 3
+        n_bands = 5
+        vals = np.random.rand(4, n_bands, n_chan, n_chan)
+        result = flatten_feature_for_plotting(vals, constants.FeatureType.BANDED_MATRIX, triag=True)
+        n_pairs = n_chan * (n_chan - 1) // 2
+        assert result.shape == (4, n_pairs, n_bands)
+
+    def test_flatten_banded_matrix_no_triag(self):
+        from neurodent.visualization.feature_utils import flatten_feature_for_plotting
+        n_chan = 3
+        n_bands = 5
+        vals = np.random.rand(4, n_bands, n_chan, n_chan)
+        result = flatten_feature_for_plotting(vals, constants.FeatureType.BANDED_MATRIX, triag=False)
+        assert result.shape == (4, n_chan * n_chan, n_bands)
+
+    def test_flatten_unsupported_raises(self):
+        from neurodent.visualization.feature_utils import flatten_feature_for_plotting
+        vals = np.random.rand(4, 3)
+        with pytest.raises(ValueError, match="Unsupported FeatureType"):
+            flatten_feature_for_plotting(vals, constants.FeatureType.HIST)
+
+
+class TestCollapseFeatureChannels:
+    """Test collapse_feature_channels utility."""
+
+    def test_collapse_linear(self):
+        from neurodent.visualization.feature_utils import collapse_feature_channels
+        vals = np.array([[1.0, 3.0], [5.0, 7.0]])  # (2 windows, 2 channels)
+        result = collapse_feature_channels(vals, constants.FeatureType.LINEAR)
+        np.testing.assert_array_equal(result, [2.0, 6.0])
+
+    def test_collapse_linear_2d(self):
+        from neurodent.visualization.feature_utils import collapse_feature_channels
+        vals = np.array([[[1.0, 2.0], [3.0, 4.0]]])  # (1, 2 chan, 2 comp)
+        result = collapse_feature_channels(vals, constants.FeatureType.LINEAR_2D)
+        assert result.shape == (1, 2)
+        np.testing.assert_array_equal(result[0], [2.0, 3.0])
+
+    def test_collapse_band(self):
+        from neurodent.visualization.feature_utils import collapse_feature_channels
+        vals = np.array([[[1.0, 3.0], [5.0, 7.0]]])  # (1, 2 bands, 2 chan)
+        result = collapse_feature_channels(vals, constants.FeatureType.BAND)
+        assert result.shape == (1, 2)
+        np.testing.assert_array_equal(result[0], [2.0, 6.0])
+
+    def test_collapse_simple_matrix(self):
+        from neurodent.visualization.feature_utils import collapse_feature_channels
+        # 2x2 symmetric matrix, tril pair = (1,0) only
+        vals = np.array([[[0.0, 0.5], [0.5, 0.0]]])  # (1, 2, 2)
+        result = collapse_feature_channels(vals, constants.FeatureType.SIMPLE_MATRIX)
+        assert result.shape == (1,)
+        np.testing.assert_almost_equal(result[0], 0.5)
+
+    def test_collapse_banded_matrix(self):
+        from neurodent.visualization.feature_utils import collapse_feature_channels
+        # (1 window, 2 bands, 2 chan, 2 chan)
+        vals = np.zeros((1, 2, 2, 2))
+        vals[0, 0, 1, 0] = 0.8  # band 0, pair (1,0)
+        vals[0, 1, 1, 0] = 0.6  # band 1, pair (1,0)
+        result = collapse_feature_channels(vals, constants.FeatureType.BANDED_MATRIX)
+        assert result.shape == (1, 2)
+        np.testing.assert_almost_equal(result[0, 0], 0.8)
+        np.testing.assert_almost_equal(result[0, 1], 0.6)
+
+    def test_collapse_hist(self):
+        from neurodent.visualization.feature_utils import collapse_feature_channels
+        vals = np.array([[[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]])  # (1, 2 chan, 3 freq)
+        result = collapse_feature_channels(vals, constants.FeatureType.HIST)
+        assert result.shape == (1, 3)
+        np.testing.assert_array_equal(result[0], [2.5, 3.5, 4.5])
+
+    def test_collapse_unsupported_raises(self):
+        from neurodent.visualization.feature_utils import collapse_feature_channels
+        # Use a mock unsupported type - pass an invalid value
+        with pytest.raises((ValueError, AttributeError)):
+            collapse_feature_channels(np.array([1.0]), "not_a_feature_type")
 
 
 class TestDataProcessingForVisualization:

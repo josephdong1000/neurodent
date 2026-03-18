@@ -15,7 +15,7 @@ from statannotations.Annotator import Annotator
 from ... import core
 from ... import visualization as viz
 from ... import constants
-from ..feature_utils import extract_linear_array, extract_band_dict, extract_hist_data
+from ..feature_utils import extract_linear_array, extract_band_dict, extract_hist_data, collapse_feature_channels
 
 
 class ExperimentPlotter:
@@ -301,32 +301,35 @@ class ExperimentPlotter:
             if ftype in (constants.FeatureType.LINEAR, constants.FeatureType.LINEAR_2D, constants.FeatureType.BAND):
                 if ftype is constants.FeatureType.BAND:
                     vals, _keys = extract_band_dict(df_war[feature])
-                    vals = vals.transpose((0, 2, 1))
                 else:
                     vals = extract_linear_array(df_war[feature])
 
                 if collapse_channels:
-                    vals = np.nanmean(vals, axis=1)
+                    vals = collapse_feature_channels(vals, ftype)
                     logging.debug(f"vals.shape: {vals.shape}")
                     vals = {"average": vals.tolist()}
                 else:
-                    logging.debug(f"vals.shape: {vals.shape}")
-                    vals = {
-                        ch: vals[:, ch_to_idx[ch]].tolist()
-                        for ch in channels
-                        if ch in ch_names
-                    }
+                    if ftype is constants.FeatureType.BAND:
+                        # (n_windows, n_bands, n_chan) → index channel at axis 2
+                        vals_indexed = {
+                            ch: vals[:, :, ch_to_idx[ch]].tolist()
+                            for ch in channels
+                            if ch in ch_names
+                        }
+                    else:
+                        logging.debug(f"vals.shape: {vals.shape}")
+                        vals_indexed = {
+                            ch: vals[:, ch_to_idx[ch]].tolist()
+                            for ch in channels
+                            if ch in ch_names
+                        }
+                    vals = vals_indexed
                 vals = df_war[groupby].to_dict("list") | vals
 
             elif ftype is constants.FeatureType.SIMPLE_MATRIX:
                 vals = extract_linear_array(df_war[feature])
                 if collapse_channels:
-                    # Get lower triangular elements (excluding diagonal)
-                    tril_indices = np.tril_indices(vals.shape[1], k=-1)
-                    # Take mean across pairs
-                    vals = np.nanmean(
-                        vals[:, tril_indices[0], tril_indices[1]], axis=-1
-                    )
+                    vals = collapse_feature_channels(vals, ftype)
                     logging.debug(f"vals.shape: {vals.shape}")
                     vals = {"average": vals.tolist()}
                 else:
@@ -339,12 +342,7 @@ class ExperimentPlotter:
                 logging.debug(f"vals.shape: {vals.shape}")
 
                 if collapse_channels:
-                    # vals is expected to be shaped (n_windows, n_bands, n_chan, n_chan)
-                    # Use the channel dimension (axis=2) when building triangular indices.
-                    tril_indices = np.tril_indices(vals.shape[2], k=-1)
-                    vals = np.nanmean(
-                        vals[:, :, tril_indices[0], tril_indices[1]], axis=-1
-                    )
+                    vals = collapse_feature_channels(vals, ftype)
                     logging.debug(f"vals.shape: {vals.shape}")
                     vals = {"average": vals.tolist()}
                 else:
@@ -371,7 +369,7 @@ class ExperimentPlotter:
 
                 # freq_vals.shape: (8, 501), psd_vals.shape: (8, 10, 501)
                 if collapse_channels:
-                    psd_vals = np.nanmean(psd_vals, axis=1)
+                    psd_vals = collapse_feature_channels(psd_vals, ftype)
                     logging.debug(f"psd_vals.shape: {psd_vals.shape}")  # (8, 501)
                     psd_vals = {"average": psd_vals.tolist()}
                 else:

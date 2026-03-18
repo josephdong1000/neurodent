@@ -11,7 +11,7 @@ from scipy.stats import gzscore, linregress, zscore
 
 from ... import constants
 from ... import visualization as viz
-from ..feature_utils import extract_linear_array, extract_band_dict
+from ..feature_utils import extract_linear_array, extract_band_dict, flatten_feature_for_plotting
 
 
 class AnimalPlotter(viz.AnimalFeatureParser):
@@ -290,39 +290,17 @@ class AnimalPlotter(viz.AnimalFeatureParser):
     ):
         ftype = constants.classify_feature(feature)
 
-        if ftype is constants.FeatureType.LINEAR:
-            data_X = extract_linear_array(group[feature])
-            data_X = np.expand_dims(data_X, axis=-1)
-        elif ftype is constants.FeatureType.LINEAR_2D:
-            data_X = extract_linear_array(group[feature])
-            # Keep all components (e.g. slope + intercept) for visualization
-        elif ftype is constants.FeatureType.BAND:
-            data_X, _keys = extract_band_dict(group[feature])
-            # (n_time, n_bands, n_chan) → (n_time, n_chan, n_bands)
-            data_X = data_X.transpose((0, 2, 1))
-        elif ftype is constants.FeatureType.BANDED_MATRIX:
-            data_X, _keys = extract_band_dict(group[feature])
-            # (n_time, n_bands, n_chan, n_chan) → (n_bands, n_chan, n_chan, n_time)
-            data_X = np.moveaxis(data_X, 0, -1)
-            if triag:
-                tril = np.tril_indices(data_X.shape[1], k=-1)
-                data_X = data_X[:, tril[0], tril[1], :]
-            data_X = data_X.reshape(data_X.shape[0], -1, data_X.shape[-1])
-            data_X = np.transpose(data_X)
-        elif ftype is constants.FeatureType.SIMPLE_MATRIX:
-            data_X = extract_linear_array(group[feature])
-            # (n_time, n_chan, n_chan) → (n_chan, n_chan, n_time)
-            data_X = np.moveaxis(data_X, 0, -1)
-            if triag:
-                tril = np.tril_indices(data_X.shape[0], k=-1)
-                data_X = data_X[tril[0], tril[1], :]
-            data_X = data_X.reshape(-1, data_X.shape[-1])
-            data_X = data_X.transpose()
-            data_X = np.expand_dims(data_X, axis=-1)
-        else:
+        if ftype is constants.FeatureType.HIST:
             raise ValueError(
                 f"Unsupported FeatureType {ftype} for feature extraction: {feature}"
             )
+
+        if ftype.is_dict_stored:
+            data_X, _keys = extract_band_dict(group[feature])
+        else:
+            data_X = extract_linear_array(group[feature])
+
+        data_X = flatten_feature_for_plotting(data_X, ftype, triag=triag)
 
         return self._calculate_standard_data(data_X, mode=score_type, axis=0)
 
