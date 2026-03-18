@@ -6,6 +6,7 @@ import os
 import platform
 import re
 import sys
+import unicodedata
 import warnings
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -1532,4 +1533,35 @@ def should_use_cache_unified(
 def convert_intan_chname_mne(mne_obj):
     for i in range(len(mne_obj.info['ch_names'])):
         mne_obj.info['ch_names'][i] = parse_chname_to_abbrev(channel_name = mne_obj.info['ch_names'][i], assume_from_number=True, strict_matching=False)
+
+
+def slugify(value, allow_unicode=False):
+    """Convert a string to a URL-friendly slug.
+
+    Converts to ASCII (unless *allow_unicode* is ``True``), lowercases,
+    removes non-alphanumeric characters (except hyphens and underscores),
+    and converts spaces and repeated dashes to single dashes.
+
+    Drop-in replacement for ``django.utils.text.slugify`` using only the
+    standard library.
+
+    Args:
+        value: The string to slugify.
+        allow_unicode: If ``True``, keep Unicode characters instead of
+            transliterating to ASCII.
+
+    Returns:
+        str: A URL-safe slug string.
+    """
+    value = str(value)
+    if allow_unicode:
+        value = unicodedata.normalize("NFKC", value)
+    else:
+        value = (
+            unicodedata.normalize("NFKD", value)
+            .encode("ascii", "ignore")
+            .decode("ascii")
+        )
+    value = re.sub(r"[^\w\s-]", "", value.lower())
+    return re.sub(r"[-\s]+", "-", value).strip("-_")
     return mne_obj

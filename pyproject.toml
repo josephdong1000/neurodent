@@ -39,7 +39,6 @@ dependencies = [
     "pyarrow",
     "statannotations",
     "statsmodels",
-    "django",
     "openpyxl",
     "appnope",
     "zarr>=2.18.3",
