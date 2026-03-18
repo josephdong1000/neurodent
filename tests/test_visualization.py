@@ -2121,11 +2121,12 @@ class TestCollapseFeatureChannels:
         assert result.shape == (1, 3)
         np.testing.assert_array_equal(result[0], [2.5, 3.5, 4.5])
 
-    def test_collapse_unsupported_raises(self):
+    def test_collapse_hist_via_function(self):
+        """Verify HIST is supported in collapse_feature_channels."""
         from neurodent.visualization.feature_utils import collapse_feature_channels
-        # Use a mock unsupported type - pass an invalid value
-        with pytest.raises((ValueError, AttributeError)):
-            collapse_feature_channels(np.array([1.0]), "not_a_feature_type")
+        vals = np.array([[[1.0, 2.0], [3.0, 4.0]]])  # (1, 2 chan, 2 freq)
+        result = collapse_feature_channels(vals, constants.FeatureType.HIST)
+        assert result.shape == (1, 2)
 
 
 class TestDataProcessingForVisualization:

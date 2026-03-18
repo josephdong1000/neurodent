@@ -189,10 +189,12 @@ def flatten_feature_for_plotting(
     ftype: constants.FeatureType,
     triag: bool = True,
 ) -> np.ndarray:
-    """Reshape extracted feature data into a uniform 3-D array for plotting.
+    """Reshape extracted feature data into a 3-D array for plotting.
 
-    Converts raw extracted feature arrays into the common shape
+    Converts raw extracted feature arrays into a three-axis shape
     ``(n_time, n_features, n_components)`` used by per-channel visualization.
+    The middle axis represents channels, channel-pairs, or other spatial
+    units depending on the feature type.
 
     Parameters
     ----------
