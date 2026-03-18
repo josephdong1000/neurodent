@@ -265,16 +265,15 @@ class AnimalPlotter(viz.AnimalFeatureParser):
             ax.plot(data_T, data_Z[:, :, i], c=f"C{i}", **kwargs)
         ftype = constants.classify_feature(feature)
         if ftype is constants.FeatureType.LINEAR:
-            if feature == "psdslope":
-                ax.set_yticks(ytick_offset, ["psdslope", "psdintercept"])
-            else:
-                ax.set_yticks([ytick_offset], [feature])
+            ax.set_yticks([ytick_offset], [feature])
+        elif ftype is constants.FeatureType.LINEAR_2D:
+            ax.set_yticks(ytick_offset, ["psdslope", "psdintercept"])
         elif ftype is constants.FeatureType.BAND:
             ax.set_yticks(ytick_offset, constants.BAND_NAMES)
         else:
             raise ValueError(
                 f"Unsupported FeatureType {ftype} for ytick labels: {feature} "
-                f"(expected LINEAR or BAND)"
+                f"(expected LINEAR, LINEAR_2D, or BAND)"
             )
 
         if show_endfile:
@@ -291,12 +290,11 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         ftype = constants.classify_feature(feature)
 
         if ftype is constants.FeatureType.LINEAR:
-            if feature == "psdslope":
-                data_X = np.array(group[feature].to_list())
-                data_X = data_X[:, :, 0]  # Take first component (slope)
-            else:
-                data_X = np.array(group[feature].to_list())
-                data_X = np.expand_dims(data_X, axis=-1)
+            data_X = np.array(group[feature].to_list())
+            data_X = np.expand_dims(data_X, axis=-1)
+        elif ftype is constants.FeatureType.LINEAR_2D:
+            data_X = np.array(group[feature].to_list())
+            # Keep all components (e.g. slope + intercept) for visualization
         elif ftype is constants.FeatureType.BAND:
             data_X = np.array([list(d.values()) for d in group[feature]])
             data_X = np.stack(data_X, axis=-1)

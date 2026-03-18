@@ -74,6 +74,7 @@ class TestConstants:
     def test_feature_constants(self):
         """Test feature-related constants."""
         assert isinstance(constants.LINEAR_FEATURES, list)
+        assert isinstance(constants.LINEAR_2D_FEATURES, list)
         assert isinstance(constants.BAND_FEATURES, list)
         assert isinstance(constants.MATRIX_FEATURES, list)
         assert isinstance(constants.HIST_FEATURES, list)
@@ -84,12 +85,12 @@ class TestConstants:
         assert "rms" in constants.LINEAR_FEATURES
         assert "ampvar" in constants.LINEAR_FEATURES
         assert "psdtotal" in constants.LINEAR_FEATURES
-        assert "psdslope" in constants.LINEAR_FEATURES
         assert "nspike" in constants.LINEAR_FEATURES
         assert "logrms" in constants.LINEAR_FEATURES
         assert "logampvar" in constants.LINEAR_FEATURES
         assert "logpsdtotal" in constants.LINEAR_FEATURES
         assert "lognspike" in constants.LINEAR_FEATURES
+        assert "psdslope" in constants.LINEAR_2D_FEATURES
         assert "psdband" in constants.BAND_FEATURES
         assert "psdfrac" in constants.BAND_FEATURES
         assert "logpsdband" in constants.BAND_FEATURES
@@ -172,16 +173,22 @@ class TestFeatureType:
     def test_feature_type_enum_members(self):
         """Test that FeatureType enum has the expected members."""
         assert hasattr(constants.FeatureType, "LINEAR")
+        assert hasattr(constants.FeatureType, "LINEAR_2D")
         assert hasattr(constants.FeatureType, "BAND")
         assert hasattr(constants.FeatureType, "BANDED_MATRIX")
         assert hasattr(constants.FeatureType, "SIMPLE_MATRIX")
         assert hasattr(constants.FeatureType, "HIST")
-        assert len(constants.FeatureType) == 5
+        assert len(constants.FeatureType) == 6
 
     def test_classify_feature_linear(self):
         """Test that all LINEAR_FEATURES classify as LINEAR."""
         for feat in constants.LINEAR_FEATURES:
             assert constants.classify_feature(feat) is constants.FeatureType.LINEAR
+
+    def test_classify_feature_linear_2d(self):
+        """Test that all LINEAR_2D_FEATURES classify as LINEAR_2D."""
+        for feat in constants.LINEAR_2D_FEATURES:
+            assert constants.classify_feature(feat) is constants.FeatureType.LINEAR_2D
 
     def test_classify_feature_band(self):
         """Test that all BAND_FEATURES classify as BAND."""
@@ -219,11 +226,21 @@ class TestFeatureType:
         for feat in constants.FEATURE_TYPES:
             assert feat in features_set
 
+    def test_is_linear_property(self):
+        """Test the is_linear convenience property."""
+        assert constants.FeatureType.LINEAR.is_linear is True
+        assert constants.FeatureType.LINEAR_2D.is_linear is True
+        assert constants.FeatureType.BAND.is_linear is False
+        assert constants.FeatureType.BANDED_MATRIX.is_linear is False
+        assert constants.FeatureType.SIMPLE_MATRIX.is_linear is False
+        assert constants.FeatureType.HIST.is_linear is False
+
     def test_is_matrix_property(self):
         """Test the is_matrix convenience property."""
         assert constants.FeatureType.BANDED_MATRIX.is_matrix is True
         assert constants.FeatureType.SIMPLE_MATRIX.is_matrix is True
         assert constants.FeatureType.LINEAR.is_matrix is False
+        assert constants.FeatureType.LINEAR_2D.is_matrix is False
         assert constants.FeatureType.BAND.is_matrix is False
         assert constants.FeatureType.HIST.is_matrix is False
 
@@ -232,6 +249,7 @@ class TestFeatureType:
         assert constants.FeatureType.BAND.is_dict_stored is True
         assert constants.FeatureType.BANDED_MATRIX.is_dict_stored is True
         assert constants.FeatureType.LINEAR.is_dict_stored is False
+        assert constants.FeatureType.LINEAR_2D.is_dict_stored is False
         assert constants.FeatureType.SIMPLE_MATRIX.is_dict_stored is False
         assert constants.FeatureType.HIST.is_dict_stored is False
 
@@ -248,6 +266,20 @@ class TestFeatureType:
             f for f, ft in constants.FEATURE_TYPES.items() if ft.is_dict_stored
         )
         assert dict_stored == sorted(constants.BAND_FEATURES + constants.BANDED_MATRIX_FEATURES)
+
+    def test_linear_features_consistent(self):
+        """Test that is_linear features = LINEAR_FEATURES + LINEAR_2D_FEATURES."""
+        linear_from_types = sorted(
+            f for f, ft in constants.FEATURE_TYPES.items() if ft.is_linear
+        )
+        assert linear_from_types == sorted(constants.LINEAR_FEATURES + constants.LINEAR_2D_FEATURES)
+
+    def test_psdslope_is_linear_2d(self):
+        """Test that psdslope is correctly classified as LINEAR_2D."""
+        assert constants.classify_feature("psdslope") is constants.FeatureType.LINEAR_2D
+        assert constants.FeatureType.LINEAR_2D.is_linear
+        assert not constants.FeatureType.LINEAR_2D.is_matrix
+        assert not constants.FeatureType.LINEAR_2D.is_dict_stored
 
 
 class TestOkabeItoColors:

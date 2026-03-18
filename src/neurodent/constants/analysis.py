@@ -23,6 +23,9 @@ class FeatureType(Enum):
     LINEAR = "linear"
     """Scalar per channel.  Stored as a list of floats (one per channel)."""
 
+    LINEAR_2D = "linear_2d"
+    """Multi-component per channel.  Stored as a 2-D array ``(n_channels, n_components)``."""
+
     BAND = "band"
     """Dict keyed by frequency-band name, values are per-channel arrays."""
 
@@ -36,6 +39,11 @@ class FeatureType(Enum):
     """Histogram / spectral data stored as a ``(frequencies, values)`` tuple."""
 
     # -- convenience predicates --------------------------------------------------
+
+    @property
+    def is_linear(self) -> bool:
+        """``True`` for per-channel features (scalar or multi-component)."""
+        return self in (FeatureType.LINEAR, FeatureType.LINEAR_2D)
 
     @property
     def is_matrix(self) -> bool:
@@ -52,7 +60,6 @@ LINEAR_FEATURES = [
     "rms",
     "ampvar",
     "psdtotal",
-    "psdslope",
     "nspike",
     "logrms",
     "logampvar",
@@ -60,6 +67,9 @@ LINEAR_FEATURES = [
     "lognspike",
 ]
 """List of linear (scalar) feature names computed per channel."""
+
+LINEAR_2D_FEATURES = ["psdslope"]
+"""List of multi-component linear features (stored as 2-D arrays per channel)."""
 
 BAND_FEATURES = ["psdband", "psdfrac"] + ["logpsdband", "logpsdfrac"]
 """List of frequency-band feature names (one value per band)."""
@@ -77,7 +87,7 @@ SIMPLE_MATRIX_FEATURES = ["pcorr", "zpcorr"]
 HIST_FEATURES = ["psd"]
 """List of histogram/spectral feature names."""
 
-FEATURES = LINEAR_FEATURES + BAND_FEATURES + MATRIX_FEATURES + HIST_FEATURES
+FEATURES = LINEAR_FEATURES + LINEAR_2D_FEATURES + BAND_FEATURES + MATRIX_FEATURES + HIST_FEATURES
 """Complete list of all available features."""
 
 WAR_FEATURES = [f for f in FEATURES if "nspike" not in f]
@@ -87,19 +97,15 @@ WAR_FEATURES = [f for f in FEATURES if "nspike" not in f]
 # Centralised feature-name → FeatureType mapping
 # ---------------------------------------------------------------------------
 
-FEATURE_TYPES: dict[str, FeatureType] = {}
+FEATURE_TYPES: dict[str, FeatureType] = {
+    **{f: FeatureType.LINEAR for f in LINEAR_FEATURES},
+    **{f: FeatureType.LINEAR_2D for f in LINEAR_2D_FEATURES},
+    **{f: FeatureType.BAND for f in BAND_FEATURES},
+    **{f: FeatureType.BANDED_MATRIX for f in BANDED_MATRIX_FEATURES},
+    **{f: FeatureType.SIMPLE_MATRIX for f in SIMPLE_MATRIX_FEATURES},
+    **{f: FeatureType.HIST for f in HIST_FEATURES},
+}
 """Mapping from every known feature name to its :class:`FeatureType`."""
-
-for _f in LINEAR_FEATURES:
-    FEATURE_TYPES[_f] = FeatureType.LINEAR
-for _f in BAND_FEATURES:
-    FEATURE_TYPES[_f] = FeatureType.BAND
-for _f in BANDED_MATRIX_FEATURES:
-    FEATURE_TYPES[_f] = FeatureType.BANDED_MATRIX
-for _f in SIMPLE_MATRIX_FEATURES:
-    FEATURE_TYPES[_f] = FeatureType.SIMPLE_MATRIX
-for _f in HIST_FEATURES:
-    FEATURE_TYPES[_f] = FeatureType.HIST
 
 
 def classify_feature(feature_name: str) -> FeatureType:

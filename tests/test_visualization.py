@@ -1149,6 +1149,98 @@ class TestAnimalPlotter:
         plotter.plot_coherecorr_spectral(features=["cohere", "pcorr"])
         mock_subplots.assert_called()
 
+    def test_get_linear_feature_linear(self, plotter):
+        """Test __get_linear_feature dispatches LINEAR features correctly."""
+        n_time, n_chan = 5, 2
+        group = pd.DataFrame({
+            "rms": [np.random.rand(n_chan).tolist() for _ in range(n_time)],
+        })
+        # Access name-mangled private method
+        result = plotter._AnimalPlotter__get_linear_feature(group, "rms", score_type="none")
+        # LINEAR features are expanded with a trailing dim: (n_time, n_chan, 1)
+        assert result.shape == (n_time, n_chan, 1)
+
+    def test_get_linear_feature_linear_2d(self, plotter):
+        """Test __get_linear_feature dispatches LINEAR_2D features correctly."""
+        n_time, n_chan, n_components = 5, 2, 2
+        group = pd.DataFrame({
+            "psdslope": [np.random.rand(n_chan, n_components).tolist() for _ in range(n_time)],
+        })
+        result = plotter._AnimalPlotter__get_linear_feature(group, "psdslope", score_type="none")
+        # LINEAR_2D keeps all components → (n_time, n_chan, n_components)
+        assert result.shape == (n_time, n_chan, n_components)
+
+    def test_get_linear_feature_band(self, plotter):
+        """Test __get_linear_feature dispatches BAND features correctly."""
+        n_time, n_chan = 5, 2
+        n_bands = len(constants.BAND_NAMES)
+        group = pd.DataFrame({
+            "psdband": [
+                {b: np.random.rand(n_chan).tolist() for b in constants.BAND_NAMES}
+                for _ in range(n_time)
+            ],
+        })
+        result = plotter._AnimalPlotter__get_linear_feature(group, "psdband", score_type="none")
+        assert result.shape == (n_time, n_chan, n_bands)
+
+    def test_get_linear_feature_simple_matrix(self, plotter):
+        """Test __get_linear_feature dispatches SIMPLE_MATRIX features correctly."""
+        n_time, n_chan = 5, 2
+        group = pd.DataFrame({
+            "pcorr": [np.random.rand(n_chan, n_chan).tolist() for _ in range(n_time)],
+        })
+        # triag=True: extracts lower triangle (1 pair for 2x2)
+        result = plotter._AnimalPlotter__get_linear_feature(group, "pcorr", score_type="none", triag=True)
+        expected_pairs = n_chan * (n_chan - 1) // 2
+        assert result.shape == (n_time, expected_pairs, 1)
+
+    def test_plot_linear_temporalgroup_yticks_linear(self, plotter):
+        """Test that LINEAR features get correct ytick labels."""
+        import matplotlib.pyplot as plt
+        n_time, n_chan = 5, 2
+        group = pd.DataFrame({
+            "rms": [np.random.rand(n_chan).tolist() for _ in range(n_time)],
+            "duration": [1.0] * n_time,
+        })
+        fig, ax = plt.subplots()
+        plotter._plot_linear_temporalgroup(group, "rms", ax)
+        labels = [t.get_text() for t in ax.get_yticklabels()]
+        assert "rms" in labels
+        plt.close(fig)
+
+    def test_plot_linear_temporalgroup_yticks_linear_2d(self, plotter):
+        """Test that LINEAR_2D features get psdslope/psdintercept ytick labels."""
+        import matplotlib.pyplot as plt
+        n_time, n_chan = 5, 2
+        group = pd.DataFrame({
+            "psdslope": [np.random.rand(n_chan, 2).tolist() for _ in range(n_time)],
+            "duration": [1.0] * n_time,
+        })
+        fig, ax = plt.subplots()
+        plotter._plot_linear_temporalgroup(group, "psdslope", ax)
+        labels = [t.get_text() for t in ax.get_yticklabels()]
+        assert "psdslope" in labels
+        assert "psdintercept" in labels
+        plt.close(fig)
+
+    def test_plot_linear_temporalgroup_yticks_band(self, plotter):
+        """Test that BAND features get frequency band ytick labels."""
+        import matplotlib.pyplot as plt
+        n_time, n_chan = 5, 2
+        group = pd.DataFrame({
+            "psdband": [
+                {b: np.random.rand(n_chan).tolist() for b in constants.BAND_NAMES}
+                for _ in range(n_time)
+            ],
+            "duration": [1.0] * n_time,
+        })
+        fig, ax = plt.subplots()
+        plotter._plot_linear_temporalgroup(group, "psdband", ax)
+        labels = [t.get_text() for t in ax.get_yticklabels()]
+        for band in constants.BAND_NAMES:
+            assert band in labels
+        plt.close(fig)
+
 
 class TestExperimentPlotter:
     """Test ExperimentPlotter class."""

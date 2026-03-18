@@ -48,7 +48,7 @@ class AnimalFeatureParser:
         weights = np.asarray(weights)
 
         ftype = constants.classify_feature(colname)
-        if ftype in (constants.FeatureType.LINEAR, constants.FeatureType.SIMPLE_MATRIX):
+        if ftype in (constants.FeatureType.LINEAR, constants.FeatureType.LINEAR_2D, constants.FeatureType.SIMPLE_MATRIX):
             col_agg = np.array(column.tolist())
             avg = core.nanaverage(col_agg, axis=0, weights=weights)
 
@@ -2075,7 +2075,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         for feature in self._feature_columns:
             ftype = constants.classify_feature(feature)
 
-            if ftype in (constants.FeatureType.LINEAR, constants.FeatureType.BAND):
+            if ftype in (constants.FeatureType.LINEAR, constants.FeatureType.LINEAR_2D, constants.FeatureType.BAND):
                 if ftype is constants.FeatureType.BAND:
                     df_bands = pd.DataFrame(result[feature].tolist())
                     vals = np.array(df_bands.values.tolist())
@@ -3505,18 +3505,18 @@ class WindowAnalysisResult(AnimalFeatureParser):
             ftype = constants.classify_feature(feat)
 
             if ftype is constants.FeatureType.LINEAR:
-                if feat == "psdslope":
-                    vals = np.array(result[feat].tolist())
-                    mask = np.broadcast_to(filter_tfs[:, :, np.newaxis], vals.shape)
-                    vals[~mask] = np.nan
-                    result[feat] = vals.tolist()
-                else:
-                    vals = np.array(result[feat].tolist())
-                    # Convert to float to allow NaN assignment for integer features
-                    if vals.dtype.kind in ("i", "u"):  # integer types
-                        vals = vals.astype(float)
-                    vals[~filter_tfs] = np.nan
-                    result[feat] = vals.tolist()
+                vals = np.array(result[feat].tolist())
+                # Convert to float to allow NaN assignment for integer features
+                if vals.dtype.kind in ("i", "u"):  # integer types
+                    vals = vals.astype(float)
+                vals[~filter_tfs] = np.nan
+                result[feat] = vals.tolist()
+
+            elif ftype is constants.FeatureType.LINEAR_2D:
+                vals = np.array(result[feat].tolist())
+                mask = np.broadcast_to(filter_tfs[:, :, np.newaxis], vals.shape)
+                vals[~mask] = np.nan
+                result[feat] = vals.tolist()
 
             elif ftype is constants.FeatureType.HIST:
                 # FIXME The sampling rates have changed between computation passes so WARs have different shapes.

@@ -297,7 +297,7 @@ class ExperimentPlotter:
 
             ftype = constants.classify_feature(feature)
 
-            if ftype in (constants.FeatureType.LINEAR, constants.FeatureType.BAND):
+            if ftype in (constants.FeatureType.LINEAR, constants.FeatureType.LINEAR_2D, constants.FeatureType.BAND):
                 if ftype is constants.FeatureType.BAND:
                     df_bands = pd.DataFrame(df_war[feature].tolist())
                     vals = np.array(df_bands.values.tolist())
@@ -431,13 +431,13 @@ class ExperimentPlotter:
         if feature == "psd":
             df = df.explode(["psd", "freq"])
 
-        if feature == "psdslope":
+        if ftype is constants.FeatureType.LINEAR_2D:
             if df[feature].isna().any():
                 logging.warning(f"{feature} contains NaNs")
                 df = df[df[feature].notna()]
             df[feature] = df[feature].apply(
                 lambda x: x[0]
-            )  # get slope from [slope, intercept]
+            )  # get first component (e.g. slope from [slope, intercept])
         elif ftype.is_dict_stored:
             df[feature] = df[feature].apply(
                 lambda x: list(zip(x, constants.BAND_NAMES))
