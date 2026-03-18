@@ -275,7 +275,7 @@ class TestDatetimesAreStartPropagation:
 class TestValidateSamplingRates:
     """Tests for the _validate_sampling_rates() method on AnimalOrganizer."""
 
-    _date_counter = 1000  # Offset from TestIterValidRecordings to avoid collision
+    _date_counter = 0
 
     def _make_mock_lro(self, sampling_freq=1000.0, total_samples=1000, display_name="mock_lro", date=None):
         """Create a mock LongRecordingOrganizer with configurable sampling frequency."""
@@ -290,9 +290,9 @@ class TestValidateSamplingRates:
         mock_rec.get_sampling_frequency.return_value = sampling_freq
         lro.LongRecording = mock_rec
 
+        TestValidateSamplingRates._date_counter += 1
         if date is None:
-            TestValidateSamplingRates._date_counter += 1
-            date = f"Jan-{TestValidateSamplingRates._date_counter:02d}-2025"
+            date = f"Dec-{TestValidateSamplingRates._date_counter:02d}-2025"
         lro.get_date_string.return_value = date
 
         return lro
@@ -359,5 +359,9 @@ class TestValidateSamplingRates:
         ]
         ao = self._make_ao(lros)
 
-        with pytest.raises(ValueError, match="3 different rates"):
+        with pytest.raises(ValueError, match="3 different rates") as exc_info:
             ao._validate_sampling_rates()
+        msg = str(exc_info.value)
+        assert "rec_a" in msg
+        assert "rec_b" in msg
+        assert "rec_c" in msg
