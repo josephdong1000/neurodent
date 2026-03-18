@@ -263,24 +263,16 @@ class AnimalPlotter(viz.AnimalFeatureParser):
 
         for i in range(n_feat):
             ax.plot(data_T, data_Z[:, :, i], c=f"C{i}", **kwargs)
-        match feature:  # NOTE refactor this to use constants
-            case (
-                "rms"
-                | "ampvar"
-                | "psdtotal"
-                | "nspike"
-                | "logrms"
-                | "logampvar"
-                | "logpsdtotal"
-                | "lognspike"
-            ):
-                ax.set_yticks([ytick_offset], [feature])
-            case "psdslope":
+        ftype = constants.classify_feature(feature)
+        if ftype is constants.FeatureType.LINEAR:
+            if feature == "psdslope":
                 ax.set_yticks(ytick_offset, ["psdslope", "psdintercept"])
-            case "psdband" | "psdfrac" | "logpsdband" | "logpsdfrac":
-                ax.set_yticks(ytick_offset, constants.BAND_NAMES)
-            case _:
-                raise ValueError(f"Invalid feature {feature}")
+            else:
+                ax.set_yticks([ytick_offset], [feature])
+        elif ftype is constants.FeatureType.BAND:
+            ax.set_yticks(ytick_offset, constants.BAND_NAMES)
+        else:
+            raise ValueError(f"Invalid feature {feature}")
 
         if show_endfile:
             self._plot_filediv_lines(
@@ -293,45 +285,37 @@ class AnimalPlotter(viz.AnimalFeatureParser):
     def __get_linear_feature(
         self, group: pd.DataFrame, feature: str, score_type="z", triag=True
     ):
-        match feature:  # NOTE refactor this to use constants
-            case (
-                "rms"
-                | "ampvar"
-                | "psdtotal"
-                | "nspike"
-                | "logrms"
-                | "logampvar"
-                | "logpsdtotal"
-                | "lognspike"
-            ):
-                data_X = np.array(group[feature].to_list())
-                data_X = np.expand_dims(data_X, axis=-1)
-            case "psdband" | "psdfrac" | "logpsdband" | "logpsdfrac":
-                data_X = np.array([list(d.values()) for d in group[feature]])
-                data_X = np.stack(data_X, axis=-1)
-                data_X = np.transpose(data_X)
-            case "psdslope":
+        ftype = constants.classify_feature(feature)
+
+        if ftype is constants.FeatureType.LINEAR:
+            if feature == "psdslope":
                 data_X = np.array(group[feature].to_list())
                 data_X = data_X[:, :, 0]  # Take first component (slope)
-                # data_X = np.expand_dims(data_X, axis=-1)  # Keep 3D format for consistency
-            case "cohere" | "zcohere" | "imcoh" | "zimcoh":
-                data_X = np.array([list(d.values()) for d in group[feature]])
-                data_X = np.stack(data_X, axis=-1)
-                if triag:
-                    tril = np.tril_indices(data_X.shape[1], k=-1)
-                    data_X = data_X[:, tril[0], tril[1], :]
-                data_X = data_X.reshape(data_X.shape[0], -1, data_X.shape[-1])
-                data_X = np.transpose(data_X)
-            case "pcorr" | "zpcorr":
-                data_X = np.stack(group[feature], axis=-1)
-                if triag:
-                    tril = np.tril_indices(data_X.shape[1], k=-1)
-                    data_X = data_X[tril[0], tril[1], :]
-                data_X = data_X.reshape(-1, data_X.shape[-1])
-                data_X = data_X.transpose()
+            else:
+                data_X = np.array(group[feature].to_list())
                 data_X = np.expand_dims(data_X, axis=-1)
-            case _:
-                raise ValueError(f"Invalid feature {feature}")
+        elif ftype is constants.FeatureType.BAND:
+            data_X = np.array([list(d.values()) for d in group[feature]])
+            data_X = np.stack(data_X, axis=-1)
+            data_X = np.transpose(data_X)
+        elif ftype is constants.FeatureType.BANDED_MATRIX:
+            data_X = np.array([list(d.values()) for d in group[feature]])
+            data_X = np.stack(data_X, axis=-1)
+            if triag:
+                tril = np.tril_indices(data_X.shape[1], k=-1)
+                data_X = data_X[:, tril[0], tril[1], :]
+            data_X = data_X.reshape(data_X.shape[0], -1, data_X.shape[-1])
+            data_X = np.transpose(data_X)
+        elif ftype is constants.FeatureType.SIMPLE_MATRIX:
+            data_X = np.stack(group[feature], axis=-1)
+            if triag:
+                tril = np.tril_indices(data_X.shape[1], k=-1)
+                data_X = data_X[tril[0], tril[1], :]
+            data_X = data_X.reshape(-1, data_X.shape[-1])
+            data_X = data_X.transpose()
+            data_X = np.expand_dims(data_X, axis=-1)
+        else:
+            raise ValueError(f"Invalid feature {feature}")
 
         return self._calculate_standard_data(data_X, mode=score_type, axis=0)
 

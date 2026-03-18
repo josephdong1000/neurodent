@@ -47,46 +47,25 @@ class AnimalFeatureParser:
         colitem = column.iloc[0]
         weights = np.asarray(weights)
 
-        match colname:  # NOTE refactor this to use constants
-            case (
-                "rms"
-                | "ampvar"
-                | "psdtotal"
-                | "pcorr"
-                | "zpcorr"
-                | "nspike"
-                | "logrms"
-                | "logampvar"
-                | "logpsdtotal"
-                | "lognspike"
-                | "psdslope"
-            ):
-                col_agg = np.array(column.tolist())
-                avg = core.nanaverage(col_agg, axis=0, weights=weights)
+        ftype = constants.classify_feature(colname)
+        if ftype in (constants.FeatureType.LINEAR, constants.FeatureType.SIMPLE_MATRIX):
+            col_agg = np.array(column.tolist())
+            avg = core.nanaverage(col_agg, axis=0, weights=weights)
 
-            case (
-                "cohere"
-                | "zcohere"
-                | "imcoh"
-                | "zimcoh"
-                | "psdband"
-                | "psdfrac"
-                | "logpsdband"
-                | "logpsdfrac"
-            ):
-                keys = colitem.keys()
-                avg = {}
-                for k in keys:
-                    v = np.array([d[k] for d in column])
-                    avg[k] = core.nanaverage(v, axis=0, weights=weights)
+        elif ftype.is_dict_stored:
+            keys = colitem.keys()
+            avg = {}
+            for k in keys:
+                v = np.array([d[k] for d in column])
+                avg[k] = core.nanaverage(v, axis=0, weights=weights)
 
-            case "psd":
-                coords = colitem[0]
-                values = np.array([x[1] for x in column])
-                avg = (coords, core.nanaverage(values, axis=0, weights=weights))
+        elif ftype is constants.FeatureType.HIST:
+            coords = colitem[0]
+            values = np.array([x[1] for x in column])
+            avg = (coords, core.nanaverage(values, axis=0, weights=weights))
 
-            case _:
-                raise TypeError(f"Unrecognized type in column {colname}: {colitem}")
+        else:
+            raise TypeError(f"Unrecognized type in column {colname}: {colitem}")
 
         return avg
 
@@ -2092,78 +2071,77 @@ class WindowAnalysisResult(AnimalFeatureParser):
             )
 
         for feature in self._feature_columns:
-            match feature:
-                case _ if (
-                    feature in constants.LINEAR_FEATURES + constants.BAND_FEATURES
-                ):
-                    if feature in constants.BAND_FEATURES:
-                        df_bands = pd.DataFrame(result[feature].tolist())
-                        vals = np.array(df_bands.values.tolist())
-                        vals = vals.transpose((0, 2, 1))
-                        keys = df_bands.keys()
-                    else:
-                        vals = np.array(result[feature].tolist())
+            ftype = constants.classify_feature(feature)
 
-                    new_vals = np.full(
-                        (vals.shape[0], len(target_channels), *vals.shape[2:]), np.nan
-                    )  # dubious
+            if ftype in (constants.FeatureType.LINEAR, constants.FeatureType.BAND):
+                if ftype is constants.FeatureType.BAND:
+                    df_bands = pd.DataFrame(result[feature].tolist())
+                    vals = np.array(df_bands.values.tolist())
+                    vals = vals.transpose((0, 2, 1))
+                    keys = df_bands.keys()
+                else:
+                    vals = np.array(result[feature].tolist())
 
-                    for i, ch in enumerate(channel_names):
-                        if ch in channel_map:
-                            new_vals[:, channel_map[ch]] = vals[:, i]
+                new_vals = np.full(
+                    (vals.shape[0], len(target_channels), *vals.shape[2:]), np.nan
+                )  # dubious
 
-                    if feature in constants.BAND_FEATURES:
-                        new_vals = new_vals.transpose((0, 2, 1))
-                        result[feature] = [dict(zip(keys, vals)) for vals in new_vals]
-                    else:
-                        result[feature] = [list(x) for x in new_vals]
+                for i, ch in enumerate(channel_names):
+                    if ch in channel_map:
+                        new_vals[:, channel_map[ch]] = vals[:, i]
 
-                case _ if feature in constants.MATRIX_FEATURES:
-                    if feature in ["cohere", "zcohere", "imcoh", "zimcoh"]:
-                        df_bands = pd.DataFrame(result[feature].tolist())
-                        vals = np.array(df_bands.values.tolist())
-                        keys = df_bands.keys()
-                    else:
-                        vals = np.array(result[feature].tolist())
+                if ftype is constants.FeatureType.BAND:
+                    new_vals = new_vals.transpose((0, 2, 1))
+                    result[feature] = [dict(zip(keys, vals)) for vals in new_vals]
+                else:
+                    result[feature] = [list(x) for x in new_vals]
 
-                    logging.debug(f"vals.shape: {vals.shape}")
-                    new_shape = list(vals.shape[:-2]) + [
-                        len(target_channels),
-                        len(target_channels),
-                    ]
-                    new_vals = np.full(new_shape, np.nan)
+            elif ftype.is_matrix:
+                if ftype is constants.FeatureType.BANDED_MATRIX:
+                    df_bands = pd.DataFrame(result[feature].tolist())
+                    vals = np.array(df_bands.values.tolist())
+                    keys = df_bands.keys()
+                else:
+                    vals = np.array(result[feature].tolist())
 
-                    # Map original channels to target channels
-                    for i, ch1 in enumerate(channel_names):
-                        if ch1 in channel_map:
-                            for j, ch2 in enumerate(channel_names):
-                                if ch2 in channel_map:
-                                    new_vals[
-                                        ..., channel_map[ch1], channel_map[ch2]
-                                    ] = vals[..., i, j]
+                logging.debug(f"vals.shape: {vals.shape}")
+                new_shape = list(vals.shape[:-2]) + [
+                    len(target_channels),
+                    len(target_channels),
+                ]
+                new_vals = np.full(new_shape, np.nan)
 
-                    if feature in ["cohere", "zcohere", "imcoh", "zimcoh"]:
-                        result[feature] = [dict(zip(keys, vals)) for vals in new_vals]
-                    else:
-                        result[feature] = [list(x) for x in new_vals]
+                # Map original channels to target channels
+                for i, ch1 in enumerate(channel_names):
+                    if ch1 in channel_map:
+                        for j, ch2 in enumerate(channel_names):
+                            if ch2 in channel_map:
+                                new_vals[
+                                    ..., channel_map[ch1], channel_map[ch2]
+                                ] = vals[..., i, j]
 
-                case _ if feature in constants.HIST_FEATURES:
-                    coords = np.array([x[0] for x in result[feature].tolist()])
-                    vals = np.array([x[1] for x in result[feature].tolist()])
-                    new_vals = np.full(
-                        (*vals.shape[0:-1], len(target_channels)), np.nan
-                    )
+                if ftype is constants.FeatureType.BANDED_MATRIX:
+                    result[feature] = [dict(zip(keys, vals)) for vals in new_vals]
+                else:
+                    result[feature] = [list(x) for x in new_vals]
 
-                    for i, ch in enumerate(channel_names):
-                        if ch in channel_map:
-                            new_vals[:, ..., channel_map[ch]] = vals[:, ..., i]
+            elif ftype is constants.FeatureType.HIST:
+                coords = np.array([x[0] for x in result[feature].tolist()])
+                vals = np.array([x[1] for x in result[feature].tolist()])
+                new_vals = np.full(
+                    (*vals.shape[0:-1], len(target_channels)), np.nan
+                )
 
-                    result[feature] = [
-                        (coords[i], new_vals[i]) for i in range(len(coords))
-                    ]
+                for i, ch in enumerate(channel_names):
+                    if ch in channel_map:
+                        new_vals[:, ..., channel_map[ch]] = vals[:, ..., i]
 
-                case _:
-                    raise ValueError(f"Invalid feature: {feature}")
+                result[feature] = [
+                    (coords[i], new_vals[i]) for i in range(len(coords))
+                ]
+
+            else:
+                raise ValueError(f"Invalid feature: {feature}")
 
         if inplace:
             self.result = result
@@ -3520,70 +3498,67 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 logging.debug(f"Skipping {feat} because it is not in result")
                 continue
             logging.debug(f"Filtering {feat}")
-            match feat:  # NOTE refactor this to use constants
-                case (
-                    "rms"
-                    | "ampvar"
-                    | "psdtotal"
-                    | "nspike"
-                    | "logrms"
-                    | "logampvar"
-                    | "logpsdtotal"
-                    | "lognspike"
-                ):
+            ftype = constants.classify_feature(feat)
+
+            if ftype is constants.FeatureType.LINEAR:
+                if feat == "psdslope":
+                    vals = np.array(result[feat].tolist())
+                    mask = np.broadcast_to(filter_tfs[:, :, np.newaxis], vals.shape)
+                    vals[~mask] = np.nan
+                    result[feat] = vals.tolist()
+                else:
                     vals = np.array(result[feat].tolist())
                     # Convert to float to allow NaN assignment for integer features
                     if vals.dtype.kind in ("i", "u"):  # integer types
                         vals = vals.astype(float)
                     vals[~filter_tfs] = np.nan
                     result[feat] = vals.tolist()
-                case "psd":
-                    # FIXME The sampling rates have changed between computation passes so WARs have different shapes.
-                    # Add a check for same sampling frequency, other war-relevant properties etc.
-                    # The logging lines below should be removed at some point, but I'll keep it this way for now
-                    logging.debug(
-                        f"set([np.asarray(x[0]).shape for x in result[feat].tolist()]) = {list(set([np.asarray(x[0]).shape for x in result[feat].tolist()]))}"
-                    )
-                    logging.debug(
-                        f"set([np.asarray(x[1]).shape for x in result[feat].tolist()]) = {list(set([np.asarray(x[1]).shape for x in result[feat].tolist()]))}"
-                    )
-                    coords = np.array([x[0] for x in result[feat].tolist()])
-                    vals = np.array([x[1] for x in result[feat].tolist()])
-                    mask = np.broadcast_to(filter_tfs[:, np.newaxis, :], vals.shape)
-                    vals[~mask] = np.nan
-                    outs = [(c, vals[i, :, :]) for i, c in enumerate(coords)]
-                    result[feat] = outs
-                case "psdband" | "psdfrac" | "logpsdband" | "logpsdfrac":
-                    vals = pd.DataFrame(result[feat].tolist())
-                    for colname in vals.columns:
-                        v = np.array(vals[colname].tolist())
-                        v[~filter_tfs] = np.nan
-                        vals[colname] = v.tolist()
-                    result[feat] = vals.to_dict("records")
-                case "psdslope":
-                    vals = np.array(result[feat].tolist())
-                    mask = np.broadcast_to(filter_tfs[:, :, np.newaxis], vals.shape)
-                    vals[~mask] = np.nan
-                    # vals = [list(map(tuple, x)) for x in vals.tolist()]
-                    result[feat] = vals.tolist()
-                case "cohere" | "zcohere" | "imcoh" | "zimcoh":
-                    vals = pd.DataFrame(result[feat].tolist())
-                    shape = np.array(vals.iloc[:, 0].tolist()).shape
-                    mask = np.broadcast_to(filter_tfs[:, :, np.newaxis], shape)
-                    for colname in vals.columns:
-                        v = np.array(vals[colname].tolist())
-                        v[~mask] = np.nan
-                        v[~mask.transpose(0, 2, 1)] = np.nan
-                        vals[colname] = v.tolist()
-                    result[feat] = vals.to_dict("records")
-                case "pcorr" | "zpcorr":
-                    vals = np.array(result[feat].tolist())
-                    mask = np.broadcast_to(filter_tfs[:, :, np.newaxis], vals.shape)
-                    vals[~mask] = np.nan
-                    vals[~mask.transpose(0, 2, 1)] = np.nan
-                    result[feat] = vals.tolist()
-                case _:
-                    raise ValueError(f"Unknown feature to filter {feat}")
+
+            elif ftype is constants.FeatureType.HIST:
+                # FIXME The sampling rates have changed between computation passes so WARs have different shapes.
+                # Add a check for same sampling frequency, other war-relevant properties etc.
+                # The logging lines below should be removed at some point, but I'll keep it this way for now
+                logging.debug(
+                    f"set([np.asarray(x[0]).shape for x in result[feat].tolist()]) = {list(set([np.asarray(x[0]).shape for x in result[feat].tolist()]))}"
+                )
+                logging.debug(
+                    f"set([np.asarray(x[1]).shape for x in result[feat].tolist()]) = {list(set([np.asarray(x[1]).shape for x in result[feat].tolist()]))}"
+                )
+                coords = np.array([x[0] for x in result[feat].tolist()])
+                vals = np.array([x[1] for x in result[feat].tolist()])
+                mask = np.broadcast_to(filter_tfs[:, np.newaxis, :], vals.shape)
+                vals[~mask] = np.nan
+                outs = [(c, vals[i, :, :]) for i, c in enumerate(coords)]
+                result[feat] = outs
+
+            elif ftype is constants.FeatureType.BAND:
+                vals = pd.DataFrame(result[feat].tolist())
+                for colname in vals.columns:
+                    v = np.array(vals[colname].tolist())
+                    v[~filter_tfs] = np.nan
+                    vals[colname] = v.tolist()
+                result[feat] = vals.to_dict("records")
+
+            elif ftype is constants.FeatureType.BANDED_MATRIX:
+                vals = pd.DataFrame(result[feat].tolist())
+                shape = np.array(vals.iloc[:, 0].tolist()).shape
+                mask = np.broadcast_to(filter_tfs[:, :, np.newaxis], shape)
+                for colname in vals.columns:
+                    v = np.array(vals[colname].tolist())
+                    v[~mask] = np.nan
+                    v[~mask.transpose(0, 2, 1)] = np.nan
+                    vals[colname] = v.tolist()
+                result[feat] = vals.to_dict("records")
+
+            elif ftype is constants.FeatureType.SIMPLE_MATRIX:
+                vals = np.array(result[feat].tolist())
+                mask = np.broadcast_to(filter_tfs[:, :, np.newaxis], vals.shape)
+                vals[~mask] = np.nan
+                vals[~mask.transpose(0, 2, 1)] = np.nan
+                result[feat] = vals.tolist()
+
+            else:
+                raise ValueError(f"Unknown feature to filter {feat}")
         return result
 
     def save_pickle_and_json(

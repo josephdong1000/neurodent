@@ -60,6 +60,7 @@ from .mappings import (
 ANIMAL_METADATA: dict = {}
 
 from .analysis import (
+    FeatureType,
     LINEAR_FEATURES,
     BAND_FEATURES,
     MATRIX_FEATURES,
@@ -68,6 +69,8 @@ from .analysis import (
     HIST_FEATURES,
     FEATURES,
     WAR_FEATURES,
+    FEATURE_TYPES,
+    classify_feature,
 
     FREQ_BANDS,
     BAND_NAMES,
@@ -98,6 +101,10 @@ __all__ = [
     "DATEPARSER_PATTERNS_TO_REMOVE",
     "DEFAULT_DAY",
     "FEATURE_LABELS",
+    # Feature Typing
+    "FeatureType",
+    "FEATURE_TYPES",
+    "classify_feature",
     # Feature & Frequency Definitions
     "LINEAR_FEATURES",
     "BAND_FEATURES",

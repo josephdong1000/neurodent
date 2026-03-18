@@ -166,6 +166,90 @@ class TestConstants:
         )
 
 
+class TestFeatureType:
+    """Test FeatureType enum, FEATURE_TYPES mapping, and classify_feature()."""
+
+    def test_feature_type_enum_members(self):
+        """Test that FeatureType enum has the expected members."""
+        assert hasattr(constants.FeatureType, "LINEAR")
+        assert hasattr(constants.FeatureType, "BAND")
+        assert hasattr(constants.FeatureType, "BANDED_MATRIX")
+        assert hasattr(constants.FeatureType, "SIMPLE_MATRIX")
+        assert hasattr(constants.FeatureType, "HIST")
+        assert len(constants.FeatureType) == 5
+
+    def test_classify_feature_linear(self):
+        """Test that all LINEAR_FEATURES classify as LINEAR."""
+        for feat in constants.LINEAR_FEATURES:
+            assert constants.classify_feature(feat) is constants.FeatureType.LINEAR
+
+    def test_classify_feature_band(self):
+        """Test that all BAND_FEATURES classify as BAND."""
+        for feat in constants.BAND_FEATURES:
+            assert constants.classify_feature(feat) is constants.FeatureType.BAND
+
+    def test_classify_feature_banded_matrix(self):
+        """Test that all BANDED_MATRIX_FEATURES classify as BANDED_MATRIX."""
+        for feat in constants.BANDED_MATRIX_FEATURES:
+            assert constants.classify_feature(feat) is constants.FeatureType.BANDED_MATRIX
+
+    def test_classify_feature_simple_matrix(self):
+        """Test that all SIMPLE_MATRIX_FEATURES classify as SIMPLE_MATRIX."""
+        for feat in constants.SIMPLE_MATRIX_FEATURES:
+            assert constants.classify_feature(feat) is constants.FeatureType.SIMPLE_MATRIX
+
+    def test_classify_feature_hist(self):
+        """Test that all HIST_FEATURES classify as HIST."""
+        for feat in constants.HIST_FEATURES:
+            assert constants.classify_feature(feat) is constants.FeatureType.HIST
+
+    def test_classify_feature_unknown_raises(self):
+        """Test that classify_feature raises ValueError for unknown features."""
+        with pytest.raises(ValueError, match="Unknown feature"):
+            constants.classify_feature("nonexistent_feature")
+
+    def test_feature_types_dict_covers_all_features(self):
+        """Test that FEATURE_TYPES maps every known feature."""
+        for feat in constants.FEATURES:
+            assert feat in constants.FEATURE_TYPES
+
+    def test_feature_types_dict_has_no_extras(self):
+        """Test that FEATURE_TYPES doesn't contain features not in FEATURES."""
+        features_set = set(constants.FEATURES)
+        for feat in constants.FEATURE_TYPES:
+            assert feat in features_set
+
+    def test_is_matrix_property(self):
+        """Test the is_matrix convenience property."""
+        assert constants.FeatureType.BANDED_MATRIX.is_matrix is True
+        assert constants.FeatureType.SIMPLE_MATRIX.is_matrix is True
+        assert constants.FeatureType.LINEAR.is_matrix is False
+        assert constants.FeatureType.BAND.is_matrix is False
+        assert constants.FeatureType.HIST.is_matrix is False
+
+    def test_is_dict_stored_property(self):
+        """Test the is_dict_stored convenience property."""
+        assert constants.FeatureType.BAND.is_dict_stored is True
+        assert constants.FeatureType.BANDED_MATRIX.is_dict_stored is True
+        assert constants.FeatureType.LINEAR.is_dict_stored is False
+        assert constants.FeatureType.SIMPLE_MATRIX.is_dict_stored is False
+        assert constants.FeatureType.HIST.is_dict_stored is False
+
+    def test_matrix_features_consistent(self):
+        """Test that MATRIX_FEATURES = BANDED_MATRIX_FEATURES + SIMPLE_MATRIX_FEATURES."""
+        matrix_from_types = sorted(
+            f for f, ft in constants.FEATURE_TYPES.items() if ft.is_matrix
+        )
+        assert matrix_from_types == sorted(constants.MATRIX_FEATURES)
+
+    def test_dict_stored_features_consistent(self):
+        """Test that dict-stored features = BAND_FEATURES + BANDED_MATRIX_FEATURES."""
+        dict_stored = sorted(
+            f for f, ft in constants.FEATURE_TYPES.items() if ft.is_dict_stored
+        )
+        assert dict_stored == sorted(constants.BAND_FEATURES + constants.BANDED_MATRIX_FEATURES)
+
+
 class TestOkabeItoColors:
     """Test Okabe-Ito colorblind-friendly color palette."""
 

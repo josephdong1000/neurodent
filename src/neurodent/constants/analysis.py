@@ -1,3 +1,53 @@
+from enum import Enum
+
+
+class FeatureType(Enum):
+    """Enumeration of feature data shapes.
+
+    Each feature in the system has exactly one :class:`FeatureType` that describes
+    how its data is stored and how common operations (averaging, filtering,
+    channel remapping, plotting) should handle it.
+
+    Using :func:`classify_feature` with this enum eliminates the need for
+    scattered ``match`` / ``if`` blocks that hard-code feature name strings.
+
+    Example::
+
+        from neurodent.constants import FeatureType, classify_feature
+
+        ftype = classify_feature("rms")
+        assert ftype is FeatureType.LINEAR
+        assert not ftype.is_dict_stored
+    """
+
+    LINEAR = "linear"
+    """Scalar per channel.  Stored as a list of floats (one per channel)."""
+
+    BAND = "band"
+    """Dict keyed by frequency-band name, values are per-channel arrays."""
+
+    BANDED_MATRIX = "banded_matrix"
+    """Dict keyed by frequency-band name, values are 2-D (channel × channel) matrices."""
+
+    SIMPLE_MATRIX = "simple_matrix"
+    """2-D (channel × channel) matrix without a frequency-band dimension."""
+
+    HIST = "hist"
+    """Histogram / spectral data stored as a ``(frequencies, values)`` tuple."""
+
+    # -- convenience predicates --------------------------------------------------
+
+    @property
+    def is_matrix(self) -> bool:
+        """``True`` for features stored as channel × channel matrices."""
+        return self in (FeatureType.BANDED_MATRIX, FeatureType.SIMPLE_MATRIX)
+
+    @property
+    def is_dict_stored(self) -> bool:
+        """``True`` for features stored as dicts keyed by frequency band."""
+        return self in (FeatureType.BAND, FeatureType.BANDED_MATRIX)
+
+
 LINEAR_FEATURES = [
     "rms",
     "ampvar",
@@ -32,6 +82,45 @@ FEATURES = LINEAR_FEATURES + BAND_FEATURES + MATRIX_FEATURES + HIST_FEATURES
 
 WAR_FEATURES = [f for f in FEATURES if "nspike" not in f]
 """Features available in WindowAnalysisResult (excludes spike-related)."""
+
+# ---------------------------------------------------------------------------
+# Centralised feature-name → FeatureType mapping
+# ---------------------------------------------------------------------------
+
+FEATURE_TYPES: dict[str, FeatureType] = {}
+"""Mapping from every known feature name to its :class:`FeatureType`."""
+
+for _f in LINEAR_FEATURES:
+    FEATURE_TYPES[_f] = FeatureType.LINEAR
+for _f in BAND_FEATURES:
+    FEATURE_TYPES[_f] = FeatureType.BAND
+for _f in BANDED_MATRIX_FEATURES:
+    FEATURE_TYPES[_f] = FeatureType.BANDED_MATRIX
+for _f in SIMPLE_MATRIX_FEATURES:
+    FEATURE_TYPES[_f] = FeatureType.SIMPLE_MATRIX
+for _f in HIST_FEATURES:
+    FEATURE_TYPES[_f] = FeatureType.HIST
+
+
+def classify_feature(feature_name: str) -> FeatureType:
+    """Return the :class:`FeatureType` for a given feature name.
+
+    Args:
+        feature_name: Name of the feature (e.g. ``'rms'``, ``'psdband'``, ``'cohere'``).
+
+    Returns:
+        The corresponding :class:`FeatureType` enum member.
+
+    Raises:
+        ValueError: If *feature_name* is not a recognised feature.
+    """
+    try:
+        return FEATURE_TYPES[feature_name]
+    except KeyError:
+        raise ValueError(
+            f"Unknown feature '{feature_name}'. "
+            f"Known features: {sorted(FEATURE_TYPES.keys())}"
+        ) from None
 
 FREQ_BANDS = {
     "delta": (1, 4),

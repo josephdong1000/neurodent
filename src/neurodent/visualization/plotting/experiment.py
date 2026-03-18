@@ -295,130 +295,128 @@ class ExperimentPlotter:
             if feature not in df_war.columns:
                 raise ValueError(f"'{feature}' feature not found in {war}")
 
-            match feature:
-                case _ if (
-                    feature in constants.LINEAR_FEATURES + constants.BAND_FEATURES
-                ):
-                    if feature in constants.BAND_FEATURES:
-                        df_bands = pd.DataFrame(df_war[feature].tolist())
-                        vals = np.array(df_bands.values.tolist())
-                        vals = vals.transpose((0, 2, 1))
-                    else:
-                        vals = np.array(df_war[feature].tolist())
+            ftype = constants.classify_feature(feature)
 
-                    if collapse_channels:
-                        vals = np.nanmean(vals, axis=1)
-                        logging.debug(f"vals.shape: {vals.shape}")
-                        vals = {"average": vals.tolist()}
-                    else:
-                        logging.debug(f"vals.shape: {vals.shape}")
-                        vals = {
-                            ch: vals[:, ch_to_idx[ch]].tolist()
-                            for ch in channels
-                            if ch in ch_names
-                        }
-                    vals = df_war[groupby].to_dict("list") | vals
-
-                case "pcorr" | "zpcorr":
-                    vals = np.array(df_war[feature].tolist())
-                    if collapse_channels:
-                        # Get lower triangular elements (excluding diagonal)
-                        tril_indices = np.tril_indices(vals.shape[1], k=-1)
-                        # Take mean across pairs
-                        vals = np.nanmean(
-                            vals[:, tril_indices[0], tril_indices[1]], axis=-1
-                        )
-                        logging.debug(f"vals.shape: {vals.shape}")
-                        vals = {"average": vals.tolist()}
-                    else:
-                        logging.debug(f"vals.shape: {vals.shape}")
-                        vals = {"all": vals.tolist()}
-                    vals = df_war[groupby].to_dict("list") | vals
-
-                case "cohere" | "zcohere" | "imcoh" | "zimcoh":
+            if ftype in (constants.FeatureType.LINEAR, constants.FeatureType.BAND):
+                if ftype is constants.FeatureType.BAND:
                     df_bands = pd.DataFrame(df_war[feature].tolist())
                     vals = np.array(df_bands.values.tolist())
+                    vals = vals.transpose((0, 2, 1))
+                else:
+                    vals = np.array(df_war[feature].tolist())
+
+                if collapse_channels:
+                    vals = np.nanmean(vals, axis=1)
                     logging.debug(f"vals.shape: {vals.shape}")
+                    vals = {"average": vals.tolist()}
+                else:
+                    logging.debug(f"vals.shape: {vals.shape}")
+                    vals = {
+                        ch: vals[:, ch_to_idx[ch]].tolist()
+                        for ch in channels
+                        if ch in ch_names
+                    }
+                vals = df_war[groupby].to_dict("list") | vals
 
-                    if collapse_channels:
-                        tril_indices = np.tril_indices(vals.shape[1], k=-1)
-                        vals = np.nanmean(
-                            vals[:, :, tril_indices[0], tril_indices[1]], axis=-1
+            elif ftype is constants.FeatureType.SIMPLE_MATRIX:
+                vals = np.array(df_war[feature].tolist())
+                if collapse_channels:
+                    # Get lower triangular elements (excluding diagonal)
+                    tril_indices = np.tril_indices(vals.shape[1], k=-1)
+                    # Take mean across pairs
+                    vals = np.nanmean(
+                        vals[:, tril_indices[0], tril_indices[1]], axis=-1
+                    )
+                    logging.debug(f"vals.shape: {vals.shape}")
+                    vals = {"average": vals.tolist()}
+                else:
+                    logging.debug(f"vals.shape: {vals.shape}")
+                    vals = {"all": vals.tolist()}
+                vals = df_war[groupby].to_dict("list") | vals
+
+            elif ftype is constants.FeatureType.BANDED_MATRIX:
+                df_bands = pd.DataFrame(df_war[feature].tolist())
+                vals = np.array(df_bands.values.tolist())
+                logging.debug(f"vals.shape: {vals.shape}")
+
+                if collapse_channels:
+                    tril_indices = np.tril_indices(vals.shape[1], k=-1)
+                    vals = np.nanmean(
+                        vals[:, :, tril_indices[0], tril_indices[1]], axis=-1
+                    )
+                    logging.debug(f"vals.shape: {vals.shape}")
+                    vals = {"average": vals.tolist()}
+                else:
+                    logging.debug(f"vals.shape: {vals.shape}")
+                    vals = {"all": vals.tolist()}
+                vals = df_war[groupby].to_dict("list") | vals
+
+            elif ftype is constants.FeatureType.HIST:
+                # REVIEW revise this, splitting up frequencys and values and instead making both of them independent features
+                # this way they can be averaged, processed, etc. without worrying about tuple things
+                # if freq present, explode it
+                psd_data = df_war[feature].tolist()
+
+                freq_vals = np.array(
+                    [
+                        (
+                            item[0]
+                            if isinstance(item, (tuple, list)) and len(item) == 2
+                            else item
                         )
-                        logging.debug(f"vals.shape: {vals.shape}")
-                        vals = {"average": vals.tolist()}
-                    else:
-                        logging.debug(f"vals.shape: {vals.shape}")
-                        vals = {"all": vals.tolist()}
-                    vals = df_war[groupby].to_dict("list") | vals
-
-                # ANCHOR
-                case _ if feature in constants.HIST_FEATURES:
-                    # REVIEW revise this, splitting up frequencys and values and instead making both of them independent features
-                    # this way they can be averaged, processed, etc. without worrying about tuple things
-                    # if freq present, explode it
-                    psd_data = df_war[feature].tolist()
-
-                    freq_vals = np.array(
-                        [
-                            (
-                                item[0]
-                                if isinstance(item, (tuple, list)) and len(item) == 2
-                                else item
-                            )
-                            for item in psd_data
-                        ]
-                    )
-                    n_unique_freq_vals = np.unique(freq_vals, axis=0).shape[0]
-                    if n_unique_freq_vals > 1:
-                        raise ValueError(
-                            f"Multiple frequency bin values found in {feature}: {n_unique_freq_vals} values"
-                        )
-
-                    psd_vals = np.array(
-                        [
-                            (
-                                item[1]
-                                if isinstance(item, (tuple, list)) and len(item) == 2
-                                else item
-                            )
-                            for item in psd_data
-                        ]
-                    )
-                    psd_vals = psd_vals.transpose((0, 2, 1))
-
-                    logging.debug(
-                        f"freq_vals.shape: {freq_vals.shape}, psd_vals.shape: {psd_vals.shape}"
-                    )
-
-                    # freq_vals.shape: (8, 501), psd_vals.shape: (8, 10, 501)
-                    if collapse_channels:
-                        psd_vals = np.nanmean(psd_vals, axis=1)
-                        logging.debug(f"psd_vals.shape: {psd_vals.shape}")  # (8, 501)
-                        psd_vals = {"average": psd_vals.tolist()}
-                    else:
-                        logging.debug(
-                            f"psd_vals.shape: {psd_vals.shape}"
-                        )  # (8, 10, 501)
-                        psd_vals = {
-                            ch: psd_vals[:, ch_to_idx[ch], :].tolist()
-                            for ch in channels
-                            if ch in ch_names
-                        }  # (8, 10, 501)
-                    psd_vals = psd_vals | {"freq": freq_vals.tolist()}
-                    vals = df_war[groupby].to_dict("list") | psd_vals
-
-                case _:
+                        for item in psd_data
+                    ]
+                )
+                n_unique_freq_vals = np.unique(freq_vals, axis=0).shape[0]
+                if n_unique_freq_vals > 1:
                     raise ValueError(
-                        f"{feature} is not supported in _pull_timeseries_dataframe"
+                        f"Multiple frequency bin values found in {feature}: {n_unique_freq_vals} values"
                     )
+
+                psd_vals = np.array(
+                    [
+                        (
+                            item[1]
+                            if isinstance(item, (tuple, list)) and len(item) == 2
+                            else item
+                        )
+                        for item in psd_data
+                    ]
+                )
+                psd_vals = psd_vals.transpose((0, 2, 1))
+
+                logging.debug(
+                    f"freq_vals.shape: {freq_vals.shape}, psd_vals.shape: {psd_vals.shape}"
+                )
+
+                # freq_vals.shape: (8, 501), psd_vals.shape: (8, 10, 501)
+                if collapse_channels:
+                    psd_vals = np.nanmean(psd_vals, axis=1)
+                    logging.debug(f"psd_vals.shape: {psd_vals.shape}")  # (8, 501)
+                    psd_vals = {"average": psd_vals.tolist()}
+                else:
+                    logging.debug(
+                        f"psd_vals.shape: {psd_vals.shape}"
+                    )  # (8, 10, 501)
+                    psd_vals = {
+                        ch: psd_vals[:, ch_to_idx[ch], :].tolist()
+                        for ch in channels
+                        if ch in ch_names
+                    }  # (8, 10, 501)
+                psd_vals = psd_vals | {"freq": freq_vals.tolist()}
+                vals = df_war[groupby].to_dict("list") | psd_vals
+
+            else:
+                raise ValueError(
+                    f"{feature} is not supported in _pull_timeseries_dataframe"
+                )
 
             df_feature = pd.DataFrame.from_dict(vals, orient="columns")
             dataframes.append(df_feature)
 
         df = pd.concat(dataframes, axis=0, ignore_index=True)
 
-        if feature in constants.HIST_FEATURES:
+        if ftype is constants.FeatureType.HIST:
             melt_groupby = groupby + ["freq"]
         else:
             melt_groupby = groupby
@@ -440,12 +438,7 @@ class ExperimentPlotter:
             df[feature] = df[feature].apply(
                 lambda x: x[0]
             )  # get slope from [slope, intercept]
-        elif feature in constants.BAND_FEATURES + [
-            "cohere",
-            "zcohere",
-            "imcoh",
-            "zimcoh",
-        ]:
+        elif ftype.is_dict_stored:
             df[feature] = df[feature].apply(
                 lambda x: list(zip(x, constants.BAND_NAMES))
             )
@@ -503,9 +496,10 @@ class ExperimentPlotter:
         """
         Create a boxplot of feature data.
         """
-        if feature in constants.MATRIX_FEATURES and not collapse_channels:
+        ftype = constants.classify_feature(feature)
+        if ftype.is_matrix and not collapse_channels:
             raise ValueError("To plot matrix features, collapse_channels must be True")
-        if feature in constants.HIST_FEATURES:
+        if ftype is constants.FeatureType.HIST:
             raise ValueError(
                 f"'{feature}' is a histogram feature and is not supported in plot_catplot. Use plot_psd instead."
             )
@@ -679,7 +673,7 @@ class ExperimentPlotter:
             - colors.Normalize(vmin=-1, vmax=1)  # Fixed range
             - colors.LogNorm()  # Logarithmic scale
         """
-        if feature not in constants.MATRIX_FEATURES:
+        if not constants.classify_feature(feature).is_matrix:
             raise ValueError(f"{feature} is not supported for 2D feature plots")
 
         if isinstance(groupby, str):
@@ -841,7 +835,7 @@ class ExperimentPlotter:
             - colors.Normalize(vmin=-1, vmax=1)  # Fixed range
             - colors.LogNorm()  # Logarithmic scale
         """
-        if feature not in constants.MATRIX_FEATURES:
+        if not constants.classify_feature(feature).is_matrix:
             raise ValueError(f"{feature} is not supported for 2D feature plots")
 
         if isinstance(groupby, str):
@@ -994,9 +988,10 @@ class ExperimentPlotter:
         """
         Create a QQ plot of the feature data.
         """
-        if feature in constants.MATRIX_FEATURES and not collapse_channels:
+        ftype = constants.classify_feature(feature)
+        if ftype.is_matrix and not collapse_channels:
             raise ValueError("To plot matrix features, collapse_channels must be True")
-        if feature in constants.HIST_FEATURES:
+        if ftype is constants.FeatureType.HIST:
             raise ValueError(
                 f"'{feature}' is a histogram feature and is not supported in plot_qqplot"
             )
