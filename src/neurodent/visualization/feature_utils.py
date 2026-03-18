@@ -14,6 +14,17 @@ import numpy as np
 import pandas as pd
 
 
+def _ensure_dense(arr: np.ndarray, error_msg: str) -> np.ndarray:
+    """Validate that *arr* is a dense (non-object) numpy array.
+
+    Raises ``ValueError`` with *error_msg* when the array has ``dtype=object``,
+    which indicates ragged (non-uniform) nested structure.
+    """
+    if arr.dtype == object:
+        raise ValueError(error_msg)
+    return arr
+
+
 # ---------------------------------------------------------------------------
 # Linear / array-valued features
 # ---------------------------------------------------------------------------
@@ -51,13 +62,11 @@ def extract_linear_array(series: pd.Series) -> np.ndarray:
             f"Ragged input: per-row shapes are not uniform ({shapes}). "
             f"All rows must have the same shape."
         )
-    if result.dtype == object:
-        shapes = {np.asarray(row).shape for row in series}
-        raise ValueError(
-            f"Ragged input: per-row shapes are not uniform ({shapes}). "
-            f"All rows must have the same shape."
-        )
-    return result
+    return _ensure_dense(
+        result,
+        "Ragged input: per-row shapes are not uniform. "
+        "All rows must have the same shape.",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -84,21 +93,17 @@ def extract_band_dict(series: pd.Series) -> tuple[np.ndarray, list]:
     ValueError
         If band values have inconsistent shapes across windows (ragged data).
     """
+    _RAGGED_BAND_MSG = (
+        "Ragged input: band values have inconsistent shapes across windows. "
+        "All windows must have the same shape per band."
+    )
     df_bands = pd.DataFrame(series.tolist())
     keys = list(df_bands.columns)
     try:
         vals = np.asarray(df_bands.values.tolist())
     except ValueError:
-        raise ValueError(
-            "Ragged input: band values have inconsistent shapes across windows. "
-            "All windows must have the same shape per band."
-        )
-    if vals.dtype == object:
-        raise ValueError(
-            "Ragged input: band values have inconsistent shapes across windows. "
-            "All windows must have the same shape per band."
-        )
-    return vals, keys
+        raise ValueError(_RAGGED_BAND_MSG)
+    return _ensure_dense(vals, _RAGGED_BAND_MSG), keys
 
 
 def repack_band_dict(vals: np.ndarray, keys: list) -> list[dict]:
@@ -150,6 +155,10 @@ def extract_hist_data(series: pd.Series) -> tuple[np.ndarray, np.ndarray]:
         If histogram entries have inconsistent shapes across windows
         (ragged data).
     """
+    _RAGGED_HIST_MSG = (
+        "Ragged input: histogram entries have inconsistent shapes across windows. "
+        "All windows must have the same shape."
+    )
     data = series.tolist()
     try:
         coords = np.asarray([
@@ -163,13 +172,7 @@ def extract_hist_data(series: pd.Series) -> tuple[np.ndarray, np.ndarray]:
             for item in data
         ])
     except ValueError:
-        raise ValueError(
-            "Ragged input: histogram entries have inconsistent shapes across windows. "
-            "All windows must have the same shape."
-        )
-    if coords.dtype == object or values.dtype == object:
-        raise ValueError(
-            "Ragged input: histogram entries have inconsistent shapes across windows. "
-            "All windows must have the same shape."
-        )
+        raise ValueError(_RAGGED_HIST_MSG)
+    _ensure_dense(coords, _RAGGED_HIST_MSG)
+    _ensure_dense(values, _RAGGED_HIST_MSG)
     return coords, values
