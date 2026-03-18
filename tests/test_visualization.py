@@ -33,6 +33,7 @@ class TestAnimalFeatureParser:
     @pytest.fixture
     def sample_df(self):
         """Create a sample DataFrame for testing."""
+        n_chan = 3
         data = {
             "rms": [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]],
             "duration": [1.0, 2.0, 1.5],
@@ -40,6 +41,26 @@ class TestAnimalFeatureParser:
                 {"alpha": [1.0, 2.0], "beta": [3.0, 4.0]},
                 {"alpha": [5.0, 6.0], "beta": [7.0, 8.0]},
                 {"alpha": [9.0, 10.0], "beta": [11.0, 12.0]},
+            ],
+            "psdslope": [
+                [[0.1, 0.2], [0.3, 0.4], [0.5, 0.6]],
+                [[0.7, 0.8], [0.9, 1.0], [1.1, 1.2]],
+                [[1.3, 1.4], [1.5, 1.6], [1.7, 1.8]],
+            ],
+            "pcorr": [
+                np.eye(n_chan).tolist(),
+                (np.eye(n_chan) * 2).tolist(),
+                (np.eye(n_chan) * 3).tolist(),
+            ],
+            "cohere": [
+                {"alpha": np.ones((n_chan, n_chan)).tolist(), "beta": (np.ones((n_chan, n_chan)) * 2).tolist()},
+                {"alpha": (np.ones((n_chan, n_chan)) * 3).tolist(), "beta": (np.ones((n_chan, n_chan)) * 4).tolist()},
+                {"alpha": (np.ones((n_chan, n_chan)) * 5).tolist(), "beta": (np.ones((n_chan, n_chan)) * 6).tolist()},
+            ],
+            "psd": [
+                (np.array([1.0, 2.0, 3.0]), np.array([[10.0, 20.0, 30.0], [40.0, 50.0, 60.0]])),
+                (np.array([1.0, 2.0, 3.0]), np.array([[70.0, 80.0, 90.0], [100.0, 110.0, 120.0]])),
+                (np.array([1.0, 2.0, 3.0]), np.array([[130.0, 140.0, 150.0], [160.0, 170.0, 180.0]])),
             ],
         }
         return pd.DataFrame(data)
@@ -63,6 +84,42 @@ class TestAnimalFeatureParser:
         assert "beta" in result
         assert len(result["alpha"]) == 2
         assert len(result["beta"]) == 2
+
+    def test_average_feature_linear_2d(self, parser, sample_df):
+        """Test averaging LINEAR_2D feature (psdslope)."""
+        result = parser._average_feature(sample_df, "psdslope", "duration")
+        assert isinstance(result, np.ndarray)
+        assert result.shape == (3, 2)  # (n_chan, n_components)
+
+    def test_average_feature_simple_matrix(self, parser, sample_df):
+        """Test averaging SIMPLE_MATRIX feature (pcorr)."""
+        result = parser._average_feature(sample_df, "pcorr", "duration")
+        assert isinstance(result, np.ndarray)
+        assert result.shape == (3, 3)  # (n_chan, n_chan)
+
+    def test_average_feature_banded_matrix(self, parser, sample_df):
+        """Test averaging BANDED_MATRIX feature (cohere)."""
+        result = parser._average_feature(sample_df, "cohere", "duration")
+        assert isinstance(result, dict)
+        assert "alpha" in result
+        assert "beta" in result
+        assert np.array(result["alpha"]).shape == (3, 3)
+
+    def test_average_feature_hist(self, parser, sample_df):
+        """Test averaging HIST feature (psd)."""
+        result = parser._average_feature(sample_df, "psd", "duration")
+        assert isinstance(result, tuple)
+        assert len(result) == 2
+        coords, values = result
+        np.testing.assert_array_equal(coords, [1.0, 2.0, 3.0])
+        assert values.shape == (2, 3)  # (n_freq_rows, n_chan)
+
+    def test_average_feature_no_weights(self, parser, sample_df):
+        """Test averaging with no weight column (uniform weights)."""
+        result = parser._average_feature(sample_df, "rms", weightsname=None)
+        # Uniform weights → simple mean
+        expected = np.mean([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]], axis=0)
+        np.testing.assert_array_almost_equal(result, expected)
 
 
 class TestWindowAnalysisResult:
@@ -1013,6 +1070,225 @@ class TestWindowAnalysisResultFiltering:
             assert isinstance(filtered, WindowAnalysisResult)
 
 
+class TestWindowAnalysisResultRemapChannels:
+    """Test WindowAnalysisResult.reorder_and_pad_channels() FeatureType dispatch."""
+
+    @pytest.fixture
+    def remap_war(self):
+        """Create a WAR with all feature types for remap testing (2 channels → 3)."""
+        n_rows = 3
+        n_chan = 2
+        n_freq = 4
+        ch_names = ["LMot", "RMot"]
+        rng = np.random.default_rng(99)
+
+        data = {
+            "animal": ["A1"] * n_rows,
+            "animalday": ["A1_day1"] * n_rows,
+            "genotype": ["WT"] * n_rows,
+            "duration": [4.0] * n_rows,
+            "rms": [rng.random(n_chan).tolist() for _ in range(n_rows)],
+            "psdslope": [rng.random((n_chan, 2)).tolist() for _ in range(n_rows)],
+            "psdband": [
+                {b: rng.random(n_chan).tolist() for b in constants.BAND_NAMES}
+                for _ in range(n_rows)
+            ],
+            "pcorr": [rng.random((n_chan, n_chan)).tolist() for _ in range(n_rows)],
+            "cohere": [
+                {b: rng.random((n_chan, n_chan)).tolist() for b in constants.BAND_NAMES}
+                for _ in range(n_rows)
+            ],
+            "psd": [
+                (np.linspace(1, 40, n_freq), rng.random((n_freq, n_chan)))
+                for _ in range(n_rows)
+            ],
+        }
+        return WindowAnalysisResult(
+            result=pd.DataFrame(data),
+            animal_id="A1",
+            genotype="WT",
+            channel_names=ch_names,
+        )
+
+    def test_remap_channels_linear(self, remap_war):
+        """Test remap_channels for LINEAR feature (rms)."""
+        target = ["LMot", "RMot", "LBar"]
+        result = remap_war.reorder_and_pad_channels(target, use_abbrevs=False, inplace=False)
+        for row in result["rms"]:
+            arr = np.array(row)
+            assert arr.shape == (3,)
+            assert np.isnan(arr[2])  # LBar should be NaN-padded
+            assert not np.isnan(arr[0])
+
+    def test_remap_channels_linear_2d(self, remap_war):
+        """Test remap_channels for LINEAR_2D feature (psdslope)."""
+        target = ["LMot", "RMot", "LBar"]
+        result = remap_war.reorder_and_pad_channels(target, use_abbrevs=False, inplace=False)
+        for row in result["psdslope"]:
+            arr = np.array(row)
+            assert arr.shape == (3, 2)
+            assert np.all(np.isnan(arr[2]))  # LBar padded
+
+    def test_remap_channels_band(self, remap_war):
+        """Test remap_channels for BAND feature (psdband)."""
+        target = ["LMot", "RMot", "LBar"]
+        result = remap_war.reorder_and_pad_channels(target, use_abbrevs=False, inplace=False)
+        for row_dict in result["psdband"]:
+            assert set(row_dict.keys()) == set(constants.BAND_NAMES)
+            for band_vals in row_dict.values():
+                arr = np.array(band_vals)
+                assert arr.shape == (3,)
+                assert np.isnan(arr[2])
+
+    def test_remap_channels_simple_matrix(self, remap_war):
+        """Test remap_channels for SIMPLE_MATRIX feature (pcorr)."""
+        target = ["LMot", "RMot", "LBar"]
+        result = remap_war.reorder_and_pad_channels(target, use_abbrevs=False, inplace=False)
+        for row in result["pcorr"]:
+            arr = np.array(row)
+            assert arr.shape == (3, 3)
+            # LBar row/col should be NaN
+            assert np.all(np.isnan(arr[2, :]))
+            assert np.all(np.isnan(arr[:, 2]))
+
+    def test_remap_channels_banded_matrix(self, remap_war):
+        """Test remap_channels for BANDED_MATRIX feature (cohere)."""
+        target = ["LMot", "RMot", "LBar"]
+        result = remap_war.reorder_and_pad_channels(target, use_abbrevs=False, inplace=False)
+        for row_dict in result["cohere"]:
+            assert set(row_dict.keys()) == set(constants.BAND_NAMES)
+            for band_mat in row_dict.values():
+                arr = np.array(band_mat)
+                assert arr.shape == (3, 3)
+                assert np.all(np.isnan(arr[2, :]))
+                assert np.all(np.isnan(arr[:, 2]))
+
+    def test_remap_channels_hist(self, remap_war):
+        """Test remap_channels for HIST feature (psd)."""
+        target = ["LMot", "RMot", "LBar"]
+        result = remap_war.reorder_and_pad_channels(target, use_abbrevs=False, inplace=False)
+        for item in result["psd"]:
+            coords, vals = item
+            arr = np.array(vals)
+            assert arr.shape[-1] == 3  # 3 target channels
+            assert np.all(np.isnan(arr[..., 2]))
+
+    def test_remap_channels_inplace(self, remap_war):
+        """Test remap_channels with inplace=True updates instance state."""
+        target = ["LMot", "RMot", "LBar"]
+        remap_war.reorder_and_pad_channels(target, use_abbrevs=False, inplace=True)
+        assert remap_war.channel_names == target
+        # Verify data was updated
+        arr = np.array(remap_war.result["rms"].iloc[0])
+        assert arr.shape == (3,)
+
+
+class TestApplyFilter:
+    """Test WindowAnalysisResult._apply_filter() FeatureType dispatch."""
+
+    @pytest.fixture
+    def filter_war(self):
+        """Create a WAR with all feature types for filter testing."""
+        n_rows = 3
+        n_chan = 2
+        n_freq = 4
+        rng = np.random.default_rng(77)
+
+        data = {
+            "animal": ["A1"] * n_rows,
+            "animalday": ["A1_day1"] * n_rows,
+            "genotype": ["WT"] * n_rows,
+            "duration": [4.0] * n_rows,
+            "rms": [rng.random(n_chan).tolist() for _ in range(n_rows)],
+            "psdslope": [rng.random((n_chan, 2)).tolist() for _ in range(n_rows)],
+            "psdband": [
+                {b: rng.random(n_chan).tolist() for b in constants.BAND_NAMES}
+                for _ in range(n_rows)
+            ],
+            "pcorr": [rng.random((n_chan, n_chan)).tolist() for _ in range(n_rows)],
+            "cohere": [
+                {b: rng.random((n_chan, n_chan)).tolist() for b in constants.BAND_NAMES}
+                for _ in range(n_rows)
+            ],
+            "psd": [
+                (np.linspace(1, 40, n_freq), rng.random((n_freq, n_chan)))
+                for _ in range(n_rows)
+            ],
+        }
+        return WindowAnalysisResult(
+            result=pd.DataFrame(data),
+            animal_id="A1",
+            genotype="WT",
+            channel_names=["LMot", "RMot"],
+        )
+
+    @pytest.fixture
+    def mask(self):
+        """Boolean mask: keep all except row 0, channel 1."""
+        m = np.ones((3, 2), dtype=bool)
+        m[0, 1] = False
+        return m
+
+    def test_apply_filter_linear(self, filter_war, mask):
+        """Test _apply_filter for LINEAR feature (rms)."""
+        result = filter_war._apply_filter(mask)
+        vals = np.array(result["rms"].tolist())
+        assert np.isnan(vals[0, 1])
+        assert not np.isnan(vals[0, 0])
+
+    def test_apply_filter_linear_2d(self, filter_war, mask):
+        """Test _apply_filter for LINEAR_2D feature (psdslope)."""
+        result = filter_war._apply_filter(mask)
+        vals = np.array(result["psdslope"].tolist())
+        # Masked position: all components should be NaN
+        assert np.all(np.isnan(vals[0, 1, :]))
+        assert not np.any(np.isnan(vals[0, 0, :]))
+
+    def test_apply_filter_band(self, filter_war, mask):
+        """Test _apply_filter for BAND feature (psdband)."""
+        result = filter_war._apply_filter(mask)
+        for band in constants.BAND_NAMES:
+            val = np.array(result["psdband"].iloc[0][band])
+            assert np.isnan(val[1])  # channel 1 masked
+            assert not np.isnan(val[0])
+
+    def test_apply_filter_simple_matrix(self, filter_war, mask):
+        """Test _apply_filter for SIMPLE_MATRIX feature (pcorr)."""
+        result = filter_war._apply_filter(mask)
+        mat = np.array(result["pcorr"].iloc[0])
+        # Channel 1 masked → row 1 and col 1 should be NaN
+        assert np.isnan(mat[1, 0])
+        assert np.isnan(mat[0, 1])
+        assert not np.isnan(mat[0, 0])
+
+    def test_apply_filter_banded_matrix(self, filter_war, mask):
+        """Test _apply_filter for BANDED_MATRIX feature (cohere)."""
+        result = filter_war._apply_filter(mask)
+        row_dict = result["cohere"].iloc[0]
+        for band_mat in row_dict.values():
+            mat = np.array(band_mat)
+            assert np.isnan(mat[1, 0])
+            assert np.isnan(mat[0, 1])
+            assert not np.isnan(mat[0, 0])
+
+    def test_apply_filter_hist(self, filter_war, mask):
+        """Test _apply_filter for HIST feature (psd)."""
+        result = filter_war._apply_filter(mask)
+        coords, vals = result["psd"].iloc[0]
+        arr = np.array(vals)
+        # mask shape is (n_rows, n_chan), broadcast to (n_rows, n_freq, n_chan)
+        # row 0, channel 1 should be NaN
+        assert np.all(np.isnan(arr[:, 1]))
+        assert not np.any(np.isnan(arr[:, 0]))
+
+    def test_apply_filter_all_true_preserves_data(self, filter_war):
+        """Test that an all-True mask preserves all data (no NaNs introduced)."""
+        mask = np.ones((3, 2), dtype=bool)
+        result = filter_war._apply_filter(mask)
+        vals = np.array(result["rms"].tolist())
+        assert not np.any(np.isnan(vals))
+
+
 class TestAnimalPlotter:
     """Test AnimalPlotter class."""
 
@@ -1193,6 +1469,20 @@ class TestAnimalPlotter:
         result = plotter._AnimalPlotter__get_linear_feature(group, "pcorr", score_type="none", triag=True)
         expected_pairs = n_chan * (n_chan - 1) // 2
         assert result.shape == (n_time, expected_pairs, 1)
+
+    def test_get_linear_feature_banded_matrix(self, plotter):
+        """Test __get_linear_feature dispatches BANDED_MATRIX features correctly."""
+        n_time, n_chan = 5, 2
+        n_bands = len(constants.BAND_NAMES)
+        group = pd.DataFrame({
+            "cohere": [
+                {b: np.random.rand(n_chan, n_chan).tolist() for b in constants.BAND_NAMES}
+                for _ in range(n_time)
+            ],
+        })
+        result = plotter._AnimalPlotter__get_linear_feature(group, "cohere", score_type="none", triag=True)
+        expected_pairs = n_chan * (n_chan - 1) // 2
+        assert result.shape == (n_time, expected_pairs, n_bands)
 
     def test_plot_linear_temporalgroup_yticks_linear(self, plotter):
         """Test that LINEAR features get correct ytick labels."""
@@ -1542,6 +1832,26 @@ class TestExperimentPlotterFeatureDispatch:
         with pytest.raises(ValueError, match="feature not found"):
             feature_plotter.pull_timeseries_dataframe(
                 feature="nonexistent_feature", groupby=["genotype"]
+            )
+
+    def test_pull_simple_matrix_feature_not_collapsed(self, feature_plotter):
+        """Test pull_timeseries_dataframe with SIMPLE_MATRIX, collapse_channels=False."""
+        df = feature_plotter.pull_timeseries_dataframe(
+            feature="pcorr", groupby=["genotype"], collapse_channels=False
+        )
+        assert isinstance(df, pd.DataFrame)
+        assert "pcorr" in df.columns
+        assert (df["channel"] == "all").all()
+
+    def test_pull_banded_matrix_feature_collapsed_known_bug(self, feature_plotter):
+        """BANDED_MATRIX collapse_channels=True triggers IndexError (known bug).
+
+        vals.shape[1] is n_bands, but tril_indices expects n_chan.
+        This documents the pre-existing issue noted in test_pull_banded_matrix_feature.
+        """
+        with pytest.raises(IndexError):
+            feature_plotter.pull_timeseries_dataframe(
+                feature="cohere", groupby=["genotype"], collapse_channels=True
             )
 
 
