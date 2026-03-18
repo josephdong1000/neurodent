@@ -1239,6 +1239,37 @@ class TestAnimalPlotter:
         assert labels == constants.BAND_NAMES
         plt.close(fig)
 
+    def test_plot_linear_temporalgroup_yticks_invalid_feature(self, plotter):
+        """Test that unsupported FeatureTypes for ytick labels raise ValueError."""
+        import matplotlib.pyplot as plt
+        n_time, n_chan = 5, 2
+        # Use a HIST feature (psd) which is not supported for ytick labels
+        group = pd.DataFrame({
+            "psd": [
+                (np.linspace(0, 50, 10).tolist(), np.random.rand(10, n_chan).tolist())
+                for _ in range(n_time)
+            ],
+            "duration": [1.0] * n_time,
+        })
+        fig, ax = plt.subplots()
+        # psd will fail in __get_linear_feature, not in ytick setting
+        with pytest.raises(ValueError, match="Unsupported FeatureType.*for feature extraction"):
+            plotter._plot_linear_temporalgroup(group, "psd", ax)
+        plt.close(fig)
+
+    def test_get_linear_feature_invalid_feature(self, plotter):
+        """Test that unsupported FeatureTypes for feature extraction raise ValueError."""
+        n_time, n_chan = 5, 2
+        # Use a HIST feature (psd) which should raise in __get_linear_feature
+        group = pd.DataFrame({
+            "psd": [
+                (np.linspace(0, 50, 10).tolist(), np.random.rand(10, n_chan).tolist())
+                for _ in range(n_time)
+            ],
+        })
+        with pytest.raises(ValueError, match="Unsupported FeatureType.*for feature extraction"):
+            plotter._AnimalPlotter__get_linear_feature(group, "psd", score_type="none")
+
 
 class TestExperimentPlotter:
     """Test ExperimentPlotter class."""
