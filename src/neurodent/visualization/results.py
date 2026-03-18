@@ -1104,9 +1104,21 @@ class AnimalOrganizer(AnimalFeatureParser):
         """
         sfreqs: dict[str, float] = {}
         for _i, lrec in self._iter_valid_recordings():
-            if hasattr(lrec, "LongRecording"):
-                sf = lrec.LongRecording.get_sampling_frequency()
-                sfreqs[lrec.display_name] = sf
+            long_rec = getattr(lrec, "LongRecording", None)
+            if long_rec is None:
+                logging.warning(
+                    f"Skipping recording {_i} ({getattr(lrec, 'display_name', 'unknown')}): "
+                    "LongRecording is None"
+                )
+                continue
+            if not hasattr(long_rec, "get_sampling_frequency"):
+                raise ValueError(
+                    f"LongRecording for recording "
+                    f"{getattr(lrec, 'display_name', f'index {_i}')!r} does not define "
+                    "get_sampling_frequency()."
+                )
+            sf = long_rec.get_sampling_frequency()
+            sfreqs[lrec.display_name] = sf
 
         if not sfreqs:
             return
