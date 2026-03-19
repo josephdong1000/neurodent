@@ -74,6 +74,7 @@ class TestConstants:
     def test_feature_constants(self):
         """Test feature-related constants."""
         assert isinstance(constants.LINEAR_FEATURES, list)
+        assert isinstance(constants.LINEAR_2D_FEATURES, list)
         assert isinstance(constants.BAND_FEATURES, list)
         assert isinstance(constants.MATRIX_FEATURES, list)
         assert isinstance(constants.HIST_FEATURES, list)
@@ -84,12 +85,12 @@ class TestConstants:
         assert "rms" in constants.LINEAR_FEATURES
         assert "ampvar" in constants.LINEAR_FEATURES
         assert "psdtotal" in constants.LINEAR_FEATURES
-        assert "psdslope" in constants.LINEAR_FEATURES
         assert "nspike" in constants.LINEAR_FEATURES
         assert "logrms" in constants.LINEAR_FEATURES
         assert "logampvar" in constants.LINEAR_FEATURES
         assert "logpsdtotal" in constants.LINEAR_FEATURES
         assert "lognspike" in constants.LINEAR_FEATURES
+        assert "psdslope" in constants.LINEAR_2D_FEATURES
         assert "psdband" in constants.BAND_FEATURES
         assert "psdfrac" in constants.BAND_FEATURES
         assert "logpsdband" in constants.BAND_FEATURES
@@ -164,6 +165,185 @@ class TestConstants:
         assert combined_range == constants.FREQ_BAND_TOTAL, (
             f"Combined band range {combined_range} does not match FREQ_BAND_TOTAL {constants.FREQ_BAND_TOTAL}"
         )
+
+
+class TestFeatureType:
+    """Test FeatureType enum, FEATURE_TYPES mapping, and classify_feature()."""
+
+    def test_feature_type_enum_members(self):
+        """Test that FeatureType enum has the expected members."""
+        assert hasattr(constants.FeatureType, "LINEAR")
+        assert hasattr(constants.FeatureType, "LINEAR_2D")
+        assert hasattr(constants.FeatureType, "BAND")
+        assert hasattr(constants.FeatureType, "BANDED_MATRIX")
+        assert hasattr(constants.FeatureType, "SIMPLE_MATRIX")
+        assert hasattr(constants.FeatureType, "HIST")
+        assert len(constants.FeatureType) == 6
+
+    def test_classify_feature_linear(self):
+        """Test that all LINEAR_FEATURES classify as LINEAR."""
+        for feat in constants.LINEAR_FEATURES:
+            assert constants.classify_feature(feat) is constants.FeatureType.LINEAR
+
+    def test_classify_feature_linear_2d(self):
+        """Test that all LINEAR_2D_FEATURES classify as LINEAR_2D."""
+        for feat in constants.LINEAR_2D_FEATURES:
+            assert constants.classify_feature(feat) is constants.FeatureType.LINEAR_2D
+
+    def test_classify_feature_band(self):
+        """Test that all BAND_FEATURES classify as BAND."""
+        for feat in constants.BAND_FEATURES:
+            assert constants.classify_feature(feat) is constants.FeatureType.BAND
+
+    def test_classify_feature_banded_matrix(self):
+        """Test that all BANDED_MATRIX_FEATURES classify as BANDED_MATRIX."""
+        for feat in constants.BANDED_MATRIX_FEATURES:
+            assert constants.classify_feature(feat) is constants.FeatureType.BANDED_MATRIX
+
+    def test_classify_feature_simple_matrix(self):
+        """Test that all SIMPLE_MATRIX_FEATURES classify as SIMPLE_MATRIX."""
+        for feat in constants.SIMPLE_MATRIX_FEATURES:
+            assert constants.classify_feature(feat) is constants.FeatureType.SIMPLE_MATRIX
+
+    def test_classify_feature_hist(self):
+        """Test that all HIST_FEATURES classify as HIST."""
+        for feat in constants.HIST_FEATURES:
+            assert constants.classify_feature(feat) is constants.FeatureType.HIST
+
+    def test_classify_feature_unknown_raises(self):
+        """Test that classify_feature raises ValueError for unknown features."""
+        with pytest.raises(ValueError, match="Unknown feature"):
+            constants.classify_feature("nonexistent_feature")
+
+    def test_feature_types_dict_covers_all_features(self):
+        """Test that FEATURE_TYPES maps every known feature."""
+        for feat in constants.FEATURES:
+            assert feat in constants.FEATURE_TYPES
+
+    def test_feature_types_dict_has_no_extras(self):
+        """Test that FEATURE_TYPES doesn't contain features not in FEATURES."""
+        features_set = set(constants.FEATURES)
+        for feat in constants.FEATURE_TYPES:
+            assert feat in features_set
+
+    def test_is_linear_property(self):
+        """Test the is_linear convenience property."""
+        assert constants.FeatureType.LINEAR.is_linear is True
+        assert constants.FeatureType.LINEAR_2D.is_linear is True
+        assert constants.FeatureType.BAND.is_linear is False
+        assert constants.FeatureType.BANDED_MATRIX.is_linear is False
+        assert constants.FeatureType.SIMPLE_MATRIX.is_linear is False
+        assert constants.FeatureType.HIST.is_linear is False
+
+    def test_is_matrix_property(self):
+        """Test the is_matrix convenience property."""
+        assert constants.FeatureType.BANDED_MATRIX.is_matrix is True
+        assert constants.FeatureType.SIMPLE_MATRIX.is_matrix is True
+        assert constants.FeatureType.LINEAR.is_matrix is False
+        assert constants.FeatureType.LINEAR_2D.is_matrix is False
+        assert constants.FeatureType.BAND.is_matrix is False
+        assert constants.FeatureType.HIST.is_matrix is False
+
+    def test_is_dict_stored_property(self):
+        """Test the is_dict_stored convenience property."""
+        assert constants.FeatureType.BAND.is_dict_stored is True
+        assert constants.FeatureType.BANDED_MATRIX.is_dict_stored is True
+        assert constants.FeatureType.LINEAR.is_dict_stored is False
+        assert constants.FeatureType.LINEAR_2D.is_dict_stored is False
+        assert constants.FeatureType.SIMPLE_MATRIX.is_dict_stored is False
+        assert constants.FeatureType.HIST.is_dict_stored is False
+
+    def test_matrix_features_consistent(self):
+        """Test that MATRIX_FEATURES = BANDED_MATRIX_FEATURES + SIMPLE_MATRIX_FEATURES."""
+        matrix_from_types = sorted(
+            f for f, ft in constants.FEATURE_TYPES.items() if ft.is_matrix
+        )
+        assert matrix_from_types == sorted(constants.MATRIX_FEATURES)
+
+    def test_dict_stored_features_consistent(self):
+        """Test that dict-stored features = BAND_FEATURES + BANDED_MATRIX_FEATURES."""
+        dict_stored = sorted(
+            f for f, ft in constants.FEATURE_TYPES.items() if ft.is_dict_stored
+        )
+        assert dict_stored == sorted(constants.BAND_FEATURES + constants.BANDED_MATRIX_FEATURES)
+
+    def test_linear_features_consistent(self):
+        """Test that is_linear features = LINEAR_FEATURES + LINEAR_2D_FEATURES."""
+        linear_from_types = sorted(
+            f for f, ft in constants.FEATURE_TYPES.items() if ft.is_linear
+        )
+        assert linear_from_types == sorted(constants.LINEAR_FEATURES + constants.LINEAR_2D_FEATURES)
+
+    def test_psdslope_is_linear_2d(self):
+        """Test that psdslope is correctly classified as LINEAR_2D."""
+        assert constants.classify_feature("psdslope") is constants.FeatureType.LINEAR_2D
+        assert constants.FeatureType.LINEAR_2D.is_linear
+        assert not constants.FeatureType.LINEAR_2D.is_matrix
+        assert not constants.FeatureType.LINEAR_2D.is_dict_stored
+
+
+class TestFeatureShapes:
+    """Test FEATURE_SHAPES registry and FeatureType shape properties."""
+
+    def test_feature_shapes_exists(self):
+        """Test that FEATURE_SHAPES is exported from constants."""
+        assert hasattr(constants, "FEATURE_SHAPES")
+        assert isinstance(constants.FEATURE_SHAPES, dict)
+
+    def test_feature_shapes_covers_all_types(self):
+        """Test that every FeatureType member has an entry in FEATURE_SHAPES."""
+        for ftype in constants.FeatureType:
+            assert ftype in constants.FEATURE_SHAPES, f"Missing entry for {ftype}"
+
+    def test_feature_shapes_keys(self):
+        """Test that each entry has the required keys."""
+        required_keys = {"extracted_shape", "cell_shape", "channel_axes", "semantic_axes", "description"}
+        for ftype, info in constants.FEATURE_SHAPES.items():
+            for key in required_keys:
+                assert key in info, f"{ftype} missing key '{key}'"
+
+    def test_channel_axes_values(self):
+        """Test channel_axes for each FeatureType matches convention."""
+        assert constants.FeatureType.LINEAR.channel_axes == (1,)
+        assert constants.FeatureType.LINEAR_2D.channel_axes == (1,)
+        assert constants.FeatureType.BAND.channel_axes == (1,)
+        assert constants.FeatureType.HIST.channel_axes == (1,)
+        assert constants.FeatureType.SIMPLE_MATRIX.channel_axes == (1, 2)
+        assert constants.FeatureType.BANDED_MATRIX.channel_axes == (1, 2)
+
+    def test_semantic_axes_values(self):
+        """Test semantic_axes for each FeatureType."""
+        assert constants.FeatureType.LINEAR.semantic_axes == {}
+        assert constants.FeatureType.LINEAR_2D.semantic_axes == {"components": 2}
+        assert constants.FeatureType.BAND.semantic_axes == {"bands": 2}
+        assert constants.FeatureType.HIST.semantic_axes == {"freq_bins": 2}
+        assert constants.FeatureType.SIMPLE_MATRIX.semantic_axes == {}
+        assert constants.FeatureType.BANDED_MATRIX.semantic_axes == {"bands": 3}
+
+    def test_extracted_shape_property(self):
+        """Test the extracted_shape property on FeatureType."""
+        assert constants.FeatureType.LINEAR.extracted_shape == "W, C"
+        assert constants.FeatureType.LINEAR_2D.extracted_shape == "W, C, K"
+        assert constants.FeatureType.BAND.extracted_shape == "W, C, B"
+        assert constants.FeatureType.SIMPLE_MATRIX.extracted_shape == "W, C, C"
+        assert constants.FeatureType.BANDED_MATRIX.extracted_shape == "W, C, C, B"
+        assert constants.FeatureType.HIST.extracted_shape == "W, C, F"
+
+    def test_channel_axes_property(self):
+        """Test the channel_axes property on FeatureType."""
+        for ftype in constants.FeatureType:
+            assert ftype.channel_axes == constants.FEATURE_SHAPES[ftype]["channel_axes"]
+
+    def test_semantic_axes_property(self):
+        """Test the semantic_axes property on FeatureType."""
+        for ftype in constants.FeatureType:
+            assert ftype.semantic_axes == constants.FEATURE_SHAPES[ftype]["semantic_axes"]
+
+    def test_channel_axes_always_start_at_1(self):
+        """Test that channel axes always start at axis 1 (axis 0 is windows)."""
+        for ftype in constants.FeatureType:
+            axes = ftype.channel_axes
+            assert axes[0] == 1, f"{ftype} channel axes should start at 1, got {axes}"
 
 
 class TestOkabeItoColors:

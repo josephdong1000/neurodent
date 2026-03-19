@@ -64,3 +64,4 @@ docs/_build/
 environment.pickle
 **/generated/
 .snakemake/
+coverage.xml
