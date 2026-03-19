@@ -31,7 +31,10 @@ def _ensure_dense(arr: np.ndarray, error_msg: str) -> np.ndarray:
 # Linear / array-valued features
 # ---------------------------------------------------------------------------
 
-def extract_linear_array(series: pd.Series) -> np.ndarray:
+def extract_linear_array(
+    series: pd.Series,
+    ftype: constants.FeatureType | None = None,
+) -> np.ndarray:
     """Convert a Series of per-channel arrays into a dense numpy array.
 
     Works for LINEAR features (scalar per channel), LINEAR_2D features
@@ -42,6 +45,8 @@ def extract_linear_array(series: pd.Series) -> np.ndarray:
     ----------
     series : pd.Series
         Each element is a list/array of consistent shape.
+    ftype : constants.FeatureType, optional
+        When provided, the expected ndim is validated against the feature type.
 
     Returns
     -------
@@ -54,7 +59,8 @@ def extract_linear_array(series: pd.Series) -> np.ndarray:
     Raises
     ------
     ValueError
-        If the per-row arrays have inconsistent shapes (ragged data).
+        If the per-row arrays have inconsistent shapes (ragged data),
+        or if *ftype* is provided and the extracted ndim doesn't match.
     """
     try:
         result = np.asarray(series.tolist())
@@ -64,24 +70,38 @@ def extract_linear_array(series: pd.Series) -> np.ndarray:
             f"Ragged input: per-row shapes are not uniform ({shapes}). "
             f"All rows must have the same shape."
         )
-    return _ensure_dense(
+    result = _ensure_dense(
         result,
         "Ragged input: per-row shapes are not uniform. "
         "All rows must have the same shape.",
     )
+    if ftype is not None:
+        expected_ndim = len(ftype.extracted_shape.split(","))
+        if result.ndim != expected_ndim:
+            raise ValueError(
+                f"Expected {expected_ndim}-D array for {ftype.name} "
+                f"but got {result.ndim}-D (shape {result.shape})."
+            )
+    return result
 
 
 # ---------------------------------------------------------------------------
 # Dict-stored (banded) features
 # ---------------------------------------------------------------------------
 
-def extract_band_dict(series: pd.Series) -> tuple[np.ndarray, list]:
+def extract_band_dict(
+    series: pd.Series,
+    ftype: constants.FeatureType | None = None,
+) -> tuple[np.ndarray, list]:
     """Unpack a Series of band dicts into an array plus ordered key list.
 
     Parameters
     ----------
     series : pd.Series
         Each element is a dict ``{band_name: array}``.
+    ftype : constants.FeatureType, optional
+        When provided, the expected ndim is validated against the feature type
+        instead of being inferred from the array shape alone.
 
     Returns
     -------
@@ -95,7 +115,8 @@ def extract_band_dict(series: pd.Series) -> tuple[np.ndarray, list]:
     Raises
     ------
     ValueError
-        If band values have inconsistent shapes across windows (ragged data).
+        If band values have inconsistent shapes across windows (ragged data),
+        or if *ftype* is provided and the extracted ndim doesn't match.
     """
     _RAGGED_BAND_MSG = (
         "Ragged input: band values have inconsistent shapes across windows. "
@@ -108,6 +129,15 @@ def extract_band_dict(series: pd.Series) -> tuple[np.ndarray, list]:
     except ValueError:
         raise ValueError(_RAGGED_BAND_MSG)
     vals = _ensure_dense(vals, _RAGGED_BAND_MSG)
+
+    # Determine expected ndim from ftype or infer from array shape.
+    if ftype is not None:
+        expected_ndim = len(ftype.extracted_shape.split(","))
+        if vals.ndim != expected_ndim:
+            raise ValueError(
+                f"Expected {expected_ndim}-D array for {ftype.name} "
+                f"but got {vals.ndim}-D (shape {vals.shape})."
+            )
     # Transpose to canonical (W, C, ..., B) shape: move band axis to last position.
     # Raw stacking yields (W, B, C) for BAND or (W, B, C, C) for BANDED_MATRIX.
     if vals.ndim == 3:
@@ -152,7 +182,10 @@ def repack_band_dict(vals: np.ndarray, keys: list) -> list[dict]:
 # Histogram / spectral (PSD) features
 # ---------------------------------------------------------------------------
 
-def extract_hist_data(series: pd.Series) -> tuple[np.ndarray, np.ndarray]:
+def extract_hist_data(
+    series: pd.Series,
+    ftype: constants.FeatureType | None = None,
+) -> tuple[np.ndarray, np.ndarray]:
     """Unpack a Series of ``(coords, values)`` histogram tuples.
 
     Handles both pickle-origin tuples and parquet-origin lists.
@@ -161,6 +194,8 @@ def extract_hist_data(series: pd.Series) -> tuple[np.ndarray, np.ndarray]:
     ----------
     series : pd.Series
         Each element is a ``(coords, values)`` tuple or list pair.
+    ftype : constants.FeatureType, optional
+        When provided, validates that *ftype* is ``FeatureType.HIST``.
 
     Returns
     -------
@@ -174,8 +209,12 @@ def extract_hist_data(series: pd.Series) -> tuple[np.ndarray, np.ndarray]:
     ------
     ValueError
         If histogram entries have inconsistent shapes across windows
-        (ragged data).
+        (ragged data), or if *ftype* is provided and is not ``HIST``.
     """
+    if ftype is not None and ftype is not constants.FeatureType.HIST:
+        raise ValueError(
+            f"extract_hist_data expects FeatureType.HIST but got {ftype.name}."
+        )
     _RAGGED_HIST_MSG = (
         "Ragged input: histogram entries have inconsistent shapes across windows. "
         "All windows must have the same shape."
@@ -232,9 +271,9 @@ def extract_feature(
         Band keys for dict-stored features, ``None`` otherwise.
     """
     if ftype.is_dict_stored:
-        vals, keys = extract_band_dict(series)
+        vals, keys = extract_band_dict(series, ftype=ftype)
     else:
-        vals = extract_linear_array(series)
+        vals = extract_linear_array(series, ftype=ftype)
         keys = None
     return vals, keys
 

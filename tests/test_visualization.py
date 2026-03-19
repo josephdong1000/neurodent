@@ -2034,6 +2034,41 @@ class TestFeatureUtils:
         with pytest.raises(ValueError, match="Ragged input"):
             extract_hist_data(series)
 
+    def test_extract_linear_array_ftype_validation(self):
+        """Test ftype param validates ndim."""
+        from neurodent.visualization.feature_utils import extract_linear_array
+        series = pd.Series([[1.0, 2.0], [3.0, 4.0]])
+        # Correct ftype should pass
+        result = extract_linear_array(series, ftype=constants.FeatureType.LINEAR)
+        assert result.shape == (2, 2)
+        # Wrong ftype should raise
+        with pytest.raises(ValueError, match="Expected 3-D"):
+            extract_linear_array(series, ftype=constants.FeatureType.LINEAR_2D)
+
+    def test_extract_band_dict_ftype_validation(self):
+        """Test ftype param validates ndim."""
+        from neurodent.visualization.feature_utils import extract_band_dict
+        series = pd.Series([{"delta": [1.0, 2.0], "theta": [3.0, 4.0]}])
+        # Correct ftype should pass
+        vals, keys = extract_band_dict(series, ftype=constants.FeatureType.BAND)
+        assert vals.shape == (1, 2, 2)
+        # Wrong ftype (expects 4-D) should raise
+        with pytest.raises(ValueError, match="Expected 4-D"):
+            extract_band_dict(series, ftype=constants.FeatureType.BANDED_MATRIX)
+
+    def test_extract_hist_data_ftype_validation(self):
+        """Test ftype param validates feature type."""
+        from neurodent.visualization.feature_utils import extract_hist_data
+        series = pd.Series([
+            (np.array([1.0, 2.0]), np.array([10.0, 20.0])),
+        ])
+        # Correct ftype should pass
+        coords, values = extract_hist_data(series, ftype=constants.FeatureType.HIST)
+        assert coords.shape == (1, 2)
+        # Wrong ftype should raise
+        with pytest.raises(ValueError, match="expects FeatureType.HIST"):
+            extract_hist_data(series, ftype=constants.FeatureType.LINEAR)
+
 
 class TestFlattenFeatureForPlotting:
     """Test flatten_feature_for_plotting utility."""
