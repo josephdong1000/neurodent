@@ -2418,7 +2418,7 @@ wheels = [
 
 [[package]]
 name = "neurodent"
-version = "0.3.0a1"
+version = "0.3.0"
 source = { editable = "." }
 dependencies = [
     { name = "appnope" },
