@@ -296,9 +296,59 @@ class TestTimelineSequencing:
         # Timestamps must be sequenced (no overlap)
         assert result["folder_b"] > result["folder_a"]
 
-        # Gap between sessions is preserved (session1 ends at 13:00, session2 starts at 14:00)
+        # Gap between computed start times is preserved (12:00 → 14:00 = 2 hours)
         gap = result["folder_b"] - result["folder_a"]
         assert gap == timedelta(hours=2)
+
+    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    def test_create_long_recordings_forces_datetimes_are_start_true(
+        self, mock_lro_cls, ao
+    ):
+        """
+        Regression test for the actual bug fix in _create_long_recordings:
+        when _processed_timestamps is set, downstream LongRecordingOrganizer
+        must always receive datetimes_are_start=True, even if the original
+        lro_kwargs had datetimes_are_start=False (end-time inputs).
+
+        This verifies the fix in AnimalOrganizer._create_long_recordings that
+        sets kwargs["datetimes_are_start"] = True when injecting
+        _processed_timestamps, since _compute_global_timeline always produces
+        start times regardless of the original datetimes_are_start value.
+        """
+        mock_lro_instance = MagicMock()
+        mock_lro_cls.return_value = mock_lro_instance
+
+        # Bind _create_long_recordings as a real method on the mock AO
+        ao._create_long_recordings = AnimalOrganizer._create_long_recordings.__get__(
+            ao, AnimalOrganizer
+        )
+
+        # Pre-populate state that _create_long_recordings reads
+        ao._animalday_folder_groups = {
+            "session1": ["/data/sess1/folder_a"],
+            "session2": ["/data/sess2/folder_b"],
+        }
+        ao.unique_animaldays = ["session1", "session2"]
+        # _processed_timestamps holds start times (output of _compute_global_timeline)
+        ao._processed_timestamps = {
+            "folder_a": pd.to_datetime("2025-01-01 12:00:00"),
+            "folder_b": pd.to_datetime("2025-01-01 14:00:00"),
+        }
+
+        # Simulate the bug scenario: original lro_kwargs had datetimes_are_start=False
+        lro_kwargs = {"datetimes_are_start": False}
+
+        ao._create_long_recordings(lro_kwargs)
+
+        # Both LRO constructor calls must receive datetimes_are_start=True,
+        # not the original False — because _processed_timestamps are always start times.
+        assert mock_lro_cls.call_count == 2
+        for call in mock_lro_cls.call_args_list:
+            _, kwargs = call
+            assert kwargs.get("datetimes_are_start") is True, (
+                f"Expected datetimes_are_start=True but got {kwargs.get('datetimes_are_start')!r}. "
+                "LongRecordingOrganizer must receive start times when _processed_timestamps is used."
+            )
 
     def test_session_keyed_dict_missing_session_raises(self, ao):
         """
