@@ -15,10 +15,16 @@ A Python package for standardizing rodent EEG analysis and figure generation. Va
 
 ## Installation
 
-NeuRodent can be installed via `pip`:
+NeuRodent can be installed via `pip` or `conda`:
 
 ```bash
 pip install neurodent
+```
+
+or
+
+```bash
+conda install -c conda-forge neurodent
 ```
 
 For pipeline support, development setup, and other installation options, check out the [full installation guide](https://josephdong1000.github.io/neurodent/main/installation/index.html).
