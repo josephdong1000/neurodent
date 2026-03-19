@@ -2157,6 +2157,143 @@ class TestCollapseFeatureChannels:
         assert result.shape == (1, 2)
 
 
+class TestExtractFeature:
+    """Test extract_feature utility."""
+
+    def test_extract_linear(self):
+        from neurodent.visualization.feature_utils import extract_feature
+        series = pd.Series([[1.0, 2.0], [3.0, 4.0]])
+        vals, keys = extract_feature(series, constants.FeatureType.LINEAR)
+        assert vals.shape == (2, 2)
+        assert keys is None
+        np.testing.assert_array_equal(vals[0], [1.0, 2.0])
+
+    def test_extract_linear_2d(self):
+        from neurodent.visualization.feature_utils import extract_feature
+        series = pd.Series([[[1.0, 2.0], [3.0, 4.0]]])
+        vals, keys = extract_feature(series, constants.FeatureType.LINEAR_2D)
+        assert vals.shape == (1, 2, 2)
+        assert keys is None
+
+    def test_extract_simple_matrix(self):
+        from neurodent.visualization.feature_utils import extract_feature
+        series = pd.Series([[[0.0, 0.5], [0.5, 0.0]]])
+        vals, keys = extract_feature(series, constants.FeatureType.SIMPLE_MATRIX)
+        assert vals.shape == (1, 2, 2)
+        assert keys is None
+
+    def test_extract_band(self):
+        from neurodent.visualization.feature_utils import extract_feature
+        series = pd.Series([{"delta": [1.0, 2.0], "theta": [3.0, 4.0]}])
+        vals, keys = extract_feature(series, constants.FeatureType.BAND)
+        assert vals.shape == (1, 2, 2)  # (W, C, B)
+        assert keys == ["delta", "theta"]
+
+    def test_extract_banded_matrix(self):
+        from neurodent.visualization.feature_utils import extract_feature
+        series = pd.Series([{"delta": [[0.0, 0.5], [0.5, 0.0]]}])
+        vals, keys = extract_feature(series, constants.FeatureType.BANDED_MATRIX)
+        assert vals.shape == (1, 2, 2, 1)  # (W, C, C, B)
+        assert keys == ["delta"]
+
+
+class TestFormatChannelData:
+    """Test format_channel_data utility with numeric validity."""
+
+    def test_format_linear_collapsed(self):
+        from neurodent.visualization.feature_utils import format_channel_data
+        vals = np.array([[1.0, 3.0], [5.0, 7.0]])  # (2 win, 2 chan)
+        result = format_channel_data(vals, constants.FeatureType.LINEAR, collapse_channels=True)
+        assert "average" in result
+        np.testing.assert_array_almost_equal(result["average"], [2.0, 6.0])
+
+    def test_format_linear_per_channel(self):
+        from neurodent.visualization.feature_utils import format_channel_data
+        vals = np.array([[1.0, 3.0], [5.0, 7.0]])  # (2 win, 2 chan)
+        result = format_channel_data(
+            vals, constants.FeatureType.LINEAR, collapse_channels=False,
+            ch_to_idx={"LM": 0, "RM": 1}, channels=["LM", "RM"], ch_names=["LM", "RM"],
+        )
+        assert set(result.keys()) == {"LM", "RM"}
+        assert result["LM"] == [1.0, 5.0]
+        assert result["RM"] == [3.0, 7.0]
+
+    def test_format_band_collapsed(self):
+        from neurodent.visualization.feature_utils import format_channel_data
+        # Canonical: (W, C, B)
+        vals = np.array([[[1.0, 5.0], [3.0, 7.0]]])  # (1, 2 chan, 2 bands)
+        result = format_channel_data(vals, constants.FeatureType.BAND, collapse_channels=True)
+        assert "average" in result
+        np.testing.assert_array_almost_equal(result["average"], [[2.0, 6.0]])
+
+    def test_format_band_per_channel(self):
+        from neurodent.visualization.feature_utils import format_channel_data
+        vals = np.array([[[1.0, 5.0], [3.0, 7.0]]])  # (1, 2 chan, 2 bands)
+        result = format_channel_data(
+            vals, constants.FeatureType.BAND, collapse_channels=False,
+            ch_to_idx={"LM": 0, "RM": 1}, channels=["LM", "RM"], ch_names=["LM", "RM"],
+        )
+        assert set(result.keys()) == {"LM", "RM"}
+        np.testing.assert_array_almost_equal(result["LM"], [[1.0, 5.0]])
+
+    def test_format_simple_matrix_collapsed(self):
+        from neurodent.visualization.feature_utils import format_channel_data
+        vals = np.array([[[0.0, 0.5], [0.5, 0.0]]])  # (1, 2, 2)
+        result = format_channel_data(vals, constants.FeatureType.SIMPLE_MATRIX, collapse_channels=True)
+        assert "average" in result
+        np.testing.assert_array_almost_equal(result["average"], [0.5])
+
+    def test_format_simple_matrix_not_collapsed(self):
+        from neurodent.visualization.feature_utils import format_channel_data
+        vals = np.array([[[0.0, 0.5], [0.5, 0.0]]])  # (1, 2, 2)
+        result = format_channel_data(vals, constants.FeatureType.SIMPLE_MATRIX, collapse_channels=False)
+        assert "all" in result
+
+    def test_format_banded_matrix_collapsed(self):
+        from neurodent.visualization.feature_utils import format_channel_data
+        vals = np.zeros((1, 2, 2, 2))
+        vals[0, 1, 0, 0] = 0.8
+        vals[0, 1, 0, 1] = 0.6
+        result = format_channel_data(vals, constants.FeatureType.BANDED_MATRIX, collapse_channels=True)
+        assert "average" in result
+        np.testing.assert_array_almost_equal(result["average"], [[0.8, 0.6]])
+
+    def test_format_banded_matrix_not_collapsed(self):
+        from neurodent.visualization.feature_utils import format_channel_data
+        vals = np.zeros((1, 2, 2, 2))
+        result = format_channel_data(vals, constants.FeatureType.BANDED_MATRIX, collapse_channels=False)
+        assert "all" in result
+
+    def test_format_hist_collapsed(self):
+        from neurodent.visualization.feature_utils import format_channel_data
+        vals = np.array([[[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]])  # (1, 2 chan, 3 freq)
+        result = format_channel_data(vals, constants.FeatureType.HIST, collapse_channels=True)
+        assert "average" in result
+        np.testing.assert_array_almost_equal(result["average"], [[2.5, 3.5, 4.5]])
+
+    def test_format_hist_per_channel(self):
+        from neurodent.visualization.feature_utils import format_channel_data
+        vals = np.array([[[1.0, 2.0], [3.0, 4.0]]])  # (1, 2 chan, 2 freq)
+        result = format_channel_data(
+            vals, constants.FeatureType.HIST, collapse_channels=False,
+            ch_to_idx={"LM": 0, "RM": 1}, channels=["LM", "RM"], ch_names=["LM", "RM"],
+        )
+        assert set(result.keys()) == {"LM", "RM"}
+        np.testing.assert_array_almost_equal(result["LM"], [[1.0, 2.0]])
+
+    def test_format_channel_subset(self):
+        """Only requested channels are included in the result."""
+        from neurodent.visualization.feature_utils import format_channel_data
+        vals = np.array([[1.0, 3.0, 5.0]])  # (1, 3 chan)
+        result = format_channel_data(
+            vals, constants.FeatureType.LINEAR, collapse_channels=False,
+            ch_to_idx={"A": 0, "B": 1, "C": 2}, channels=["A", "C"], ch_names=["A", "B", "C"],
+        )
+        assert set(result.keys()) == {"A", "C"}
+        assert result["A"] == [1.0]
+        assert result["C"] == [5.0]
+
+
 class TestDataProcessingForVisualization:
     """Test data processing functions for visualization."""
 

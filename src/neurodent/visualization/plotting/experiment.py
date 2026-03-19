@@ -15,7 +15,7 @@ from statannotations.Annotator import Annotator
 from ... import core
 from ... import visualization as viz
 from ... import constants
-from ..feature_utils import extract_linear_array, extract_band_dict, extract_hist_data, collapse_feature_channels
+from ..feature_utils import extract_linear_array, extract_band_dict, extract_hist_data, collapse_feature_channels, extract_feature, format_channel_data
 
 
 class ExperimentPlotter:
@@ -298,90 +298,32 @@ class ExperimentPlotter:
 
             ftype = constants.classify_feature(feature)
 
-            if ftype in (constants.FeatureType.LINEAR, constants.FeatureType.LINEAR_2D, constants.FeatureType.BAND):
-                if ftype is constants.FeatureType.BAND:
-                    vals, _keys = extract_band_dict(df_war[feature])
-                else:
-                    vals = extract_linear_array(df_war[feature])
-
-                if collapse_channels:
-                    vals = collapse_feature_channels(vals, ftype)
-                    logging.debug(f"vals.shape: {vals.shape}")
-                    vals = {"average": vals.tolist()}
-                else:
-                    if ftype is constants.FeatureType.BAND:
-                        # (n_windows, n_chan, n_bands) — channels at axis 1
-                        vals_indexed = {
-                            ch: vals[:, ch_to_idx[ch], :].tolist()
-                            for ch in channels
-                            if ch in ch_names
-                        }
-                    else:
-                        logging.debug(f"vals.shape: {vals.shape}")
-                        vals_indexed = {
-                            ch: vals[:, ch_to_idx[ch]].tolist()
-                            for ch in channels
-                            if ch in ch_names
-                        }
-                    vals = vals_indexed
-                vals = df_war[groupby].to_dict("list") | vals
-
-            elif ftype is constants.FeatureType.SIMPLE_MATRIX:
-                vals = extract_linear_array(df_war[feature])
-                if collapse_channels:
-                    vals = collapse_feature_channels(vals, ftype)
-                    logging.debug(f"vals.shape: {vals.shape}")
-                    vals = {"average": vals.tolist()}
-                else:
-                    logging.debug(f"vals.shape: {vals.shape}")
-                    vals = {"all": vals.tolist()}
-                vals = df_war[groupby].to_dict("list") | vals
-
-            elif ftype is constants.FeatureType.BANDED_MATRIX:
-                vals, _keys = extract_band_dict(df_war[feature])
-                logging.debug(f"vals.shape: {vals.shape}")
-
-                if collapse_channels:
-                    vals = collapse_feature_channels(vals, ftype)
-                    logging.debug(f"vals.shape: {vals.shape}")
-                    vals = {"average": vals.tolist()}
-                else:
-                    logging.debug(f"vals.shape: {vals.shape}")
-                    vals = {"all": vals.tolist()}
-                vals = df_war[groupby].to_dict("list") | vals
-
-            elif ftype is constants.FeatureType.HIST:
-                # REVIEW revise this, splitting up frequencys and values and instead making both of them independent features
-                # this way they can be averaged, processed, etc. without worrying about tuple things
-                # if freq present, explode it
+            if ftype is constants.FeatureType.HIST:
+                # HIST is special: extract both coords and values
                 freq_vals, psd_vals = extract_hist_data(df_war[feature])
                 n_unique_freq_vals = np.unique(freq_vals, axis=0).shape[0]
                 if n_unique_freq_vals > 1:
                     raise ValueError(
                         f"Multiple frequency bin values found in {feature}: {n_unique_freq_vals} values"
                     )
-
-                # psd_vals is already canonical (W, C, F) — no transpose needed
                 logging.debug(
                     f"freq_vals.shape: {freq_vals.shape}, psd_vals.shape: {psd_vals.shape}"
                 )
+                channel_dict = format_channel_data(
+                    psd_vals, ftype, collapse_channels,
+                    ch_to_idx=ch_to_idx, channels=channels, ch_names=ch_names,
+                )
+                channel_dict = channel_dict | {"freq": freq_vals.tolist()}
+                vals = df_war[groupby].to_dict("list") | channel_dict
 
-                # freq_vals.shape: (8, 501), psd_vals.shape: (8, 10, 501)
-                if collapse_channels:
-                    psd_vals = collapse_feature_channels(psd_vals, ftype)
-                    logging.debug(f"psd_vals.shape: {psd_vals.shape}")  # (8, 501)
-                    psd_vals = {"average": psd_vals.tolist()}
-                else:
-                    logging.debug(
-                        f"psd_vals.shape: {psd_vals.shape}"
-                    )  # (8, 10, 501)
-                    psd_vals = {
-                        ch: psd_vals[:, ch_to_idx[ch], :].tolist()
-                        for ch in channels
-                        if ch in ch_names
-                    }  # (8, 10, 501)
-                psd_vals = psd_vals | {"freq": freq_vals.tolist()}
-                vals = df_war[groupby].to_dict("list") | psd_vals
+            elif ftype in constants.FeatureType:
+                extracted, _keys = extract_feature(df_war[feature], ftype)
+                logging.debug(f"vals.shape: {extracted.shape}")
+                channel_dict = format_channel_data(
+                    extracted, ftype, collapse_channels,
+                    ch_to_idx=ch_to_idx, channels=channels, ch_names=ch_names,
+                )
+                vals = df_war[groupby].to_dict("list") | channel_dict
 
             else:
                 raise ValueError(

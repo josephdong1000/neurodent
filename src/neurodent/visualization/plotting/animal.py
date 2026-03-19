@@ -11,7 +11,7 @@ from scipy.stats import gzscore, linregress, zscore
 
 from ... import constants
 from ... import visualization as viz
-from ..feature_utils import extract_linear_array, extract_band_dict, flatten_feature_for_plotting
+from ..feature_utils import extract_linear_array, extract_band_dict, flatten_feature_for_plotting, extract_feature
 
 
 class AnimalPlotter(viz.AnimalFeatureParser):
@@ -295,10 +295,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                 f"Unsupported FeatureType {ftype} for feature extraction: {feature}"
             )
 
-        if ftype.is_dict_stored:
-            data_X, _keys = extract_band_dict(group[feature])
-        else:
-            data_X = extract_linear_array(group[feature])
+        data_X, _keys = extract_feature(group[feature], ftype)
 
         data_X = flatten_feature_for_plotting(data_X, ftype, triag=triag)
 

@@ -2106,7 +2106,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     vals, keys = extract_band_dict(result[feature])
                     # vals is canonical (W, C, C, B)
                     logging.debug(f"vals.shape: {vals.shape}")
-                    n_bands = vals.shape[3]
+                    n_bands = vals.shape[ftype.semantic_axes["bands"]]
                     new_shape = [vals.shape[0], len(target_channels), len(target_channels), n_bands]
                     new_vals = np.full(new_shape, np.nan)
                     for i, ch1 in enumerate(channel_names):
@@ -2132,7 +2132,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 coords, vals = extract_hist_data(result[feature])
                 # vals is canonical (W, C, F)
                 new_vals = np.full(
-                    (vals.shape[0], len(target_channels), vals.shape[2]), np.nan
+                    (vals.shape[0], len(target_channels), vals.shape[ftype.semantic_axes["freq_bins"]]), np.nan
                 )
 
                 for i, ch in enumerate(channel_names):

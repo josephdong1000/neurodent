@@ -207,6 +207,99 @@ def extract_hist_data(series: pd.Series) -> tuple[np.ndarray, np.ndarray]:
 # Channel reshaping utilities
 # ---------------------------------------------------------------------------
 
+def extract_feature(
+    series: pd.Series,
+    ftype: constants.FeatureType,
+) -> np.ndarray:
+    """Extract feature data from a Series, dispatching on FeatureType.
+
+    Uses :func:`extract_band_dict` for dict-stored features and
+    :func:`extract_linear_array` for all others, returning the canonical
+    extracted array for the given feature type.
+
+    Parameters
+    ----------
+    series : pd.Series
+        One column of a WAR DataFrame.
+    ftype : constants.FeatureType
+        The classified feature type.
+
+    Returns
+    -------
+    vals : np.ndarray
+        Canonical extracted array (shape depends on *ftype*).
+    keys : list or None
+        Band keys for dict-stored features, ``None`` otherwise.
+    """
+    if ftype.is_dict_stored:
+        vals, keys = extract_band_dict(series)
+    else:
+        vals = extract_linear_array(series)
+        keys = None
+    return vals, keys
+
+
+def format_channel_data(
+    vals: np.ndarray,
+    ftype: constants.FeatureType,
+    collapse_channels: bool,
+    ch_to_idx: dict[str, int] | None = None,
+    channels: list[str] | None = None,
+    ch_names: list[str] | None = None,
+) -> dict[str, list]:
+    """Format extracted feature data as a channel-keyed dict.
+
+    Handles both the *collapse_channels* path (average across channels)
+    and the per-channel path (index by channel name).
+
+    Parameters
+    ----------
+    vals : np.ndarray
+        Canonical extracted array.
+    ftype : constants.FeatureType
+        The classified feature type.
+    collapse_channels : bool
+        If ``True``, average across channels via
+        :func:`collapse_feature_channels` and return ``{"average": ...}``.
+        If ``False``, return per-channel data indexed by channel name,
+        or ``{"all": ...}`` for matrix features.
+    ch_to_idx : dict, optional
+        Channel name → column index mapping (required when *collapse_channels*
+        is ``False`` and *ftype* is not a matrix type).
+    channels : list[str], optional
+        Which channels to include (required when *collapse_channels* is
+        ``False`` and *ftype* is not a matrix type).
+    ch_names : list[str], optional
+        All channel names in the WAR (required when *collapse_channels* is
+        ``False`` and *ftype* is not a matrix type).
+
+    Returns
+    -------
+    dict[str, list]
+        Channel-keyed dict suitable for DataFrame construction.
+    """
+    if collapse_channels:
+        collapsed = collapse_feature_channels(vals, ftype)
+        return {"average": collapsed.tolist()}
+
+    if ftype.is_matrix:
+        return {"all": vals.tolist()}
+
+    # Per-channel indexing for non-matrix features.
+    # Features with semantic trailing axes (BAND, LINEAR_2D, HIST) need
+    # ``[:, idx, :]`` while scalar-per-channel (LINEAR) needs ``[:, idx]``.
+    has_semantic = bool(ftype.semantic_axes)
+    result: dict[str, list] = {}
+    for ch in channels:
+        if ch in ch_names:
+            idx = ch_to_idx[ch]
+            if has_semantic:
+                result[ch] = vals[:, idx, :].tolist()
+            else:
+                result[ch] = vals[:, idx].tolist()
+    return result
+
+
 def flatten_feature_for_plotting(
     vals: np.ndarray,
     ftype: constants.FeatureType,
@@ -266,14 +359,13 @@ def flatten_feature_for_plotting(
             return vals.reshape(n_time, n_chan * n_chan, n_bands)
 
     elif ftype is constants.FeatureType.SIMPLE_MATRIX:
-        # (n_time, n_chan, n_chan) → (n_chan, n_chan, n_time)
-        result = np.moveaxis(vals, 0, -1)
+        # (n_time, n_chan, n_chan) → (n_time, n_pairs, 1)
+        n_time, n_chan, _ = vals.shape
         if triag:
-            tril = np.tril_indices(result.shape[0], k=-1)
-            result = result[tril[0], tril[1], :]
-        result = result.reshape(-1, result.shape[-1])
-        # (n_pairs, n_time) → (n_time, n_pairs)
-        result = result.transpose()
+            tril = np.tril_indices(n_chan, k=-1)
+            result = vals[:, tril[0], tril[1]]  # (n_time, n_pairs)
+        else:
+            result = vals.reshape(n_time, n_chan * n_chan)
         return np.expand_dims(result, axis=-1)
 
     else:
