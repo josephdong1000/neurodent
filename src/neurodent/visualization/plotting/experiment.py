@@ -316,7 +316,8 @@ class ExperimentPlotter:
                 channel_dict = channel_dict | {"freq": freq_vals.tolist()}
                 vals = df_war[groupby].to_dict("list") | channel_dict
 
-            elif ftype in constants.FeatureType:
+            else:
+                # All non-HIST feature types: extract + format channels
                 extracted, _keys = extract_feature(df_war[feature], ftype)
                 logging.debug(f"vals.shape: {extracted.shape}")
                 channel_dict = format_channel_data(
@@ -324,11 +325,6 @@ class ExperimentPlotter:
                     ch_to_idx=ch_to_idx, channels=channels, ch_names=ch_names,
                 )
                 vals = df_war[groupby].to_dict("list") | channel_dict
-
-            else:
-                raise ValueError(
-                    f"{feature} (FeatureType: {ftype}) is not supported in _pull_timeseries_dataframe"
-                )
 
             df_feature = pd.DataFrame.from_dict(vals, orient="columns")
             dataframes.append(df_feature)

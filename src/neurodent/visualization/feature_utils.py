@@ -249,7 +249,7 @@ def extract_hist_data(
 def extract_feature(
     series: pd.Series,
     ftype: constants.FeatureType,
-) -> np.ndarray:
+) -> tuple[np.ndarray, list | None]:
     """Extract feature data from a Series, dispatching on FeatureType.
 
     Uses :func:`extract_band_dict` for dict-stored features and
