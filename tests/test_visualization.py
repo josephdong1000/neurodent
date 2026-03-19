@@ -1919,8 +1919,10 @@ class TestFeatureUtils:
         ])
         vals, keys = extract_band_dict(series)
         assert keys == ["delta", "theta"]
-        assert vals.shape == (2, 2, 2)  # (windows, bands, channels)
-        np.testing.assert_array_equal(vals[0, 0], [1.0, 2.0])  # delta, window 0
+        # Canonical shape: (n_windows, n_channels, n_bands)
+        assert vals.shape == (2, 2, 2)
+        # vals[window, channel, band] — channel 0, all bands, window 0
+        np.testing.assert_array_equal(vals[0, 0], [1.0, 3.0])  # ch0: delta=1.0, theta=3.0
 
     def test_repack_band_dict(self):
         """Test repacking array back to list of band dicts."""
@@ -1963,6 +1965,7 @@ class TestFeatureUtils:
         ])
         coords, values = extract_hist_data(series)
         assert coords.shape == (2, 3)
+        # 1-D values per cell → no channel axis, shape stays (W, F)
         assert values.shape == (2, 3)
         np.testing.assert_array_equal(coords[0], [1.0, 2.0, 3.0])
         np.testing.assert_array_equal(values[1], [40.0, 50.0, 60.0])
@@ -1977,8 +1980,29 @@ class TestFeatureUtils:
         ])
         coords, values = extract_hist_data(series)
         assert coords.shape == (2, 3)
+        # 1-D values per cell → no channel axis, shape stays (W, F)
         assert values.shape == (2, 3)
         np.testing.assert_array_equal(values[0], [10.0, 20.0, 30.0])
+
+    def test_extract_hist_data_multichannel(self):
+        """Test extracting histogram data where values are 2-D (F, C) per cell."""
+        from neurodent.visualization.feature_utils import extract_hist_data
+
+        n_freq, n_chan = 4, 3
+        coords_row = np.arange(n_freq, dtype=float)
+        # Per-cell values are (F, C) = (4, 3)
+        vals_row0 = np.arange(n_freq * n_chan, dtype=float).reshape(n_freq, n_chan)
+        vals_row1 = vals_row0 + 100.0
+        series = pd.Series([
+            (coords_row, vals_row0),
+            (coords_row, vals_row1),
+        ])
+        coords, values = extract_hist_data(series)
+        assert coords.shape == (2, n_freq)
+        # Canonical shape: (W, C, F)
+        assert values.shape == (2, n_chan, n_freq)
+        # Channel 0 of window 0 should equal the first row of vals_row0 transposed
+        np.testing.assert_array_equal(values[0, 0], vals_row0[:, 0])
 
     def test_extract_linear_array_ragged_raises(self):
         """Test that ragged input raises ValueError."""
@@ -2028,9 +2052,10 @@ class TestFlattenFeatureForPlotting:
 
     def test_flatten_band(self):
         from neurodent.visualization.feature_utils import flatten_feature_for_plotting
-        vals = np.random.rand(4, 5, 3)  # (n_time, n_bands, n_chan)
+        # Canonical input: (n_time, n_chan, n_bands)
+        vals = np.random.rand(4, 3, 5)  # (n_time, n_chan, n_bands)
         result = flatten_feature_for_plotting(vals, constants.FeatureType.BAND)
-        # (n_time, n_chan, n_bands)
+        # No transpose needed — output is (n_time, n_chan, n_bands)
         assert result.shape == (4, 3, 5)
 
     def test_flatten_simple_matrix_triag(self):
@@ -2052,7 +2077,8 @@ class TestFlattenFeatureForPlotting:
         from neurodent.visualization.feature_utils import flatten_feature_for_plotting
         n_chan = 3
         n_bands = 5
-        vals = np.random.rand(4, n_bands, n_chan, n_chan)
+        # Canonical input: (n_time, n_chan, n_chan, n_bands)
+        vals = np.random.rand(4, n_chan, n_chan, n_bands)
         result = flatten_feature_for_plotting(vals, constants.FeatureType.BANDED_MATRIX, triag=True)
         n_pairs = n_chan * (n_chan - 1) // 2
         assert result.shape == (4, n_pairs, n_bands)
@@ -2061,7 +2087,8 @@ class TestFlattenFeatureForPlotting:
         from neurodent.visualization.feature_utils import flatten_feature_for_plotting
         n_chan = 3
         n_bands = 5
-        vals = np.random.rand(4, n_bands, n_chan, n_chan)
+        # Canonical input: (n_time, n_chan, n_chan, n_bands)
+        vals = np.random.rand(4, n_chan, n_chan, n_bands)
         result = flatten_feature_for_plotting(vals, constants.FeatureType.BANDED_MATRIX, triag=False)
         assert result.shape == (4, n_chan * n_chan, n_bands)
 
@@ -2090,7 +2117,8 @@ class TestCollapseFeatureChannels:
 
     def test_collapse_band(self):
         from neurodent.visualization.feature_utils import collapse_feature_channels
-        vals = np.array([[[1.0, 3.0], [5.0, 7.0]]])  # (1, 2 bands, 2 chan)
+        # Canonical shape: (n_windows, n_channels, n_bands)
+        vals = np.array([[[1.0, 5.0], [3.0, 7.0]]])  # (1, 2 chan, 2 bands)
         result = collapse_feature_channels(vals, constants.FeatureType.BAND)
         assert result.shape == (1, 2)
         np.testing.assert_array_equal(result[0], [2.0, 6.0])
@@ -2105,10 +2133,10 @@ class TestCollapseFeatureChannels:
 
     def test_collapse_banded_matrix(self):
         from neurodent.visualization.feature_utils import collapse_feature_channels
-        # (1 window, 2 bands, 2 chan, 2 chan)
+        # Canonical shape: (n_windows, n_chan, n_chan, n_bands)
         vals = np.zeros((1, 2, 2, 2))
-        vals[0, 0, 1, 0] = 0.8  # band 0, pair (1,0)
-        vals[0, 1, 1, 0] = 0.6  # band 1, pair (1,0)
+        vals[0, 1, 0, 0] = 0.8  # ch_row=1, ch_col=0, band=0
+        vals[0, 1, 0, 1] = 0.6  # ch_row=1, ch_col=0, band=1
         result = collapse_feature_channels(vals, constants.FeatureType.BANDED_MATRIX)
         assert result.shape == (1, 2)
         np.testing.assert_almost_equal(result[0, 0], 0.8)

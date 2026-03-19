@@ -54,11 +54,15 @@ class AnimalFeatureParser:
         elif ftype.is_dict_stored:
             vals, keys = extract_band_dict(column)
             avg_vals = core.nanaverage(vals, axis=0, weights=weights)
-            avg = dict(zip(keys, avg_vals))
+            # vals is canonical (W, C, B) for BAND or (W, C, C, B) for BANDED_MATRIX.
+            # avg_vals after axis=0 is (C, B) or (C, C, B). Build {band: per-ch-array}.
+            avg = {keys[i]: avg_vals[..., i] for i in range(len(keys))}
 
         elif ftype is constants.FeatureType.HIST:
             coords, values = extract_hist_data(column)
-            avg = (coords[0], core.nanaverage(values, axis=0, weights=weights))
+            # values is canonical (W, C, F); average over windows → (C, F).
+            # Transpose to (F, C) to preserve per-cell storage format.
+            avg = (coords[0], core.nanaverage(values, axis=0, weights=weights).T)
 
         else:
             raise TypeError(
@@ -2074,7 +2078,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             if ftype in (constants.FeatureType.LINEAR, constants.FeatureType.LINEAR_2D, constants.FeatureType.BAND):
                 if ftype is constants.FeatureType.BAND:
                     vals, keys = extract_band_dict(result[feature])
-                    vals = vals.transpose((0, 2, 1))
+                    # vals is canonical (W, C, B) — no transpose needed
                 else:
                     vals = extract_linear_array(result[feature])
 
@@ -2091,7 +2095,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                         new_vals[:, channel_map[ch]] = vals[:, i]
 
                 if ftype is constants.FeatureType.BAND:
-                    new_vals = new_vals.transpose((0, 2, 1))
+                    # new_vals is (W, n_target, B) — canonical, pass directly to repack
                     result[feature] = repack_band_dict(new_vals, keys)
                 else:
                     result[feature] = [list(x) for x in new_vals]
@@ -2099,42 +2103,44 @@ class WindowAnalysisResult(AnimalFeatureParser):
             elif ftype.is_matrix:
                 if ftype is constants.FeatureType.BANDED_MATRIX:
                     vals, keys = extract_band_dict(result[feature])
-                else:
-                    vals = extract_linear_array(result[feature])
-
-                logging.debug(f"vals.shape: {vals.shape}")
-                new_shape = list(vals.shape[:-2]) + [
-                    len(target_channels),
-                    len(target_channels),
-                ]
-                new_vals = np.full(new_shape, np.nan)
-
-                # Map original channels to target channels
-                for i, ch1 in enumerate(channel_names):
-                    if ch1 in channel_map:
-                        for j, ch2 in enumerate(channel_names):
-                            if ch2 in channel_map:
-                                new_vals[
-                                    ..., channel_map[ch1], channel_map[ch2]
-                                ] = vals[..., i, j]
-
-                if ftype is constants.FeatureType.BANDED_MATRIX:
+                    # vals is canonical (W, C, C, B)
+                    logging.debug(f"vals.shape: {vals.shape}")
+                    n_bands = vals.shape[3]
+                    new_shape = [vals.shape[0], len(target_channels), len(target_channels), n_bands]
+                    new_vals = np.full(new_shape, np.nan)
+                    for i, ch1 in enumerate(channel_names):
+                        if ch1 in channel_map:
+                            for j, ch2 in enumerate(channel_names):
+                                if ch2 in channel_map:
+                                    new_vals[:, channel_map[ch1], channel_map[ch2], :] = vals[:, i, j, :]
                     result[feature] = repack_band_dict(new_vals, keys)
                 else:
+                    vals = extract_linear_array(result[feature])
+                    # vals is canonical (W, C, C) for SIMPLE_MATRIX
+                    logging.debug(f"vals.shape: {vals.shape}")
+                    new_shape = [vals.shape[0], len(target_channels), len(target_channels)]
+                    new_vals = np.full(new_shape, np.nan)
+                    for i, ch1 in enumerate(channel_names):
+                        if ch1 in channel_map:
+                            for j, ch2 in enumerate(channel_names):
+                                if ch2 in channel_map:
+                                    new_vals[:, channel_map[ch1], channel_map[ch2]] = vals[:, i, j]
                     result[feature] = [list(x) for x in new_vals]
 
             elif ftype is constants.FeatureType.HIST:
                 coords, vals = extract_hist_data(result[feature])
+                # vals is canonical (W, C, F)
                 new_vals = np.full(
-                    (*vals.shape[0:-1], len(target_channels)), np.nan
+                    (vals.shape[0], len(target_channels), vals.shape[2]), np.nan
                 )
 
                 for i, ch in enumerate(channel_names):
                     if ch in channel_map:
-                        new_vals[:, ..., channel_map[ch]] = vals[:, ..., i]
+                        new_vals[:, channel_map[ch], :] = vals[:, i, :]
 
+                # Repack as (F, C) per cell to preserve per-cell storage format
                 result[feature] = [
-                    (coords[i], new_vals[i]) for i in range(len(coords))
+                    (coords[i], new_vals[i].T) for i in range(len(coords))
                 ]
 
             else:
@@ -3521,28 +3527,32 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     f"set([np.asarray(x[1]).shape for x in result[feat].tolist()]) = {list(set([np.asarray(x[1]).shape for x in result[feat].tolist()]))}"
                 )
                 coords, vals = extract_hist_data(result[feat])
-                mask = np.broadcast_to(filter_tfs[:, np.newaxis, :], vals.shape)
+                # vals is canonical (W, C, F); filter_tfs is (W, C)
+                mask = np.broadcast_to(filter_tfs[:, :, np.newaxis], vals.shape)
                 vals[~mask] = np.nan
-                outs = [(c, vals[i, :, :]) for i, c in enumerate(coords)]
+                # Repack as (F, C) per cell to preserve per-cell storage format
+                outs = [(c, vals[i].T) for i, c in enumerate(coords)]
                 result[feat] = outs
 
             elif ftype is constants.FeatureType.BAND:
                 band_vals, band_keys = extract_band_dict(result[feat])
+                # band_vals is canonical (W, C, B); index band on last axis
                 for bi, colname in enumerate(band_keys):
-                    v = band_vals[:, bi]
+                    v = band_vals[:, :, bi]  # (W, C)
                     v[~filter_tfs] = np.nan
-                    band_vals[:, bi] = v
+                    band_vals[:, :, bi] = v
                 result[feat] = repack_band_dict(band_vals, band_keys)
 
             elif ftype is constants.FeatureType.BANDED_MATRIX:
                 band_vals, band_keys = extract_band_dict(result[feat])
-                shape = band_vals[:, 0].shape
+                # band_vals is canonical (W, C, C, B); index band on last axis
+                shape = band_vals[:, :, :, 0].shape  # (W, C, C)
                 mask = np.broadcast_to(filter_tfs[:, :, np.newaxis], shape)
                 for bi, colname in enumerate(band_keys):
-                    v = band_vals[:, bi]
+                    v = band_vals[:, :, :, bi]  # (W, C, C)
                     v[~mask] = np.nan
                     v[~mask.transpose(0, 2, 1)] = np.nan
-                    band_vals[:, bi] = v
+                    band_vals[:, :, :, bi] = v
                 result[feat] = repack_band_dict(band_vals, band_keys)
 
             elif ftype is constants.FeatureType.SIMPLE_MATRIX:

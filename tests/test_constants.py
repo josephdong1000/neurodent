@@ -282,6 +282,70 @@ class TestFeatureType:
         assert not constants.FeatureType.LINEAR_2D.is_dict_stored
 
 
+class TestFeatureShapes:
+    """Test FEATURE_SHAPES registry and FeatureType shape properties."""
+
+    def test_feature_shapes_exists(self):
+        """Test that FEATURE_SHAPES is exported from constants."""
+        assert hasattr(constants, "FEATURE_SHAPES")
+        assert isinstance(constants.FEATURE_SHAPES, dict)
+
+    def test_feature_shapes_covers_all_types(self):
+        """Test that every FeatureType member has an entry in FEATURE_SHAPES."""
+        for ftype in constants.FeatureType:
+            assert ftype in constants.FEATURE_SHAPES, f"Missing entry for {ftype}"
+
+    def test_feature_shapes_keys(self):
+        """Test that each entry has the required keys."""
+        required_keys = {"extracted_shape", "cell_shape", "channel_axes", "semantic_axes", "description"}
+        for ftype, info in constants.FEATURE_SHAPES.items():
+            for key in required_keys:
+                assert key in info, f"{ftype} missing key '{key}'"
+
+    def test_channel_axes_values(self):
+        """Test channel_axes for each FeatureType matches convention."""
+        assert constants.FeatureType.LINEAR.channel_axes == (1,)
+        assert constants.FeatureType.LINEAR_2D.channel_axes == (1,)
+        assert constants.FeatureType.BAND.channel_axes == (1,)
+        assert constants.FeatureType.HIST.channel_axes == (1,)
+        assert constants.FeatureType.SIMPLE_MATRIX.channel_axes == (1, 2)
+        assert constants.FeatureType.BANDED_MATRIX.channel_axes == (1, 2)
+
+    def test_semantic_axes_values(self):
+        """Test semantic_axes for each FeatureType."""
+        assert constants.FeatureType.LINEAR.semantic_axes == {}
+        assert constants.FeatureType.LINEAR_2D.semantic_axes == {"components": 2}
+        assert constants.FeatureType.BAND.semantic_axes == {"bands": 2}
+        assert constants.FeatureType.HIST.semantic_axes == {"freq_bins": 2}
+        assert constants.FeatureType.SIMPLE_MATRIX.semantic_axes == {}
+        assert constants.FeatureType.BANDED_MATRIX.semantic_axes == {"bands": 3}
+
+    def test_extracted_shape_property(self):
+        """Test the extracted_shape property on FeatureType."""
+        assert constants.FeatureType.LINEAR.extracted_shape == "W, C"
+        assert constants.FeatureType.LINEAR_2D.extracted_shape == "W, C, K"
+        assert constants.FeatureType.BAND.extracted_shape == "W, C, B"
+        assert constants.FeatureType.SIMPLE_MATRIX.extracted_shape == "W, C, C"
+        assert constants.FeatureType.BANDED_MATRIX.extracted_shape == "W, C, C, B"
+        assert constants.FeatureType.HIST.extracted_shape == "W, C, F"
+
+    def test_channel_axes_property(self):
+        """Test the channel_axes property on FeatureType."""
+        for ftype in constants.FeatureType:
+            assert ftype.channel_axes == constants.FEATURE_SHAPES[ftype]["channel_axes"]
+
+    def test_semantic_axes_property(self):
+        """Test the semantic_axes property on FeatureType."""
+        for ftype in constants.FeatureType:
+            assert ftype.semantic_axes == constants.FEATURE_SHAPES[ftype]["semantic_axes"]
+
+    def test_channel_axes_always_start_at_1(self):
+        """Test that channel axes always start at axis 1 (axis 0 is windows)."""
+        for ftype in constants.FeatureType:
+            axes = ftype.channel_axes
+            assert axes[0] == 1, f"{ftype} channel axes should start at 1, got {axes}"
+
+
 class TestOkabeItoColors:
     """Test Okabe-Ito colorblind-friendly color palette."""
 
