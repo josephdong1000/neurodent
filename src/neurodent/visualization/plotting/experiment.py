@@ -310,9 +310,9 @@ class ExperimentPlotter:
                     vals = {"average": vals.tolist()}
                 else:
                     if ftype is constants.FeatureType.BAND:
-                        # (n_windows, n_bands, n_chan) → index channel at axis 2
+                        # (n_windows, n_chan, n_bands) — channels at axis 1
                         vals_indexed = {
-                            ch: vals[:, :, ch_to_idx[ch]].tolist()
+                            ch: vals[:, ch_to_idx[ch], :].tolist()
                             for ch in channels
                             if ch in ch_names
                         }
@@ -361,8 +361,7 @@ class ExperimentPlotter:
                         f"Multiple frequency bin values found in {feature}: {n_unique_freq_vals} values"
                     )
 
-                psd_vals = psd_vals.transpose((0, 2, 1))
-
+                # psd_vals is already canonical (W, C, F) — no transpose needed
                 logging.debug(
                     f"freq_vals.shape: {freq_vals.shape}, psd_vals.shape: {psd_vals.shape}"
                 )

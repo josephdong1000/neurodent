@@ -62,6 +62,7 @@ ANIMAL_METADATA: dict = {}
 
 from .analysis import (
     FeatureType,
+    FEATURE_SHAPES,
     LINEAR_FEATURES,
     LINEAR_2D_FEATURES,
     BAND_FEATURES,
@@ -105,6 +106,7 @@ __all__ = [
     "FEATURE_LABELS",
     # Feature Typing
     "FeatureType",
+    "FEATURE_SHAPES",
     "FEATURE_TYPES",
     "classify_feature",
     # Feature & Frequency Definitions
