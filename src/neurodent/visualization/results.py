@@ -55,7 +55,8 @@ class AnimalFeatureParser:
             vals, keys = extract_band_dict(column)
             avg_vals = core.nanaverage(vals, axis=0, weights=weights)
             # vals is canonical (W, C, B) for BAND or (W, C, C, B) for BANDED_MATRIX.
-            # avg_vals after axis=0 is (C, B) or (C, C, B). Build {band: per-ch-array}.
+            # avg_vals after axis=0 is (C, B) or (C, C, B).
+            # Bands are always on the last axis — use [..., i] to slice per band.
             avg = {keys[i]: avg_vals[..., i] for i in range(len(keys))}
 
         elif ftype is constants.FeatureType.HIST:

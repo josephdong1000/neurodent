@@ -1965,7 +1965,7 @@ class TestFeatureUtils:
         ])
         coords, values = extract_hist_data(series)
         assert coords.shape == (2, 3)
-        # 1-D values per cell → no channel axis, shape stays (W, F)
+        # 1-D values per cell (single-channel) → no channel dim, shape stays (W, F)
         assert values.shape == (2, 3)
         np.testing.assert_array_equal(coords[0], [1.0, 2.0, 3.0])
         np.testing.assert_array_equal(values[1], [40.0, 50.0, 60.0])
@@ -1980,7 +1980,7 @@ class TestFeatureUtils:
         ])
         coords, values = extract_hist_data(series)
         assert coords.shape == (2, 3)
-        # 1-D values per cell → no channel axis, shape stays (W, F)
+        # 1-D values per cell (single-channel) → no channel dim, shape stays (W, F)
         assert values.shape == (2, 3)
         np.testing.assert_array_equal(values[0], [10.0, 20.0, 30.0])
 
