@@ -11,7 +11,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from packaging.version import Version
+from packaging.version import InvalidVersion, Version
 
 
 def get_git_tags():
@@ -24,9 +24,17 @@ def get_git_tags():
             check=True
         )
         tags = [tag.strip() for tag in result.stdout.split('\n') if tag.strip()]
+        # Filter to only PEP 440-compliant tags, warning about any that are skipped
+        valid_tags = []
+        for tag in tags:
+            try:
+                Version(tag[1:])
+                valid_tags.append(tag)
+            except InvalidVersion:
+                print(f"Warning: skipping tag {tag!r} — not a valid PEP 440 version", file=sys.stderr)
         # Sort tags by version (latest first)
-        tags.sort(reverse=True, key=lambda x: Version(x[1:]))
-        return tags
+        valid_tags.sort(reverse=True, key=lambda x: Version(x[1:]))
+        return valid_tags
     except subprocess.CalledProcessError as e:
         print(f"Error getting git tags: {e}", file=sys.stderr)
         return []
