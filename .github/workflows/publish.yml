@@ -40,7 +40,3 @@ jobs:
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          # TODO: After successful TestPyPI validation, remove the repository-url
-          # line below to publish to production PyPI instead.
-          repository-url: https://test.pypi.org/legacy/
