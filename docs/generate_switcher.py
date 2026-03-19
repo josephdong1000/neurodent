@@ -11,6 +11,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from packaging.version import Version
+
 
 def get_git_tags():
     """Get all git tags matching version pattern v*.*.* """
@@ -23,7 +25,7 @@ def get_git_tags():
         )
         tags = [tag.strip() for tag in result.stdout.split('\n') if tag.strip()]
         # Sort tags by version (latest first)
-        tags.sort(reverse=True, key=lambda x: [int(n) if n.isdigit() else n for n in x.replace('v', '').split('.')])
+        tags.sort(reverse=True, key=lambda x: Version(x.replace('v', '')))
         return tags
     except subprocess.CalledProcessError as e:
         print(f"Error getting git tags: {e}", file=sys.stderr)
