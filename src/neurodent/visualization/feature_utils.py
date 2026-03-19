@@ -286,9 +286,9 @@ def collapse_feature_channels(
 ) -> np.ndarray:
     """Average feature data across channels, collapsing the channel dimension.
 
-    For array features the channel axis is averaged directly.  For matrix
-    features the lower-triangular channel pairs are extracted first, then
-    averaged across those pairs.
+    For non-matrix features the single channel axis (``ftype.channel_axes[0]``)
+    is averaged directly.  For matrix features the lower-triangular channel
+    pairs are extracted first using the two channel axes, then averaged.
 
     Parameters
     ----------
@@ -302,7 +302,8 @@ def collapse_feature_channels(
         - BANDED_MATRIX: ``(n_windows, n_channels, n_channels, n_bands)``
         - HIST: ``(n_windows, n_channels, n_freq_bins)``
     ftype : constants.FeatureType
-        The classified feature type.
+        The classified feature type.  The ``channel_axes`` property is used
+        to determine which axes to collapse; no axis positions are hardcoded.
 
     Returns
     -------
@@ -321,27 +322,21 @@ def collapse_feature_channels(
     ValueError
         If *ftype* is not a supported feature type.
     """
-    if ftype in (constants.FeatureType.LINEAR, constants.FeatureType.LINEAR_2D):
-        # (n_windows, n_channels[, n_components]) → average over channels
-        return np.nanmean(vals, axis=1)
+    channel_axes = ftype.channel_axes
 
-    elif ftype is constants.FeatureType.BAND:
-        # (n_windows, n_channels, n_bands) → average over channels (axis 1)
-        return np.nanmean(vals, axis=1)
-
-    elif ftype is constants.FeatureType.HIST:
-        # (n_windows, n_channels, n_freq) → average over channels
-        return np.nanmean(vals, axis=1)
-
-    elif ftype is constants.FeatureType.SIMPLE_MATRIX:
-        # (n_windows, n_chan, n_chan) → extract lower tril, mean across pairs
-        tril_indices = np.tril_indices(vals.shape[1], k=-1)
-        return np.nanmean(vals[:, tril_indices[0], tril_indices[1]], axis=-1)
-
-    elif ftype is constants.FeatureType.BANDED_MATRIX:
-        # (n_windows, n_chan, n_chan, n_bands) → extract lower tril per band, mean
-        tril_indices = np.tril_indices(vals.shape[1], k=-1)
-        return np.nanmean(vals[:, tril_indices[0], tril_indices[1], :], axis=1)
+    if not ftype.is_matrix:
+        # Single channel axis — average over it.  axis index comes from
+        # channel_axes so no position is hardcoded here.
+        return np.nanmean(vals, axis=channel_axes[0])
 
     else:
-        raise ValueError(f"Unsupported FeatureType for channel collapse: {ftype}")
+        # Matrix types (SIMPLE_MATRIX, BANDED_MATRIX): channel_axes = (1, 2).
+        # Extract the lower-triangular channel pairs then average over them.
+        # n_chan is derived from the first channel axis via channel_axes.
+        n_chan = vals.shape[channel_axes[0]]
+        tril = np.tril_indices(n_chan, k=-1)
+        # Advanced indexing on the two channel axes simultaneously; any
+        # trailing semantic axes (e.g. bands) are preserved automatically.
+        tril_vals = vals[:, tril[0], tril[1]]  # (W, n_pairs[, ...semantic])
+        return np.nanmean(tril_vals, axis=1)
+
