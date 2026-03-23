@@ -261,6 +261,7 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
         save_abbrevs_as_chnames=False,
         overwrite=False,
         multiprocess_mode: Literal["dask", "serial"] = "serial",
+        chunk_len: float = 60,
     ):
         """
         Archive frequency domain spike analysis result as fif and json files.
@@ -275,11 +276,19 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
             overwrite: If True, overwrite existing files
             multiprocess_mode: Whether to use Dask for parallel conversion.
                 Defaults to "serial".
+            chunk_len (float, optional): Length of each chunk in seconds used when
+                converting SortingAnalyzers to a NumPy trace array. Smaller values
+                reduce peak RAM at the cost of more I/O round-trips; larger values
+                improve throughput on high-memory systems. Only used when
+                ``result_mne`` is ``None`` and ``convert_to_mne`` is ``True``.
+                Defaults to 60.
         """
         if self.result_mne is None:
             if convert_to_mne and self.result_sas:
                 result_mne = self.convert_to_mne(
-                    save_raw=True, multiprocess_mode=multiprocess_mode,
+                    chunk_len=chunk_len,
+                    save_raw=True,
+                    multiprocess_mode=multiprocess_mode,
                 )
                 if result_mne is None:
                     warnings.warn("No data found for saving")

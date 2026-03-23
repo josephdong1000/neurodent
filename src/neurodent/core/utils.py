@@ -983,7 +983,10 @@ def get_temp_directory() -> Path:
 
 
 def cache_fragments_to_zarr(
-    np_fragments: np.ndarray, n_fragments: int, tmpdir: Optional[str] = None
+    np_fragments: np.ndarray,
+    n_fragments: int,
+    tmpdir: Optional[str] = None,
+    chunk_size: Optional[int] = None,
 ) -> tuple[str, "zarr.Array"]:
     """
     Cache numpy fragments array to zarr format for efficient memory management.
@@ -998,6 +1001,10 @@ def cache_fragments_to_zarr(
         n_fragments (int): Number of fragments to cache (allows for subset caching).
         tmpdir (str, optional): Directory path for temporary zarr storage. If None,
             uses get_temp_directory(). Defaults to None.
+        chunk_size (int, optional): Number of fragments per zarr chunk along the first
+            axis. Controls the read/write granularity when accessing the zarr array.
+            Smaller values reduce memory overhead per chunk; larger values improve
+            sequential throughput. When None, defaults to ``min(100, n_fragments)``.
 
     Returns:
         tuple[str, zarr.Array]: A tuple containing:
@@ -1021,7 +1028,10 @@ def cache_fragments_to_zarr(
     logging.debug(f"Caching numpy array with zarr in {tmppath}")
 
     # Create Zarr array with optimal settings for fragment-wise access
-    chunk_size = min(100, n_fragments)  # Cap at 100 fragments per chunk
+    if chunk_size is None:
+        chunk_size = min(100, n_fragments)  # Cap at 100 fragments per chunk
+    else:
+        chunk_size = min(chunk_size, n_fragments)
     zarr_array = zarr.open(
         tmppath,
         mode="w",
