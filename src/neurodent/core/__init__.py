@@ -78,11 +78,13 @@ from .utils import (
     validate_timestamps,
     nanaverage,
     parse_chname_to_abbrev,
+    abbreviate_channel_names,
     parse_str_to_day,
     log_transform,
     should_use_cache_unified,
     get_feature_label,
     get_cache_status_message,
+    slugify,
 )
 
 from .zeitgeber import (
@@ -119,10 +121,12 @@ __all__ = [
     "validate_timestamps",
     "nanaverage",
     "parse_chname_to_abbrev",
+    "abbreviate_channel_names",
     "parse_str_to_day",
     "log_transform",
     "get_feature_label",
     "get_cache_status_message",
     "should_use_cache_unified",
+    "slugify",
     "utils",
 ]

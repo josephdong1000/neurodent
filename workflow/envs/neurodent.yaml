@@ -16,4 +16,3 @@ dependencies:
   - mne
   - pip:
       - neurodent
-      - django

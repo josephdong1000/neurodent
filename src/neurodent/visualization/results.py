@@ -22,7 +22,6 @@ import mne
 import numpy as np
 import pandas as pd
 from dask import delayed
-from django.utils.text import slugify
 from scipy.stats import zscore
 from scipy.ndimage import binary_opening, binary_closing
 from tqdm import tqdm
@@ -31,7 +30,7 @@ from tqdm import tqdm
 from .. import constants, core
 from ..core import FragmentAnalyzer, get_temp_directory
 from ..core.frequency_domain_spike_detection import FrequencyDomainSpikeDetector
-from ..core.utils import filepath_to_index, parse_chname_to_abbrev
+from ..core.utils import abbreviate_channel_names, filepath_to_index, parse_chname_to_abbrev, slugify
 from .feature_utils import extract_linear_array, extract_band_dict, repack_band_dict, extract_hist_data
 
 
@@ -120,6 +119,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         unique_animaldays (list[str]): List of unique session identifiers (format: "{animal}_{session}").
         animaldays (list[str]): Alias for unique_animaldays.
         genotype (str): Genotype of the animal (from ANIMAL_METADATA if available).
+        sex (str): Sex of the animal (from ANIMAL_METADATA if available).
         long_recordings (list[LongRecordingOrganizer]): LRO instances, one per session.
         long_analyzers (list[LongRecordingAnalyzer]): Analysis instances, one per session.
         features_df (pd.DataFrame): Aggregated feature DataFrame across all sessions.
@@ -230,6 +230,12 @@ class AnimalOrganizer(AnimalFeatureParser):
 
         self.genotype = (
             constants.ANIMAL_METADATA.get(self.animal_id, {}).get("gene", "Unknown")
+            if self.animal_id
+            else "Unknown"
+        )
+
+        self.sex = (
+            constants.ANIMAL_METADATA.get(self.animal_id, {}).get("sex", "Unknown")
             if self.animal_id
             else "Unknown"
         )
@@ -673,6 +679,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                     item_name = self._get_item_name(items[0])
                     if item_name in self._processed_timestamps:
                         kwargs["manual_datetimes"] = self._processed_timestamps[item_name]
+                        kwargs["datetimes_are_start"] = True  # _compute_global_timeline always returns start times
                         logging.debug(
                             f"Using processed timestamp for {item_name}: {kwargs['manual_datetimes']}"
                         )
@@ -685,6 +692,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                             item_timestamps.append(self._processed_timestamps[item_name])
                     if item_timestamps:
                         kwargs["manual_datetimes"] = item_timestamps
+                        kwargs["datetimes_are_start"] = True  # _compute_global_timeline always returns start times
                         logging.debug(
                             f"Using processed timestamps for {animalday}: {item_timestamps}"
                         )
@@ -712,6 +720,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                             individual_kwargs["manual_datetimes"] = (
                                 self._processed_timestamps[item_name]
                             )
+                            individual_kwargs["datetimes_are_start"] = True  # _compute_global_timeline always returns start times
                     individual_lro = core.LongRecordingOrganizer(
                         item, **individual_kwargs
                     )
@@ -1074,6 +1083,48 @@ class AnimalOrganizer(AnimalFeatureParser):
                 continue
             yield i, lrec
 
+    def _validate_sampling_rates(self):
+        """Validate that all valid recordings share the same sampling rate.
+
+        Inconsistent sampling rates across recordings lead to PSD arrays with
+        different frequency-axis lengths, which causes downstream failures in
+        ``_apply_filter`` and other operations that stack arrays across windows.
+
+        Raises:
+            ValueError: If recordings have different sampling rates.
+        """
+        sfreqs: dict[str, float] = {}
+        for _i, lrec in self._iter_valid_recordings():
+            long_rec = getattr(lrec, "LongRecording", None)
+            if long_rec is None:
+                logging.warning(
+                    f"Skipping recording {_i} ({getattr(lrec, 'display_name', 'unknown')}): "
+                    "LongRecording is None"
+                )
+                continue
+            if not hasattr(long_rec, "get_sampling_frequency"):
+                raise ValueError(
+                    f"LongRecording for recording "
+                    f"{getattr(lrec, 'display_name', f'index {_i}')!r} does not define "
+                    "get_sampling_frequency()."
+                )
+            sf = long_rec.get_sampling_frequency()
+            sfreqs[lrec.display_name] = sf
+
+        if not sfreqs:
+            return
+
+        unique_rates = set(sfreqs.values())
+        if len(unique_rates) > 1:
+            details = ", ".join(
+                f"{name}: {rate} Hz" for name, rate in sfreqs.items()
+            )
+            raise ValueError(
+                f"All recordings must have the same sampling rate to produce "
+                f"consistent feature shapes (e.g. PSD). "
+                f"Found {len(unique_rates)} different rates: {details}"
+            )
+
     def compute_bad_channels(
         self, lof_threshold: float = None, force_recompute: bool = False
     ):
@@ -1157,6 +1208,8 @@ class AnimalOrganizer(AnimalFeatureParser):
             WindowAnalysisResult: A WindowAnalysisResult object containing extracted features for all recordings
         """
         features = _sanitize_feature_request(features, exclude)
+
+        self._validate_sampling_rates()
 
         dataframes = []
         for _i, lrec in self._iter_valid_recordings():
@@ -1300,6 +1353,7 @@ class AnimalOrganizer(AnimalFeatureParser):
             self.features_df,
             self.animal_id,
             self.genotype,
+            self.sex,
             self.channel_names,
             self.assume_from_number,
             self.bad_channels_dict,
@@ -1411,6 +1465,7 @@ class AnimalOrganizer(AnimalFeatureParser):
 
         animal = self.animal_id or "unknown"
         genotype = self.genotype or "Unknown"
+        sex = self.sex or "Unknown"
         session = None
 
         if isinstance(item, DiscoveredFile) and item.metadata:
@@ -1418,6 +1473,7 @@ class AnimalOrganizer(AnimalFeatureParser):
             animal = meta.get("animal", animal)
             session = meta.get("session")
             genotype = constants.ANIMAL_METADATA.get(animal, {}).get("gene", genotype)
+            sex = constants.ANIMAL_METADATA.get(animal, {}).get("sex", sex)
 
         if session is None:
             try:
@@ -1429,6 +1485,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         row["animal"] = animal
         row["day"] = session
         row["genotype"] = genotype
+        row["sex"] = sex
         row["duration"] = lan.LongRecording.get_dur_fragment(window_s, idx)
         row["endfile"] = lan.get_file_end(idx)
 
@@ -1456,6 +1513,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         lros: list[core.LongRecordingOrganizer],
         animal_id: str,
         genotype: str = "Unknown",
+        sex: str = "Unknown",
         assume_from_number: bool = False,
     ) -> "AnimalOrganizer":
         """
@@ -1470,6 +1528,7 @@ class AnimalOrganizer(AnimalFeatureParser):
             lros (list[LongRecordingOrganizer]): List of LRO instances to wrap.
             animal_id (str): Animal identifier for this organizer.
             genotype (str, optional): Genotype string. Defaults to "Unknown".
+            sex (str, optional): Sex string (e.g. "Male", "Female"). Defaults to "Unknown".
             assume_from_number (bool, optional): Whether to assume channel aliases
                 from numbers. Defaults to False.
 
@@ -1505,6 +1564,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         ao.anim_id = animal_id
         ao.animal_id = animal_id
         ao.genotype = genotype
+        ao.sex = sex
         ao.assume_from_number = assume_from_number
 
         # Step 1: Group LROs by date
@@ -1641,23 +1701,14 @@ class AnimalOrganizer(AnimalFeatureParser):
         if not first_names:
             return []
 
-        def _abbreviate(names: list[str]) -> list[str]:
-            result = []
-            for n in names:
-                try:
-                    result.append(core.parse_chname_to_abbrev(n, strict_matching=False))
-                except ValueError:
-                    result.append(n)  # Fall back to raw name if parsing fails
-            return result
-
-        reference_abbrevs = _abbreviate(first_names)
+        reference_abbrevs = abbreviate_channel_names(first_names, strict_matching=False)
         reference_set = set(reference_abbrevs)
         # Map abbreviation -> canonical raw name from first LRO
         abbrev_to_raw = dict(zip(reference_abbrevs, first_names))
 
         for i, lro in enumerate(lros[1:], start=1):
             current_names = lro.channel_names if lro.channel_names else []
-            current_abbrevs = _abbreviate(current_names)
+            current_abbrevs = abbreviate_channel_names(current_names, strict_matching=False)
             current_set = set(current_abbrevs)
 
             if current_set != reference_set:
@@ -1800,6 +1851,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                 lros=child_lros,
                 animal_id=group_name,
                 genotype=self.genotype,
+                sex=self.sex,
                 assume_from_number=self.assume_from_number,
             )
 
@@ -1879,6 +1931,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         result: pd.DataFrame,
         animal_id: str = None,
         genotype: str = None,
+        sex: str = "Unknown",
         channel_names: list[str] = None,
         assume_from_number=False,
         bad_channels_dict: dict[str, list[str]] = {},
@@ -1888,6 +1941,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         self.result = result
         self.animal_id = animal_id
         self.genotype = genotype
+        self.sex = sex
         self.channel_names = channel_names
         self.assume_from_number = assume_from_number
         self.bad_channels_dict = bad_channels_dict.copy()
@@ -1913,6 +1967,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             result=self.result.copy(deep=True),
             animal_id=self.animal_id,
             genotype=self.genotype,
+            sex=self.sex,
             channel_names=(
                 self.channel_names.copy() if self.channel_names is not None else None
             ),
@@ -1943,6 +1998,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         new_war.result = result
         new_war.animal_id = source.animal_id
         new_war.genotype = source.genotype
+        new_war.sex = source.sex
         new_war.channel_names = source.channel_names
         new_war.assume_from_number = source.assume_from_number
         new_war.bad_channels_dict = source.bad_channels_dict.copy()
@@ -2337,6 +2393,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         info.append(
             f"genotype: {self.result['genotype'].unique()[0] if 'genotype' in self.result.columns else self.genotype}"
         )
+        info.append(f"sex: {self.sex}")
         info.append(
             f"channel_names: {', '.join(self.channel_names) if self.channel_names else 'None'}"
         )
@@ -3622,6 +3679,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         json_dict = {
             "animal_id": self.animal_id,
             "genotype": self.genotype,
+            "sex": self.sex,
             "channel_names": (
                 self.channel_abbrevs if save_abbrevs_as_chnames else self.channel_names
             ),
@@ -4069,7 +4127,12 @@ class WindowAnalysisResult(AnimalFeatureParser):
         if "isday" not in groupby:
             agg_dict["isday"] = lambda df: None
 
-        constant_cols = ["animal", "day", "genotype"]
+        special_agg_cols = {"animalday", "isday", "duration", "endfile", "timestamp"}
+        constant_cols = [
+            col
+            for col in self._nonfeature_columns
+            if col not in groupby and col not in special_agg_cols
+        ]
         for col in constant_cols:
             if col in self.result.columns:
                 is_constant = result_grouped[col].nunique() == 1

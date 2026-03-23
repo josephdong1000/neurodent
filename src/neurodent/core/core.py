@@ -51,6 +51,7 @@ from .utils import (
     should_use_cache_unified,
     get_cache_status_message,
     convert_intan_chname_mne,
+    abbreviate_channel_names,
 )
 
 
@@ -2074,12 +2075,14 @@ class LongRecordingOrganizer:
         # Validate merge compatibility
         self._validate_merge_compatibility(other_lro)
 
-        # Skip merging if other_lro has 0 samples (e.g. empty tail file).
-        # Still update metadata so file_durations/dt_end remain consistent.
+        # Skip recording concatenation if other_lro has 0 samples (e.g. empty
+        # tail file), but still update metadata so dt_end etc. stay correct.
+        # _update_metadata_after_merge filters out 0-duration entries from
+        # file_end_datetimes/file_durations to avoid corrupting TimestampMapper.
         if other_lro.LongRecording.get_total_samples() == 0:
             logging.warning(
-                f"Skipping merge of {getattr(other_lro, 'item', 'unknown')}: "
-                "0 samples. Metadata updated but recording not extended."
+                f"Skipping recording concatenation of {getattr(other_lro, 'item', 'unknown')}: "
+                "0 samples. Updating metadata only."
             )
             self._update_metadata_after_merge(other_lro)
             return
@@ -2088,8 +2091,22 @@ class LongRecordingOrganizer:
         logging.info(
             f"Merging LRO {getattr(other_lro, 'item', 'unknown')} into {getattr(self, 'item', 'unknown')}"
         )
+
+        # If channel names differ but abbreviations matched (validated above),
+        # rename other recording's channels to match self's for SI concatenation.
+        other_rec = other_lro.LongRecording
+        if self.channel_names != other_lro.channel_names:
+            logging.info(
+                f"Renaming channels {other_lro.channel_names} -> {self.channel_names} "
+                "for merge compatibility"
+            )
+            other_rec = other_rec.rename_channels(
+                new_channel_ids=self.channel_names
+            )
+            other_lro.channel_names = list(self.channel_names)
+
         self.LongRecording = si.concatenate_recordings(
-            [self.LongRecording, other_lro.LongRecording]
+            [self.LongRecording, other_rec]
         )
 
         # Update metadata after merge
@@ -2106,10 +2123,16 @@ class LongRecordingOrganizer:
         Raises:
             ValueError: If LROs are incompatible
         """
-        # Check channel names
-        if self.channel_names != other_lro.channel_names:
+        # Check channel names — compare by abbreviation to tolerate naming
+        # variants (e.g. "L Barrel" vs "L Barrel Ctx" both → "LBar").
+        # Unparseable names pass through as-is for exact comparison.
+        self_abbrevs = abbreviate_channel_names(self.channel_names)
+        other_abbrevs = abbreviate_channel_names(other_lro.channel_names)
+        if self_abbrevs != other_abbrevs:
             raise ValueError(
-                f"Channel names mismatch: this LRO has {self.channel_names}, other LRO has {other_lro.channel_names}"
+                f"Channel names mismatch: this LRO has {self.channel_names} "
+                f"(abbrevs: {self_abbrevs}), other LRO has {other_lro.channel_names} "
+                f"(abbrevs: {other_abbrevs})"
             )
 
         # Check sampling rates
@@ -2159,8 +2182,14 @@ class LongRecordingOrganizer:
 
         if has_durs:
             if has_dates:
-                self.file_end_datetimes.extend(other_lro.file_end_datetimes)
-                self.file_durations.extend(other_lro.file_durations)
+                # Filter out 0-duration entries (from 0-sample recordings) to
+                # avoid corrupting TimestampMapper with degenerate mappings.
+                for dt, dur in zip(
+                    other_lro.file_end_datetimes, other_lro.file_durations
+                ):
+                    if dur > 0:
+                        self.file_end_datetimes.append(dt)
+                        self.file_durations.append(dur)
             else:
                 # If we are merging durations, we must be able to merge timestamps
                 # OR we must drop timestamps entirely to avoid mismatch (destructive).

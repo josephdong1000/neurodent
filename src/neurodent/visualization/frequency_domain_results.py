@@ -17,8 +17,6 @@ import dask.delayed
 import numpy as np
 import matplotlib.pyplot as plt
 import mne
-from django.utils.text import slugify
-
 try:
     import spikeinterface.core as si
     SPIKEINTERFACE_AVAILABLE = True
@@ -27,6 +25,7 @@ except ImportError:  # pragma: no cover
     SPIKEINTERFACE_AVAILABLE = False
 
 from .. import core
+from ..core.utils import abbreviate_channel_names, slugify
 from .results import AnimalFeatureParser
 
 
@@ -84,18 +83,9 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
         self.channel_names = channel_names
         self.assume_from_number = assume_from_number
 
-        if channel_names:
-            self.channel_abbrevs = []
-            for x in self.channel_names:
-                try:
-                    abbrev = core.parse_chname_to_abbrev(x, assume_from_number=assume_from_number)
-                    self.channel_abbrevs.append(abbrev)
-                except (ValueError, AttributeError):
-                    # If parsing fails, use the original channel name
-                    logging.warning(f"Failed to parse channel name {x}, using original name")
-                    self.channel_abbrevs.append(x)
-        else:
-            self.channel_abbrevs = []
+        self.channel_abbrevs = abbreviate_channel_names(
+            self.channel_names, assume_from_number=assume_from_number
+        )
 
         logging.info(f"Channel names: \t{self.channel_names}")
         logging.info(f"Channel abbreviations: \t{self.channel_abbrevs}")
