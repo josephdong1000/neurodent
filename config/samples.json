@@ -483,6 +483,10 @@
             "id": "032221_cohort 2, Group 3, Mouse 6 Cage 2A Re-Recording",
             "sex": "Female",
             "gene": "Het",
+            "pattern": [
+                "{data_root}/*{animal}*/{session}/*-{index}_ColMajor.bin",
+                "{data_root}/*{animal}*/{session}/*-{index}_Meta.csv"
+            ],
             "manual_datetime": {
                 "032221": "2021-03-22 23:37:54",
                 "032321": "2021-03-23 12:07:55",
@@ -497,6 +501,10 @@
             "id": "040221_Group 1 Mouse 9 Recording",
             "sex": "Female",
             "gene": "Mut",
+            "pattern": [
+                "{data_root}/*{animal}*/{session}/*-{index}_ColMajor.bin",
+                "{data_root}/*{animal}*/{session}/*-{index}_Meta.csv"
+            ],
             "manual_datetime": {
                 "040221": "2021-04-02 15:37:56",
                 "040321 (2)": "2021-04-03 23:35:16",

@@ -6,6 +6,7 @@ import os
 import platform
 import re
 import sys
+import unicodedata
 import warnings
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -836,6 +837,36 @@ def parse_chname_to_abbrev(channel_name: str, assume_from_number=False, strict_m
     return lr + chname
 
 
+def abbreviate_channel_names(
+    names: list[str],
+    strict_matching: bool = True,
+    assume_from_number: bool = False,
+) -> list[str]:
+    """Abbreviate a list of channel names, falling back to raw names for unparseable entries.
+
+    Args:
+        names: List of channel name strings to abbreviate.
+        strict_matching: Passed to parse_chname_to_abbrev.
+        assume_from_number: Passed to parse_chname_to_abbrev.
+
+    Returns:
+        List of abbreviated channel names (same length as input).
+    """
+    result = []
+    for name in names:
+        try:
+            result.append(
+                parse_chname_to_abbrev(
+                    name,
+                    assume_from_number=assume_from_number,
+                    strict_matching=strict_matching,
+                )
+            )
+        except (ValueError, KeyError, AttributeError):
+            result.append(name)
+    return result
+
+
 def _get_key_from_match_values(input_string: str, alias_dict: dict, strict_matching: bool = True, alias_name: str = "alias"):
     """
     Find the best matching key from alias dictionary.
@@ -882,6 +913,30 @@ def _get_key_from_match_values(input_string: str, alias_dict: dict, strict_match
     # Return the key with the longest matching alias
     best_match_key, _, _ = max(matches, key=lambda x: x[2])
     return best_match_key
+
+
+def normalize_value_from_aliases(
+    value: str,
+    alias_dict: dict[str, list[str]],
+) -> str | None:
+    """Normalize a value to its canonical form using an alias dictionary.
+
+    Unlike :func:`_get_key_from_match_values` which uses substring matching for
+    parsing values embedded in filenames, this function performs exact matching
+    for normalizing standalone configuration values.
+
+    Args:
+        value: The raw value to normalize (e.g., ``"M"``, ``"female"``).
+        alias_dict: Dictionary of ``{canonical_key: [aliases]}``.
+
+    Returns:
+        The canonical key if *value* matches any alias, or ``None`` if no match.
+    """
+    # REVIEW the function name should be unified with _get_key_from_match_values
+    for canonical_key, aliases in alias_dict.items():
+        if value in aliases:
+            return canonical_key
+    return None
 
 
 def set_temp_directory(path: str | Path) -> None:
@@ -1533,3 +1588,34 @@ def convert_intan_chname_mne(mne_obj):
     for i in range(len(mne_obj.info['ch_names'])):
         mne_obj.info['ch_names'][i] = parse_chname_to_abbrev(channel_name = mne_obj.info['ch_names'][i], assume_from_number=True, strict_matching=False)
     return mne_obj
+
+
+def slugify(value, allow_unicode=False):
+    """Convert a string to a URL-friendly slug.
+
+    Converts to ASCII (unless *allow_unicode* is ``True``), lowercases,
+    removes non-alphanumeric characters (except hyphens and underscores),
+    and converts spaces and repeated dashes to single dashes.
+
+    Drop-in replacement for ``django.utils.text.slugify`` using only the
+    standard library.
+
+    Args:
+        value: The string to slugify.
+        allow_unicode: If ``True``, keep Unicode characters instead of
+            transliterating to ASCII.
+
+    Returns:
+        str: A URL-safe slug string.
+    """
+    value = str(value)
+    if allow_unicode:
+        value = unicodedata.normalize("NFKC", value)
+    else:
+        value = (
+            unicodedata.normalize("NFKD", value)
+            .encode("ascii", "ignore")
+            .decode("ascii")
+        )
+    value = re.sub(r"[^\w\s-]", "", value.lower())
+    return re.sub(r"[-\s]+", "-", value).strip("-_")

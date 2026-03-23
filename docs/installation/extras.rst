@@ -9,6 +9,10 @@ NeuRodent provides optional dependency groups for different use cases. Install a
    # or with uv:
    uv add neurodent[extra_name]
 
+.. note::
+
+   **Using conda?** Conda does not support pip-style extras. To use optional dependency groups, install NeuRodent via pip or uv instead of conda.
+
 Available Extras
 ----------------
 

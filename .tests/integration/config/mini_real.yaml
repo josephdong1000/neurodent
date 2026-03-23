@@ -1,5 +1,5 @@
 # Mini Real Dataset — small committed bin/csv recordings for smoke testing
-# Usage: NEURODENT_DATASET=mini_real snakemake --cores 1
+# Usage: NEURODENT_DATASET=mini_real snakemake --cores all
 
 temp_directory: "/tmp/neurodent_mini_real"
 

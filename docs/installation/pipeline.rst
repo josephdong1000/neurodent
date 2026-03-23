@@ -22,6 +22,10 @@ Install the optional pipeline dependencies:
 
 .. note::
 
+   **Using conda?** The ``pipeline`` extra must be installed via pip or uv. Conda does not support pip-style extras, so run ``pip install neurodent[pipeline]`` after activating your conda environment.
+
+.. note::
+
    The ``pipeline`` extra includes Snakemake and related dependencies needed for running the automated analysis workflow. If you only need the core NeuRodent library for Python-based analysis, the basic installation is sufficient.
 
 SLURM Cluster Configuration
