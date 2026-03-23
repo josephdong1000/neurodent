@@ -245,6 +245,7 @@ class TestStandardizedImports:
         internal_functions = [
             "parse_truncate",
             "cache_fragments_to_zarr",
+            "stream_fragments_to_zarr",
             "is_day",
             "nanmean_series_of_np",
             "sort_dataframe_by_plot_order",
