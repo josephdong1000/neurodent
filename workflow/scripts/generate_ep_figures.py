@@ -26,47 +26,16 @@ from seaborn import axes_style
 from neurodent import visualization, constants
 from neurodent.workflow import setup_snakemake_logging, load_wars, inject_config_aliases
 
-
 def infer_metadata_columns(df):
     """
-    Infer metadata columns (sex, gene) from genotype and animal ID.
-    This logic is isolated as it may change depending on project conventions.
+    Add 'gene' column from genotype. Sex is expected to already be present from WAR data.
     """
     df = df.copy()
 
-    # Add categorical columns based on genotype
+    # Map gene from genotype — genotype is plain (WT/Het/Mut), use directly
     if "genotype" in df.columns:
-        # First try to map from standard genotypes
-        df["sex"] = df["genotype"].map(
-            lambda x: "Male" if x in ["MWT", "MHet", "MMut"] else "Female" if x in ["FWT", "FHet", "FMut"] else None
-        )
-        
-        # If sex is missing, try to infer from animal ID (e.g. "...-M" or "...-F")
-        if df["sex"].isnull().any() and "animal" in df.columns:
-            def infer_sex_from_animal(row):
-                if pd.notna(row["sex"]):
-                    return row["sex"]
-                animal = str(row["animal"]).upper()
-                if animal.endswith("-M") or animal.endswith("_M"):
-                    return "Male"
-                if animal.endswith("-F") or animal.endswith("_F"):
-                    return "Female"
-                return "Unknown"
-            
-            df["sex"] = df.apply(infer_sex_from_animal, axis=1)
-
-        # Map gene/genotype
-        df["gene"] = df["genotype"].map(
-            lambda x: "WT"
-            if x in ["MWT", "FWT", "WT"]  # Added WT explicitly
-            else "Het"
-            if x in ["MHet", "FHet"]
-            else "Mut"
-            if x in ["MMut", "FMut", "HOMO"] # Added HOMO explicitly if possible, or just fallback
-            else x
-        )
+        df["gene"] = df["genotype"]
     return df
-
 
 def process_feature_dataframe(df, feature):
     """Process feature dataframe by adding categorical columns and pivoting.
@@ -127,7 +96,6 @@ def process_feature_dataframe(df, feature):
 
     return df, df_pivot
 
-
 def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config):
     """Create plots for a specific feature using seaborn objects"""
 
@@ -143,20 +111,20 @@ def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
         # Pipeline 1: Pull averaged data for traditional plots (1 point per animal)
         if feature == "normpsd":
             df_avg = ep.pull_timeseries_dataframe(
-                feature="psd", groupby=["animal", "genotype", "isday"], collapse_channels=True, average_groupby=True
+                feature="psd", groupby=["animal", "genotype", "sex", "isday"], collapse_channels=True, average_groupby=True
             )
             df_total = ep.pull_timeseries_dataframe(
                 feature="psdtotal",
-                groupby=["animal", "genotype", "isday"],
+                groupby=["animal", "genotype", "sex", "isday"],
                 collapse_channels=True,
                 average_groupby=True,
             )
 
-            df_avg = df_avg.merge(df_total, on=["animal", "genotype", "channel"], suffixes=("", "_total"))
+            df_avg = df_avg.merge(df_total, on=["animal", "genotype", "sex", "channel"], suffixes=("", "_total"))
             df_avg["normpsd"] = df_avg["psd"] / df_avg["psdtotal"]
         else:
             df_avg = ep.pull_timeseries_dataframe(
-                feature=feature, groupby=["animal", "genotype", "isday"], collapse_channels=True, average_groupby=True
+                feature=feature, groupby=["animal", "genotype", "sex", "isday"], collapse_channels=True, average_groupby=True
             )
 
         # Process averaged dataframe (adds sex and gene columns)
@@ -256,7 +224,6 @@ def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
         logger.error(f"Failed to process feature {feature}: {str(e)}")
         raise
 
-
 def main():
     """Main EP figures generation function"""
     global snakemake
@@ -292,8 +259,8 @@ def main():
     features = ep_config["features"]
     exclude_features = ep_config.get("exclude_features", [])
 
-    # Create genotype ordering - ensure we include all genotypes present in the data
-    genotype_order = ["MWT", "MHet", "MMut", "FWT", "FHet", "FMut"]
+    # Create genotype ordering from constants, adding any observed genotypes not in the default list
+    genotype_order = list(constants.DF_SORT_ORDER.get("genotype", []))
     
     # Check for genotypes in loaded WARs that aren't in the default list
     found_genotypes = set()
@@ -324,8 +291,8 @@ def main():
         "zimcoh": "z(Imaginary Coherencey)",
         "logpsdfrac": "Log Percent Power",
         "logpsdband": "Log Band Power",
-        "psdband": "Band Power ($\\mu V^2$)",
-        "psd": "PSD ($\\mu V^2/Hz$)",
+        "psdband": r"Band Power ($\mu V^2$)",
+        "psd": r"PSD ($\mu V^2/Hz$)",
         "normpsd": "Normalized PSD",
         "nspike": "n_spike / t_window",
         "lognspike": "Log(n_spike / t_window)",
@@ -340,7 +307,6 @@ def main():
 
         create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
     logger.info(f"Successfully generated EP statistical figures for {len(features)} features")
-
 
 if __name__ == "__main__":
     main()

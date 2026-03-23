@@ -10,7 +10,7 @@ Get NeuRodent installed and ready for EEG analysis.
    * - Guide
      - Description
    * - :doc:`quickstart`
-     - Install NeuRodent with pip or uv
+     - Install NeuRodent with pip, conda, or uv
    * - :doc:`extras`
      - Optional dependency groups (pipeline, dev, all)
    * - :doc:`pipeline`
