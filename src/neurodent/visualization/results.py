@@ -1275,56 +1275,15 @@ class AnimalOrganizer(AnimalFeatureParser):
                     first_fragment = lan.get_fragment_np(0)
 
                     if chunk_size is not None:
-                        # Streaming path: write fragments to zarr in batches to limit
-                        # peak memory usage.  Only `chunk_size` fragments are held in
-                        # RAM at any one time instead of the entire recording.
-                        try:
-                            import zarr as _zarr
-                        except ImportError:
-                            raise ImportError("zarr package is required for fragment caching")
-
-                        import os as _os
-                        from neurodent.core.utils import get_temp_directory
-
-                        fragment_shape = first_fragment.shape
-                        fragment_dtype = first_fragment.dtype
-                        _batch = min(chunk_size, n_fragments_war)
-
-                        tmpdir = get_temp_directory()
-                        tmppath = _os.path.join(
-                            tmpdir, f"temp_{_os.urandom(24).hex()}.zarr"
+                        # Streaming path: stream fragments to zarr in batches,
+                        # keeping only `chunk_size` fragments in RAM at a time.
+                        tmppath = core.utils.stream_fragments_to_zarr(
+                            lan.get_fragment_np,
+                            n_fragments_war,
+                            first_fragment.shape,
+                            first_fragment.dtype,
+                            chunk_size,
                         )
-                        logging.debug(
-                            f"Streaming {n_fragments_war} fragments to zarr in "
-                            f"batches of {_batch} (path: {tmppath})"
-                        )
-                        zarr_array = _zarr.open(
-                            tmppath,
-                            mode="w",
-                            shape=(n_fragments_war,) + fragment_shape,
-                            chunks=(
-                                _batch,
-                                -1,
-                                -1,
-                            ),
-                            dtype=fragment_dtype,
-                            compressor=_zarr.Blosc(
-                                cname="lz4", clevel=3, shuffle=_zarr.Blosc.SHUFFLE
-                            ),
-                        )
-                        for batch_start in range(0, n_fragments_war, _batch):
-                            batch_end = min(batch_start + _batch, n_fragments_war)
-                            batch_len = batch_end - batch_start
-                            np_batch = np.empty(
-                                (batch_len,) + fragment_shape, dtype=fragment_dtype
-                            )
-                            for local_idx, global_idx in enumerate(
-                                range(batch_start, batch_end)
-                            ):
-                                np_batch[local_idx] = lan.get_fragment_np(global_idx)
-                            zarr_array[batch_start:batch_end] = np_batch
-                            del np_batch
-                        del zarr_array
                     else:
                         # Default path: allocate the full array then write to zarr in
                         # one shot.  Maximises throughput on high-memory systems.

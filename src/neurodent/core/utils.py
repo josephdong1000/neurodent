@@ -10,7 +10,7 @@ import unicodedata
 import warnings
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Literal, Optional, Union
+from typing import Callable, Literal, Optional, Union
 
 import dateutil.parser
 import numpy as np
@@ -1056,6 +1056,82 @@ def cache_fragments_to_zarr(
     logging.debug(f"  - Zarr array chunks: {zarr_array.chunks}")
 
     return tmppath, zarr_array
+
+
+def stream_fragments_to_zarr(
+    get_fragment_fn: Callable[[int], np.ndarray],
+    n_fragments: int,
+    fragment_shape: tuple,
+    fragment_dtype: np.dtype,
+    chunk_size: int,
+    tmpdir: Optional[str] = None,
+) -> str:
+    """Stream recording fragments to a zarr store in memory-bounded batches.
+
+    Unlike :func:`cache_fragments_to_zarr`, this function never holds more than
+    ``chunk_size`` fragments in RAM at once.  It calls ``get_fragment_fn`` one
+    batch at a time, writes each batch to the zarr store, and immediately frees
+    the batch buffer — so peak RAM is proportional to ``chunk_size`` rather than
+    ``n_fragments``.
+
+    Args:
+        get_fragment_fn (Callable[[int], np.ndarray]): A callable that accepts a
+            fragment index (0-based) and returns the corresponding fragment as a
+            NumPy array of shape ``fragment_shape``.
+        n_fragments (int): Total number of fragments to stream.
+        fragment_shape (tuple): Shape of a single fragment (e.g. ``(n_samples,
+            n_channels)``).
+        fragment_dtype (np.dtype): Data-type of the fragment arrays.
+        chunk_size (int): Number of fragments to buffer per batch.  Must be >= 1.
+            Larger values improve sequential write throughput; smaller values
+            reduce peak RAM.
+        tmpdir (str, optional): Directory for the temporary zarr file.  If
+            ``None``, uses :func:`get_temp_directory`.
+
+    Returns:
+        str: Path to the temporary zarr file on disk.
+
+    Raises:
+        ValueError: If ``chunk_size`` < 1.
+        ImportError: If zarr is not available.
+    """
+    if chunk_size < 1:
+        raise ValueError(f"chunk_size must be >= 1, got {chunk_size}")
+
+    if tmpdir is None:
+        tmpdir = get_temp_directory()
+
+    tmppath = os.path.join(tmpdir, f"temp_{os.urandom(24).hex()}.zarr")
+    batch = min(chunk_size, n_fragments)
+
+    logging.debug(
+        f"Streaming {n_fragments} fragments to zarr in batches of {batch} "
+        f"(path: {tmppath})"
+    )
+
+    zarr_array = zarr.open(
+        tmppath,
+        mode="w",
+        shape=(n_fragments,) + fragment_shape,
+        chunks=(batch, -1, -1),
+        dtype=fragment_dtype,
+        compressor=zarr.Blosc(cname="lz4", clevel=3, shuffle=zarr.Blosc.SHUFFLE),
+    )
+
+    for batch_start in range(0, n_fragments, batch):
+        batch_end = min(batch_start + batch, n_fragments)
+        batch_len = batch_end - batch_start
+        np_batch = np.empty((batch_len,) + fragment_shape, dtype=fragment_dtype)
+        for local_idx, global_idx in enumerate(range(batch_start, batch_end)):
+            np_batch[local_idx] = get_fragment_fn(global_idx)
+        zarr_array[batch_start:batch_end] = np_batch
+        del np_batch
+
+    logging.debug(f"  - Zarr array shape: {zarr_array.shape}")
+    logging.debug(f"  - Zarr array chunks: {zarr_array.chunks}")
+    del zarr_array
+
+    return tmppath
 
 
 def get_file_stem(filepath: Union[str, Path]) -> str:
