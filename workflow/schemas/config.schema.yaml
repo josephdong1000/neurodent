@@ -30,3 +30,58 @@ properties:
   analysis:
     type: object
     description: Analysis parameters
+    properties:
+      war_generation:
+        type: object
+        description: WAR generation parameters
+        properties:
+          compute_windowed_analysis:
+            type: object
+            description: Parameters forwarded to AnimalOrganizer.compute_windowed_analysis()
+            properties:
+              features:
+                type: array
+                description: Features to compute. Use ["all"] for all supported features.
+                items:
+                  type: string
+              multiprocess_mode:
+                type: string
+                description: "'dask' for parallel computation or 'serial' for single-threaded"
+                enum: ["dask", "serial"]
+              chunk_size:
+                description: >
+                  Number of recording fragments to buffer in RAM at one time when streaming
+                  to zarr. null = allocate all fragments at once (high throughput, high RAM).
+                  Set to an integer (e.g. 50) to cap peak RAM use.
+                type: ["integer", "null"]
+      frequency_domain_spike_detection:
+        type: object
+        description: Spike detection parameters
+        properties:
+          save_fif_chunk_len:
+            type: number
+            description: >
+              Chunk length in seconds used when reading traces back for .fif export.
+              Smaller values reduce peak RAM during export.
+          spike_averaged_traces:
+            type: object
+            description: Parameters for spike-averaged trace plots and epoch exports
+            properties:
+              tmin:
+                type: number
+                description: Epoch start time relative to spike (seconds)
+              tmax:
+                type: number
+                description: Epoch end time relative to spike (seconds)
+              baseline:
+                description: Baseline correction window [tmin, tmax] or null
+                type: ["array", "null"]
+              save_epochs:
+                type: boolean
+                description: Whether to save epoch data as .fif files
+              figure_format:
+                type: string
+                description: Output format for spike-averaged-trace figures
+              dpi:
+                type: integer
+                description: Figure resolution in dots per inch
