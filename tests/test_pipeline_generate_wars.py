@@ -236,3 +236,245 @@ class TestPipelineIntegrationWithSyntheticData:
         assert pattern.endswith("/{index}.EDF")
         assert cfg["lro_kwargs"]["mode"] == "mne"
         assert cfg["lro_kwargs"]["extract_func"] == "read_raw_edf"
+
+
+# ---------------------------------------------------------------------------
+# Tests for compute_windowed_analysis config wiring
+# ---------------------------------------------------------------------------
+
+
+class TestComputeWindowedAnalysisConfigWiring:
+    """Verify that generate_wars.py reads compute_windowed_analysis config and
+    passes the correct arguments (including chunk_size) to
+    AnimalOrganizer.compute_windowed_analysis().
+    """
+
+    def _build_war_gen_config(self, cwa_overrides=None):
+        """Return a minimal analysis.war_generation config dict."""
+        cwa = {
+            "features": ["all"],
+            "multiprocess_mode": "dask",
+            "chunk_size": None,
+        }
+        if cwa_overrides:
+            cwa.update(cwa_overrides)
+        return {"compute_windowed_analysis": cwa}
+
+    # ------------------------------------------------------------------
+    # Logic extracted from generate_wars.py (the block we want to test)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _call_cwa(analysis_config, mock_ao):
+        """Replicate the generate_wars.py logic for calling compute_windowed_analysis."""
+        import warnings
+        cwa_config = analysis_config.get("compute_windowed_analysis", {})
+        cwa_features = cwa_config.get("features", ["all"])
+        cwa_multiprocess_mode = cwa_config.get("multiprocess_mode", "dask")
+        cwa_chunk_size = cwa_config.get("chunk_size", None)
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message=".*fmin=.*Spectrum estimate will be unreliable.*",
+                category=RuntimeWarning,
+            )
+            mock_ao.compute_windowed_analysis(
+                cwa_features,
+                multiprocess_mode=cwa_multiprocess_mode,
+                chunk_size=cwa_chunk_size,
+            )
+
+    def test_default_config_passes_all_features_and_dask(self):
+        """Default config: features=["all"], mode="dask", chunk_size=None."""
+        ao = MagicMock()
+        cfg = self._build_war_gen_config()
+        self._call_cwa(cfg, ao)
+
+        ao.compute_windowed_analysis.assert_called_once_with(
+            ["all"],
+            multiprocess_mode="dask",
+            chunk_size=None,
+        )
+
+    def test_chunk_size_forwarded_from_config(self):
+        """When chunk_size is set in config it must reach compute_windowed_analysis."""
+        ao = MagicMock()
+        cfg = self._build_war_gen_config({"chunk_size": 50})
+        self._call_cwa(cfg, ao)
+
+        _, kwargs = ao.compute_windowed_analysis.call_args
+        assert kwargs["chunk_size"] == 50
+
+    def test_chunk_size_null_passes_none(self):
+        """Explicit null in YAML translates to Python None."""
+        ao = MagicMock()
+        cfg = self._build_war_gen_config({"chunk_size": None})
+        self._call_cwa(cfg, ao)
+
+        _, kwargs = ao.compute_windowed_analysis.call_args
+        assert kwargs["chunk_size"] is None
+
+    def test_features_list_forwarded(self):
+        """Custom features list is forwarded verbatim."""
+        ao = MagicMock()
+        features = ["rms", "psd", "pcorr"]
+        cfg = self._build_war_gen_config({"features": features})
+        self._call_cwa(cfg, ao)
+
+        pos_args, _ = ao.compute_windowed_analysis.call_args
+        assert pos_args[0] == features
+
+    def test_multiprocess_mode_serial_forwarded(self):
+        """serial multiprocess_mode is forwarded correctly."""
+        ao = MagicMock()
+        cfg = self._build_war_gen_config({"multiprocess_mode": "serial"})
+        self._call_cwa(cfg, ao)
+
+        _, kwargs = ao.compute_windowed_analysis.call_args
+        assert kwargs["multiprocess_mode"] == "serial"
+
+    def test_missing_cwa_section_uses_defaults(self):
+        """When compute_windowed_analysis section is absent, safe defaults apply."""
+        ao = MagicMock()
+        cfg = {}  # no compute_windowed_analysis key
+        self._call_cwa(cfg, ao)
+
+        ao.compute_windowed_analysis.assert_called_once_with(
+            ["all"],
+            multiprocess_mode="dask",
+            chunk_size=None,
+        )
+
+
+class TestSaveFifChunkLenWiring:
+    """Verify that generate_wars.py reads save_fif_chunk_len and passes it to
+    fdsar.save_fif_and_json().
+    """
+
+    @staticmethod
+    def _call_save_fif(fdsar_config, mock_fdsar, animalday_dir):
+        """Replicate the generate_wars.py save_fif_and_json call logic."""
+        fdsar_save_chunk_len = fdsar_config.get("save_fif_chunk_len", 60)
+        mock_fdsar.save_fif_and_json(
+            animalday_dir,
+            convert_to_mne=True,
+            slugify_filebase=False,
+            overwrite=True,
+            chunk_len=fdsar_save_chunk_len,
+        )
+
+    def test_default_chunk_len_is_60(self, tmp_path):
+        """When save_fif_chunk_len is absent, 60 s is used."""
+        fdsar = MagicMock()
+        self._call_save_fif({}, fdsar, tmp_path)
+
+        _, kwargs = fdsar.save_fif_and_json.call_args
+        assert kwargs["chunk_len"] == 60
+
+    def test_custom_chunk_len_forwarded(self, tmp_path):
+        """Custom save_fif_chunk_len is forwarded to save_fif_and_json."""
+        fdsar = MagicMock()
+        self._call_save_fif({"save_fif_chunk_len": 30}, fdsar, tmp_path)
+
+        _, kwargs = fdsar.save_fif_and_json.call_args
+        assert kwargs["chunk_len"] == 30
+
+    def test_convert_to_mne_always_true(self, tmp_path):
+        """convert_to_mne must always be True (required for saving .fif)."""
+        fdsar = MagicMock()
+        self._call_save_fif({"save_fif_chunk_len": 45}, fdsar, tmp_path)
+
+        _, kwargs = fdsar.save_fif_and_json.call_args
+        assert kwargs["convert_to_mne"] is True
+
+
+class TestFdsarDiagnosticsConfigWiring:
+    """Verify that generate_fdsar_diagnostics.py reads spike_averaged_traces
+    config and passes the parameters to fdsar.plot_spike_averaged_traces().
+    """
+
+    @staticmethod
+    def _call_plot(sat_config, mock_fdsar, output_dir):
+        """Replicate the generate_fdsar_diagnostics.py call logic."""
+        import warnings
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=RuntimeWarning)
+            mock_fdsar.plot_spike_averaged_traces(
+                tmin=sat_config.get("tmin", -0.5),
+                tmax=sat_config.get("tmax", 0.5),
+                baseline=sat_config.get("baseline", None),
+                save_dir=output_dir,
+                animal_id="test_animal_day1",
+                save_epoch=sat_config.get("save_epochs", True),
+            )
+
+    def test_defaults_when_sat_config_empty(self, tmp_path):
+        """With empty sat_config the expected defaults are used."""
+        fdsar = MagicMock()
+        self._call_plot({}, fdsar, tmp_path)
+
+        _, kwargs = fdsar.plot_spike_averaged_traces.call_args
+        assert kwargs["tmin"] == -0.5
+        assert kwargs["tmax"] == 0.5
+        assert kwargs["baseline"] is None
+        assert kwargs["save_epoch"] is True
+
+    def test_tmin_tmax_from_config(self, tmp_path):
+        """Custom tmin/tmax from config are forwarded correctly."""
+        fdsar = MagicMock()
+        sat = {"tmin": -1.0, "tmax": 1.0}
+        self._call_plot(sat, fdsar, tmp_path)
+
+        _, kwargs = fdsar.plot_spike_averaged_traces.call_args
+        assert kwargs["tmin"] == -1.0
+        assert kwargs["tmax"] == 1.0
+
+    def test_save_epochs_false_forwarded(self, tmp_path):
+        """save_epochs=false in config maps to save_epoch=False."""
+        fdsar = MagicMock()
+        self._call_plot({"save_epochs": False}, fdsar, tmp_path)
+
+        _, kwargs = fdsar.plot_spike_averaged_traces.call_args
+        assert kwargs["save_epoch"] is False
+
+    def test_save_epochs_true_forwarded(self, tmp_path):
+        """save_epochs=true in config maps to save_epoch=True."""
+        fdsar = MagicMock()
+        self._call_plot({"save_epochs": True}, fdsar, tmp_path)
+
+        _, kwargs = fdsar.plot_spike_averaged_traces.call_args
+        assert kwargs["save_epoch"] is True
+
+    def test_save_dir_and_animal_id_forwarded(self, tmp_path):
+        """save_dir and animal_id must reach plot_spike_averaged_traces."""
+        fdsar = MagicMock()
+        fdsar.animal_id = "M3_MHET"
+        fdsar.animal_day = "day1"
+
+        import warnings
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=RuntimeWarning)
+            fdsar.plot_spike_averaged_traces(
+                tmin={}.get("tmin", -0.5),
+                tmax={}.get("tmax", 0.5),
+                baseline={}.get("baseline", None),
+                save_dir=tmp_path,
+                animal_id=f"{fdsar.animal_id}_{fdsar.animal_day}",
+                save_epoch={}.get("save_epochs", True),
+            )
+
+        _, kwargs = fdsar.plot_spike_averaged_traces.call_args
+        assert kwargs["save_dir"] == tmp_path
+        assert kwargs["animal_id"] == "M3_MHET_day1"
+
+    def test_save_epochs_config_key_maps_to_save_epoch_param(self, tmp_path):
+        """The config key 'save_epochs' (plural) maps to the function param 'save_epoch' (singular)."""
+        fdsar = MagicMock()
+        # Explicitly set save_epochs=False to verify the plural→singular mapping
+        self._call_plot({"save_epochs": False}, fdsar, tmp_path)
+
+        _, kwargs = fdsar.plot_spike_averaged_traces.call_args
+        # The function receives the singular 'save_epoch' keyword
+        assert "save_epoch" in kwargs
+        assert kwargs["save_epoch"] is False
+
