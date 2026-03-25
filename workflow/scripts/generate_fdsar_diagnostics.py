@@ -63,7 +63,7 @@ def load_fdsar_results(fdsar_base_dir: Path):
     return fdsar_list
 
 
-def generate_diagnostics(fdsar_list: list[FrequencyDomainSpikeAnalysisResult], output_dir: Path):
+def generate_diagnostics(fdsar_list: list[FrequencyDomainSpikeAnalysisResult], output_dir: Path, sat_config: dict):
     """Generate diagnostic plots for all FDSAR results"""
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -94,12 +94,14 @@ def generate_diagnostics(fdsar_list: list[FrequencyDomainSpikeAnalysisResult], o
                 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
                 returned_counts = fdsar.plot_spike_averaged_traces(
-                    tmin=-0.5,
-                    tmax=0.5,
-                    baseline=None,
+                    tmin=sat_config.get("tmin", -0.5),
+                    tmax=sat_config.get("tmax", 0.5),
+                    baseline=sat_config.get("baseline", None),
                     save_dir=output_dir,
                     animal_id=f"{fdsar.animal_id}_{fdsar.animal_day}",
-                    save_epoch=False,
+                    # Note: the config key is 'save_epochs' (plural) to match YAML convention,
+                    # while the function parameter is 'save_epoch' (singular).
+                    save_epoch=sat_config.get("save_epochs", True),
                 )
 
             logging.info(f"  Generated plots for {len([c for c in returned_counts if c > 0])} channels with spikes")
@@ -122,10 +124,19 @@ def main():
     # Load FDSAR results
     fdsar_dir = Path(snakemake.params.fdsar_dir)
     output_dir = Path(snakemake.output.diagnostics_dir)
+    config = snakemake.params.config
     samples_config = snakemake.params.samples_config
-    
+
     # Inject aliases
     inject_config_aliases(samples_config)
+
+    # Extract spike-averaged-traces parameters from config
+    sat_config = (
+        config
+        .get("analysis", {})
+        .get("frequency_domain_spike_detection", {})
+        .get("spike_averaged_traces", {})
+    )
 
     logger.info(f"Loading FDSAR results from: {fdsar_dir}")
     fdsar_list = load_fdsar_results(fdsar_dir)
@@ -137,7 +148,7 @@ def main():
 
     # Generate diagnostics
     logger.info(f"Generating diagnostics to: {output_dir}")
-    generate_diagnostics(fdsar_list, output_dir)
+    generate_diagnostics(fdsar_list, output_dir, sat_config)
 
     logger.info("FDSAR diagnostics generation completed successfully")
 
