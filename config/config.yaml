@@ -31,6 +31,10 @@ analysis:
     lro_kwargs:
       multiprocess_mode: "dask"
       overwrite_rowbins: false # REVIEW function of this parameter when mode is not "bin"
+    compute_windowed_analysis:
+      features: ["all"]             # Feature list; "all" computes every supported feature
+      multiprocess_mode: "dask"     # "dask" (parallel) or "serial"
+      chunk_size: null              # null = single bulk allocation (fast, high RAM); int = stream N fragments at a time (slower, low RAM)
 
   # Frequency domain spike detection parameters
   frequency_domain_spike_detection:
@@ -51,6 +55,9 @@ analysis:
 
     # Processing parameters
     multiprocess_mode: "dask"    # "dask" or "serial"
+
+    # .fif export parameters
+    save_fif_chunk_len: 60         # seconds per chunk when reading traces to write .fif (lower = less RAM)
 
     # Visualization parameters
     spike_averaged_traces:
