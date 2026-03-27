@@ -729,21 +729,9 @@ class AnimalOrganizer(AnimalFeatureParser):
                 # Filter out 0-sample LROs (from failed/empty file pairs) before
                 # merging. A 0-sample base LRO causes merge metadata failures, and
                 # downstream _iter_valid_recordings() cannot recover from that.
-                valid_pairs = []
-                skipped_names = []
-                for item, lro in item_lro_pairs:
-                    try:
-                        if (
-                            hasattr(lro, "LongRecording")
-                            and lro.LongRecording is not None
-                            and lro.LongRecording.get_total_samples() == 0
-                        ):
-                            skipped_names.append(self._get_item_name(item))
-                            continue
-                    except (TypeError, AttributeError):
-                        pass  # Non-SI or mock — keep it
-                    valid_pairs.append((item, lro))
-
+                valid_pairs, skipped_names = self._filter_zero_sample_lros(
+                    item_lro_pairs, self._get_item_name
+                )
                 if skipped_names:
                     logging.warning(
                         f"Skipping {len(skipped_names)} 0-sample LRO(s) for "
@@ -1094,6 +1082,47 @@ class AnimalOrganizer(AnimalFeatureParser):
     def cleanup_rec(self):
         for lrec in self.long_recordings:
             lrec.cleanup_rec()
+
+    @staticmethod
+    def _filter_zero_sample_lros(lro_pairs, get_name):
+        """Remove 0-sample LROs from *lro_pairs* before a merge loop.
+
+        A 0-sample LRO used as the **base** of a merge causes
+        ``si.concatenate_recordings`` to fail or produce corrupt metadata.
+        This helper removes such LROs up-front so every caller's merge loop
+        starts from a valid base.
+
+        This is intentionally separate from the ``merge()`` check in
+        ``LongRecordingOrganizer``, which only guards against a 0-sample
+        *other_lro* being merged in.  Together the two checks cover all cases:
+        base=0-sample (this helper) and other_lro=0-sample (``merge()``).
+
+        Args:
+            lro_pairs: Iterable of ``(key, lro)`` pairs.  *key* is whatever
+                the caller uses to name the LRO (item path, string tag, …).
+            get_name: Callable ``(key) -> str`` used to produce a human-readable
+                name for warning messages.
+
+        Returns:
+            ``(valid_pairs, skipped_names)`` where *valid_pairs* is a list of
+            ``(key, lro)`` pairs with 0-sample entries removed and
+            *skipped_names* is a list of names of the removed LROs.
+        """
+        valid_pairs = []
+        skipped_names = []
+        for key, lro in lro_pairs:
+            try:
+                if (
+                    hasattr(lro, "LongRecording")
+                    and lro.LongRecording is not None
+                    and lro.LongRecording.get_total_samples() == 0
+                ):
+                    skipped_names.append(get_name(key))
+                    continue
+            except (TypeError, AttributeError):
+                pass  # Non-SI or mock — keep it
+            valid_pairs.append((key, lro))
+        return valid_pairs, skipped_names
 
     def _iter_valid_recordings(self):
         """Yield (index, lrec) pairs, skipping recordings with zero samples.
@@ -1659,14 +1688,34 @@ class AnimalOrganizer(AnimalFeatureParser):
                     f"Merging into single LRO (mimicking normal __init__ behavior)."
                 )
 
-                # Sort by median time (same logic as normal __init__)
+                # Filter out 0-sample LROs before the merge loop.  A 0-sample
+                # base LRO makes si.concatenate_recordings fail; using the same
+                # helper as _create_long_recordings keeps the two code paths
+                # consistent.
                 lro_pairs = [(f"lro_{idx}", lro) for idx, lro in lro_group]
+                valid_pairs, skipped_names = cls._filter_zero_sample_lros(
+                    lro_pairs, lambda k: k
+                )
+                if skipped_names:
+                    logging.warning(
+                        f"Skipping {len(skipped_names)} 0-sample LRO(s) for "
+                        f"'{animalday}' before merge: {skipped_names}"
+                    )
+                if not valid_pairs:
+                    logging.warning(
+                        f"All {len(lro_group)} LRO(s) for '{animalday}' are "
+                        f"0-sample; skipping this date."
+                    )
+                    continue
+                lro_pairs = valid_pairs
+
+                # Sort by median time (same logic as normal __init__)
                 sorted_pairs = cls._sort_lros_by_median_time_static(lro_pairs)
 
                 # Merge all LROs into the first one (in temporal order)
                 base_lro = sorted_pairs[0][1]
-                original_idx = lro_group[0][0]
-                logging.info(f"Base LRO: index {original_idx}")
+                base_tag = sorted_pairs[0][0]
+                logging.info(f"Base LRO: {base_tag}")
 
                 for i, (_, lro) in enumerate(sorted_pairs[1:], 1):
                     try:

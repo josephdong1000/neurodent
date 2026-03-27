@@ -382,8 +382,9 @@ class TestZeroSampleLROFiltering:
         ao._sort_lros_by_median_time = AnimalOrganizer._sort_lros_by_median_time.__get__(
             ao, AnimalOrganizer
         )
-        # Static method needed by _sort_lros_by_median_time
+        # Static methods needed by _create_long_recordings
         ao._sort_lros_by_median_time_static = AnimalOrganizer._sort_lros_by_median_time_static
+        ao._filter_zero_sample_lros = AnimalOrganizer._filter_zero_sample_lros
         ao._get_item_name = AnimalOrganizer._get_item_name.__get__(ao, AnimalOrganizer)
         ao._is_item_file = AnimalOrganizer._is_item_file.__get__(ao, AnimalOrganizer)
         return ao

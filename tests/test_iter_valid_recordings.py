@@ -151,6 +151,144 @@ class TestIterValidRecordings:
         assert result[1][0] == 4
 
 
+class TestFilterZeroSampleLros:
+    """Tests for AnimalOrganizer._filter_zero_sample_lros() and its use in from_lros().
+
+    _filter_zero_sample_lros is shared by _create_long_recordings (tested in
+    test_timeline_sequencing.py) and from_lros.  These tests verify:
+    1. The helper's contract directly.
+    2. That from_lros removes 0-sample LROs before the merge loop (fixing the gap
+       where a 0-sample *base* LRO would crash si.concatenate_recordings).
+    """
+
+    _date_counter = 0
+
+    def _make_mock_lro(self, total_samples=1000, date=None):
+        lro = MagicMock(spec=LongRecordingOrganizer)
+        lro.channel_names = ["ch1", "ch2"]
+        lro.base_folder_path = "/tmp/mock"
+        lro.labels = {}
+        lro.display_name = f"lro_{total_samples}"
+        mock_rec = MagicMock()
+        mock_rec.get_total_samples.return_value = total_samples
+        lro.LongRecording = mock_rec
+        TestFilterZeroSampleLros._date_counter += 1
+        if date is None:
+            date = f"Mar-{TestFilterZeroSampleLros._date_counter:02d}-2022"
+        lro.get_date_string.return_value = date
+        return lro
+
+    # -----------------------------------------------------------------------
+    # Direct unit tests for _filter_zero_sample_lros
+    # -----------------------------------------------------------------------
+
+    def test_all_valid_returned_unchanged(self):
+        """All non-zero-sample LROs are kept and skipped_names is empty."""
+        lros = [self._make_mock_lro(100), self._make_mock_lro(200)]
+        pairs = [(f"key_{i}", lro) for i, lro in enumerate(lros)]
+        valid, skipped = AnimalOrganizer._filter_zero_sample_lros(pairs, lambda k: k)
+        assert valid == pairs
+        assert skipped == []
+
+    def test_zero_sample_lro_removed(self):
+        """0-sample LROs are removed; their keys appear in skipped_names."""
+        valid_lro = self._make_mock_lro(100)
+        empty_lro = self._make_mock_lro(0)
+        pairs = [("key_valid", valid_lro), ("key_empty", empty_lro)]
+        valid, skipped = AnimalOrganizer._filter_zero_sample_lros(pairs, lambda k: k)
+        assert len(valid) == 1
+        assert valid[0][0] == "key_valid"
+        assert valid[0][1] is valid_lro
+        assert skipped == ["key_empty"]
+
+    def test_all_zero_sample_all_removed(self):
+        """When all LROs are 0-sample, valid_pairs is empty."""
+        pairs = [(f"k{i}", self._make_mock_lro(0)) for i in range(3)]
+        valid, skipped = AnimalOrganizer._filter_zero_sample_lros(pairs, lambda k: k)
+        assert valid == []
+        assert len(skipped) == 3
+
+    def test_lro_without_long_recording_kept(self):
+        """LROs missing the LongRecording attribute are not filtered out."""
+        lro = MagicMock(spec=LongRecordingOrganizer)
+        del lro.LongRecording
+        pairs = [("k", lro)]
+        valid, skipped = AnimalOrganizer._filter_zero_sample_lros(pairs, lambda k: k)
+        assert len(valid) == 1
+        assert skipped == []
+
+    def test_lro_with_none_long_recording_kept(self):
+        """LROs with LongRecording=None are not filtered out."""
+        lro = self._make_mock_lro(100)
+        lro.LongRecording = None
+        pairs = [("k", lro)]
+        valid, skipped = AnimalOrganizer._filter_zero_sample_lros(pairs, lambda k: k)
+        assert len(valid) == 1
+        assert valid[0][1] is lro
+
+    def test_get_name_callable_used_for_skipped_names(self):
+        """The get_name callable is applied to the key of each filtered LRO."""
+        empty_lro = self._make_mock_lro(0)
+        pairs = [("raw_key", empty_lro)]
+        valid, skipped = AnimalOrganizer._filter_zero_sample_lros(
+            pairs, lambda k: f"human_{k}"
+        )
+        assert skipped == ["human_raw_key"]
+
+    # -----------------------------------------------------------------------
+    # Integration tests: from_lros filters 0-sample LROs in multi-LRO groups
+    # -----------------------------------------------------------------------
+
+    def test_from_lros_filters_zero_sample_base_lro(self, caplog):
+        """When the first (base) LRO for a date has 0 samples it is dropped
+        and the remaining valid LRO becomes the sole recording for that date."""
+        base_empty = self._make_mock_lro(0, date="Apr-01-2022")
+        other_valid = self._make_mock_lro(500, date="Apr-01-2022")
+
+        with caplog.at_level(logging.WARNING):
+            ao = AnimalOrganizer.from_lros(
+                [base_empty, other_valid], animal_id="A1", genotype="WT"
+            )
+
+        assert len(ao.long_recordings) == 1
+        # The surviving LRO must be the valid one
+        assert ao.long_recordings[0].LongRecording.get_total_samples() == 500
+        # Warning should mention the skipped count and the date context
+        assert any("0-sample" in m and "lro_0" in m for m in caplog.messages)
+
+    def test_from_lros_all_zero_sample_date_skipped(self, caplog):
+        """When ALL LROs for a date are 0-sample that date is skipped entirely."""
+        empty_a = self._make_mock_lro(0, date="May-01-2022")
+        empty_b = self._make_mock_lro(0, date="May-01-2022")
+        valid_other_date = self._make_mock_lro(300, date="May-02-2022")
+
+        with caplog.at_level(logging.WARNING):
+            ao = AnimalOrganizer.from_lros(
+                [empty_a, empty_b, valid_other_date], animal_id="A1", genotype="WT"
+            )
+
+        # May-01 is skipped; only May-02 survives
+        assert len(ao.long_recordings) == 1
+        assert ao.long_recordings[0].LongRecording.get_total_samples() == 300
+        assert any("0-sample" in m for m in caplog.messages)
+
+    def test_from_lros_partial_zero_sample_other_lro_filtered(self, caplog):
+        """A 0-sample non-base LRO in a multi-LRO group is filtered out and the
+        remaining valid LROs are merged normally."""
+        valid_a = self._make_mock_lro(200, date="Jun-01-2022")
+        empty_b = self._make_mock_lro(0, date="Jun-01-2022")
+        valid_c = self._make_mock_lro(300, date="Jun-01-2022")
+
+        with caplog.at_level(logging.WARNING):
+            ao = AnimalOrganizer.from_lros(
+                [valid_a, empty_b, valid_c], animal_id="A1", genotype="WT"
+            )
+
+        # The empty_b LRO should have been skipped; one merged LRO for the date
+        assert len(ao.long_recordings) == 1
+        assert any("0-sample" in m for m in caplog.messages)
+
+
 class TestDatetimesAreStartPropagation:
     """Tests for datetimes_are_start propagation from war_generation config to lro_kwargs."""
 
