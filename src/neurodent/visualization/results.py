@@ -1238,6 +1238,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         multiprocess_mode: Literal["dask", "serial"] = "serial",
         suppress_short_interval_error=False,
         apply_notch_filter=True,
+        chunk_size: Optional[int] = None,
         **kwargs,
     ) -> "WindowAnalysisResult":
         """Computes windowed analysis of animal recordings. The data is divided into windows (time bins), then features are extracted from each window. The result is
@@ -1249,6 +1250,15 @@ class AnimalOrganizer(AnimalFeatureParser):
             window_s (int, optional): Length of each window in seconds. Note that some features break with very short window times. Defaults to 5.
             suppress_short_interval_error (bool, optional): If True, suppress ValueError for short intervals between timestamps in resulting WindowAnalysisResult. Useful for aggregated WARs. Defaults to False.
             apply_notch_filter (bool, optional): Whether to apply notch filtering to remove line noise. Uses constants.LINE_FREQ. Defaults to True.
+            chunk_size (int, optional): Number of fragments to hold in memory at once during
+                the Dask processing path. When ``None`` (default), all fragments are loaded
+                into a single NumPy array before being written to the intermediate zarr store
+                — the original behavior, which maximizes throughput but requires enough RAM
+                to hold the entire recording at once.  When set to a positive integer, only
+                ``chunk_size`` fragments are buffered at a time, streaming them to zarr
+                incrementally; use a small value (e.g. 50) on memory-constrained machines and
+                a larger value (e.g. 500+) on high-memory nodes for maximum throughput. Only
+                has an effect when ``multiprocess_mode="dask"``.
 
         Raises:
             AttributeError: If a feature's ``compute_...()`` function was not implemented, this error will be raised.
@@ -1281,19 +1291,33 @@ class AnimalOrganizer(AnimalFeatureParser):
 
                     n_fragments_war = max(lan.n_fragments - 1, 1)
                     first_fragment = lan.get_fragment_np(0)
-                    np_fragments = np.empty(
-                        (n_fragments_war,) + first_fragment.shape,
-                        dtype=first_fragment.dtype,
-                    )
-                    logging.debug(f"np_fragments.shape: {np_fragments.shape}")
-                    for idx in range(n_fragments_war):
-                        np_fragments[idx] = lan.get_fragment_np(idx)
 
-                    # Cache fragments to zarr
-                    tmppath, _ = core.utils.cache_fragments_to_zarr(
-                        np_fragments, n_fragments_war
-                    )
-                    del np_fragments
+                    if chunk_size is not None:
+                        # Streaming path: stream fragments to zarr in batches,
+                        # keeping only `chunk_size` fragments in RAM at a time.
+                        tmppath = core.utils.stream_fragments_to_zarr(
+                            lan.get_fragment_np,
+                            n_fragments_war,
+                            first_fragment.shape,
+                            first_fragment.dtype,
+                            chunk_size,
+                        )
+                    else:
+                        # Default path: allocate the full array then write to zarr in
+                        # one shot.  Maximises throughput on high-memory systems.
+                        np_fragments = np.empty(
+                            (n_fragments_war,) + first_fragment.shape,
+                            dtype=first_fragment.dtype,
+                        )
+                        logging.debug(f"np_fragments.shape: {np_fragments.shape}")
+                        for idx in range(n_fragments_war):
+                            np_fragments[idx] = lan.get_fragment_np(idx)
+
+                        # Cache fragments to zarr
+                        tmppath, _ = core.utils.cache_fragments_to_zarr(
+                            np_fragments, n_fragments_war
+                        )
+                        del np_fragments
 
                     logging.debug("Processing metadata serially")
                     metadatas = [
