@@ -1,4 +1,6 @@
 
+import logging
+
 import pytest
 from unittest.mock import MagicMock, patch
 from pathlib import Path
@@ -372,3 +374,79 @@ class TestTimelineSequencing:
             )
 
 
+class TestZeroSampleLROFiltering:
+    @pytest.fixture
+    def ao(self):
+        ao = MagicMock(spec=AnimalOrganizer)
+        ao.animal_id = "M1"
+        ao._sort_lros_by_median_time = AnimalOrganizer._sort_lros_by_median_time.__get__(
+            ao, AnimalOrganizer
+        )
+        # Static method needed by _sort_lros_by_median_time
+        ao._sort_lros_by_median_time_static = AnimalOrganizer._sort_lros_by_median_time_static
+        ao._get_item_name = AnimalOrganizer._get_item_name.__get__(ao, AnimalOrganizer)
+        ao._is_item_file = AnimalOrganizer._is_item_file.__get__(ao, AnimalOrganizer)
+        return ao
+
+    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    def test_partial_zero_sample_lros_filtered_before_merge(
+        self, mock_lro_cls, ao, caplog
+    ):
+        """0-sample LROs are removed before merge; valid LROs proceed."""
+        lro_valid = MagicMock()
+        lro_valid.LongRecording = MagicMock()
+        lro_valid.LongRecording.get_total_samples.return_value = 100
+        lro_valid.LongRecording.get_duration.return_value = 3600.0
+
+        lro_empty = MagicMock()
+        lro_empty.LongRecording = MagicMock()
+        lro_empty.LongRecording.get_total_samples.return_value = 0
+
+        def side_effect(folder, **kwargs):
+            if "folder_a" in str(folder):
+                return lro_empty
+            return lro_valid
+
+        mock_lro_cls.side_effect = side_effect
+
+        ao._create_long_recordings = AnimalOrganizer._create_long_recordings.__get__(
+            ao, AnimalOrganizer
+        )
+        ao._animalday_folder_groups = {
+            "session1": ["/data/folder_a", "/data/folder_b"]
+        }
+        ao.unique_animaldays = ["session1"]
+        ao._processed_timestamps = None
+
+        with caplog.at_level(logging.WARNING):
+            ao._create_long_recordings({})
+
+        assert len(ao.long_recordings) == 1
+        assert ao.long_recordings[0] is lro_valid
+        assert "folder_a" in caplog.text
+
+    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    def test_all_zero_sample_lros_raises_value_error(self, mock_lro_cls, ao):
+        """When all LROs for an animalday are 0-sample, raises ValueError."""
+        def side_effect(folder, **kwargs):
+            m = MagicMock()
+            m.LongRecording = MagicMock()
+            m.LongRecording.get_total_samples.return_value = 0
+            return m
+
+        mock_lro_cls.side_effect = side_effect
+
+        ao._create_long_recordings = AnimalOrganizer._create_long_recordings.__get__(
+            ao, AnimalOrganizer
+        )
+        ao._animalday_folder_groups = {
+            "session1": ["/data/folder_a", "/data/folder_b"]
+        }
+        ao.unique_animaldays = ["session1"]
+        ao._processed_timestamps = None
+
+        with pytest.raises(
+            ValueError,
+            match=r"All 2 file\(s\) for animalday 'session1' failed to load",
+        ):
+            ao._create_long_recordings({})

@@ -744,6 +744,37 @@ class AnimalOrganizer(AnimalFeatureParser):
                     )
                     item_lro_pairs.append((item, individual_lro))
 
+                # Filter out 0-sample LROs (from failed/empty file pairs) before
+                # merging. A 0-sample base LRO causes merge metadata failures, and
+                # downstream _iter_valid_recordings() cannot recover from that.
+                valid_pairs = []
+                skipped_names = []
+                for item, lro in item_lro_pairs:
+                    try:
+                        if (
+                            hasattr(lro, "LongRecording")
+                            and lro.LongRecording is not None
+                            and lro.LongRecording.get_total_samples() == 0
+                        ):
+                            skipped_names.append(self._get_item_name(item))
+                            continue
+                    except (TypeError, AttributeError):
+                        pass  # Non-SI or mock — keep it
+                    valid_pairs.append((item, lro))
+
+                if skipped_names:
+                    logging.warning(
+                        f"Skipping {len(skipped_names)} 0-sample LRO(s) for "
+                        f"'{animalday}' before merge: {skipped_names}"
+                    )
+                if not valid_pairs:
+                    raise ValueError(
+                        f"All {len(item_lro_pairs)} file(s) for animalday '{animalday}' "
+                        f"failed to load (all 0-sample). "
+                        f"Check the files for corrupt or empty metadata: {skipped_names}"
+                    )
+                item_lro_pairs = valid_pairs
+
                 sorted_folder_lro_pairs = self._sort_lros_by_median_time(item_lro_pairs)
 
                 logging.info("LRO merge order for overlapping animalday:")
@@ -2057,10 +2088,34 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     f"that are shorter than the median duration of {median_duration:.1f}s"
                 )
 
-                if (
-                    pct_short > 1.0 and not self.suppress_short_interval_error
-                ):  # More than 1% of intervals are short
-                    raise ValueError(warning_msg)
+                if pct_short > 1.0 and not self.suppress_short_interval_error:
+                    # Build a diagnostic showing the first few overlapping pairs
+                    # so the user can identify which sessions have bad timestamps.
+                    short_idx = short_intervals[short_intervals].index[:5]
+                    diag_lines = []
+                    has_animalday = "animalday" in self.result.columns
+                    for idx in short_idx:
+                        pos = self.result.index.get_loc(idx)
+                        prev_row = self.result.iloc[pos - 1]
+                        curr_row = self.result.iloc[pos]
+                        gap = timestamp_diffs.loc[idx]
+                        prev_ad = f" ({prev_row['animalday']})" if has_animalday else ""
+                        curr_ad = f" ({curr_row['animalday']})" if has_animalday else ""
+                        diag_lines.append(
+                            f"  {prev_row['timestamp']}{prev_ad} -> "
+                            f"{curr_row['timestamp']}{curr_ad}: gap={gap}"
+                        )
+                    diag = "\n".join(diag_lines)
+                    raise ValueError(
+                        f"{warning_msg}\n"
+                        f"First overlapping pairs (of {n_short} total):\n{diag}\n"
+                        f"Hint: if using datetimes_are_start=False, the backward "
+                        f"computation assumes contiguous files. Large gaps between "
+                        f"files in a session will push computed start times too far "
+                        f"back, overlapping adjacent sessions. Consider providing "
+                        f"per-file timestamps or set suppress_short_interval_error=True "
+                        f"to downgrade this to a warning."
+                    )
                 elif not self.suppress_short_interval_error:
                     warnings.warn(warning_msg)
 

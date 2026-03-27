@@ -370,6 +370,32 @@ class TestWindowAnalysisResult:
         with pytest.raises(ValueError, match=r"Found \d+ intervals.*shorter than the median duration"):
             WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"])
 
+    def test_short_intervals_error_includes_diagnostic(self):
+        """Error message includes overlapping pairs and the datetimes_are_start hint."""
+        data = {
+            "animal": ["A1"] * 4,
+            "animalday": ["A1_day1", "A1_day1", "A1_day2", "A1_day2"],
+            "genotype": ["WT"] * 4,
+            "timestamp": pd.to_datetime(
+                [
+                    "2023-01-01 10:00:00",
+                    "2023-01-01 10:00:30",  # 30s gap (short)
+                    "2023-01-01 10:01:00",  # 30s gap (short)
+                    "2023-01-01 10:04:00",
+                ]
+            ),
+            "duration": [240.0] * 4,
+            "rms": [[100.0, 110.0]] * 4,
+        }
+        df = pd.DataFrame(data)
+
+        with pytest.raises(ValueError) as exc_info:
+            WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"])
+
+        msg = str(exc_info.value)
+        assert "datetimes_are_start" in msg
+        assert "A1_day" in msg  # animalday context included
+
     def test_suppress_short_intervals_error(self):
         """Test that suppress_short_interval_error parameter suppresses the ValueError."""
         # Create DataFrame where >1% of intervals are short (same as test_short_intervals_error)

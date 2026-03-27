@@ -767,6 +767,21 @@ class LongRecordingOrganizer:
         else:
             raise ValueError(f"Invalid mode: {mode}")
 
+    @staticmethod
+    def _make_empty_si_recording() -> "si.BaseRecording":
+        """Return a 0-sample SpikeInterface recording as a placeholder.
+
+        Used when a file group fails to load (e.g. corrupt or empty metadata).
+        The 0-sample recording is detected by the unified check in
+        ``convert_file_with_si_to_recording`` and skipped by
+        ``_iter_valid_recordings`` in downstream processing.
+        """
+        return si.NumpyRecording(
+            traces_list=[np.zeros((0, 1), dtype=np.float32)],
+            sampling_frequency=1.0,
+            channel_ids=["placeholder"],
+        )
+
     def convert_file_with_si_to_recording(
         self,
         extract_func: Callable[..., "si.BaseRecording"],
@@ -791,8 +806,19 @@ class LongRecordingOrganizer:
         if isinstance(self.item, DiscoveredFile):
             # DiscoveredFile: handle both single and multi-file cases
             if self.item.is_multi_file:
-                # Multi-file group: pass as-is to extract_func (user's custom reader)
-                rec: "si.BaseRecording" = extract_func(self.item, **kwargs)
+                # Multi-file group: pass as-is to extract_func (user's custom reader).
+                # Wrap in try/except so a corrupt/empty file group produces a 0-sample
+                # placeholder that downstream code skips, rather than crashing the
+                # entire animal's pipeline run.
+                try:
+                    rec: "si.BaseRecording" = extract_func(self.item, **kwargs)
+                except (ValueError, IndexError, OSError, KeyError) as e:
+                    logging.warning(
+                        f"extract_func failed for {self.display_name} "
+                        f"({self.item.paths}): {e}. "
+                        f"Creating 0-sample placeholder; this recording will be skipped."
+                    )
+                    rec = self._make_empty_si_recording()
             else:
                 # Single file
                 rec: "si.BaseRecording" = extract_func(self.item.path, **kwargs)
