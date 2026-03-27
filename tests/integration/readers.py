@@ -47,10 +47,20 @@ def read_bin_csv_pair(discovered_file, **kwargs):
         reader = csv.DictReader(f)
         rows = list(reader)
 
+    if not rows:
+        raise ValueError(
+            f"CSV metadata file has no data rows (header-only): {csv_path}"
+        )
+
     n_channels = len(rows)
     sampling_rate = float(rows[0]["SampleRate"])
     channel_names = [row["Label"] for row in rows]
-    data = np.fromfile(bin_path, dtype=np.float32).reshape(-1, n_channels)
+    data = np.fromfile(bin_path, dtype=np.float32)
+
+    if data.size == 0:
+        raise ValueError(f"Binary file is empty (0 bytes): {bin_path}")
+
+    data = data.reshape(-1, n_channels)
 
     return si_core.NumpyRecording(
         traces_list=[data],
