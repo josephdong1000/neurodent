@@ -478,3 +478,103 @@ class TestFdsarDiagnosticsConfigWiring:
         assert "save_epoch" in kwargs
         assert kwargs["save_epoch"] is False
 
+
+class TestFdsarMaxLengthWiring:
+    """Verify that generate_wars.py reads max_length from
+    frequency_domain_spike_detection config and passes it to
+    ao.compute_frequency_domain_spike_analysis().
+    """
+
+    @staticmethod
+    def _call_fdsar(fdsar_config, mock_ao):
+        """Replicate the generate_wars.py logic for calling
+        compute_frequency_domain_spike_analysis."""
+        detection_params = fdsar_config.get("default_params", {})
+        multiprocess_mode = fdsar_config.get("multiprocess_mode", "serial")
+        fdsar_max_length = fdsar_config.get("max_length", None)
+        mock_ao.compute_frequency_domain_spike_analysis(
+            detection_params=detection_params,
+            multiprocess_mode=multiprocess_mode,
+            max_length=fdsar_max_length,
+        )
+
+    def test_max_length_null_passes_none(self):
+        """When max_length is null/absent, None is forwarded."""
+        ao = MagicMock()
+        self._call_fdsar({"default_params": {}, "multiprocess_mode": "dask"}, ao)
+
+        _, kwargs = ao.compute_frequency_domain_spike_analysis.call_args
+        assert kwargs["max_length"] is None
+
+    def test_max_length_int_forwarded(self):
+        """When max_length is an integer, it is forwarded verbatim."""
+        ao = MagicMock()
+        self._call_fdsar(
+            {"default_params": {}, "multiprocess_mode": "dask", "max_length": 900_000},
+            ao,
+        )
+
+        _, kwargs = ao.compute_frequency_domain_spike_analysis.call_args
+        assert kwargs["max_length"] == 900_000
+
+    def test_missing_max_length_defaults_none(self):
+        """When max_length key is absent, None is used."""
+        ao = MagicMock()
+        self._call_fdsar({"default_params": {}}, ao)
+
+        _, kwargs = ao.compute_frequency_domain_spike_analysis.call_args
+        assert kwargs["max_length"] is None
+
+
+class TestLofLimitMemoryWiring:
+    """Verify that generate_wars.py reads limit_memory from
+    channel_filter_config.lof and passes it to ao.compute_bad_channels().
+    """
+
+    @staticmethod
+    def _call_compute_bad_channels(lof_config, mock_ao):
+        """Replicate the generate_wars.py logic for calling compute_bad_channels."""
+        lof_threshold = lof_config.get("reject_lof_threshold")
+        lof_limit_memory = lof_config.get("limit_memory", True)
+        mock_ao.compute_bad_channels(
+            lof_threshold=lof_threshold, limit_memory=lof_limit_memory
+        )
+
+    def test_limit_memory_true_by_default(self):
+        """When limit_memory is absent, True is used."""
+        ao = MagicMock()
+        self._call_compute_bad_channels({"reject_lof_threshold": 2.5}, ao)
+
+        _, kwargs = ao.compute_bad_channels.call_args
+        assert kwargs["limit_memory"] is True
+
+    def test_limit_memory_true_forwarded(self):
+        """limit_memory=true in config is forwarded."""
+        ao = MagicMock()
+        self._call_compute_bad_channels(
+            {"reject_lof_threshold": 2.5, "limit_memory": True}, ao
+        )
+
+        _, kwargs = ao.compute_bad_channels.call_args
+        assert kwargs["limit_memory"] is True
+
+    def test_limit_memory_false_forwarded(self):
+        """limit_memory=false in config is forwarded."""
+        ao = MagicMock()
+        self._call_compute_bad_channels(
+            {"reject_lof_threshold": 2.5, "limit_memory": False}, ao
+        )
+
+        _, kwargs = ao.compute_bad_channels.call_args
+        assert kwargs["limit_memory"] is False
+
+    def test_lof_threshold_forwarded(self):
+        """reject_lof_threshold is forwarded as lof_threshold."""
+        ao = MagicMock()
+        self._call_compute_bad_channels(
+            {"reject_lof_threshold": 3.0, "limit_memory": True}, ao
+        )
+
+        _, kwargs = ao.compute_bad_channels.call_args
+        assert kwargs["lof_threshold"] == 3.0
+

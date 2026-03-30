@@ -194,8 +194,10 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
 
             # Compute bad channels
             logger.info(f"Computing bad channels for {animal_key}")
-            lof_threshold = config["analysis"]["channel_filter_config"]["lof"].get("reject_lof_threshold")
-            ao.compute_bad_channels(lof_threshold=lof_threshold)
+            lof_config = config["analysis"]["channel_filter_config"]["lof"]
+            lof_threshold = lof_config.get("reject_lof_threshold")
+            lof_limit_memory = lof_config.get("limit_memory", True)
+            ao.compute_bad_channels(lof_threshold=lof_threshold, limit_memory=lof_limit_memory)
 
             # Generate WAR using Dask
             logger.info(f"Computing windowed analysis for {animal_key}")
@@ -220,9 +222,11 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
             fdsar_config = config["analysis"]["frequency_domain_spike_detection"]
             detection_params = fdsar_config["default_params"]
             multiprocess_mode = fdsar_config.get("multiprocess_mode", "serial")
+            fdsar_max_length = fdsar_config.get("max_length", None)
 
             fdsar_list = ao.compute_frequency_domain_spike_analysis(
-                detection_params=detection_params, multiprocess_mode=multiprocess_mode
+                detection_params=detection_params, multiprocess_mode=multiprocess_mode,
+                max_length=fdsar_max_length,
             )
 
             # Integrate spike features into WAR

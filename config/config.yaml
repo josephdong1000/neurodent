@@ -55,6 +55,7 @@ analysis:
 
     # Processing parameters
     multiprocess_mode: "dask"    # "dask" or "serial"
+    max_length: null             # null = analyze full recording; int = max samples to analyze per recording (caps peak RAM)
 
     # .fif export parameters
     save_fif_chunk_len: 60         # seconds per chunk when reading traces to write .fif (lower = less RAM)
@@ -98,6 +99,7 @@ analysis:
       reject_lof_threshold: 2.5  # LOF threshold above which channels are considered bad
       reject_channels: []  # List of channels to reject globally
       min_valid_channels: 3
+      limit_memory: true   # Whether to reduce memory during LOF computation (decimation + float16)
 
   # Data aggregation parameters (applied after filtering)
   aggregation:

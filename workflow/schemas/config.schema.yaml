@@ -58,6 +58,12 @@ properties:
         type: object
         description: Spike detection parameters
         properties:
+          max_length:
+            description: >
+              Maximum number of samples to analyze per recording during spike detection.
+              null = analyze the full recording (more accurate, higher peak RAM).
+              Set to an integer to truncate long recordings (reduces peak RAM).
+            type: ["integer", "null"]
           save_fif_chunk_len:
             type: number
             description: >
@@ -85,3 +91,20 @@ properties:
               dpi:
                 type: integer
                 description: Figure resolution in dots per inch
+      channel_filter_config:
+        type: object
+        description: Channel filtering configurations
+        properties:
+          lof:
+            type: object
+            description: LOF-based bad channel detection parameters
+            properties:
+              reject_lof_threshold:
+                type: number
+                description: LOF score threshold above which channels are considered bad
+              limit_memory:
+                type: boolean
+                description: >
+                  Whether to reduce memory during LOF computation by applying
+                  10× decimation and float16 conversion (~20× total reduction).
+                  Set to false for full-precision LOF on machines with enough RAM.
