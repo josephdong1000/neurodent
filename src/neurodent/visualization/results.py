@@ -1126,7 +1126,7 @@ class AnimalOrganizer(AnimalFeatureParser):
             )
 
     def compute_bad_channels(
-        self, lof_threshold: float = None, force_recompute: bool = False, limit_memory: bool = True
+        self, lof_threshold: float = None, force_recompute: bool = False
     ):
         """Compute bad channels using LOF analysis for all recordings.
 
@@ -1134,7 +1134,6 @@ class AnimalOrganizer(AnimalFeatureParser):
             lof_threshold (float, optional): Threshold for determining bad channels from LOF scores.
                                            If None, only computes/loads scores without setting bad_channel_names.
             force_recompute (bool): Whether to recompute LOF scores even if they exist.
-            limit_memory (bool): Whether to reduce memory usage by decimation and float16 during LOF.
         """
         logging.info(
             f"Computing bad channels for {len(self.long_recordings)} recordings with threshold={lof_threshold}"
@@ -1145,7 +1144,6 @@ class AnimalOrganizer(AnimalFeatureParser):
             )
             lrec.compute_bad_channels(
                 lof_threshold=lof_threshold, force_recompute=force_recompute,
-                limit_memory=limit_memory,
             )
             logging.debug(
                 f"Recording {i} LOF scores computed: {hasattr(lrec, 'lof_scores') and lrec.lof_scores is not None}"

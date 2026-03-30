@@ -641,22 +641,30 @@ class TestLongRecordingOrganizer:
             assert result == mock_raw
 
     def test_compute_bad_channels(self, temp_dir):
-        """Test compute_bad_channels method."""
+        """Test compute_bad_channels method with chunked distance computation."""
         organizer = LongRecordingOrganizer(temp_dir, mode=None)
 
-        # Mock LongRecording
+        # Mock LongRecording with chunked-read API
+        n_channels = 4
         n_samples = 1000
-        # Create test data where channel 2 is an outlier
-        normal_data = np.random.randn(n_samples, 3) * 10  # channels 0,1,3
+        fs = 500.0
+
+        # Create test data where channel 3 is an outlier
+        normal_data = np.random.randn(n_samples, 3) * 10  # channels 0,1,2
         outlier_data = (
             np.random.randn(n_samples, 1) * 100
-        )  # channel 2 (much larger amplitude)
+        )  # channel 3 (much larger amplitude)
         test_data = np.hstack([normal_data, outlier_data])
-        # Rearrange to put outlier in position 2
-        test_data = test_data[:, [0, 1, 3, 2]]
 
         mock_recording = Mock()
-        mock_recording.get_traces.return_value = test_data
+        mock_recording.get_num_channels.return_value = n_channels
+        mock_recording.get_total_samples.return_value = n_samples
+        mock_recording.get_sampling_frequency.return_value = fs
+        mock_recording.get_traces.side_effect = (
+            lambda start_frame=0, end_frame=None, return_scaled=True: test_data[
+                start_frame : (end_frame if end_frame is not None else n_samples)
+            ]
+        )
         mock_recording.__str__ = Mock(return_value="MockRecording")
         organizer.LongRecording = mock_recording
         organizer.channel_names = ["ch1", "ch2", "ch3", "ch4"]
@@ -680,8 +688,10 @@ class TestLongRecordingOrganizer:
             # Test with default threshold
             organizer.compute_bad_channels(lof_threshold=1.5)
 
-            # Verify Natural_Neighbor was used
-            mock_nn.read.assert_called_once()
+            # Verify Natural_Neighbor was given a distance matrix
+            mock_nn.read_distance_matrix.assert_called_once()
+            dist_mat = mock_nn.read_distance_matrix.call_args[0][0]
+            assert dist_mat.shape == (n_channels, n_channels)
             mock_nn.algorithm.assert_called_once()
 
             # Verify LocalOutlierFactor was configured correctly
@@ -691,45 +701,51 @@ class TestLongRecordingOrganizer:
             # Channel 4 should be identified as bad (score 2.0 > threshold 1.5)
             assert organizer.bad_channel_names == ["ch4"]
 
-    def test_compute_bad_channels_limit_memory(self, temp_dir):
-        """Test compute_bad_channels with limit_memory=True."""
+    def test_compute_bad_channels_chunked_distance(self, temp_dir):
+        """Test that chunked distance computation produces correct distances."""
         organizer = LongRecordingOrganizer(temp_dir, mode=None)
 
-        # Create larger test data
-        n_channels = 2
-        n_samples = 10000
-        test_data = np.random.randn(n_samples, n_channels).astype(np.float64)
+        n_channels = 3
+        n_samples = 500
+        fs = 100.0  # small fs so chunk_size > n_samples → single chunk
+
+        np.random.seed(42)
+        test_data = np.random.randn(n_samples, n_channels)
 
         mock_recording = Mock()
-        mock_recording.get_traces.return_value = test_data
+        mock_recording.get_num_channels.return_value = n_channels
+        mock_recording.get_total_samples.return_value = n_samples
+        mock_recording.get_sampling_frequency.return_value = fs
+        mock_recording.get_traces.side_effect = (
+            lambda start_frame=0, end_frame=None, return_scaled=True: test_data[
+                start_frame : (end_frame if end_frame is not None else n_samples)
+            ]
+        )
         mock_recording.__str__ = Mock(return_value="MockRecording")
         organizer.LongRecording = mock_recording
-        organizer.channel_names = ["ch1", "ch2"]
+        organizer.channel_names = [f"ch{i}" for i in range(n_channels)]
+
+        # Compute expected distance matrix from full data
+        from scipy.spatial.distance import pdist, squareform
+        expected_dists = squareform(pdist(test_data.T, metric="euclidean"))
 
         with (
             patch("neurodent.core.core.Natural_Neighbor") as mock_nn_class,
             patch("neurodent.core.core.LocalOutlierFactor") as mock_lof_class,
-            patch("neurodent.core.core.decimate") as mock_decimate,
         ):
             mock_nn = Mock()
             mock_nn.algorithm.return_value = 2
             mock_nn_class.return_value = mock_nn
 
             mock_lof = Mock()
-            mock_lof.negative_outlier_factor_ = np.array([-1.0, -1.0])
+            mock_lof.negative_outlier_factor_ = np.array([-1.0] * n_channels)
             mock_lof_class.return_value = mock_lof
 
-            # Mock decimate to return smaller data
-            decimated_data = test_data[::10]  # Simulate decimation
-            mock_decimate.return_value = decimated_data
+            organizer.compute_bad_channels(lof_threshold=2.0)
 
-            organizer.compute_bad_channels(limit_memory=True)
-
-            # Verify decimate was called
-            mock_decimate.assert_called_once()
-            # Verify data was converted to float16 before decimation
-            call_args = mock_decimate.call_args[0]
-            assert call_args[0].dtype == np.float16
+            # Verify the distance matrix passed to Natural_Neighbor matches expected
+            dist_mat = mock_nn.read_distance_matrix.call_args[0][0]
+            np.testing.assert_allclose(dist_mat, expected_dists, atol=1e-5)
 
     def test_extract_channel_names_prefers_channel_name_property(self):
         """Test _extract_channel_names uses channel_name property when available."""
