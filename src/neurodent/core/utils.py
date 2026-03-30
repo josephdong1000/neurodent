@@ -1374,6 +1374,22 @@ class Natural_Neighbor(object):
             data (np.ndarray): Input data array
         """
         self.data = data
+        self._distance_matrix = None
+
+    def read_distance_matrix(self, distance_matrix: np.ndarray):
+        """
+        Load a precomputed distance matrix for neighbor search.
+
+        When a distance matrix is provided, :meth:`algorithm` uses
+        argsort-based neighbor lookup instead of a KDTree, avoiding the
+        need to hold the raw high-dimensional data in memory.
+
+        Args:
+            distance_matrix (np.ndarray): Symmetric (n, n) distance matrix.
+        """
+        self._distance_matrix = distance_matrix
+        # Set data length so existing helpers (asserts, count, etc.) work
+        self.data = np.empty((distance_matrix.shape[0], 0))
 
     def asserts(self):
         """
@@ -1417,6 +1433,25 @@ class Natural_Neighbor(object):
         _, ind = tree.query([inst], r + 1)
         return np.delete(ind[0], 0)
 
+    def _findKNN_precomputed(self, i, r):
+        """
+        Find the r nearest neighbors of point *i* using the precomputed
+        distance matrix (argsort-based, exact).
+
+        Args:
+            i (int): Index of the query point.
+            r (int): Number of neighbors to return.
+
+        Returns:
+            np.ndarray: Array of neighbor indices (excluding point *i*).
+        """
+        dists = self._distance_matrix[i]
+        # argsort gives indices sorted by distance; index 0 is self (distance 0)
+        sorted_idx = np.argsort(dists)
+        # Remove self (always first since distance to self is 0)
+        sorted_idx = sorted_idx[sorted_idx != i]
+        return sorted_idx[:r]
+
     def algorithm(self):
         """
         Execute the Natural Neighbor algorithm.
@@ -1424,19 +1459,37 @@ class Natural_Neighbor(object):
         The algorithm iteratively expands the neighborhood radius until convergence,
         finding mutual neighbors between instances.
 
+        When a precomputed distance matrix is available (see
+        :meth:`read_distance_matrix`), neighbor lookup is performed via
+        argsort instead of a KDTree, which avoids holding the raw
+        high-dimensional data in memory.
+
         Returns:
             int: The final radius value when convergence is reached
         """
-        # Initialize KDTree for efficient neighbor search
-        tree = KDTree(self.data)
+        use_precomputed = (
+            hasattr(self, "_distance_matrix")
+            and self._distance_matrix is not None
+        )
+
+        if not use_precomputed:
+            # Initialize KDTree for efficient neighbor search
+            tree = KDTree(self.data)
+        else:
+            tree = None  # not used in precomputed path
+
         self.asserts()
         flag = 0
         r = 1
 
-        max_r = len(self.data) - 1  # r + 1 must not exceed n_points
+        n_points = len(self.data)
+        max_r = n_points - 1  # r + 1 must not exceed n_points
         while flag == 0:
-            for i in range(len(self.data)):
-                knn = self.findKNN(self.data[i], r, tree)
+            for i in range(n_points):
+                if use_precomputed:
+                    knn = self._findKNN_precomputed(i, r)
+                else:
+                    knn = self.findKNN(self.data[i], r, tree)
                 n = knn[-1]
                 self.knn[i].add(n)
                 if i in self.knn[n] and (i, n) not in self.nan_edges:

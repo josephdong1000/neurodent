@@ -196,8 +196,7 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
             logger.info(f"Computing bad channels for {animal_key}")
             lof_config = config["analysis"]["channel_filter_config"]["lof"]
             lof_threshold = lof_config.get("reject_lof_threshold")
-            lof_limit_memory = lof_config.get("limit_memory", True)
-            ao.compute_bad_channels(lof_threshold=lof_threshold, limit_memory=lof_limit_memory)
+            ao.compute_bad_channels(lof_threshold=lof_threshold)
 
             # Generate WAR using Dask
             logger.info(f"Computing windowed analysis for {animal_key}")

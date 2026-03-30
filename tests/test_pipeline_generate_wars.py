@@ -526,55 +526,38 @@ class TestFdsarMaxLengthWiring:
         assert kwargs["max_length"] is None
 
 
-class TestLofLimitMemoryWiring:
-    """Verify that generate_wars.py reads limit_memory from
-    channel_filter_config.lof and passes it to ao.compute_bad_channels().
+class TestLofThresholdWiring:
+    """Verify that generate_wars.py reads lof config and passes
+    reject_lof_threshold to ao.compute_bad_channels().
     """
 
     @staticmethod
     def _call_compute_bad_channels(lof_config, mock_ao):
         """Replicate the generate_wars.py logic for calling compute_bad_channels."""
         lof_threshold = lof_config.get("reject_lof_threshold")
-        lof_limit_memory = lof_config.get("limit_memory", True)
-        mock_ao.compute_bad_channels(
-            lof_threshold=lof_threshold, limit_memory=lof_limit_memory
-        )
-
-    def test_limit_memory_true_by_default(self):
-        """When limit_memory is absent, True is used."""
-        ao = MagicMock()
-        self._call_compute_bad_channels({"reject_lof_threshold": 2.5}, ao)
-
-        _, kwargs = ao.compute_bad_channels.call_args
-        assert kwargs["limit_memory"] is True
-
-    def test_limit_memory_true_forwarded(self):
-        """limit_memory=true in config is forwarded."""
-        ao = MagicMock()
-        self._call_compute_bad_channels(
-            {"reject_lof_threshold": 2.5, "limit_memory": True}, ao
-        )
-
-        _, kwargs = ao.compute_bad_channels.call_args
-        assert kwargs["limit_memory"] is True
-
-    def test_limit_memory_false_forwarded(self):
-        """limit_memory=false in config is forwarded."""
-        ao = MagicMock()
-        self._call_compute_bad_channels(
-            {"reject_lof_threshold": 2.5, "limit_memory": False}, ao
-        )
-
-        _, kwargs = ao.compute_bad_channels.call_args
-        assert kwargs["limit_memory"] is False
+        mock_ao.compute_bad_channels(lof_threshold=lof_threshold)
 
     def test_lof_threshold_forwarded(self):
         """reject_lof_threshold is forwarded as lof_threshold."""
         ao = MagicMock()
-        self._call_compute_bad_channels(
-            {"reject_lof_threshold": 3.0, "limit_memory": True}, ao
-        )
+        self._call_compute_bad_channels({"reject_lof_threshold": 3.0}, ao)
 
         _, kwargs = ao.compute_bad_channels.call_args
         assert kwargs["lof_threshold"] == 3.0
+
+    def test_lof_threshold_none_when_absent(self):
+        """When reject_lof_threshold is absent, None is forwarded."""
+        ao = MagicMock()
+        self._call_compute_bad_channels({}, ao)
+
+        _, kwargs = ao.compute_bad_channels.call_args
+        assert kwargs["lof_threshold"] is None
+
+    def test_no_limit_memory_parameter(self):
+        """compute_bad_channels should NOT receive a limit_memory kwarg."""
+        ao = MagicMock()
+        self._call_compute_bad_channels({"reject_lof_threshold": 2.5}, ao)
+
+        _, kwargs = ao.compute_bad_channels.call_args
+        assert "limit_memory" not in kwargs
 

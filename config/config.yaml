@@ -99,7 +99,6 @@ analysis:
       reject_lof_threshold: 2.5  # LOF threshold above which channels are considered bad
       reject_channels: []  # List of channels to reject globally
       min_valid_channels: 3
-      limit_memory: true   # Whether to reduce memory during LOF computation (decimation + float16)
 
   # Data aggregation parameters (applied after filtering)
   aggregation:
