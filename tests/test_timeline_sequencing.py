@@ -427,8 +427,8 @@ class TestZeroSampleLROFiltering:
         assert "folder_a" in caplog.text
 
     @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
-    def test_all_zero_sample_lros_raises_value_error(self, mock_lro_cls, ao):
-        """When all LROs for an animalday are 0-sample, raises ValueError."""
+    def test_all_zero_sample_lros_all_animaldays_raises(self, mock_lro_cls, ao):
+        """When every animalday is all-0-sample (nothing loaded), raises RuntimeError."""
         def side_effect(folder, **kwargs):
             m = MagicMock()
             m.LongRecording = MagicMock()
@@ -446,8 +446,38 @@ class TestZeroSampleLROFiltering:
         ao.unique_animaldays = ["session1"]
         ao._processed_timestamps = None
 
-        with pytest.raises(
-            ValueError,
-            match=r"All 2 file\(s\) for animalday 'session1' failed to load",
-        ):
+        with pytest.raises(RuntimeError, match="No recordings were loaded"):
             ao._create_long_recordings({})
+
+    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    def test_mixed_animaldays_skips_bad_keeps_good(self, mock_lro_cls, ao):
+        """One all-0-sample animalday is skipped; a valid animalday still loads."""
+        call_count = [0]
+
+        def side_effect(folder, **kwargs):
+            call_count[0] += 1
+            m = MagicMock()
+            m.LongRecording = MagicMock()
+            # session1 items both 0-sample; session2 item valid
+            m.LongRecording.get_total_samples.return_value = (
+                0 if "folder_a" in folder or "folder_b" in folder else 100
+            )
+            return m
+
+        mock_lro_cls.side_effect = side_effect
+
+        ao._create_long_recordings = AnimalOrganizer._create_long_recordings.__get__(
+            ao, AnimalOrganizer
+        )
+        ao._animalday_folder_groups = {
+            "session1": ["/data/folder_a", "/data/folder_b"],
+            "session2": ["/data/folder_c"],
+        }
+        ao.unique_animaldays = ["session1", "session2"]
+        ao._processed_timestamps = None
+
+        ao._create_long_recordings({})
+
+        assert len(ao.long_recordings) == 1
+        assert "session1" not in ao.unique_animaldays
+        assert "session2" in ao.unique_animaldays

@@ -671,6 +671,7 @@ class AnimalOrganizer(AnimalFeatureParser):
     def _create_long_recordings(self, lro_kwargs: dict):
         """Create LongRecordingOrganizer instances for each unique animalday."""
         self.long_recordings: list[core.LongRecordingOrganizer] = []
+        skipped_animaldays: list[str] = []
         for animalday, items in self._animalday_folder_groups.items():
             kwargs = lro_kwargs.copy()
             if getattr(self, "_processed_timestamps", None) is not None:
@@ -738,11 +739,14 @@ class AnimalOrganizer(AnimalFeatureParser):
                         f"'{animalday}' before merge: {skipped_names}"
                     )
                 if not valid_pairs:
-                    raise ValueError(
-                        f"All {len(item_lro_pairs)} file(s) for animalday '{animalday}' "
-                        f"failed to load (all 0-sample). "
-                        f"Check the files for corrupt or empty metadata: {skipped_names}"
+                    logging.error(
+                        f"Skipping animalday '{animalday}' entirely: all {len(item_lro_pairs)} "
+                        f"file(s) produced 0-sample LROs. Each file may have been corrupt, "
+                        f"empty, or failed during loading (check earlier warnings above for "
+                        f"root causes per file). Skipped files: {skipped_names}"
                     )
+                    skipped_animaldays.append(animalday)
+                    continue
                 item_lro_pairs = valid_pairs
 
                 sorted_folder_lro_pairs = self._sort_lros_by_median_time(item_lro_pairs)
@@ -777,6 +781,22 @@ class AnimalOrganizer(AnimalFeatureParser):
                 )
 
             self.long_recordings.append(lro)
+
+        if skipped_animaldays:
+            self.unique_animaldays = [
+                ad for ad in self.unique_animaldays if ad not in skipped_animaldays
+            ]
+            self.animaldays = self.unique_animaldays
+
+        if not self.long_recordings:
+            raise RuntimeError(
+                f"No recordings were loaded for this animal. "
+                f"All {len(skipped_animaldays)} animalday(s) were skipped because every "
+                f"file produced a 0-sample LRO. This usually indicates a misconfiguration "
+                f"(wrong file pattern, wrong data root, or corrupt data). "
+                f"Skipped animaldays: {skipped_animaldays}. "
+                f"Check the warnings above for per-file root causes."
+            )
 
         self._log_timeline_summary()
 
