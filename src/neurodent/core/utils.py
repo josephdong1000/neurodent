@@ -1448,9 +1448,8 @@ class Natural_Neighbor(object):
         dists = self._distance_matrix[i]
         # argsort gives indices sorted by distance; index 0 is self (distance 0)
         sorted_idx = np.argsort(dists)
-        # Remove self (always first since distance to self is 0)
-        sorted_idx = sorted_idx[sorted_idx != i]
-        return sorted_idx[:r]
+        # Skip self at position 0 (distance to self is always 0)
+        return sorted_idx[1 : r + 1]
 
     def algorithm(self):
         """
