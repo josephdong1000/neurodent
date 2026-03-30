@@ -1,5 +1,5 @@
 {
-    "data_parent_folder": "/mnt/isilon/marsh_single_unit/PythonEEG Data/Arx Rosa",
+    "data_root": "/mnt/isilon/marsh_single_unit/PythonEEG Data/Arx Rosa",
 
     "_note_channels": "Channel structure varies by session:",
     "_note_edf": "EDF sessions: 32 total channels split among 2-4 animals (8 or 16 channels each)",
@@ -9,6 +9,25 @@
     "CHNAME_ALIASES": {},
 
     "LR_ALIASES": {},
+
+    "animals": [
+        {"id": "ArxRosa-1017", "gene": "UNKNOWN", "sex": "UNKNOWN", "manual_datetime": "2015-02-25 09:52:45"},
+        {"id": "ArxRosa-1015", "gene": "UNKNOWN", "sex": "UNKNOWN", "manual_datetime": "2015-02-25 09:52:45"},
+        {"id": "ArxRosa-1199", "gene": "UNKNOWN", "sex": "UNKNOWN", "manual_datetime": "2016-01-20 12:11:20"},
+        {"id": "ArxRosa-1198", "gene": "UNKNOWN", "sex": "UNKNOWN", "manual_datetime": "2016-01-20 12:11:20"},
+        {"id": "ArxRosa-1211", "gene": "UNKNOWN", "sex": "UNKNOWN", "manual_datetime": "2016-01-20 12:11:20"},
+        {"id": "ArxRosa-1201", "gene": "UNKNOWN", "sex": "UNKNOWN", "manual_datetime": "2016-01-20 12:11:20"},
+        {"id": "ArxRosa-967", "gene": "UNKNOWN", "sex": "UNKNOWN", "manual_datetime": "2014-11-26 09:37:10"},
+        {"id": "ArxRosa-968", "gene": "UNKNOWN", "sex": "UNKNOWN", "manual_datetime": "2014-11-26 09:37:10"},
+        {"id": "ArxRosa-969", "gene": "UNKNOWN", "sex": "UNKNOWN", "manual_datetime": "2014-11-26 09:37:10"},
+        {"id": "ArxRosa-418", "gene": "UNKNOWN", "sex": "UNKNOWN", "manual_datetime": "2014-11-26 09:37:10"},
+        {"id": "ArxRosa-2059", "gene": "UNKNOWN", "sex": "UNKNOWN", "manual_datetime": "2020-08-04 08:48:59"},
+        {"id": "ArxRosa-2063", "gene": "UNKNOWN", "sex": "UNKNOWN", "manual_datetime": "2020-08-04 08:48:59"},
+        {"id": "ArxRosa-2064", "gene": "UNKNOWN", "sex": "UNKNOWN", "manual_datetime": "2020-08-04 08:48:59"},
+        {"id": "ArxRosa-3022", "gene": "UNKNOWN", "sex": "UNKNOWN", "manual_datetime": "2020-12-29 08:30:18"},
+        {"id": "ArxRosa-3023", "gene": "UNKNOWN", "sex": "UNKNOWN", "manual_datetime": "2020-12-29 08:30:18"},
+        {"id": "ArxRosa-3024", "gene": "UNKNOWN", "sex": "UNKNOWN", "manual_datetime": "2020-12-29 08:30:18"}
+    ],
 
     "joint_sessions": {
         "Arx Rosa 1017 1015": {
@@ -103,45 +122,6 @@
         }
     },
 
-    "data_folders_to_animal_ids": {},
     "bad_channels": {},
-    "bad_folder_animalday": [],
-
-    "manual_datetimes": {
-        "ArxRosa-1017": "2015-02-25 09:52:45",
-        "ArxRosa-1015": "2015-02-25 09:52:45",
-        "ArxRosa-1199": "2016-01-20 12:11:20",
-        "ArxRosa-1198": "2016-01-20 12:11:20",
-        "ArxRosa-1211": "2016-01-20 12:11:20",
-        "ArxRosa-1201": "2016-01-20 12:11:20",
-        "ArxRosa-967": "2014-11-26 09:37:10",
-        "ArxRosa-968": "2014-11-26 09:37:10",
-        "ArxRosa-969": "2014-11-26 09:37:10",
-        "ArxRosa-418": "2014-11-26 09:37:10",
-        "ArxRosa-2059": "2020-08-04 08:48:59",
-        "ArxRosa-2063": "2020-08-04 08:48:59",
-        "ArxRosa-2064": "2020-08-04 08:48:59",
-        "ArxRosa-3022": "2020-12-29 08:30:18",
-        "ArxRosa-3023": "2020-12-29 08:30:18",
-        "ArxRosa-3024": "2020-12-29 08:30:18"
-    },
-
-    "ANIMAL_METADATA": [
-        {"id": "ArxRosa-1017", "gene": "UNKNOWN", "sex": "UNKNOWN"},
-        {"id": "ArxRosa-1015", "gene": "UNKNOWN", "sex": "UNKNOWN"},
-        {"id": "ArxRosa-1199", "gene": "UNKNOWN", "sex": "UNKNOWN"},
-        {"id": "ArxRosa-1198", "gene": "UNKNOWN", "sex": "UNKNOWN"},
-        {"id": "ArxRosa-1211", "gene": "UNKNOWN", "sex": "UNKNOWN"},
-        {"id": "ArxRosa-1201", "gene": "UNKNOWN", "sex": "UNKNOWN"},
-        {"id": "ArxRosa-967", "gene": "UNKNOWN", "sex": "UNKNOWN"},
-        {"id": "ArxRosa-968", "gene": "UNKNOWN", "sex": "UNKNOWN"},
-        {"id": "ArxRosa-969", "gene": "UNKNOWN", "sex": "UNKNOWN"},
-        {"id": "ArxRosa-418", "gene": "UNKNOWN", "sex": "UNKNOWN"},
-        {"id": "ArxRosa-2059", "gene": "UNKNOWN", "sex": "UNKNOWN"},
-        {"id": "ArxRosa-2063", "gene": "UNKNOWN", "sex": "UNKNOWN"},
-        {"id": "ArxRosa-2064", "gene": "UNKNOWN", "sex": "UNKNOWN"},
-        {"id": "ArxRosa-3022", "gene": "UNKNOWN", "sex": "UNKNOWN"},
-        {"id": "ArxRosa-3023", "gene": "UNKNOWN", "sex": "UNKNOWN"},
-        {"id": "ArxRosa-3024", "gene": "UNKNOWN", "sex": "UNKNOWN"}
-    ]
+    "bad_folder_animalday": []
 }

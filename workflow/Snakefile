@@ -99,6 +99,14 @@ ANIMAL_TO_FOLDERS_MAP = {}  # Maps slugified animal_id -> list of (folder, anima
 ANIMAL_TO_FULL_ID_MAP = {} # Maps slugified animal_id -> original animal_id string
 
 if "animals" in samples_config:
+    # Pre-compute joint-session animals to avoid duplicate folder entries.
+    # Joint-session animals get their folder entries from the joint_sessions loop below,
+    # so we skip the empty-folder placeholder for them here.
+    _joint_animal_ids = set()
+    for _session, _animals_dict in samples_config.get("joint_sessions", {}).items():
+        for _aid in _animals_dict.keys():
+            _joint_animal_ids.add(slugify(_aid, allow_unicode=True))
+
     # Unified format: iterate directly from animals list
     for animal_entry in samples_config["animals"]:
         animal = animal_entry["id"]
@@ -109,8 +117,9 @@ if "animals" in samples_config:
             ANIMAL_TO_FOLDERS_MAP[slugified_name] = []
             ANIMAL_TO_FULL_ID_MAP[slugified_name] = animal
 
-        # Each animal gets a single entry; pattern handles discovery
-        ANIMAL_TO_FOLDERS_MAP[slugified_name].append(("", animal, ""))
+        # Joint-session animals get folder entries from the joint_sessions loop below
+        if slugified_name not in _joint_animal_ids:
+            ANIMAL_TO_FOLDERS_MAP[slugified_name].append(("", animal, ""))
 elif "data_folders_to_animal_ids" in samples_config:
     # Legacy format: iterate from data_folders_to_animal_ids
     for folder, animals in samples_config["data_folders_to_animal_ids"].items():
