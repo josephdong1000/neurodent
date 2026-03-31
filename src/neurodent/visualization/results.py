@@ -671,7 +671,6 @@ class AnimalOrganizer(AnimalFeatureParser):
     def _create_long_recordings(self, lro_kwargs: dict):
         """Create LongRecordingOrganizer instances for each unique animalday."""
         self.long_recordings: list[core.LongRecordingOrganizer] = []
-        skipped_animaldays: list[str] = []
         for animalday, items in self._animalday_folder_groups.items():
             kwargs = lro_kwargs.copy()
             if getattr(self, "_processed_timestamps", None) is not None:
@@ -727,28 +726,6 @@ class AnimalOrganizer(AnimalFeatureParser):
                     )
                     item_lro_pairs.append((item, individual_lro))
 
-                # Filter out 0-sample LROs (from failed/empty file pairs) before
-                # merging. A 0-sample base LRO causes merge metadata failures, and
-                # downstream _iter_valid_recordings() cannot recover from that.
-                valid_pairs, skipped_names = self._filter_zero_sample_lros(
-                    item_lro_pairs, self._get_item_name
-                )
-                if skipped_names:
-                    logging.warning(
-                        f"Skipping {len(skipped_names)} 0-sample LRO(s) for "
-                        f"'{animalday}' before merge: {skipped_names}"
-                    )
-                if not valid_pairs:
-                    logging.error(
-                        f"Skipping animalday '{animalday}' entirely: all {len(item_lro_pairs)} "
-                        f"file(s) produced 0-sample LROs. Each file may have been corrupt, "
-                        f"empty, or failed during loading (check earlier warnings above for "
-                        f"root causes per file). Skipped files: {skipped_names}"
-                    )
-                    skipped_animaldays.append(animalday)
-                    continue
-                item_lro_pairs = valid_pairs
-
                 sorted_folder_lro_pairs = self._sort_lros_by_median_time(item_lro_pairs)
 
                 logging.info("LRO merge order for overlapping animalday:")
@@ -782,35 +759,6 @@ class AnimalOrganizer(AnimalFeatureParser):
 
             self.long_recordings.append(lro)
 
-        if skipped_animaldays:
-            self.unique_animaldays = [
-                ad for ad in self.unique_animaldays if ad not in skipped_animaldays
-            ]
-            self.animaldays = self.unique_animaldays
-
-        if not self.long_recordings:
-            raise RuntimeError(
-                f"No recordings were loaded for this animal. "
-                f"All {len(skipped_animaldays)} animalday(s) were skipped because every "
-                f"file produced a 0-sample LRO. This usually indicates a misconfiguration "
-                f"(wrong file pattern, wrong data root, or corrupt data). "
-                f"Skipped animaldays: {skipped_animaldays}. "
-                f"Check the warnings above for per-file root causes."
-            )
-
-        # It is possible for long_recordings to contain only 0-sample placeholder LROs.
-        # In that case, _iter_valid_recordings() will yield nothing and downstream analysis
-        # (e.g. concatenating results) will fail with a less informative error.
-        # Guard against this by raising early if there are no valid (nonzero-sample) LROs.
-        valid_long_recordings = list(self._iter_valid_recordings())
-        if not valid_long_recordings:
-            raise RuntimeError(
-                "No valid (nonzero-sample) recordings were loaded for this animal. "
-                "One or more LongRecordingOrganizer instances were created, but all of "
-                "them contain 0 samples. This usually indicates a misconfiguration "
-                "(wrong file pattern, wrong data root, or corrupt data). "
-                "Check the warnings above for per-file root causes."
-            )
         self._log_timeline_summary()
 
         if len(self.long_recordings) != len(self.unique_animaldays):
@@ -1116,47 +1064,6 @@ class AnimalOrganizer(AnimalFeatureParser):
         for lrec in self.long_recordings:
             lrec.cleanup_rec()
 
-    @staticmethod
-    def _filter_zero_sample_lros(lro_pairs, get_name):
-        """Remove 0-sample LROs from *lro_pairs* before a merge loop.
-
-        A 0-sample LRO used as the **base** of a merge causes
-        ``si.concatenate_recordings`` to fail or produce corrupt metadata.
-        This helper removes such LROs up-front so every caller's merge loop
-        starts from a valid base.
-
-        This is intentionally separate from the ``merge()`` check in
-        ``LongRecordingOrganizer``, which only guards against a 0-sample
-        *other_lro* being merged in.  Together the two checks cover all cases:
-        base=0-sample (this helper) and other_lro=0-sample (``merge()``).
-
-        Args:
-            lro_pairs: Iterable of ``(key, lro)`` pairs.  *key* is whatever
-                the caller uses to name the LRO (item path, string tag, …).
-            get_name: Callable ``(key) -> str`` used to produce a human-readable
-                name for warning messages.
-
-        Returns:
-            ``(valid_pairs, skipped_names)`` where *valid_pairs* is a list of
-            ``(key, lro)`` pairs with 0-sample entries removed and
-            *skipped_names* is a list of names of the removed LROs.
-        """
-        valid_pairs = []
-        skipped_names = []
-        for key, lro in lro_pairs:
-            try:
-                if (
-                    hasattr(lro, "LongRecording")
-                    and lro.LongRecording is not None
-                    and lro.LongRecording.get_total_samples() == 0
-                ):
-                    skipped_names.append(get_name(key))
-                    continue
-            except (TypeError, AttributeError):
-                pass  # Non-SI or mock — keep it
-            valid_pairs.append((key, lro))
-        return valid_pairs, skipped_names
-
     def _iter_valid_recordings(self):
         """Yield (index, lrec) pairs, skipping recordings with zero samples.
 
@@ -1219,7 +1126,8 @@ class AnimalOrganizer(AnimalFeatureParser):
             )
 
     def compute_bad_channels(
-        self, lof_threshold: float = None, force_recompute: bool = False
+        self, lof_threshold: float = None, force_recompute: bool = False,
+        lof_chunk_duration_s: float = 60,
     ):
         """Compute bad channels using LOF analysis for all recordings.
 
@@ -1227,6 +1135,8 @@ class AnimalOrganizer(AnimalFeatureParser):
             lof_threshold (float, optional): Threshold for determining bad channels from LOF scores.
                                            If None, only computes/loads scores without setting bad_channel_names.
             force_recompute (bool): Whether to recompute LOF scores even if they exist.
+            lof_chunk_duration_s (float): Duration in seconds of each chunk used
+                for the pairwise-distance computation in LOF.  Defaults to 60.
         """
         logging.info(
             f"Computing bad channels for {len(self.long_recordings)} recordings with threshold={lof_threshold}"
@@ -1236,7 +1146,8 @@ class AnimalOrganizer(AnimalFeatureParser):
                 f"Computing bad channels for recording {i}: {self.animaldays[i]}"
             )
             lrec.compute_bad_channels(
-                lof_threshold=lof_threshold, force_recompute=force_recompute
+                lof_threshold=lof_threshold, force_recompute=force_recompute,
+                lof_chunk_duration_s=lof_chunk_duration_s,
             )
             logging.debug(
                 f"Recording {i} LOF scores computed: {hasattr(lrec, 'lof_scores') and lrec.lof_scores is not None}"
@@ -1282,7 +1193,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         multiprocess_mode: Literal["dask", "serial"] = "serial",
         suppress_short_interval_error=False,
         apply_notch_filter=True,
-        chunk_size: Optional[int] = None,
+        chunk_duration_s: Optional[float] = 3600,
         **kwargs,
     ) -> "WindowAnalysisResult":
         """Computes windowed analysis of animal recordings. The data is divided into windows (time bins), then features are extracted from each window. The result is
@@ -1294,15 +1205,19 @@ class AnimalOrganizer(AnimalFeatureParser):
             window_s (int, optional): Length of each window in seconds. Note that some features break with very short window times. Defaults to 5.
             suppress_short_interval_error (bool, optional): If True, suppress ValueError for short intervals between timestamps in resulting WindowAnalysisResult. Useful for aggregated WARs. Defaults to False.
             apply_notch_filter (bool, optional): Whether to apply notch filtering to remove line noise. Uses constants.LINE_FREQ. Defaults to True.
-            chunk_size (int, optional): Number of fragments to hold in memory at once during
-                the Dask processing path. When ``None`` (default), all fragments are loaded
-                into a single NumPy array before being written to the intermediate zarr store
-                — the original behavior, which maximizes throughput but requires enough RAM
-                to hold the entire recording at once.  When set to a positive integer, only
-                ``chunk_size`` fragments are buffered at a time, streaming them to zarr
-                incrementally; use a small value (e.g. 50) on memory-constrained machines and
-                a larger value (e.g. 500+) on high-memory nodes for maximum throughput. Only
-                has an effect when ``multiprocess_mode="dask"``.
+            chunk_duration_s (float, optional): Duration in seconds of data to hold
+                in memory at once during the Dask processing path.  Internally
+                converted to a number of fragments via
+                ``int(chunk_duration_s / window_s)``.  When ``None``,
+                all fragments are loaded into a single NumPy array before being
+                written to the intermediate zarr store — the original behavior,
+                which maximizes throughput but requires enough RAM to hold the
+                entire recording at once.  When set to a positive value, only the
+                corresponding number of fragments are buffered at a time, streaming
+                them to zarr incrementally; use a small value (e.g. 250) on
+                memory-constrained machines and a larger value (e.g. 2500+) on
+                high-memory nodes for maximum throughput.  Only has an effect when
+                ``multiprocess_mode="dask"``.  Defaults to 3600.
 
         Raises:
             AttributeError: If a feature's ``compute_...()`` function was not implemented, this error will be raised.
@@ -1336,15 +1251,17 @@ class AnimalOrganizer(AnimalFeatureParser):
                     n_fragments_war = max(lan.n_fragments - 1, 1)
                     first_fragment = lan.get_fragment_np(0)
 
-                    if chunk_size is not None:
+                    if chunk_duration_s is not None:
+                        # Convert seconds → number of fragments
+                        n_frag_per_chunk = max(1, int(chunk_duration_s / window_s))
                         # Streaming path: stream fragments to zarr in batches,
-                        # keeping only `chunk_size` fragments in RAM at a time.
+                        # keeping only `n_frag_per_chunk` fragments in RAM at a time.
                         tmppath = core.utils.stream_fragments_to_zarr(
                             lan.get_fragment_np,
                             n_fragments_war,
                             first_fragment.shape,
                             first_fragment.dtype,
-                            chunk_size,
+                            n_frag_per_chunk,
                         )
                     else:
                         # Default path: allocate the full array then write to zarr in
@@ -1483,7 +1400,7 @@ class AnimalOrganizer(AnimalFeatureParser):
     def compute_frequency_domain_spike_analysis(
         self,
         detection_params: dict = None,
-        max_length: int = None,
+        chunk_duration_s: float = 3600,
         multiprocess_mode: Literal["dask", "serial"] = "serial",
     ):
         """
@@ -1491,7 +1408,11 @@ class AnimalOrganizer(AnimalFeatureParser):
 
         Args:
             detection_params (dict, optional): Detection parameters. Uses defaults if None.
-            max_length (int, optional): Maximum length in samples to analyze per recording
+            chunk_duration_s (float): Duration in seconds of each
+                processing chunk.  Defaults to 3600 (1 hour).  The full
+                recording is always analysed; this parameter controls peak RAM
+                by processing in overlapping chunks.  ``None`` loads the full
+                recording at once (fastest).
             multiprocess_mode (Literal["dask", "serial"]): Processing mode
 
         Returns:
@@ -1519,7 +1440,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                     FrequencyDomainSpikeDetector.detect_spikes_recording(
                         rec,
                         detection_params=detection_params,
-                        max_length=max_length,
+                        chunk_duration_s=chunk_duration_s,
                         multiprocess_mode=multiprocess_mode,
                     )
                 )
@@ -1721,34 +1642,14 @@ class AnimalOrganizer(AnimalFeatureParser):
                     f"Merging into single LRO (mimicking normal __init__ behavior)."
                 )
 
-                # Filter out 0-sample LROs before the merge loop.  A 0-sample
-                # base LRO makes si.concatenate_recordings fail; using the same
-                # helper as _create_long_recordings keeps the two code paths
-                # consistent.
-                lro_pairs = [(f"lro_{idx}", lro) for idx, lro in lro_group]
-                valid_pairs, skipped_names = cls._filter_zero_sample_lros(
-                    lro_pairs, lambda k: k
-                )
-                if skipped_names:
-                    logging.warning(
-                        f"Skipping {len(skipped_names)} 0-sample LRO(s) for "
-                        f"'{animalday}' before merge: {skipped_names}"
-                    )
-                if not valid_pairs:
-                    logging.warning(
-                        f"All {len(lro_group)} LRO(s) for '{animalday}' are "
-                        f"0-sample; skipping this date."
-                    )
-                    continue
-                lro_pairs = valid_pairs
-
                 # Sort by median time (same logic as normal __init__)
+                lro_pairs = [(f"lro_{idx}", lro) for idx, lro in lro_group]
                 sorted_pairs = cls._sort_lros_by_median_time_static(lro_pairs)
 
                 # Merge all LROs into the first one (in temporal order)
                 base_lro = sorted_pairs[0][1]
-                base_tag = sorted_pairs[0][0]
-                logging.info(f"Base LRO: {base_tag}")
+                original_idx = lro_group[0][0]
+                logging.info(f"Base LRO: index {original_idx}")
 
                 for i, (_, lro) in enumerate(sorted_pairs[1:], 1):
                     try:
@@ -2176,34 +2077,10 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     f"that are shorter than the median duration of {median_duration:.1f}s"
                 )
 
-                if pct_short > 1.0 and not self.suppress_short_interval_error:
-                    # Build a diagnostic showing the first few overlapping pairs
-                    # so the user can identify which sessions have bad timestamps.
-                    short_idx = short_intervals[short_intervals].index[:5]
-                    diag_lines = []
-                    has_animalday = "animalday" in self.result.columns
-                    for idx in short_idx:
-                        pos = self.result.index.get_loc(idx)
-                        prev_row = self.result.iloc[pos - 1]
-                        curr_row = self.result.iloc[pos]
-                        gap = timestamp_diffs.loc[idx]
-                        prev_ad = f" ({prev_row['animalday']})" if has_animalday else ""
-                        curr_ad = f" ({curr_row['animalday']})" if has_animalday else ""
-                        diag_lines.append(
-                            f"  {prev_row['timestamp']}{prev_ad} -> "
-                            f"{curr_row['timestamp']}{curr_ad}: gap={gap}"
-                        )
-                    diag = "\n".join(diag_lines)
-                    raise ValueError(
-                        f"{warning_msg}\n"
-                        f"First overlapping pairs (of {n_short} total):\n{diag}\n"
-                        f"Hint: if using datetimes_are_start=False, the backward "
-                        f"computation assumes contiguous files. Large gaps between "
-                        f"files in a session will push computed start times too far "
-                        f"back, overlapping adjacent sessions. Consider providing "
-                        f"per-file timestamps or set suppress_short_interval_error=True "
-                        f"to downgrade this to a warning."
-                    )
+                if (
+                    pct_short > 1.0 and not self.suppress_short_interval_error
+                ):  # More than 1% of intervals are short
+                    raise ValueError(warning_msg)
                 elif not self.suppress_short_interval_error:
                     warnings.warn(warning_msg)
 

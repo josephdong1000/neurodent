@@ -139,8 +139,7 @@ class TestExampleDatasetGeneration:
         """samples_config contains all required keys."""
         sc = example_dataset["samples_config"]
         assert "data_root" in sc
-        assert "ANIMAL_METADATA" in sc
-        assert "data_folders_to_animal_ids" in sc
+        assert "animals" in sc
         assert "GENOTYPE_ALIASES" in sc
 
 

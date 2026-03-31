@@ -48,23 +48,29 @@ properties:
                 type: string
                 description: "'dask' for parallel computation or 'serial' for single-threaded"
                 enum: ["dask", "serial"]
-              chunk_size:
+              chunk_duration_s:
                 description: >
-                  Number of recording fragments to buffer in RAM at one time when streaming
-                  to zarr. null = allocate all fragments at once (high throughput, high RAM).
-                  Set to a positive integer (>= 1, e.g. 50) to cap peak RAM use.
-                type: ["integer", "null"]
-                minimum: 1
+                  Duration in seconds of data to buffer in RAM at one time when
+                  streaming to zarr. null = allocate all fragments at once (high
+                  throughput, high RAM). Set to a number (e.g. 250) to cap peak
+                  RAM use. Only has an effect when multiprocess_mode is "dask".
+                type: ["number", "null"]
       frequency_domain_spike_detection:
         type: object
         description: Spike detection parameters
         properties:
-          save_fif_chunk_len:
-            type: number
-            exclusiveMinimum: 0
+          chunk_duration_s:
             description: >
-              Chunk length in seconds used when reading traces back for .fif export.
-              Smaller values reduce peak RAM during export.
+              Duration in seconds of each processing chunk for spike detection.
+              The full recording is always analysed; this parameter controls
+              peak RAM by processing overlapping chunks of the given duration.
+              null = load the full recording at once (fastest, highest RAM).
+            type: ["number", "null"]
+          export_chunk_duration_s:
+            type: number
+            description: >
+              Duration in seconds of each chunk read when exporting traces to
+              .fif files. Smaller values reduce peak RAM during export.
           spike_averaged_traces:
             type: object
             description: Parameters for spike-averaged trace plots and epoch exports
@@ -87,3 +93,20 @@ properties:
               dpi:
                 type: integer
                 description: Figure resolution in dots per inch
+      channel_filter_config:
+        type: object
+        description: Channel filtering configurations
+        properties:
+          lof:
+            type: object
+            description: LOF-based bad channel detection parameters
+            properties:
+              reject_lof_threshold:
+                type: number
+                description: LOF score threshold above which channels are considered bad
+              lof_chunk_duration_s:
+                type: number
+                description: >
+                  Duration in seconds of each chunk used for pairwise-distance
+                  computation in LOF bad-channel detection.  Lower values reduce
+                  peak RAM at the cost of more I/O passes over the recording.

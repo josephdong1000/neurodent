@@ -3,11 +3,11 @@
 Verifies that:
 - ``cache_fragments_to_zarr`` honors the ``chunk_size`` parameter.
 - ``stream_fragments_to_zarr`` streams fragments correctly with bounded peak RAM.
-- ``compute_windowed_analysis`` accepts ``chunk_size`` and delegates to
+- ``compute_windowed_analysis`` accepts ``chunk_duration_s`` and delegates to
   ``stream_fragments_to_zarr``.
 - Edge cases: ``chunk_size=1``, ``chunk_size`` larger than total fragments,
   and ``chunk_size=None`` (default behavior).
-- ``save_fif_and_json`` propagates the ``chunk_len`` parameter to
+- ``save_fif_and_json`` propagates the ``chunk_duration_s`` parameter to
   ``convert_to_mne``.
 """
 
@@ -101,20 +101,6 @@ class TestCacheFragmentsToZarrChunkSize:
         with patch.dict(os.environ, {"TMPDIR": str(tmp_path)}):
             _, arr_none = cache_fragments_to_zarr(frags, 50, chunk_size=None)
         assert arr_none.chunks[0] == 50
-
-    def test_invalid_chunk_size_zero_raises(self, tmp_path):
-        """``chunk_size=0`` should raise ``ValueError`` before touching zarr."""
-        frags = _make_fragments(5)
-        with pytest.raises(ValueError, match="chunk_size must be >= 1"):
-            with patch.dict(os.environ, {"TMPDIR": str(tmp_path)}):
-                cache_fragments_to_zarr(frags, 5, chunk_size=0)
-
-    def test_invalid_chunk_size_negative_raises(self, tmp_path):
-        """Negative ``chunk_size`` should raise ``ValueError`` before touching zarr."""
-        frags = _make_fragments(5)
-        with pytest.raises(ValueError, match="chunk_size must be >= 1"):
-            with patch.dict(os.environ, {"TMPDIR": str(tmp_path)}):
-                cache_fragments_to_zarr(frags, 5, chunk_size=-10)
 
 
 # ---------------------------------------------------------------------------
@@ -302,88 +288,128 @@ class TestStreamFragmentsPeakMemory:
 
 
 # ---------------------------------------------------------------------------
-# compute_windowed_analysis – chunk_size parameter is accepted by the method
+# compute_windowed_analysis – chunk_duration_s parameter is accepted by the method
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
 class TestComputeWindowedAnalysisSignature:
-    """Smoke-test that ``chunk_size`` is wired into the method signature."""
+    """Smoke-test that ``chunk_duration_s`` is wired into the method signature."""
 
-    def test_chunk_size_in_signature(self):
-        """``compute_windowed_analysis`` must accept a ``chunk_size`` kwarg."""
+    def test_chunk_duration_s_in_signature(self):
+        """``compute_windowed_analysis`` must accept a ``chunk_duration_s`` kwarg."""
         import inspect
         from neurodent.visualization.results import AnimalOrganizer
 
         sig = inspect.signature(AnimalOrganizer.compute_windowed_analysis)
-        assert "chunk_size" in sig.parameters
+        assert "chunk_duration_s" in sig.parameters
 
-    def test_chunk_size_default_is_none(self):
-        """Default value of ``chunk_size`` should be None (backward-compat)."""
+    def test_chunk_duration_s_default_is_3600(self):
+        """Default value of ``chunk_duration_s`` should be 3600."""
         import inspect
         from neurodent.visualization.results import AnimalOrganizer
 
         sig = inspect.signature(AnimalOrganizer.compute_windowed_analysis)
-        assert sig.parameters["chunk_size"].default is None
+        assert sig.parameters["chunk_duration_s"].default == 3600
 
-    def test_stream_fragments_to_zarr_called_when_chunk_size_set(self, tmp_path):
-        """With ``chunk_size`` set, the dask path must call
-        ``stream_fragments_to_zarr`` (not the bulk path)."""
-        from neurodent.core import utils as core_utils
+    def test_stream_fragments_to_zarr_called_when_chunk_duration_s_set(self, tmp_path):
+        """Calling ``compute_windowed_analysis(multiprocess_mode="dask",
+        chunk_duration_s=...)`` must invoke ``stream_fragments_to_zarr``
+        inside the dask branch of AO."""
+        import pandas as pd
+        from neurodent.visualization.results import AnimalOrganizer
 
-        with patch.object(core_utils, "stream_fragments_to_zarr") as mock_stream:
-            mock_stream.return_value = str(tmp_path / "fake.zarr")
-            # Patch da.from_zarr so dask doesn't actually try to read the fake path
-            with patch("neurodent.visualization.results.da.from_zarr"):
-                from neurodent.visualization.results import AnimalOrganizer
+        # -- build a minimal AO instance ------------------------------------
+        ao = AnimalOrganizer.__new__(AnimalOrganizer)
+        ao._validate_sampling_rates = MagicMock()
+        ao.long_analyzers = []
+        ao.long_recordings = []
+        ao.animaldays = []
+        ao.animal_id = "test"
+        ao.genotype = "WT"
+        ao.sex = "M"
+        ao.channel_names = ["Left Aud", "Right Aud"]
+        ao.assume_from_number = False
+        ao.bad_channels_dict = {}
 
-                ao = AnimalOrganizer.__new__(AnimalOrganizer)
+        # -- mock LAN returned by core.LongRecordingAnalyzer ----------------
+        mock_lan = MagicMock()
+        mock_lan.n_fragments = 5
+        mock_lan.f_s = 1000
+        mock_lan.get_fragment_np.return_value = np.zeros(
+            (10, 2), dtype=np.float32
+        )
 
-                mock_lan = MagicMock()
-                mock_lan.n_fragments = 5
-                mock_lan.get_fragment_np.return_value = np.zeros((10, 2), dtype=np.float32)
+        # _iter_valid_recordings yields one recording so the dask branch runs
+        mock_lrec = MagicMock()
+        mock_lrec.display_name = "rec0"
+        ao._iter_valid_recordings = MagicMock(
+            return_value=iter([(0, mock_lrec)])
+        )
 
-                # Invoke only the dask branch setup, not the full method
-                # by patching _iter_valid_recordings to yield nothing
-                ao._iter_valid_recordings = MagicMock(return_value=iter([]))
-                ao._validate_sampling_rates = MagicMock()
-                ao.long_analyzers = []
+        with (
+            patch(
+                "neurodent.visualization.results.core.LongRecordingAnalyzer",
+                return_value=mock_lan,
+            ),
+            patch(
+                "neurodent.visualization.results.core.utils.stream_fragments_to_zarr",
+                return_value=str(tmp_path / "fake.zarr"),
+            ) as mock_stream,
+            patch("neurodent.visualization.results.da.from_zarr"),
+            patch(
+                "neurodent.visualization.results.dask.compute",
+                # n_fragments_war = max(n_fragments - 1, 1) = 4
+                return_value=[{"rms": 0.0}] * (mock_lan.n_fragments - 1),
+            ),
+            patch(
+                "neurodent.visualization.results.delayed",
+                side_effect=lambda f: lambda *a, **kw: {"rms": 0.0},
+            ),
+            patch(
+                "neurodent.visualization.results.core.validate_timestamps"
+            ),
+        ):
+            ao._process_fragment_metadata = MagicMock(
+                return_value={
+                    "animalday": "test WT 2025",
+                    "timestamp": 0.0,
+                    "animal": "test",
+                    "session": "2025",
+                    "genotype": "WT",
+                    "sex": "M",
+                }
+            )
 
-                # Manually exercise the streaming branch
-                import os as _os
-                n_fragments_war = 4
-                first_fragment = np.zeros((10, 2), dtype=np.float32)
-                chunk_size = 2
+            ao.compute_windowed_analysis(
+                features=["rms"],
+                multiprocess_mode="dask",
+                chunk_duration_s=600,
+            )
 
-                core_utils.stream_fragments_to_zarr(
-                    mock_lan.get_fragment_np,
-                    n_fragments_war,
-                    first_fragment.shape,
-                    first_fragment.dtype,
-                    chunk_size,
-                )
-                mock_stream.assert_called_once_with(
-                    mock_lan.get_fragment_np,
-                    n_fragments_war,
-                    first_fragment.shape,
-                    first_fragment.dtype,
-                    chunk_size,
-                )
+            mock_stream.assert_called_once()
+            # Verify the chunk_size argument (5th positional arg) is derived
+            # from chunk_duration_s=600 / window_s=5 = 120
+            call_args = mock_stream.call_args
+            actual_chunk_size = call_args[0][4]
+            assert actual_chunk_size == 120, (
+                f"Expected chunk_size=120 (600/5), got {actual_chunk_size}"
+            )
 
 
 # ---------------------------------------------------------------------------
-# save_fif_and_json – chunk_len parameter propagation
+# save_fif_and_json – chunk_duration_s parameter propagation
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
-class TestSaveFifAndJsonChunkLen:
-    """Verify that ``save_fif_and_json`` forwards ``chunk_len`` to
+class TestSaveFifAndJsonChunkDurationS:
+    """Verify that ``save_fif_and_json`` forwards ``chunk_duration_s`` to
     ``convert_to_mne``."""
 
-    def test_chunk_len_forwarded_to_convert_to_mne(self, tmp_path):
+    def test_chunk_duration_s_forwarded_to_convert_to_mne(self, tmp_path):
         """``save_fif_and_json`` should call ``convert_to_mne`` with the
-        supplied ``chunk_len``."""
+        supplied ``chunk_duration_s``."""
         from neurodent.visualization.frequency_domain_results import (
             FrequencyDomainSpikeAnalysisResult,
         )
@@ -403,33 +429,415 @@ class TestSaveFifAndJsonChunkLen:
                 try:
                     fdsar.save_fif_and_json(
                         folder=str(tmp_path),
-                        chunk_len=30.0,
+                        chunk_duration_s=30.0,
                         multiprocess_mode="serial",
                     )
                 except Exception:
                     pass  # saving may fail for mocked objects; we only care about the call
 
-            # Verify chunk_len was forwarded
+            # Verify chunk_duration_s was forwarded
             mock_conv.assert_called_once()
             _, kwargs = mock_conv.call_args
-            assert kwargs.get("chunk_len") == 30.0
+            assert kwargs.get("chunk_duration_s") == 30.0
 
-    def test_chunk_len_default_is_60(self):
-        """Default ``chunk_len`` in ``save_fif_and_json`` should be 60 s."""
+    def test_chunk_duration_s_default_is_60(self):
+        """Default ``chunk_duration_s`` in ``save_fif_and_json`` should be 60 s."""
         import inspect
         from neurodent.visualization.frequency_domain_results import (
             FrequencyDomainSpikeAnalysisResult,
         )
 
         sig = inspect.signature(FrequencyDomainSpikeAnalysisResult.save_fif_and_json)
-        assert sig.parameters["chunk_len"].default == 60
+        assert sig.parameters["chunk_duration_s"].default == 60
 
-    def test_chunk_len_in_signature(self):
-        """``save_fif_and_json`` must expose a ``chunk_len`` parameter."""
+    def test_chunk_duration_s_in_signature(self):
+        """``save_fif_and_json`` must expose a ``chunk_duration_s`` parameter."""
         import inspect
         from neurodent.visualization.frequency_domain_results import (
             FrequencyDomainSpikeAnalysisResult,
         )
 
         sig = inspect.signature(FrequencyDomainSpikeAnalysisResult.save_fif_and_json)
-        assert "chunk_len" in sig.parameters
+        assert "chunk_duration_s" in sig.parameters
+
+
+# ---------------------------------------------------------------------------
+# chunked_channel_distance_matrix – unit tests for extracted utility
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestChunkedChannelDistanceMatrix:
+    """Test that ``chunked_channel_distance_matrix`` returns correct Euclidean
+    distances and that chunked computation matches the non-chunked baseline."""
+
+    def _brute_force_distance(self, data):
+        """Reference implementation: full pairwise Euclidean distance."""
+        from scipy.spatial.distance import squareform, pdist
+        return squareform(pdist(data.T, metric="euclidean"))
+
+    def test_identity_with_single_chunk(self):
+        """When chunk_samples >= n_samples, result matches brute-force."""
+        from neurodent.core.utils import chunked_channel_distance_matrix
+        rng = np.random.default_rng(42)
+        n_channels, n_samples = 4, 200
+        traces = rng.standard_normal((n_samples, n_channels))
+
+        result = chunked_channel_distance_matrix(
+            get_traces_fn=lambda s, e: traces[s:e],
+            n_channels=n_channels,
+            n_samples=n_samples,
+            chunk_samples=n_samples,  # single chunk
+        )
+        expected = self._brute_force_distance(traces)
+        np.testing.assert_allclose(result, expected, atol=1e-6)
+
+    def test_matches_brute_force_multiple_chunks(self):
+        """Chunked result must be identical to brute-force for many small chunks."""
+        from neurodent.core.utils import chunked_channel_distance_matrix
+        rng = np.random.default_rng(7)
+        n_channels, n_samples = 6, 500
+        traces = rng.standard_normal((n_samples, n_channels))
+
+        result = chunked_channel_distance_matrix(
+            get_traces_fn=lambda s, e: traces[s:e],
+            n_channels=n_channels,
+            n_samples=n_samples,
+            chunk_samples=37,  # deliberately non-divisor
+        )
+        expected = self._brute_force_distance(traces)
+        np.testing.assert_allclose(result, expected, atol=1e-6)
+
+    def test_symmetry(self):
+        """Distance matrix must be symmetric."""
+        from neurodent.core.utils import chunked_channel_distance_matrix
+        rng = np.random.default_rng(99)
+        n_channels, n_samples = 5, 300
+        traces = rng.standard_normal((n_samples, n_channels))
+
+        result = chunked_channel_distance_matrix(
+            get_traces_fn=lambda s, e: traces[s:e],
+            n_channels=n_channels,
+            n_samples=n_samples,
+            chunk_samples=50,
+        )
+        np.testing.assert_allclose(result, result.T, atol=1e-10)
+
+    def test_diagonal_is_zero(self):
+        """Self-distances must be zero."""
+        from neurodent.core.utils import chunked_channel_distance_matrix
+        rng = np.random.default_rng(11)
+        n_channels, n_samples = 3, 100
+        traces = rng.standard_normal((n_samples, n_channels))
+
+        result = chunked_channel_distance_matrix(
+            get_traces_fn=lambda s, e: traces[s:e],
+            n_channels=n_channels,
+            n_samples=n_samples,
+            chunk_samples=25,
+        )
+        np.testing.assert_allclose(np.diag(result), 0, atol=1e-6)
+
+    def test_non_negative(self):
+        """All distances must be non-negative."""
+        from neurodent.core.utils import chunked_channel_distance_matrix
+        rng = np.random.default_rng(55)
+        n_channels, n_samples = 4, 150
+        traces = rng.standard_normal((n_samples, n_channels))
+
+        result = chunked_channel_distance_matrix(
+            get_traces_fn=lambda s, e: traces[s:e],
+            n_channels=n_channels,
+            n_samples=n_samples,
+            chunk_samples=30,
+        )
+        assert np.all(result >= 0)
+
+    def test_chunk_size_one(self):
+        """Edge case: chunk_samples = 1 still produces correct result."""
+        from neurodent.core.utils import chunked_channel_distance_matrix
+        rng = np.random.default_rng(21)
+        n_channels, n_samples = 3, 10
+        traces = rng.standard_normal((n_samples, n_channels))
+
+        result = chunked_channel_distance_matrix(
+            get_traces_fn=lambda s, e: traces[s:e],
+            n_channels=n_channels,
+            n_samples=n_samples,
+            chunk_samples=1,
+        )
+        expected = self._brute_force_distance(traces)
+        np.testing.assert_allclose(result, expected, atol=1e-6)
+
+
+# ---------------------------------------------------------------------------
+# FDSAR chunked spike detection – boundary deduplication
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestFdsarChunkedDetection:
+    """Verify that chunked spike detection processes the full recording and
+    deduplicates spikes at chunk boundaries."""
+
+    def test_chunked_matches_unchunked(self):
+        """Spike indices from chunked processing must match unchunked."""
+        try:
+            import spikeinterface.core as si
+        except ImportError:
+            pytest.skip("SpikeInterface not available")
+
+        from neurodent.core.frequency_domain_spike_detection import (
+            FrequencyDomainSpikeDetector,
+        )
+
+        rng = np.random.default_rng(42)
+        n_channels, fs, duration = 2, 1000.0, 5.0
+        n_samples = int(duration * fs)
+        data = rng.standard_normal((n_channels, n_samples)) * 0.1
+
+        # Insert clear negative spikes at known positions
+        spike_positions = [500, 1500, 2500, 3500, 4500]
+        for ch in range(n_channels):
+            for pos in spike_positions:
+                width = int(0.02 * fs)
+                half = width // 2
+                t = np.arange(-half, half + 1)
+                spike = -5.0 * np.exp(-0.5 * (t / (width / 6)) ** 2)
+                start = max(0, pos - half)
+                end = min(n_samples, pos + half + 1)
+                data[ch, start:end] += spike[: end - start]
+
+        rec = si.NumpyRecording(data.T, sampling_frequency=fs)
+
+        params = {
+            "bp": [3.0, 40.0],
+            "notch": 60.0,
+            "notch_q": 30.0,
+            "freq_slices": [10.0, 20.0],
+            "sneo_percentile": 98.0,
+            "cluster_gap_ms": 80.0,
+            "vote_k": 1,
+            "baseline_ms": 500.0,
+            "search_ms": 160.0,
+            "k_sigma": 3.0,
+            "smooth_window": 7,
+            "smooth_len": 5,
+            "window_s": 0.125,
+        }
+
+        # Unchunked (None = full recording at once)
+        spikes_full, _ = FrequencyDomainSpikeDetector.detect_spikes_recording(
+            rec, detection_params=params, chunk_duration_s=None,
+            multiprocess_mode="serial",
+        )
+
+        # Chunked: 1-second chunks → several boundary crossings
+        spikes_chunked, _ = FrequencyDomainSpikeDetector.detect_spikes_recording(
+            rec, detection_params=params, chunk_duration_s=1.0,
+            multiprocess_mode="serial",
+        )
+
+        # Results must be identical (no duplicates, no missing spikes)
+        for ch in range(n_channels):
+            np.testing.assert_array_equal(
+                spikes_chunked[ch], spikes_full[ch],
+                err_msg=f"Channel {ch}: chunked vs unchunked spike indices differ",
+            )
+
+    def test_no_duplicate_spikes_at_boundaries(self):
+        """Spikes near chunk boundaries must not be duplicated."""
+        try:
+            import spikeinterface.core as si
+        except ImportError:
+            pytest.skip("SpikeInterface not available")
+
+        from neurodent.core.frequency_domain_spike_detection import (
+            FrequencyDomainSpikeDetector,
+        )
+
+        rng = np.random.default_rng(7)
+        fs = 1000.0
+        duration = 4.0
+        n_samples = int(duration * fs)
+        data = rng.standard_normal((1, n_samples)) * 0.1
+
+        # Place a spike exactly at the 2-second boundary
+        pos = 2000
+        width = int(0.02 * fs)
+        half = width // 2
+        t = np.arange(-half, half + 1)
+        spike = -5.0 * np.exp(-0.5 * (t / (width / 6)) ** 2)
+        data[0, pos - half : pos + half + 1] += spike
+
+        rec = si.NumpyRecording(data.T, sampling_frequency=fs)
+
+        params = {
+            "bp": [3.0, 40.0],
+            "notch": 60.0,
+            "notch_q": 30.0,
+            "freq_slices": [10.0, 20.0],
+            "sneo_percentile": 98.0,
+            "cluster_gap_ms": 80.0,
+            "vote_k": 1,
+            "baseline_ms": 500.0,
+            "search_ms": 160.0,
+            "k_sigma": 3.0,
+            "smooth_window": 7,
+            "smooth_len": 5,
+            "window_s": 0.125,
+        }
+
+        spikes, _ = FrequencyDomainSpikeDetector.detect_spikes_recording(
+            rec, detection_params=params, chunk_duration_s=2.0,
+            multiprocess_mode="serial",
+        )
+
+        # No duplicate indices
+        assert len(spikes[0]) == len(np.unique(spikes[0])), \
+            "Duplicate spike indices found at chunk boundary"
+
+
+# ---------------------------------------------------------------------------
+# Input validation tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestInputValidation:
+    """Verify that chunk-related functions reject invalid parameters early
+    instead of entering infinite loops or producing cryptic errors."""
+
+    # --- chunked_channel_distance_matrix ---
+
+    def test_distance_matrix_rejects_zero_chunk_samples(self):
+        """chunk_samples=0 must raise ValueError."""
+        from neurodent.core.utils import chunked_channel_distance_matrix
+
+        with pytest.raises(ValueError, match="chunk_samples must be >= 1"):
+            chunked_channel_distance_matrix(
+                get_traces_fn=lambda s, e: np.zeros((e - s, 2)),
+                n_channels=2, n_samples=10, chunk_samples=0,
+            )
+
+    def test_distance_matrix_rejects_negative_chunk_samples(self):
+        """chunk_samples=-5 must raise ValueError."""
+        from neurodent.core.utils import chunked_channel_distance_matrix
+
+        with pytest.raises(ValueError, match="chunk_samples must be >= 1"):
+            chunked_channel_distance_matrix(
+                get_traces_fn=lambda s, e: np.zeros((e - s, 2)),
+                n_channels=2, n_samples=10, chunk_samples=-5,
+            )
+
+    # --- cache_fragments_to_zarr ---
+
+    def test_cache_fragments_rejects_zero_chunk_size(self, tmp_path):
+        """chunk_size=0 must raise ValueError."""
+        frags = _make_fragments(5)
+        with pytest.raises(ValueError, match="chunk_size must be >= 1"):
+            cache_fragments_to_zarr(frags, 5, chunk_size=0, tmpdir=str(tmp_path))
+
+    def test_cache_fragments_rejects_negative_chunk_size(self, tmp_path):
+        """chunk_size=-1 must raise ValueError."""
+        frags = _make_fragments(5)
+        with pytest.raises(ValueError, match="chunk_size must be >= 1"):
+            cache_fragments_to_zarr(frags, 5, chunk_size=-1, tmpdir=str(tmp_path))
+
+    def test_cache_fragments_rejects_non_int_chunk_size(self, tmp_path):
+        """chunk_size=2.5 must raise TypeError."""
+        frags = _make_fragments(5)
+        with pytest.raises(TypeError, match="chunk_size must be an integer"):
+            cache_fragments_to_zarr(frags, 5, chunk_size=2.5, tmpdir=str(tmp_path))
+
+    # --- detect_spikes_recording chunk_duration_s ---
+
+    def test_spike_detection_tiny_chunk_duration_no_infinite_loop(self):
+        """Very small chunk_duration_s should not cause an infinite loop;
+        chunk_samples is clamped to at least 1."""
+        try:
+            import spikeinterface as si
+        except ImportError:
+            pytest.skip("spikeinterface not installed")
+
+        from neurodent.core.frequency_domain_spike_detection import (
+            FrequencyDomainSpikeDetector,
+        )
+
+        rng = np.random.default_rng(42)
+        n_channels, n_samples, fs = 1, 100, 1000.0
+        traces = rng.standard_normal((n_samples, n_channels)).astype(np.float32)
+        rec = si.core.NumpyRecording(
+            traces_list=[traces], sampling_frequency=fs
+        )
+
+        params = {
+            "baseline_ms": 50.0,
+            "k_sigma": 3.0,
+            "smooth_window": 7,
+            "smooth_len": 5,
+            "window_s": 0.05,
+        }
+
+        # chunk_duration_s so tiny it rounds to 0 samples → clamped to 1
+        spikes, raw = FrequencyDomainSpikeDetector.detect_spikes_recording(
+            rec, detection_params=params,
+            chunk_duration_s=1e-10,
+            multiprocess_mode="serial",
+        )
+        # Just verify it terminates and returns correct types
+        assert isinstance(spikes, list)
+        assert len(spikes) == n_channels
+
+    def test_spike_detection_none_chunk_with_empty_recording_raises(self):
+        """chunk_duration_s=None on a recording with 0 samples must raise."""
+        try:
+            import spikeinterface as si
+        except ImportError:
+            pytest.skip("spikeinterface not installed")
+
+        from neurodent.core.frequency_domain_spike_detection import (
+            FrequencyDomainSpikeDetector,
+        )
+
+        traces = np.empty((0, 1), dtype=np.float32)
+        rec = si.core.NumpyRecording(
+            traces_list=[traces], sampling_frequency=1000.0
+        )
+
+        with pytest.raises(ValueError, match="no samples"):
+            FrequencyDomainSpikeDetector.detect_spikes_recording(
+                rec, chunk_duration_s=None, multiprocess_mode="serial",
+            )
+
+    # --- LOF lof_chunk_duration_s validation ---
+
+    def test_lof_rejects_zero_chunk_duration(self):
+        """lof_chunk_duration_s=0 must raise ValueError."""
+        from neurodent.core.core import LongRecordingOrganizer
+
+        lro = LongRecordingOrganizer.__new__(LongRecordingOrganizer)
+
+        mock_rec = MagicMock()
+        mock_rec.get_num_channels.return_value = 3
+        mock_rec.get_total_samples.return_value = 1000
+        mock_rec.get_sampling_frequency.return_value = 1000.0
+        lro.LongRecording = mock_rec
+
+        with pytest.raises(ValueError, match="lof_chunk_duration_s must be positive"):
+            lro._compute_lof_scores(lof_chunk_duration_s=0)
+
+    def test_lof_rejects_negative_chunk_duration(self):
+        """lof_chunk_duration_s=-10 must raise ValueError."""
+        from neurodent.core.core import LongRecordingOrganizer
+
+        lro = LongRecordingOrganizer.__new__(LongRecordingOrganizer)
+
+        mock_rec = MagicMock()
+        mock_rec.get_num_channels.return_value = 3
+        mock_rec.get_total_samples.return_value = 1000
+        mock_rec.get_sampling_frequency.return_value = 1000.0
+        lro.LongRecording = mock_rec
+
+        with pytest.raises(ValueError, match="lof_chunk_duration_s must be positive"):
+            lro._compute_lof_scores(lof_chunk_duration_s=-10)

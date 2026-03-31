@@ -27,7 +27,7 @@ def load_samples_and_config():
     # Get parameters from Snakemake
     samples_config = snakemake.params.samples_config
     config = snakemake.params.config
-    animal_folders = snakemake.params.animal_folders # List of (folder, animal_id, session_key)
+    animal_folders = snakemake.params.animal_folders # List of AnimalFolder named tuples
     animal_id = snakemake.params.animal_id
     channel_subset = snakemake.params.channel_subset  # None for regular, list for joint sessions
 
@@ -38,7 +38,7 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
     """Generate WAR for a specific animal, aggregating across multiple folders/sessions.
     
     Args:
-        animal_folders: List of (folder_path, source_animal_id, session_key) tuples.
+        animal_folders: List of AnimalFolder named tuples.
         channel_subset: Global channel subset for this animal if it is part of a joint session.
     """
 
@@ -72,7 +72,7 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
             # Resolve genotype from metadata (Metadata-First)
             if animal_id not in constants.ANIMAL_METADATA:
                  raise KeyError(
-                     f"Animal '{animal_id}' (from {animal_folders[0][0]}) not found in ANIMAL_METADATA. "
+                     f"Animal '{animal_id}' (from {animal_folders[0].folder_path}) not found in ANIMAL_METADATA. "
                      "All animals in the pipeline must be defined in the metadata for reliable processing."
                  )
             
@@ -82,8 +82,9 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
 
             # Load data from all source folders
             for folder_info in animal_folders:
-                # Unpack tuple from Snakefile
-                folder_path, source_animal_id, session_key = folder_info
+                folder_path = folder_info.folder_path
+                source_animal_id = folder_info.animal_id
+                session_key = folder_info.session_key
                 
                 logger.info(f"Loading session: {folder_path} (ID in metadata: {source_animal_id})")
                 
@@ -194,15 +195,20 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
 
             # Compute bad channels
             logger.info(f"Computing bad channels for {animal_key}")
-            lof_threshold = config["analysis"]["channel_filter_config"]["lof"].get("reject_lof_threshold")
-            ao.compute_bad_channels(lof_threshold=lof_threshold)
+            lof_config = config["analysis"]["channel_filter_config"]["lof"]
+            lof_threshold = lof_config.get("reject_lof_threshold")
+            lof_chunk_duration_s = lof_config.get("lof_chunk_duration_s", 60)
+            ao.compute_bad_channels(
+                lof_threshold=lof_threshold,
+                lof_chunk_duration_s=lof_chunk_duration_s,
+            )
 
             # Generate WAR using Dask
             logger.info(f"Computing windowed analysis for {animal_key}")
             cwa_config = analysis_config.get("compute_windowed_analysis", {})
             cwa_features = cwa_config.get("features", ["all"])
             cwa_multiprocess_mode = cwa_config.get("multiprocess_mode", "dask")
-            cwa_chunk_size = cwa_config.get("chunk_size", None)
+            cwa_chunk_duration_s = cwa_config.get("chunk_duration_s", 3600)
             with warnings.catch_warnings():
                 warnings.filterwarnings(
                     "ignore",
@@ -212,7 +218,7 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
                 war = ao.compute_windowed_analysis(
                     cwa_features,
                     multiprocess_mode=cwa_multiprocess_mode,
-                    chunk_size=cwa_chunk_size,
+                    chunk_duration_s=cwa_chunk_duration_s,
                 )
 
             # Frequency-domain spike detection
@@ -220,9 +226,11 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
             fdsar_config = config["analysis"]["frequency_domain_spike_detection"]
             detection_params = fdsar_config["default_params"]
             multiprocess_mode = fdsar_config.get("multiprocess_mode", "serial")
+            fdsar_chunk_duration_s = fdsar_config.get("chunk_duration_s", 3600)
 
             fdsar_list = ao.compute_frequency_domain_spike_analysis(
-                detection_params=detection_params, multiprocess_mode=multiprocess_mode
+                detection_params=detection_params, multiprocess_mode=multiprocess_mode,
+                chunk_duration_s=fdsar_chunk_duration_s,
             )
 
             # Integrate spike features into WAR
@@ -258,14 +266,14 @@ def main():
     fdsar_base_dir = Path(snakemake.output.fdsar_dir)
     fdsar_base_dir.mkdir(parents=True, exist_ok=True)
     fdsar_config = config["analysis"]["frequency_domain_spike_detection"]
-    fdsar_save_chunk_len = fdsar_config.get("save_fif_chunk_len", 60)
+    fdsar_export_chunk_duration_s = fdsar_config.get("export_chunk_duration_s", 60)
 
     for fdsar in fdsar_list:
         # Create subdirectory for this animalday
         animalday_dir = fdsar_base_dir / f"{fdsar.animal_id}-{fdsar.genotype}-{fdsar.animal_day}"
         animalday_dir.mkdir(parents=True, exist_ok=True)
 
-        fdsar.save_fif_and_json(animalday_dir, convert_to_mne=True, slugify_filebase=False, overwrite=True, chunk_len=fdsar_save_chunk_len)
+        fdsar.save_fif_and_json(animalday_dir, convert_to_mne=True, slugify_filebase=False, overwrite=True, chunk_duration_s=fdsar_export_chunk_duration_s)
         logger.info(f"Saved FDSAR for {fdsar.animal_id} {fdsar.animal_day} to {animalday_dir}")
 
     logger.info(f"Successfully saved {len(fdsar_list)} FDSAR results to {fdsar_base_dir}")
