@@ -1739,11 +1739,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                         f"All {len(lro_group)} LRO(s) for '{animalday}' are "
                         f"0-sample; skipping this date."
                     )
-                    raise RuntimeError(
-                        f"No non-zero-sample long recordings remain for date "
-                        f"'{animalday}' after filtering/skipping 0-sample LROs. "
-                        f"Cannot construct an AnimalOrganizer from these inputs."
-                    )
+                    continue
                 lro_pairs = valid_pairs
 
                 # Sort by median time (same logic as normal __init__)

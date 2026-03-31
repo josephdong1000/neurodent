@@ -24,6 +24,8 @@ class TestTimelineSequencing:
         # Bind helpers that _compute_global_timeline uses
         ao._get_item_name = AnimalOrganizer._get_item_name.__get__(ao, AnimalOrganizer)
         ao._is_item_file = AnimalOrganizer._is_item_file.__get__(ao, AnimalOrganizer)
+        # Bind _iter_valid_recordings so the post-load guard in _create_long_recordings works
+        ao._iter_valid_recordings = AnimalOrganizer._iter_valid_recordings.__get__(ao, AnimalOrganizer)
         
         # Mock dependencies
         ao._resolve_timestamp_input = MagicMock(side_effect=lambda x, y: pd.to_datetime(x))
@@ -387,6 +389,8 @@ class TestZeroSampleLROFiltering:
         ao._filter_zero_sample_lros = AnimalOrganizer._filter_zero_sample_lros
         ao._get_item_name = AnimalOrganizer._get_item_name.__get__(ao, AnimalOrganizer)
         ao._is_item_file = AnimalOrganizer._is_item_file.__get__(ao, AnimalOrganizer)
+        # Bind _iter_valid_recordings so the post-load guard in _create_long_recordings works
+        ao._iter_valid_recordings = AnimalOrganizer._iter_valid_recordings.__get__(ao, AnimalOrganizer)
         return ao
 
     @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
