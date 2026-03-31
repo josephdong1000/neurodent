@@ -359,7 +359,8 @@ class TestComputeWindowedAnalysisSignature:
             patch("neurodent.visualization.results.da.from_zarr"),
             patch(
                 "neurodent.visualization.results.dask.compute",
-                return_value=[{"rms": 0.0}] * 4,
+                # n_fragments_war = max(n_fragments - 1, 1) = 4
+                return_value=[{"rms": 0.0}] * (mock_lan.n_fragments - 1),
             ),
             patch(
                 "neurodent.visualization.results.delayed",
