@@ -29,7 +29,7 @@ rule generate_zeitgeber_plots:
         mem_mb=increment_memory(config["cluster"]["zeitgeber_plots"]["mem_mb"]),
         nodes=config["cluster"]["zeitgeber_plots"]["nodes"],
     log:
-        stdout="logs/zeitgeber_analysis/generate_zeitgeber_plots.stdout",
-        stderr="logs/zeitgeber_analysis/generate_zeitgeber_plots.stderr",
+        stdout="logs/zeitgeber_plots/generate_zeitgeber_plots.out",
+        stderr="logs/zeitgeber_plots/generate_zeitgeber_plots.err",
     script:
         "../scripts/generate_zeitgeber_plots.py"

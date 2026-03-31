@@ -30,8 +30,8 @@ rule generate_ep_figures:
         mem_mb=increment_memory(config["cluster"]["ep_figures"]["mem_mb"]),
         nodes=config["cluster"]["ep_figures"]["nodes"],
     log:
-        stdout="logs/ep_analysis/generate_ep_figures.stdout",
-        stderr="logs/ep_analysis/generate_ep_figures.stderr",
+        stdout="logs/ep_analysis/generate_ep_figures.out",
+        stderr="logs/ep_analysis/generate_ep_figures.err",
     script:
         "../scripts/generate_ep_figures.py"
 
@@ -60,7 +60,7 @@ rule generate_ep_heatmaps:
         mem_mb=increment_memory(config["cluster"]["ep_heatmaps"]["mem_mb"]),
         nodes=config["cluster"]["ep_heatmaps"]["nodes"],
     log:
-        stdout="logs/ep_analysis/generate_ep_heatmaps.stdout",
-        stderr="logs/ep_analysis/generate_ep_heatmaps.stderr",
+        stdout="logs/ep_analysis/generate_ep_heatmaps.out",
+        stderr="logs/ep_analysis/generate_ep_heatmaps.err",
     script:
         "../scripts/generate_ep_heatmaps.py"

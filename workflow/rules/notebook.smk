@@ -21,8 +21,8 @@ rule war_explorer_notebook:
         # Executed notebook with embedded outputs
         notebook="results/notebooks/war_data_explorer.ipynb"
     log:
-        stdout="logs/notebooks/war_data_explorer.stdout",
-        stderr="logs/notebooks/war_data_explorer.stderr"
+        stdout="logs/notebook/war_data_explorer.out",
+        stderr="logs/notebook/war_data_explorer.err"
     threads: config["cluster"]["notebook"]["threads"]
     retries:
         config["cluster"]["notebook"]["retries"]

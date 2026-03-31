@@ -32,7 +32,7 @@ checkpoint war_fragment_filter:
         mem_mb=increment_memory(config["cluster"]["war_fragment_filter"]["mem_mb"]),
         nodes=config["cluster"]["war_fragment_filter"]["nodes"],
     log:
-        stdout="logs/war_fragment_filter/{animal}.stdout",
-        stderr="logs/war_fragment_filter/{animal}.stderr",
+        stdout="logs/war_fragment_filter/{animal}.out",
+        stderr="logs/war_fragment_filter/{animal}.err",
     script:
         "../scripts/filter_wars_fragments.py"

@@ -41,13 +41,16 @@ def setup_snakemake_logging(snakemake) -> logging.Logger:
 
     Note:
         The log file path is determined by the ``log:`` directive in your
-        Snakemake rule. For example::
+        Snakemake rule. Log files use ``.out`` and ``.err`` extensions and
+        are organized under ``logs/<rule_group>/``. For example::
 
             rule my_rule:
-                log: "logs/my_rule.log"
+                log:
+                    stdout="logs/my_rule/{animal}.out",
+                    stderr="logs/my_rule/{animal}.err",
                 script: "scripts/my_script.py"
 
-        The logger will write to ``logs/my_rule.log``.
+        The logger will write to ``logs/my_rule/{animal}.out``.
     """
     log_path = snakemake.log[0]
     log_file = open(log_path, "w")
