@@ -64,7 +64,7 @@ class FrequencyDomainSpikeDetector:
     def detect_spikes_recording(
         recording: "si.BaseRecording",
         detection_params: dict = None,
-        max_length: int = None,
+        max_duration_s: float = None,
         multiprocess_mode: Literal["dask", "serial"] = "serial",
     ) -> tuple[list[np.ndarray], "mne.io.RawArray"]:
         """
@@ -73,7 +73,9 @@ class FrequencyDomainSpikeDetector:
         Args:
             recording (si.BaseRecording): The recording to analyze
             detection_params (dict, optional): Detection parameters. Uses DEFAULT_PARAMS if None
-            max_length (int, optional): Maximum length in samples to analyze
+            max_duration_s (float, optional): Maximum duration in seconds to analyze.
+                When set, only the first ``max_duration_s`` seconds of the recording
+                are kept, capping peak RAM usage.
             multiprocess_mode (Literal["dask", "serial"]): Processing mode
 
         Returns:
@@ -108,9 +110,11 @@ class FrequencyDomainSpikeDetector:
         channel_names = [str(ch_id) for ch_id in rec_preprocessed.get_channel_ids()]
         n_channels = len(channel_names)
 
-        # Apply max_length if specified
-        if max_length and raw_data.shape[1] > max_length:
-            raw_data = raw_data[:, :max_length]
+        # Apply max_duration_s if specified (convert seconds → samples)
+        if max_duration_s is not None:
+            max_samples = int(max_duration_s * sampling_freq)
+            if raw_data.shape[1] > max_samples:
+                raw_data = raw_data[:, :max_samples]
 
         # Create MNE RawArray for consistency
         info = mne.create_info(

@@ -103,13 +103,13 @@ class TestWARIntegration:
 
     def test_frequency_domain_spike_detection_for_war(self, animal_organizer_with_war):
         """Test frequency domain spike detection for WAR integration."""
-        max_length = 20000  # Limit for faster testing
+        max_duration_s = 20.0  # Limit for faster testing
 
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=RuntimeWarning)
 
             fdsar_list = animal_organizer_with_war.compute_frequency_domain_spike_analysis(
-                detection_params=TEST_DETECTION_PARAMS, max_length=max_length, multiprocess_mode="auto")
+                detection_params=TEST_DETECTION_PARAMS, max_duration_s=max_duration_s, multiprocess_mode="auto")
 
         # Verify spike detection results
         assert len(fdsar_list) > 0
@@ -125,7 +125,7 @@ class TestWARIntegration:
 
     def test_war_spike_integration_via_read_sars_spikes(self, animal_organizer_with_war):
         """Test integration of spike features into WAR via read_sars_spikes method."""
-        max_length = 15000
+        max_duration_s = 15.0
 
         # Step 1: Generate WAR without spike features
         war_features = ["rms", "ampvar"]  # Minimal set for faster testing
@@ -138,7 +138,7 @@ class TestWARIntegration:
 
             # Step 2: Run frequency domain spike detection
             fdsar_list = animal_organizer_with_war.compute_frequency_domain_spike_analysis(
-                detection_params=TEST_DETECTION_PARAMS, max_length=max_length, multiprocess_mode="auto")
+                detection_params=TEST_DETECTION_PARAMS, max_duration_s=max_duration_s, multiprocess_mode="auto")
 
         # Step 3: Integrate spike features using read_sars_spikes
         original_columns = set(war.result.columns)
@@ -189,7 +189,7 @@ class TestWARIntegration:
 
     def test_inplace_spike_integration(self, animal_organizer_with_war):
         """Test in-place integration of spike features."""
-        max_length = 10000
+        max_duration_s = 10.0
 
         # Generate WAR
         with warnings.catch_warnings():
@@ -200,7 +200,7 @@ class TestWARIntegration:
 
             # Generate spike detection results
             fdsar_list = animal_organizer_with_war.compute_frequency_domain_spike_analysis(
-                detection_params=TEST_DETECTION_PARAMS, max_length=max_length, multiprocess_mode="auto")
+                detection_params=TEST_DETECTION_PARAMS, max_duration_s=max_duration_s, multiprocess_mode="auto")
 
         # Test in-place integration
         original_id = id(war.result)
@@ -219,7 +219,7 @@ class TestWARIntegration:
 
     def test_spike_integration_with_multiple_recordings(self, animal_organizer_with_war):
         """Test spike integration when there are multiple recording sessions."""
-        max_length = 8000  # Short length for multiple recordings test
+        max_duration_s = 8.0  # Short duration for multiple recordings test
 
         # Check if we have multiple recordings
         if len(animal_organizer_with_war.long_recordings) <= 1:
@@ -232,7 +232,7 @@ class TestWARIntegration:
                 features=["rms"], window_s=5, multiprocess_mode="auto")
 
             fdsar_list = animal_organizer_with_war.compute_frequency_domain_spike_analysis(
-                detection_params=TEST_DETECTION_PARAMS, max_length=max_length, multiprocess_mode="auto")
+                detection_params=TEST_DETECTION_PARAMS, max_duration_s=max_duration_s, multiprocess_mode="auto")
 
         # Should have results for each recording session
         assert len(fdsar_list) == len(animal_organizer_with_war.long_recordings)
@@ -255,7 +255,7 @@ class TestWARIntegration:
 
     def test_spike_counts_consistency(self, animal_organizer_with_war):
         """Test that spike counts in WAR match original detection results."""
-        max_length = 12000
+        max_duration_s = 12.0
 
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=RuntimeWarning)
@@ -264,7 +264,7 @@ class TestWARIntegration:
                 features=["rms"], window_s=5, multiprocess_mode="auto")
 
             fdsar_list = animal_organizer_with_war.compute_frequency_domain_spike_analysis(
-                detection_params=TEST_DETECTION_PARAMS, max_length=max_length, multiprocess_mode="auto")
+                detection_params=TEST_DETECTION_PARAMS, max_duration_s=max_duration_s, multiprocess_mode="auto")
 
             enhanced_war = war.read_sars_spikes(fdsar_list, read_mode="sa", inplace=False)
 
@@ -284,7 +284,7 @@ class TestWARIntegration:
                 nspike_row = row["nspike"]
                 war_total += sum(nspike_row)
 
-            # Allow for some difference due to windowing effects and max_length truncation
+            # Allow for some difference due to windowing effects and max_duration_s truncation
             # The WAR windowing might split or truncate some spikes differently
             assert abs(original_total - war_total) <= max(10, original_total * 0.2), (
                 f"Spike count mismatch for {animalday}: original={original_total}, war={war_total}"
@@ -294,7 +294,7 @@ class TestWARIntegration:
 
     def test_log_transformation_correctness(self, animal_organizer_with_war):
         """Test that lognspike values are correctly computed."""
-        max_length = 10000
+        max_duration_s = 10.0
 
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=RuntimeWarning)
@@ -303,7 +303,7 @@ class TestWARIntegration:
                 features=["rms"], window_s=5, multiprocess_mode="auto")
 
             fdsar_list = animal_organizer_with_war.compute_frequency_domain_spike_analysis(
-                detection_params=TEST_DETECTION_PARAMS, max_length=max_length, multiprocess_mode="auto")
+                detection_params=TEST_DETECTION_PARAMS, max_duration_s=max_duration_s, multiprocess_mode="auto")
 
             enhanced_war = war.read_sars_spikes(fdsar_list, read_mode="sa", inplace=False)
 
@@ -332,7 +332,7 @@ class TestWARIntegration:
 
     def test_feature_compatibility_with_existing_pipeline(self, animal_organizer_with_war):
         """Test that spike-enhanced WAR works with existing pipeline methods."""
-        max_length = 10000
+        max_duration_s = 10.0
 
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=RuntimeWarning)
@@ -341,7 +341,7 @@ class TestWARIntegration:
                 features=["rms", "ampvar"], window_s=5, multiprocess_mode="auto")
 
             fdsar_list = animal_organizer_with_war.compute_frequency_domain_spike_analysis(
-                detection_params=TEST_DETECTION_PARAMS, max_length=max_length, multiprocess_mode="auto")
+                detection_params=TEST_DETECTION_PARAMS, max_duration_s=max_duration_s, multiprocess_mode="auto")
 
             enhanced_war = war.read_sars_spikes(fdsar_list, read_mode="sa", inplace=False)
 

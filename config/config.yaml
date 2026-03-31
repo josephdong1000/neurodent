@@ -34,7 +34,7 @@ analysis:
     compute_windowed_analysis:
       features: ["all"]             # Feature list; "all" computes every supported feature
       multiprocess_mode: "dask"     # "dask" (parallel) or "serial"
-      chunk_size: null              # null = single bulk allocation (fast, high RAM); int = stream N fragments at a time (slower, low RAM)
+      chunk_duration_s: null         # null = single bulk allocation (fast, high RAM); float = seconds of data to buffer at a time (slower, low RAM)
 
   # Frequency domain spike detection parameters
   frequency_domain_spike_detection:
@@ -55,10 +55,10 @@ analysis:
 
     # Processing parameters
     multiprocess_mode: "dask"    # "dask" or "serial"
-    max_length: null             # null = analyze full recording; int = max samples to analyze per recording (caps peak RAM)
+    max_duration_s: null           # null = analyze full recording; float = max seconds to analyze per recording (caps peak RAM)
 
     # .fif export parameters
-    save_fif_chunk_len: 60         # seconds per chunk when reading traces to write .fif (lower = less RAM)
+    export_chunk_duration_s: 60    # seconds per chunk when reading traces to write .fif (lower = less RAM)
 
     # Visualization parameters
     spike_averaged_traces:

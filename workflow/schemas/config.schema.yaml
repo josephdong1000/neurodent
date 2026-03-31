@@ -48,27 +48,29 @@ properties:
                 type: string
                 description: "'dask' for parallel computation or 'serial' for single-threaded"
                 enum: ["dask", "serial"]
-              chunk_size:
+              chunk_duration_s:
                 description: >
-                  Number of recording fragments to buffer in RAM at one time when streaming
-                  to zarr. null = allocate all fragments at once (high throughput, high RAM).
-                  Set to an integer (e.g. 50) to cap peak RAM use.
-                type: ["integer", "null"]
+                  Duration in seconds of data to buffer in RAM at one time when
+                  streaming to zarr. null = allocate all fragments at once (high
+                  throughput, high RAM). Set to a number (e.g. 250) to cap peak
+                  RAM use.
+                type: ["number", "null"]
       frequency_domain_spike_detection:
         type: object
         description: Spike detection parameters
         properties:
-          max_length:
+          max_duration_s:
             description: >
-              Maximum number of samples to analyze per recording during spike detection.
-              null = analyze the full recording (more accurate, higher peak RAM).
-              Set to an integer to truncate long recordings (reduces peak RAM).
-            type: ["integer", "null"]
-          save_fif_chunk_len:
+              Maximum duration in seconds to analyze per recording during spike
+              detection. null = analyze the full recording (more accurate, higher
+              peak RAM). Set to a number to truncate long recordings (reduces
+              peak RAM).
+            type: ["number", "null"]
+          export_chunk_duration_s:
             type: number
             description: >
-              Chunk length in seconds used when reading traces back for .fif export.
-              Smaller values reduce peak RAM during export.
+              Duration in seconds of each chunk read when exporting traces to
+              .fif files. Smaller values reduce peak RAM during export.
           spike_averaged_traces:
             type: object
             description: Parameters for spike-averaged trace plots and epoch exports

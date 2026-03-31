@@ -3,11 +3,11 @@
 Verifies that:
 - ``cache_fragments_to_zarr`` honors the ``chunk_size`` parameter.
 - ``stream_fragments_to_zarr`` streams fragments correctly with bounded peak RAM.
-- ``compute_windowed_analysis`` accepts ``chunk_size`` and delegates to
+- ``compute_windowed_analysis`` accepts ``chunk_duration_s`` and delegates to
   ``stream_fragments_to_zarr``.
 - Edge cases: ``chunk_size=1``, ``chunk_size`` larger than total fragments,
   and ``chunk_size=None`` (default behavior).
-- ``save_fif_and_json`` propagates the ``chunk_len`` parameter to
+- ``save_fif_and_json`` propagates the ``chunk_duration_s`` parameter to
   ``convert_to_mne``.
 """
 
@@ -288,32 +288,32 @@ class TestStreamFragmentsPeakMemory:
 
 
 # ---------------------------------------------------------------------------
-# compute_windowed_analysis – chunk_size parameter is accepted by the method
+# compute_windowed_analysis – chunk_duration_s parameter is accepted by the method
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
 class TestComputeWindowedAnalysisSignature:
-    """Smoke-test that ``chunk_size`` is wired into the method signature."""
+    """Smoke-test that ``chunk_duration_s`` is wired into the method signature."""
 
-    def test_chunk_size_in_signature(self):
-        """``compute_windowed_analysis`` must accept a ``chunk_size`` kwarg."""
+    def test_chunk_duration_s_in_signature(self):
+        """``compute_windowed_analysis`` must accept a ``chunk_duration_s`` kwarg."""
         import inspect
         from neurodent.visualization.results import AnimalOrganizer
 
         sig = inspect.signature(AnimalOrganizer.compute_windowed_analysis)
-        assert "chunk_size" in sig.parameters
+        assert "chunk_duration_s" in sig.parameters
 
-    def test_chunk_size_default_is_none(self):
-        """Default value of ``chunk_size`` should be None (backward-compat)."""
+    def test_chunk_duration_s_default_is_none(self):
+        """Default value of ``chunk_duration_s`` should be None (backward-compat)."""
         import inspect
         from neurodent.visualization.results import AnimalOrganizer
 
         sig = inspect.signature(AnimalOrganizer.compute_windowed_analysis)
-        assert sig.parameters["chunk_size"].default is None
+        assert sig.parameters["chunk_duration_s"].default is None
 
-    def test_stream_fragments_to_zarr_called_when_chunk_size_set(self, tmp_path):
-        """With ``chunk_size`` set, the dask path must call
+    def test_stream_fragments_to_zarr_called_when_chunk_duration_s_set(self, tmp_path):
+        """With ``chunk_duration_s`` set, the dask path must call
         ``stream_fragments_to_zarr`` (not the bulk path)."""
         from neurodent.core import utils as core_utils
 
@@ -358,18 +358,18 @@ class TestComputeWindowedAnalysisSignature:
 
 
 # ---------------------------------------------------------------------------
-# save_fif_and_json – chunk_len parameter propagation
+# save_fif_and_json – chunk_duration_s parameter propagation
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.unit
-class TestSaveFifAndJsonChunkLen:
-    """Verify that ``save_fif_and_json`` forwards ``chunk_len`` to
+class TestSaveFifAndJsonChunkDurationS:
+    """Verify that ``save_fif_and_json`` forwards ``chunk_duration_s`` to
     ``convert_to_mne``."""
 
-    def test_chunk_len_forwarded_to_convert_to_mne(self, tmp_path):
+    def test_chunk_duration_s_forwarded_to_convert_to_mne(self, tmp_path):
         """``save_fif_and_json`` should call ``convert_to_mne`` with the
-        supplied ``chunk_len``."""
+        supplied ``chunk_duration_s``."""
         from neurodent.visualization.frequency_domain_results import (
             FrequencyDomainSpikeAnalysisResult,
         )
@@ -389,33 +389,33 @@ class TestSaveFifAndJsonChunkLen:
                 try:
                     fdsar.save_fif_and_json(
                         folder=str(tmp_path),
-                        chunk_len=30.0,
+                        chunk_duration_s=30.0,
                         multiprocess_mode="serial",
                     )
                 except Exception:
                     pass  # saving may fail for mocked objects; we only care about the call
 
-            # Verify chunk_len was forwarded
+            # Verify chunk_duration_s was forwarded
             mock_conv.assert_called_once()
             _, kwargs = mock_conv.call_args
-            assert kwargs.get("chunk_len") == 30.0
+            assert kwargs.get("chunk_duration_s") == 30.0
 
-    def test_chunk_len_default_is_60(self):
-        """Default ``chunk_len`` in ``save_fif_and_json`` should be 60 s."""
+    def test_chunk_duration_s_default_is_60(self):
+        """Default ``chunk_duration_s`` in ``save_fif_and_json`` should be 60 s."""
         import inspect
         from neurodent.visualization.frequency_domain_results import (
             FrequencyDomainSpikeAnalysisResult,
         )
 
         sig = inspect.signature(FrequencyDomainSpikeAnalysisResult.save_fif_and_json)
-        assert sig.parameters["chunk_len"].default == 60
+        assert sig.parameters["chunk_duration_s"].default == 60
 
-    def test_chunk_len_in_signature(self):
-        """``save_fif_and_json`` must expose a ``chunk_len`` parameter."""
+    def test_chunk_duration_s_in_signature(self):
+        """``save_fif_and_json`` must expose a ``chunk_duration_s`` parameter."""
         import inspect
         from neurodent.visualization.frequency_domain_results import (
             FrequencyDomainSpikeAnalysisResult,
         )
 
         sig = inspect.signature(FrequencyDomainSpikeAnalysisResult.save_fif_and_json)
-        assert "chunk_len" in sig.parameters
+        assert "chunk_duration_s" in sig.parameters
