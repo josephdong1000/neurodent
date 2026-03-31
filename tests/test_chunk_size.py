@@ -102,6 +102,20 @@ class TestCacheFragmentsToZarrChunkSize:
             _, arr_none = cache_fragments_to_zarr(frags, 50, chunk_size=None)
         assert arr_none.chunks[0] == 50
 
+    def test_invalid_chunk_size_zero_raises(self, tmp_path):
+        """``chunk_size=0`` should raise ``ValueError`` before touching zarr."""
+        frags = _make_fragments(5)
+        with pytest.raises(ValueError, match="chunk_size must be >= 1"):
+            with patch.dict(os.environ, {"TMPDIR": str(tmp_path)}):
+                cache_fragments_to_zarr(frags, 5, chunk_size=0)
+
+    def test_invalid_chunk_size_negative_raises(self, tmp_path):
+        """Negative ``chunk_size`` should raise ``ValueError`` before touching zarr."""
+        frags = _make_fragments(5)
+        with pytest.raises(ValueError, match="chunk_size must be >= 1"):
+            with patch.dict(os.environ, {"TMPDIR": str(tmp_path)}):
+                cache_fragments_to_zarr(frags, 5, chunk_size=-10)
+
 
 # ---------------------------------------------------------------------------
 # stream_fragments_to_zarr – correctness

@@ -1013,7 +1013,14 @@ def cache_fragments_to_zarr(
 
     Raises:
         ImportError: If zarr is not available
+        ValueError: If ``chunk_size`` is not None and is less than 1
     """
+    if chunk_size is not None and chunk_size < 1:
+        raise ValueError(
+            f"chunk_size must be >= 1, got {chunk_size!r}. "
+            "Pass None to use the default chunk size."
+        )
+
     try:
         import zarr
     except ImportError:
