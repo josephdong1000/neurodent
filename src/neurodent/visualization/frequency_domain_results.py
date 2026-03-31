@@ -224,14 +224,16 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
         return sorting_analyzers
 
     def convert_to_mne(
-        self, chunk_len: float = 60, save_raw=True,
+        self, chunk_duration_s: float = 60, save_raw=True,
         multiprocess_mode: Literal["dask", "serial"] = "serial",
     ) -> mne.io.RawArray:
         """
         Convert SortingAnalyzers to MNE RawArray.
 
         Args:
-            chunk_len: Chunk length for processing (compatibility parameter)
+            chunk_duration_s (float, optional): Duration in seconds of each chunk
+                read during conversion. Smaller values reduce peak RAM; larger
+                values improve throughput. Defaults to 60.
             save_raw: Whether to save the result internally
             multiprocess_mode: Whether to use Dask for parallel per-channel conversion.
                 Defaults to "serial".
@@ -242,7 +244,7 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
         if self.result_mne is None:
             if self.result_sas:
                 result_mne = FrequencyDomainSpikeAnalysisResult.convert_sas_to_mne(
-                    self.result_sas, chunk_len, multiprocess_mode=multiprocess_mode,
+                    self.result_sas, chunk_duration_s, multiprocess_mode=multiprocess_mode,
                 )
                 if save_raw:
                     self.result_mne = result_mne
@@ -261,7 +263,7 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
         save_abbrevs_as_chnames=False,
         overwrite=False,
         multiprocess_mode: Literal["dask", "serial"] = "serial",
-        chunk_len: float = 60,
+        chunk_duration_s: float = 60,
     ):
         """
         Archive frequency domain spike analysis result as fif and json files.
@@ -276,17 +278,17 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
             overwrite: If True, overwrite existing files
             multiprocess_mode: Whether to use Dask for parallel conversion.
                 Defaults to "serial".
-            chunk_len (float, optional): Length of each chunk in seconds used when
-                converting SortingAnalyzers to a NumPy trace array. Smaller values
-                reduce peak RAM at the cost of more I/O round-trips; larger values
-                improve throughput on high-memory systems. Only used when
-                ``result_mne`` is ``None`` and ``convert_to_mne`` is ``True``.
-                Defaults to 60.
+            chunk_duration_s (float, optional): Duration in seconds of each chunk
+                read when converting SortingAnalyzers to a NumPy trace array.
+                Smaller values reduce peak RAM at the cost of more I/O
+                round-trips; larger values improve throughput on high-memory
+                systems. Only used when ``result_mne`` is ``None`` and
+                ``convert_to_mne`` is ``True``. Defaults to 60.
         """
         if self.result_mne is None:
             if convert_to_mne and self.result_sas:
                 result_mne = self.convert_to_mne(
-                    chunk_len=chunk_len,
+                    chunk_duration_s=chunk_duration_s,
                     save_raw=True,
                     multiprocess_mode=multiprocess_mode,
                 )
@@ -541,14 +543,15 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
 
     @staticmethod
     def convert_sas_to_mne(
-        sas: list[si.SortingAnalyzer], chunk_len: float = 60,
+        sas: list[si.SortingAnalyzer], chunk_duration_s: float = 60,
         multiprocess_mode: Literal["dask", "serial"] = "serial",
     ) -> mne.io.RawArray:
         """Convert a list of SortingAnalyzers to a MNE RawArray.
 
         Args:
             sas (list[si.SortingAnalyzer]): The list of SortingAnalyzers to convert
-            chunk_len (float, optional): The length of the chunks to use for the conversion. Defaults to 60.
+            chunk_duration_s (float, optional): Duration in seconds of each chunk
+                read during conversion. Defaults to 60.
             multiprocess_mode (Literal["dask", "serial"], optional): Whether to use Dask for parallel
                 per-channel conversion. Defaults to "serial".
 
@@ -575,7 +578,7 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
         match multiprocess_mode:
             case "dask":
                 delayed_traces = [
-                    dask.delayed(FrequencyDomainSpikeAnalysisResult.convert_sa_to_np)(sa, chunk_len)
+                    dask.delayed(FrequencyDomainSpikeAnalysisResult.convert_sa_to_np)(sa, chunk_duration_s)
                     for sa in sas
                 ]
                 traces_list = dask.compute(*delayed_traces)
@@ -584,7 +587,7 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
             case "serial":
                 for i, sa in enumerate(sas):
                     logging.debug(f"Converting channel {i + 1} of {n_channels}")
-                    data[i, :] = FrequencyDomainSpikeAnalysisResult.convert_sa_to_np(sa, chunk_len)
+                    data[i, :] = FrequencyDomainSpikeAnalysisResult.convert_sa_to_np(sa, chunk_duration_s)
 
         channel_names = [str(sa.recording.get_channel_ids().item()) for sa in sas]
         logging.debug(f"Channel names: {channel_names}")
@@ -615,14 +618,15 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
 
     @staticmethod
     def convert_sa_to_np(
-        sa: si.SortingAnalyzer, chunk_len: float = 60,
+        sa: si.SortingAnalyzer, chunk_duration_s: float = 60,
         multiprocess_mode: Literal["dask", "serial"] = "serial",
     ) -> np.ndarray:
         """Convert a SortingAnalyzer to a numpy array of traces.
 
         Args:
             sa (si.SortingAnalyzer): The SortingAnalyzer to convert. Must have only 1 channel.
-            chunk_len (float, optional): The length of the chunks to use for the conversion. Defaults to 60.
+            chunk_duration_s (float, optional): Duration in seconds of each chunk
+                read during conversion. Defaults to 60.
             multiprocess_mode (Literal["dask", "serial"], optional): Whether to use Dask for parallel
                 per-chunk reads. Defaults to "serial". Note: avoid using "dask" when this method is
                 already called from ``convert_sas_to_mne`` in Dask mode, as that parallelizes across
@@ -641,8 +645,9 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
 
         # Calculate total number of frames and chunks
         total_frames = int(rec.get_duration() * rec.get_sampling_frequency())
-        frames_per_chunk = round(chunk_len * rec.get_sampling_frequency())
-        n_chunks = total_frames // frames_per_chunk
+        fs = rec.get_sampling_frequency()
+        frames_per_chunk = max(1, int(round(chunk_duration_s * fs)))
+        n_chunks = max(1, total_frames // frames_per_chunk)
 
         def _read_chunk(recording, start, end):
             return recording.get_traces(

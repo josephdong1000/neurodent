@@ -33,14 +33,13 @@ except (
     se = None
     spre = None
     sw = None
-from scipy.signal import decimate
 from sklearn.neighbors import LocalOutlierFactor
-from scipy.spatial.distance import pdist, squareform
 
 from .. import constants
 from .utils import (
     Natural_Neighbor,
     TimestampMapper,
+    chunked_channel_distance_matrix,
     convert_colpath_to_rowpath,
     convert_units_to_multiplier,
     extract_mne_unit_info,
@@ -1619,16 +1618,17 @@ class LongRecordingOrganizer:
     def compute_bad_channels(
         self,
         lof_threshold: float = None,
-        limit_memory: bool = True,
         force_recompute: bool = False,
+        lof_chunk_duration_s: float = 60,
     ):
         """Compute bad channels using LOF analysis with unified score storage.
 
         Args:
             lof_threshold (float, optional): Threshold for determining bad channels from LOF scores.
                                            If None, only computes/loads scores without setting bad_channel_names.
-            limit_memory (bool): Whether to reduce memory usage by decimation and float16.
             force_recompute (bool): Whether to recompute LOF scores even if they exist.
+            lof_chunk_duration_s (float): Duration in seconds of each chunk used
+                for the pairwise-distance computation in LOF.  Defaults to 60.
         """
         # Check if LOF scores already exist and are current
         if (
@@ -1640,7 +1640,9 @@ class LongRecordingOrganizer:
         else:
             # Compute new LOF scores
             try:
-                scores = self._compute_lof_scores(limit_memory=limit_memory)
+                scores = self._compute_lof_scores(
+                    lof_chunk_duration_s=lof_chunk_duration_s,
+                )
                 self.lof_scores = scores
                 logging.info(f"Computed LOF scores for {len(scores)} channels")
             except Exception as e:
@@ -1651,49 +1653,61 @@ class LongRecordingOrganizer:
         if lof_threshold is not None:
             self.apply_lof_threshold(lof_threshold)
 
-    def _compute_lof_scores(self, limit_memory: bool = True) -> np.ndarray:
+    def _compute_lof_scores(self, lof_chunk_duration_s: float = 60) -> np.ndarray:
         """Compute raw LOF scores for all channels.
 
+        Pairwise Euclidean distances between channels are computed in
+        chunks so that the full recording never needs to be held in
+        memory at once.  Both the Natural-Neighbor *k*-selection and the
+        LOF fit operate on the precomputed distance matrix.
+
         Args:
-            limit_memory (bool): Whether to reduce memory usage.
+            lof_chunk_duration_s: Duration in seconds of each chunk used
+                for the pairwise-distance computation.  Defaults to 60.
 
         Returns:
             np.ndarray: LOF scores for each channel.
         """
         try:
-            nn = Natural_Neighbor()
             rec = self.LongRecording
+            n_channels = rec.get_num_channels()
+            n_samples = rec.get_total_samples()
+            fs = rec.get_sampling_frequency()
 
             logging.debug(f"Computing LOF scores for {rec.__str__()}")
-            rec_np = rec.get_traces(return_scaled=True)  # (n_samples, n_channels)
-            logging.debug(f"Got recording shape: {rec_np.shape}")
+            logging.debug(
+                f"Recording: {n_channels} channels, {n_samples} samples, {fs} Hz"
+            )
 
-            if limit_memory:
-                rec_np = rec_np.astype(np.float16)
-                rec_np = decimate(rec_np, 10, axis=0)
-            logging.debug(f"Decimated traces shape: {rec_np.shape}")
-            rec_np = rec_np.T  # (n_channels, n_samples)
-            logging.debug(f"Transposed traces shape: {rec_np.shape}")
+            # --- Chunked pairwise-distance computation ---
+            if lof_chunk_duration_s <= 0:
+                raise ValueError(
+                    f"lof_chunk_duration_s must be positive, got {lof_chunk_duration_s}."
+                )
 
-            # Compute the optimal number of neighbors
-            nn.read(rec_np)
+            chunk_samples_raw = lof_chunk_duration_s * fs
+            chunk_samples = max(1, int(round(chunk_samples_raw)))
+            distance_matrix = chunked_channel_distance_matrix(
+                get_traces_fn=lambda s, e: rec.get_traces(
+                    start_frame=s, end_frame=e, return_scaled=True
+                ),
+                n_channels=n_channels,
+                n_samples=n_samples,
+                chunk_samples=chunk_samples,
+            )
+            logging.debug(f"Distance matrix shape: {distance_matrix.shape}")
+
+            # --- Optimal neighbour count via Natural Neighbor ---
+            nn = Natural_Neighbor()
+            nn.read_distance_matrix(distance_matrix)
             n_neighbors = nn.algorithm()
             logging.info(f"Computed n_neighbors for LOF computation: {n_neighbors}")
-
-            # Initialize LocalOutlierFactor
-            # lof = LocalOutlierFactor(n_neighbors=n_neighbors, metric="minkowski", p=2)
-            # distance_vector = pdist(rec_np, metric="seuclidean")
-            distance_vector = pdist(rec_np, metric="euclidean")
-            distance_matrix = squareform(distance_vector)
-            lof = LocalOutlierFactor(n_neighbors=n_neighbors, metric="precomputed")
-            # lof = LocalOutlierFactor(n_neighbors=n_neighbors, metric=pdist, )
-
-            # Compute the outlier scores
-            logging.debug("Computing outlier scores")
             del nn
-            # lof.fit(rec_np)
+
+            # --- LOF on precomputed distances ---
+            lof = LocalOutlierFactor(n_neighbors=n_neighbors, metric="precomputed")
+            logging.debug("Computing outlier scores")
             lof.fit(distance_matrix)
-            del rec_np
             scores = lof.negative_outlier_factor_ * -1
             logging.info(f"LOF computation successful: {len(scores)} channels")
             logging.debug(f"LOF scores: {scores}")

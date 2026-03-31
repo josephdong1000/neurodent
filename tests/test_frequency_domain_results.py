@@ -402,7 +402,7 @@ class TestConvertDaskParallelization:
         """Generate a list of mock SortingAnalyzers with deterministic data.
 
         Returns three channels each with 120 s of data at 1000 Hz (long enough
-        to exercise the chunking logic at the default chunk_len=60).
+        to exercise the chunking logic at the default chunk_duration_s=60).
         """
         rng = np.random.default_rng(42)
         sfreq = 1000.0
@@ -422,7 +422,7 @@ class TestConvertDaskParallelization:
         """Generate a single mock SortingAnalyzer for convert_sa_to_np tests."""
         rng = np.random.default_rng(99)
         sfreq = 1000.0
-        duration_s = 180.0  # 3 chunks at default chunk_len=60
+        duration_s = 180.0  # 3 chunks at default chunk_duration_s=60
         n_samples = int(duration_s * sfreq)
         traces = rng.standard_normal(n_samples).astype(np.float64) * 100
         spikes = np.sort(rng.choice(n_samples, size=5, replace=False))
