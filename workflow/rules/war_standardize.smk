@@ -31,7 +31,7 @@ rule war_standardize:
         mem_mb=increment_memory(config["cluster"]["war_standardize"]["mem_mb"]),
         nodes=config["cluster"]["war_standardize"]["nodes"],
     log:
-        stdout="logs/war_standardize/{animal}.stdout",
-        stderr="logs/war_standardize/{animal}.stderr",
+        stdout="logs/war_standardize/{animal}.out",
+        stderr="logs/war_standardize/{animal}.err",
     script:
         "../scripts/standardize_wars.py"
