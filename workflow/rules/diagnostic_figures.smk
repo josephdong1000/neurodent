@@ -31,8 +31,8 @@ rule diagnostic_figures_unfiltered:
         mem_mb=increment_memory(config["cluster"]["diagnostic_figures"]["mem_mb"]),
         nodes=config["cluster"]["diagnostic_figures"]["nodes"],
     log:
-        stdout="logs/diagnostic_figures/{animal}-unfiltered.out",
-        stderr="logs/diagnostic_figures/{animal}-unfiltered.err",
+        stdout="logs/diagnostic_figures_unfiltered/{animal}.out",
+        stderr="logs/diagnostic_figures_unfiltered/{animal}.err",
     script:
         "../scripts/generate_diagnostic_figs.py"
 
@@ -61,7 +61,7 @@ rule diagnostic_figures_filtered:
         mem_mb=increment_memory(config["cluster"]["diagnostic_figures"]["mem_mb"]),
         nodes=config["cluster"]["diagnostic_figures"]["nodes"],
     log:
-        stdout="logs/diagnostic_figures/{animal}-filtered.out",
-        stderr="logs/diagnostic_figures/{animal}-filtered.err",
+        stdout="logs/diagnostic_figures_filtered/{animal}.out",
+        stderr="logs/diagnostic_figures_filtered/{animal}.err",
     script:
         "../scripts/generate_diagnostic_figs.py"

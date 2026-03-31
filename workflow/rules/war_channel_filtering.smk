@@ -31,8 +31,8 @@ rule war_channel_filtering_manual:
         mem_mb=increment_memory(config["cluster"]["war_channel_filtering"]["mem_mb"]),
         nodes=config["cluster"]["war_channel_filtering"]["nodes"],
     log:
-        stdout="logs/war_channel_filtering/{animal}-manual.out",
-        stderr="logs/war_channel_filtering/{animal}-manual.err",
+        stdout="logs/war_channel_filtering_manual/{animal}.out",
+        stderr="logs/war_channel_filtering_manual/{animal}.err",
     script:
         "../scripts/filter_wars_channels.py"
 
@@ -61,8 +61,8 @@ rule war_channel_filtering_lof:
         mem_mb=increment_memory(config["cluster"]["war_channel_filtering"]["mem_mb"]),
         nodes=config["cluster"]["war_channel_filtering"]["nodes"],
     log:
-        stdout="logs/war_channel_filtering/{animal}-lof.out",
-        stderr="logs/war_channel_filtering/{animal}-lof.err",
+        stdout="logs/war_channel_filtering_lof/{animal}.out",
+        stderr="logs/war_channel_filtering_lof/{animal}.err",
     script:
         "../scripts/filter_wars_channels.py"
 
