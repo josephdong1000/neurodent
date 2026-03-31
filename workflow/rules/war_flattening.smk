@@ -55,8 +55,8 @@ rule war_flattening_manual:
         mem_mb=increment_memory(config["cluster"]["war_flattening"]["mem_mb"]),
         nodes=config["cluster"]["war_flattening"]["nodes"],
     log:
-        stdout="logs/war_flattening/{animal}-manual.out",
-        stderr="logs/war_flattening/{animal}-manual.err",
+        stdout="logs/war_flattening_manual/{animal}.out",
+        stderr="logs/war_flattening_manual/{animal}.err",
     script:
         "../scripts/flatten_wars.py"
 
@@ -82,7 +82,7 @@ rule war_flattening_lof:
         mem_mb=increment_memory(config["cluster"]["war_flattening"]["mem_mb"]),
         nodes=config["cluster"]["war_flattening"]["nodes"],
     log:
-        stdout="logs/war_flattening/{animal}-lof.out",
-        stderr="logs/war_flattening/{animal}-lof.err",
+        stdout="logs/war_flattening_lof/{animal}.out",
+        stderr="logs/war_flattening_lof/{animal}.err",
     script:
         "../scripts/flatten_wars.py"
