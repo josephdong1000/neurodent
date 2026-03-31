@@ -656,3 +656,148 @@ class TestFdsarChunkedDetection:
         # No duplicate indices
         assert len(spikes[0]) == len(np.unique(spikes[0])), \
             "Duplicate spike indices found at chunk boundary"
+
+
+# ---------------------------------------------------------------------------
+# Input validation tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestInputValidation:
+    """Verify that chunk-related functions reject invalid parameters early
+    instead of entering infinite loops or producing cryptic errors."""
+
+    # --- chunked_channel_distance_matrix ---
+
+    def test_distance_matrix_rejects_zero_chunk_samples(self):
+        """chunk_samples=0 must raise ValueError."""
+        from neurodent.core.utils import chunked_channel_distance_matrix
+
+        with pytest.raises(ValueError, match="chunk_samples must be >= 1"):
+            chunked_channel_distance_matrix(
+                get_traces_fn=lambda s, e: np.zeros((e - s, 2)),
+                n_channels=2, n_samples=10, chunk_samples=0,
+            )
+
+    def test_distance_matrix_rejects_negative_chunk_samples(self):
+        """chunk_samples=-5 must raise ValueError."""
+        from neurodent.core.utils import chunked_channel_distance_matrix
+
+        with pytest.raises(ValueError, match="chunk_samples must be >= 1"):
+            chunked_channel_distance_matrix(
+                get_traces_fn=lambda s, e: np.zeros((e - s, 2)),
+                n_channels=2, n_samples=10, chunk_samples=-5,
+            )
+
+    # --- cache_fragments_to_zarr ---
+
+    def test_cache_fragments_rejects_zero_chunk_size(self, tmp_path):
+        """chunk_size=0 must raise ValueError."""
+        frags = _make_fragments(5)
+        with pytest.raises(ValueError, match="chunk_size must be >= 1"):
+            cache_fragments_to_zarr(frags, 5, chunk_size=0, tmpdir=str(tmp_path))
+
+    def test_cache_fragments_rejects_negative_chunk_size(self, tmp_path):
+        """chunk_size=-1 must raise ValueError."""
+        frags = _make_fragments(5)
+        with pytest.raises(ValueError, match="chunk_size must be >= 1"):
+            cache_fragments_to_zarr(frags, 5, chunk_size=-1, tmpdir=str(tmp_path))
+
+    def test_cache_fragments_rejects_non_int_chunk_size(self, tmp_path):
+        """chunk_size=2.5 must raise TypeError."""
+        frags = _make_fragments(5)
+        with pytest.raises(TypeError, match="chunk_size must be an integer"):
+            cache_fragments_to_zarr(frags, 5, chunk_size=2.5, tmpdir=str(tmp_path))
+
+    # --- detect_spikes_recording chunk_duration_s ---
+
+    def test_spike_detection_tiny_chunk_duration_no_infinite_loop(self):
+        """Very small chunk_duration_s should not cause an infinite loop;
+        chunk_samples is clamped to at least 1."""
+        try:
+            import spikeinterface as si
+        except ImportError:
+            pytest.skip("spikeinterface not installed")
+
+        from neurodent.core.frequency_domain_spike_detection import (
+            FrequencyDomainSpikeDetector,
+        )
+
+        rng = np.random.default_rng(42)
+        n_channels, n_samples, fs = 1, 100, 1000.0
+        traces = rng.standard_normal((n_samples, n_channels)).astype(np.float32)
+        rec = si.core.NumpyRecording(
+            traces_list=[traces], sampling_frequency=fs
+        )
+
+        params = {
+            "baseline_ms": 50.0,
+            "k_sigma": 3.0,
+            "smooth_window": 7,
+            "smooth_len": 5,
+            "window_s": 0.05,
+        }
+
+        # chunk_duration_s so tiny it rounds to 0 samples → clamped to 1
+        spikes, raw = FrequencyDomainSpikeDetector.detect_spikes_recording(
+            rec, detection_params=params,
+            chunk_duration_s=1e-10,
+            multiprocess_mode="serial",
+        )
+        # Just verify it terminates and returns correct types
+        assert isinstance(spikes, list)
+        assert len(spikes) == n_channels
+
+    def test_spike_detection_none_chunk_with_empty_recording_raises(self):
+        """chunk_duration_s=None on a recording with 0 samples must raise."""
+        try:
+            import spikeinterface as si
+        except ImportError:
+            pytest.skip("spikeinterface not installed")
+
+        from neurodent.core.frequency_domain_spike_detection import (
+            FrequencyDomainSpikeDetector,
+        )
+
+        traces = np.empty((0, 1), dtype=np.float32)
+        rec = si.core.NumpyRecording(
+            traces_list=[traces], sampling_frequency=1000.0
+        )
+
+        with pytest.raises(ValueError, match="no samples"):
+            FrequencyDomainSpikeDetector.detect_spikes_recording(
+                rec, chunk_duration_s=None, multiprocess_mode="serial",
+            )
+
+    # --- LOF lof_chunk_duration_s validation ---
+
+    def test_lof_rejects_zero_chunk_duration(self):
+        """lof_chunk_duration_s=0 must raise ValueError."""
+        from neurodent.core.core import LongRecordingOrganizer
+
+        lro = LongRecordingOrganizer.__new__(LongRecordingOrganizer)
+
+        mock_rec = MagicMock()
+        mock_rec.get_num_channels.return_value = 3
+        mock_rec.get_total_samples.return_value = 1000
+        mock_rec.get_sampling_frequency.return_value = 1000.0
+        lro.LongRecording = mock_rec
+
+        with pytest.raises(ValueError, match="lof_chunk_duration_s must be positive"):
+            lro._compute_lof_scores(lof_chunk_duration_s=0)
+
+    def test_lof_rejects_negative_chunk_duration(self):
+        """lof_chunk_duration_s=-10 must raise ValueError."""
+        from neurodent.core.core import LongRecordingOrganizer
+
+        lro = LongRecordingOrganizer.__new__(LongRecordingOrganizer)
+
+        mock_rec = MagicMock()
+        mock_rec.get_num_channels.return_value = 3
+        mock_rec.get_total_samples.return_value = 1000
+        mock_rec.get_sampling_frequency.return_value = 1000.0
+        lro.LongRecording = mock_rec
+
+        with pytest.raises(ValueError, match="lof_chunk_duration_s must be positive"):
+            lro._compute_lof_scores(lof_chunk_duration_s=-10)

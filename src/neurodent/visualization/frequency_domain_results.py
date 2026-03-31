@@ -645,8 +645,9 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
 
         # Calculate total number of frames and chunks
         total_frames = int(rec.get_duration() * rec.get_sampling_frequency())
-        frames_per_chunk = round(chunk_duration_s * rec.get_sampling_frequency())
-        n_chunks = total_frames // frames_per_chunk
+        fs = rec.get_sampling_frequency()
+        frames_per_chunk = max(1, int(round(chunk_duration_s * fs)))
+        n_chunks = max(1, total_frames // frames_per_chunk)
 
         def _read_chunk(recording, start, end):
             return recording.get_traces(

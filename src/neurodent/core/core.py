@@ -1654,7 +1654,13 @@ class LongRecordingOrganizer:
             )
 
             # --- Chunked pairwise-distance computation ---
-            chunk_samples = round(lof_chunk_duration_s * fs)
+            if lof_chunk_duration_s <= 0:
+                raise ValueError(
+                    f"lof_chunk_duration_s must be positive, got {lof_chunk_duration_s}."
+                )
+
+            chunk_samples_raw = lof_chunk_duration_s * fs
+            chunk_samples = max(1, int(round(chunk_samples_raw)))
             distance_matrix = chunked_channel_distance_matrix(
                 get_traces_fn=lambda s, e: rec.get_traces(
                     start_frame=s, end_frame=e, return_scaled=True
