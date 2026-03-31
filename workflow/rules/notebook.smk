@@ -7,7 +7,7 @@ These notebooks provide interactive exploration and reporting capabilities.
 """
 
 
-rule war_explorer_notebook:
+rule notebook:
     """
     Execute the WAR data explorer notebook for interactive analysis of flattened WARs.
     
@@ -21,8 +21,8 @@ rule war_explorer_notebook:
         # Executed notebook with embedded outputs
         notebook="results/notebooks/war_data_explorer.ipynb"
     log:
-        stdout="logs/notebook/war_data_explorer.out",
-        stderr="logs/notebook/war_data_explorer.err"
+        stdout="logs/notebook/notebook.out",
+        stderr="logs/notebook/notebook.err"
     threads: config["cluster"]["notebook"]["threads"]
     retries:
         config["cluster"]["notebook"]["retries"]

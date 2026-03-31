@@ -7,7 +7,7 @@ This enables comparison between manual bad channel lists and LOF-based detection
 """
 
 
-rule war_channel_filter_manual:
+rule war_channel_filtering_manual:
     """
     Apply manual bad channel filtering using config/samples.json bad channel lists
     """
@@ -31,13 +31,13 @@ rule war_channel_filter_manual:
         mem_mb=increment_memory(config["cluster"]["war_channel_filtering"]["mem_mb"]),
         nodes=config["cluster"]["war_channel_filtering"]["nodes"],
     log:
-        stdout="logs/war_channel_filtering/{animal}_manual.out",
-        stderr="logs/war_channel_filtering/{animal}_manual.err",
+        stdout="logs/war_channel_filtering/{animal}-manual.out",
+        stderr="logs/war_channel_filtering/{animal}-manual.err",
     script:
         "../scripts/filter_wars_channels.py"
 
 
-rule war_channel_filter_lof:
+rule war_channel_filtering_lof:
     """
     Apply LOF-based bad channel filtering using pre-computed LOF scores
     """
@@ -61,8 +61,8 @@ rule war_channel_filter_lof:
         mem_mb=increment_memory(config["cluster"]["war_channel_filtering"]["mem_mb"]),
         nodes=config["cluster"]["war_channel_filtering"]["nodes"],
     log:
-        stdout="logs/war_channel_filtering/{animal}_lof.out",
-        stderr="logs/war_channel_filtering/{animal}_lof.err",
+        stdout="logs/war_channel_filtering/{animal}-lof.out",
+        stderr="logs/war_channel_filtering/{animal}-lof.err",
     script:
         "../scripts/filter_wars_channels.py"
 

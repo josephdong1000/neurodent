@@ -7,7 +7,7 @@ This allows AnimalPlotter to generate variable numbers of files naturally.
 """
 
 
-rule make_diagnostic_figures_unfiltered:
+rule diagnostic_figures_unfiltered:
     """
     Generate diagnostic figures from quality-filtered (unfiltered) data
     """
@@ -31,21 +31,21 @@ rule make_diagnostic_figures_unfiltered:
         mem_mb=increment_memory(config["cluster"]["diagnostic_figures"]["mem_mb"]),
         nodes=config["cluster"]["diagnostic_figures"]["nodes"],
     log:
-        stdout="logs/diagnostic_figures/{animal}_unfiltered.out",
-        stderr="logs/diagnostic_figures/{animal}_unfiltered.err",
+        stdout="logs/diagnostic_figures/{animal}-unfiltered.out",
+        stderr="logs/diagnostic_figures/{animal}-unfiltered.err",
     script:
         "../scripts/generate_diagnostic_figs.py"
 
 
-rule make_diagnostic_figures_filtered:
+rule diagnostic_figures_filtered:
     """
     Generate diagnostic figures from fragment-filtered data
     """
     input:
         war_pkl="results/wars_fragment_filtered/{animal}/war.pkl",
         war_json="results/wars_fragment_filtered/{animal}/war.json",
-        # war_pkl=lambda wc: Path(checkpoints.war_fragment_filter.get(**wc).output[0]) / "war.pkl",
-        # war_json=lambda wc: Path(checkpoints.war_fragment_filter.get(**wc).output[0]) / "war.json",
+        # war_pkl=lambda wc: Path(checkpoints.war_fragment_filtering.get(**wc).output[0]) / "war.pkl",
+        # war_json=lambda wc: Path(checkpoints.war_fragment_filtering.get(**wc).output[0]) / "war.json",
     output:
         figure_dir=directory("results/diagnostic_figures/{animal}/filtered/"),
     params:
@@ -61,7 +61,7 @@ rule make_diagnostic_figures_filtered:
         mem_mb=increment_memory(config["cluster"]["diagnostic_figures"]["mem_mb"]),
         nodes=config["cluster"]["diagnostic_figures"]["nodes"],
     log:
-        stdout="logs/diagnostic_figures/{animal}_filtered.out",
-        stderr="logs/diagnostic_figures/{animal}_filtered.err",
+        stdout="logs/diagnostic_figures/{animal}-filtered.out",
+        stderr="logs/diagnostic_figures/{animal}-filtered.err",
     script:
         "../scripts/generate_diagnostic_figs.py"

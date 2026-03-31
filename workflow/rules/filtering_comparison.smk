@@ -8,7 +8,7 @@ between the two filtering methods.
 """
 
 
-rule generate_filtering_comparison:
+rule filtering_comparison:
     """
     Generate comparison plots between manual and LOF channel filtering
     """
@@ -29,7 +29,7 @@ rule generate_filtering_comparison:
         mem_mb=increment_memory(config["cluster"]["filtering_comparison"]["mem_mb"]),
         nodes=config["cluster"]["filtering_comparison"]["nodes"],
     log:
-        stdout="logs/filtering_comparison/generate_filtering_comparison.out",
-        stderr="logs/filtering_comparison/generate_filtering_comparison.err",
+        stdout="logs/filtering_comparison/filtering_comparison.out",
+        stderr="logs/filtering_comparison/filtering_comparison.err",
     script:
         "../scripts/generate_filtering_comparison.py"
