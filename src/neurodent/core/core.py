@@ -34,7 +34,6 @@ except (
     spre = None
     sw = None
 from sklearn.neighbors import LocalOutlierFactor
-from scipy.spatial.distance import pdist, squareform
 
 from .. import constants
 from .utils import (
