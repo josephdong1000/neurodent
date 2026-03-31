@@ -7,7 +7,7 @@ This includes spike-averaged traces and epoch data for visual inspection and val
 """
 
 
-rule make_fdsar_diagnostics:
+rule fdsar_diagnostics:
     """
     Generate diagnostic plots from FDSAR results for a specific animal.
 

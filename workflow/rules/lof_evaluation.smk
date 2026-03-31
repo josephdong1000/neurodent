@@ -8,7 +8,7 @@ analysis across all flattened WARs.
 """
 
 
-rule evaluate_lof_accuracy:
+rule lof_evaluation:
     """
     Evaluate LOF accuracy across all flattened WARs using ground truth bad channels
     """
@@ -33,7 +33,7 @@ rule evaluate_lof_accuracy:
         mem_mb=increment_memory(config["cluster"]["lof_evaluation"]["mem_mb"]),
         nodes=config["cluster"]["lof_evaluation"]["nodes"],
     log:
-        stdout="logs/lof_evaluation/evaluate_lof_accuracy.out",
-        stderr="logs/lof_evaluation/evaluate_lof_accuracy.err",
+        stdout="logs/lof_evaluation/lof_evaluation.out",
+        stderr="logs/lof_evaluation/lof_evaluation.err",
     script:
         "../scripts/evaluate_lof_accuracy.py"

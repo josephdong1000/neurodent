@@ -8,7 +8,7 @@ to ensure all downstream analysis uses consistently filtered data.
 """
 
 
-checkpoint war_fragment_filter:
+checkpoint war_fragment_filtering:
     """
     Apply fragment filtering to standardized WARs (no channel filtering)
     """
@@ -32,7 +32,7 @@ checkpoint war_fragment_filter:
         mem_mb=increment_memory(config["cluster"]["war_fragment_filter"]["mem_mb"]),
         nodes=config["cluster"]["war_fragment_filter"]["nodes"],
     log:
-        stdout="logs/war_fragment_filter/{animal}.out",
-        stderr="logs/war_fragment_filter/{animal}.err",
+        stdout="logs/war_fragment_filtering/{animal}.out",
+        stderr="logs/war_fragment_filtering/{animal}.err",
     script:
         "../scripts/filter_wars_fragments.py"

@@ -7,12 +7,12 @@ channel-filtered, non-flattened WARs. These plots show the empirical
 distributions of features across all time windows, providing richer
 distributions than flattened data (n_animals × windows_per_animal datapoints).
 
-Sister to extract_zeitgeber_features - both operate on channel-filtered,
+Sister to war_zeitgeber - both operate on channel-filtered,
 non-flattened WARs before the flattening step.
 """
 
 
-rule generate_relfreq_plots:
+rule war_relfreq_plots:
     """
     Generate relative frequency distribution plots from channel-filtered WARs
     """
@@ -34,7 +34,7 @@ rule generate_relfreq_plots:
         mem_mb=increment_memory(config["cluster"]["relfreq_plots"]["mem_mb"]),
         nodes=config["cluster"]["relfreq_plots"]["nodes"],
     log:
-        stdout="logs/relfreq_plots/generate_relfreq_plots.out",
-        stderr="logs/relfreq_plots/generate_relfreq_plots.err",
+        stdout="logs/war_relfreq_plots/war_relfreq_plots.out",
+        stderr="logs/war_relfreq_plots/war_relfreq_plots.err",
     script:
         "../scripts/generate_relfreq_plots.py"

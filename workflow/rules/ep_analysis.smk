@@ -8,7 +8,7 @@ from flattened WARs across all animals.
 """
 
 
-rule generate_ep_figures:
+rule ep_figures:
     """
     Generate experiment-level statistical figures using ExperimentPlotter
     """
@@ -30,13 +30,13 @@ rule generate_ep_figures:
         mem_mb=increment_memory(config["cluster"]["ep_figures"]["mem_mb"]),
         nodes=config["cluster"]["ep_figures"]["nodes"],
     log:
-        stdout="logs/ep_analysis/generate_ep_figures.out",
-        stderr="logs/ep_analysis/generate_ep_figures.err",
+        stdout="logs/ep_figures/ep_figures.out",
+        stderr="logs/ep_figures/ep_figures.err",
     script:
         "../scripts/generate_ep_figures.py"
 
 
-rule generate_ep_heatmaps:
+rule ep_heatmaps:
     """
     Generate experiment-level correlation/coherence matrix heatmaps
     """
@@ -60,7 +60,7 @@ rule generate_ep_heatmaps:
         mem_mb=increment_memory(config["cluster"]["ep_heatmaps"]["mem_mb"]),
         nodes=config["cluster"]["ep_heatmaps"]["nodes"],
     log:
-        stdout="logs/ep_analysis/generate_ep_heatmaps.out",
-        stderr="logs/ep_analysis/generate_ep_heatmaps.err",
+        stdout="logs/ep_heatmaps/ep_heatmaps.out",
+        stderr="logs/ep_heatmaps/ep_heatmaps.err",
     script:
         "../scripts/generate_ep_heatmaps.py"

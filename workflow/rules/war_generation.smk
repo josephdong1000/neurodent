@@ -7,7 +7,7 @@ This corresponds to the pipeline-war-* scripts in the original workflow.
 """
 
 
-rule make_war:
+rule war_generation:
     """
     Generate WAR (Windowed Analysis Results) with integrated spike detection for a specific animal.
 

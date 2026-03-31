@@ -290,7 +290,7 @@ def get_diagnostic_figures_filtered(wildcards):
 #     """Get filtered diagnostic figure directories for fragment-filtered animals"""  
 #     filtered_dirs = []
 #     for anim in ANIMALS:
-#         ck_output = checkpoints.make_diagnostic_figures_filtered.get(animal=anim).output
+#         ck_output = checkpoints.diagnostic_figures_filtered.get(animal=anim).output
 #         if ck_output:
 #             filtered_dirs.append(f"results/diagnostic_figures/{anim}/filtered/")
 #     return filtered_dirs

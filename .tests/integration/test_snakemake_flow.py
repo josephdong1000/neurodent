@@ -9,7 +9,7 @@ Two levels of validation for the Snakemake pipeline:
    broken imports, and invalid wildcard resolution without executing jobs.
 
 2. **Full pipeline run** (``TestSnakemakePipelineRun``) — actually executes
-   the ``make_war`` rule against the committed mini-real dataset in
+   the ``war_generation`` rule against the committed mini-real dataset in
    ``.tests/integration/data/``.  Verifies that the pipeline produces
    the expected WAR output files end-to-end.
 
@@ -63,7 +63,7 @@ class TestSnakemakeDryRun:
         Args:
             dataset: Name of the dataset config (e.g. ``"example"``).
             targets: Optional list of target rules/files.  When ``None``,
-                only ``make_war`` for the first animal is requested so the
+                only ``war_generation`` for the first animal is requested so the
                 dry-run stays fast.
 
         Returns:
@@ -128,7 +128,7 @@ class TestSnakemakePipelineRun:
     ``.tests/integration/data/``.  They verify that the pipeline runs to
     completion and produces the expected output artifacts.
 
-    Only the ``make_war`` rule is exercised so that the test stays fast
+    Only the ``war_generation`` rule is exercised so that the test stays fast
     while still covering the most critical data-loading and analysis path.
     """
 
@@ -181,7 +181,7 @@ class TestSnakemakePipelineRun:
     def _cleanup(self) -> None:
         """Remove output directories created by the test.
 
-        The ``make_war`` rule outputs three artifacts that all need cleanup:
+        The ``war_generation`` rule outputs three artifacts that all need cleanup:
         - ``results/wars/{animal}/``    — WAR pickle + JSON
         - ``results/fdsars/{animal}/``  — FDSAR spike detection directory
         - ``logs/war_generation/``      — Snakemake job logs
@@ -193,8 +193,8 @@ class TestSnakemakePipelineRun:
         ):
             shutil.rmtree(_REPO_ROOT / subdir, ignore_errors=True)
 
-    def test_make_war_produces_outputs(self):
-        """``make_war`` runs to completion and produces WAR ``.pkl`` and ``.json``."""
+    def test_war_generation_produces_outputs(self):
+        """``war_generation`` runs to completion and produces WAR ``.pkl`` and ``.json``."""
         war_pkl = _REPO_ROOT / f"results/wars/{self.ANIMAL}/war.pkl"
         war_json = _REPO_ROOT / f"results/wars/{self.ANIMAL}/war.json"
 
@@ -202,7 +202,7 @@ class TestSnakemakePipelineRun:
         try:
             result = self._run_snakemake(
                 [f"results/wars/{self.ANIMAL}/war.pkl"],
-                extra_args=["--forcerun", "make_war"],
+                extra_args=["--forcerun", "war_generation"],
             )
             assert result.returncode == 0, (
                 f"Snakemake run failed for '{self.DATASET}' dataset, "
