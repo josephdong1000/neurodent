@@ -36,14 +36,16 @@ class TestFrequencyDomainSpikeDetector:
         mock_rec.get_channel_ids.return_value = ["ch1", "ch2", "ch3", "ch4"]
         mock_rec.get_sampling_frequency.return_value = 1000.0
         mock_rec.get_num_frames.return_value = 10000
+        mock_rec.get_total_samples.return_value = 10000
         mock_rec.get_dtype.return_value = np.float32
         mock_rec.clone.return_value = mock_rec
         mock_rec.set_channel_ids.return_value = None
 
         # Mock data - transposed to (samples, channels) format as get_traces returns
         np.random.seed(42)
-        mock_data = np.random.randn(10000, 4) * 0.1
-        mock_rec.get_traces.return_value = mock_data
+        full_data = np.random.randn(10000, 4) * 0.1
+        mock_rec.get_traces.side_effect = lambda start_frame=0, end_frame=None, return_scaled=True, return_in_uV=False: \
+            full_data[start_frame:(end_frame if end_frame is not None else 10000)]
 
         return mock_rec
 
@@ -290,15 +292,15 @@ class TestFrequencyDomainSpikeDetector:
         spike_descriptions = [desc for desc in descriptions if desc.startswith("Spike_Ch")]
         assert len(spike_descriptions) == 5
 
-    @patch.object(FrequencyDomainSpikeDetector, "_apply_preprocessing")
+    @patch.object(FrequencyDomainSpikeDetector, "_preprocess_array")
     @patch.object(FrequencyDomainSpikeDetector, "_detect_spikes_channel")
     @patch.object(FrequencyDomainSpikeDetector, "_add_spike_annotations")
     def test_detect_spikes_recording_serial(
         self, mock_add_annotations, mock_detect_channel, mock_preprocess, mock_recording, detection_params
     ):
         """Test full spike detection pipeline in serial mode."""
-        # Setup mocks
-        mock_preprocess.return_value = mock_recording
+        # Setup mocks: _preprocess_array receives an ndarray, returns filtered ndarray
+        mock_preprocess.side_effect = lambda data, fs, params: data
         mock_detect_channel.return_value = np.array([100, 500, 1000])
 
         # Mock MNE creation
@@ -319,7 +321,7 @@ class TestFrequencyDomainSpikeDetector:
         assert len(spike_indices) == 4  # 4 channels
         assert mne_raw is not None
 
-    @patch.object(FrequencyDomainSpikeDetector, "_apply_preprocessing")
+    @patch.object(FrequencyDomainSpikeDetector, "_preprocess_array")
     @patch.object(FrequencyDomainSpikeDetector, "_detect_spikes_channel")
     @patch.object(FrequencyDomainSpikeDetector, "_add_spike_annotations")
     def test_detect_spikes_recording_dask(
@@ -327,7 +329,7 @@ class TestFrequencyDomainSpikeDetector:
     ):
         """Test full spike detection pipeline in dask mode."""
         # Setup mocks
-        mock_preprocess.return_value = mock_recording
+        mock_preprocess.side_effect = lambda data, fs, params: data
         mock_detect_channel.return_value = np.array([100, 500, 1000])
 
         # Mock MNE creation

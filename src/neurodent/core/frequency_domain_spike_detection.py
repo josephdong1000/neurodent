@@ -64,18 +64,25 @@ class FrequencyDomainSpikeDetector:
     def detect_spikes_recording(
         recording: "si.BaseRecording",
         detection_params: dict = None,
-        max_duration_s: float = None,
+        chunk_duration_s: float = None,
         multiprocess_mode: Literal["dask", "serial"] = "serial",
     ) -> tuple[list[np.ndarray], "mne.io.RawArray"]:
         """
         Detect spikes in a recording using frequency-domain analysis.
 
+        When ``chunk_duration_s`` is set, the recording is processed in
+        overlapping time chunks so that the entire recording is analysed
+        without loading it all into RAM at once.  Spike indices from
+        adjacent chunks are merged with deduplication at chunk boundaries.
+
         Args:
             recording (si.BaseRecording): The recording to analyze
             detection_params (dict, optional): Detection parameters. Uses DEFAULT_PARAMS if None
-            max_duration_s (float, optional): Maximum duration in seconds to analyze.
-                When set, only the first ``max_duration_s`` seconds of the recording
-                are kept, capping peak RAM usage.
+            chunk_duration_s (float, optional): Duration in seconds of each
+                processing chunk.  When ``None``, the full recording is loaded
+                into memory at once (fastest, highest RAM).  Set to a positive
+                value (e.g. 3600) to cap peak RAM usage while still analysing
+                the entire recording.
             multiprocess_mode (Literal["dask", "serial"]): Processing mode
 
         Returns:
@@ -97,51 +104,61 @@ class FrequencyDomainSpikeDetector:
         logging.debug(f"Recording info: {recording}")
         logging.debug(f"Recording channels: {recording.get_channel_ids()}")
 
-        # Get preprocessed recording
-        rec_preprocessed = FrequencyDomainSpikeDetector._apply_preprocessing(
-            recording, params
-        )
-
-        # Extract data for analysis
-        raw_data = rec_preprocessed.get_traces(return_in_uV=True)  # (samples, channels)
-        raw_data = raw_data.T  # (channels, samples)
-
-        sampling_freq = rec_preprocessed.get_sampling_frequency()
-        channel_names = [str(ch_id) for ch_id in rec_preprocessed.get_channel_ids()]
+        sampling_freq = recording.get_sampling_frequency()
+        total_samples = recording.get_total_samples()
+        channel_ids = recording.get_channel_ids()
+        channel_names = [str(ch_id) for ch_id in channel_ids]
         n_channels = len(channel_names)
 
-        # Apply max_duration_s if specified (convert seconds → samples)
-        if max_duration_s is not None:
-            max_samples = round(max_duration_s * sampling_freq)
-            if raw_data.shape[1] > max_samples:
-                raw_data = raw_data[:, :max_samples]
+        # Determine whether to use chunked processing
+        if chunk_duration_s is not None and chunk_duration_s > 0:
+            chunk_samples = round(chunk_duration_s * sampling_freq)
+        else:
+            chunk_samples = total_samples  # single chunk = full recording
 
-        # Create MNE RawArray for consistency
+        # Overlap to avoid filter and detection edge effects.
+        # Use the baseline_ms parameter from detection params as the overlap,
+        # which is the largest window used during spike refinement.
+        overlap_ms = params.get("baseline_ms", 500.0)
+        overlap_samples = round(sampling_freq * overlap_ms / 1000.0)
+
+        spike_indices_per_channel = [np.array([], dtype=int) for _ in range(n_channels)]
+
+        chunk_start = 0
+        while chunk_start < total_samples:
+            chunk_end = min(chunk_start + chunk_samples, total_samples)
+
+            # Extend with overlap for non-first/non-last chunks
+            read_start = max(0, chunk_start - overlap_samples)
+            read_end = min(total_samples, chunk_end + overlap_samples)
+
+            logging.debug(
+                f"Processing chunk: samples {chunk_start}-{chunk_end} "
+                f"(read {read_start}-{read_end} with overlap)"
+            )
+
+            chunk_spikes = FrequencyDomainSpikeDetector._detect_spikes_chunk(
+                recording, params, read_start, read_end,
+                chunk_start, chunk_end, multiprocess_mode,
+            )
+
+            for ch in range(n_channels):
+                spike_indices_per_channel[ch] = np.concatenate([
+                    spike_indices_per_channel[ch], chunk_spikes[ch]
+                ])
+
+            chunk_start = chunk_end
+
+        # Deduplicate spike indices (overlap regions may produce duplicates)
+        for ch in range(n_channels):
+            spike_indices_per_channel[ch] = np.unique(spike_indices_per_channel[ch])
+
+        # Build MNE RawArray by reading traces in chunks for the annotated output
+        raw_data = recording.get_traces(return_in_uV=True).T  # (channels, samples)
         info = mne.create_info(
             ch_names=channel_names, sfreq=sampling_freq, ch_types="eeg"
         )
         mne_raw = mne.io.RawArray(data=raw_data, info=info)
-
-        # Run spike detection
-        match multiprocess_mode:
-            case "dask":
-                if dask is None:
-                    raise ImportError("dask is required for multiprocess_mode='dask'")
-                spike_tasks = [
-                    dask.delayed(FrequencyDomainSpikeDetector._detect_spikes_channel)(
-                        raw_data[ch, :], sampling_freq, params
-                    )
-                    for ch in range(n_channels)
-                ]
-                # dask.compute returns tuple, convert to list for consistency with serial mode
-                spike_indices_per_channel = list(dask.compute(*spike_tasks))
-            case _:
-                spike_indices_per_channel = [
-                    FrequencyDomainSpikeDetector._detect_spikes_channel(
-                        raw_data[ch, :], sampling_freq, params
-                    )
-                    for ch in range(n_channels)
-                ]
 
         # Add spike annotations to MNE object
         mne_raw_with_annotations = FrequencyDomainSpikeDetector._add_spike_annotations(
@@ -149,6 +166,116 @@ class FrequencyDomainSpikeDetector:
         )
 
         return spike_indices_per_channel, mne_raw_with_annotations
+
+    @staticmethod
+    def _detect_spikes_chunk(
+        recording: "si.BaseRecording",
+        params: dict,
+        read_start: int,
+        read_end: int,
+        valid_start: int,
+        valid_end: int,
+        multiprocess_mode: str,
+    ) -> list[np.ndarray]:
+        """Detect spikes in a single time chunk of a recording.
+
+        The chunk is read with overlap (``read_start`` to ``read_end``),
+        preprocessed, and spike detection is run.  Only spikes whose
+        *global* sample index falls within ``[valid_start, valid_end)``
+        are returned, avoiding duplicates at chunk boundaries.
+
+        Args:
+            recording: Full SpikeInterface recording.
+            params: Merged detection parameters.
+            read_start: First sample to read (may include overlap before).
+            read_end: Last sample to read (exclusive, may include overlap after).
+            valid_start: First sample of the non-overlapping region.
+            valid_end: Last sample of the non-overlapping region (exclusive).
+            multiprocess_mode: ``"dask"`` or ``"serial"``.
+
+        Returns:
+            List of spike-index arrays (one per channel), with indices
+            expressed in the *global* sample coordinate system.
+        """
+        # Read the chunk (with overlap) from the recording
+        chunk_data = recording.get_traces(
+            start_frame=read_start, end_frame=read_end, return_in_uV=True
+        )  # (samples, channels)
+        chunk_data = chunk_data.T  # (channels, samples)
+
+        sampling_freq = recording.get_sampling_frequency()
+        n_channels = chunk_data.shape[0]
+
+        # Preprocess chunk in place
+        chunk_data = FrequencyDomainSpikeDetector._preprocess_array(
+            chunk_data, sampling_freq, params
+        )
+
+        # Run spike detection per channel
+        match multiprocess_mode:
+            case "dask":
+                if dask is None:
+                    raise ImportError("dask is required for multiprocess_mode='dask'")
+                spike_tasks = [
+                    dask.delayed(FrequencyDomainSpikeDetector._detect_spikes_channel)(
+                        chunk_data[ch, :], sampling_freq, params
+                    )
+                    for ch in range(n_channels)
+                ]
+                chunk_spikes_per_channel = list(dask.compute(*spike_tasks))
+            case _:
+                chunk_spikes_per_channel = [
+                    FrequencyDomainSpikeDetector._detect_spikes_channel(
+                        chunk_data[ch, :], sampling_freq, params
+                    )
+                    for ch in range(n_channels)
+                ]
+
+        # Convert local chunk indices to global indices and keep only those
+        # in the valid (non-overlapping) region.
+        offset_in_read = valid_start - read_start
+        offset_out_read = valid_end - read_start
+        result = []
+        for spikes_local in chunk_spikes_per_channel:
+            mask = (spikes_local >= offset_in_read) & (spikes_local < offset_out_read)
+            result.append(spikes_local[mask] - offset_in_read + valid_start)
+        return result
+
+    @staticmethod
+    def _preprocess_array(
+        data: np.ndarray, sampling_freq: float, params: dict
+    ) -> np.ndarray:
+        """Apply bandpass and notch filtering to a (channels, samples) array.
+
+        This is the array-level preprocessing helper used by chunked
+        detection.  It operates in-place where possible and returns the
+        filtered array.
+
+        Args:
+            data: Shape ``(n_channels, n_samples)``.
+            sampling_freq: Sampling rate in Hz.
+            params: Detection parameter dict (must contain ``bp``,
+                ``notch``, ``notch_q``).
+
+        Returns:
+            Filtered array with the same shape as *data*.
+        """
+        bp_lo, bp_hi = params["bp"]
+        sos_bp = iirfilter(
+            N=4,
+            Wn=[bp_lo, bp_hi],
+            btype="bandpass",
+            ftype="butter",
+            output="sos",
+            fs=sampling_freq,
+        )
+        data = sosfiltfilt(sos_bp, data, axis=-1)
+
+        notch_freq = params["notch"]
+        notch_q = params["notch_q"]
+        b_notch, a_notch = iirnotch(w0=notch_freq, Q=notch_q, fs=sampling_freq)
+        data = filtfilt(b_notch, a_notch, data, axis=-1)
+        return data
 
     @staticmethod
     def _apply_preprocessing(
@@ -161,23 +288,9 @@ class FrequencyDomainSpikeDetector:
 
         sampling_freq = recording.get_sampling_frequency()
 
-        # Apply bandpass filter
-        bp_lo, bp_hi = params["bp"]
-        sos_bp = iirfilter(
-            N=4,
-            Wn=[bp_lo, bp_hi],
-            btype="bandpass",
-            ftype="butter",
-            output="sos",
-            fs=sampling_freq,
+        raw_notch = FrequencyDomainSpikeDetector._preprocess_array(
+            raw_data, sampling_freq, params
         )
-        raw_filtered = sosfiltfilt(sos_bp, raw_data, axis=-1)
-
-        # Apply notch filter
-        notch_freq = params["notch"]
-        notch_q = params["notch_q"]
-        b_notch, a_notch = iirnotch(w0=notch_freq, Q=notch_q, fs=sampling_freq)
-        raw_notch = filtfilt(b_notch, a_notch, raw_filtered, axis=-1)
 
         # Create new recording with filtered data
         # info = mne.create_info(
