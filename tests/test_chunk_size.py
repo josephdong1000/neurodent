@@ -313,48 +313,87 @@ class TestComputeWindowedAnalysisSignature:
         assert sig.parameters["chunk_duration_s"].default == 3600
 
     def test_stream_fragments_to_zarr_called_when_chunk_duration_s_set(self, tmp_path):
-        """With ``chunk_duration_s`` set, the dask path must call
-        ``stream_fragments_to_zarr`` (not the bulk path)."""
-        from neurodent.core import utils as core_utils
+        """Calling ``compute_windowed_analysis(multiprocess_mode="dask",
+        chunk_duration_s=...)`` must invoke ``stream_fragments_to_zarr``
+        inside the dask branch of AO."""
+        import pandas as pd
+        from neurodent.visualization.results import AnimalOrganizer
 
-        with patch.object(core_utils, "stream_fragments_to_zarr") as mock_stream:
-            mock_stream.return_value = str(tmp_path / "fake.zarr")
-            # Patch da.from_zarr so dask doesn't actually try to read the fake path
-            with patch("neurodent.visualization.results.da.from_zarr"):
-                from neurodent.visualization.results import AnimalOrganizer
+        # -- build a minimal AO instance ------------------------------------
+        ao = AnimalOrganizer.__new__(AnimalOrganizer)
+        ao._validate_sampling_rates = MagicMock()
+        ao.long_analyzers = []
+        ao.long_recordings = []
+        ao.animaldays = []
+        ao.animal_id = "test"
+        ao.genotype = "WT"
+        ao.sex = "M"
+        ao.channel_names = ["Left Aud", "Right Aud"]
+        ao.assume_from_number = False
+        ao.bad_channels_dict = {}
 
-                ao = AnimalOrganizer.__new__(AnimalOrganizer)
+        # -- mock LAN returned by core.LongRecordingAnalyzer ----------------
+        mock_lan = MagicMock()
+        mock_lan.n_fragments = 5
+        mock_lan.f_s = 1000
+        mock_lan.get_fragment_np.return_value = np.zeros(
+            (10, 2), dtype=np.float32
+        )
 
-                mock_lan = MagicMock()
-                mock_lan.n_fragments = 5
-                mock_lan.get_fragment_np.return_value = np.zeros((10, 2), dtype=np.float32)
+        # _iter_valid_recordings yields one recording so the dask branch runs
+        mock_lrec = MagicMock()
+        mock_lrec.display_name = "rec0"
+        ao._iter_valid_recordings = MagicMock(
+            return_value=iter([(0, mock_lrec)])
+        )
 
-                # Invoke only the dask branch setup, not the full method
-                # by patching _iter_valid_recordings to yield nothing
-                ao._iter_valid_recordings = MagicMock(return_value=iter([]))
-                ao._validate_sampling_rates = MagicMock()
-                ao.long_analyzers = []
+        with (
+            patch(
+                "neurodent.visualization.results.core.LongRecordingAnalyzer",
+                return_value=mock_lan,
+            ),
+            patch(
+                "neurodent.visualization.results.core.utils.stream_fragments_to_zarr",
+                return_value=str(tmp_path / "fake.zarr"),
+            ) as mock_stream,
+            patch("neurodent.visualization.results.da.from_zarr"),
+            patch(
+                "neurodent.visualization.results.dask.compute",
+                return_value=[{"rms": 0.0}] * 4,
+            ),
+            patch(
+                "neurodent.visualization.results.delayed",
+                side_effect=lambda f: lambda *a, **kw: {"rms": 0.0},
+            ),
+            patch(
+                "neurodent.visualization.results.core.validate_timestamps"
+            ),
+        ):
+            ao._process_fragment_metadata = MagicMock(
+                return_value={
+                    "animalday": "test WT 2025",
+                    "timestamp": 0.0,
+                    "animal": "test",
+                    "session": "2025",
+                    "genotype": "WT",
+                    "sex": "M",
+                }
+            )
 
-                # Manually exercise the streaming branch
-                import os as _os
-                n_fragments_war = 4
-                first_fragment = np.zeros((10, 2), dtype=np.float32)
-                chunk_size = 2
+            ao.compute_windowed_analysis(
+                features=["rms"],
+                multiprocess_mode="dask",
+                chunk_duration_s=600,
+            )
 
-                core_utils.stream_fragments_to_zarr(
-                    mock_lan.get_fragment_np,
-                    n_fragments_war,
-                    first_fragment.shape,
-                    first_fragment.dtype,
-                    chunk_size,
-                )
-                mock_stream.assert_called_once_with(
-                    mock_lan.get_fragment_np,
-                    n_fragments_war,
-                    first_fragment.shape,
-                    first_fragment.dtype,
-                    chunk_size,
-                )
+            mock_stream.assert_called_once()
+            # Verify the chunk_size argument (5th positional arg) is derived
+            # from chunk_duration_s=600 / window_s=5 = 120
+            call_args = mock_stream.call_args
+            actual_chunk_size = call_args[0][4]
+            assert actual_chunk_size == 120, (
+                f"Expected chunk_size=120 (600/5), got {actual_chunk_size}"
+            )
 
 
 # ---------------------------------------------------------------------------
