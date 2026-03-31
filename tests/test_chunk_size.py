@@ -528,3 +528,131 @@ class TestChunkedChannelDistanceMatrix:
         )
         expected = self._brute_force_distance(traces)
         np.testing.assert_allclose(result, expected, atol=1e-6)
+
+
+# ---------------------------------------------------------------------------
+# FDSAR chunked spike detection – boundary deduplication
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestFdsarChunkedDetection:
+    """Verify that chunked spike detection processes the full recording and
+    deduplicates spikes at chunk boundaries."""
+
+    def test_chunked_matches_unchunked(self):
+        """Spike indices from chunked processing must match unchunked."""
+        try:
+            import spikeinterface.core as si
+        except ImportError:
+            pytest.skip("SpikeInterface not available")
+
+        from neurodent.core.frequency_domain_spike_detection import (
+            FrequencyDomainSpikeDetector,
+        )
+
+        rng = np.random.default_rng(42)
+        n_channels, fs, duration = 2, 1000.0, 5.0
+        n_samples = int(duration * fs)
+        data = rng.standard_normal((n_channels, n_samples)) * 0.1
+
+        # Insert clear negative spikes at known positions
+        spike_positions = [500, 1500, 2500, 3500, 4500]
+        for ch in range(n_channels):
+            for pos in spike_positions:
+                width = int(0.02 * fs)
+                half = width // 2
+                t = np.arange(-half, half + 1)
+                spike = -5.0 * np.exp(-0.5 * (t / (width / 6)) ** 2)
+                start = max(0, pos - half)
+                end = min(n_samples, pos + half + 1)
+                data[ch, start:end] += spike[: end - start]
+
+        rec = si.NumpyRecording(data.T, sampling_frequency=fs)
+
+        params = {
+            "bp": [3.0, 40.0],
+            "notch": 60.0,
+            "notch_q": 30.0,
+            "freq_slices": [10.0, 20.0],
+            "sneo_percentile": 98.0,
+            "cluster_gap_ms": 80.0,
+            "vote_k": 1,
+            "baseline_ms": 500.0,
+            "search_ms": 160.0,
+            "k_sigma": 3.0,
+            "smooth_window": 7,
+            "smooth_len": 5,
+            "window_s": 0.125,
+        }
+
+        # Unchunked (None = full recording at once)
+        spikes_full, _ = FrequencyDomainSpikeDetector.detect_spikes_recording(
+            rec, detection_params=params, chunk_duration_s=None,
+            multiprocess_mode="serial",
+        )
+
+        # Chunked: 1-second chunks → several boundary crossings
+        spikes_chunked, _ = FrequencyDomainSpikeDetector.detect_spikes_recording(
+            rec, detection_params=params, chunk_duration_s=1.0,
+            multiprocess_mode="serial",
+        )
+
+        # Results must be identical (no duplicates, no missing spikes)
+        for ch in range(n_channels):
+            np.testing.assert_array_equal(
+                spikes_chunked[ch], spikes_full[ch],
+                err_msg=f"Channel {ch}: chunked vs unchunked spike indices differ",
+            )
+
+    def test_no_duplicate_spikes_at_boundaries(self):
+        """Spikes near chunk boundaries must not be duplicated."""
+        try:
+            import spikeinterface.core as si
+        except ImportError:
+            pytest.skip("SpikeInterface not available")
+
+        from neurodent.core.frequency_domain_spike_detection import (
+            FrequencyDomainSpikeDetector,
+        )
+
+        rng = np.random.default_rng(7)
+        fs = 1000.0
+        duration = 4.0
+        n_samples = int(duration * fs)
+        data = rng.standard_normal((1, n_samples)) * 0.1
+
+        # Place a spike exactly at the 2-second boundary
+        pos = 2000
+        width = int(0.02 * fs)
+        half = width // 2
+        t = np.arange(-half, half + 1)
+        spike = -5.0 * np.exp(-0.5 * (t / (width / 6)) ** 2)
+        data[0, pos - half : pos + half + 1] += spike
+
+        rec = si.NumpyRecording(data.T, sampling_frequency=fs)
+
+        params = {
+            "bp": [3.0, 40.0],
+            "notch": 60.0,
+            "notch_q": 30.0,
+            "freq_slices": [10.0, 20.0],
+            "sneo_percentile": 98.0,
+            "cluster_gap_ms": 80.0,
+            "vote_k": 1,
+            "baseline_ms": 500.0,
+            "search_ms": 160.0,
+            "k_sigma": 3.0,
+            "smooth_window": 7,
+            "smooth_len": 5,
+            "window_s": 0.125,
+        }
+
+        spikes, _ = FrequencyDomainSpikeDetector.detect_spikes_recording(
+            rec, detection_params=params, chunk_duration_s=2.0,
+            multiprocess_mode="serial",
+        )
+
+        # No duplicate indices
+        assert len(spikes[0]) == len(np.unique(spikes[0])), \
+            "Duplicate spike indices found at chunk boundary"

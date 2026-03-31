@@ -117,8 +117,11 @@ class FrequencyDomainSpikeDetector:
             chunk_samples = total_samples  # single chunk = full recording
 
         # Overlap to avoid filter and detection edge effects.
-        # Use the baseline_ms parameter from detection params as the overlap,
-        # which is the largest window used during spike refinement.
+        # ``baseline_ms`` is the largest look-back/look-ahead window used
+        # during spike refinement (_enforce_downward_and_refine_minimal),
+        # so using it as the overlap ensures that spikes near chunk
+        # boundaries see the same baseline context they would in an
+        # un-chunked run.
         overlap_ms = params.get("baseline_ms", 500.0)
         overlap_samples = round(sampling_freq * overlap_ms / 1000.0)
 
