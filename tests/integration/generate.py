@@ -24,6 +24,7 @@ Usage from tests::
 from pathlib import Path
 
 import numpy as np
+from neurodent.workflow.utils import expand_animals_config
 
 
 # ---------------------------------------------------------------------------
@@ -197,17 +198,14 @@ def create_synthetic_dataset(
                 seed=hash(animal["id"]) % (2**31) + day_idx,
             )
 
-    samples_config = {
+    samples_config = expand_animals_config({
         "data_root": str(data_root),
+        "animals": animals,
         "GENOTYPE_ALIASES": {
             "WT": ["WT", "ExWT"],
             "KO": ["KO", "ExKO"],
         },
-        "ANIMAL_METADATA": animals,
-        "data_folders_to_animal_ids": {
-            session_folder: animal_ids,
-        },
-    }
+    })
 
     return {
         "data_root": data_root,
@@ -338,17 +336,14 @@ def create_synthetic_bin_csv_dataset(
         "{animal}/{session}/{index}_Meta.csv",
     ]
 
-    samples_config = {
+    samples_config = expand_animals_config({
         "data_root": str(data_root),
+        "animals": animals,
         "GENOTYPE_ALIASES": {
             "WT": ["WT", "ExWT"],
             "KO": ["KO", "ExKO"],
         },
-        "ANIMAL_METADATA": animals,
-        "data_folders_to_animal_ids": {
-            session_folder: animal_ids,
-        },
-    }
+    })
 
     return {
         "data_root": data_root,

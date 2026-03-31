@@ -10,21 +10,11 @@
     },
     "CHNAME_ALIASES": {"Aud": ["0", "9"], "Vis": ["1", "8"], "Hip": ["2", "7"], "Bar": ["3", "6"], "Mot": ["4", "5"]},
     "LR_ALIASES": {"L": ["0", "1", "2", "3", "4"], "R": ["5", "6", "7", "8", "9"]},
-    "data_folders_to_animal_ids": {
-        "PortA-AP3B2homo-240-M-PortB-AP3B2wt-241-M-standardEEG 11-27-25_251127_153905": [
-            "AP3B2homo-240-M",
-            "AP3B2wt-241-M"
-        ]
-    },
+    "animals": [
+        {"id": "AP3B2homo-240-M", "gene": "HOMO", "sex": "Male", "manual_datetime": "2025-11-27 15:39:05"},
+        {"id": "AP3B2wt-241-M", "gene": "WT", "sex": "Male", "manual_datetime": "2025-11-27 15:39:05"}
+    ],
     "bad_channels": {},
     "bad_folder_animalday": [],
-    "joint_sessions": {},
-    "manual_datetimes": {
-        "AP3B2homo-240-M": "2025-11-27 15:39:05",
-        "AP3B2wt-241-M": "2025-11-27 15:39:05"
-    },
-    "ANIMAL_METADATA": [
-        {"id": "AP3B2homo-240-M", "gene": "HOMO", "sex": "Male"},
-        {"id": "AP3B2wt-241-M", "gene": "WT", "sex": "Male"}
-    ]
+    "joint_sessions": {}
 }

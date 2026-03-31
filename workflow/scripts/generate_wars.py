@@ -27,7 +27,7 @@ def load_samples_and_config():
     # Get parameters from Snakemake
     samples_config = snakemake.params.samples_config
     config = snakemake.params.config
-    animal_folders = snakemake.params.animal_folders # List of (folder, animal_id, session_key)
+    animal_folders = snakemake.params.animal_folders # List of AnimalFolder named tuples
     animal_id = snakemake.params.animal_id
     channel_subset = snakemake.params.channel_subset  # None for regular, list for joint sessions
 
@@ -38,7 +38,7 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
     """Generate WAR for a specific animal, aggregating across multiple folders/sessions.
     
     Args:
-        animal_folders: List of (folder_path, source_animal_id, session_key) tuples.
+        animal_folders: List of AnimalFolder named tuples.
         channel_subset: Global channel subset for this animal if it is part of a joint session.
     """
 
@@ -72,7 +72,7 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
             # Resolve genotype from metadata (Metadata-First)
             if animal_id not in constants.ANIMAL_METADATA:
                  raise KeyError(
-                     f"Animal '{animal_id}' (from {animal_folders[0][0]}) not found in ANIMAL_METADATA. "
+                     f"Animal '{animal_id}' (from {animal_folders[0].folder_path}) not found in ANIMAL_METADATA. "
                      "All animals in the pipeline must be defined in the metadata for reliable processing."
                  )
             
@@ -82,8 +82,9 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
 
             # Load data from all source folders
             for folder_info in animal_folders:
-                # Unpack tuple from Snakefile
-                folder_path, source_animal_id, session_key = folder_info
+                folder_path = folder_info.folder_path
+                source_animal_id = folder_info.animal_id
+                session_key = folder_info.session_key
                 
                 logger.info(f"Loading session: {folder_path} (ID in metadata: {source_animal_id})")
                 

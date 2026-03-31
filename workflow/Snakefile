@@ -18,7 +18,7 @@ import sys
 import glob
 
 # Import workflow utilities
-from neurodent.workflow.utils import deep_merge_dict, expand_animals_config, format_config_value, increment_memory
+from neurodent.workflow.utils import AnimalFolder, deep_merge_dict, expand_animals_config, format_config_value, increment_memory
 
 
 # Load configuration
@@ -92,51 +92,36 @@ with open(samples_file, "r") as f:
 # Expand unified "animals" list into pipeline keys (if present)
 samples_config = expand_animals_config(samples_config)
 
-# Extract sample information
-# Support both unified (animals list) and legacy (data_folders_to_animal_ids) formats
 ANIMALS = []
-ANIMAL_TO_FOLDERS_MAP = {}  # Maps slugified animal_id -> list of (folder, animal_id, original_session_key)
+ANIMAL_TO_FOLDERS_MAP = {}  # Maps slugified animal_id -> list of AnimalFolder
 ANIMAL_TO_FULL_ID_MAP = {} # Maps slugified animal_id -> original animal_id string
 
-if "animals" in samples_config:
-    # Pre-compute joint-session animals to avoid duplicate folder entries.
-    # Joint-session animals get their folder entries from the joint_sessions loop below,
-    # so we skip the empty-folder placeholder for them here.
-    _joint_animal_ids = set()
-    for _session, _animals_dict in samples_config.get("joint_sessions", {}).items():
-        for _aid in _animals_dict.keys():
-            _joint_animal_ids.add(slugify(_aid, allow_unicode=True))
-
-    # Unified format: iterate directly from animals list
-    for animal_entry in samples_config["animals"]:
-        animal = animal_entry["id"]
-        slugified_name = slugify(animal, allow_unicode=True)
-
-        if slugified_name not in ANIMALS:
-            ANIMALS.append(slugified_name)
-            ANIMAL_TO_FOLDERS_MAP[slugified_name] = []
-            ANIMAL_TO_FULL_ID_MAP[slugified_name] = animal
-
-        # Joint-session animals get folder entries from the joint_sessions loop below
-        if slugified_name not in _joint_animal_ids:
-            ANIMAL_TO_FOLDERS_MAP[slugified_name].append(("", animal, ""))
-elif "data_folders_to_animal_ids" in samples_config:
-    # Legacy format: iterate from data_folders_to_animal_ids
-    for folder, animals in samples_config["data_folders_to_animal_ids"].items():
-        for animal in animals:
-            slugified_name = slugify(animal, allow_unicode=True)
-
-            if slugified_name not in ANIMALS:
-                ANIMALS.append(slugified_name)
-                ANIMAL_TO_FOLDERS_MAP[slugified_name] = []
-                ANIMAL_TO_FULL_ID_MAP[slugified_name] = animal
-
-            ANIMAL_TO_FOLDERS_MAP[slugified_name].append((folder, animal, folder))
-else:
+if "animals" not in samples_config:
     raise KeyError(
-        "Samples config must contain either 'animals' (unified format) "
-        "or 'data_folders_to_animal_ids' (legacy format)"
+        "Samples config must contain an 'animals' list. "
+        "See config/samples.json for the expected format."
     )
+
+# Pre-compute joint-session animals to avoid duplicate folder entries.
+# Joint-session animals get their folder entries from the joint_sessions loop below,
+# so we skip the placeholder entry for them here.
+_joint_animal_ids = set()
+for _session, _animals_dict in samples_config.get("joint_sessions", {}).items():
+    for _aid in _animals_dict.keys():
+        _joint_animal_ids.add(slugify(_aid, allow_unicode=True))
+
+for animal_entry in samples_config["animals"]:
+    animal = animal_entry["id"]
+    slugified_name = slugify(animal, allow_unicode=True)
+
+    if slugified_name not in ANIMALS:
+        ANIMALS.append(slugified_name)
+        ANIMAL_TO_FOLDERS_MAP[slugified_name] = []
+        ANIMAL_TO_FULL_ID_MAP[slugified_name] = animal
+
+    # Joint-session animals get folder entries from the joint_sessions loop below
+    if slugified_name not in _joint_animal_ids:
+        ANIMAL_TO_FOLDERS_MAP[slugified_name].append(AnimalFolder(folder_path="", animal_id=animal, session_key=""))
 
 # Build mapping for animals from joint sessions
 # These animals will have their data read from split output folders
@@ -154,7 +139,7 @@ for session, animals_dict in samples_config.get("joint_sessions", {}).items():
             ANIMAL_TO_FULL_ID_MAP[slugified_name] = animal_id
             
         # For joint sessions, 'session' is the folder
-        ANIMAL_TO_FOLDERS_MAP[slugified_name].append((session, animal_id, session))
+        ANIMAL_TO_FOLDERS_MAP[slugified_name].append(AnimalFolder(folder_path=session, animal_id=animal_id, session_key=session))
 
 # Optionally limit to first N animals (useful for testing)
 _truncate_animals = config.get("samples", {}).get("truncate_animals", None)
@@ -175,7 +160,7 @@ def get_animal_folder(wildcards):
     
     Used for backward compatibility with downstream rules (e.g. log paths).
     """
-    return ANIMAL_TO_FOLDERS_MAP[wildcards.animal][0][0]
+    return ANIMAL_TO_FOLDERS_MAP[wildcards.animal][0].folder_path
 
 
 def get_joint_session_channels(wildcards):

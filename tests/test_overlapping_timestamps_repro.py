@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from neurodent.visualization import AnimalOrganizer
+from neurodent.workflow.utils import AnimalFolder
 from neurodent import core
 
 # Mocking the folder structure and LRO creation
@@ -31,14 +32,17 @@ def test_distributed_timestamps_logic(mock_lros):
     """
     Simulates the logic added to generate_wars.py to distribute timestamps.
     """
-    animal_folders = [("/data/Session1", "AnimalA", "Session1"), ("/data/Session2", "AnimalA", "Session2")]
+    animal_folders = [
+        AnimalFolder(folder_path="/data/Session1", animal_id="AnimalA", session_key="Session1"),
+        AnimalFolder(folder_path="/data/Session2", animal_id="AnimalA", session_key="Session2"),
+    ]
     manual_datetimes_list = ["2025-11-27 15:39:05", "2025-11-28 11:47:05"]
     
     # Simulate generate_wars.py loop
     final_lros = []
     
     for i, folder_info in enumerate(animal_folders):
-        folder_path = folder_info[0]
+        folder_path = folder_info.folder_path
         
         # Logic from generate_wars.py
         current_dt = manual_datetimes_list[i]

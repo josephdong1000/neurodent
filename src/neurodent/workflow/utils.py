@@ -8,10 +8,26 @@ import copy
 import logging
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 if TYPE_CHECKING:
     from neurodent.visualization import WindowAnalysisResult
+
+
+class AnimalFolder(NamedTuple):
+    """A single folder/session entry for an animal in the pipeline.
+
+    Attributes:
+        folder_path: Path to the data folder. Empty string for regular animals
+            that use pattern-based discovery.
+        animal_id: The original (non-slugified) animal ID string.
+        session_key: Session identifier. Empty string for regular animals;
+            matches the joint-session name for joint-session animals.
+    """
+
+    folder_path: str
+    animal_id: str
+    session_key: str
 
 
 def setup_snakemake_logging(snakemake) -> logging.Logger:
