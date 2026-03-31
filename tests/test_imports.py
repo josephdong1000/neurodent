@@ -246,6 +246,7 @@ class TestStandardizedImports:
             "parse_truncate",
             "cache_fragments_to_zarr",
             "stream_fragments_to_zarr",
+            "chunked_channel_distance_matrix",
             "is_day",
             "nanmean_series_of_np",
             "sort_dataframe_by_plot_order",

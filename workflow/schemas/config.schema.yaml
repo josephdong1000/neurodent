@@ -59,12 +59,12 @@ properties:
         type: object
         description: Spike detection parameters
         properties:
-          max_duration_s:
+          chunk_duration_s:
             description: >
-              Maximum duration in seconds to analyze per recording during spike
-              detection. null = analyze the full recording (more accurate, higher
-              peak RAM). Set to a number to truncate long recordings (reduces
-              peak RAM).
+              Duration in seconds of each processing chunk for spike detection.
+              The full recording is always analysed; this parameter controls
+              peak RAM by processing overlapping chunks of the given duration.
+              null = load the full recording at once (fastest, highest RAM).
             type: ["number", "null"]
           export_chunk_duration_s:
             type: number
@@ -104,3 +104,9 @@ properties:
               reject_lof_threshold:
                 type: number
                 description: LOF score threshold above which channels are considered bad
+              lof_chunk_duration_s:
+                type: number
+                description: >
+                  Duration in seconds of each chunk used for pairwise-distance
+                  computation in LOF bad-channel detection.  Lower values reduce
+                  peak RAM at the cost of more I/O passes over the recording.

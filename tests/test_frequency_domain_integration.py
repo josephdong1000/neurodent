@@ -85,8 +85,8 @@ class TestFrequencyDomainSpikeDetectionIntegration:
 
     def test_frequency_domain_spike_detection_basic(self, animal_organizer):
         """Test basic frequency domain spike detection on real data."""
-        # Limit processing time by using max_duration_s
-        max_duration_s = 30.0  # ~30 seconds
+        # Limit peak RAM by using chunk_duration_s
+        chunk_duration_s = 30.0  # ~30 seconds
 
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=RuntimeWarning)
@@ -94,7 +94,7 @@ class TestFrequencyDomainSpikeDetectionIntegration:
             # Run frequency domain spike detection
             fdsar_list = animal_organizer.compute_frequency_domain_spike_analysis(
                 detection_params=TEST_DETECTION_PARAMS,
-                max_duration_s=max_duration_s,
+                chunk_duration_s=chunk_duration_s,
                 multiprocess_mode="auto",
             )
 
@@ -141,7 +141,7 @@ class TestFrequencyDomainSpikeDetectionIntegration:
             },
         ]
 
-        max_duration_s = 20.0  # Shorter for parameter testing
+        chunk_duration_s = 20.0  # Shorter for parameter testing
 
         results = []
         for i, params in enumerate(param_sets):
@@ -150,7 +150,7 @@ class TestFrequencyDomainSpikeDetectionIntegration:
 
                 fdsar_list = animal_organizer.compute_frequency_domain_spike_analysis(
                     detection_params=params,
-                    max_duration_s=max_duration_s,
+                    chunk_duration_s=chunk_duration_s,
                     multiprocess_mode="auto",
                 )
 
@@ -174,14 +174,14 @@ class TestFrequencyDomainSpikeDetectionIntegration:
 
     def test_spikeinterface_compatibility(self, animal_organizer):
         """Test that results are compatible with SpikeInterface infrastructure."""
-        max_duration_s = 15.0
+        chunk_duration_s = 15.0
 
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=RuntimeWarning)
 
             fdsar_list = animal_organizer.compute_frequency_domain_spike_analysis(
                 detection_params=TEST_DETECTION_PARAMS,
-                max_duration_s=max_duration_s,
+                chunk_duration_s=chunk_duration_s,
                 multiprocess_mode="auto",
             )
 
@@ -207,14 +207,14 @@ class TestFrequencyDomainSpikeDetectionIntegration:
 
     def test_mne_annotation_creation(self, animal_organizer):
         """Test that MNE annotations are properly created."""
-        max_duration_s = 15.0
+        chunk_duration_s = 15.0
 
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=RuntimeWarning)
 
             fdsar_list = animal_organizer.compute_frequency_domain_spike_analysis(
                 detection_params=TEST_DETECTION_PARAMS,
-                max_duration_s=max_duration_s,
+                chunk_duration_s=chunk_duration_s,
                 multiprocess_mode="auto",
             )
 
@@ -250,14 +250,14 @@ class TestFrequencyDomainSpikeDetectionIntegration:
 
     def test_save_and_load_integration(self, animal_organizer, tmp_path):
         """Test saving and loading with real data."""
-        max_duration_s = 10.0
+        chunk_duration_s = 10.0
 
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=RuntimeWarning)
 
             fdsar_list = animal_organizer.compute_frequency_domain_spike_analysis(
                 detection_params=TEST_DETECTION_PARAMS,
-                max_duration_s=max_duration_s,
+                chunk_duration_s=chunk_duration_s,
                 multiprocess_mode="auto",
             )
 
@@ -295,14 +295,14 @@ class TestFrequencyDomainSpikeDetectionIntegration:
 
     def test_spike_averaged_plotting(self, animal_organizer, tmp_path):
         """Test spike-averaged trace plotting with real data."""
-        max_duration_s = 20.0
+        chunk_duration_s = 20.0
 
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=RuntimeWarning)
 
             fdsar_list = animal_organizer.compute_frequency_domain_spike_analysis(
                 detection_params=TEST_DETECTION_PARAMS,
-                max_duration_s=max_duration_s,
+                chunk_duration_s=chunk_duration_s,
                 multiprocess_mode="auto",
             )
 
@@ -375,7 +375,7 @@ class TestFrequencyDomainSpikeDetectorStandalone:
 
     def test_direct_spike_detection(self, spikeinterface_recording):
         """Test FrequencyDomainSpikeDetector directly on SpikeInterface recording."""
-        max_duration_s = 15.0
+        chunk_duration_s = 15.0
 
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=RuntimeWarning)
@@ -384,7 +384,7 @@ class TestFrequencyDomainSpikeDetectorStandalone:
                 FrequencyDomainSpikeDetector.detect_spikes_recording(
                     spikeinterface_recording,
                     detection_params=TEST_DETECTION_PARAMS,
-                    max_duration_s=max_duration_s,
+                    chunk_duration_s=chunk_duration_s,
                     multiprocess_mode="auto",
                 )
             )
@@ -404,7 +404,7 @@ class TestFrequencyDomainSpikeDetectorStandalone:
 
     def test_detection_parameter_effects(self, spikeinterface_recording):
         """Test that different parameters produce different results."""
-        max_duration_s = 10.0
+        chunk_duration_s = 10.0
 
         # Test with high threshold (should detect fewer spikes)
         high_threshold_params = {**TEST_DETECTION_PARAMS, "sneo_percentile": 99.5}
@@ -418,14 +418,14 @@ class TestFrequencyDomainSpikeDetectorStandalone:
             high_spikes, _ = FrequencyDomainSpikeDetector.detect_spikes_recording(
                 spikeinterface_recording,
                 detection_params=high_threshold_params,
-                max_duration_s=max_duration_s,
+                chunk_duration_s=chunk_duration_s,
                 multiprocess_mode="auto",
             )
 
             low_spikes, _ = FrequencyDomainSpikeDetector.detect_spikes_recording(
                 spikeinterface_recording,
                 detection_params=low_threshold_params,
-                max_duration_s=max_duration_s,
+                chunk_duration_s=chunk_duration_s,
                 multiprocess_mode="auto",
             )
 

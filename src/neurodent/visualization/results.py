@@ -1126,7 +1126,8 @@ class AnimalOrganizer(AnimalFeatureParser):
             )
 
     def compute_bad_channels(
-        self, lof_threshold: float = None, force_recompute: bool = False
+        self, lof_threshold: float = None, force_recompute: bool = False,
+        lof_chunk_duration_s: float = 60,
     ):
         """Compute bad channels using LOF analysis for all recordings.
 
@@ -1134,6 +1135,8 @@ class AnimalOrganizer(AnimalFeatureParser):
             lof_threshold (float, optional): Threshold for determining bad channels from LOF scores.
                                            If None, only computes/loads scores without setting bad_channel_names.
             force_recompute (bool): Whether to recompute LOF scores even if they exist.
+            lof_chunk_duration_s (float): Duration in seconds of each chunk used
+                for the pairwise-distance computation in LOF.  Defaults to 60.
         """
         logging.info(
             f"Computing bad channels for {len(self.long_recordings)} recordings with threshold={lof_threshold}"
@@ -1144,6 +1147,7 @@ class AnimalOrganizer(AnimalFeatureParser):
             )
             lrec.compute_bad_channels(
                 lof_threshold=lof_threshold, force_recompute=force_recompute,
+                lof_chunk_duration_s=lof_chunk_duration_s,
             )
             logging.debug(
                 f"Recording {i} LOF scores computed: {hasattr(lrec, 'lof_scores') and lrec.lof_scores is not None}"
@@ -1189,7 +1193,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         multiprocess_mode: Literal["dask", "serial"] = "serial",
         suppress_short_interval_error=False,
         apply_notch_filter=True,
-        chunk_duration_s: Optional[float] = None,
+        chunk_duration_s: Optional[float] = 3600,
         **kwargs,
     ) -> "WindowAnalysisResult":
         """Computes windowed analysis of animal recordings. The data is divided into windows (time bins), then features are extracted from each window. The result is
@@ -1204,7 +1208,7 @@ class AnimalOrganizer(AnimalFeatureParser):
             chunk_duration_s (float, optional): Duration in seconds of data to hold
                 in memory at once during the Dask processing path.  Internally
                 converted to a number of fragments via
-                ``int(chunk_duration_s / window_s)``.  When ``None`` (default),
+                ``int(chunk_duration_s / window_s)``.  When ``None``,
                 all fragments are loaded into a single NumPy array before being
                 written to the intermediate zarr store — the original behavior,
                 which maximizes throughput but requires enough RAM to hold the
@@ -1213,7 +1217,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                 them to zarr incrementally; use a small value (e.g. 250) on
                 memory-constrained machines and a larger value (e.g. 2500+) on
                 high-memory nodes for maximum throughput.  Only has an effect when
-                ``multiprocess_mode="dask"``.
+                ``multiprocess_mode="dask"``.  Defaults to 3600.
 
         Raises:
             AttributeError: If a feature's ``compute_...()`` function was not implemented, this error will be raised.
@@ -1396,7 +1400,7 @@ class AnimalOrganizer(AnimalFeatureParser):
     def compute_frequency_domain_spike_analysis(
         self,
         detection_params: dict = None,
-        max_duration_s: float = None,
+        chunk_duration_s: float = None,
         multiprocess_mode: Literal["dask", "serial"] = "serial",
     ):
         """
@@ -1404,9 +1408,11 @@ class AnimalOrganizer(AnimalFeatureParser):
 
         Args:
             detection_params (dict, optional): Detection parameters. Uses defaults if None.
-            max_duration_s (float, optional): Maximum duration in seconds to analyze
-                per recording.  When set, only the first ``max_duration_s`` seconds
-                of each recording are kept, capping peak RAM usage.
+            chunk_duration_s (float, optional): Duration in seconds of each
+                processing chunk.  The full recording is always analysed;
+                this parameter controls peak RAM by processing the recording
+                in overlapping chunks of the given duration.
+                ``None`` loads the full recording at once (fastest).
             multiprocess_mode (Literal["dask", "serial"]): Processing mode
 
         Returns:
@@ -1434,7 +1440,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                     FrequencyDomainSpikeDetector.detect_spikes_recording(
                         rec,
                         detection_params=detection_params,
-                        max_duration_s=max_duration_s,
+                        chunk_duration_s=chunk_duration_s,
                         multiprocess_mode=multiprocess_mode,
                     )
                 )

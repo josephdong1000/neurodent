@@ -479,8 +479,8 @@ class TestFdsarDiagnosticsConfigWiring:
         assert kwargs["save_epoch"] is False
 
 
-class TestFdsarMaxLengthWiring:
-    """Verify that generate_wars.py reads max_duration_s from
+class TestFdsarChunkDurationWiring:
+    """Verify that generate_wars.py reads chunk_duration_s from
     frequency_domain_spike_detection config and passes it to
     ao.compute_frequency_domain_spike_analysis().
     """
@@ -491,51 +491,55 @@ class TestFdsarMaxLengthWiring:
         compute_frequency_domain_spike_analysis."""
         detection_params = fdsar_config.get("default_params", {})
         multiprocess_mode = fdsar_config.get("multiprocess_mode", "serial")
-        fdsar_max_duration_s = fdsar_config.get("max_duration_s", None)
+        fdsar_chunk_duration_s = fdsar_config.get("chunk_duration_s", None)
         mock_ao.compute_frequency_domain_spike_analysis(
             detection_params=detection_params,
             multiprocess_mode=multiprocess_mode,
-            max_duration_s=fdsar_max_duration_s,
+            chunk_duration_s=fdsar_chunk_duration_s,
         )
 
-    def test_max_duration_s_null_passes_none(self):
-        """When max_duration_s is null/absent, None is forwarded."""
+    def test_chunk_duration_s_null_passes_none(self):
+        """When chunk_duration_s is null/absent, None is forwarded."""
         ao = MagicMock()
         self._call_fdsar({"default_params": {}, "multiprocess_mode": "dask"}, ao)
 
         _, kwargs = ao.compute_frequency_domain_spike_analysis.call_args
-        assert kwargs["max_duration_s"] is None
+        assert kwargs["chunk_duration_s"] is None
 
-    def test_max_duration_s_forwarded(self):
-        """When max_duration_s is a number, it is forwarded verbatim."""
+    def test_chunk_duration_s_forwarded(self):
+        """When chunk_duration_s is a number, it is forwarded verbatim."""
         ao = MagicMock()
         self._call_fdsar(
-            {"default_params": {}, "multiprocess_mode": "dask", "max_duration_s": 300.0},
+            {"default_params": {}, "multiprocess_mode": "dask", "chunk_duration_s": 300.0},
             ao,
         )
 
         _, kwargs = ao.compute_frequency_domain_spike_analysis.call_args
-        assert kwargs["max_duration_s"] == 300.0
+        assert kwargs["chunk_duration_s"] == 300.0
 
-    def test_missing_max_duration_s_defaults_none(self):
-        """When max_duration_s key is absent, None is used."""
+    def test_missing_chunk_duration_s_defaults_none(self):
+        """When chunk_duration_s key is absent, None is used."""
         ao = MagicMock()
         self._call_fdsar({"default_params": {}}, ao)
 
         _, kwargs = ao.compute_frequency_domain_spike_analysis.call_args
-        assert kwargs["max_duration_s"] is None
+        assert kwargs["chunk_duration_s"] is None
 
 
 class TestLofThresholdWiring:
     """Verify that generate_wars.py reads lof config and passes
-    reject_lof_threshold to ao.compute_bad_channels().
+    reject_lof_threshold and lof_chunk_duration_s to ao.compute_bad_channels().
     """
 
     @staticmethod
     def _call_compute_bad_channels(lof_config, mock_ao):
         """Replicate the generate_wars.py logic for calling compute_bad_channels."""
         lof_threshold = lof_config.get("reject_lof_threshold")
-        mock_ao.compute_bad_channels(lof_threshold=lof_threshold)
+        lof_chunk_duration_s = lof_config.get("lof_chunk_duration_s", 60)
+        mock_ao.compute_bad_channels(
+            lof_threshold=lof_threshold,
+            lof_chunk_duration_s=lof_chunk_duration_s,
+        )
 
     def test_lof_threshold_forwarded(self):
         """reject_lof_threshold is forwarded as lof_threshold."""
@@ -560,4 +564,22 @@ class TestLofThresholdWiring:
 
         _, kwargs = ao.compute_bad_channels.call_args
         assert "limit_memory" not in kwargs
+
+    def test_lof_chunk_duration_s_forwarded(self):
+        """lof_chunk_duration_s is forwarded from config."""
+        ao = MagicMock()
+        self._call_compute_bad_channels(
+            {"reject_lof_threshold": 2.5, "lof_chunk_duration_s": 120}, ao,
+        )
+
+        _, kwargs = ao.compute_bad_channels.call_args
+        assert kwargs["lof_chunk_duration_s"] == 120
+
+    def test_lof_chunk_duration_s_default_60(self):
+        """When lof_chunk_duration_s is absent, defaults to 60."""
+        ao = MagicMock()
+        self._call_compute_bad_channels({"reject_lof_threshold": 2.5}, ao)
+
+        _, kwargs = ao.compute_bad_channels.call_args
+        assert kwargs["lof_chunk_duration_s"] == 60
 

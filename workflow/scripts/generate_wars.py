@@ -196,14 +196,18 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
             logger.info(f"Computing bad channels for {animal_key}")
             lof_config = config["analysis"]["channel_filter_config"]["lof"]
             lof_threshold = lof_config.get("reject_lof_threshold")
-            ao.compute_bad_channels(lof_threshold=lof_threshold)
+            lof_chunk_duration_s = lof_config.get("lof_chunk_duration_s", 60)
+            ao.compute_bad_channels(
+                lof_threshold=lof_threshold,
+                lof_chunk_duration_s=lof_chunk_duration_s,
+            )
 
             # Generate WAR using Dask
             logger.info(f"Computing windowed analysis for {animal_key}")
             cwa_config = analysis_config.get("compute_windowed_analysis", {})
             cwa_features = cwa_config.get("features", ["all"])
             cwa_multiprocess_mode = cwa_config.get("multiprocess_mode", "dask")
-            cwa_chunk_duration_s = cwa_config.get("chunk_duration_s", None)
+            cwa_chunk_duration_s = cwa_config.get("chunk_duration_s", 3600)
             with warnings.catch_warnings():
                 warnings.filterwarnings(
                     "ignore",
@@ -221,11 +225,11 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
             fdsar_config = config["analysis"]["frequency_domain_spike_detection"]
             detection_params = fdsar_config["default_params"]
             multiprocess_mode = fdsar_config.get("multiprocess_mode", "serial")
-            fdsar_max_duration_s = fdsar_config.get("max_duration_s", None)
+            fdsar_chunk_duration_s = fdsar_config.get("chunk_duration_s", None)
 
             fdsar_list = ao.compute_frequency_domain_spike_analysis(
                 detection_params=detection_params, multiprocess_mode=multiprocess_mode,
-                max_duration_s=fdsar_max_duration_s,
+                chunk_duration_s=fdsar_chunk_duration_s,
             )
 
             # Integrate spike features into WAR

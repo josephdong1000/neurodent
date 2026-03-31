@@ -304,13 +304,13 @@ class TestComputeWindowedAnalysisSignature:
         sig = inspect.signature(AnimalOrganizer.compute_windowed_analysis)
         assert "chunk_duration_s" in sig.parameters
 
-    def test_chunk_duration_s_default_is_none(self):
-        """Default value of ``chunk_duration_s`` should be None (backward-compat)."""
+    def test_chunk_duration_s_default_is_3600(self):
+        """Default value of ``chunk_duration_s`` should be 3600."""
         import inspect
         from neurodent.visualization.results import AnimalOrganizer
 
         sig = inspect.signature(AnimalOrganizer.compute_windowed_analysis)
-        assert sig.parameters["chunk_duration_s"].default is None
+        assert sig.parameters["chunk_duration_s"].default == 3600
 
     def test_stream_fragments_to_zarr_called_when_chunk_duration_s_set(self, tmp_path):
         """With ``chunk_duration_s`` set, the dask path must call
@@ -419,3 +419,112 @@ class TestSaveFifAndJsonChunkDurationS:
 
         sig = inspect.signature(FrequencyDomainSpikeAnalysisResult.save_fif_and_json)
         assert "chunk_duration_s" in sig.parameters
+
+
+# ---------------------------------------------------------------------------
+# chunked_channel_distance_matrix – unit tests for extracted utility
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestChunkedChannelDistanceMatrix:
+    """Test that ``chunked_channel_distance_matrix`` returns correct Euclidean
+    distances and that chunked computation matches the non-chunked baseline."""
+
+    def _brute_force_distance(self, data):
+        """Reference implementation: full pairwise Euclidean distance."""
+        from scipy.spatial.distance import squareform, pdist
+        return squareform(pdist(data.T, metric="euclidean"))
+
+    def test_identity_with_single_chunk(self):
+        """When chunk_samples >= n_samples, result matches brute-force."""
+        from neurodent.core.utils import chunked_channel_distance_matrix
+        rng = np.random.default_rng(42)
+        n_channels, n_samples = 4, 200
+        traces = rng.standard_normal((n_samples, n_channels))
+
+        result = chunked_channel_distance_matrix(
+            get_traces_fn=lambda s, e: traces[s:e],
+            n_channels=n_channels,
+            n_samples=n_samples,
+            chunk_samples=n_samples,  # single chunk
+        )
+        expected = self._brute_force_distance(traces)
+        np.testing.assert_allclose(result, expected, atol=1e-6)
+
+    def test_matches_brute_force_multiple_chunks(self):
+        """Chunked result must be identical to brute-force for many small chunks."""
+        from neurodent.core.utils import chunked_channel_distance_matrix
+        rng = np.random.default_rng(7)
+        n_channels, n_samples = 6, 500
+        traces = rng.standard_normal((n_samples, n_channels))
+
+        result = chunked_channel_distance_matrix(
+            get_traces_fn=lambda s, e: traces[s:e],
+            n_channels=n_channels,
+            n_samples=n_samples,
+            chunk_samples=37,  # deliberately non-divisor
+        )
+        expected = self._brute_force_distance(traces)
+        np.testing.assert_allclose(result, expected, atol=1e-6)
+
+    def test_symmetry(self):
+        """Distance matrix must be symmetric."""
+        from neurodent.core.utils import chunked_channel_distance_matrix
+        rng = np.random.default_rng(99)
+        n_channels, n_samples = 5, 300
+        traces = rng.standard_normal((n_samples, n_channels))
+
+        result = chunked_channel_distance_matrix(
+            get_traces_fn=lambda s, e: traces[s:e],
+            n_channels=n_channels,
+            n_samples=n_samples,
+            chunk_samples=50,
+        )
+        np.testing.assert_allclose(result, result.T, atol=1e-10)
+
+    def test_diagonal_is_zero(self):
+        """Self-distances must be zero."""
+        from neurodent.core.utils import chunked_channel_distance_matrix
+        rng = np.random.default_rng(11)
+        n_channels, n_samples = 3, 100
+        traces = rng.standard_normal((n_samples, n_channels))
+
+        result = chunked_channel_distance_matrix(
+            get_traces_fn=lambda s, e: traces[s:e],
+            n_channels=n_channels,
+            n_samples=n_samples,
+            chunk_samples=25,
+        )
+        np.testing.assert_allclose(np.diag(result), 0, atol=1e-6)
+
+    def test_non_negative(self):
+        """All distances must be non-negative."""
+        from neurodent.core.utils import chunked_channel_distance_matrix
+        rng = np.random.default_rng(55)
+        n_channels, n_samples = 4, 150
+        traces = rng.standard_normal((n_samples, n_channels))
+
+        result = chunked_channel_distance_matrix(
+            get_traces_fn=lambda s, e: traces[s:e],
+            n_channels=n_channels,
+            n_samples=n_samples,
+            chunk_samples=30,
+        )
+        assert np.all(result >= 0)
+
+    def test_chunk_size_one(self):
+        """Edge case: chunk_samples = 1 still produces correct result."""
+        from neurodent.core.utils import chunked_channel_distance_matrix
+        rng = np.random.default_rng(21)
+        n_channels, n_samples = 3, 10
+        traces = rng.standard_normal((n_samples, n_channels))
+
+        result = chunked_channel_distance_matrix(
+            get_traces_fn=lambda s, e: traces[s:e],
+            n_channels=n_channels,
+            n_samples=n_samples,
+            chunk_samples=1,
+        )
+        expected = self._brute_force_distance(traces)
+        np.testing.assert_allclose(result, expected, atol=1e-6)

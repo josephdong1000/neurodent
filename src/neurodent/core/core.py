@@ -39,6 +39,7 @@ from .. import constants
 from .utils import (
     Natural_Neighbor,
     TimestampMapper,
+    chunked_channel_distance_matrix,
     convert_colpath_to_rowpath,
     convert_units_to_multiplier,
     extract_mne_unit_info,
@@ -1592,6 +1593,7 @@ class LongRecordingOrganizer:
         self,
         lof_threshold: float = None,
         force_recompute: bool = False,
+        lof_chunk_duration_s: float = 60,
     ):
         """Compute bad channels using LOF analysis with unified score storage.
 
@@ -1599,6 +1601,8 @@ class LongRecordingOrganizer:
             lof_threshold (float, optional): Threshold for determining bad channels from LOF scores.
                                            If None, only computes/loads scores without setting bad_channel_names.
             force_recompute (bool): Whether to recompute LOF scores even if they exist.
+            lof_chunk_duration_s (float): Duration in seconds of each chunk used
+                for the pairwise-distance computation in LOF.  Defaults to 60.
         """
         # Check if LOF scores already exist and are current
         if (
@@ -1610,7 +1614,9 @@ class LongRecordingOrganizer:
         else:
             # Compute new LOF scores
             try:
-                scores = self._compute_lof_scores()
+                scores = self._compute_lof_scores(
+                    lof_chunk_duration_s=lof_chunk_duration_s,
+                )
                 self.lof_scores = scores
                 logging.info(f"Computed LOF scores for {len(scores)} channels")
             except Exception as e:
@@ -1621,13 +1627,17 @@ class LongRecordingOrganizer:
         if lof_threshold is not None:
             self.apply_lof_threshold(lof_threshold)
 
-    def _compute_lof_scores(self) -> np.ndarray:
+    def _compute_lof_scores(self, lof_chunk_duration_s: float = 60) -> np.ndarray:
         """Compute raw LOF scores for all channels.
 
         Pairwise Euclidean distances between channels are computed in
         chunks so that the full recording never needs to be held in
         memory at once.  Both the Natural-Neighbor *k*-selection and the
         LOF fit operate on the precomputed distance matrix.
+
+        Args:
+            lof_chunk_duration_s: Duration in seconds of each chunk used
+                for the pairwise-distance computation.  Defaults to 60.
 
         Returns:
             np.ndarray: LOF scores for each channel.
@@ -1644,27 +1654,15 @@ class LongRecordingOrganizer:
             )
 
             # --- Chunked pairwise-distance computation ---
-            # Process 60 s of data at a time to keep RAM bounded.
-            chunk_samples = int(60 * fs)
-            sq_dist_accum = np.zeros((n_channels, n_channels), dtype=np.float64)
-
-            for start in range(0, n_samples, chunk_samples):
-                end = min(start + chunk_samples, n_samples)
-                chunk = rec.get_traces(
-                    start_frame=start, end_frame=end, return_scaled=True
-                )  # (chunk_len, n_channels)
-                chunk_t = chunk.T  # (n_channels, chunk_len)
-
-                # ||c_i - c_j||^2 = ||c_i||^2 + ||c_j||^2 - 2 * c_i · c_j
-                norms_sq = np.sum(chunk_t ** 2, axis=1)  # (n_channels,)
-                gram = chunk_t @ chunk_t.T  # (n_channels, n_channels)
-                sq_dist_accum += norms_sq[:, None] + norms_sq[None, :] - 2 * gram
-                del chunk, chunk_t, norms_sq, gram
-
-            # Clamp tiny negatives from floating-point arithmetic
-            np.maximum(sq_dist_accum, 0, out=sq_dist_accum)
-            distance_matrix = np.sqrt(sq_dist_accum)
-            del sq_dist_accum
+            chunk_samples = round(lof_chunk_duration_s * fs)
+            distance_matrix = chunked_channel_distance_matrix(
+                get_traces_fn=lambda s, e: rec.get_traces(
+                    start_frame=s, end_frame=e, return_scaled=True
+                ),
+                n_channels=n_channels,
+                n_samples=n_samples,
+                chunk_samples=chunk_samples,
+            )
             logging.debug(f"Distance matrix shape: {distance_matrix.shape}")
 
             # --- Optimal neighbour count via Natural Neighbor ---

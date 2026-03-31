@@ -1134,6 +1134,56 @@ def stream_fragments_to_zarr(
     return tmppath
 
 
+def chunked_channel_distance_matrix(
+    get_traces_fn: Callable[[int, int], np.ndarray],
+    n_channels: int,
+    n_samples: int,
+    chunk_samples: int,
+) -> np.ndarray:
+    """Compute pairwise Euclidean distance matrix between channels in chunks.
+
+    Instead of loading the full ``(n_samples, n_channels)`` trace matrix at
+    once, this function reads ``chunk_samples`` frames at a time and
+    accumulates squared distances using the identity
+
+        ||c_i - c_j||^2 = ||c_i||^2 + ||c_j||^2 - 2 * c_i · c_j
+
+    so that peak RAM is proportional to ``chunk_samples * n_channels``
+    rather than ``n_samples * n_channels``.
+
+    Args:
+        get_traces_fn: ``fn(start_frame, end_frame) -> np.ndarray`` with
+            shape ``(frames, n_channels)``.  Typically
+            ``recording.get_traces(start_frame=..., end_frame=...,
+            return_scaled=True)``.
+        n_channels: Number of channels.
+        n_samples: Total number of samples in the recording.
+        chunk_samples: Number of samples to read per chunk.
+
+    Returns:
+        np.ndarray: Symmetric ``(n_channels, n_channels)`` Euclidean
+        distance matrix.
+    """
+    sq_dist_accum = np.zeros((n_channels, n_channels), dtype=np.float64)
+
+    for start in range(0, n_samples, chunk_samples):
+        end = min(start + chunk_samples, n_samples)
+        chunk = get_traces_fn(start, end)  # (chunk_len, n_channels)
+        chunk_t = chunk.T  # (n_channels, chunk_len)
+
+        # ||c_i - c_j||^2 = ||c_i||^2 + ||c_j||^2 - 2 * c_i · c_j
+        norms_sq = np.sum(chunk_t ** 2, axis=1)  # (n_channels,)
+        gram = chunk_t @ chunk_t.T  # (n_channels, n_channels)
+        sq_dist_accum += norms_sq[:, None] + norms_sq[None, :] - 2 * gram
+        del chunk, chunk_t, norms_sq, gram
+
+    # Clamp tiny negatives from floating-point arithmetic
+    np.maximum(sq_dist_accum, 0, out=sq_dist_accum)
+    distance_matrix = np.sqrt(sq_dist_accum)
+    del sq_dist_accum
+    return distance_matrix
+
+
 def get_file_stem(filepath: Union[str, Path]) -> str:
     """Get the true stem for files, handling double extensions like .npy.gz."""
     filepath = Path(filepath)
