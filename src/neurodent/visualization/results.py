@@ -671,6 +671,7 @@ class AnimalOrganizer(AnimalFeatureParser):
     def _create_long_recordings(self, lro_kwargs: dict):
         """Create LongRecordingOrganizer instances for each unique animalday."""
         self.long_recordings: list[core.LongRecordingOrganizer] = []
+        skipped_animaldays = []  # Track animaldays that are skipped due to all 0-sample LROs
         for animalday, items in self._animalday_folder_groups.items():
             kwargs = lro_kwargs.copy()
             if getattr(self, "_processed_timestamps", None) is not None:
@@ -726,7 +727,23 @@ class AnimalOrganizer(AnimalFeatureParser):
                     )
                     item_lro_pairs.append((item, individual_lro))
 
-                sorted_folder_lro_pairs = self._sort_lros_by_median_time(item_lro_pairs)
+                valid_pairs, skipped_names = self._filter_zero_sample_lros(
+                    item_lro_pairs, self._get_item_name
+                )
+                if skipped_names:
+                    logging.warning(
+                        f"Skipping {len(skipped_names)} 0-sample LRO(s) for "
+                        f"'{animalday}' before merge: {skipped_names}"
+                    )
+                if not valid_pairs:
+                    logging.warning(
+                        f"All {len(item_lro_pairs)} LRO(s) for '{animalday}' are "
+                        f"0-sample; skipping entire date."
+                    )
+                    skipped_animaldays.append(animalday)
+                    continue
+
+                sorted_folder_lro_pairs = self._sort_lros_by_median_time(valid_pairs)
 
                 logging.info("LRO merge order for overlapping animalday:")
                 for i, (item, lro) in enumerate(sorted_folder_lro_pairs):
@@ -759,7 +776,22 @@ class AnimalOrganizer(AnimalFeatureParser):
 
             self.long_recordings.append(lro)
 
+        # Remove skipped animaldays from unique_animaldays
+        if skipped_animaldays:
+            for skipped in skipped_animaldays:
+                if skipped in self.unique_animaldays:
+                    self.unique_animaldays.remove(skipped)
+                if hasattr(self, "animaldays") and skipped in self.animaldays:
+                    self.animaldays.remove(skipped)
+            logging.info(
+                f"Removed {len(skipped_animaldays)} skipped animalday(s) from unique_animaldays: {skipped_animaldays}"
+            )
+
         self._log_timeline_summary()
+
+        # Check if no recordings were loaded
+        if len(self.long_recordings) == 0:
+            raise RuntimeError("No recordings were loaded")
 
         if len(self.long_recordings) != len(self.unique_animaldays):
             error_msg = (
@@ -1082,6 +1114,47 @@ class AnimalOrganizer(AnimalFeatureParser):
                 )
                 continue
             yield i, lrec
+
+    @staticmethod
+    def _filter_zero_sample_lros(lro_pairs, get_name):
+        """Remove 0-sample LROs from *lro_pairs* before a merge loop.
+
+        A 0-sample LRO used as the **base** of a merge causes
+        ``si.concatenate_recordings`` to fail or produce corrupt metadata.
+        This helper removes such LROs up-front so every caller's merge loop
+        starts from a valid base.
+
+        This is intentionally separate from the ``merge()`` check in
+        ``LongRecordingOrganizer``, which only guards against a 0-sample
+        *other_lro* being merged in.  Together the two checks cover all cases:
+        base=0-sample (this helper) and other_lro=0-sample (``merge()``).
+
+        Args:
+            lro_pairs: Iterable of ``(key, lro)`` pairs.  *key* is whatever
+                the caller uses to name the LRO (item path, string tag, …).
+            get_name: Callable ``(key) -> str`` used to produce a human-readable
+                name for warning messages.
+
+        Returns:
+            ``(valid_pairs, skipped_names)`` where *valid_pairs* is a list of
+            ``(key, lro)`` pairs with 0-sample entries removed and
+            *skipped_names* is a list of names of the removed LROs.
+        """
+        valid_pairs = []
+        skipped_names = []
+        for key, lro in lro_pairs:
+            try:
+                if (
+                    hasattr(lro, "LongRecording")
+                    and lro.LongRecording is not None
+                    and lro.LongRecording.get_total_samples() == 0
+                ):
+                    skipped_names.append(get_name(key))
+                    continue
+            except (TypeError, AttributeError):
+                pass  # Non-SI or mock — keep it
+            valid_pairs.append((key, lro))
+        return valid_pairs, skipped_names
 
     def _validate_sampling_rates(self):
         """Validate that all valid recordings share the same sampling rate.
@@ -1642,9 +1715,28 @@ class AnimalOrganizer(AnimalFeatureParser):
                     f"Merging into single LRO (mimicking normal __init__ behavior)."
                 )
 
-                # Sort by median time (same logic as normal __init__)
+                # Filter out 0-sample LROs before the merge loop.  A 0-sample
+                # base LRO makes si.concatenate_recordings fail; using the same
+                # helper as _create_long_recordings keeps the two code paths
+                # consistent.
                 lro_pairs = [(f"lro_{idx}", lro) for idx, lro in lro_group]
-                sorted_pairs = cls._sort_lros_by_median_time_static(lro_pairs)
+                valid_pairs, skipped_names = cls._filter_zero_sample_lros(
+                    lro_pairs, lambda k: k
+                )
+                if skipped_names:
+                    logging.warning(
+                        f"Skipping {len(skipped_names)} 0-sample LRO(s) for "
+                        f"'{animalday}' before merge: {skipped_names}"
+                    )
+                if not valid_pairs:
+                    logging.warning(
+                        f"All {len(lro_group)} LRO(s) for '{animalday}' are "
+                        f"0-sample; skipping entire date."
+                    )
+                    continue
+
+                # Sort by median time (same logic as normal __init__)
+                sorted_pairs = cls._sort_lros_by_median_time_static(valid_pairs)
 
                 # Merge all LROs into the first one (in temporal order)
                 base_lro = sorted_pairs[0][1]
