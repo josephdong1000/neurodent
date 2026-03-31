@@ -112,7 +112,7 @@ class FrequencyDomainSpikeDetector:
 
         # Apply max_duration_s if specified (convert seconds → samples)
         if max_duration_s is not None:
-            max_samples = int(max_duration_s * sampling_freq)
+            max_samples = round(max_duration_s * sampling_freq)
             if raw_data.shape[1] > max_samples:
                 raw_data = raw_data[:, :max_samples]
 

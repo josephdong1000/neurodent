@@ -53,7 +53,7 @@ properties:
                   Duration in seconds of data to buffer in RAM at one time when
                   streaming to zarr. null = allocate all fragments at once (high
                   throughput, high RAM). Set to a number (e.g. 250) to cap peak
-                  RAM use.
+                  RAM use. Only has an effect when multiprocess_mode is "dask".
                 type: ["number", "null"]
       frequency_domain_spike_detection:
         type: object
