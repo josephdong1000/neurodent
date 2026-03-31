@@ -101,7 +101,7 @@ def generate_diagnostics(fdsar_list: list[FrequencyDomainSpikeAnalysisResult], o
                     animal_id=f"{fdsar.animal_id}_{fdsar.animal_day}",
                     # Note: the config key is 'save_epochs' (plural) to match YAML convention,
                     # while the function parameter is 'save_epoch' (singular).
-                    save_epoch=sat_config.get("save_epochs", True),
+                    save_epoch=sat_config.get("save_epochs", False),
                 )
 
             logging.info(f"  Generated plots for {len([c for c in returned_counts if c > 0])} channels with spikes")

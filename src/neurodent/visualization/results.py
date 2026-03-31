@@ -798,6 +798,19 @@ class AnimalOrganizer(AnimalFeatureParser):
                 f"Check the warnings above for per-file root causes."
             )
 
+        # It is possible for long_recordings to contain only 0-sample placeholder LROs.
+        # In that case, _iter_valid_recordings() will yield nothing and downstream analysis
+        # (e.g. concatenating results) will fail with a less informative error.
+        # Guard against this by raising early if there are no valid (nonzero-sample) LROs.
+        valid_long_recordings = list(self._iter_valid_recordings())
+        if not valid_long_recordings:
+            raise RuntimeError(
+                "No valid (nonzero-sample) recordings were loaded for this animal. "
+                "One or more LongRecordingOrganizer instances were created, but all of "
+                "them contain 0 samples. This usually indicates a misconfiguration "
+                "(wrong file pattern, wrong data root, or corrupt data). "
+                "Check the warnings above for per-file root causes."
+            )
         self._log_timeline_summary()
 
         if len(self.long_recordings) != len(self.unique_animaldays):
@@ -1726,7 +1739,11 @@ class AnimalOrganizer(AnimalFeatureParser):
                         f"All {len(lro_group)} LRO(s) for '{animalday}' are "
                         f"0-sample; skipping this date."
                     )
-                    continue
+                    raise RuntimeError(
+                        f"No non-zero-sample long recordings remain for date "
+                        f"'{animalday}' after filtering/skipping 0-sample LROs. "
+                        f"Cannot construct an AnimalOrganizer from these inputs."
+                    )
                 lro_pairs = valid_pairs
 
                 # Sort by median time (same logic as normal __init__)

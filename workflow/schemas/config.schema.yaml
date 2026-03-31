@@ -52,14 +52,16 @@ properties:
                 description: >
                   Number of recording fragments to buffer in RAM at one time when streaming
                   to zarr. null = allocate all fragments at once (high throughput, high RAM).
-                  Set to an integer (e.g. 50) to cap peak RAM use.
+                  Set to a positive integer (>= 1, e.g. 50) to cap peak RAM use.
                 type: ["integer", "null"]
+                minimum: 1
       frequency_domain_spike_detection:
         type: object
         description: Spike detection parameters
         properties:
           save_fif_chunk_len:
             type: number
+            exclusiveMinimum: 0
             description: >
               Chunk length in seconds used when reading traces back for .fif export.
               Smaller values reduce peak RAM during export.
