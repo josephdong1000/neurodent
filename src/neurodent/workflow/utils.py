@@ -329,10 +329,14 @@ def expand_animals_config(samples_config: dict) -> dict:
     if "animals" not in result:
         return result
 
-    animals_list = result["animals"]
+    # Filter out excluded animals from the working list and from result["animals"]
+    # so downstream consumers (e.g. the Snakefile) don't need their own exclude check.
+    # The excluded entries are preserved in the on-disk samples.json for documentation.
+    animals_list = [a for a in result["animals"] if not a.get("exclude", False)]
+    result["animals"] = animals_list
 
     # Keys that are per-animal overrides (not core metadata)
-    _OVERRIDE_KEYS = {"pattern", "lro_kwargs", "day_parse_kwargs", "manual_datetime", "datetimes_are_start", "bad_channels"}
+    _OVERRIDE_KEYS = {"pattern", "lro_kwargs", "day_parse_kwargs", "manual_datetime", "datetimes_are_start", "bad_channels", "exclude"}
     _METADATA_SKIP = _OVERRIDE_KEYS  # excluded from ANIMAL_METADATA entries
 
     # --- Build ANIMAL_METADATA ---

@@ -623,3 +623,77 @@ class TestExpandAnimalsConfig:
         expand_animals_config(cfg)
         assert cfg["animals"][0]["bad_channels"] == original_bc
         assert "bad_channels" not in cfg  # top-level not added to original
+
+    # --- Exclude field tests ---
+
+    def test_exclude_animal_omitted_from_metadata(self):
+        """Animal with exclude=true is omitted from all pipeline keys."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {
+                    "id": "BAD",
+                    "gene": "KO",
+                    "sex": "M",
+                    "exclude": True,
+                    "manual_datetime": "2025-01-01 10:00:00",
+                    "bad_channels": ["LHip"],
+                },
+            ],
+        }
+        result = expand_animals_config(cfg)
+        meta_ids = {e["id"] for e in result["ANIMAL_METADATA"]}
+        assert "BAD" not in meta_ids
+        assert "BAD" not in result.get("manual_datetimes", {})
+        assert "BAD" not in result.get("bad_channels", {})
+        assert "BAD" not in result.get("_animal_overrides", {})
+        # Excluded animal should also be removed from result["animals"]
+        result_ids = [a["id"] for a in result["animals"]]
+        assert "BAD" not in result_ids
+
+    def test_exclude_false_animal_included(self):
+        """Animal with explicit exclude=false is still included."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "OK", "gene": "WT", "sex": "F", "exclude": False},
+            ],
+        }
+        result = expand_animals_config(cfg)
+        meta_ids = {e["id"] for e in result["ANIMAL_METADATA"]}
+        assert "OK" in meta_ids
+
+    def test_exclude_mixed(self):
+        """Mix of excluded and non-excluded animals; only non-excluded appear."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "GOOD", "gene": "WT", "sex": "M"},
+                {"id": "BAD", "gene": "KO", "sex": "F", "exclude": True},
+                {"id": "ALSO_GOOD", "gene": "Het", "sex": "F"},
+            ],
+        }
+        result = expand_animals_config(cfg)
+        meta_ids = {e["id"] for e in result["ANIMAL_METADATA"]}
+        assert meta_ids == {"GOOD", "ALSO_GOOD"}
+        # Excluded animal should not appear in GENOTYPE_ALIASES
+        ko_animals = result.get("GENOTYPE_ALIASES", {}).get("KO", [])
+        assert "BAD" not in ko_animals
+        # Non-excluded genotypes should be present
+        assert "GOOD" in result["GENOTYPE_ALIASES"]["WT"]
+        assert "ALSO_GOOD" in result["GENOTYPE_ALIASES"]["Het"]
+        # result["animals"] should only contain non-excluded entries
+        result_ids = {a["id"] for a in result["animals"]}
+        assert result_ids == {"GOOD", "ALSO_GOOD"}
+
+    def test_exclude_key_not_in_metadata_entry(self):
+        """The 'exclude' key itself is stripped from ANIMAL_METADATA entries."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "A", "gene": "WT", "sex": "M", "exclude": False},
+            ],
+        }
+        result = expand_animals_config(cfg)
+        meta = result["ANIMAL_METADATA"][0]
+        assert "exclude" not in meta
