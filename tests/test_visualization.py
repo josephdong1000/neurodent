@@ -1973,10 +1973,10 @@ class TestFeatureUtils:
         ])
         coords, values = extract_hist_data(series)
         assert coords.shape == (2, 3)
-        # 1-D values per cell (single-channel) → no channel dim, shape stays (W, F)
-        assert values.shape == (2, 3)
+        # 1-D values per cell (single-channel) → singleton channel dim inserted, shape (W, C, F)
+        assert values.shape == (2, 1, 3)
         np.testing.assert_array_equal(coords[0], [1.0, 2.0, 3.0])
-        np.testing.assert_array_equal(values[1], [40.0, 50.0, 60.0])
+        np.testing.assert_array_equal(values[1, 0], [40.0, 50.0, 60.0])
 
     def test_extract_hist_data_lists(self):
         """Test extracting histogram data from list format (parquet origin)."""
@@ -1988,9 +1988,9 @@ class TestFeatureUtils:
         ])
         coords, values = extract_hist_data(series)
         assert coords.shape == (2, 3)
-        # 1-D values per cell (single-channel) → no channel dim, shape stays (W, F)
-        assert values.shape == (2, 3)
-        np.testing.assert_array_equal(values[0], [10.0, 20.0, 30.0])
+        # 1-D values per cell (single-channel) → singleton channel dim inserted, shape (W, C, F)
+        assert values.shape == (2, 1, 3)
+        np.testing.assert_array_equal(values[0, 0], [10.0, 20.0, 30.0])
 
     def test_extract_hist_data_multichannel(self):
         """Test extracting histogram data where values are 2-D (F, C) per cell."""

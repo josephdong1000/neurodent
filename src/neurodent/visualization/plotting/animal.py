@@ -11,7 +11,7 @@ from scipy.stats import gzscore, linregress, zscore
 
 from ... import constants
 from ... import visualization as viz
-from ..feature_utils import extract_linear_array, extract_band_dict, flatten_feature_for_plotting, extract_feature
+from ..feature_utils import flatten_feature_for_plotting, extract_feature
 
 
 class AnimalPlotter(viz.AnimalFeatureParser):

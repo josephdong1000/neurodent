@@ -15,7 +15,7 @@ from statannotations.Annotator import Annotator
 from ... import core
 from ... import visualization as viz
 from ... import constants
-from ..feature_utils import extract_linear_array, extract_band_dict, extract_hist_data, collapse_feature_channels, extract_feature, format_channel_data
+from ..feature_utils import extract_hist_data, extract_feature, format_channel_data
 
 
 class ExperimentPlotter:

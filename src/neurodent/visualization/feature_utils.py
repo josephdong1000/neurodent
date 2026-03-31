@@ -235,10 +235,15 @@ def extract_hist_data(
         raise ValueError(_RAGGED_HIST_MSG)
     _ensure_dense(coords, _RAGGED_HIST_MSG)
     _ensure_dense(values, _RAGGED_HIST_MSG)
-    # Raw stacking yields (W, F, C) since each cell stores (F, C).
+    # Raw stacking yields (W, F, C) when each cell stores (F, C).
     # Transpose to canonical (W, C, F) — channels axis 1, freq_bins axis 2.
     if values.ndim == 3:
         values = values.transpose((0, 2, 1))
+    # If each cell stored a 1-D (F,) vector (single-channel), stacking
+    # produces (W, F). Insert a singleton channel axis to match the
+    # canonical (W, C, F) shape expected by downstream code.
+    elif values.ndim == 2:
+        values = values[:, np.newaxis, :]
     return coords, values
 
 
