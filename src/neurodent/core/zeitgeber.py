@@ -36,18 +36,13 @@ def get_expanded_feature_names(base_features):
     expanded_features = []
     
     for feature in base_features:
-        if feature in constants.BAND_FEATURES or feature in constants.BANDED_MATRIX_FEATURES:
+        ftype = constants.FEATURE_TYPES.get(feature)
+        if ftype is not None and ftype.is_dict_stored:
             # Expand into per-band features (e.g. zcohere -> zcohere_delta, zcohere_theta, ...)
             for band in constants.BAND_NAMES:
                 expanded_features.append(f"{feature}_{band}")
-        elif feature in constants.SIMPLE_MATRIX_FEATURES:
-            # Simple matrix features are NOT banded - keep as single column (e.g. zpcorr, pcorr)
-            expanded_features.append(feature)
-        elif feature in constants.LINEAR_FEATURES or feature in constants.HIST_FEATURES:
-            # Keep as is
-            expanded_features.append(feature)
         else:
-            # Unknown feature type, assume it's a single column
+            # LINEAR, SIMPLE_MATRIX, HIST, and unknown features remain as single columns
             expanded_features.append(feature)
             
     return expanded_features
