@@ -284,8 +284,8 @@ class TestWARIntegration:
                 nspike_row = row["nspike"]
                 war_total += sum(nspike_row)
 
-            # Allow for some difference due to windowing effects and chunk_duration_s truncation
-            # The WAR windowing might split or truncate some spikes differently
+            # Allow for some difference due to windowing effects and chunked/buffered processing
+            # The WAR windowing and FDSAR chunking may assign spikes to windows slightly differently
             assert abs(original_total - war_total) <= max(10, original_total * 0.2), (
                 f"Spike count mismatch for {animalday}: original={original_total}, war={war_total}"
             )

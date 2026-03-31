@@ -1031,6 +1031,10 @@ def cache_fragments_to_zarr(
     if chunk_size is None:
         chunk_size = min(100, n_fragments)  # Cap at 100 fragments per chunk
     else:
+        if not isinstance(chunk_size, int):
+            raise TypeError("chunk_size must be an integer or None")
+        if chunk_size < 1:
+            raise ValueError("chunk_size must be >= 1 when provided")
         chunk_size = min(chunk_size, n_fragments)
     zarr_array = zarr.open(
         tmppath,
@@ -1164,6 +1168,9 @@ def chunked_channel_distance_matrix(
         np.ndarray: Symmetric ``(n_channels, n_channels)`` Euclidean
         distance matrix.
     """
+    if chunk_samples < 1:
+        raise ValueError(f"chunk_samples must be >= 1, got {chunk_samples}")
+
     sq_dist_accum = np.zeros((n_channels, n_channels), dtype=np.float64)
 
     for start in range(0, n_samples, chunk_samples):

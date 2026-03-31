@@ -86,7 +86,12 @@ class FrequencyDomainSpikeDetector:
         Returns:
             tuple: (spike_indices_per_channel, mne_raw_with_annotations)
                 - spike_indices_per_channel: List of arrays with spike sample indices per channel
-                - mne_raw_with_annotations: MNE RawArray with spike annotations
+                - mne_raw_with_annotations: MNE RawArray built from the
+                  **raw/unfiltered** recording traces, with spike annotations.
+                  Spike detection itself is performed on preprocessed
+                  (filtered) chunks; the unfiltered signal is stored so that
+                  downstream consumers can inspect waveform context without
+                  filtering artifacts.
         """
         if not SPIKEINTERFACE_AVAILABLE:
             raise ImportError(
@@ -110,8 +115,13 @@ class FrequencyDomainSpikeDetector:
 
         # Determine whether to use chunked processing
         if chunk_duration_s is not None and chunk_duration_s > 0:
-            chunk_samples = round(chunk_duration_s * sampling_freq)
+            # Ensure we have at least one sample per chunk to avoid infinite loops
+            chunk_samples = max(1, int(round(chunk_duration_s * sampling_freq)))
         else:
+            if total_samples <= 0:
+                raise ValueError(
+                    "Recording has no samples; cannot perform spike detection."
+                )
             chunk_samples = total_samples  # single chunk = full recording
 
         # Overlap to avoid filter and detection edge effects.
@@ -154,7 +164,11 @@ class FrequencyDomainSpikeDetector:
         for ch in range(n_channels):
             spike_indices_per_channel[ch] = np.unique(spike_indices_per_channel[ch])
 
-        # Build MNE RawArray by reading traces in chunks for the annotated output
+        # Build MNE RawArray from the *unfiltered* recording traces.
+        # Note: spike detection is performed on preprocessed (filtered) chunks,
+        # but the returned MNE object contains the original raw/unfiltered
+        # signal so that downstream consumers can inspect the waveform context
+        # around each detected spike without filtering artifacts.
         raw_data = recording.get_traces(return_in_uV=True).T  # (channels, samples)
         info = mne.create_info(
             ch_names=channel_names, sfreq=sampling_freq, ch_types="eeg"
