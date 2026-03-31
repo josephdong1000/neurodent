@@ -3561,15 +3561,12 @@ class WindowAnalysisResult(AnimalFeatureParser):
             ftype = constants.classify_feature(feat)
 
             if ftype is constants.FeatureType.LINEAR:
-                vals = extract_linear_array(result[feat])
-                # Convert to float to allow NaN assignment for integer features
-                if vals.dtype.kind in ("i", "u"):  # integer types
-                    vals = vals.astype(float)
+                vals = extract_linear_array(result[feat]).astype(float, copy=False)
                 vals[~filter_tfs] = np.nan
                 result[feat] = vals.tolist()
 
             elif ftype is constants.FeatureType.LINEAR_2D:
-                vals = extract_linear_array(result[feat])
+                vals = extract_linear_array(result[feat]).astype(float, copy=False)
                 mask = np.broadcast_to(filter_tfs[:, :, np.newaxis], vals.shape)
                 vals[~mask] = np.nan
                 result[feat] = vals.tolist()
@@ -3585,6 +3582,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     f"set([np.asarray(x[1]).shape for x in result[feat].tolist()]) = {list(set([np.asarray(x[1]).shape for x in result[feat].tolist()]))}"
                 )
                 coords, vals = extract_hist_data(result[feat])
+                vals = vals.astype(float, copy=False)
                 # vals is canonical (W, C, F); filter_tfs is (W, C)
                 mask = np.broadcast_to(filter_tfs[:, :, np.newaxis], vals.shape)
                 vals[~mask] = np.nan
@@ -3594,6 +3592,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
             elif ftype is constants.FeatureType.BAND:
                 band_vals, band_keys = extract_band_dict(result[feat])
+                band_vals = band_vals.astype(float, copy=False)
                 # band_vals is canonical (W, C, B); index band on last axis
                 for bi, colname in enumerate(band_keys):
                     v = band_vals[:, :, bi]  # (W, C)
@@ -3603,6 +3602,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
             elif ftype is constants.FeatureType.BANDED_MATRIX:
                 band_vals, band_keys = extract_band_dict(result[feat])
+                band_vals = band_vals.astype(float, copy=False)
                 # band_vals is canonical (W, C, C, B); index band on last axis
                 shape = band_vals[:, :, :, 0].shape  # (W, C, C)
                 mask = np.broadcast_to(filter_tfs[:, :, np.newaxis], shape)
@@ -3614,7 +3614,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 result[feat] = repack_band_dict(band_vals, band_keys)
 
             elif ftype is constants.FeatureType.SIMPLE_MATRIX:
-                vals = extract_linear_array(result[feat])
+                vals = extract_linear_array(result[feat]).astype(float, copy=False)
                 mask = np.broadcast_to(filter_tfs[:, :, np.newaxis], vals.shape)
                 vals[~mask] = np.nan
                 vals[~mask.transpose(0, 2, 1)] = np.nan
