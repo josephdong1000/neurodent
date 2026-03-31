@@ -64,7 +64,7 @@ class FrequencyDomainSpikeDetector:
     def detect_spikes_recording(
         recording: "si.BaseRecording",
         detection_params: dict = None,
-        chunk_duration_s: float = None,
+        chunk_duration_s: float = 3600,
         multiprocess_mode: Literal["dask", "serial"] = "serial",
     ) -> tuple[list[np.ndarray], "mne.io.RawArray"]:
         """
@@ -78,11 +78,9 @@ class FrequencyDomainSpikeDetector:
         Args:
             recording (si.BaseRecording): The recording to analyze
             detection_params (dict, optional): Detection parameters. Uses DEFAULT_PARAMS if None
-            chunk_duration_s (float, optional): Duration in seconds of each
-                processing chunk.  When ``None``, the full recording is loaded
-                into memory at once (fastest, highest RAM).  Set to a positive
-                value (e.g. 3600) to cap peak RAM usage while still analysing
-                the entire recording.
+            chunk_duration_s (float): Duration in seconds of each processing
+                chunk.  Defaults to 3600 (1 hour).  Set to ``None`` to load
+                the full recording into memory at once (fastest, highest RAM).
             multiprocess_mode (Literal["dask", "serial"]): Processing mode
 
         Returns:

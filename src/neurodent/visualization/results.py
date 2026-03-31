@@ -1400,7 +1400,7 @@ class AnimalOrganizer(AnimalFeatureParser):
     def compute_frequency_domain_spike_analysis(
         self,
         detection_params: dict = None,
-        chunk_duration_s: float = None,
+        chunk_duration_s: float = 3600,
         multiprocess_mode: Literal["dask", "serial"] = "serial",
     ):
         """
@@ -1408,11 +1408,11 @@ class AnimalOrganizer(AnimalFeatureParser):
 
         Args:
             detection_params (dict, optional): Detection parameters. Uses defaults if None.
-            chunk_duration_s (float, optional): Duration in seconds of each
-                processing chunk.  The full recording is always analysed;
-                this parameter controls peak RAM by processing the recording
-                in overlapping chunks of the given duration.
-                ``None`` loads the full recording at once (fastest).
+            chunk_duration_s (float): Duration in seconds of each
+                processing chunk.  Defaults to 3600 (1 hour).  The full
+                recording is always analysed; this parameter controls peak RAM
+                by processing in overlapping chunks.  ``None`` loads the full
+                recording at once (fastest).
             multiprocess_mode (Literal["dask", "serial"]): Processing mode
 
         Returns:
