@@ -245,7 +245,7 @@ class TestPipelineIntegrationWithSyntheticData:
 
 class TestComputeWindowedAnalysisConfigWiring:
     """Verify that generate_wars.py reads compute_windowed_analysis config and
-    passes the correct arguments (including chunk_size) to
+    passes the correct arguments (including chunk_duration_s) to
     AnimalOrganizer.compute_windowed_analysis().
     """
 
@@ -254,7 +254,7 @@ class TestComputeWindowedAnalysisConfigWiring:
         cwa = {
             "features": ["all"],
             "multiprocess_mode": "dask",
-            "chunk_size": None,
+            "chunk_duration_s": None,
         }
         if cwa_overrides:
             cwa.update(cwa_overrides)
@@ -271,7 +271,7 @@ class TestComputeWindowedAnalysisConfigWiring:
         cwa_config = analysis_config.get("compute_windowed_analysis", {})
         cwa_features = cwa_config.get("features", ["all"])
         cwa_multiprocess_mode = cwa_config.get("multiprocess_mode", "dask")
-        cwa_chunk_size = cwa_config.get("chunk_size", None)
+        cwa_chunk_duration_s = cwa_config.get("chunk_duration_s", None)
         with warnings.catch_warnings():
             warnings.filterwarnings(
                 "ignore",
@@ -281,11 +281,11 @@ class TestComputeWindowedAnalysisConfigWiring:
             mock_ao.compute_windowed_analysis(
                 cwa_features,
                 multiprocess_mode=cwa_multiprocess_mode,
-                chunk_size=cwa_chunk_size,
+                chunk_duration_s=cwa_chunk_duration_s,
             )
 
     def test_default_config_passes_all_features_and_dask(self):
-        """Default config: features=["all"], mode="dask", chunk_size=None."""
+        """Default config: features=["all"], mode="dask", chunk_duration_s=None."""
         ao = MagicMock()
         cfg = self._build_war_gen_config()
         self._call_cwa(cfg, ao)
@@ -293,26 +293,26 @@ class TestComputeWindowedAnalysisConfigWiring:
         ao.compute_windowed_analysis.assert_called_once_with(
             ["all"],
             multiprocess_mode="dask",
-            chunk_size=None,
+            chunk_duration_s=None,
         )
 
-    def test_chunk_size_forwarded_from_config(self):
-        """When chunk_size is set in config it must reach compute_windowed_analysis."""
+    def test_chunk_duration_s_forwarded_from_config(self):
+        """When chunk_duration_s is set in config it must reach compute_windowed_analysis."""
         ao = MagicMock()
-        cfg = self._build_war_gen_config({"chunk_size": 50})
+        cfg = self._build_war_gen_config({"chunk_duration_s": 250})
         self._call_cwa(cfg, ao)
 
         _, kwargs = ao.compute_windowed_analysis.call_args
-        assert kwargs["chunk_size"] == 50
+        assert kwargs["chunk_duration_s"] == 250
 
-    def test_chunk_size_null_passes_none(self):
+    def test_chunk_duration_s_null_passes_none(self):
         """Explicit null in YAML translates to Python None."""
         ao = MagicMock()
-        cfg = self._build_war_gen_config({"chunk_size": None})
+        cfg = self._build_war_gen_config({"chunk_duration_s": None})
         self._call_cwa(cfg, ao)
 
         _, kwargs = ao.compute_windowed_analysis.call_args
-        assert kwargs["chunk_size"] is None
+        assert kwargs["chunk_duration_s"] is None
 
     def test_features_list_forwarded(self):
         """Custom features list is forwarded verbatim."""
@@ -342,47 +342,47 @@ class TestComputeWindowedAnalysisConfigWiring:
         ao.compute_windowed_analysis.assert_called_once_with(
             ["all"],
             multiprocess_mode="dask",
-            chunk_size=None,
+            chunk_duration_s=None,
         )
 
 
 class TestSaveFifChunkLenWiring:
-    """Verify that generate_wars.py reads save_fif_chunk_len and passes it to
+    """Verify that generate_wars.py reads export_chunk_duration_s and passes it to
     fdsar.save_fif_and_json().
     """
 
     @staticmethod
     def _call_save_fif(fdsar_config, mock_fdsar, animalday_dir):
         """Replicate the generate_wars.py save_fif_and_json call logic."""
-        fdsar_save_chunk_len = fdsar_config.get("save_fif_chunk_len", 60)
+        fdsar_export_chunk_duration_s = fdsar_config.get("export_chunk_duration_s", 60)
         mock_fdsar.save_fif_and_json(
             animalday_dir,
             convert_to_mne=True,
             slugify_filebase=False,
             overwrite=True,
-            chunk_len=fdsar_save_chunk_len,
+            chunk_duration_s=fdsar_export_chunk_duration_s,
         )
 
-    def test_default_chunk_len_is_60(self, tmp_path):
-        """When save_fif_chunk_len is absent, 60 s is used."""
+    def test_default_chunk_duration_s_is_60(self, tmp_path):
+        """When export_chunk_duration_s is absent, 60 s is used."""
         fdsar = MagicMock()
         self._call_save_fif({}, fdsar, tmp_path)
 
         _, kwargs = fdsar.save_fif_and_json.call_args
-        assert kwargs["chunk_len"] == 60
+        assert kwargs["chunk_duration_s"] == 60
 
-    def test_custom_chunk_len_forwarded(self, tmp_path):
-        """Custom save_fif_chunk_len is forwarded to save_fif_and_json."""
+    def test_custom_chunk_duration_s_forwarded(self, tmp_path):
+        """Custom export_chunk_duration_s is forwarded to save_fif_and_json."""
         fdsar = MagicMock()
-        self._call_save_fif({"save_fif_chunk_len": 30}, fdsar, tmp_path)
+        self._call_save_fif({"export_chunk_duration_s": 30}, fdsar, tmp_path)
 
         _, kwargs = fdsar.save_fif_and_json.call_args
-        assert kwargs["chunk_len"] == 30
+        assert kwargs["chunk_duration_s"] == 30
 
     def test_convert_to_mne_always_true(self, tmp_path):
         """convert_to_mne must always be True (required for saving .fif)."""
         fdsar = MagicMock()
-        self._call_save_fif({"save_fif_chunk_len": 45}, fdsar, tmp_path)
+        self._call_save_fif({"export_chunk_duration_s": 45}, fdsar, tmp_path)
 
         _, kwargs = fdsar.save_fif_and_json.call_args
         assert kwargs["convert_to_mne"] is True
@@ -480,7 +480,7 @@ class TestFdsarDiagnosticsConfigWiring:
 
 
 class TestFdsarMaxLengthWiring:
-    """Verify that generate_wars.py reads max_length from
+    """Verify that generate_wars.py reads max_duration_s from
     frequency_domain_spike_detection config and passes it to
     ao.compute_frequency_domain_spike_analysis().
     """
@@ -491,39 +491,39 @@ class TestFdsarMaxLengthWiring:
         compute_frequency_domain_spike_analysis."""
         detection_params = fdsar_config.get("default_params", {})
         multiprocess_mode = fdsar_config.get("multiprocess_mode", "serial")
-        fdsar_max_length = fdsar_config.get("max_length", None)
+        fdsar_max_duration_s = fdsar_config.get("max_duration_s", None)
         mock_ao.compute_frequency_domain_spike_analysis(
             detection_params=detection_params,
             multiprocess_mode=multiprocess_mode,
-            max_length=fdsar_max_length,
+            max_duration_s=fdsar_max_duration_s,
         )
 
-    def test_max_length_null_passes_none(self):
-        """When max_length is null/absent, None is forwarded."""
+    def test_max_duration_s_null_passes_none(self):
+        """When max_duration_s is null/absent, None is forwarded."""
         ao = MagicMock()
         self._call_fdsar({"default_params": {}, "multiprocess_mode": "dask"}, ao)
 
         _, kwargs = ao.compute_frequency_domain_spike_analysis.call_args
-        assert kwargs["max_length"] is None
+        assert kwargs["max_duration_s"] is None
 
-    def test_max_length_int_forwarded(self):
-        """When max_length is an integer, it is forwarded verbatim."""
+    def test_max_duration_s_forwarded(self):
+        """When max_duration_s is a number, it is forwarded verbatim."""
         ao = MagicMock()
         self._call_fdsar(
-            {"default_params": {}, "multiprocess_mode": "dask", "max_length": 900_000},
+            {"default_params": {}, "multiprocess_mode": "dask", "max_duration_s": 300.0},
             ao,
         )
 
         _, kwargs = ao.compute_frequency_domain_spike_analysis.call_args
-        assert kwargs["max_length"] == 900_000
+        assert kwargs["max_duration_s"] == 300.0
 
-    def test_missing_max_length_defaults_none(self):
-        """When max_length key is absent, None is used."""
+    def test_missing_max_duration_s_defaults_none(self):
+        """When max_duration_s key is absent, None is used."""
         ao = MagicMock()
         self._call_fdsar({"default_params": {}}, ao)
 
         _, kwargs = ao.compute_frequency_domain_spike_analysis.call_args
-        assert kwargs["max_length"] is None
+        assert kwargs["max_duration_s"] is None
 
 
 class TestLofThresholdWiring:

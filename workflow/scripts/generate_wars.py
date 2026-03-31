@@ -203,7 +203,7 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
             cwa_config = analysis_config.get("compute_windowed_analysis", {})
             cwa_features = cwa_config.get("features", ["all"])
             cwa_multiprocess_mode = cwa_config.get("multiprocess_mode", "dask")
-            cwa_chunk_size = cwa_config.get("chunk_size", None)
+            cwa_chunk_duration_s = cwa_config.get("chunk_duration_s", None)
             with warnings.catch_warnings():
                 warnings.filterwarnings(
                     "ignore",
@@ -213,7 +213,7 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
                 war = ao.compute_windowed_analysis(
                     cwa_features,
                     multiprocess_mode=cwa_multiprocess_mode,
-                    chunk_size=cwa_chunk_size,
+                    chunk_duration_s=cwa_chunk_duration_s,
                 )
 
             # Frequency-domain spike detection
@@ -221,11 +221,11 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
             fdsar_config = config["analysis"]["frequency_domain_spike_detection"]
             detection_params = fdsar_config["default_params"]
             multiprocess_mode = fdsar_config.get("multiprocess_mode", "serial")
-            fdsar_max_length = fdsar_config.get("max_length", None)
+            fdsar_max_duration_s = fdsar_config.get("max_duration_s", None)
 
             fdsar_list = ao.compute_frequency_domain_spike_analysis(
                 detection_params=detection_params, multiprocess_mode=multiprocess_mode,
-                max_length=fdsar_max_length,
+                max_duration_s=fdsar_max_duration_s,
             )
 
             # Integrate spike features into WAR
@@ -261,14 +261,14 @@ def main():
     fdsar_base_dir = Path(snakemake.output.fdsar_dir)
     fdsar_base_dir.mkdir(parents=True, exist_ok=True)
     fdsar_config = config["analysis"]["frequency_domain_spike_detection"]
-    fdsar_save_chunk_len = fdsar_config.get("save_fif_chunk_len", 60)
+    fdsar_export_chunk_duration_s = fdsar_config.get("export_chunk_duration_s", 60)
 
     for fdsar in fdsar_list:
         # Create subdirectory for this animalday
         animalday_dir = fdsar_base_dir / f"{fdsar.animal_id}-{fdsar.genotype}-{fdsar.animal_day}"
         animalday_dir.mkdir(parents=True, exist_ok=True)
 
-        fdsar.save_fif_and_json(animalday_dir, convert_to_mne=True, slugify_filebase=False, overwrite=True, chunk_len=fdsar_save_chunk_len)
+        fdsar.save_fif_and_json(animalday_dir, convert_to_mne=True, slugify_filebase=False, overwrite=True, chunk_duration_s=fdsar_export_chunk_duration_s)
         logger.info(f"Saved FDSAR for {fdsar.animal_id} {fdsar.animal_day} to {animalday_dir}")
 
     logger.info(f"Successfully saved {len(fdsar_list)} FDSAR results to {fdsar_base_dir}")
