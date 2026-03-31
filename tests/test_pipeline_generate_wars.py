@@ -271,7 +271,7 @@ class TestComputeWindowedAnalysisConfigWiring:
         cwa_config = analysis_config.get("compute_windowed_analysis", {})
         cwa_features = cwa_config.get("features", ["all"])
         cwa_multiprocess_mode = cwa_config.get("multiprocess_mode", "dask")
-        cwa_chunk_duration_s = cwa_config.get("chunk_duration_s", None)
+        cwa_chunk_duration_s = cwa_config.get("chunk_duration_s", 3600)
         with warnings.catch_warnings():
             warnings.filterwarnings(
                 "ignore",
@@ -342,7 +342,7 @@ class TestComputeWindowedAnalysisConfigWiring:
         ao.compute_windowed_analysis.assert_called_once_with(
             ["all"],
             multiprocess_mode="dask",
-            chunk_duration_s=None,
+            chunk_duration_s=3600,
         )
 
 
@@ -491,20 +491,20 @@ class TestFdsarChunkDurationWiring:
         compute_frequency_domain_spike_analysis."""
         detection_params = fdsar_config.get("default_params", {})
         multiprocess_mode = fdsar_config.get("multiprocess_mode", "serial")
-        fdsar_chunk_duration_s = fdsar_config.get("chunk_duration_s", None)
+        fdsar_chunk_duration_s = fdsar_config.get("chunk_duration_s", 3600)
         mock_ao.compute_frequency_domain_spike_analysis(
             detection_params=detection_params,
             multiprocess_mode=multiprocess_mode,
             chunk_duration_s=fdsar_chunk_duration_s,
         )
 
-    def test_chunk_duration_s_null_passes_none(self):
-        """When chunk_duration_s is null/absent, None is forwarded."""
+    def test_chunk_duration_s_absent_defaults_3600(self):
+        """When chunk_duration_s is null/absent, 3600 s is forwarded."""
         ao = MagicMock()
         self._call_fdsar({"default_params": {}, "multiprocess_mode": "dask"}, ao)
 
         _, kwargs = ao.compute_frequency_domain_spike_analysis.call_args
-        assert kwargs["chunk_duration_s"] is None
+        assert kwargs["chunk_duration_s"] == 3600
 
     def test_chunk_duration_s_forwarded(self):
         """When chunk_duration_s is a number, it is forwarded verbatim."""
@@ -517,13 +517,13 @@ class TestFdsarChunkDurationWiring:
         _, kwargs = ao.compute_frequency_domain_spike_analysis.call_args
         assert kwargs["chunk_duration_s"] == 300.0
 
-    def test_missing_chunk_duration_s_defaults_none(self):
-        """When chunk_duration_s key is absent, None is used."""
+    def test_missing_chunk_duration_s_defaults_3600(self):
+        """When chunk_duration_s key is absent, 3600 is used."""
         ao = MagicMock()
         self._call_fdsar({"default_params": {}}, ao)
 
         _, kwargs = ao.compute_frequency_domain_spike_analysis.call_args
-        assert kwargs["chunk_duration_s"] is None
+        assert kwargs["chunk_duration_s"] == 3600
 
 
 class TestLofThresholdWiring:

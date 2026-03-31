@@ -225,7 +225,7 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
             fdsar_config = config["analysis"]["frequency_domain_spike_detection"]
             detection_params = fdsar_config["default_params"]
             multiprocess_mode = fdsar_config.get("multiprocess_mode", "serial")
-            fdsar_chunk_duration_s = fdsar_config.get("chunk_duration_s", None)
+            fdsar_chunk_duration_s = fdsar_config.get("chunk_duration_s", 3600)
 
             fdsar_list = ao.compute_frequency_domain_spike_analysis(
                 detection_params=detection_params, multiprocess_mode=multiprocess_mode,
