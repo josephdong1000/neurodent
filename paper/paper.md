@@ -75,6 +75,6 @@ Claude Opus 4.6 via GitHub Copilot and Claude Code was used to assist with code 
 
 Funding information 
 
-We acknowledge contributions from Yastika Singh, Yifan Wei, Ananya Madhira, and Jessica Lahr. This project benefited from insights and best practices described in Peter K. G. Williams’s One Good Tutorial. 
+We acknowledge contributions from Yastika Singh, Yifan Wei, Jessica Lahr, and Ananya Madhira. This project benefited from insights and best practices described in Peter K. G. Williams’s One Good Tutorial. 
  
 # References 
