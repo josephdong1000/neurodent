@@ -60,9 +60,6 @@ analysis:
     # .fif export parameters
     export_chunk_duration_s: 60    # seconds per chunk when reading traces to write .fif (lower = less RAM)
 
-    # .fif export parameters
-    save_fif_chunk_len: 60         # seconds per chunk when reading traces to write .fif (lower = less RAM)
-
     # Visualization parameters
     spike_averaged_traces:
       tmin: -0.5                   # epoch start time (seconds)
