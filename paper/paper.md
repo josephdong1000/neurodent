@@ -17,10 +17,10 @@ authors:
   orchid: 0000-0003-3264-0902
   affiliation: "1, 2"
 affiliations:
-- name: Children's Hospital of Philadelphia
+- name: Children's Hospital of Philadelphia, United States
   index: 1
   ror: 01z7r7q48
-- name: University of Pennslyvania Perelman School of Medicine
+- name: University of Pennslyvania, United States
   index: 2
   ror: 00b30xv10
 date: 31 March 2026
