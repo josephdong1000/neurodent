@@ -1,17 +1,16 @@
 # NeuRodent 🐁
 
 [![CI](https://github.com/josephdong1000/neurodent/actions/workflows/test-build-docs.yml/badge.svg)](https://github.com/josephdong1000/neurodent/actions/workflows/test-build-docs.yml)
-<!-- [![Coverage](https://codecov.io/gh/josephdong1000/neurodent/branch/main/graph/badge.svg)](https://codecov.io/gh/josephdong1000/neurodent) -->
+[![Coverage](https://codecov.io/gh/josephdong1000/neurodent/branch/main/graph/badge.svg)](https://codecov.io/gh/josephdong1000/neurodent)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/pypi/pyversions/neurodent)](https://pypi.org/project/neurodent/)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.15780751.svg)](https://doi.org/10.5281/zenodo.15780751)
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/josephdong1000/neurodent/HEAD)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/josephdong1000/neurodent/)
 
+A Python package for standardizing rodent EEG analysis and figure generation. Various EEG formats are loadable and features are extracted in parallel. Also includes a Snakemake workflow for automated analysis.
 
 > Presented at [USRSE'25](https://doi.org/10.5281/zenodo.17274681)!
-
-A Python package for standardizing rodent EEG analysis and figure generation. Various EEG formats are loadable and features are extracted in parallel. Also includes a Snakemake workflow for automated analysis.
 
 ## Installation
 
@@ -74,13 +73,13 @@ This project benefited from insights and best practices described in Peter K. G.
 If you find NeuRodent useful, please cite our work!
 
 ```bibtex
-@misc{https://doi.org/10.5281/zenodo.17051374,
-  doi = {10.5281/ZENODO.17051374},
-  url = {https://zenodo.org/doi/10.5281/zenodo.17051374},
-  author = {Dong,  Joseph and Yongtaek Oh,   and Marsh,  Eric},
-  title = {josephdong1000/PyEEG: 0.1.1},
+@software{dong2026neurodent,
+  author    = {Dong, Joseph P. and Oh, Yongtaek and Marsh, Eric D.},
+  title     = {NeuRodent},
+  year      = {2026},
   publisher = {Zenodo},
-  year = {2025},
-  copyright = {MIT License}
+  doi       = {10.5281/zenodo.15780751},
+  url       = {https://doi.org/10.5281/zenodo.15780751},
+  license   = {MIT}
 }
 ```
