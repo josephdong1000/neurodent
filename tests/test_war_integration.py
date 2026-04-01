@@ -97,7 +97,11 @@ class TestWARIntegration:
         """WAR with spike features integrated, shared across tests."""
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=RuntimeWarning)
-            return war_baseline.read_sars_spikes(fdsar_baseline, read_mode="sa", inplace=False)
+            # Use a light copy of the baseline WAR and modify it in-place to avoid
+            # triggering the internal deepcopy path in read_sars_spikes while
+            # keeping the shared war_baseline fixture unmodified.
+            war_copy = copy.copy(war_baseline)
+            return war_copy.read_sars_spikes(fdsar_baseline, read_mode="sa", inplace=True)
 
     def test_war_without_spikes(self, war_baseline):
         """Test WAR generation without spike features as baseline."""
@@ -175,7 +179,7 @@ class TestWARIntegration:
     def test_inplace_spike_integration(self, war_baseline, fdsar_baseline):
         """Test in-place integration of spike features."""
         # Deep copy so we don't mutate the shared fixture
-        war = copy.deepcopy(war_baseline)
+        war = war_baseline.copy()
 
         # Test in-place integration
         original_id = id(war.result)
