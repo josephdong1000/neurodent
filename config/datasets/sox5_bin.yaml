@@ -16,5 +16,3 @@ analysis:
       mode: "si"
       extract_func: "tests/integration/readers.py:read_bin_csv_pair"
       multiprocess_mode: "serial"
-    compute_windowed_analysis:
-      chunk_size: 50  # stream 50 fragments at a time to cap peak RAM (~32 MB vs full-array OOM)
