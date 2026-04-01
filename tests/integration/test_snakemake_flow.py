@@ -62,8 +62,8 @@ def _bin_csv_extractor(discovered_file, **kwargs):
 # Fixtures
 # ---------------------------------------------------------------------------
 
-@pytest.fixture
-def example_pipeline_env(tmp_path):
+@pytest.fixture(scope="session")
+def example_pipeline_env(tmp_path_factory):
     """Create a complete, tiny pipeline environment under tmp_path.
 
     Returns a dict with ``data_root``, ``samples_config``, ``animals``,
@@ -72,6 +72,7 @@ def example_pipeline_env(tmp_path):
     """
     from tests.integration.generate import create_synthetic_dataset
 
+    tmp_path = tmp_path_factory.mktemp("pipeline")
     ds = create_synthetic_dataset(tmp_path, n_sessions=2, duration_s=3)
 
     # Build a minimal pipeline config (mirrors config/config.yaml + example.yaml)
@@ -416,7 +417,7 @@ class TestPipelineContinuation:
     same synthetic data.
     """
 
-    @pytest.fixture
+    @pytest.fixture(scope="class")
     def war_env(self, example_pipeline_env):
         """Return (ao, war, ds) with constants injected for the test scope."""
         from neurodent import constants

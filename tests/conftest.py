@@ -317,8 +317,8 @@ def mock_long_recording_organizer():
 # ============================================================================
 
 
-@pytest.fixture
-def example_dataset(tmp_path):
+@pytest.fixture(scope="session")
+def example_dataset(tmp_path_factory):
     """Generate a minimal synthetic NWB dataset for pipeline integration tests.
 
     Creates a directory tree under ``tmp_path`` with two animals
@@ -326,12 +326,13 @@ def example_dataset(tmp_path):
     dict contains the data root path and a ``samples_config`` dict ready
     to be used with ``inject_config_aliases`` or pipeline scripts.
 
-    Yields:
+    Returns:
         dict with keys ``data_root``, ``samples_config``, ``animals``,
         ``session_folder``.
     """
     from tests.integration.generate import create_synthetic_dataset
 
+    tmp_path = tmp_path_factory.mktemp("dataset")
     return create_synthetic_dataset(tmp_path)
 
 
