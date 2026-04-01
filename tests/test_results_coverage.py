@@ -161,10 +161,7 @@ class TestReorderAndPadChannels:
         war = make_war()
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            # Use inplace=False so _update_instance_vars doesn't try to parse bad names
             war.reorder_and_pad_channels(["LAud", "RAud", "LVis"], use_abbrevs=True, inplace=False)
-            # If LMot/RMot aren't in ["LAud","RAud","LVis"], we get the warning
-            # Actually LMot/RMot are the abbrevs, and they ARE NOT in target → warns
             assert any("None of the channel names" in str(ww.message) for ww in w)
 
     def test_unsupported_feature_type_raises(self):
@@ -220,15 +217,17 @@ class TestExtractBandedMatrixFeatures:
         assert result is df
 
     def test_non_2d_matrix_warns(self):
-        """Lines 2751-2755: non-2D matrix in dict produces warning."""
+        """Lines 2751-2755: non-2D matrix in dict produces warning and NaN fill."""
         war = make_war()
         df = war.result.copy()
         bad_matrix = np.array([1, 2, 3])  # 1D, not 2D
         df["cohere"] = [{"alpha": bad_matrix}] * len(df)
-        with warnings.catch_warnings(record=True):
-            warnings.simplefilter("always")
-            result = war._extract_banded_matrix_features(df, "cohere", ["alpha"])
+        result = war._extract_banded_matrix_features(df, "cohere", ["alpha"])
         assert "cohere_alpha" in result.columns
+        # Non-2D matrices should be replaced with NaN-filled matrices
+        for val in result["cohere_alpha"]:
+            if isinstance(val, np.ndarray):
+                assert np.isnan(val).all(), "Non-2D input should produce NaN-filled matrix"
 
     def test_list_3d_array_format(self):
         """Lines 2776, 2791: list-stored 3D array format."""
@@ -286,7 +285,7 @@ class TestExtractBandedMatrixFeatures:
 
 class TestAverageAcrossChannels:
 
-    def test_non_2d_matrix_warns(self):
+    def test_non_2d_matrix_warns_and_fills_nan(self):
         """Lines 2888-2893: non-2D matrix produces warning and NaN."""
         war = make_war()
         df = war.result.copy()
@@ -294,14 +293,18 @@ class TestAverageAcrossChannels:
         df.at[df.index[1], "pcorr"] = "not_a_matrix"
         result = war._average_across_channels(df, ["pcorr"])
         assert "pcorr" in result.columns
+        # The corrupted row should produce NaN
+        assert np.isnan(result["pcorr"].iloc[1])
 
-    def test_small_matrix_fallback(self):
-        """Lines 2895-2900: 1x1 matrix falls back to nanmean."""
+    def test_small_matrix_nanmean_fallback(self):
+        """Lines 2895-2900: 1x1 matrix falls back to nanmean instead of upper triangle."""
         war = make_war()
         df = war.result.copy()
         df["pcorr"] = [np.array([[5.0]]).tolist()] * len(df)
         result = war._average_across_channels(df, ["pcorr"])
         assert "pcorr" in result.columns
+        # 1x1 matrix can't use upper triangle; nanmean of [[5.0]] == 5.0
+        assert all(v == pytest.approx(5.0) for v in result["pcorr"])
 
 
 # =========================================================================
@@ -317,18 +320,19 @@ class TestGetFilterHighBeta:
         n_ch = len(war.channel_names)
         if "psdfrac" in df.columns:
             df = df.drop(columns=["psdfrac"])
+        # beta=0.3, total=1.0 → proportion=0.3, which is below max_beta_prop=0.4
         df["psdband"] = [{"beta": np.array([0.3] * n_ch)}] * len(df)
         df["psdtotal"] = [np.array([1.0] * n_ch)] * len(df)
         result = war.get_filter_high_beta(df=df)
         assert result.shape[0] == len(df)
+        # All windows should pass (0.3 < 0.4 threshold)
+        assert result.all(), "All windows should pass with beta proportion 0.3 < 0.4"
 
     def test_missing_psd_features_raises(self):
         """Lines 3005-3008: missing both psdfrac and psdband raises."""
         war = make_war()
         df = war.result.copy()
-        cols_to_drop = [c for c in ["psdfrac", "psdband", "psdtotal"] if c in df.columns]
-        if cols_to_drop:
-            df = df.drop(columns=cols_to_drop)
+        df = df.drop(columns=["psdfrac", "psdband", "psdtotal"], errors="ignore")
         with pytest.raises(ValueError, match="psdfrac or psdband"):
             war.get_filter_high_beta(df=df)
 
@@ -355,11 +359,21 @@ class TestGetFilterRejectChannels:
 class TestMorphologicalSmoothing:
 
     def test_small_structure_early_return(self):
-        """Line 3216: structure_size <= 1 returns mask unchanged."""
+        """Line 3216: structure_size <= 1 returns mask unchanged (no morphological ops).
+
+        With duration=60s and smoothing_seconds=30s, structure_size = max(1, int(30/60)) = 1,
+        which triggers the early return path without applying any morphological operations.
+        We verify this by using a mask with isolated False values that morphological opening
+        would remove if the operations were actually applied.
+        """
         war = make_war()
-        mask = np.ones((len(war.result), len(war.channel_names)), dtype=bool)
-        # With duration=60 and smoothing_seconds=30, structure_size=0 → early return
+        n_windows = len(war.result)
+        n_ch = len(war.channel_names)
+        mask = np.ones((n_windows, n_ch), dtype=bool)
+        # Set isolated False values that opening would expand if ops ran
+        mask[1, 0] = False
         result = war.get_filter_morphological_smoothing(mask, smoothing_seconds=30.0)
+        # Early return means isolated False is preserved exactly
         np.testing.assert_array_equal(result, mask)
 
 

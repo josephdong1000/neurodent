@@ -866,7 +866,11 @@ class TestPlotDiffheatmapFaceted:
         war2 = _make_mock_war(animal_id="A2", genotype="KO", features=["cohere"])
         ep = ExperimentPlotter([war1, war2], features=["cohere"], plot_order=CUSTOM_PLOT_ORDER)
         df = ep.pull_timeseries_dataframe("cohere", groupby=["genotype"])
-        with patch("neurodent.visualization.plotting.experiment.df_normalize_baseline", side_effect=lambda **kw: kw["df"]):
+        captured_kwargs = {}
+        def _capture_baseline(**kw):
+            captured_kwargs.update(kw)
+            return kw["df"]
+        with patch("neurodent.visualization.plotting.experiment.df_normalize_baseline", side_effect=_capture_baseline):
             grids = ep.plot_diffheatmap_faceted(
                 "cohere",
                 groupby=["genotype"],
@@ -875,6 +879,9 @@ class TestPlotDiffheatmapFaceted:
                 df=df,
             )
         assert isinstance(grids, list)
+        # Verify 'band' was appended to groupby for banded matrix feature
+        assert "band" in captured_kwargs.get("groupby", []), \
+            "Expected 'band' to be appended to groupby for banded matrix feature"
 
 
 # ---------------------------------------------------------------------------

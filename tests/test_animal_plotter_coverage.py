@@ -731,7 +731,7 @@ class TestPlotLinearTemporalgroupEdgeCases:
             plotter._AnimalPlotter__get_linear_feature = original
 
     def test_show_endfile_calls_filediv(self, plotter, rng):
-        """show_endfile=True triggers _plot_filediv_lines."""
+        """show_endfile=True triggers _plot_filediv_lines, drawing vertical lines."""
         fig, ax = plt.subplots()
         n_time = 5
         group = pd.DataFrame(
@@ -741,4 +741,7 @@ class TestPlotLinearTemporalgroupEdgeCases:
                 "endfile": [np.nan] * (n_time - 1) + [0.5],
             }
         )
+        lines_before = len(ax.get_lines())
         plotter._plot_linear_temporalgroup(group, "rms", ax, show_endfile=True)
+        lines_after = len(ax.get_lines())
+        assert lines_after > lines_before, "Expected vertical divider lines to be drawn"
