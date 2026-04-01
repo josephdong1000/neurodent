@@ -46,6 +46,12 @@ def _close_figures():
     plt.close("all")
 
 
+@pytest.fixture()
+def rng():
+    """Deterministic RNG shared across helpers and tests."""
+    return np.random.default_rng(42)
+
+
 def _make_mock_war(
     animal_id="A1",
     genotype="WT",
@@ -54,8 +60,10 @@ def _make_mock_war(
     channel_abbrevs=None,
     features=None,
     n_rows=4,
+    rng=None,
 ):
     """Create a mock WindowAnalysisResult with configurable data."""
+    rng = rng or np.random.default_rng(0)
     if channel_names is None:
         channel_names = ["LMot", "RMot"]
     if channel_abbrevs is None:
@@ -80,26 +88,26 @@ def _make_mock_war(
         ftype = constants.classify_feature(feat)
         if ftype is constants.FeatureType.LINEAR:
             data[feat] = [
-                np.random.rand(len(channel_names)).tolist() for _ in range(n_rows)
+                rng.random(len(channel_names)).tolist() for _ in range(n_rows)
             ]
         elif ftype is constants.FeatureType.LINEAR_2D:
             data[feat] = [
-                np.random.rand(len(channel_names), 2).tolist() for _ in range(n_rows)
+                rng.random((len(channel_names), 2)).tolist() for _ in range(n_rows)
             ]
         elif ftype is constants.FeatureType.BAND:
             data[feat] = [
-                {b: np.random.rand(len(channel_names)).tolist() for b in constants.BAND_NAMES}
+                {b: rng.random(len(channel_names)).tolist() for b in constants.BAND_NAMES}
                 for _ in range(n_rows)
             ]
         elif ftype is constants.FeatureType.SIMPLE_MATRIX:
             data[feat] = [
-                np.random.rand(len(channel_names), len(channel_names)).tolist()
+                rng.random((len(channel_names), len(channel_names))).tolist()
                 for _ in range(n_rows)
             ]
         elif ftype is constants.FeatureType.BANDED_MATRIX:
             data[feat] = [
                 {
-                    b: np.random.rand(len(channel_names), len(channel_names)).tolist()
+                    b: rng.random((len(channel_names), len(channel_names))).tolist()
                     for b in constants.BAND_NAMES
                 }
                 for _ in range(n_rows)
@@ -107,7 +115,7 @@ def _make_mock_war(
         elif ftype is constants.FeatureType.HIST:
             freqs = np.linspace(1, 40, N_FREQ).tolist()
             data[feat] = [
-                (freqs, np.random.rand(N_FREQ, len(channel_names)).tolist())
+                (freqs, rng.random((N_FREQ, len(channel_names))).tolist())
                 for _ in range(n_rows)
             ]
 
@@ -305,8 +313,8 @@ class TestPullTimeseriesDataframe:
         # Create inconsistent frequencies across rows
         freqs_a = np.linspace(1, 40, N_FREQ).tolist()
         freqs_b = np.linspace(2, 50, N_FREQ).tolist()
-        vals_a = np.random.rand(N_FREQ, N_CHAN).tolist()
-        vals_b = np.random.rand(N_FREQ, N_CHAN).tolist()
+        vals_a = np.random.default_rng(0).random((N_FREQ, N_CHAN)).tolist()
+        vals_b = np.random.default_rng(1).random((N_FREQ, N_CHAN)).tolist()
         df["psd"] = [(freqs_a, vals_a), (freqs_b, vals_b)]
         ep = ExperimentPlotter([war], features=["psd"], plot_order=CUSTOM_PLOT_ORDER)
         with pytest.raises(ValueError, match="Multiple frequency bin values"):
@@ -679,7 +687,7 @@ class TestPlotMatrix:
         ep = ExperimentPlotter([war], features=["pcorr"], plot_order=CUSTOM_PLOT_ORDER)
         n = N_CHAN
         data = pd.DataFrame({
-            "pcorr": [np.random.rand(n, n).tolist() for _ in range(3)],
+            "pcorr": [np.random.default_rng(0).random((n, n)).tolist() for _ in range(3)],
             "genotype": ["WT"] * 3,
         })
         fig, ax = plt.subplots()
@@ -694,7 +702,7 @@ class TestPlotMatrix:
         ep = ExperimentPlotter([war], features=["pcorr"], plot_order=CUSTOM_PLOT_ORDER)
         n = N_CHAN
         data = pd.DataFrame({
-            "pcorr": [np.random.rand(n, n).tolist() for _ in range(3)],
+            "pcorr": [np.random.default_rng(0).random((n, n)).tolist() for _ in range(3)],
             "genotype": ["WT"] * 3,
         })
         fig, ax = plt.subplots()
@@ -1024,7 +1032,7 @@ class TestDfNormalizeBaseline:
         df = pd.DataFrame({
             "isday": [True] * 4 + [False] * 4,
             "genotype": ["WT"] * 8,
-            "rms": np.random.rand(8) + 1.0,
+            "rms": np.random.default_rng(0).random(8) + 1.0,
         })
         result = df_normalize_baseline(
             df, "rms", groupby=["isday"], baseline_key=True
@@ -1087,7 +1095,7 @@ class TestDfNormalizeBaseline:
         """Lines 1069-1073: global baseline (no remaining_groupby)."""
         df = pd.DataFrame({
             "genotype": ["WT"] * 4 + ["KO"] * 4,
-            "rms": np.random.rand(8) + 1.0,
+            "rms": np.random.default_rng(0).random(8) + 1.0,
         })
         result = df_normalize_baseline(
             df, "rms", groupby=["genotype"], baseline_key="WT"
@@ -1122,7 +1130,7 @@ class TestDfNormalizeBaseline:
         """Lines 1081-1082: remove_baseline with empty result."""
         df = pd.DataFrame({
             "genotype": ["WT"] * 4,
-            "rms": np.random.rand(4) + 1.0,
+            "rms": np.random.default_rng(0).random(4) + 1.0,
         })
         with pytest.raises(ValueError, match="No rows found"):
             df_normalize_baseline(
@@ -1176,7 +1184,7 @@ class TestDfNormalizeBaseline:
         df = pd.DataFrame({
             "genotype": ["WT"] * 4 + ["KO"] * 4,
             "pcorr": [
-                np.random.rand(n, n) for _ in range(8)
+                np.random.default_rng(0).random((n, n)) for _ in range(8)
             ],
         })
         result = df_normalize_baseline(

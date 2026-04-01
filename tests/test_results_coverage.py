@@ -603,29 +603,30 @@ class TestParquetLoading:
 
         parquet_path = tmp_path / "test.parquet"
         json_path = tmp_path / "test.json"
-        if parquet_path.exists():
-            import pyarrow.parquet as pq
-            table = pq.read_table(parquet_path)
-            schema_meta = table.schema.metadata or {}
-            encoded_cols = []
-            if b"neurodent" in schema_meta:
-                nd_meta = json.loads(schema_meta[b"neurodent"])
-                encoded_cols = nd_meta.get("encoded_columns", [])
+        assert parquet_path.exists(), "Parquet file should be created by save_pickle_and_json"
 
-            # Rewrite without neurodent metadata to trigger sidecar fallback
-            new_meta = {k: v for k, v in (schema_meta or {}).items() if k != b"neurodent"}
-            new_table = table.replace_schema_metadata(new_meta)
-            pq.write_table(new_table, parquet_path)
+        import pyarrow.parquet as pq
+        table = pq.read_table(parquet_path)
+        schema_meta = table.schema.metadata or {}
+        encoded_cols = []
+        if b"neurodent" in schema_meta:
+            nd_meta = json.loads(schema_meta[b"neurodent"])
+            encoded_cols = nd_meta.get("encoded_columns", [])
 
-            # Write sidecar file
-            sidecar_path = tmp_path / "test.parquet.meta.json"
-            sidecar_path.write_text(json.dumps({"encoded_columns": encoded_cols}))
+        # Rewrite without neurodent metadata to trigger sidecar fallback
+        new_meta = {k: v for k, v in (schema_meta or {}).items() if k != b"neurodent"}
+        new_table = table.replace_schema_metadata(new_meta)
+        pq.write_table(new_table, parquet_path)
 
-            # Specify json_name explicitly to avoid the "found 2 json" error
-            loaded = WindowAnalysisResult.load_pickle_and_json(
-                folder_path=tmp_path, json_name="test.json"
-            )
-            assert loaded.animal_id == "A1"
+        # Write sidecar file
+        sidecar_path = tmp_path / "test.parquet.meta.json"
+        sidecar_path.write_text(json.dumps({"encoded_columns": encoded_cols}))
+
+        # Specify json_name explicitly to avoid the "found 2 json" error
+        loaded = WindowAnalysisResult.load_pickle_and_json(
+            folder_path=tmp_path, json_name="test.json"
+        )
+        assert loaded.animal_id == "A1"
 
     def test_parquet_load_failure_falls_back_to_pickle(self, tmp_path):
         """Lines 4120-4125: parquet load failure falls back to pickle."""
@@ -633,11 +634,12 @@ class TestParquetLoading:
         war.save_pickle_and_json(tmp_path, filename="test")
 
         parquet_path = tmp_path / "test.parquet"
-        if parquet_path.exists():
-            # Corrupt the parquet file
-            parquet_path.write_bytes(b"corrupted data")
-            loaded = WindowAnalysisResult.load_pickle_and_json(folder_path=tmp_path)
-            assert loaded.animal_id == "A1"
+        assert parquet_path.exists(), "Parquet file should be created by save_pickle_and_json"
+
+        # Corrupt the parquet file
+        parquet_path.write_bytes(b"corrupted data")
+        loaded = WindowAnalysisResult.load_pickle_and_json(folder_path=tmp_path)
+        assert loaded.animal_id == "A1"
 
 
 # =========================================================================

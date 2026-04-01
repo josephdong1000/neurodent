@@ -33,6 +33,12 @@ def _close_figures():
 
 
 @pytest.fixture()
+def rng():
+    """Deterministic RNG shared across helpers and tests."""
+    return np.random.default_rng(42)
+
+
+@pytest.fixture()
 def mock_war():
     """Create a minimal mock WindowAnalysisResult."""
     war = MagicMock(spec=WindowAnalysisResult)
@@ -55,22 +61,24 @@ def plotter(mock_war):
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _make_linear_group(n_time=10, n_chan=N_CHAN, feature="rms"):
+def _make_linear_group(n_time=10, n_chan=N_CHAN, feature="rms", rng=None):
     """Return a DataFrame suitable for __get_linear_feature with a LINEAR feature."""
+    rng = rng or np.random.default_rng(0)
     return pd.DataFrame(
         {
-            feature: [np.random.rand(n_chan).tolist() for _ in range(n_time)],
+            feature: [rng.random(n_chan).tolist() for _ in range(n_time)],
             "duration": [1.0] * n_time,
         }
     )
 
 
-def _make_band_group(n_time=10, n_chan=N_CHAN, feature="psdband"):
+def _make_band_group(n_time=10, n_chan=N_CHAN, feature="psdband", rng=None):
     """Return a DataFrame suitable for __get_linear_feature with a BAND feature."""
+    rng = rng or np.random.default_rng(0)
     return pd.DataFrame(
         {
             feature: [
-                {b: np.random.rand(n_chan).tolist() for b in constants.BAND_NAMES}
+                {b: rng.random(n_chan).tolist() for b in constants.BAND_NAMES}
                 for _ in range(n_time)
             ],
             "duration": [1.0] * n_time,
@@ -78,36 +86,39 @@ def _make_band_group(n_time=10, n_chan=N_CHAN, feature="psdband"):
     )
 
 
-def _make_coherecorr_avg(n_row=2, n_chan=N_CHAN):
+def _make_coherecorr_avg(n_row=2, n_chan=N_CHAN, rng=None):
     """Return mock groupavg data used by coherecorr methods."""
+    rng = rng or np.random.default_rng(0)
     band_names = constants.BAND_NAMES + ["pcorr"]
-    cohere_dicts = [{band: np.random.rand(n_chan, n_chan) for band in band_names} for _ in range(n_row)]
+    cohere_dicts = [{band: rng.random((n_chan, n_chan)) for band in band_names} for _ in range(n_row)]
     return pd.DataFrame({"cohere": cohere_dicts}, index=[f"row{i}" for i in range(n_row)])
 
 
-def _make_grouprows_linear(n_time=10, n_chan=N_CHAN, features=None):
+def _make_grouprows_linear(n_time=10, n_chan=N_CHAN, features=None, rng=None):
     """Build a DataFrame mimicking get_grouprows_result for linear/band features."""
+    rng = rng or np.random.default_rng(0)
     if features is None:
         features = ["rms"]
     data = {"duration": [1.0] * n_time}
     for feat in features:
         ftype = constants.classify_feature(feat)
         if ftype is constants.FeatureType.LINEAR:
-            data[feat] = [np.random.rand(n_chan).tolist() for _ in range(n_time)]
+            data[feat] = [rng.random(n_chan).tolist() for _ in range(n_time)]
         elif ftype is constants.FeatureType.BAND:
             data[feat] = [
-                {b: np.random.rand(n_chan).tolist() for b in constants.BAND_NAMES}
+                {b: rng.random(n_chan).tolist() for b in constants.BAND_NAMES}
                 for _ in range(n_time)
             ]
         elif ftype is constants.FeatureType.LINEAR_2D:
-            data[feat] = [np.random.rand(n_chan, 2).tolist() for _ in range(n_time)]
+            data[feat] = [rng.random((n_chan, 2)).tolist() for _ in range(n_time)]
     df = pd.DataFrame(data)
     df.index = pd.MultiIndex.from_tuples([("group1",)] * n_time)
     return df
 
 
-def _make_grouprows_matrix(n_time=10, n_chan=N_CHAN, features=None):
+def _make_grouprows_matrix(n_time=10, n_chan=N_CHAN, features=None, rng=None):
     """Build DataFrame for coherecorr spectral (matrix features stored per-row)."""
+    rng = rng or np.random.default_rng(0)
     if features is None:
         features = ["zcohere", "zpcorr"]
     data = {"duration": [1.0] * n_time}
@@ -115,11 +126,11 @@ def _make_grouprows_matrix(n_time=10, n_chan=N_CHAN, features=None):
         ftype = constants.classify_feature(feat)
         if ftype is constants.FeatureType.BANDED_MATRIX:
             data[feat] = [
-                {b: np.random.rand(n_chan, n_chan).tolist() for b in constants.BAND_NAMES}
+                {b: rng.random((n_chan, n_chan)).tolist() for b in constants.BAND_NAMES}
                 for _ in range(n_time)
             ]
         elif ftype is constants.FeatureType.SIMPLE_MATRIX:
-            data[feat] = [np.random.rand(n_chan, n_chan).tolist() for _ in range(n_time)]
+            data[feat] = [rng.random((n_chan, n_chan)).tolist() for _ in range(n_time)]
     df = pd.DataFrame(data)
     df.index = pd.MultiIndex.from_tuples([("group1",)] * n_time)
     return df
@@ -229,31 +240,27 @@ class TestPlotCoherecorrMatrix:
 # ===================================================================
 
 class TestPlotCoherecorrMatrixgroup:
-    def test_center_cmap_true(self, plotter):
+    def test_center_cmap_true(self, plotter, rng):
         """When center_cmap=True and norm_list=None, CenteredNorm is used."""
         bands = ["delta"]
-        group = pd.Series({"delta": np.random.rand(N_CHAN, N_CHAN)}, name="test_row")
+        group = pd.Series({"delta": rng.random((N_CHAN, N_CHAN))}, name="test_row")
         fig, ax_arr = plt.subplots(1, 1, squeeze=False)
         plotter._plot_coherecorr_matrixgroup(
             group, bands, ax_arr[0, :], show_bandname=True, center_cmap=True
         )
 
     def test_show_channelname_false(self, plotter):
-        """show_channelname=False triggers the else branch for tick labels.
-
-        Note: the source passes a single-char string " " instead of a list of
-        blank labels, which is a pre-existing bug. We use a Mock axis to avoid
-        the matplotlib validation error and still exercise the code path.
-        """
+        """show_channelname=False triggers the else branch for tick labels."""
         bands = ["delta"]
-        group = pd.Series({"delta": np.random.rand(N_CHAN, N_CHAN)}, name="test_row")
-        mock_ax = [Mock()]
+        group = pd.Series({"delta": np.random.default_rng(0).random((N_CHAN, N_CHAN))}, name="test_row")
+        fig, ax_arr = plt.subplots(1, 1, squeeze=False)
         plotter._plot_coherecorr_matrixgroup(
-            group, bands, mock_ax, show_bandname=False, show_channelname=False
+            group,
+            bands,
+            ax_arr[0, :],
+            show_bandname=False,
+            show_channelname=False,
         )
-        # The else branch calls set_xticks / set_yticks with " "
-        mock_ax[0].set_xticks.assert_called()
-        mock_ax[0].set_yticks.assert_called()
 
 
 # ===================================================================
@@ -428,10 +435,11 @@ class TestPlotCoherecorrSpectralgroup:
 #     (lines 487-501)
 # ===================================================================
 
-def _make_psd_avg(n_col=2, n_freq=20, n_chan=N_CHAN):
+def _make_psd_avg(n_col=2, n_freq=20, n_chan=N_CHAN, rng=None):
     """Mock groupavg for PSD: each entry is (freqs, psd_matrix)."""
+    rng = rng or np.random.default_rng(0)
     freqs = np.linspace(1, 50, n_freq)
-    rows = [(freqs, np.random.rand(n_freq, n_chan) + 0.01) for _ in range(n_col)]
+    rows = [(freqs, rng.random((n_freq, n_chan)) + 0.01) for _ in range(n_col)]
     return pd.DataFrame({"psd": rows}, index=[f"day{i}" for i in range(n_col)])
 
 
@@ -478,10 +486,11 @@ class TestPlotPsdHistogram:
 # 11. plot_psd_spectrogram – median branch (lines 546-549)
 # ===================================================================
 
-def _make_psd_rows(n_time=10, n_freq=20, n_chan=N_CHAN):
+def _make_psd_rows(n_time=10, n_freq=20, n_chan=N_CHAN, rng=None):
+    rng = rng or np.random.default_rng(0)
     freqs = np.linspace(1, 50, n_freq)
     data = {
-        "psd": [(freqs, np.random.rand(n_freq, n_chan) + 0.01) for _ in range(n_time)],
+        "psd": [(freqs, rng.random((n_freq, n_chan)) + 0.01) for _ in range(n_time)],
         "duration": [1.0] * n_time,
     }
     df = pd.DataFrame(data)
@@ -517,8 +526,9 @@ class TestPlotPsdSpectrogram:
 #     (lines 625-767)
 # ===================================================================
 
-def _make_temporal_heatmap_rows(n_time=48, n_chan=N_CHAN, features=None):
+def _make_temporal_heatmap_rows(n_time=48, n_chan=N_CHAN, features=None, rng=None):
     """Create a DataFrame with timestamps spanning 2 days."""
+    rng = rng or np.random.default_rng(0)
     if features is None:
         features = ["rms"]
 
@@ -532,10 +542,10 @@ def _make_temporal_heatmap_rows(n_time=48, n_chan=N_CHAN, features=None):
     for feat in features:
         ftype = constants.classify_feature(feat)
         if ftype is constants.FeatureType.LINEAR:
-            data[feat] = [np.random.rand(n_chan).tolist() for _ in range(n_time)]
+            data[feat] = [rng.random(n_chan).tolist() for _ in range(n_time)]
         elif ftype is constants.FeatureType.BAND:
             data[feat] = [
-                {b: np.random.rand(n_chan).tolist() for b in constants.BAND_NAMES}
+                {b: rng.random(n_chan).tolist() for b in constants.BAND_NAMES}
                 for _ in range(n_time)
             ]
 
@@ -577,12 +587,12 @@ class TestPlotTemporalHeatmap:
             plotter.plot_temporal_heatmap(features=["rms"], score_type="none")
 
     @patch("matplotlib.pyplot.show")
-    def test_many_days_label_thinning(self, mock_show, plotter, mock_war):
+    def test_many_days_label_thinning(self, mock_show, plotter, mock_war, rng):
         """When > 10 days exist, only every nth day label is shown."""
         n_time = 24 * 12  # 12 days at hourly resolution
         timestamps = pd.date_range("2023-01-01 00:00", periods=n_time, freq="1h")
         data = {
-            "rms": [np.random.rand(N_CHAN).tolist() for _ in range(n_time)],
+            "rms": [rng.random(N_CHAN).tolist() for _ in range(n_time)],
             "duration": [1.0] * n_time,
             "timestamp": timestamps,
             "endfile": [np.nan] * n_time,
@@ -697,13 +707,13 @@ class TestHandleFigure:
 # ===================================================================
 
 class TestPlotLinearTemporalgroupEdgeCases:
-    def test_invalid_ndim_raises(self, plotter):
+    def test_invalid_ndim_raises(self, plotter, rng):
         """1-D feature array raises ValueError."""
         fig, ax = plt.subplots()
         n_time = 5
         group = pd.DataFrame(
             {
-                "rms": [np.random.rand(N_CHAN).tolist() for _ in range(n_time)],
+                "rms": [rng.random(N_CHAN).tolist() for _ in range(n_time)],
                 "duration": [1.0] * n_time,
             }
         )
@@ -711,7 +721,7 @@ class TestPlotLinearTemporalgroupEdgeCases:
         original = plotter._AnimalPlotter__get_linear_feature
 
         def _fake_get(group, feature, score_type):
-            return np.random.rand(n_time)
+            return rng.random(n_time)
 
         plotter._AnimalPlotter__get_linear_feature = _fake_get
         try:
@@ -720,13 +730,13 @@ class TestPlotLinearTemporalgroupEdgeCases:
         finally:
             plotter._AnimalPlotter__get_linear_feature = original
 
-    def test_show_endfile_calls_filediv(self, plotter):
+    def test_show_endfile_calls_filediv(self, plotter, rng):
         """show_endfile=True triggers _plot_filediv_lines."""
         fig, ax = plt.subplots()
         n_time = 5
         group = pd.DataFrame(
             {
-                "rms": [np.random.rand(N_CHAN).tolist() for _ in range(n_time)],
+                "rms": [rng.random(N_CHAN).tolist() for _ in range(n_time)],
                 "duration": [1.0] * n_time,
                 "endfile": [np.nan] * (n_time - 1) + [0.5],
             }
