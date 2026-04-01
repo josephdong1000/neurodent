@@ -51,8 +51,6 @@ Rather than implementing its own file readers, `NeuRodent` delegates data loadin
 
 Within the core library, computation is structured around a hierarchy of organizer classes that mirror the stages of a rodent EEG experiment:
 
-(figure)
-
 - **LongRecordingOrganizer**: one recording session, many channels
 - **AnimalOrganizer**: one animal, many recording sessions
 - **WindowAnalysisResult**, **FrequencyDomainSpikeAnalysisResult**: analysis results of one animal
@@ -74,8 +72,6 @@ Originally designed for EEG analyses for the lead developer, `NeuRodent` is bein
 Claude Opus 4.6 via GitHub Copilot and Claude Code was used to assist with code development and documentation writing. AI-generated code and tests were manually reviewed and edited by human authors, and correctness was validated against large datasets used by our group and collaborating groups. All architectural decisions and scientific interpretations were made by human authors.
 
 # Acknowledgements
-
-(Funding information)
 
 We acknowledge contributions from Yastika Singh, Yifan Wei, Jessica Lahr, and Ananya Madhira. This project benefited from insights and best practices described in Peter K. G. Williams’s *One Good Tutorial*.
 
