@@ -373,7 +373,7 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
             data = json.load(f)
 
         # Load MNE data
-        result_mne = mne.io.read_raw_fif(fif_path, preload=True)
+        result_mne = mne.io.read_raw_fif(fif_path, preload=False)
 
         # Extract spike indices from MNE annotations
         spike_indices = cls._extract_spike_indices_from_mne(result_mne)
