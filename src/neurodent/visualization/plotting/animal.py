@@ -150,8 +150,8 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                 )
                 ax[i].set_yticks(range(self.n_channels), self.channel_abbrevs)
             else:
-                ax[i].set_xticks(range(self.n_channels), " ")
-                ax[i].set_yticks(range(self.n_channels), " ")
+                ax[i].set_xticks(range(self.n_channels), [""] * self.n_channels)
+                ax[i].set_yticks(range(self.n_channels), [""] * self.n_channels)
 
         ax[0].set_ylabel(rowname, rotation="horizontal", ha="right")
 
