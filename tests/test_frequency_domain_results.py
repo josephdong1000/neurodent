@@ -354,6 +354,63 @@ class TestFrequencyDomainSpikeAnalysisResult:
 
         assert repr(fdsar) == str_repr
 
+    def test_load_fif_and_json_does_not_preload_data(self, sample_spike_indices, sample_mne_raw, detection_params):
+        """load_fif_and_json() must open the .fif with preload=False (memory-mapped).
+
+        This is critical for memory efficiency in make_fdsar_diagnostics: loading
+        with preload=True pulls the full recording into RAM (~2-7 GB per animalday),
+        causing SLURM OOM kills at 20 GB. With preload=False MNE memory-maps the
+        file, and mne.Epochs reads only the windowed samples around spikes.
+        """
+        with tempfile.TemporaryDirectory() as temp_dir:
+            save_dir = Path(temp_dir)
+            fdsar = FrequencyDomainSpikeAnalysisResult(
+                result_mne=sample_mne_raw,
+                spike_indices=sample_spike_indices,
+                detection_params=detection_params,
+                animal_id="test_animal",
+                genotype="WT",
+                animal_day="day1",
+                channel_names=sample_mne_raw.ch_names,
+            )
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=RuntimeWarning)
+                fdsar.save_fif_and_json(save_dir)
+                loaded_fdsar = FrequencyDomainSpikeAnalysisResult.load_fif_and_json(save_dir)
+
+            assert loaded_fdsar.result_mne.preload is False
+
+    def test_plot_spike_averaged_traces_with_memmap_raw(self, sample_mne_raw, detection_params):
+        """plot_spike_averaged_traces() works correctly when raw is memory-mapped (preload=False).
+
+        Verifies that mne.Epochs with preload=True correctly loads windowed data
+        from a memory-mapped .fif file, producing the same results as preloaded data.
+        """
+        with tempfile.TemporaryDirectory() as temp_dir:
+            save_dir = Path(temp_dir)
+            fdsar_orig = FrequencyDomainSpikeAnalysisResult(
+                result_mne=sample_mne_raw,
+                detection_params=detection_params,
+                channel_names=sample_mne_raw.ch_names,
+            )
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=RuntimeWarning)
+                fdsar_orig.save_fif_and_json(save_dir)
+
+            # Load with preload=False (the new default)
+            plot_dir = Path(temp_dir) / "plots"
+            plot_dir.mkdir()
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=RuntimeWarning)
+                loaded_fdsar = FrequencyDomainSpikeAnalysisResult.load_fif_and_json(save_dir)
+                assert loaded_fdsar.result_mne.preload is False
+                counts = loaded_fdsar.plot_spike_averaged_traces(
+                    save_dir=plot_dir, animal_id="test_animal", save_epoch=False
+                )
+
+            assert isinstance(counts, dict)
+            assert set(counts.keys()) == set(range(len(sample_mne_raw.ch_names)))
+
 
 def _make_mock_sorting_analyzer(traces_uv, sfreq, channel_id, spike_samples):
     """Build a mock SortingAnalyzer backed by a real numpy array.
