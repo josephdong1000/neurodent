@@ -1,3 +1,106 @@
+@article{Bokil:2010,
+  title = {Chronux: A Platform for Analyzing Neural Signals},
+  shorttitle = {Chronux},
+  author = {Bokil, Hemant and Andrews, Peter and Kulkarni, Jayant E. and Mehta, Samar and Mitra, Partha P.},
+  date = {2010-09-30},
+  journaltitle = {Journal of Neuroscience Methods},
+  shortjournal = {J Neurosci Methods},
+  volume = {192},
+  number = {1},
+  eprint = {20637804},
+  eprinttype = {pubmed},
+  pages = {146--151},
+  issn = {1872-678X},
+  doi = {10.1016/j.jneumeth.2010.06.020},
+  abstract = {Chronux is an open-source software package developed for the analysis of neural data. The current version of Chronux includes software for signal processing of neural time-series data including several specialized mini-packages for spike-sorting, local regression, audio segmentation, and other data-analysis tasks typically encountered by a neuroscientist. Chronux is freely available along with user tutorials, sample data, and extensive documentation from http://chronux.org/.},
+  langid = {english},
+  pmcid = {PMC2934871},
+  keywords = {Action Potentials,Animals,Humans,Likelihood Functions,Neurons,Regression Analysis,Software,Spectrum Analysis,Statistics as Topic}
+}
+
+@article{Buccino:2020,
+  title = {{{SpikeInterface}}, a Unified Framework for Spike Sorting},
+  author = {Buccino, Alessio P. and Hurwitz, Cole L. and Garcia, Samuel and Magland, Jeremy and Siegle, Joshua H. and Hurwitz, Roger and Hennig, Matthias H.},
+  date = {2020-11-10},
+  journaltitle = {eLife},
+  shortjournal = {Elife},
+  volume = {9},
+  eprint = {33170122},
+  eprinttype = {pubmed},
+  pages = {e61834},
+  issn = {2050-084X},
+  doi = {10.7554/eLife.61834},
+  abstract = {Much development has been directed toward improving the performance and automation of spike sorting. This continuous development, while essential, has contributed to an over-saturation of new, incompatible tools that hinders rigorous benchmarking and complicates reproducible analysis. To address these limitations, we developed SpikeInterface, a Python framework designed to unify preexisting spike sorting technologies into a single codebase and to facilitate straightforward comparison and adoption of different approaches. With a few lines of code, researchers can reproducibly run, compare, and benchmark most modern spike sorting algorithms; pre-process, post-process, and visualize extracellular datasets; validate, curate, and export sorting outputs; and more. In this paper, we provide an overview of SpikeInterface and, with applications to real and simulated datasets, demonstrate how it can be utilized to reduce the burden of manual curation and to more comprehensively benchmark automated spike sorters.},
+  langid = {english},
+  pmcid = {PMC7704107},
+  keywords = {Action Potentials,Algorithms,extracellular recordings,Humans,Models Neurological,mouse,Neurons,neuroscience,open-source software,python,rat,reproducibility,Signal Processing Computer-Assisted,Software,spike sorting},
+  file = {/Users/josephdong/Zotero/storage/42K8LDCV/Buccino et al. - 2020 - SpikeInterface, a unified framework for spike sorting.pdf}
+}
+
+@manual{DaskDevelopmentTeam:2016,
+  type = {manual},
+  title = {Dask: {{Library}} for Dynamic Task Scheduling},
+  author = {{Dask Development Team}},
+  date = {2016},
+  url = {http://dask.pydata.org}
+}
+
+@article{Delorme:2004,
+  title = {{{EEGLAB}}: An Open Source Toolbox for Analysis of Single-Trial {{EEG}} Dynamics Including Independent Component Analysis},
+  shorttitle = {{{EEGLAB}}},
+  author = {Delorme, Arnaud and Makeig, Scott},
+  date = {2004-03},
+  journaltitle = {Journal of Neuroscience Methods},
+  shortjournal = {Journal of Neuroscience Methods},
+  volume = {134},
+  number = {1},
+  pages = {9--21},
+  issn = {01650270},
+  doi = {10.1016/j.jneumeth.2003.10.009},
+  url = {https://linkinghub.elsevier.com/retrieve/pii/S0165027003003479},
+  urldate = {2026-04-01},
+  abstract = {We have developed a toolbox and graphic user interface, EEGLAB, running under the cross-platform MATLAB environment (The Mathworks, Inc.) for processing collections of single-trial and/or averaged EEG data of any number of channels. Available functions include EEG data, channel and event information importing, data visualization (scrolling, scalp map and dipole model plotting, plus multi-trial ERP-image plots), preprocessing (including artifact rejection, filtering, epoch selection, and averaging), Independent Component Analysis (ICA) and time/frequency decompositions including channel and component cross-coherence supported by bootstrap statistical methods based on data resampling. EEGLAB functions are organized into three layers. Top-layer functions allow users to interact with the data through the graphic interface without needing to use MATLAB syntax. Menu options allow users to tune the behavior of EEGLAB to available memory. Middle-layer functions allow users to customize data processing using command history and interactive ‘pop’ functions. Experienced MATLAB users can use EEGLAB data structures and stand-alone signal processing functions to write custom and/or batch analysis scripts. Extensive function help and tutorial information are included. A ‘plug-in’ facility allows easy incorporation of new EEG modules into the main menu. EEGLAB is freely available (http://www.sccn.ucsd.edu/eeglab/) under the GNU public license for noncommercial use and open source development, together with sample data, user tutorial and extensive documentation.},
+  langid = {english},
+  file = {/Users/josephdong/Zotero/storage/F8SNPF6R/Delorme and Makeig - 2004 - EEGLAB an open source toolbox for analysis of single-trial EEG dynamics including independent compo.pdf}
+}
+
+@unpublished{Dong:2025,
+  title = {{{PyEEG}}: {{Unifying Rodent EEG Analysis Pipelines}}},
+  shorttitle = {{{PyEEG}}},
+  author = {Dong, Joseph and Oh, Yongtaek and Singh, Yastika and Wei, Yifan and Marsh, Eric},
+  date = {2025-10-06},
+  doi = {10.5281/zenodo.17274681},
+  url = {https://zenodo.org/records/17274681},
+  urldate = {2026-04-01},
+  abstract = {Electroencephalography (EEG) is a cornerstone neuroscience technique used in humans to diagnose and localize epilepsy and for validating and generating a mechanistic understanding in animal models of neurological disease. A number of both free and paid software packages have been developed to analyze rodent EEG recordings; however, there is no interoperability between packages. This fragmentation of analysis tools and techniques is a challenge to researchers. The ability to unify analysis pipelines will allow collaboration and comparison of models across laboratories and animal models. This will, in turn, advance research into neurological disorders. We developed PyEEG (working title), a Python-based EEG analysis package designed for rodent EEG. As a free and open-source tool, PyEEG focuses on modularity, interoperability, and scalability of EEG analysis pipelines. A generalized framework for feature calculation is implemented so that contributors may easily extend the list of features. The package utilizes the SpikeInterface[1] and MNE[2] packages for data import and export, allowing support of a wide variety of file formats with a syntax used frequently in neuroscience.Development of PyEEG adopts the Continuous Integration practice of code development, with self-contained branches tested before merging. EEG datasets can grow to several terabytes in size, which introduces complications with data loading, memory usage and compute time. Our initial implementation of serial analysis in-memory failed to scale for the whole dataset, so we address the problem by integrating dataset caching into the pipeline and using Dask to parallelize feature computation on a high-performance computing cluster. Intermediate computations are saved to avoid rerunning the whole pipeline due to trivial errors.Design of the package was guided directly by questions we and collaborators would like to answer with EEG analysis. This produced a tool that was immediately useful, sufficiently fast, and tested on experimental data. The heterogeneity of EEG data formats prompted us to use a modular package structure that was agnostic to file types. Visualizing the dataset with plotting functions was a particular need early so that we could periodically “sanity-check” pipeline calculations with collaborators and benchmark progress.PyEEG uses two parallel and configurable pipelines to analyze EEG traces: Window Analysis which extracts features on time-binned windows, and Spike Analysis which implements electrographic spike detection. Artifacts are rejected by outlier root mean square (RMS) amplitude events, high RMS amplitude, high beta band power or high local outlier factor. Thresholds were selected by comparison with biological limits and visual inspection of filtered data. Features from both pipelines feed into plotting utilities to visualize at the experiment level or the animal level. We validate this toolbox over mouse intracranial EEG datasets collected from several models of epilepsy. Our analysis demonstrates the value of this tool to unify pipelines in an ever-evolving field, and the lessons that come along with development. The code is available at https://github.com/josephdong1000/PyEEG. Code documentation is a work in progress at the time of this writing and available at https://josephdong1000.github.io/PyEEG/.1. Buccino AP, Hurwitz CL, Garcia S, Magland J, Siegle JH, Hurwitz R, Hennig MH. SpikeInterface, a unified framework for spike sorting. Elife. 2020 Nov 10;9:e61834. doi: 10.7554/eLife.61834. PMID: 33170122; PMCID: PMC7704107.2. Alexandre Gramfort, Martin Luessi, Eric Larson, Denis A. Engemann, Daniel Strohmeier, Christian Brodbeck, Roman Goj, Mainak Jas, Teon Brooks, Lauri Parkkonen, and Matti S. Hämäläinen. MEG and EEG data analysis with MNE-Python. Frontiers in Neuroscience, 7(267):1–13, 2013. doi:10.3389/fnins.2013.00267.},
+  file = {/Users/josephdong/Zotero/storage/LSGYEQS5/Dong et al. - 2025 - PyEEG Unifying Rodent EEG Analysis Pipelines.pdf}
+}
+
+@article{Ferrari:2026,
+  title = {Mice with {{Sox5}} Inactivation in the {{Emx1}} Lineage as a Model for the Human {{Lamb-Shaffer}} Neurodevelopmental Syndrome},
+  author = {Ferrari, Emily K. and Dong, Joseph and Duncan-Field, Kaylia and Sharma, Vishi and Whipple, Samantha and McCoy, Almedia J. and Marsh, Eric D. and Lefebvre, Véronique},
+  date = {2026},
+  journaltitle = {Brain Research}
+}
+
+@article{Gramfort:2013,
+  title = {{{MEG}} and {{EEG}} Data Analysis with {{MNE-Python}}},
+  author = {Gramfort, Alexandre and Luessi, Martin and Larson, Eric and Engemann, Denis A. and Strohmeier, Daniel and Brodbeck, Christian and Goj, Roman and Jas, Mainak and Brooks, Teon and Parkkonen, Lauri and Hämäläinen, Matti},
+  date = {2013-12-26},
+  journaltitle = {Frontiers in Neuroscience},
+  shortjournal = {Front. Neurosci.},
+  volume = {7},
+  publisher = {Frontiers},
+  issn = {1662-453X},
+  doi = {10.3389/fnins.2013.00267},
+  url = {https://www.frontiersin.org/journals/neuroscience/articles/10.3389/fnins.2013.00267/full},
+  urldate = {2026-04-01},
+  abstract = {Magnetoencephalography and electroencephalography (M/EEG) measure the weak electromagnetic signals generated by neuronal activity in the brain. Using these signals to characterize and locate neural activation in the brain is a challenge that requires expertise in physics, signal processing, statistics, and numerical methods. As part of the MNE software suite, MNE-Python is an open-source software package that addresses this challenge by providing state-of-the-art algorithms implemented in Python that cover multiple methods of data  preprocessing, source localization, statistical analysis, and estimation of functional connectivity between distributed brain regions. All algorithms and utility functions are implemented in a consistent manner  with well-documented interfaces, enabling users to create M/EEG data analysis pipelines by writing Python scripts. Moreover, MNE-Python is tightly integrated with the core Python libraries for scientific comptutation (Numpy, Scipy) and visualization (matplotlib and Mayavi), as well as the greater neuroimaging ecosystem in Python  via the Nibabel package. The code is provided under the new BSD license allowing code reuse, even in commercial products. Although MNE-Python has only been under heavy development for a couple of years, it has rapidly evolved with expanded analysis capabilities and pedagogical tutorials because multiple  labs have collaborated during code development to help share best practices. MNE-Python also gives easy access to preprocessed datasets, helping users to get started quickly and facilitating reproducibility of methods by other researchers. Full documentation, including dozens of examples, is available at http://martinos.org/mne.},
+  langid = {english},
+  keywords = {Electroencephalography (EEG),Magnetoencephalography (MEG),Neuroimaging,open-source,python,Software},
+  file = {/Users/josephdong/Zotero/storage/SYGVW6VS/Gramfort et al. - 2013 - MEG and EEG data analysis with MNE-Python.pdf}
+}
+
 @article{LivintPopa:2020,
   title = {The {{Role}} of {{Quantitative EEG}} in the {{Diagnosis}} of {{Neuropsychiatric Disorders}}},
   author = {Livint Popa, Livia and Dragos, Hanna and Pantelemon, Cristina and Verisezan Rosu, Olivia and Strilciuc, Stefan},
@@ -55,6 +158,57 @@
   urldate = {2026-04-01},
   abstract = {In most mouse models of disease, the outward manifestation of a disorder can be measured easily, can be assessed with a trivial test such as hind limb clasping, or can even be observed simply by comparing the gross morphological characteristics of mutant and wild-type littermates. But what if we are trying to model a disorder with a phenotype that appears only sporadically and briefly, like epileptic seizures? The purpose of this Review is to highlight the challenges of modelling epilepsy, in which the most obvious manifestation of the disorder, seizures, occurs only intermittently, possibly very rarely and often at times when the mice are not under direct observation. Over time, researchers have developed a number of ways in which to overcome these challenges, each with their own advantages and disadvantages. In this Review, we describe the genetics of epilepsy and the ways in which genetically altered mouse models have been used. We also discuss the use of induced models in which seizures are brought about by artificial stimulation to the brain of wild-type animals, and conclude with the ways these different approaches could be used to develop a wider range of anti-seizure medications that could benefit larger patient populations.},
   file = {/Users/josephdong/Zotero/storage/U7RDEG3D/Marshall et al. - 2021 - Modelling epilepsy in the mouse challenges and solutions.pdf;/Users/josephdong/Zotero/storage/ZFP96GFZ/dmm.html}
+}
+
+@online{Molder:2021,
+  title = {Sustainable Data Analysis with {{Snakemake}}},
+  author = {Mölder, Felix and Jablonski, Kim Philipp and Letcher, Brice and Hall, Michael B. and Tomkins-Tinch, Christopher H. and Sochat, Vanessa and Forster, Jan and Lee, Soohyun and Twardziok, Sven O. and Kanitz, Alexander and Wilm, Andreas and Holtgrewe, Manuel and Rahmann, Sven and Nahnsen, Sven and Köster, Johannes},
+  date = {2021-01-18},
+  eprinttype = {F1000Research},
+  doi = {10.12688/f1000research.29032.1},
+  url = {https://f1000research.com/articles/10-33},
+  urldate = {2026-04-01},
+  abstract = {Data analysis often entails a multitude of heterogeneous steps, from the application of various command line tools to the usage of scripting languages like R or Python for the generation of plots and tables. It is widely recognized that data analyses should ideally be conducted in a reproducible way.\&nbsp;Reproducibility enables technical validation and regeneration of results on the original or even new data. However, reproducibility alone is by no means sufficient to deliver an analysis that is of lasting impact (i.e., sustainable) for the field, or even just one research group. We postulate that it is equally important to ensure adaptability and transparency. The former describes the ability to modify the analysis to answer extended or slightly different research questions. The latter describes the ability to understand the analysis in order to judge whether it is not only technically, but methodologically valid. Here, we analyze the properties needed for a data analysis to become reproducible, adaptable, and transparent. We show how the popular workflow management system Snakemake can be used to guarantee this, and how it enables an ergonomic, combined, unified representation of all steps involved in data analysis, ranging from raw data processing, to quality control and fine-grained, interactive exploration and plotting of final results.},
+  langid = {english},
+  pubstate = {prepublished},
+  keywords = {adaptability,data analysis,reproducibility,scalability,sustainability,transparency,workflow management},
+  file = {/Users/josephdong/Zotero/storage/4HB8Q49Y/Mölder et al. - 2021 - Sustainable data analysis with Snakemake.pdf}
+}
+
+@article{Oostenveld:2011,
+  title = {{{FieldTrip}}: {{Open Source Software}} for {{Advanced Analysis}} of {{MEG}}, {{EEG}}, and {{Invasive Electrophysiological Data}}},
+  shorttitle = {{{FieldTrip}}},
+  author = {Oostenveld, Robert and Fries, Pascal and Maris, Eric and Schoffelen, Jan-Mathijs},
+  date = {2011},
+  journaltitle = {Computational Intelligence and Neuroscience},
+  volume = {2011},
+  number = {1},
+  pages = {156869},
+  issn = {1687-5273},
+  doi = {10.1155/2011/156869},
+  url = {https://onlinelibrary.wiley.com/doi/abs/10.1155/2011/156869},
+  urldate = {2026-04-01},
+  abstract = {This paper describes FieldTrip, an open source software package that we developed for the analysis of MEG, EEG, and other electrophysiological data. The software is implemented as a MATLAB toolbox and includes a complete set of consistent and user-friendly high-level functions that allow experimental neuroscientists to analyze experimental data. It includes algorithms for simple and advanced analysis, such as time-frequency analysis using multitapers, source reconstruction using dipoles, distributed sources and beamformers, connectivity analysis, and nonparametric statistical permutation tests at the channel and source level. The implementation as toolbox allows the user to perform elaborate and structured analyses of large data sets using the MATLAB command line and batch scripting. Furthermore, users and developers can easily extend the functionality and implement new algorithms. The modular design facilitates the reuse in other software packages.},
+  langid = {english},
+  file = {/Users/josephdong/Zotero/storage/TWCMHH9L/Oostenveld et al. - 2011 - FieldTrip Open Source Software for Advanced Analysis of MEG, EEG, and Invasive Electrophysiological.pdf;/Users/josephdong/Zotero/storage/EYN7IBRJ/156869.html}
+}
+
+@article{Tadel:2011,
+  title = {Brainstorm: {{A User-Friendly Application}} for {{MEG}}/{{EEG Analysis}}},
+  shorttitle = {Brainstorm},
+  author = {Tadel, François and Baillet, Sylvain and Mosher, John C. and Pantazis, Dimitrios and Leahy, Richard M.},
+  date = {2011},
+  journaltitle = {Computational Intelligence and Neuroscience},
+  volume = {2011},
+  number = {1},
+  pages = {879716},
+  issn = {1687-5273},
+  doi = {10.1155/2011/879716},
+  url = {https://onlinelibrary.wiley.com/doi/abs/10.1155/2011/879716},
+  urldate = {2026-04-01},
+  abstract = {Brainstorm is a collaborative open-source application dedicated to magnetoencephalography (MEG) and electroencephalography (EEG) data visualization and processing, with an emphasis on cortical source estimation techniques and their integration with anatomical magnetic resonance imaging (MRI) data. The primary objective of the software is to connect MEG/EEG neuroscience investigators with both the best-established and cutting-edge methods through a simple and intuitive graphical user interface (GUI).},
+  langid = {english},
+  file = {/Users/josephdong/Zotero/storage/ZM8L6LAV/Tadel et al. - 2011 - Brainstorm A User-Friendly Application for MEGEEG Analysis.pdf;/Users/josephdong/Zotero/storage/2PCQ26XG/879716.html}
 }
 
 @article{Tudor:2005,
