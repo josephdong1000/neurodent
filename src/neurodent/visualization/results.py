@@ -1753,6 +1753,17 @@ class AnimalOrganizer(AnimalFeatureParser):
                         f"All {len(lro_group)} LRO(s) for '{animalday}' are "
                         f"0-sample; skipping this date."
                     )
+                    # If no LROs have been merged yet, then all available LROs
+                    # encountered so far are 0-sample. In this case, raising an
+                    # error is more informative and consistent with the normal
+                    # __init__ path, which fails when nothing is loadable.
+                    if not merged_lros:
+                        raise ValueError(
+                            f"No non-empty local recording objects (LROs) could be "
+                            f"loaded for '{animalday}' (all {len(lro_group)} LRO(s) "
+                            f"are 0-sample). Cannot construct an AnimalOrganizer "
+                            f"with no recordings."
+                        )
                     continue
                 lro_pairs = valid_pairs
 
@@ -2193,14 +2204,14 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 if pct_short > 1.0 and not self.suppress_short_interval_error:
                     # Build a diagnostic showing the first few overlapping pairs
                     # so the user can identify which sessions have bad timestamps.
-                    short_idx = short_intervals[short_intervals].index[:5]
+                    short_positions = np.flatnonzero(short_intervals.to_numpy())[:5]
                     diag_lines = []
                     has_animalday = "animalday" in self.result.columns
-                    for idx in short_idx:
-                        pos = self.result.index.get_loc(idx)
+                    for pos in short_positions:
+                        # short_intervals marks gaps between row (pos - 1) and row pos
                         prev_row = self.result.iloc[pos - 1]
                         curr_row = self.result.iloc[pos]
-                        gap = timestamp_diffs.loc[idx]
+                        gap = timestamp_diffs.iloc[pos]
                         prev_ad = f" ({prev_row['animalday']})" if has_animalday else ""
                         curr_ad = f" ({curr_row['animalday']})" if has_animalday else ""
                         diag_lines.append(
