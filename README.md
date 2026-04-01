@@ -76,7 +76,7 @@ If you find NeuRodent useful, please cite our work!
 @software{dong2026neurodent,
   author    = {Dong, Joseph P. and Oh, Yongtaek and Marsh, Eric D.},
   title     = {NeuRodent},
-  year      = {2026},
+  year      = {2025},
   publisher = {Zenodo},
   doi       = {10.5281/zenodo.15780751},
   url       = {https://doi.org/10.5281/zenodo.15780751},
