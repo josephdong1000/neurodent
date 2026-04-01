@@ -17,7 +17,7 @@ import pytest
 
 try:
     import spikeinterface.core as si
-except Exception:
+except ImportError:
     si = None
 
 from neurodent.core.core import (
@@ -28,6 +28,8 @@ from neurodent.core.core import (
     _convert_ddfrowbin_to_si_no_resample,
 )
 from neurodent import constants
+
+_DEFAULT_CH_NAMES = ["a", "b", "c", "d"]
 
 
 # ---------------------------------------------------------------------------
@@ -273,7 +275,7 @@ class TestConvertFileWithSI:
                 mock_si.concatenate_recordings.return_value = concat_rec
                 with patch.object(lro, "_apply_resampling", return_value=concat_rec):
                     with patch.object(lro, "finalize_file_timestamps"):
-                        with patch.object(lro, "_extract_channel_names", return_value=["a", "b", "c", "d"]):
+                        with patch.object(lro, "_extract_channel_names", return_value=_DEFAULT_CH_NAMES):
                             lro.convert_file_with_si_to_recording(
                                 extract_func=extract_func,
                                 multiprocess_mode="dask",
@@ -292,7 +294,7 @@ class TestConvertFileWithSI:
             mock_si.concatenate_recordings.return_value = concat_rec
             with patch.object(lro, "_apply_resampling", return_value=concat_rec):
                 with patch.object(lro, "finalize_file_timestamps"):
-                    with patch.object(lro, "_extract_channel_names", return_value=["a", "b", "c", "d"]):
+                    with patch.object(lro, "_extract_channel_names", return_value=_DEFAULT_CH_NAMES):
                         lro.convert_file_with_si_to_recording(
                             extract_func=extract_func
                         )
@@ -477,6 +479,8 @@ class TestGetOrCreateIntermediateFile:
                                     extract_func=extract_func,
                                     n_jobs=1,
                                 )
+        # Verify regeneration happened (extract_func called to rebuild metadata)
+        assert extract_func.called
         assert meta is not None
 
     def test_item_list_extract_func(self, tmp_path):
@@ -589,6 +593,9 @@ class TestIntanAndEdfExport:
                                 n_jobs=1,
                             )
                             assert mock_mne.export.export_raw.call_count == 2
+                            # Verify second call used physical_range kwarg (robust retry)
+                            second_call = mock_mne.export.export_raw.call_args_list[1]
+                            assert "physical_range" in second_call.kwargs
 
 
 # ===================================================================
@@ -620,7 +627,7 @@ class TestConvertFileWithMne:
             "_get_or_create_intermediate_file",
             return_value=(rec, raw, RecordingMetadata(
                 None, n_channels=4, f_s=1000, dt_end=None,
-                channel_names=["a", "b", "c", "d"],
+                channel_names=_DEFAULT_CH_NAMES,
             )),
         ):
             with patch.object(lro, "_apply_resampling", return_value=rec):
@@ -645,7 +652,7 @@ class TestConvertFileWithMne:
                         "_get_or_create_intermediate_file",
                         return_value=(rec, raw, RecordingMetadata(
                             None, n_channels=4, f_s=1000, dt_end=None,
-                            channel_names=["a", "b", "c", "d"],
+                            channel_names=_DEFAULT_CH_NAMES,
                         )),
                     ):
                         with patch.object(lro, "_apply_resampling", return_value=rec):
@@ -667,7 +674,7 @@ class TestConvertFileWithMne:
                     "_get_or_create_intermediate_file",
                     return_value=(rec, raw, RecordingMetadata(
                         None, n_channels=4, f_s=1000, dt_end=None,
-                        channel_names=["a", "b", "c", "d"],
+                        channel_names=_DEFAULT_CH_NAMES,
                     )),
                 ):
                     with patch.object(lro, "_apply_resampling", return_value=rec):
@@ -692,7 +699,7 @@ class TestConvertFileWithMne:
                 "_get_or_create_intermediate_file",
                 return_value=(rec, raw, RecordingMetadata(
                     None, n_channels=4, f_s=1000, dt_end=None,
-                    channel_names=["a", "b", "c", "d"],
+                    channel_names=_DEFAULT_CH_NAMES,
                 )),
             ):
                 with patch.object(lro, "_apply_resampling", return_value=rec):
@@ -703,6 +710,7 @@ class TestConvertFileWithMne:
         assert len(lro.file_durations) == 2
         assert lro.file_durations[0] == 10.0
         assert lro.file_durations[1] == 10.0
+        assert sum(lro.file_durations) == pytest.approx(20.0)  # total preserved
 
 
 # ===================================================================
