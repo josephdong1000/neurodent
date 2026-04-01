@@ -12,17 +12,17 @@ authors:
   affiliation: 1
 - name: Oh Yongtaek
   orchid: 0000-0002-1723-0553
-  affiliation: 1 ****************************
+  affiliation: 1
 - name: Eric D. Marsh
   orchid: 0000-0003-3264-0902
-  affiliation: 1 ****************************
+  affiliation: "1, 2"
 affiliations:
-- name: Children's Hospital of Philadelphia ******************************
+- name: Children's Hospital of Philadelphia
   index: 1
-  ror: https://ror.org/01z7r7q48
-- name: University of Pennslyvania Perelman School of Medicine **********************
+  ror: 01z7r7q48
+- name: University of Pennslyvania Perelman School of Medicine
   index: 2
-  ror: https://ror.org/00b30xv10
+  ror: 00b30xv10
 date: 31 March 2026
 bibliography: paper.bib
 ---
