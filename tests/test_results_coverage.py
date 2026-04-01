@@ -320,7 +320,7 @@ class TestGetFilterHighBeta:
         n_ch = len(war.channel_names)
         if "psdfrac" in df.columns:
             df = df.drop(columns=["psdfrac"])
-        # beta=0.3, total=1.0 → proportion=0.3, which is below max_beta_prop=0.4
+        # beta=0.3, total=1.0 -> proportion=0.3, which is below max_beta_prop=0.4
         df["psdband"] = [{"beta": np.array([0.3] * n_ch)}] * len(df)
         df["psdtotal"] = [np.array([1.0] * n_ch)] * len(df)
         result = war.get_filter_high_beta(df=df)
