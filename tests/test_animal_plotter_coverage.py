@@ -144,8 +144,8 @@ class TestCalculateStandardData:
 
     @pytest.fixture()
     def data(self):
-        np.random.seed(42)
-        return np.random.rand(10, 3)
+        rng = np.random.default_rng(42)
+        return rng.random((10, 3))
 
     def test_z(self, plotter, data):
         result = plotter._calculate_standard_data(data, mode="z")
@@ -666,35 +666,23 @@ class TestHandleFigure:
         plotter._handle_figure(fig, title="test")
         mock_show.assert_called_once()
 
-    def test_save_fig_creates_file(self, plotter):
+    def test_save_fig_creates_file(self, plotter, tmp_path):
         fig, _ = plt.subplots()
-        save_dir = Path(".")
-        save_path = save_dir / "test_save_output"
+        save_path = tmp_path / "test_save_output"
         plotter.save_fig = True
         plotter.save_path = save_path
-        try:
-            plotter._handle_figure(fig, title="myfig")
-            expected = Path(f"{save_path}_myfig.png")
-            assert expected.exists()
-        finally:
-            expected = Path(f"{save_path}_myfig.png")
-            if expected.exists():
-                expected.unlink()
+        plotter._handle_figure(fig, title="myfig")
+        expected = Path(f"{save_path}_myfig.png")
+        assert expected.exists()
 
-    def test_save_fig_no_title(self, plotter):
+    def test_save_fig_no_title(self, plotter, tmp_path):
         fig, _ = plt.subplots()
-        save_dir = Path(".")
-        save_path = save_dir / "test_save_notitle"
+        save_path = tmp_path / "test_save_notitle"
         plotter.save_fig = True
         plotter.save_path = save_path
-        try:
-            plotter._handle_figure(fig, title=None)
-            expected = Path(f"{save_path}.png")
-            assert expected.exists()
-        finally:
-            expected = Path(f"{save_path}.png")
-            if expected.exists():
-                expected.unlink()
+        plotter._handle_figure(fig, title=None)
+        expected = Path(f"{save_path}.png")
+        assert expected.exists()
 
     def test_save_fig_no_path_raises(self, plotter):
         fig, _ = plt.subplots()

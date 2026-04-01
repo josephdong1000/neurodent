@@ -978,12 +978,12 @@ class TestDfNormalizeBaseline:
     @pytest.fixture()
     def baseline_df(self):
         """DataFrame for baseline normalization tests."""
-        np.random.seed(42)
+        rng = np.random.default_rng(42)
         return pd.DataFrame({
             "genotype": ["WT"] * 6 + ["KO"] * 6,
             "sex": (["Male"] * 3 + ["Female"] * 3) * 2,
             "channel": (["LM", "RM", "LM"] * 4),
-            "rms": np.random.rand(12) + 1.0,
+            "rms": rng.random(12) + 1.0,
         })
 
     def test_groupby_as_string(self, baseline_df):
