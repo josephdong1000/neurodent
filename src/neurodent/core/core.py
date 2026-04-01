@@ -777,7 +777,7 @@ class LongRecordingOrganizer:
         """
         return si.NumpyRecording(
             traces_list=[np.zeros((0, 1), dtype=np.float32)],
-            sampling_frequency=1.0,
+            sampling_frequency=constants.GLOBAL_SAMPLING_RATE,
             channel_ids=["placeholder"],
         )
 

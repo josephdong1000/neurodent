@@ -137,16 +137,14 @@ def main():
     )
 
     logger.info(f"Loading FDSAR results from: {fdsar_dir}")
-    fdsar_list = load_fdsar_results(fdsar_dir)
-
-    if not fdsar_list:
-        logger.warning("No FDSAR results found, creating empty output directory")
-        output_dir.mkdir(parents=True, exist_ok=True)
-        return
+    fdsar_iter = load_fdsar_results(fdsar_dir)
 
     # Generate diagnostics
+    # Note: load_fdsar_results() returns a generator (always truthy), so
+    # emptiness is handled inside generate_diagnostics() via the `if not i`
+    # guard after iteration completes.
     logger.info(f"Generating diagnostics to: {output_dir}")
-    generate_diagnostics(fdsar_list, output_dir, sat_config)
+    generate_diagnostics(fdsar_iter, output_dir, sat_config)
 
     logger.info("FDSAR diagnostics generation completed successfully")
 

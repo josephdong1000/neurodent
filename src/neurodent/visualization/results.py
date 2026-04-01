@@ -1753,17 +1753,6 @@ class AnimalOrganizer(AnimalFeatureParser):
                         f"All {len(lro_group)} LRO(s) for '{animalday}' are "
                         f"0-sample; skipping this date."
                     )
-                    # If no LROs have been merged yet, then all available LROs
-                    # encountered so far are 0-sample. In this case, raising an
-                    # error is more informative and consistent with the normal
-                    # __init__ path, which fails when nothing is loadable.
-                    if not merged_lros:
-                        raise ValueError(
-                            f"No non-empty local recording objects (LROs) could be "
-                            f"loaded for '{animalday}' (all {len(lro_group)} LRO(s) "
-                            f"are 0-sample). Cannot construct an AnimalOrganizer "
-                            f"with no recordings."
-                        )
                     continue
                 lro_pairs = valid_pairs
 
@@ -1793,17 +1782,29 @@ class AnimalOrganizer(AnimalFeatureParser):
                     f"Successfully merged {len(lro_group)} LROs for {animalday}"
                 )
 
-        # Step 3: Set merged LROs and animaldays
+        # Step 3: Ensure at least one date produced a valid (non-empty) merged LRO.
+        # If every date group was filtered out as 0-sample, merged_lros is empty
+        # and downstream methods (e.g. compute_windowed_analysis) would fail with
+        # less informative errors.  Raise early, consistent with the normal
+        # __init__ path which raises when nothing is loadable.
+        if not merged_lros:
+            raise ValueError(
+                f"No non-empty local recording objects (LROs) could be loaded. "
+                f"All date groups were 0-sample. Cannot construct an "
+                f"AnimalOrganizer with no recordings."
+            )
+
+        # Step 4: Set merged LROs and animaldays
         ao.long_recordings = merged_lros
         ao.unique_animaldays = merged_animaldays
         ao.animaldays = (
             merged_animaldays.copy()
         )  # Create separate list for compatibility
 
-        # Step 4: Validate and reconcile channel names across all merged LROs
+        # Step 5: Validate and reconcile channel names across all merged LROs
         ao.channel_names = cls._validate_channel_names(merged_lros)
 
-        # Step 5: CRITICAL VALIDATION - ensure no duplicates after merge
+        # Step 6: CRITICAL VALIDATION - ensure no duplicates after merge
         if len(ao.long_recordings) != len(set(ao.unique_animaldays)):
             duplicate_dates = [
                 date
@@ -1823,7 +1824,7 @@ class AnimalOrganizer(AnimalFeatureParser):
             f"{len(ao.unique_animaldays)} unique animaldays (no duplicates)"
         )
 
-        # Step 6: Initialize default attributes for factory-created instances
+        # Step 7: Initialize default attributes for factory-created instances
         cls._init_factory_defaults(ao, animal_id, merged_lros)
 
         logging.info(
