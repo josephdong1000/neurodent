@@ -70,7 +70,8 @@ class TestManualDatetimesEdgeCases:
         )
 
         # Should successfully fallback to using the flat folder keys
-        assert ao._processed_timestamps[f"WT_{self.animal_id}_2023-01-15"] == datetime(
+        # Keys are now full paths (from _get_item_key)
+        assert ao._processed_timestamps[str(self.folder1)] == datetime(
             2023, 2, 1, 10, 0
         )
 

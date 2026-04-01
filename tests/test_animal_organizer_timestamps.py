@@ -178,14 +178,15 @@ class TestAnimalOrganizerTimestampHandling:
         assert len(ao._processed_timestamps) == 3
 
         # Check that function was applied to each folder
+        # Keys are now full paths (from _get_item_key), not just folder names
         expected_times = {
-            f"WT_{self.animal_id}_2023-01-15": datetime(2023, 1, 15, 9, 0, 0),
-            f"WT_{self.animal_id}_2023-01-16": datetime(2023, 1, 16, 10, 0, 0),
-            f"WT_{self.animal_id}_2023-01-17": datetime(2023, 1, 17, 11, 0, 0),
+            str(self.folder1): datetime(2023, 1, 15, 9, 0, 0),
+            str(self.folder2): datetime(2023, 1, 16, 10, 0, 0),
+            str(self.folder3): datetime(2023, 1, 17, 11, 0, 0),
         }
 
-        for folder_name, expected_time in expected_times.items():
-            assert ao._processed_timestamps[folder_name] == expected_time
+        for folder_path, expected_time in expected_times.items():
+            assert ao._processed_timestamps[folder_path] == expected_time
 
     @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
     @patch("glob.glob")
@@ -222,13 +223,14 @@ class TestAnimalOrganizerTimestampHandling:
         # Verify processing
         assert len(ao._processed_timestamps) == 3
 
+        # Keys are now full paths (from _get_item_key), not just folder names
         # Check explicit datetime
-        assert ao._processed_timestamps[f"WT_{self.animal_id}_2023-01-15"] == datetime(
+        assert ao._processed_timestamps[str(self.folder1)] == datetime(
             2023, 1, 15, 8, 0, 0
         )
 
         # Check function result
-        assert ao._processed_timestamps[f"WT_{self.animal_id}_2023-01-16"] == datetime(
+        assert ao._processed_timestamps[str(self.folder2)] == datetime(
             2023, 1, 16, 14, 30, 0
         )
 
@@ -238,7 +240,7 @@ class TestAnimalOrganizerTimestampHandling:
             datetime(2023, 1, 17, 14, 0, 0),
         ]
         assert (
-            ao._processed_timestamps[f"WT_{self.animal_id}_2023-01-17"] == expected_list
+            ao._processed_timestamps[str(self.folder3)] == expected_list
         )
 
     @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
@@ -446,8 +448,8 @@ class TestAnimalOrganizerTimestampHandling:
         )
 
         # Verify that recursive resolution worked
-        folder_name = f"WT_{self.animal_id}_2023-01-15"
-        assert ao._processed_timestamps[folder_name] == datetime(2023, 1, 15, 12, 0, 0)
+        # Keys are now full paths (from _get_item_key)
+        assert ao._processed_timestamps[str(self.folder1)] == datetime(2023, 1, 15, 12, 0, 0)
 
     @patch("glob.glob")
     def test_continuous_timeline_single_datetime(self, mock_glob):
@@ -893,6 +895,167 @@ class TestComputeGlobalTimelineNaturalSort:
             f"  Expected (natural): {natural_order}\n"
             f"  Got:                {timestamps_sorted_by_value}"
         )
+
+
+class TestTimestampCollisionPrevention:
+    """Regression tests for cross-session timestamp key collisions.
+
+    Issue: _get_item_name() returns filename-only keys (e.g. 'file-0.bin'),
+    so when two sessions contain files with the same name, the
+    _processed_timestamps dict silently overwrites earlier entries.
+    Fix: use _get_item_key() which returns the full path.
+    """
+
+    def test_get_item_key_returns_full_path_for_strings(self):
+        ao = _make_minimal_ao()
+        assert ao._get_item_key("/data/sess1/file-0.bin") == "/data/sess1/file-0.bin"
+        assert ao._get_item_key("/data/sess2/file-0.bin") == "/data/sess2/file-0.bin"
+
+    def test_get_item_key_returns_full_path_for_lists(self):
+        ao = _make_minimal_ao()
+        key = ao._get_item_key(["/data/sess1/file-0.bin", "/data/sess1/file-0.json"])
+        assert key == "/data/sess1/file-0.bin"
+
+    def test_get_item_key_distinct_for_same_filename(self):
+        """Two items with the same filename in different directories get distinct keys."""
+        ao = _make_minimal_ao()
+        key1 = ao._get_item_key("/data/session_1/Cage 3 F9 Mut-0_ColMajor.bin")
+        key2 = ao._get_item_key("/data/session_2/Cage 3 F9 Mut-0_ColMajor.bin")
+        assert key1 != key2
+
+    def test_get_item_name_would_collide(self):
+        """Verify that _get_item_name DOES produce the same key for same-named files."""
+        ao = _make_minimal_ao()
+        name1 = ao._get_item_name("/data/session_1/Cage 3 F9 Mut-0_ColMajor.bin")
+        name2 = ao._get_item_name("/data/session_2/Cage 3 F9 Mut-0_ColMajor.bin")
+        assert name1 == name2  # This is the collision we're preventing
+
+    def test_compute_global_timeline_uses_full_path_keys(self):
+        """_compute_global_timeline result keys are full paths, not just filenames."""
+        with patch("neurodent.visualization.results.core.LongRecordingOrganizer") as mock_lro_class:
+            mock_lro_class.side_effect = lambda item, **kw: _make_mock_lro(100.0)
+
+            ao = _make_minimal_ao()
+            base_dt = datetime(2023, 9, 1, 10, 0, 0)
+
+            # Two items with the same filename in different directories
+            items = {
+                "/data/sess1/file-0.bin": ["/data/sess1/file-0.bin"],
+                "/data/sess2/file-0.bin": ["/data/sess2/file-0.bin"],
+            }
+            result = ao._compute_global_timeline(
+                base_dt, items, {}, original_manual_datetimes=base_dt
+            )
+
+            # Keys must be full paths, not just "file-0.bin"
+            assert len(result) == 2
+            assert "/data/sess1/file-0.bin" in result
+            assert "/data/sess2/file-0.bin" in result
+
+    def test_session_keys_no_overwrite_across_sessions(self):
+        """has_session_keys branch: items from different sessions get distinct timestamps.
+
+        Regression test for the bug where out.update(sess_timeline) would
+        overwrite session-1's file-0 timestamp with session-2's file-0 timestamp.
+        """
+        with patch("neurodent.visualization.results.core.LongRecordingOrganizer") as mock_lro_class:
+            mock_lro_class.side_effect = lambda item, **kw: _make_mock_lro(100.0)
+
+            ao = _make_minimal_ao()
+
+            # Two sessions, each with one item sharing the same filename
+            animalday_to_items = {
+                "2022-09-03": ["/data/2022-09-03/Cage 3 F9 Mut-0_ColMajor.bin"],
+                "2022-09-02": ["/data/2022-09-02/Cage 3 F9 Mut-0_ColMajor.bin"],
+            }
+            manual_datetimes = {
+                "2022-09-03": datetime(2023, 9, 3, 9, 0, 0),
+                "2022-09-02": datetime(2023, 9, 2, 15, 0, 0),
+            }
+
+            result = ao._process_manual_datetimes(
+                manual_datetimes, animalday_to_items, {}
+            )
+
+            # Must have 2 distinct entries (not 1 due to collision)
+            assert len(result) == 2
+
+            # Keys must be full paths
+            keys = list(result.keys())
+            assert any("2022-09-03" in k for k in keys)
+            assert any("2022-09-02" in k for k in keys)
+
+            # Timestamps must be different
+            timestamps = list(result.values())
+            assert timestamps[0] != timestamps[1]
+
+
+class TestValidateTimestampOrdering:
+    """Tests for the _validate_timestamp_ordering static method."""
+
+    def test_passes_for_distinct_ordered_timestamps(self):
+        ts = {
+            "/data/sess1/file-0.bin": datetime(2023, 1, 1, 10, 0, 0),
+            "/data/sess2/file-0.bin": datetime(2023, 1, 2, 10, 0, 0),
+        }
+        results.AnimalOrganizer._validate_timestamp_ordering(ts)  # Should not raise
+
+    def test_raises_on_equal_timestamps(self):
+        """Equal timestamps indicate a key collision (overwritten entry)."""
+        same_time = datetime(2023, 1, 1, 10, 0, 0)
+        ts = {
+            "/data/sess1/file.bin": same_time,
+            "/data/sess2/file.bin": same_time,
+        }
+        with pytest.raises(ValueError, match="Timestamp collision"):
+            results.AnimalOrganizer._validate_timestamp_ordering(ts)
+
+    def test_passes_for_single_item(self):
+        ts = {"/data/file.bin": datetime(2023, 1, 1, 10, 0, 0)}
+        results.AnimalOrganizer._validate_timestamp_ordering(ts)  # Should not raise
+
+    def test_passes_for_empty_dict(self):
+        results.AnimalOrganizer._validate_timestamp_ordering({})  # Should not raise
+
+    def test_skips_non_datetime_values(self):
+        """Non-datetime values (lists, functions) are not validated."""
+        ts = {
+            "/data/sess1/file.bin": [datetime(2023, 1, 1), datetime(2023, 1, 2)],
+            "/data/sess2/file.bin": [datetime(2023, 1, 1), datetime(2023, 1, 2)],
+        }
+        results.AnimalOrganizer._validate_timestamp_ordering(ts)  # Should not raise
+
+
+class TestDiagnosticDisplayOffByOne:
+    """Test that short-interval diagnostic display uses correct row indices."""
+
+    def test_first_short_interval_shows_correct_rows(self):
+        """When the first interval (row 0->1) is short, diagnostic should show rows 0 and 1, not row -1."""
+        war = results.WindowAnalysisResult.__new__(results.WindowAnalysisResult)
+        war.suppress_short_interval_error = False
+        war.animal_id = "test"
+
+        # Create a result DataFrame where the gap between row 0 and row 1 is
+        # shorter than the median duration (triggering the diagnostic).
+        war.result = pd.DataFrame({
+            "timestamp": pd.to_datetime([
+                "2023-01-01 10:00:00",
+                "2023-01-01 10:00:01",  # 1s gap (short!)
+                "2023-01-01 10:00:06",  # 5s gap (ok)
+                "2023-01-01 10:00:11",  # 5s gap (ok)
+            ]),
+            "duration": [5.0, 5.0, 5.0, 5.0],
+            "animal": ["test"] * 4,
+        })
+
+        # Should raise ValueError with diagnostic showing rows 0->1
+        with pytest.raises(ValueError, match="Found 1 intervals") as exc_info:
+            war._update_instance_vars()
+
+        # The diagnostic should reference 10:00:00 -> 10:00:01 (not the last row)
+        error_msg = str(exc_info.value)
+        assert "10:00:00" in error_msg
+        assert "10:00:01" in error_msg
 
 
 def _make_mock_lro(duration_seconds=1800.0):

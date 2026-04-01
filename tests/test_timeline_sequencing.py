@@ -23,10 +23,12 @@ class TestTimelineSequencing:
         ao._sort_lros_by_median_time = AnimalOrganizer._sort_lros_by_median_time.__get__(ao, AnimalOrganizer)
         # Bind helpers that _compute_global_timeline uses
         ao._get_item_name = AnimalOrganizer._get_item_name.__get__(ao, AnimalOrganizer)
+        ao._get_item_key = AnimalOrganizer._get_item_key.__get__(ao, AnimalOrganizer)
+        ao._validate_timestamp_ordering = AnimalOrganizer._validate_timestamp_ordering
         ao._is_item_file = AnimalOrganizer._is_item_file.__get__(ao, AnimalOrganizer)
         # Bind _iter_valid_recordings so the post-load guard in _create_long_recordings works
         ao._iter_valid_recordings = AnimalOrganizer._iter_valid_recordings.__get__(ao, AnimalOrganizer)
-        
+
         # Mock dependencies
         ao._resolve_timestamp_input = MagicMock(side_effect=lambda x, y: pd.to_datetime(x))
         ao._get_folders_for_animal = MagicMock(side_effect=lambda aid, mapping: [f for folders in mapping.values() for f in folders])
@@ -63,12 +65,12 @@ class TestTimelineSequencing:
         # when a single start timestamp is provided.
         result = ao._process_manual_datetimes(manual_datetimes, animalday_to_folders, base_lro_kwargs)
         
-        # Verification
-        assert "M1_day1" in result
-        assert "M1_day2" in result
-        
-        t1 = result["M1_day1"]
-        t2 = result["M1_day2"] # _compute_global_timeline sorts folders by name
+        # Verification — keys are now full paths (from _get_item_key)
+        assert "/data/M1_day1" in result
+        assert "/data/M1_day2" in result
+
+        t1 = result["/data/M1_day1"]
+        t2 = result["/data/M1_day2"] # _compute_global_timeline sorts folders by name
         
         print(f"T1: {t1}, T2: {t2}")
         
@@ -115,12 +117,11 @@ class TestTimelineSequencing:
         # Execute
         result = ao._process_manual_datetimes(manual_datetimes, animalday_to_folders, base_lro_kwargs)
         
-        # Timepoints
-        # Keys are folder names (basenames)
-        t1 = result["Nov28"]
-        t2 = result["Nov29"]
-        t3 = result["Nov30"]
-        t4 = result["Dec01"]
+        # Timepoints — keys are full paths (from _get_item_key)
+        t1 = result["/data/Nov28"]
+        t2 = result["/data/Nov29"]
+        t3 = result["/data/Nov30"]
+        t4 = result["/data/Dec01"]
         
         print(f"T1: {t1}")
         print(f"T2: {t2}")
@@ -163,10 +164,9 @@ class TestTimelineSequencing:
         # Execute
         result = ao._process_manual_datetimes(manual_datetimes, animalday_to_folders, base_lro_kwargs)
         
-        # Verification
-        # Keys in result are folder names
-        assert result["folder1"] == pd.to_datetime("2025-01-01 12:00:00")
-        assert result["folder2"] == pd.to_datetime("2025-01-01 14:00:00")
+        # Verification — keys are now full paths (from _get_item_key)
+        assert result["/data/folder1"] == pd.to_datetime("2025-01-01 12:00:00")
+        assert result["/data/folder2"] == pd.to_datetime("2025-01-01 14:00:00")
 
     @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
     def test_session_keyed_dict(self, mock_lro_cls, ao):
@@ -207,11 +207,12 @@ class TestTimelineSequencing:
         )
 
         # Each session's single item should get a timeline-computed timestamp
-        assert "010822_files0-12" in result
-        assert "010822_files13-21" in result
+        # Keys are now full paths (from _get_item_key)
+        assert "/data/010822_files0-12" in result
+        assert "/data/010822_files13-21" in result
         # Start time matches the session's manual timestamp
-        assert result["010822_files0-12"] == pd.to_datetime("2022-01-08 18:55:02")
-        assert result["010822_files13-21"] == pd.to_datetime("2022-01-08 23:25:03")
+        assert result["/data/010822_files0-12"] == pd.to_datetime("2022-01-08 18:55:02")
+        assert result["/data/010822_files13-21"] == pd.to_datetime("2022-01-08 23:25:03")
 
     @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
     def test_session_keyed_dict_multi_item_sessions(self, mock_lro_cls, ao):
@@ -249,10 +250,11 @@ class TestTimelineSequencing:
         )
 
         # session1 items: file_a at 10:00, file_b at 10:00 + 1800s = 10:30
-        assert result["file_a"] == pd.to_datetime("2022-01-08 10:00:00")
-        assert result["file_b"] == pd.to_datetime("2022-01-08 10:30:00")
+        # Keys are now full paths (from _get_item_key)
+        assert result["/data/sess1/file_a"] == pd.to_datetime("2022-01-08 10:00:00")
+        assert result["/data/sess1/file_b"] == pd.to_datetime("2022-01-08 10:30:00")
         # session2 item: file_c at 14:00
-        assert result["file_c"] == pd.to_datetime("2022-01-08 14:00:00")
+        assert result["/data/sess2/file_c"] == pd.to_datetime("2022-01-08 14:00:00")
 
     @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
     def test_datetimes_are_start_false_sequencing(self, mock_lro_cls, ao):
@@ -294,14 +296,15 @@ class TestTimelineSequencing:
         # _compute_global_timeline should return START times computed from end times
         # session1: start = 13:00 - 1h = 12:00
         # session2: start = 15:00 - 1h = 14:00
-        assert result["folder_a"] == pd.to_datetime("2025-01-01 12:00:00")
-        assert result["folder_b"] == pd.to_datetime("2025-01-01 14:00:00")
+        # Keys are now full paths (from _get_item_key)
+        assert result["/data/sess1/folder_a"] == pd.to_datetime("2025-01-01 12:00:00")
+        assert result["/data/sess2/folder_b"] == pd.to_datetime("2025-01-01 14:00:00")
 
         # Timestamps must be sequenced (no overlap)
-        assert result["folder_b"] > result["folder_a"]
+        assert result["/data/sess2/folder_b"] > result["/data/sess1/folder_a"]
 
         # Gap between computed start times is preserved (12:00 → 14:00 = 2 hours)
-        gap = result["folder_b"] - result["folder_a"]
+        gap = result["/data/sess2/folder_b"] - result["/data/sess1/folder_a"]
         assert gap == timedelta(hours=2)
 
     @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
@@ -334,9 +337,10 @@ class TestTimelineSequencing:
         }
         ao.unique_animaldays = ["session1", "session2"]
         # _processed_timestamps holds start times (output of _compute_global_timeline)
+        # Keys are full paths (from _get_item_key)
         ao._processed_timestamps = {
-            "folder_a": pd.to_datetime("2025-01-01 12:00:00"),
-            "folder_b": pd.to_datetime("2025-01-01 14:00:00"),
+            "/data/sess1/folder_a": pd.to_datetime("2025-01-01 12:00:00"),
+            "/data/sess2/folder_b": pd.to_datetime("2025-01-01 14:00:00"),
         }
 
         # Simulate the bug scenario: original lro_kwargs had datetimes_are_start=False
@@ -388,6 +392,7 @@ class TestZeroSampleLROFiltering:
         ao._sort_lros_by_median_time_static = AnimalOrganizer._sort_lros_by_median_time_static
         ao._filter_zero_sample_lros = AnimalOrganizer._filter_zero_sample_lros
         ao._get_item_name = AnimalOrganizer._get_item_name.__get__(ao, AnimalOrganizer)
+        ao._get_item_key = AnimalOrganizer._get_item_key.__get__(ao, AnimalOrganizer)
         ao._is_item_file = AnimalOrganizer._is_item_file.__get__(ao, AnimalOrganizer)
         # Bind _iter_valid_recordings so the post-load guard in _create_long_recordings works
         ao._iter_valid_recordings = AnimalOrganizer._iter_valid_recordings.__get__(ao, AnimalOrganizer)

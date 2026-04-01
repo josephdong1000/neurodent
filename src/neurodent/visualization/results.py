@@ -281,6 +281,50 @@ class AnimalOrganizer(AnimalFeatureParser):
             return Path(item[0]).name
         return Path(item).name
 
+    def _get_item_key(self, item):
+        """Return a unique key for the item, suitable for dict lookups across sessions.
+
+        Unlike _get_item_name() which returns only the filename (e.g. 'file-0.bin'),
+        this returns the full path, ensuring items with the same filename in different
+        session directories get distinct keys.
+        """
+        from ..core.discovery import DiscoveredFile
+
+        if isinstance(item, DiscoveredFile):
+            paths = item.get_path_list()
+            return str(paths[0]) if paths else "unknown"
+        if isinstance(item, (list, tuple)):
+            return str(item[0])
+        return str(item)
+
+    @staticmethod
+    def _validate_timestamp_ordering(timestamp_dict):
+        """Validate that computed timestamps have no duplicates.
+
+        Catches key collisions (duplicate keys silently overwriting produce
+        equal timestamps for different items) and misconfigured manual_datetimes
+        that assign the same start time to multiple items.
+
+        Only checks datetime values; lists/functions are passed through unvalidated.
+        """
+        datetime_items = {
+            k: v for k, v in timestamp_dict.items()
+            if isinstance(v, datetime)
+        }
+        if len(datetime_items) < 2:
+            return
+        sorted_items = sorted(datetime_items.items(), key=lambda x: x[1])
+        for i in range(1, len(sorted_items)):
+            prev_key, prev_ts = sorted_items[i - 1]
+            curr_key, curr_ts = sorted_items[i]
+            if curr_ts <= prev_ts:
+                raise ValueError(
+                    f"Timestamp collision: {prev_key} ({prev_ts}) and "
+                    f"{curr_key} ({curr_ts}) have equal or overlapping timestamps. "
+                    f"This may indicate items with the same filename in different "
+                    f"sessions. Check manual_datetimes configuration."
+                )
+
     def _is_item_file(self, item):
         """Helper to check if an item represents a file(s) rather than a directory."""
         from ..core.discovery import DiscoveredFile
@@ -532,19 +576,29 @@ class AnimalOrganizer(AnimalFeatureParser):
         if datetimes_are_start:
             current_start_time = base_datetime
             for item in ordered_items:
-                item_name = self._get_item_name(item)
-                result[item_name] = current_start_time
+                item_key = self._get_item_key(item)
+                result[item_key] = current_start_time
                 current_start_time = current_start_time + timedelta(
                     seconds=item_durations[item]
                 )
         else:
             current_end_time = base_datetime
             for item in reversed(ordered_items):
-                item_name = self._get_item_name(item)
+                item_key = self._get_item_key(item)
                 duration = item_durations[item]
                 start_time = current_end_time - timedelta(seconds=duration)
-                result[item_name] = start_time
+                result[item_key] = start_time
                 current_end_time = start_time
+
+        # Validate monotonicity of computed timestamps in item order
+        for i in range(1, len(ordered_items)):
+            prev_key = self._get_item_key(ordered_items[i - 1])
+            curr_key = self._get_item_key(ordered_items[i])
+            if result[curr_key] <= result[prev_key]:
+                raise ValueError(
+                    f"Timeline computation produced non-monotonic timestamps: "
+                    f"{prev_key} ({result[prev_key]}) >= {curr_key} ({result[curr_key]})"
+                )
 
         total_duration = sum(item_durations.values())
         logging.info(
@@ -585,9 +639,10 @@ class AnimalOrganizer(AnimalFeatureParser):
                 for item in animal_items:
                     fname = self._get_item_name(item)
                     context_path = self._get_context_path(item)
-                    out[fname] = self._resolve_timestamp_input(
+                    out[self._get_item_key(item)] = self._resolve_timestamp_input(
                         manual_datetimes[fname], context_path
                     )
+                self._validate_timestamp_ordering(out)
                 return out
 
             elif has_session_keys:
@@ -611,7 +666,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                         sess_ts, context_path
                     )
                     sess_item_dict = {
-                        self._get_item_name(f): [f] for f in sess_items
+                        self._get_item_key(f): [f] for f in sess_items
                     }
                     sess_timeline = self._compute_global_timeline(
                         resolved_dt,
@@ -620,6 +675,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                         original_manual_datetimes=sess_ts,
                     )
                     out.update(sess_timeline)
+                self._validate_timestamp_ordering(out)
                 return out
 
             else:
@@ -661,11 +717,11 @@ class AnimalOrganizer(AnimalFeatureParser):
             out = {}
             for animalday, items in animalday_to_items.items():
                 for item in items:
-                    item_name = self._get_item_name(item)
                     context_path = self._get_context_path(item)
-                    out[item_name] = self._resolve_timestamp_input(
+                    out[self._get_item_key(item)] = self._resolve_timestamp_input(
                         manual_datetimes, context_path
                     )
+            self._validate_timestamp_ordering(out)
             return out
 
     def _create_long_recordings(self, lro_kwargs: dict):
@@ -675,22 +731,22 @@ class AnimalOrganizer(AnimalFeatureParser):
         for animalday, items in self._animalday_folder_groups.items():
             kwargs = lro_kwargs.copy()
             if getattr(self, "_processed_timestamps", None) is not None:
-                # _processed_timestamps is keyed by item name, not animalday
+                # _processed_timestamps is keyed by full item path, not animalday
                 if len(items) == 1:
-                    item_name = self._get_item_name(items[0])
-                    if item_name in self._processed_timestamps:
-                        kwargs["manual_datetimes"] = self._processed_timestamps[item_name]
+                    item_key = self._get_item_key(items[0])
+                    if item_key in self._processed_timestamps:
+                        kwargs["manual_datetimes"] = self._processed_timestamps[item_key]
                         kwargs["datetimes_are_start"] = True  # _compute_global_timeline always returns start times
                         logging.debug(
-                            f"Using processed timestamp for {item_name}: {kwargs['manual_datetimes']}"
+                            f"Using processed timestamp for {item_key}: {kwargs['manual_datetimes']}"
                         )
                 else:
                     # For multi-item animaldays, collect per-item timestamps as a list
                     item_timestamps = []
                     for item in items:
-                        item_name = self._get_item_name(item)
-                        if item_name in self._processed_timestamps:
-                            item_timestamps.append(self._processed_timestamps[item_name])
+                        item_key = self._get_item_key(item)
+                        if item_key in self._processed_timestamps:
+                            item_timestamps.append(self._processed_timestamps[item_key])
                     if item_timestamps:
                         kwargs["manual_datetimes"] = item_timestamps
                         kwargs["datetimes_are_start"] = True  # _compute_global_timeline always returns start times
@@ -716,10 +772,10 @@ class AnimalOrganizer(AnimalFeatureParser):
                     individual_kwargs = kwargs.copy()
                     # Distribute per-item timestamp so each LRO gets its own
                     if getattr(self, "_processed_timestamps", None) is not None:
-                        item_name = self._get_item_name(item)
-                        if item_name in self._processed_timestamps:
+                        item_key = self._get_item_key(item)
+                        if item_key in self._processed_timestamps:
                             individual_kwargs["manual_datetimes"] = (
-                                self._processed_timestamps[item_name]
+                                self._processed_timestamps[item_key]
                             )
                             individual_kwargs["datetimes_are_start"] = True  # _compute_global_timeline always returns start times
                     individual_lro = core.LongRecordingOrganizer(
@@ -2209,10 +2265,13 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     diag_lines = []
                     has_animalday = "animalday" in self.result.columns
                     for pos in short_positions:
-                        # short_intervals marks gaps between row (pos - 1) and row pos
-                        prev_row = self.result.iloc[pos - 1]
-                        curr_row = self.result.iloc[pos]
-                        gap = timestamp_diffs.iloc[pos]
+                        # Offset by 1 to map from sliced short_intervals (which
+                        # dropped the first NaT row) back to original DataFrame
+                        # positions. Without this, pos=0 wraps to iloc[-1].
+                        actual_pos = pos + 1
+                        prev_row = self.result.iloc[actual_pos - 1]
+                        curr_row = self.result.iloc[actual_pos]
+                        gap = timestamp_diffs.iloc[actual_pos]
                         prev_ad = f" ({prev_row['animalday']})" if has_animalday else ""
                         curr_ad = f" ({curr_row['animalday']})" if has_animalday else ""
                         diag_lines.append(
