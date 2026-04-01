@@ -317,7 +317,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         for i in range(1, len(sorted_items)):
             prev_key, prev_ts = sorted_items[i - 1]
             curr_key, curr_ts = sorted_items[i]
-            if curr_ts <= prev_ts:
+            if curr_ts < prev_ts:
                 raise ValueError(
                     f"Timestamp collision: {prev_key} ({prev_ts}) and "
                     f"{curr_key} ({curr_ts}) have equal or overlapping timestamps. "
@@ -594,10 +594,10 @@ class AnimalOrganizer(AnimalFeatureParser):
         for i in range(1, len(ordered_items)):
             prev_key = self._get_item_key(ordered_items[i - 1])
             curr_key = self._get_item_key(ordered_items[i])
-            if result[curr_key] <= result[prev_key]:
+            if result[curr_key] < result[prev_key]:
                 raise ValueError(
                     f"Timeline computation produced non-monotonic timestamps: "
-                    f"{prev_key} ({result[prev_key]}) >= {curr_key} ({result[curr_key]})"
+                    f"{prev_key} ({result[prev_key]}) > {curr_key} ({result[curr_key]})"
                 )
 
         total_duration = sum(item_durations.values())
