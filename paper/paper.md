@@ -36,7 +36,7 @@ Electroencephalography (EEG) and its invasive counterpart, local field potential
 - **Modular Architecture**: A generalized framework for feature calculation allows contributors to easily extend the library of available metrics. 
 - **Data organization**: A dedicated scheme designed for rodent study analysis, including genotype and experimental day, rather than individual subject sessions. 
 - **High Interoperability**: Integration with `SpikeInterface` and `MNE-Python` ensures support for a wide array of neuroscience file formats with syntax frequently used in the field. 
-- **Scalability**: To address the challenge of analyzing large EEG datasets efficiently, the package integrates dataset caching and uses `Dask` [@DaskDevelopmentTeam:2016] and `Snakemake` [@Molder:2021] to parallelize computations across high-performance computing (HPC) clusters. 
+- **Scalability**: To address the challenge of analyzing large EEG datasets efficiently, the package integrates dataset caching and uses `Dask` [@DaskDevelopmentTeam:2016] and `Snakemake` [@Molder:2021] to parallelize computations across high-performance computing clusters. 
 - **Reproducibility**: Development follows Continuous Integration (CI) practices, and intermediate results are saved to prevent redundant computations following pipeline errors. 
 
 # State of the Field 
@@ -49,7 +49,9 @@ The current landscape of electrophysiology and neuroimaging software includes se
 
 Rather than implementing its own file readers, `NeuRodent` delegates data loading to `SpikeInterface` and `MNE-Python` [@Buccino:2020; @Gramfort:2013], which together cover most electrophysiology formats in use. Users may also supply a custom reader function for novel formats. This deferred approach avoids duplicating format-support effort that is already well maintained by those communities and ensures that `NeuRodent` inherits new format support automatically. 
 
-Within the core library, computation is structured around a hierarchy of organizer classes that mirror the stages of a rodent EEG experiment (figure): 
+Within the core library, computation is structured around a hierarchy of organizer classes that mirror the stages of a rodent EEG experiment:
+
+(figure)
 
 - **LongRecordingOrganizer**: one recording session, many channels 
 - **AnimalOrganizer**: one animal, many recording sessions 
@@ -73,7 +75,7 @@ Claude Opus 4.6 via GitHub Copilot and Claude Code was used to assist with code 
 
 # Acknowledgements 
 
-Funding information 
+(Funding information)
 
 We acknowledge contributions from Yastika Singh, Yifan Wei, Jessica Lahr, and Ananya Madhira. This project benefited from insights and best practices described in Peter K. G. Williams’s *One Good Tutorial*. 
  
