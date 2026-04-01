@@ -51,15 +51,11 @@ Rather than implementing its own file readers, `NeuRodent` delegates data loadin
 
 Within the core library, computation is structured around a hierarchy of organizer classes that mirror the stages of a rodent EEG experiment (figure): 
 
-LongRecordingOrganizer: one recording session, many channels 
-
-AnimalOrganizer: one animal, many recording sessions 
-
-WindowAnalysisResult, FrequencyDomainSpikeAnalysisResult: analysis results of one animal 
-
-AnimalPlotter: plots from one animal 
-
-ExperimentPlotter: plots from many animals 
+- **LongRecordingOrganizer**: one recording session, many channels 
+- **AnimalOrganizer**: one animal, many recording sessions 
+- **WindowAnalysisResult**, **FrequencyDomainSpikeAnalysisResult**: analysis results of one animal 
+- **AnimalPlotter**: plots from one animal 
+- **ExperimentPlotter**: plots from many animals 
 
 Each of these classes naturally encapsulates a specific scope of rodent EEG/LFP analysis. A nested class hierarchy was chosen over a flat library to make the hierarchy of EEG analysis explicit, with lower level objects composing higher level ones. A practical consequence of this design is that analysis can be embarrassingly parallelized by processing each channel and time window independently. `NeuRodent` uses Dask to enable configurable parallel processing of channels and windows, either locally or on a distributed cluster. Adjustable in-memory chunk sizes let users trade throughput for RAM, an important consideration given that EEG recordings can span days or weeks. 
 
