@@ -55,8 +55,11 @@ def read_bin_csv_pair(discovered_file, **kwargs):
     n_samples = os.path.getsize(bin_path) // (
         np.dtype(np.float32).itemsize * n_channels
     )
-    # The sox5 format stores data column-major (Fortran order): each channel's
-    # samples are contiguous, so we must use order='F' when memory-mapping.
+    # The sox5 format stores data in column-major (Fortran) order: for a
+    # (n_samples, n_channels) array, all samples of each channel are
+    # contiguous in the file before the next channel begins.  Using
+    # order='F' ensures np.memmap interprets the byte layout correctly
+    # while keeping the mapping virtual (0 bytes loaded until accessed).
     data = np.memmap(
         bin_path, dtype=np.float32, mode="r", shape=(n_samples, n_channels), order="F"
     )

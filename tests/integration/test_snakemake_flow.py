@@ -39,6 +39,7 @@ def _bin_csv_extractor(discovered_file, **kwargs):
     directly to this callable.
     """
     import csv
+    import os
     import spikeinterface.core as si_core
 
     bin_path = [p for p in discovered_file.paths if p.endswith(".bin")][0]
@@ -50,7 +51,8 @@ def _bin_csv_extractor(discovered_file, **kwargs):
 
     n_channels = len(rows)
     sampling_rate = float(rows[0]["sampling_rate"])
-    data = np.fromfile(bin_path, dtype=np.float32).reshape(-1, n_channels)
+    n_samples = os.path.getsize(bin_path) // (np.dtype(np.float32).itemsize * n_channels)
+    data = np.memmap(bin_path, dtype=np.float32, mode="r", shape=(n_samples, n_channels), order="F")
 
     return si_core.NumpyRecording(
         traces_list=[data],
