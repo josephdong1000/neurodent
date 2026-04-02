@@ -314,7 +314,7 @@ class TestComputeWindowedAnalysisSignature:
 
     def test_stream_fragments_to_zarr_called_when_chunk_duration_s_set(self, tmp_path):
         """Calling ``compute_windowed_analysis(multiprocess_mode="dask",
-        chunk_duration_s=...)`` must invoke ``stream_fragments_to_zarr``
+        chunk_duration_s=...)`` must invoke ``stream_recording_to_zarr``
         inside the dask branch of AO."""
         import pandas as pd
         from neurodent.visualization.results import AnimalOrganizer
@@ -336,13 +336,15 @@ class TestComputeWindowedAnalysisSignature:
         mock_lan = MagicMock()
         mock_lan.n_fragments = 5
         mock_lan.f_s = 1000
-        mock_lan.get_fragment_np.return_value = np.zeros(
-            (10, 2), dtype=np.float32
-        )
+        mock_lan.apply_notch_filter = False
 
-        # _iter_valid_recordings yields one recording so the dask branch runs
+        # -- mock lrec (LongRecordingOrganizer) with a SI recording ----------
+        mock_si_rec = MagicMock()
+        mock_si_rec.get_num_channels.return_value = 2
         mock_lrec = MagicMock()
         mock_lrec.display_name = "rec0"
+        mock_lrec.LongRecording = mock_si_rec
+
         ao._iter_valid_recordings = MagicMock(
             return_value=iter([(0, mock_lrec)])
         )
@@ -353,7 +355,7 @@ class TestComputeWindowedAnalysisSignature:
                 return_value=mock_lan,
             ),
             patch(
-                "neurodent.visualization.results.core.utils.stream_fragments_to_zarr",
+                "neurodent.visualization.results.core.utils.stream_recording_to_zarr",
                 return_value=str(tmp_path / "fake.zarr"),
             ) as mock_stream,
             patch("neurodent.visualization.results.da.from_zarr"),
@@ -388,12 +390,12 @@ class TestComputeWindowedAnalysisSignature:
             )
 
             mock_stream.assert_called_once()
-            # Verify the chunk_size argument (5th positional arg) is derived
-            # from chunk_duration_s=600 / window_s=5 = 120
+            # Verify n_frag_per_chunk (4th positional arg) is derived from
+            # chunk_duration_s=600 / window_s=5 = 120
             call_args = mock_stream.call_args
-            actual_chunk_size = call_args[0][4]
-            assert actual_chunk_size == 120, (
-                f"Expected chunk_size=120 (600/5), got {actual_chunk_size}"
+            actual_n_frag_per_chunk = call_args[0][3]
+            assert actual_n_frag_per_chunk == 120, (
+                f"Expected n_frag_per_chunk=120 (600/5), got {actual_n_frag_per_chunk}"
             )
 
 
