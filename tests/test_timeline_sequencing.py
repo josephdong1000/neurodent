@@ -379,9 +379,9 @@ class TestTimelineSequencing:
         a session should use the index value, not the filename.
 
         Here filenames sort differently from indices:
-        - rec_C_data.bin (index="1") should come first
-        - rec_A_data.bin (index="2") should come second
-        - rec_B_data.bin (index="3") should come third
+        - rec_A_data.bin (index="1") should come first
+        - rec_B_data.bin (index="2") should come second
+        - rec_C_data.bin (index="3") should come third
         """
         def side_effect(*args, **kwargs):
             m = MagicMock()

@@ -398,14 +398,17 @@ class AnimalOrganizer(AnimalFeatureParser):
 
         from ..core.discovery import _natural_sort_key
 
-        def _session_sort_key(items):
-            """Return sort-key function: use {index} metadata if available, else filename."""
-            items_have_index = (
+        def _items_have_index(items):
+            """Check if items carry {index} metadata."""
+            return (
                 items
                 and hasattr(items[0], "metadata")
                 and "index" in getattr(items[0], "metadata", {})
             )
-            if items_have_index:
+
+        def _session_sort_key(items):
+            """Return sort-key function: use {index} metadata if available, else filename."""
+            if _items_have_index(items):
                 return lambda f: _natural_sort_key(f.metadata["index"])
             return lambda f: _natural_sort_key(self._get_item_name(f))
 
@@ -424,14 +427,8 @@ class AnimalOrganizer(AnimalFeatureParser):
         else:
             for animalday in sorted(animalday_to_items.keys(), key=_natural_sort_key):
                 items = animalday_to_items[animalday]
-                sort_key = _session_sort_key(items)
-                items_have_index = (
-                    items
-                    and hasattr(items[0], "metadata")
-                    and "index" in getattr(items[0], "metadata", {})
-                )
-                if items_have_index:
-                    sorted_items = sorted(items, key=sort_key)
+                if _items_have_index(items):
+                    sorted_items = sorted(items, key=_session_sort_key(items))
                     ordered_items.extend(sorted_items)
                 elif len(items) > 1:
                     item_lro_pairs = []
