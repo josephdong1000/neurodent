@@ -24,6 +24,7 @@ import seaborn.objects as so
 from seaborn import axes_style
 
 from neurodent import visualization, constants
+from neurodent.visualization.results import WindowAnalysisResult
 from neurodent.workflow import setup_snakemake_logging, load_wars, inject_config_aliases
 
 
@@ -282,10 +283,32 @@ def main():
 
     # Load WARs using the workflow utility
     wars = load_wars(war_pkl_files, war_json_files)
-    for war in wars:
-        logger.info(f"Loaded WAR for {war.animal_id} ({war.genotype})")
-
-    logger.info(f"Successfully loaded {len(wars)} WARs")
+    # Ensure we have WindowAnalysisResult objects (backwards-compatibility)
+    normalized_wars = []
+    for w in wars:
+        if isinstance(w, WindowAnalysisResult):
+            normalized_wars.append(w)
+            continue
+        # If w is a tuple or mapping with pkl/json paths, try to load via loader
+        try:
+            # support (pkl_path, json_path) tuples or objects with attributes
+            if isinstance(w, (tuple, list)) and len(w) >= 2:
+                pkl_path, json_path = w[0], w[1]
+            else:
+                pkl_path = getattr(w, "pkl", None) or getattr(w, "pkl_path", None) or getattr(w, "pickle", None)
+                json_path = getattr(w, "json", None) or getattr(w, "json_path", None)
+            if pkl_path is not None and json_path is not None:
+                loaded = WindowAnalysisResult.load_pickle_and_json(
+                    folder_path=Path(pkl_path).parent,
+                    pickle_name=Path(pkl_path).name,
+                    json_name=Path(json_path).name,
+                )
+                normalized_wars.append(loaded)
+            else:
+                normalized_wars.append(w)
+        except Exception:
+            normalized_wars.append(w)
+    wars = normalized_wars
 
     # Get EP configuration
     ep_config = config["analysis"]["ep_figures"]

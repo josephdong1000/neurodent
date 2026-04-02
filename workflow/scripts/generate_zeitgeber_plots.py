@@ -45,8 +45,23 @@ def load_data(file_path):
     Returns:
         pd.DataFrame: Loaded dataframe.
     """
+    file_path = Path(file_path)
+    if not file_path.exists():
+        raise FileNotFoundError(f"Zeitgeber data file not found: {file_path}")
+
     logger.info(f"Loading zeitgeber features from {file_path}")
-    df = pd.read_pickle(file_path)
+
+    suffix = file_path.suffix.lower()
+    if suffix in {".pkl", ".pickle", ".gz"}:
+        df = pd.read_pickle(file_path)
+    elif suffix == ".csv":
+        df = pd.read_csv(file_path)
+    else:
+        try:
+            df = pd.read_pickle(file_path)
+        except Exception:
+            df = pd.read_csv(file_path)
+
     logger.info(f"Loaded zeitgeber data with shape: {df.shape}")
     return df
 

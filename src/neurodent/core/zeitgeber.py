@@ -69,27 +69,30 @@ def _load_war_for_zeitgeber(war_path_info):
                       The DataFrame will have columns for each extracted feature and an 'animal' column.
     """
     war_pkl_path, war_json_path, features_to_extract, animal_name, pipeline_config = war_path_info
+    war_pkl_path = Path(war_pkl_path)
+    war_json_path = Path(war_json_path)
 
     try:
-        logger.info(f"Loading {animal_name}")
+        # Import here to avoid import cycles
+        from neurodent.visualization.results import WindowAnalysisResult
 
-        war = visualization.WindowAnalysisResult.load_pickle_and_json(
+        war = WindowAnalysisResult.load_pickle_and_json(
             folder_path=war_pkl_path.parent,
             pickle_name=war_pkl_path.name,
             json_name=war_json_path.name,
         )
-        
-        # Wrap with ZeitgeberAnalysisResult to apply pipeline on the fly
-        zar = ZeitgeberAnalysisResult(war, **pipeline_config)
+
+        zar = ZeitgeberAnalysisResult(war, **(pipeline_config or {}))
 
         df = zar.get_channel_averaged_result(features=features_to_extract)
         df["animal"] = animal_name
+        del war
+        del zar
         return df
 
-    except Exception as e:
-        logger.error(f"Failed to process {animal_name}: {str(e)}")
-        raise
-
+    except Exception as exc:
+        logger.error(f"Failed to load/process WAR for {animal_name} ({war_pkl_path}): {exc}")
+        return None
 
 def add_zeitgeber_time_columns(df, interval_minutes=60):
     """

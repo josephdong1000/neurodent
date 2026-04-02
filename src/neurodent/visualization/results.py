@@ -3584,6 +3584,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
             filename (str, optional): Name of the file to save. Defaults to "war".
             slugify_filename (bool, optional): If True, slugify the filename (replace special characters). Defaults to False.
             save_abbrevs_as_chnames (bool, optional): If True, save the channel abbreviations as the channel names in the json file. Defaults to False.
+
+        This version extracts large feature columns into a companion compressed .npz
+        to reduce pickle size by storing numeric arrays in compact binary form.
         """
         folder = Path(folder)
         if make_folder:
@@ -3594,8 +3597,59 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
         filepath = str(folder / filename)
 
-        self.result.to_pickle(filepath + ".pkl")
-        logging.info(f"Saved WAR to {filepath + '.pkl'}")
+        # Identify feature columns
+        feature_cols = [c for c in self.result.columns if c in constants.FEATURES]
+        meta_cols = [c for c in self.result.columns if c not in feature_cols]
+
+        # Prepare meta DataFrame (smaller, no heavy structures)
+        meta_df = self.result.loc[:, meta_cols].copy()
+
+        # Helper: try to stack a pandas Series of array-like / dicts into an ndarray
+        def _pack_series_to_array(series):
+            # If elements are dicts with identical band keys -> try to stack values
+            first = series.iloc[0]
+            try:
+                if isinstance(first, dict):
+                    # attempt to stack dict values preserving key order
+                    keys = list(first.keys())
+                    stacked = []
+                    for row in series:
+                        # convert lists to arrays
+                        vals = [np.asarray(row[k]) for k in keys]
+                        stacked.append(np.stack(vals))
+                    arr = np.stack(stacked)  # shape (n_rows, bands, ...)
+                    return arr, {"format": "dict_keys", "keys": keys}
+                else:
+                    # numeric list/array-like rows -> try vstack
+                    arr = np.stack([np.asarray(x) for x in series])
+                    return arr, {"format": "nd"}
+            except Exception:
+                # fallback: object array (pickled inside npz). smaller than nested dict pickles in many cases
+                return np.array(series.tolist(), dtype=object), {"format": "obj"}
+
+        feature_dict = {}
+        feature_meta = {}
+        for col in feature_cols:
+            arr, info = _pack_series_to_array(self.result[col])
+            feature_dict[col] = arr
+            feature_meta[col] = info
+
+        # Save meta (compressed pickle) and features (npz compressed)
+        meta_path = filepath + ".meta.pkl"
+        pd.to_pickle(meta_df, meta_path, compression="gzip")
+
+        features_path = filepath + "_features.npz"
+        try:
+            # allow pickled objects inside npz for object arrays
+            np.savez_compressed(features_path, **feature_dict)
+        except Exception:
+            # fallback: ensure keys are safe, prefix if necessary
+            safe_dict = {f"f_{i}": v for i, (k, v) in enumerate(feature_dict.items())}
+            np.savez_compressed(features_path, **safe_dict)
+            # fix feature_meta keys mapping
+            feature_meta = {f"f_{i}": feature_meta[k] for i, k in enumerate(feature_dict.keys())}
+
+        logging.info(f"Saved WAR meta to {meta_path} and features to {features_path}")
 
         json_dict = {
             "animal_id": self.animal_id,
@@ -3609,6 +3663,8 @@ class WindowAnalysisResult(AnimalFeatureParser):
             "bad_channels_dict": self.bad_channels_dict,
             "suppress_short_interval_error": self.suppress_short_interval_error,
             "lof_scores_dict": self.lof_scores_dict.copy(),
+            "saved_feature_cols": list(feature_meta.keys()),
+            "saved_feature_meta": feature_meta,
         }
 
         with open(filepath + ".json", "w") as f:
@@ -3842,6 +3898,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
         Returns:
             result: WindowAnalysisResult object
+
+        Extended loader: will look for companion *_features.npz and reattach feature arrays
+        to the DataFrame if present.
         """
         if folder_path is not None:
             folder_path = Path(folder_path)
@@ -3859,19 +3918,18 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 if not df_pickle_path.exists():
                     raise FileNotFoundError(f"Pickle file not found: {df_pickle_path}")
             else:
-                pkl_files = list(folder_path.glob("*.pkl"))
+                pkl_files = list(folder_path.glob("*.meta.pkl")) + list(folder_path.glob("*.pkl"))
+                # prefer .meta.pkl if present
                 if len(pkl_files) != 1:
                     raise ValueError(
-                        f"Expected exactly one pickle file in {folder_path}, found {len(pkl_files)}"
+                        f"Expected exactly one pickle/meta pickle file in {folder_path}, found {len(pkl_files)}"
                     )
                 df_pickle_path = pkl_files[0]
 
             if json_name is not None:
                 # Handle json_name as either absolute path or relative to folder_path
                 json_path = Path(json_name)
-                if json_path.is_absolute():
-                    json_path = json_path
-                else:
+                if not json_path.is_absolute():
                     json_path = folder_path / json_name
 
                 if not json_path.exists():
@@ -3897,11 +3955,68 @@ class WindowAnalysisResult(AnimalFeatureParser):
             if not json_path.exists():
                 raise FileNotFoundError(f"JSON file not found: {json_path}")
 
+        # Load meta DataFrame
         with open(df_pickle_path, "rb") as f:
-            data = pd.read_pickle(f)
+            meta_df = pd.read_pickle(f)
+
         with open(json_path, "r") as f:
             metadata = json.load(f)
-        return cls(data, **metadata)
+
+        # Attempt to load companion features npz
+        base = str(df_pickle_path)
+        base = base.replace(".meta.pkl", "").replace(".pkl", "")
+        features_path = Path(base + "_features.npz")
+        if features_path.exists():
+            npz = np.load(features_path, allow_pickle=True)
+            saved_cols = metadata.get("saved_feature_cols", list(npz.keys()))
+            saved_meta = metadata.get("saved_feature_meta", {})
+
+            features_df = {}
+            n_rows = len(meta_df)
+            for i, key in enumerate(saved_cols):
+                # prefer exact key, else fallback to positional mapping
+                if key in npz:
+                    arr = npz[key]
+                else:
+                    try:
+                        arr = npz[npz.files[i]]
+                    except Exception:
+                        arr = np.array([None] * n_rows, dtype=object)
+
+                # Convert arrays back to per-row Python objects/lists
+                if isinstance(arr, np.ndarray) and arr.dtype == object:
+                    col = arr.tolist()
+                else:
+                    # numeric arrays: attempt to split on first axis
+                    if getattr(arr, "ndim", 0) == 0:
+                        col = [arr] * n_rows
+                    elif arr.ndim == 1:
+                        col = arr.tolist()
+                    else:
+                        if arr.shape[0] == n_rows:
+                            col = [arr[j] for j in range(n_rows)]
+                        else:
+                            # fallback: convert whole array to each row (unlikely)
+                            col = [arr] * n_rows
+                features_df[key] = col
+
+            full_df = pd.concat([meta_df.reset_index(drop=True), pd.DataFrame(features_df)], axis=1)
+        else:
+            # Legacy single-file pickle
+            full_df = meta_df
+
+        # Only pass expected keyword args to the constructor
+        allowed = {
+            "animal_id",
+            "genotype",
+            "channel_names",
+            "assume_from_number",
+            "bad_channels_dict",
+            "suppress_short_interval_error",
+            "lof_scores_dict",
+        }
+        init_kwargs = {k: v for k, v in metadata.items() if k in allowed}
+        return cls(full_df, **init_kwargs)
 
     def aggregate_time_windows(
         self, groupby: list[str] | str = ["animalday", "isday"]

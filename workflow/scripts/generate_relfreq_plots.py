@@ -39,6 +39,7 @@ from neurodent.core import metadata as metadata_module
 
 from neurodent.constants import OKABE_ITO_COLORS
 from neurodent import visualization, constants
+from neurodent.visualization.results import WindowAnalysisResult
 
 logger = logging.getLogger(__name__)
 
@@ -114,7 +115,7 @@ def extract_feature_from_war(args):
     
     try:
         # Load WAR
-        war = visualization.WindowAnalysisResult.load_pickle_and_json(
+        war = WindowAnalysisResult.load_pickle_and_json(
             folder_path=war_pkl_path.parent, 
             pickle_name=war_pkl_path.name, 
             json_name=war_json_path.name

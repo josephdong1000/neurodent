@@ -13,6 +13,7 @@ Output: Channel-filtered WARs ready for flattening
 from pathlib import Path
 
 from neurodent import visualization
+from neurodent.visualization.results import WindowAnalysisResult
 from neurodent.workflow import setup_snakemake_logging, inject_config_aliases
 
 
@@ -120,10 +121,14 @@ def main():
         )
         logger.info(f"{filter_type} - Applied channel filtering")
 
-        # Save channel-filtered WAR as both pickle and json
-        war.save_pickle_and_json(Path(output_war_pkl).parent)
+       # Save channel-filtered WAR as both pickle and json
+        out_war_path = Path(output_war_pkl)
+        war.save_pickle_and_json(out_war_path.parent, filename=out_war_path.stem, slugify_filename=False)
 
-        logger.info(f"Successfully channel-filtered ({filter_type}) and saved {animal_name}")
+        logger.info(
+            f"Successfully channel-filtered ({filter_type}) and saved {animal_name} at "
+            f"{out_war_path.parent / (out_war_path.stem + '.meta.pkl')}"
+        )
 
     except Exception as e:
         logger.error(f"Failed to process {animal_name}: {str(e)}")

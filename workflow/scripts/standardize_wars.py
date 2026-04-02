@@ -87,9 +87,12 @@ def main():
             war.add_unique_hash(unique_hash_length)
 
         # Save preprocessed WAR as both pickle and json
-        war.save_pickle_and_json(Path(output_war_pkl).parent)
-
-        logger.info(f"Successfully standardized and saved {animal_name}")
+        out_war_path = Path(output_war_pkl)
+        war.save_pickle_and_json(out_war_path.parent, filename=out_war_path.stem, slugify_filename=False)
+        logger.info(
+            f"Successfully standardized and saved {animal_name} at "
+            f"{out_war_path.parent / (out_war_path.stem + '.meta.pkl')}"
+        )
 
     except Exception as e:
         logger.error(f"Failed to standardize {animal_name}: {str(e)}")

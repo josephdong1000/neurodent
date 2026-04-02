@@ -19,6 +19,7 @@ matplotlib.use("Agg")  # Non-interactive backend
 
 from neurodent import visualization
 from neurodent.workflow import setup_snakemake_logging, inject_config_aliases
+from neurodent.visualization.results import WindowAnalysisResult
 
 
 def create_norm_from_config(norm_config):
@@ -91,7 +92,7 @@ def load_war_and_config():
     war_dir = Path(war_pkl_path).parent
     war_pkl_name = Path(war_pkl_path).name
     war_json_name = Path(war_json_path).name
-    war = visualization.WindowAnalysisResult.load_pickle_and_json(
+    war = WindowAnalysisResult.load_pickle_and_json(
         folder_path=war_dir, pickle_name=war_pkl_name, json_name=war_json_name
     )
 

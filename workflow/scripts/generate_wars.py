@@ -243,8 +243,12 @@ def main():
     war, fdsar_list = generate_war_for_animal(samples_config, config, animal_folder, animal_id, channel_subset, logger)
 
     # Save WAR (now includes nspike/lognspike features)
-    war.save_pickle_and_json(Path(snakemake.output.war_pkl).parent, filename="war", slugify_filename=False)
-    logger.info(f"Successfully saved WAR for {animal_folder} {animal_id}")
+    out_war_path = Path(snakemake.output.war_pkl)
+    war.save_pickle_and_json(out_war_path.parent, filename=out_war_path.stem, slugify_filename=False)
+    logger.info(
+        f"Successfully saved WAR for {animal_folder} {animal_id} at "
+        f"{out_war_path.parent / (out_war_path.stem + '.meta.pkl')}"
+    )
 
     # Save FDSAR results - each animalday gets its own subdirectory
     fdsar_base_dir = Path(snakemake.output.fdsar_dir)
