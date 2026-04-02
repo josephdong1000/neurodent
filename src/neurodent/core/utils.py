@@ -1184,24 +1184,25 @@ def stream_recording_to_zarr(
     n_channels = recording.get_num_channels()
     fragment_dtype = recording.get_dtype()
     tmppath = os.path.join(tmpdir, f"temp_{os.urandom(24).hex()}.zarr")
-    batch = min(n_frag_per_chunk, n_fragments)
+    # Cap the batch size so we never request more fragments than exist
+    batch_size = min(n_frag_per_chunk, n_fragments)
 
     logging.debug(
         f"Streaming recording ({n_fragments} fragments × {n_samples_per_frag} samples) "
-        f"to zarr in batches of {batch} (path: {tmppath})"
+        f"to zarr in batches of {batch_size} (path: {tmppath})"
     )
 
     zarr_array = zarr.open(
         tmppath,
         mode="w",
         shape=(n_fragments, n_samples_per_frag, n_channels),
-        chunks=(batch, -1, -1),
+        chunks=(batch_size, -1, -1),
         dtype=fragment_dtype,
         compressor=zarr.Blosc(cname="lz4", clevel=3, shuffle=zarr.Blosc.SHUFFLE),
     )
 
-    for batch_start in range(0, n_fragments, batch):
-        batch_end = min(batch_start + batch, n_fragments)
+    for batch_start in range(0, n_fragments, batch_size):
+        batch_end = min(batch_start + batch_size, n_fragments)
         start_sample = batch_start * n_samples_per_frag
         end_sample = batch_end * n_samples_per_frag
         chunk_traces = recording.get_traces(
@@ -1211,6 +1212,7 @@ def stream_recording_to_zarr(
             batch_end - batch_start, n_samples_per_frag, n_channels
         )
         zarr_array[batch_start:batch_end] = chunk_fragments
+        # Explicitly free each batch to keep peak RAM bounded to batch_size fragments
         del chunk_traces, chunk_fragments
 
     logging.debug(f"  - Zarr array shape: {zarr_array.shape}")

@@ -1258,8 +1258,14 @@ class AnimalOrganizer(AnimalFeatureParser):
 
                     # Apply notch filter once to the entire recording (lazy SI wrapper)
                     rec = lrec.LongRecording
-                    if lan.apply_notch_filter and spre is not None:
-                        rec = spre.notch_filter(rec, freq=constants.LINE_FREQ)
+                    if lan.apply_notch_filter:
+                        if spre is not None:
+                            rec = spre.notch_filter(rec, freq=constants.LINE_FREQ)
+                        else:
+                            logging.warning(
+                                "apply_notch_filter=True but spikeinterface.preprocessing "
+                                "is not available; notch filter will be skipped."
+                            )
 
                     if chunk_duration_s is not None:
                         # Convert seconds → number of fragments
