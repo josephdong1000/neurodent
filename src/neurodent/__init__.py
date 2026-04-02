@@ -2,7 +2,12 @@
 
 import importlib.metadata
 
-__version__ = importlib.metadata.version("neurodent")
+try:
+    __version__ = importlib.metadata.version("neurodent")
+except importlib.metadata.PackageNotFoundError:
+    # When running from a source tree without an installed package, metadata
+    # may be missing. Fall back to an empty version string for local imports.
+    __version__ = "0+local"
 __author__ = "Joseph Dong, Yongtaek Oh, Eric Marsh"
 __email__ = "dongjp@chop.edu"
 __license__ = "MIT"

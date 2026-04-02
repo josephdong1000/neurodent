@@ -39,17 +39,29 @@ the :mod:`neurodent.core` analysis pipeline across animals and experiments.
 - :mod:`neurodent.constants.plotting` - Color palettes and styling
 """
 
-from .results import (
-    WindowAnalysisResult,
-    AnimalFeatureParser,
-    AnimalOrganizer,
-)
-from .plotting import (
-    AnimalPlotter,
-    ExperimentPlotter,
-    ZeitgeberPlotter,
-)
-from .frequency_domain_results import FrequencyDomainSpikeAnalysisResult
+try:
+    from .window_analysis_result import WindowAnalysisResult
+except Exception:
+    # Allow importing neurodent.visualization in minimal environments for
+    # development and unit tests that don't have optional heavy deps
+    WindowAnalysisResult = None
+
+from .feature_parser import AnimalFeatureParser
+from .animal_organizer import AnimalOrganizer
+
+try:
+    from .plotting import (
+        AnimalPlotter,
+        ExperimentPlotter,
+        ZeitgeberPlotter,
+    )
+except Exception:
+    AnimalPlotter = ExperimentPlotter = ZeitgeberPlotter = None
+
+try:
+    from .frequency_domain_results import FrequencyDomainSpikeAnalysisResult
+except Exception:
+    FrequencyDomainSpikeAnalysisResult = None
 
 __all__ = [
     "WindowAnalysisResult",
