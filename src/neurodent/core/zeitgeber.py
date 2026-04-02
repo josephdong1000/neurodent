@@ -84,8 +84,6 @@ def _load_war_for_zeitgeber(war_path_info):
 
         df = zar.get_channel_averaged_result(features=features_to_extract)
         df["animal"] = animal_name
-        del war
-        del zar
         return df
 
     except Exception as e:
