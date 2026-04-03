@@ -27,24 +27,17 @@ if TYPE_CHECKING:
 
 import mne
 from .feature_utils import extract_linear_array, extract_band_dict, repack_band_dict, extract_hist_data
-from .window_analysis_result import WindowAnalysisResult, bin_spike_times, _bin_spike_df
+from .window_analysis_result import bin_spike_times, _bin_spike_df
 
 # Implementation moved to separate modules to keep this file smaller.
 # Import and re-export the moved classes to preserve the original public API.
 from .feature_parser import AnimalFeatureParser
 from .animal_organizer import AnimalOrganizer
 
-# The AnimalOrganizer implementation now lives in `animal_organizer.py`.
-# This file keeps a compatibility import so that
-# `neurodent.visualization.results.AnimalOrganizer` continues to resolve.
-
-# NOTE: Implementation for AnimalOrganizer was moved to `animal_organizer.py`.
-# Any methods that previously lived here have been removed to avoid duplicate
-
 
 
 def _sanitize_feature_request(
-    features: list[str] | str | None, exclude: list[str] | str = []
+    features: list[str] | str | None, exclude: list[str] | str | None = None
 ):
     """
     Sanitizes a list of requested features for WindowAnalysisResult
@@ -53,8 +46,8 @@ def _sanitize_feature_request(
         features (list[str] | str | None): List of features to include, a single feature
             name as a string, or None to include all features. If ``"all"``, include all
             features in constants.FEATURES except for those in ``exclude``.
-        exclude (list[str] | str, optional): Feature or list of features to exclude.
-            Defaults to [].
+        exclude (list[str] | str | None, optional): Feature or list of features to exclude.
+            Defaults to None.
 
     Returns:
         list[str]: Sanitized list of features.
@@ -113,9 +106,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
         sex: str = "Unknown",
         channel_names: list[str] = None,
         assume_from_number=False,
-        bad_channels_dict: dict[str, list[str]] = {},
+        bad_channels_dict: dict[str, list[str]] | None = None,
         suppress_short_interval_error=False,
-        lof_scores_dict: dict[str, dict] = {},
+        lof_scores_dict: dict[str, dict] | None = None,
     ) -> None:
         self.result = result
         self.animal_id = animal_id
@@ -123,9 +116,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
         self.sex = sex
         self.channel_names = channel_names
         self.assume_from_number = assume_from_number
-        self.bad_channels_dict = bad_channels_dict.copy()
+        self.bad_channels_dict = bad_channels_dict.copy() if bad_channels_dict is not None else {}
         self.suppress_short_interval_error = suppress_short_interval_error
-        self.lof_scores_dict = lof_scores_dict
+        self.lof_scores_dict = lof_scores_dict if lof_scores_dict is not None else {}
 
         self._update_instance_vars()
 
@@ -582,7 +575,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
     def get_result(
         self,
         features: list[str] | str | None = None,
-        exclude: list[str] | str = [],
+        exclude: list[str] | str | None = None,
         allow_missing=False,
     ):
         """Get windowed analysis result dataframe, with helpful filters
@@ -606,7 +599,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
     def get_groupavg_result(
         self,
         features: list[str] | str | None = None,
-        exclude: list[str] | str = [],
+        exclude: list[str] | str | None = None,
         df: pd.DataFrame = None,
         groupby="animalday",
     ):
@@ -644,7 +637,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
     def __get_groups(
         self,
         features: list[str] | str | None = None,
-        exclude: list[str] | str = [],
+        exclude: list[str] | str | None = None,
         df: pd.DataFrame = None,
         groupby="animalday",
     ):
@@ -655,7 +648,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
     def get_grouprows_result(
         self,
         features: list[str] | str | None = None,
-        exclude: list[str] | str = [],
+        exclude: list[str] | str | None = None,
         df: pd.DataFrame = None,
         multiindex=["animalday", "animal", "genotype"],
         include=["duration", "endfile"],
@@ -668,7 +661,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
     def get_channel_averaged_result(
         self,
         features: list[str] | str | None = None,
-        exclude: list[str] | str = [],
+        exclude: list[str] | str | None = None,
         df: pd.DataFrame = None,
     ) -> pd.DataFrame:
         """Get windowed analysis result with features averaged across channels.

@@ -349,25 +349,25 @@ class TestComputeWindowedAnalysisSignature:
 
         with (
             patch(
-                "neurodent.visualization.results.core.LongRecordingAnalyzer",
+                "neurodent.visualization.animal_organizer.core.LongRecordingAnalyzer",
                 return_value=mock_lan,
             ),
             patch(
-                "neurodent.visualization.results.core.utils.stream_fragments_to_zarr",
+                "neurodent.visualization.animal_organizer.core.utils.stream_fragments_to_zarr",
                 return_value=str(tmp_path / "fake.zarr"),
             ) as mock_stream,
-            patch("neurodent.visualization.results.da.from_zarr"),
+            patch("neurodent.visualization.animal_organizer.da.from_zarr"),
             patch(
-                "neurodent.visualization.results.dask.compute",
+                "neurodent.visualization.animal_organizer.dask.compute",
                 # n_fragments_war = max(n_fragments - 1, 1) = 4
                 return_value=[{"rms": 0.0}] * (mock_lan.n_fragments - 1),
             ),
             patch(
-                "neurodent.visualization.results.delayed",
+                "neurodent.visualization.animal_organizer.delayed",
                 side_effect=lambda f: lambda *a, **kw: {"rms": 0.0},
             ),
             patch(
-                "neurodent.visualization.results.core.validate_timestamps"
+                "neurodent.visualization.animal_organizer.core.validate_timestamps"
             ),
         ):
             ao._process_fragment_metadata = MagicMock(

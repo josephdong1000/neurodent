@@ -40,8 +40,8 @@ the :mod:`neurodent.core` analysis pipeline across animals and experiments.
 """
 
 try:
-    from .window_analysis_result import WindowAnalysisResult
-except Exception:
+    from .results import WindowAnalysisResult
+except (ImportError, ModuleNotFoundError):
     # Allow importing neurodent.visualization in minimal environments for
     # development and unit tests that don't have optional heavy deps
     WindowAnalysisResult = None
@@ -55,12 +55,12 @@ try:
         ExperimentPlotter,
         ZeitgeberPlotter,
     )
-except Exception:
+except (ImportError, ModuleNotFoundError):
     AnimalPlotter = ExperimentPlotter = ZeitgeberPlotter = None
 
 try:
     from .frequency_domain_results import FrequencyDomainSpikeAnalysisResult
-except Exception:
+except (ImportError, ModuleNotFoundError):
     FrequencyDomainSpikeAnalysisResult = None
 
 __all__ = [
