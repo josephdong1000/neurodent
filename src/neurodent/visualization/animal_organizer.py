@@ -47,7 +47,7 @@ def _sanitize_feature_request(
             name as a string, or None to include all features. If ``"all"``, include all
             features in constants.FEATURES except for those in ``exclude``.
         exclude (list[str] | str, optional): Feature or list of features to exclude.
-            Defaults to [].
+            Defaults to None.
 
     Returns:
         list[str]: Sanitized list of features.
@@ -110,7 +110,7 @@ class AnimalOrganizer(AnimalFeatureParser):
             (used for analysis, not discovery). Defaults to False.
         lro_kwargs (dict, optional): Keyword arguments passed to each LongRecordingOrganizer
             instance. Common options include 'mode', 'extract_func', 'manual_datetimes'.
-            Defaults to {}.
+            Defaults to None.
         normalize_session (callable | None, optional): A function that transforms session
             keys before grouping. For example, to merge split-day folders like
             "2023-01-15", "2023-01-15(1)", "2023-01-15(2)" into one session, pass
@@ -1206,7 +1206,7 @@ class AnimalOrganizer(AnimalFeatureParser):
 
         Args:
             features (list[str]): List of features to compute. See individual ``compute_...()`` functions for output format
-            exclude (list[str], optional): List of features to ignore. Will override the features parameter. Defaults to [].
+            exclude (list[str], optional): List of features to ignore. Will override the features parameter. Defaults to None.
             window_s (int, optional): Length of each window in seconds. Note that some features break with very short window times. Defaults to 5.
             suppress_short_interval_error (bool, optional): If True, suppress ValueError for short intervals between timestamps in resulting WindowAnalysisResult. Useful for aggregated WARs. Defaults to False.
             apply_notch_filter (bool, optional): Whether to apply notch filtering to remove line noise. Uses constants.LINE_FREQ. Defaults to True.

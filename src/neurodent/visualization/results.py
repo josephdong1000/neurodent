@@ -85,7 +85,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         genotype (str, optional): Genotype of animal. Defaults to None.
         channel_names (list[str], optional): List of channel names. Defaults to None.
         assume_channels (bool, optional): If true, assumes channel names according to AnimalFeatureParser.DEFAULT_CHNUM_TO_NAME. Defaults to False.
-        bad_channels_dict (dict[str, list[str]], optional): Dictionary of channels to reject for each recording session. Defaults to {}.
+        bad_channels_dict (dict[str, list[str]], optional): Dictionary of channels to reject for each recording session. Defaults to None.
         suppress_short_interval_error (bool, optional): If True, suppress ValueError for short intervals between timestamps. Useful for aggregated WARs with large window sizes. Defaults to False.
 
     Attributes:
@@ -584,7 +584,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             features (list[str] | str | None, optional): Feature name, list of feature names,
                 or None to return all features. Defaults to None (all features).
             exclude (list[str] | str, optional): Feature name or list of feature names to
-                exclude from result; will override the features parameter. Defaults to [].
+                exclude from result; will override the features parameter. Defaults to None.
             allow_missing (bool, optional): If True, will return all requested features as columns regardless if they exist in result. Defaults to False.
 
         Returns:
@@ -609,7 +609,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             features (list[str] | str | None, optional): Feature name, list of feature names,
                 or None to return all features. Defaults to None (all features).
             exclude (list[str] | str, optional): Feature name or list of feature names to
-                exclude from result. Will override the features parameter. Defaults to [].
+                exclude from result. Will override the features parameter. Defaults to None.
             df (pd.DataFrame, optional): If not None, this function will use this dataframe instead of self.result. Defaults to None.
             groupby (str, optional): Feature or list of features to group by before averaging. Passed to the `by` parameter in pd.DataFrame.groupby(). Defaults to "animalday".
 
@@ -683,7 +683,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 or None to return all features. Can include any combination of linear, band,
                 or matrix features. Defaults to None (all features).
             exclude (list[str] | str, optional): Feature name or list of feature names to
-                exclude. Defaults to [].
+                exclude. Defaults to None.
             df (pd.DataFrame, optional): If provided, use this dataframe instead of
                 self.result. Defaults to None.
 
