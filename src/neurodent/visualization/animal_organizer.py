@@ -35,7 +35,7 @@ from .feature_parser import AnimalFeatureParser
 
 
 def _sanitize_feature_request(
-    features: list[str] | str | None, exclude: list[str] | str = []
+    features: list[str] | str | None, exclude: list[str] | str | None = None
 ):
     """
     Sanitizes a list of requested features for WindowAnalysisResult
@@ -1191,7 +1191,7 @@ class AnimalOrganizer(AnimalFeatureParser):
     def compute_windowed_analysis(
         self,
         features: list[str],
-        exclude: list[str] = [],
+        exclude: list[str] | None = None,
         window_s=5,
         multiprocess_mode: Literal["dask", "serial"] = "serial",
         suppress_short_interval_error=False,
