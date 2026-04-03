@@ -16,6 +16,8 @@ from typing import Callable, Literal, Optional, Union, TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from .frequency_domain_results import FrequencyDomainSpikeAnalysisResult
     import mne  # type: ignore
+else:
+    mne = None
 
 import dask
 import dask.array as da
