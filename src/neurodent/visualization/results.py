@@ -33,6 +33,11 @@ from ..core.frequency_domain_spike_detection import FrequencyDomainSpikeDetector
 from ..core.utils import abbreviate_channel_names, filepath_to_index, parse_chname_to_abbrev, slugify
 from .feature_utils import extract_linear_array, extract_band_dict, repack_band_dict, extract_hist_data
 
+try:
+    import spikeinterface.preprocessing as spre
+except ImportError:  # pragma: no cover
+    spre = None
+
 
 class AnimalFeatureParser:
     def _average_feature(
@@ -1398,36 +1403,48 @@ class AnimalOrganizer(AnimalFeatureParser):
                     logging.debug("Converting LongRecording to numpy array")
 
                     n_fragments_war = max(lan.n_fragments - 1, 1)
-                    first_fragment = lan.get_fragment_np(0)
+                    n_samples_per_frag = int(window_s * lan.f_s)
+
+                    # Apply notch filter once to the entire recording (lazy SI wrapper)
+                    rec = lrec.LongRecording
+                    if lan.apply_notch_filter:
+                        if spre is not None:
+                            rec = spre.notch_filter(rec, freq=constants.LINE_FREQ)
+                        else:
+                            logging.warning(
+                                "apply_notch_filter=True but spikeinterface.preprocessing "
+                                "is not available; notch filter will be skipped."
+                            )
 
                     if chunk_duration_s is not None:
                         # Convert seconds → number of fragments
                         n_frag_per_chunk = max(1, int(chunk_duration_s / window_s))
-                        # Streaming path: stream fragments to zarr in batches,
+                        # Streaming path: stream recording to zarr in batches,
                         # keeping only `n_frag_per_chunk` fragments in RAM at a time.
-                        tmppath = core.utils.stream_fragments_to_zarr(
-                            lan.get_fragment_np,
+                        tmppath = core.utils.stream_recording_to_zarr(
+                            rec,
                             n_fragments_war,
-                            first_fragment.shape,
-                            first_fragment.dtype,
+                            n_samples_per_frag,
                             n_frag_per_chunk,
                         )
                     else:
-                        # Default path: allocate the full array then write to zarr in
-                        # one shot.  Maximises throughput on high-memory systems.
-                        np_fragments = np.empty(
-                            (n_fragments_war,) + first_fragment.shape,
-                            dtype=first_fragment.dtype,
+                        # Default path: read all traces at once then write to zarr.
+                        # Maximises throughput on high-memory systems.
+                        total_samples = n_fragments_war * n_samples_per_frag
+                        all_traces = rec.get_traces(
+                            start_frame=0,
+                            end_frame=total_samples,
+                            return_scaled=True,
+                        )
+                        np_fragments = all_traces.reshape(
+                            n_fragments_war, n_samples_per_frag, rec.get_num_channels()
                         )
                         logging.debug(f"np_fragments.shape: {np_fragments.shape}")
-                        for idx in range(n_fragments_war):
-                            np_fragments[idx] = lan.get_fragment_np(idx)
-
                         # Cache fragments to zarr
                         tmppath, _ = core.utils.cache_fragments_to_zarr(
                             np_fragments, n_fragments_war
                         )
-                        del np_fragments
+                        del all_traces, np_fragments
 
                     logging.debug("Processing metadata serially")
                     metadatas = [

@@ -7,6 +7,7 @@ support pipeline testing with committed mini recordings.
 """
 
 import csv
+import os
 
 import numpy as np
 
@@ -24,7 +25,7 @@ def read_bin_csv_pair(discovered_file, **kwargs):
     Returns
     -------
     spikeinterface.core.NumpyRecording
-        In-memory recording with shape ``(n_samples, n_channels)``.
+        Memory-mapped recording with shape ``(n_samples, n_channels)``.
     """
     import spikeinterface.core as si_core
 
@@ -55,12 +56,18 @@ def read_bin_csv_pair(discovered_file, **kwargs):
     n_channels = len(rows)
     sampling_rate = float(rows[0]["SampleRate"])
     channel_names = [row["Label"] for row in rows]
-    data = np.fromfile(bin_path, dtype=np.float32)
 
-    if data.size == 0:
-        raise ValueError(f"Binary file is empty (0 bytes): {bin_path}")
-
-    data = data.reshape(-1, n_channels)
+    n_samples = os.path.getsize(bin_path) // (
+        np.dtype(np.float32).itemsize * n_channels
+    )
+    # The sox5 format stores data in column-major (Fortran) order: for a
+    # (n_samples, n_channels) array, all samples of each channel are
+    # contiguous in the file before the next channel begins.  Using
+    # order='F' ensures np.memmap interprets the byte layout correctly
+    # while keeping the mapping virtual (0 bytes loaded until accessed).
+    data = np.memmap(
+        bin_path, dtype=np.float32, mode="r", shape=(n_samples, n_channels), order="F"
+    )
 
     return si_core.NumpyRecording(
         traces_list=[data],
