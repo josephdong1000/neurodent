@@ -1686,6 +1686,48 @@ class TestReadBinCsvPair:
         with pytest.raises(ValueError, match="Binary file is empty"):
             read_bin_csv_pair(df)
 
+    def test_fortran_order_channels_read_correctly(self, temp_dir):
+        """Column-major (Fortran-order) binary is read with correct channel assignment.
+
+        Writes a file where each channel has a distinct constant value,
+        stored in Fortran order (all samples of ch0, then ch1, etc.).
+        Verifies that read_bin_csv_pair returns each channel with its
+        expected value — a C-order reader would garble the channels.
+        """
+        from tests.integration.readers import read_bin_csv_pair
+        from neurodent.core.discovery import DiscoveredFile
+
+        n_channels = 3
+        n_samples = 200
+        fs = 1000.0
+
+        # Each channel has a distinct constant: ch0=10, ch1=20, ch2=30
+        data = np.column_stack(
+            [np.full(n_samples, (ch + 1) * 10.0, dtype=np.float32) for ch in range(n_channels)]
+        )
+
+        # Write in Fortran order (column-major): all ch0 samples, then ch1, then ch2
+        bin_path = str(temp_dir / "test_ColMajor.bin")
+        data.flatten(order="F").tofile(bin_path)
+
+        csv_path = str(temp_dir / "test_Meta.csv")
+        with open(csv_path, "w") as f:
+            f.write("Entity,BinColumn,Label,ProbeInfo,SampleRate,Units,Precision,LastEdit\n")
+            for ch in range(n_channels):
+                f.write(f"{ch},{ch},Ch{ch},,{fs},uV,float32,2022-01-01\n")
+
+        df = DiscoveredFile(paths=(bin_path, csv_path), metadata={"session": "s1"})
+        rec = read_bin_csv_pair(df)
+        traces = rec.get_traces(return_scaled=True)
+
+        assert traces.shape == (n_samples, n_channels)
+        for ch in range(n_channels):
+            expected = (ch + 1) * 10.0
+            np.testing.assert_allclose(
+                traces[:, ch], expected,
+                err_msg=f"Channel {ch} should be all {expected} but got mean={traces[:, ch].mean():.1f}",
+            )
+
 
 @pytest.mark.core
 @pytest.mark.spikeinterface

@@ -57,9 +57,11 @@ def read_bin_csv_pair(discovered_file, **kwargs):
     sampling_rate = float(rows[0]["SampleRate"])
     channel_names = [row["Label"] for row in rows]
 
-    n_samples = os.path.getsize(bin_path) // (
-        np.dtype(np.float32).itemsize * n_channels
-    )
+    file_size = os.path.getsize(bin_path)
+    if file_size == 0:
+        raise ValueError(f"Binary file is empty (0 bytes): {bin_path}")
+
+    n_samples = file_size // (np.dtype(np.float32).itemsize * n_channels)
     # The sox5 format stores data in column-major (Fortran) order: for a
     # (n_samples, n_channels) array, all samples of each channel are
     # contiguous in the file before the next channel begins.  Using

@@ -18,7 +18,7 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
-from neurodent.core.utils import cache_fragments_to_zarr, stream_fragments_to_zarr
+from neurodent.core.utils import cache_fragments_to_zarr, stream_fragments_to_zarr, stream_recording_to_zarr
 
 
 # ---------------------------------------------------------------------------
@@ -214,6 +214,115 @@ class TestStreamFragmentsToZarr:
 
         assert len(call_counts) == 6
         assert all(c == 1 for c in call_counts.values())
+
+
+# ---------------------------------------------------------------------------
+# stream_recording_to_zarr – equivalence with per-fragment path
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestStreamRecordingToZarrEquivalence:
+    """Verify that ``stream_recording_to_zarr`` produces the same output as
+    the old per-fragment ``stream_fragments_to_zarr`` path."""
+
+    def test_bulk_path_matches_per_fragment_path(self, tmp_path):
+        """stream_recording_to_zarr must produce identical fragments to
+        stream_fragments_to_zarr when given the same underlying data."""
+        import spikeinterface.core as si_core
+        import zarr
+
+        rng = np.random.default_rng(42)
+        n_channels = 4
+        fs = 1000.0
+        n_frag = 10
+        n_samples_per_frag = int(5 * fs)  # 5s windows
+        total_samples = n_frag * n_samples_per_frag
+        chunk = 3
+
+        # Each channel has a different sine frequency so transposition
+        # would produce visibly different data.
+        t = np.arange(total_samples) / fs
+        data = np.column_stack(
+            [
+                np.sin(2 * np.pi * (5 + ch * 3) * t)
+                + 0.1 * rng.standard_normal(total_samples)
+                for ch in range(n_channels)
+            ]
+        ).astype(np.float32)
+
+        rec = si_core.NumpyRecording(
+            traces_list=[data], sampling_frequency=fs,
+        )
+
+        # Old path: per-fragment getter → stream_fragments_to_zarr
+        def get_fragment(idx):
+            start = idx * n_samples_per_frag
+            end = start + n_samples_per_frag
+            return rec.get_traces(
+                start_frame=start, end_frame=end, return_scaled=True,
+            )
+
+        with patch.dict(os.environ, {"TMPDIR": str(tmp_path / "old")}):
+            os.makedirs(tmp_path / "old", exist_ok=True)
+            old_path = stream_fragments_to_zarr(
+                get_fragment,
+                n_frag,
+                (n_samples_per_frag, n_channels),
+                np.float32,
+                chunk,
+            )
+
+        # New path: bulk recording → stream_recording_to_zarr
+        with patch.dict(os.environ, {"TMPDIR": str(tmp_path / "new")}):
+            os.makedirs(tmp_path / "new", exist_ok=True)
+            new_path = stream_recording_to_zarr(
+                rec, n_frag, n_samples_per_frag, chunk,
+            )
+
+        old_arr = zarr.open(old_path, mode="r")[:]
+        new_arr = zarr.open(new_path, mode="r")[:]
+
+        assert old_arr.shape == new_arr.shape == (
+            n_frag, n_samples_per_frag, n_channels,
+        )
+        np.testing.assert_array_equal(old_arr, new_arr)
+
+    def test_channels_are_distinguishable(self, tmp_path):
+        """Each channel in the zarr output must have distinct content,
+        catching transposition bugs where all channels become identical."""
+        import spikeinterface.core as si_core
+        import zarr
+
+        n_channels = 4
+        fs = 1000.0
+        n_frag = 5
+        n_samples_per_frag = int(5 * fs)
+        total_samples = n_frag * n_samples_per_frag
+
+        # Channels with very different means so transposition is obvious
+        t = np.arange(total_samples) / fs
+        data = np.column_stack(
+            [
+                ch * 100.0 + np.sin(2 * np.pi * (2 + ch) * t)
+                for ch in range(n_channels)
+            ]
+        ).astype(np.float32)
+
+        rec = si_core.NumpyRecording(
+            traces_list=[data], sampling_frequency=fs,
+        )
+
+        with patch.dict(os.environ, {"TMPDIR": str(tmp_path)}):
+            path = stream_recording_to_zarr(rec, n_frag, n_samples_per_frag, 2)
+
+        arr = zarr.open(path, mode="r")[:]
+        # Check that channel means are distinct (0, 100, 200, 300)
+        means = [arr[:, :, ch].mean() for ch in range(n_channels)]
+        for i in range(n_channels):
+            assert abs(means[i] - i * 100.0) < 1.0, (
+                f"Channel {i} mean={means[i]:.1f}, expected ~{i * 100.0}"
+            )
 
 
 # ---------------------------------------------------------------------------
