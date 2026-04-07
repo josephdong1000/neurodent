@@ -95,7 +95,7 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
     def from_detection_results(
         cls,
         spike_indices_per_channel: list[np.ndarray],
-        mne_raw_with_annotations: mne.io.RawArray,
+        recording: "si.BaseRecording",
         detection_params: dict,
         animal_id: str = None,
         genotype: str = None,
@@ -103,14 +103,14 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
         bin_folder_name: str = None,
         metadata: core.RecordingMetadata = None,
         assume_from_number: bool = False,
-        recording: "si.BaseRecording" = None,
     ):
         """
         Create FrequencyDomainSpikeAnalysisResult from raw detection outputs.
 
         Args:
             spike_indices_per_channel: List of spike sample indices per channel
-            mne_raw_with_annotations: MNE RawArray with spike annotations
+            recording: SpikeInterface recording. Traces are read directly
+                from this object (zero-copy) to build SortingAnalyzers.
             detection_params: Parameters used for detection
             animal_id: Identifier for the animal
             genotype: Genotype of animal
@@ -118,8 +118,6 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
             bin_folder_name: Binary folder name
             metadata: Recording metadata
             assume_from_number: Assume channel names from numbers
-            recording: SpikeInterface recording. Traces are read directly
-                from this object (zero-copy) to build SortingAnalyzers.
 
         Returns:
             FrequencyDomainSpikeAnalysisResult: Initialized result object
@@ -133,10 +131,9 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
             recording,
         )
 
-        channel_names = mne_raw_with_annotations.ch_names
+        channel_names = [str(ch) for ch in recording.get_channel_ids()]
 
-        # Create instance with SAS first, then set MNE
-        instance = cls(
+        return cls(
             result_sas=result_sas,
             result_mne=None,
             spike_indices=spike_indices_per_channel,
@@ -149,11 +146,6 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
             channel_names=channel_names,
             assume_from_number=assume_from_number,
         )
-
-        # Now set the MNE object after initialization
-        instance.result_mne = mne_raw_with_annotations
-
-        return instance
 
     @staticmethod
     def _convert_to_spikeinterface(
@@ -249,6 +241,14 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
                 result_mne = FrequencyDomainSpikeAnalysisResult.convert_sas_to_mne(
                     self.result_sas, chunk_duration_s, multiprocess_mode=multiprocess_mode,
                 )
+                # Add spike annotations if we have spike indices
+                if self.spike_indices:
+                    from neurodent.core.frequency_domain_spike_detection import (
+                        FrequencyDomainSpikeDetector,
+                    )
+                    FrequencyDomainSpikeDetector._add_spike_annotations(
+                        result_mne, self.spike_indices, result_mne.info['sfreq']
+                    )
                 if save_raw:
                     self.result_mne = result_mne
                 else:

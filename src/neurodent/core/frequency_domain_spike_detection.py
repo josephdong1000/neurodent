@@ -66,7 +66,7 @@ class FrequencyDomainSpikeDetector:
         detection_params: dict = None,
         chunk_duration_s: float = 3600,
         multiprocess_mode: Literal["dask", "serial"] = "serial",
-    ) -> tuple[list[np.ndarray], "mne.io.RawArray", "si.BaseRecording"]:
+    ) -> tuple[list[np.ndarray], "mne.io.RawArray"]:
         """
         Detect spikes in a recording using frequency-domain analysis.
 
@@ -84,7 +84,7 @@ class FrequencyDomainSpikeDetector:
             multiprocess_mode (Literal["dask", "serial"]): Processing mode
 
         Returns:
-            tuple: (spike_indices_per_channel, mne_raw_with_annotations, recording)
+            tuple: (spike_indices_per_channel, mne_raw_with_annotations)
                 - spike_indices_per_channel: List of arrays with spike sample indices per channel
                 - mne_raw_with_annotations: MNE RawArray built from the
                   **raw/unfiltered** recording traces, with spike annotations.
@@ -92,9 +92,6 @@ class FrequencyDomainSpikeDetector:
                   (filtered) chunks; the unfiltered signal is stored so that
                   downstream consumers can inspect waveform context without
                   filtering artifacts.
-                - recording: The original SpikeInterface recording, passed
-                  through so that downstream code can build NumpyRecordings
-                  without re-extracting data from the MNE object.
         """
         if not SPIKEINTERFACE_AVAILABLE:
             raise ImportError(
@@ -183,7 +180,7 @@ class FrequencyDomainSpikeDetector:
             mne_raw, spike_indices_per_channel, sampling_freq
         )
 
-        return spike_indices_per_channel, mne_raw_with_annotations, recording
+        return spike_indices_per_channel, mne_raw_with_annotations
 
     @staticmethod
     def _detect_spikes_chunk(
