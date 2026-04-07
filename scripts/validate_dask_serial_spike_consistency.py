@@ -144,7 +144,7 @@ def run_spike_detection(recording, detection_params, mode="serial"):
 
     start_time = time.time()
 
-    spike_indices, _ = FrequencyDomainSpikeDetector.detect_spikes_recording(
+    spike_indices = FrequencyDomainSpikeDetector.detect_spikes_recording(
         recording, detection_params, multiprocess_mode=mode
     )
 

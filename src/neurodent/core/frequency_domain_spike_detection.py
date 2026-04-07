@@ -66,7 +66,7 @@ class FrequencyDomainSpikeDetector:
         detection_params: dict = None,
         chunk_duration_s: float = 3600,
         multiprocess_mode: Literal["dask", "serial"] = "serial",
-    ) -> tuple[list[np.ndarray], "mne.io.RawArray"]:
+    ) -> list[np.ndarray]:
         """
         Detect spikes in a recording using frequency-domain analysis.
 
@@ -84,14 +84,7 @@ class FrequencyDomainSpikeDetector:
             multiprocess_mode (Literal["dask", "serial"]): Processing mode
 
         Returns:
-            tuple: (spike_indices_per_channel, mne_raw_with_annotations)
-                - spike_indices_per_channel: List of arrays with spike sample indices per channel
-                - mne_raw_with_annotations: MNE RawArray built from the
-                  **raw/unfiltered** recording traces, with spike annotations.
-                  Spike detection itself is performed on preprocessed
-                  (filtered) chunks; the unfiltered signal is stored so that
-                  downstream consumers can inspect waveform context without
-                  filtering artifacts.
+            list[np.ndarray]: Spike sample indices per channel.
         """
         if not SPIKEINTERFACE_AVAILABLE:
             raise ImportError(
@@ -164,23 +157,7 @@ class FrequencyDomainSpikeDetector:
         for ch in range(n_channels):
             spike_indices_per_channel[ch] = np.unique(spike_indices_per_channel[ch])
 
-        # Build MNE RawArray from the *unfiltered* recording traces.
-        # Note: spike detection is performed on preprocessed (filtered) chunks,
-        # but the returned MNE object contains the original raw/unfiltered
-        # signal so that downstream consumers can inspect the waveform context
-        # around each detected spike without filtering artifacts.
-        raw_data = recording.get_traces(return_in_uV=True).T  # (channels, samples)
-        info = mne.create_info(
-            ch_names=channel_names, sfreq=sampling_freq, ch_types="eeg"
-        )
-        mne_raw = mne.io.RawArray(data=raw_data, info=info)
-
-        # Add spike annotations to MNE object
-        mne_raw_with_annotations = FrequencyDomainSpikeDetector._add_spike_annotations(
-            mne_raw, spike_indices_per_channel, sampling_freq
-        )
-
-        return spike_indices_per_channel, mne_raw_with_annotations
+        return spike_indices_per_channel
 
     @staticmethod
     def _detect_spikes_chunk(

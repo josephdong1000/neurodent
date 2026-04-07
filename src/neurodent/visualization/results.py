@@ -1602,7 +1602,7 @@ class AnimalOrganizer(AnimalFeatureParser):
 
             try:
                 # Run frequency domain spike detection
-                spike_indices_per_channel, _ = (
+                spike_indices_per_channel = (
                     FrequencyDomainSpikeDetector.detect_spikes_recording(
                         rec,
                         detection_params=detection_params,

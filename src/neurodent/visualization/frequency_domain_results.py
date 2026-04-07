@@ -241,14 +241,12 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
                 result_mne = FrequencyDomainSpikeAnalysisResult.convert_sas_to_mne(
                     self.result_sas, chunk_duration_s, multiprocess_mode=multiprocess_mode,
                 )
-                # Add spike annotations if we have spike indices
-                if self.spike_indices:
-                    from neurodent.core.frequency_domain_spike_detection import (
-                        FrequencyDomainSpikeDetector,
-                    )
-                    FrequencyDomainSpikeDetector._add_spike_annotations(
-                        result_mne, self.spike_indices, result_mne.info['sfreq']
-                    )
+                from neurodent.core.frequency_domain_spike_detection import (
+                    FrequencyDomainSpikeDetector,
+                )
+                FrequencyDomainSpikeDetector._add_spike_annotations(
+                    result_mne, self.spike_indices, result_mne.info['sfreq']
+                )
                 if save_raw:
                     self.result_mne = result_mne
                 else:
