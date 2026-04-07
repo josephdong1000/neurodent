@@ -103,6 +103,7 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
         bin_folder_name: str = None,
         metadata: core.RecordingMetadata = None,
         assume_from_number: bool = False,
+        recording: "si.BaseRecording" = None,
     ):
         """
         Create FrequencyDomainSpikeAnalysisResult from raw detection outputs.
@@ -117,6 +118,8 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
             bin_folder_name: Binary folder name
             metadata: Recording metadata
             assume_from_number: Assume channel names from numbers
+            recording: SpikeInterface recording. Traces are read directly
+                from this object (zero-copy) to build SortingAnalyzers.
 
         Returns:
             FrequencyDomainSpikeAnalysisResult: Initialized result object
@@ -127,7 +130,7 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
         # Convert to SpikeInterface format for compatibility
         result_sas = cls._convert_to_spikeinterface(
             spike_indices_per_channel,
-            mne_raw_with_annotations
+            recording,
         )
 
         channel_names = mne_raw_with_annotations.ch_names
@@ -155,7 +158,7 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
     @staticmethod
     def _convert_to_spikeinterface(
         spike_indices_per_channel: list[np.ndarray],
-        mne_raw: mne.io.RawArray
+        recording: "si.BaseRecording",
     ) -> list[si.SortingAnalyzer]:
         """
         Convert spike detection results to SpikeInterface SortingAnalyzers.
@@ -165,7 +168,8 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
 
         Args:
             spike_indices_per_channel: List of spike indices per channel
-            mne_raw: MNE RawArray with the original data
+            recording: SpikeInterface recording to read traces from
+                (zero-copy via ``get_traces()``).
 
         Returns:
             list[si.SortingAnalyzer]: SortingAnalyzers for each channel
@@ -173,11 +177,10 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
         if not SPIKEINTERFACE_AVAILABLE:
             raise ImportError("SpikeInterface is required for conversion")
 
-        # Create SpikeInterface recording from MNE data
-        data = mne_raw.get_data()  # Shape: (n_channels, n_times)
-        data = data.T  # SpikeInterface expects (n_times, n_channels)
-        sampling_freq = mne_raw.info['sfreq']
-        channel_ids = mne_raw.ch_names
+        # Zero-copy: read traces directly from the SI recording
+        data = recording.get_traces(return_in_uV=True)  # (n_times, n_channels)
+        sampling_freq = recording.get_sampling_frequency()
+        channel_ids = [str(ch) for ch in recording.get_channel_ids()]
 
         # Create base recording with channel IDs
         recording = si.NumpyRecording(data, sampling_frequency=sampling_freq, channel_ids=channel_ids)
@@ -191,7 +194,7 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
             shape_params={'radius': 10}
         )
         probe.set_device_channel_indices(list(range(len(channel_ids))))
-        recording = recording.set_probe(probe)
+        recording.set_probe(probe, in_place=True)
 
         sorting_analyzers = []
 

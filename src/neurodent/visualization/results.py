@@ -1602,7 +1602,7 @@ class AnimalOrganizer(AnimalFeatureParser):
 
             try:
                 # Run frequency domain spike detection
-                spike_indices_per_channel, mne_raw_with_annotations = (
+                spike_indices_per_channel, mne_raw_with_annotations, si_recording = (
                     FrequencyDomainSpikeDetector.detect_spikes_recording(
                         rec,
                         detection_params=detection_params,
@@ -1626,6 +1626,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                     ),
                     metadata=self.long_recordings[i].meta,
                     assume_from_number=self.assume_from_number,
+                    recording=si_recording,
                 )
 
                 fdsar_list.append(fdsar)
