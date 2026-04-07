@@ -111,13 +111,12 @@ class TestFrequencyDomainSpikeDetectionIntegration:
             assert fdsar.detection_params == TEST_DETECTION_PARAMS
 
             # Verify data integrity
-            assert fdsar.result_mne is not None
             assert fdsar.result_sas is not None
-            assert len(fdsar.result_sas) == len(fdsar.result_mne.ch_names)
+            assert len(fdsar.result_sas) == len(fdsar.channel_names)
 
             # Check spike counts
             spike_counts = fdsar.get_spike_counts_per_channel()
-            assert len(spike_counts) == len(fdsar.result_mne.ch_names)
+            assert len(spike_counts) == len(fdsar.channel_names)
             assert all(count >= 0 for count in spike_counts)
 
             logging.info(
@@ -198,7 +197,7 @@ class TestFrequencyDomainSpikeDetectionIntegration:
     def test_mne_annotation_creation(self, fdsar_default):
         """Test that MNE annotations are properly created."""
         for fdsar in fdsar_default:
-            raw = fdsar.result_mne
+            raw = fdsar.convert_to_mne()
             assert raw is not None
 
             # Check annotations
@@ -337,7 +336,7 @@ class TestFrequencyDomainSpikeDetectorStandalone:
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=RuntimeWarning)
 
-            spike_indices, mne_raw = (
+            spike_indices = (
                 FrequencyDomainSpikeDetector.detect_spikes_recording(
                     spikeinterface_recording,
                     detection_params=TEST_DETECTION_PARAMS,
@@ -354,11 +353,6 @@ class TestFrequencyDomainSpikeDetectorStandalone:
             assert isinstance(ch_spikes, np.ndarray)
             assert ch_spikes.dtype == int
 
-        # Verify MNE object
-        assert mne_raw is not None
-        assert hasattr(mne_raw, "annotations")
-        assert len(mne_raw.ch_names) == spikeinterface_recording.get_num_channels()
-
     def test_detection_parameter_effects(self, spikeinterface_recording):
         """Test that different parameters produce different results."""
         chunk_duration_s = 10.0
@@ -372,14 +366,14 @@ class TestFrequencyDomainSpikeDetectorStandalone:
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=RuntimeWarning)
 
-            high_spikes, _ = FrequencyDomainSpikeDetector.detect_spikes_recording(
+            high_spikes = FrequencyDomainSpikeDetector.detect_spikes_recording(
                 spikeinterface_recording,
                 detection_params=high_threshold_params,
                 chunk_duration_s=chunk_duration_s,
                 multiprocess_mode="auto",
             )
 
-            low_spikes, _ = FrequencyDomainSpikeDetector.detect_spikes_recording(
+            low_spikes = FrequencyDomainSpikeDetector.detect_spikes_recording(
                 spikeinterface_recording,
                 detection_params=low_threshold_params,
                 chunk_duration_s=chunk_duration_s,

@@ -752,13 +752,13 @@ class TestFdsarChunkedDetection:
         }
 
         # Unchunked (None = full recording at once)
-        spikes_full, _ = FrequencyDomainSpikeDetector.detect_spikes_recording(
+        spikes_full = FrequencyDomainSpikeDetector.detect_spikes_recording(
             rec, detection_params=params, chunk_duration_s=None,
             multiprocess_mode="serial",
         )
 
         # Chunked: 1-second chunks → several boundary crossings
-        spikes_chunked, _ = FrequencyDomainSpikeDetector.detect_spikes_recording(
+        spikes_chunked = FrequencyDomainSpikeDetector.detect_spikes_recording(
             rec, detection_params=params, chunk_duration_s=1.0,
             multiprocess_mode="serial",
         )
@@ -813,7 +813,7 @@ class TestFdsarChunkedDetection:
             "window_s": 0.125,
         }
 
-        spikes, _ = FrequencyDomainSpikeDetector.detect_spikes_recording(
+        spikes = FrequencyDomainSpikeDetector.detect_spikes_recording(
             rec, detection_params=params, chunk_duration_s=2.0,
             multiprocess_mode="serial",
         )
@@ -905,7 +905,7 @@ class TestInputValidation:
         }
 
         # chunk_duration_s so tiny it rounds to 0 samples → clamped to 1
-        spikes, raw = FrequencyDomainSpikeDetector.detect_spikes_recording(
+        spikes = FrequencyDomainSpikeDetector.detect_spikes_recording(
             rec, detection_params=params,
             chunk_duration_s=1e-10,
             multiprocess_mode="serial",

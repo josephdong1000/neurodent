@@ -294,62 +294,44 @@ class TestFrequencyDomainSpikeDetector:
 
     @patch.object(FrequencyDomainSpikeDetector, "_preprocess_array")
     @patch.object(FrequencyDomainSpikeDetector, "_detect_spikes_channel")
-    @patch.object(FrequencyDomainSpikeDetector, "_add_spike_annotations")
     def test_detect_spikes_recording_serial(
-        self, mock_add_annotations, mock_detect_channel, mock_preprocess, mock_recording, detection_params
+        self, mock_detect_channel, mock_preprocess, mock_recording, detection_params
     ):
         """Test full spike detection pipeline in serial mode."""
         # Setup mocks: _preprocess_array receives an ndarray, returns filtered ndarray
         mock_preprocess.side_effect = lambda data, fs, params: data
         mock_detect_channel.return_value = np.array([100, 500, 1000])
 
-        # Mock MNE creation
-        with patch("mne.create_info"), patch("mne.io.RawArray") as mock_raw_array:
-            mock_raw = MagicMock()
-            mock_raw_array.return_value = mock_raw
-            mock_add_annotations.return_value = mock_raw
-
-            spike_indices, mne_raw = FrequencyDomainSpikeDetector.detect_spikes_recording(
-                mock_recording, detection_params, multiprocess_mode="auto")
+        spike_indices = FrequencyDomainSpikeDetector.detect_spikes_recording(
+            mock_recording, detection_params, multiprocess_mode="auto")
 
         # Check calls
         mock_preprocess.assert_called_once()
         assert mock_detect_channel.call_count == 4  # 4 channels
-        mock_add_annotations.assert_called_once()
 
         # Check outputs
         assert len(spike_indices) == 4  # 4 channels
-        assert mne_raw is not None
 
     @patch.object(FrequencyDomainSpikeDetector, "_preprocess_array")
     @patch.object(FrequencyDomainSpikeDetector, "_detect_spikes_channel")
-    @patch.object(FrequencyDomainSpikeDetector, "_add_spike_annotations")
     def test_detect_spikes_recording_dask(
-        self, mock_add_annotations, mock_detect_channel, mock_preprocess, mock_recording, detection_params
+        self, mock_detect_channel, mock_preprocess, mock_recording, detection_params
     ):
         """Test full spike detection pipeline in dask mode."""
         # Setup mocks
         mock_preprocess.side_effect = lambda data, fs, params: data
         mock_detect_channel.return_value = np.array([100, 500, 1000])
 
-        # Mock MNE creation
-        with patch("mne.create_info"), patch("mne.io.RawArray") as mock_raw_array:
-            mock_raw = MagicMock()
-            mock_raw_array.return_value = mock_raw
-            mock_add_annotations.return_value = mock_raw
-
-            spike_indices, mne_raw = FrequencyDomainSpikeDetector.detect_spikes_recording(
-                mock_recording, detection_params, multiprocess_mode="auto")
+        spike_indices = FrequencyDomainSpikeDetector.detect_spikes_recording(
+            mock_recording, detection_params, multiprocess_mode="auto")
 
         # Check calls
         mock_preprocess.assert_called_once()
         assert mock_detect_channel.call_count == 4  # 4 channels
-        mock_add_annotations.assert_called_once()
 
         # Check outputs - dask.compute returns tuple, should be converted to list/tuple
         assert len(spike_indices) == 4  # 4 channels
         assert isinstance(spike_indices, (list, tuple))
-        assert mne_raw is not None
 
     def test_detect_spikes_dask_vs_serial_consistency(self, detection_params):
         """Test that dask and serial modes produce identical results on real data."""
@@ -392,10 +374,10 @@ class TestFrequencyDomainSpikeDetector:
         test_params["sneo_percentile"] = 90.0
 
         # Run both modes
-        spike_indices_serial, _ = FrequencyDomainSpikeDetector.detect_spikes_recording(
+        spike_indices_serial = FrequencyDomainSpikeDetector.detect_spikes_recording(
             recording, test_params, multiprocess_mode="auto")
 
-        spike_indices_dask, _ = FrequencyDomainSpikeDetector.detect_spikes_recording(
+        spike_indices_dask = FrequencyDomainSpikeDetector.detect_spikes_recording(
             recording, test_params, multiprocess_mode="auto")
 
         # Check consistency
@@ -434,7 +416,7 @@ class TestFrequencyDomainSpikeDetector:
         test_params = detection_params.copy()
         test_params["sneo_percentile"] = 99.9  # Very high threshold
 
-        spike_indices, mne_raw = FrequencyDomainSpikeDetector.detect_spikes_recording(
+        spike_indices = FrequencyDomainSpikeDetector.detect_spikes_recording(
             recording, test_params, multiprocess_mode="auto")
 
         # Should return empty arrays for each channel
@@ -469,7 +451,7 @@ class TestFrequencyDomainSpikeDetector:
         test_params = detection_params.copy()
         test_params["sneo_percentile"] = 95.0
 
-        spike_indices, mne_raw = FrequencyDomainSpikeDetector.detect_spikes_recording(
+        spike_indices = FrequencyDomainSpikeDetector.detect_spikes_recording(
             recording, test_params, multiprocess_mode="auto")
 
         # Should work with single channel
@@ -504,7 +486,7 @@ class TestFrequencyDomainSpikeDetector:
         test_params = detection_params.copy()
         test_params["sneo_percentile"] = 95.0
 
-        spike_indices, mne_raw = FrequencyDomainSpikeDetector.detect_spikes_recording(
+        spike_indices = FrequencyDomainSpikeDetector.detect_spikes_recording(
             recording, test_params, multiprocess_mode="auto")
 
         # Should handle many channels
@@ -530,10 +512,10 @@ class TestFrequencyDomainSpikeDetector:
         data = np.random.randn(n_channels, n_samples) * 0.1
         recording = si.NumpyRecording(data.T, sampling_frequency=fs, channel_ids=[f"ch{i}" for i in range(n_channels)])
 
-        spike_indices_serial, mne_serial = FrequencyDomainSpikeDetector.detect_spikes_recording(
+        spike_indices_serial = FrequencyDomainSpikeDetector.detect_spikes_recording(
             recording, detection_params, multiprocess_mode="auto")
 
-        spike_indices_dask, mne_dask = FrequencyDomainSpikeDetector.detect_spikes_recording(
+        spike_indices_dask = FrequencyDomainSpikeDetector.detect_spikes_recording(
             recording, detection_params, multiprocess_mode="auto")
 
         # Both should return same container types

@@ -131,11 +131,21 @@ class TestFrequencyDomainSpikeAnalysisResult:
     @patch.object(FrequencyDomainSpikeAnalysisResult, "_convert_to_spikeinterface")
     def test_from_detection_results(self, mock_convert, sample_spike_indices, sample_mne_raw, detection_params):
         """Test creation from raw detection results."""
+        import spikeinterface.core as si
+
         mock_convert.return_value = [MagicMock()]
+
+        # Build an SI recording matching the MNE data
+        data = sample_mne_raw.get_data().T
+        recording = si.NumpyRecording(
+            data,
+            sampling_frequency=sample_mne_raw.info['sfreq'],
+            channel_ids=sample_mne_raw.ch_names,
+        )
 
         fdsar = FrequencyDomainSpikeAnalysisResult.from_detection_results(
             spike_indices_per_channel=sample_spike_indices,
-            mne_raw_with_annotations=sample_mne_raw,
+            recording=recording,
             detection_params=detection_params,
             animal_id="test_animal",
             genotype="WT",
@@ -143,16 +153,26 @@ class TestFrequencyDomainSpikeAnalysisResult:
 
         mock_convert.assert_called_once()
         assert fdsar.spike_indices == sample_spike_indices
-        assert fdsar.result_mne == sample_mne_raw
+        assert fdsar.result_mne is None
         assert fdsar.detection_params == detection_params
 
     def test_convert_to_spikeinterface(self, sample_spike_indices, sample_mne_raw):
         """Test conversion to SpikeInterface format."""
+        import spikeinterface.core as si
+
+        # Build an SI recording matching the MNE RawArray data
+        data = sample_mne_raw.get_data().T  # (n_times, n_channels)
+        recording = si.NumpyRecording(
+            data,
+            sampling_frequency=sample_mne_raw.info['sfreq'],
+            channel_ids=sample_mne_raw.ch_names,
+        )
+
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=RuntimeWarning)
 
             result_sas = FrequencyDomainSpikeAnalysisResult._convert_to_spikeinterface(
-                sample_spike_indices, sample_mne_raw
+                sample_spike_indices, recording
             )
 
         assert len(result_sas) == len(sample_spike_indices)
