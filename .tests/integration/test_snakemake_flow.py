@@ -141,6 +141,7 @@ class TestSnakemakePipelineRun:
         cls,
         targets: list[str],
         extra_args: list[str] | None = None,
+        extra_env: dict[str, str] | None = None,
         timeout: int = 600,
     ) -> subprocess.CompletedProcess:
         """Invoke ``snakemake`` as a subprocess for *targets*.
@@ -148,6 +149,8 @@ class TestSnakemakePipelineRun:
         Args:
             targets: List of output file targets to build.
             extra_args: Additional flags inserted before the target list.
+            extra_env: Additional environment variables to set (e.g.
+                ``{"NEURODENT_MEMRAY": "1"}``).
             timeout: Subprocess timeout in seconds.
 
         Returns:
@@ -168,6 +171,8 @@ class TestSnakemakePipelineRun:
             **os.environ,
             "NEURODENT_DATASET": cls.DATASET,
         }
+        if extra_env:
+            env.update(extra_env)
 
         return subprocess.run(
             cmd,
@@ -213,4 +218,35 @@ class TestSnakemakePipelineRun:
             assert war_pkl.exists(), f"Expected WAR pickle not created: {war_pkl}"
             assert war_json.exists(), f"Expected WAR JSON not created: {war_json}"
         finally:
+            self._cleanup()
+
+    def test_war_generation_with_memray(self):
+        """``war_generation`` with NEURODENT_MEMRAY=1 produces ``memray.bin`` alongside WAR outputs."""
+        war_pkl = _REPO_ROOT / f"results/wars/{self.ANIMAL}/war.pkl"
+        war_json = _REPO_ROOT / f"results/wars/{self.ANIMAL}/war.json"
+        memray_bin = _REPO_ROOT / f"results/wars/{self.ANIMAL}/memray.bin"
+
+        self._cleanup()
+        try:
+            result = self._run_snakemake(
+                [f"results/wars/{self.ANIMAL}/war.pkl"],
+                extra_args=["--forcerun", "war_generation"],
+                extra_env={"NEURODENT_MEMRAY": "1"},
+            )
+            assert result.returncode == 0, (
+                f"Snakemake run with memray failed for '{self.DATASET}' dataset, "
+                f"animal '{self.ANIMAL}'.\n"
+                f"stdout:\n{result.stdout}\n"
+                f"stderr:\n{result.stderr}"
+            )
+            # WAR outputs still produced
+            assert war_pkl.exists(), f"Expected WAR pickle not created: {war_pkl}"
+            assert war_json.exists(), f"Expected WAR JSON not created: {war_json}"
+            # memray.bin produced and non-empty
+            assert memray_bin.exists(), f"Expected memray.bin not created: {memray_bin}"
+            assert memray_bin.stat().st_size > 0, "memray.bin is empty"
+        finally:
+            # Also clean up memray.bin
+            if memray_bin.exists():
+                memray_bin.unlink()
             self._cleanup()

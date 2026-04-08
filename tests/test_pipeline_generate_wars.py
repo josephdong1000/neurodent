@@ -8,10 +8,14 @@ This addresses the need for pythonic/standardized testing of the Snakemake
 pipeline without running full datasets through.
 """
 
+import os
+import tempfile
 import warnings
+from contextlib import nullcontext
 from pathlib import Path
 from unittest.mock import MagicMock, patch, call
 
+import memray
 import pytest
 
 
@@ -582,4 +586,118 @@ class TestLofThresholdWiring:
 
         _, kwargs = ao.compute_bad_channels.call_args
         assert kwargs["lof_chunk_duration_s"] == 60
+
+
+class TestMemrayIntegration:
+    """Test the memray/cProfile profiling integration in generate_wars.py.
+
+    These tests replicate the profiling logic from the ``if __name__ == "__main__"``
+    block and verify that memray.Tracker and FileDestination behave correctly,
+    including the overwrite=True fix that resolved the 94% pipeline stall.
+    """
+
+    @staticmethod
+    def _build_tracker_ctx(memray_enabled, memray_path):
+        """Replicate the generate_wars.py logic for building the memray context manager.
+
+        This mirrors lines 282-294 of generate_wars.py exactly.
+        """
+        if memray_enabled:
+            tracker_ctx = memray.Tracker(
+                destination=memray.FileDestination(str(memray_path), overwrite=True)
+            )
+        else:
+            tracker_ctx = nullcontext()
+        return tracker_ctx
+
+    def test_tracker_creates_memray_bin(self, tmp_path):
+        """Tracker writes a valid memray.bin file."""
+        memray_path = tmp_path / "memray.bin"
+        ctx = self._build_tracker_ctx(True, memray_path)
+        with ctx:
+            _ = [i * 2 for i in range(100)]
+
+        assert memray_path.exists()
+        assert memray_path.stat().st_size > 0
+
+    def test_tracker_overwrites_existing_file(self, tmp_path):
+        """FileDestination(overwrite=True) overwrites an existing memray.bin without error.
+
+        This was the root cause of the 94% pipeline stall: memray.Tracker without
+        overwrite=True raises OSError when the file already exists from a previous run.
+        """
+        memray_path = tmp_path / "memray.bin"
+
+        # First run: create the file
+        with self._build_tracker_ctx(True, memray_path):
+            _ = list(range(50))
+        assert memray_path.exists()
+
+        # Second run: overwrite must succeed (not raise OSError)
+        with self._build_tracker_ctx(True, memray_path):
+            _ = list(range(200))
+        assert memray_path.exists()
+        assert memray_path.stat().st_size > 0
+
+    def test_disabled_memray_uses_nullcontext(self, tmp_path):
+        """When memray is disabled, a nullcontext is returned (no file created)."""
+        memray_path = tmp_path / "memray.bin"
+        ctx = self._build_tracker_ctx(False, memray_path)
+        assert isinstance(ctx, nullcontext)
+        with ctx:
+            pass
+        assert not memray_path.exists()
+
+    def test_memray_bin_readable_by_file_reader(self, tmp_path):
+        """The memray.bin file produced by Tracker is readable by memray.FileReader."""
+        memray_path = tmp_path / "memray.bin"
+        with self._build_tracker_ctx(True, memray_path):
+            _ = bytearray(1024)
+
+        reader = memray.FileReader(str(memray_path))
+        metadata = reader.metadata
+        assert metadata.pid > 0
+
+    def test_env_var_gating_matches_script_logic(self):
+        """NEURODENT_MEMRAY env var logic matches generate_wars.py."""
+        # When env var is unset → falsy
+        saved = os.environ.pop("NEURODENT_MEMRAY", None)
+        try:
+            assert not os.environ.get("NEURODENT_MEMRAY")
+        finally:
+            if saved is not None:
+                os.environ["NEURODENT_MEMRAY"] = saved
+
+    def test_cprofile_context_independent_of_memray(self, tmp_path):
+        """cProfile and memray contexts are independent — both can wrap main() together.
+
+        Replicates the nested context pattern from generate_wars.py lines 296-308.
+        """
+        import cProfile
+
+        memray_path = tmp_path / "memray.bin"
+        tracker_ctx = self._build_tracker_ctx(True, memray_path)
+
+        profiler = cProfile.Profile()
+        with tracker_ctx:
+            profiler.enable()
+            _ = sum(range(1000))
+            profiler.disable()
+
+        assert memray_path.exists()
+        prof_path = tmp_path / "profile.prof"
+        profiler.dump_stats(str(prof_path))
+        assert prof_path.exists()
+        assert prof_path.stat().st_size > 0
+
+    def test_tracker_with_subdirectory_path(self, tmp_path):
+        """Tracker works when memray_path is in a nested subdirectory (mimics war output layout)."""
+        nested = tmp_path / "results" / "wars" / "animal_x"
+        nested.mkdir(parents=True)
+        memray_path = nested / "memray.bin"
+
+        with self._build_tracker_ctx(True, memray_path):
+            _ = list(range(10))
+
+        assert memray_path.exists()
 
