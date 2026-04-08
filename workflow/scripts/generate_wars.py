@@ -236,6 +236,11 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
             logger.info(f"Integrating spike features into WAR for {animal_key}")
             war = war.read_sars_spikes(fdsar_list, read_mode="sa", inplace=True)
 
+            # Release AnimalOrganizer to free memmap-backed recording references.
+            # war is self-contained (DataFrame + metadata), fdsar_list SAs still
+            # hold per-channel recording refs needed for .fif export.
+            del ao, all_lros
+
         return war, fdsar_list
     except Exception as e:
         logger.error(f"Failed to generate WAR for {animal_key}: {e}")
@@ -260,6 +265,7 @@ def main():
     # Save WAR (now includes nspike/lognspike features)
     war.save_pickle_and_json(Path(snakemake.output.war_pkl).parent, filename="war", slugify_filename=False)
     logger.info(f"Successfully saved WAR for {animal_folder} {animal_id}")
+    del war  # Free WAR DataFrame before FDSAR saves
 
     # Save FDSAR results - each animalday gets its own subdirectory
     fdsar_base_dir = Path(snakemake.output.fdsar_dir)
@@ -274,6 +280,7 @@ def main():
 
         fdsar.save_fif_and_json(animalday_dir, convert_to_mne=True, slugify_filebase=False, overwrite=True, chunk_duration_s=fdsar_export_chunk_duration_s)
         logger.info(f"Saved FDSAR for {fdsar.animal_id} {fdsar.animal_day} to {animalday_dir}")
+        fdsar.result_sas = None  # Release memmap-backed recording references
 
     logger.info(f"Successfully saved {len(fdsar_list)} FDSAR results to {fdsar_base_dir}")
 
