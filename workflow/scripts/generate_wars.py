@@ -286,7 +286,9 @@ if __name__ == "__main__":
     if memray_enabled:
         import memray
         memray_path = Path(snakemake.output.war_pkl).parent / "memray.bin"
-        tracker_ctx = memray.Tracker(str(memray_path))
+        tracker_ctx = memray.Tracker(
+            destination=memray.FileDestination(str(memray_path), overwrite=True)
+        )
     else:
         from contextlib import nullcontext
         tracker_ctx = nullcontext()
