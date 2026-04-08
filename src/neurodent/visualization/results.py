@@ -322,12 +322,14 @@ class AnimalOrganizer(AnimalFeatureParser):
         for i in range(1, len(sorted_items)):
             prev_key, prev_ts = sorted_items[i - 1]
             curr_key, curr_ts = sorted_items[i]
-            if curr_ts < prev_ts:
+            if curr_ts <= prev_ts:
                 raise ValueError(
                     f"Timestamp collision: {prev_key} ({prev_ts}) and "
                     f"{curr_key} ({curr_ts}) have equal or overlapping timestamps. "
-                    f"This may indicate items with the same filename in different "
-                    f"sessions. Check manual_datetimes configuration."
+                    f"This may indicate duplicate files mapping to the same "
+                    f"{{index}} in the file pattern, or a manual_datetimes "
+                    f"configuration that assigns the same start time to "
+                    f"multiple items."
                 )
 
     def _is_item_file(self, item):

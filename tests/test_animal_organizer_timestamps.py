@@ -1000,15 +1000,15 @@ class TestValidateTimestampOrdering:
         }
         results.AnimalOrganizer._validate_timestamp_ordering(ts)  # Should not raise
 
-    def test_allows_equal_timestamps_for_zero_duration_files(self):
-        """Equal timestamps are allowed (e.g., 0-duration empty files)."""
+    def test_raises_for_duplicate_timestamps(self):
+        """Duplicate timestamps indicate colliding index values and should raise."""
         same_time = datetime(2023, 1, 1, 10, 0, 0)
         ts = {
             "/data/sess1/file.bin": same_time,
             "/data/sess2/file.bin": same_time,
         }
-        # Should not raise — 0-duration files legitimately share timestamps
-        results.AnimalOrganizer._validate_timestamp_ordering(ts)
+        with pytest.raises(ValueError, match="Timestamp collision"):
+            results.AnimalOrganizer._validate_timestamp_ordering(ts)
 
     def test_passes_for_single_item(self):
         ts = {"/data/file.bin": datetime(2023, 1, 1, 10, 0, 0)}
