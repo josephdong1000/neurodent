@@ -279,15 +279,32 @@ def main():
 
 
 if __name__ == "__main__":
-    if os.environ.get("NEURODENT_PROFILE"):
-        import cProfile
-        profiler = cProfile.Profile()
-        profiler.enable()
-        main()
-        profiler.disable()
-        prof_path = Path(snakemake.output.war_pkl).parent / "profile.prof"
-        profiler.dump_stats(str(prof_path))
-        print(f"Profile saved to {prof_path}")
-        print("Analyze with: python -m snakeviz {prof_path}")
+    memray_enabled = os.environ.get("NEURODENT_MEMRAY")
+    profile_enabled = os.environ.get("NEURODENT_PROFILE")
+
+    # Optional memray memory profiling (context manager wraps main)
+    if memray_enabled:
+        import memray
+        memray_path = Path(snakemake.output.war_pkl).parent / "memray.bin"
+        tracker_ctx = memray.Tracker(str(memray_path))
     else:
-        main()
+        from contextlib import nullcontext
+        tracker_ctx = nullcontext()
+
+    with tracker_ctx:
+        if profile_enabled:
+            import cProfile
+            profiler = cProfile.Profile()
+            profiler.enable()
+            main()
+            profiler.disable()
+            prof_path = Path(snakemake.output.war_pkl).parent / "profile.prof"
+            profiler.dump_stats(str(prof_path))
+            print(f"Profile saved to {prof_path}")
+            print(f"Analyze with: python -m snakeviz {prof_path}")
+        else:
+            main()
+
+    if memray_enabled:
+        print(f"Memray profile saved to {memray_path}")
+        print(f"Generate flamegraph: python -m memray flamegraph {memray_path}")

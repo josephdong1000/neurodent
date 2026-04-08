@@ -3930,8 +3930,29 @@ class WindowAnalysisResult(AnimalFeatureParser):
         # Object-like columns (lists/dicts/ndarrays) are JSON-encoded per-cell.
         # The list of encoded columns is stored in the parquet schema metadata
         # so they can be decoded on load.
-        pq_df, encoded_cols = self._encode_df_for_parquet(self.result)
-        table = pa.Table.from_pandas(pq_df)
+        #
+        # Build a column dict directly (avoids df.copy() and from_pandas()
+        # which together create 2-3 redundant copies of the DataFrame).
+        columns = {}
+        encoded_cols: list[str] = []
+        for col in self.result.columns:
+            ser = self.result[col]
+            needs_encoding = False
+            if ser.dtype == object:
+                sample = ser.dropna().head(20)
+                for v in sample:
+                    if not isinstance(v, (str, int, float, bool, type(None))):
+                        needs_encoding = True
+                        break
+            if needs_encoding:
+                encoded_cols.append(col)
+                columns[col] = [
+                    json.dumps(x, cls=WindowAnalysisResult._NumpyEncoder, ensure_ascii=False)
+                    for x in ser
+                ]
+            else:
+                columns[col] = ser.to_numpy()
+        table = pa.table(columns)
         neurodent_meta = json.dumps({"encoded_columns": encoded_cols}).encode()
         existing_meta = table.schema.metadata or {}
         merged_meta = {**existing_meta, b"neurodent": neurodent_meta}

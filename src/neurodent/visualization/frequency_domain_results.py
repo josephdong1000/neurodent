@@ -158,10 +158,14 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
         Uses NumpySorting.from_unit_dict to create compatible objects that work
         with existing WindowAnalysisResult.read_sars_spikes() infrastructure.
 
+        No data is read from the recording here — traces are only accessed
+        later during ``.fif`` export via ``convert_sa_to_np()``, which reads
+        in small chunks.
+
         Args:
             spike_indices_per_channel: List of spike indices per channel
-            recording: SpikeInterface recording to read traces from
-                (zero-copy via ``get_traces()``).
+            recording: SpikeInterface recording. Passed through to
+                SortingAnalyzers without reading traces.
 
         Returns:
             list[si.SortingAnalyzer]: SortingAnalyzers for each channel
@@ -169,31 +173,29 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
         if not SPIKEINTERFACE_AVAILABLE:
             raise ImportError("SpikeInterface is required for conversion")
 
-        # Zero-copy: read traces directly from the SI recording
-        data = recording.get_traces(return_in_uV=True)  # (n_times, n_channels)
         sampling_freq = recording.get_sampling_frequency()
-        channel_ids = [str(ch) for ch in recording.get_channel_ids()]
+        channel_ids = recording.get_channel_ids()
 
-        # Create base recording with channel IDs
-        recording = si.NumpyRecording(data, sampling_frequency=sampling_freq, channel_ids=channel_ids)
-
-        # Set a simple linear probe
+        # Set a probe if the recording doesn't already have one.
+        # create_sorting_analyzer requires a probe, but we avoid reading
+        # any trace data — only metadata is added.
         from probeinterface import Probe
-        probe = Probe(ndim=2)
-        probe.set_contacts(
-            positions=[(0, i) for i in range(len(channel_ids))],
-            shapes='circle',
-            shape_params={'radius': 10}
-        )
-        probe.set_device_channel_indices(list(range(len(channel_ids))))
-        recording.set_probe(probe, in_place=True)
+        try:
+            recording.get_probegroup()
+        except ValueError:
+            probe = Probe(ndim=2)
+            probe.set_contacts(
+                positions=[(0, i) for i in range(len(channel_ids))],
+                shapes='circle',
+                shape_params={'radius': 10}
+            )
+            probe.set_device_channel_indices(list(range(len(channel_ids))))
+            recording.set_probe(probe, in_place=True)
 
         sorting_analyzers = []
 
         for ch_idx, spike_indices in enumerate(spike_indices_per_channel):
-            # Create single-channel recording using actual recording channel IDs
-            actual_channel_ids = recording.get_channel_ids()
-            channel_id = actual_channel_ids[ch_idx]
+            channel_id = channel_ids[ch_idx]
             channel_recording = recording.select_channels([channel_id])
 
             if len(spike_indices) > 0:
