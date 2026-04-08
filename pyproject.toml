@@ -96,7 +96,7 @@ dev = [
     "jupyterlab>=4.4.10",
     "pre-commit>=4.5.1",
     "nbstripout>=0.8.2",
-    "memray>=1.19.2",
+    "memray>=1.19.2; sys_platform == 'linux'",
 ]
 
 [project.urls]
