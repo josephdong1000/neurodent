@@ -48,6 +48,7 @@ TEST_DETECTION_PARAMS = {
 @pytest.mark.skipif(not SPIKEINTERFACE_AVAILABLE, reason="SpikeInterface not available")
 @pytest.mark.skipif(len(TEST_ANIMALS) == 0, reason="Test data not available")
 @pytest.mark.integration
+@pytest.mark.slow
 class TestFrequencyDomainSpikeDetectionIntegration:
     """Integration tests using real test data."""
 
@@ -292,6 +293,7 @@ class TestFrequencyDomainSpikeDetectionIntegration:
 @pytest.mark.skipif(not SPIKEINTERFACE_AVAILABLE, reason="SpikeInterface not available")
 @pytest.mark.skipif(len(TEST_ANIMALS) == 0, reason="Test data not available")
 @pytest.mark.integration
+@pytest.mark.slow
 class TestFrequencyDomainSpikeDetectorStandalone:
     """Test FrequencyDomainSpikeDetector directly with real recordings."""
 
