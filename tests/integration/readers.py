@@ -61,7 +61,23 @@ def read_bin_csv_pair(discovered_file, **kwargs):
     if file_size == 0:
         raise ValueError(f"Binary file is empty (0 bytes): {bin_path}")
 
-    n_samples = file_size // (np.dtype(np.float32).itemsize * n_channels)
+    bytes_per_frame = np.dtype(np.float32).itemsize * n_channels
+    remainder = file_size % bytes_per_frame
+    if remainder != 0:
+        raise ValueError(
+            f"Binary file size ({file_size} bytes) is not divisible by the "
+            f"expected frame size ({bytes_per_frame} bytes = "
+            f"{np.dtype(np.float32).itemsize} bytes/float32 × {n_channels} channels). "
+            f"Remainder: {remainder} bytes. "
+            f"This usually means either:\n"
+            f"  1. The number of channels in the CSV metadata ({n_channels}) "
+            f"does not match the binary — check '{csv_path}'.\n"
+            f"  2. The binary file is corrupt or was truncated during "
+            f"transfer — re-export or re-copy '{bin_path}'.\n"
+            f"  3. The binary uses a different dtype (e.g. float64 or int16) "
+            f"instead of float32."
+        )
+    n_samples = file_size // bytes_per_frame
     # The sox5 format stores data in column-major (Fortran) order: for a
     # (n_samples, n_channels) array, all samples of each channel are
     # contiguous in the file before the next channel begins.  Using
