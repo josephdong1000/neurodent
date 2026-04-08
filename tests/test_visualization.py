@@ -3928,6 +3928,67 @@ class TestParquetSaveLoad:
                 f"than pickle ({pkl_time:.3f}s)"
             )
 
+    def test_save_parquet_bypasses_encode_df_for_parquet(self):
+        """Verify save_pickle_and_json builds a column dict directly
+        instead of calling _encode_df_for_parquet (which does df.copy()).
+
+        The old path created 2-3 redundant copies of the DataFrame via
+        df.copy() + pa.Table.from_pandas(). The new path builds a column
+        dict and uses pa.table() — no DataFrame copy.
+        """
+        from unittest.mock import patch
+
+        n_rows = 50
+        rng = np.random.default_rng(99)
+        data = {
+            "animalday": [f"A1_day{i}" for i in range(n_rows)],
+            "genotype": ["WT"] * n_rows,
+            "timestamp": pd.date_range("2023-01-01", periods=n_rows, freq="5min"),
+            "duration": [240.0] * n_rows,
+            "rms": [rng.uniform(100, 200, 4).tolist() for _ in range(n_rows)],
+            "cohere": [
+                {"ch1_ch2": rng.uniform(0, 1, 8).tolist()}
+                for _ in range(n_rows)
+            ],
+        }
+        war = WindowAnalysisResult(
+            result=pd.DataFrame(data),
+            animal_id="A1",
+            genotype="WT",
+            channel_names=["LMot", "RMot", "LAud", "RAud"],
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Patch _encode_df_for_parquet to verify it is NOT called
+            with patch.object(
+                WindowAnalysisResult, "_encode_df_for_parquet",
+                wraps=WindowAnalysisResult._encode_df_for_parquet,
+            ) as mock_encode:
+                war.save_pickle_and_json(tmpdir, filename="war")
+                mock_encode.assert_not_called()
+
+            # Verify the parquet file is valid and round-trips correctly
+            pq_path = Path(tmpdir) / "war.parquet"
+            assert pq_path.exists()
+
+            import pyarrow.parquet as pq
+            table = pq.read_table(pq_path)
+
+            # Check neurodent metadata with encoded columns list
+            nd_meta = json.loads(table.schema.metadata[b"neurodent"])
+            assert "rms" in nd_meta["encoded_columns"]
+            assert "cohere" in nd_meta["encoded_columns"]
+            assert "duration" not in nd_meta["encoded_columns"]
+
+            # Decode and verify values round-trip
+            reloaded = table.to_pandas()
+            encoded_cols = nd_meta["encoded_columns"]
+            decoded = WindowAnalysisResult._decode_df_from_parquet(reloaded, encoded_cols)
+            assert len(decoded) == n_rows
+            for i in range(min(5, n_rows)):
+                assert decoded["rms"].iloc[i] == war.result["rms"].iloc[i]
+                assert decoded["cohere"].iloc[i] == war.result["cohere"].iloc[i]
+
 
 class TestAnimalOrganizerLOF:
     """Test LOF functionality integration with AnimalOrganizer (mocked)."""
