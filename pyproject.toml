@@ -97,6 +97,7 @@ dev = [
     "pre-commit>=4.5.1",
     "nbstripout>=0.8.2",
     "memray>=1.19.2; sys_platform == 'linux'",
+    "bokeh>=3.9.0",
 ]
 
 [project.urls]
