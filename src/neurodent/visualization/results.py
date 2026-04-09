@@ -577,6 +577,24 @@ class AnimalOrganizer(AnimalFeatureParser):
                         f"Failed to load item {self._get_item_name(item)} for duration estimation: {e}"
                     ) from e
 
+        # Filter out zero-duration items (empty/corrupt files) from the
+        # timeline.  These items remain in _animalday_folder_groups and will
+        # be handled by _filter_zero_sample_lros() during LRO creation.
+        zero_items = [
+            item for item in ordered_items if item_durations.get(item, 0) == 0
+        ]
+        if zero_items:
+            for item in zero_items:
+                logging.warning(
+                    f"Skipping zero-duration item '{self._get_item_name(item)}' "
+                    f"from timeline computation (empty or corrupt file)"
+                )
+            ordered_items = [
+                item for item in ordered_items if item not in zero_items
+            ]
+            for item in zero_items:
+                item_durations.pop(item, None)
+
         datetimes_are_start = base_lro_kwargs.get("datetimes_are_start", True)
         result = {}
 
@@ -777,6 +795,12 @@ class AnimalOrganizer(AnimalFeatureParser):
                 item_lro_pairs = []
                 for item in items:
                     individual_kwargs = kwargs.copy()
+                    # Remove session-level timestamp list; replaced per-item
+                    # below.  Items missing from _processed_timestamps (e.g.,
+                    # zero-byte files skipped from timeline) must not inherit
+                    # the session list, which would cause a length mismatch.
+                    individual_kwargs.pop("manual_datetimes", None)
+                    individual_kwargs.pop("datetimes_are_start", None)
                     # Distribute per-item timestamp so each LRO gets its own
                     if getattr(self, "_processed_timestamps", None) is not None:
                         item_key = self._get_item_key(item)
