@@ -9,13 +9,13 @@ pipeline without running full datasets through.
 """
 
 import os
+import sys
 import tempfile
 import warnings
 from contextlib import nullcontext
 from pathlib import Path
 from unittest.mock import MagicMock, patch, call
 
-import memray
 import pytest
 
 
@@ -588,6 +588,7 @@ class TestLofThresholdWiring:
         assert kwargs["lof_chunk_duration_s"] == 60
 
 
+@pytest.mark.skipif(sys.platform != "linux", reason="memray is only available on Linux")
 class TestMemrayIntegration:
     """Test the memray/cProfile profiling integration in generate_wars.py.
 
@@ -602,6 +603,8 @@ class TestMemrayIntegration:
 
         This mirrors lines 282-294 of generate_wars.py exactly.
         """
+        import memray
+
         if memray_enabled:
             tracker_ctx = memray.Tracker(
                 destination=memray.FileDestination(str(memray_path), overwrite=True)
@@ -650,6 +653,8 @@ class TestMemrayIntegration:
 
     def test_memray_bin_readable_by_file_reader(self, tmp_path):
         """The memray.bin file produced by Tracker is readable by memray.FileReader."""
+        import memray
+
         memray_path = tmp_path / "memray.bin"
         with self._build_tracker_ctx(True, memray_path):
             _ = bytearray(1024)
