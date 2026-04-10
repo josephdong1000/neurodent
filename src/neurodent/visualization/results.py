@@ -3915,7 +3915,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 )
         return result
 
-    def save_pickle_and_json(
+    def save_parquet_and_json(
         self,
         folder: str | Path,
         make_folder=True,
@@ -3926,8 +3926,8 @@ class WindowAnalysisResult(AnimalFeatureParser):
         """Archive window analysis result into the folder specified, as a parquet and json file.
 
         The result DataFrame is saved as a Parquet file (stable across pandas
-        versions).  A pickle copy is also written for backward compatibility
-        with older workflows.
+        versions).  Metadata (animal_id, channel_names, bad_channels_dict,
+        lof_scores_dict, etc.) is written alongside as a JSON sidecar.
 
         Args:
             folder (str | Path): Destination folder to save results to
@@ -3947,10 +3947,6 @@ class WindowAnalysisResult(AnimalFeatureParser):
         filename = slugify(filename) if slugify_filename else filename
 
         filepath = str(folder / filename)
-
-        # Write pickle for backward compatibility with existing workflows
-        self.result.to_pickle(filepath + ".pkl")
-        logging.info(f"Saved WAR to {filepath + '.pkl'}")
 
         # Write parquet as the primary stable format.
         # Object-like columns (lists/dicts/ndarrays) are JSON-encoded per-cell.
@@ -4004,6 +4000,23 @@ class WindowAnalysisResult(AnimalFeatureParser):
         with open(filepath + ".json", "w") as f:
             json.dump(json_dict, f, indent=2)
             logging.info(f"Saved WAR to {filepath + '.json'}")
+
+    def save_pickle_and_json(self, *args, **kwargs):
+        """Deprecated: use :meth:`save_parquet_and_json` instead.
+
+        This alias is retained so external callers don't break immediately. It
+        no longer writes a pickle file — only parquet + json. The name is
+        misleading and will be removed in a future release.
+        """
+        import warnings
+
+        warnings.warn(
+            "save_pickle_and_json is deprecated and no longer writes a pickle file; "
+            "use save_parquet_and_json instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.save_parquet_and_json(*args, **kwargs)
 
     class _NumpyEncoder(json.JSONEncoder):
         """JSON encoder that handles numpy types transparently.
@@ -4289,22 +4302,29 @@ class WindowAnalysisResult(AnimalFeatureParser):
         return y_true_list, y_pred_list
 
     @classmethod
-    def load_pickle_and_json(cls, folder_path=None, pickle_name=None, json_name=None):
-        """Load WindowAnalysisResult from folder
+    def load_parquet_and_json(cls, folder_path=None, parquet_name=None, json_name=None):
+        """Load WindowAnalysisResult from folder.
+
+        Reads ``war.parquet`` (the result DataFrame) plus ``war.json`` (the
+        WAR metadata: animal_id, channel_names, bad_channels_dict, etc.).
+
+        For backward compatibility, if the resolved parquet file does not
+        exist but a matching ``.pkl`` file does, the loader falls back to
+        reading the legacy pickle format. No pickle files are written.
 
         Args:
-            folder_path (str, optional): Path of folder containing .pkl and .json files. Defaults to None.
-            pickle_name (str, optional): Name of the pickle file. Can be just the filename (e.g. "war.pkl")
-                or a path relative to folder_path (e.g. "subdir/war.pkl"). If None and folder_path is provided,
-                expects exactly one .pkl file in folder_path. Defaults to None.
+            folder_path (str, optional): Path of folder containing .parquet and .json files. Defaults to None.
+            parquet_name (str, optional): Name of the parquet file. Can be just the filename (e.g. "war.parquet")
+                or a path relative to folder_path (e.g. "subdir/war.parquet"). If None and folder_path is provided,
+                expects exactly one .parquet file in folder_path. Defaults to None.
             json_name (str, optional): Name of the JSON file. Can be just the filename (e.g. "war.json")
                 or a path relative to folder_path (e.g. "subdir/war.json"). If None and folder_path is provided,
                 expects exactly one .json file in folder_path. Defaults to None.
 
         Raises:
             ValueError: folder_path does not exist
-            ValueError: Expected exactly one pickle and one json file in folder_path (when pickle_name/json_name not specified)
-            FileNotFoundError: Specified pickle_name or json_name not found
+            ValueError: Expected exactly one parquet and one json file in folder_path (when parquet_name/json_name not specified)
+            FileNotFoundError: Specified parquet_name or json_name not found
 
         Returns:
             result: WindowAnalysisResult object
@@ -4314,32 +4334,38 @@ class WindowAnalysisResult(AnimalFeatureParser):
             if not folder_path.exists():
                 raise ValueError(f"Folder path {folder_path} does not exist")
 
-            if pickle_name is not None:
-                # Handle pickle_name as either absolute path or relative to folder_path
-                pickle_path = Path(pickle_name)
-                if pickle_path.is_absolute():
-                    df_pickle_path = pickle_path
-                else:
-                    df_pickle_path = folder_path / pickle_name
-
-                if not df_pickle_path.exists():
-                    raise FileNotFoundError(f"Pickle file not found: {df_pickle_path}")
+            if parquet_name is not None:
+                # Handle parquet_name as either absolute path or relative to folder_path
+                p = Path(parquet_name)
+                parquet_path = p if p.is_absolute() else folder_path / parquet_name
+                if not parquet_path.exists():
+                    # Allow falling back to legacy pickle with the same stem
+                    legacy_pkl = parquet_path.with_suffix(".pkl")
+                    if not legacy_pkl.exists():
+                        raise FileNotFoundError(
+                            f"Parquet file not found: {parquet_path} (and no legacy pickle at {legacy_pkl})"
+                        )
             else:
-                pkl_files = list(folder_path.glob("*.pkl"))
-                if len(pkl_files) != 1:
+                pq_files = list(folder_path.glob("*.parquet"))
+                if len(pq_files) == 1:
+                    parquet_path = pq_files[0]
+                elif len(pq_files) == 0:
+                    # Legacy layout: fall back to a single pickle file
+                    pkl_files = list(folder_path.glob("*.pkl"))
+                    if len(pkl_files) != 1:
+                        raise ValueError(
+                            f"Expected exactly one parquet file in {folder_path}, found {len(pq_files)}"
+                        )
+                    parquet_path = pkl_files[0].with_suffix(".parquet")
+                else:
                     raise ValueError(
-                        f"Expected exactly one pickle file in {folder_path}, found {len(pkl_files)}"
+                        f"Expected exactly one parquet file in {folder_path}, found {len(pq_files)}"
                     )
-                df_pickle_path = pkl_files[0]
 
             if json_name is not None:
                 # Handle json_name as either absolute path or relative to folder_path
-                json_path = Path(json_name)
-                if json_path.is_absolute():
-                    json_path = json_path
-                else:
-                    json_path = folder_path / json_name
-
+                jp = Path(json_name)
+                json_path = jp if jp.is_absolute() else folder_path / json_name
                 if not json_path.exists():
                     raise FileNotFoundError(f"JSON file not found: {json_path}")
             else:
@@ -4350,21 +4376,19 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     )
                 json_path = json_files[0]
         else:
-            if pickle_name is None or json_name is None:
+            if parquet_name is None or json_name is None:
                 raise ValueError(
-                    "Either folder_path must be provided, or both pickle_name and json_name must be provided as absolute paths"
+                    "Either folder_path must be provided, or both parquet_name and json_name must be provided as absolute paths"
                 )
 
-            df_pickle_path = Path(pickle_name)
+            parquet_path = Path(parquet_name)
             json_path = Path(json_name)
 
-            if not df_pickle_path.exists():
-                raise FileNotFoundError(f"Pickle file not found: {df_pickle_path}")
+            if not parquet_path.exists() and not parquet_path.with_suffix(".pkl").exists():
+                raise FileNotFoundError(f"Parquet file not found: {parquet_path}")
             if not json_path.exists():
                 raise FileNotFoundError(f"JSON file not found: {json_path}")
 
-        # Prefer Parquet if available (parquet is more stable across pandas versions)
-        parquet_path = df_pickle_path.with_suffix(".parquet")
         data: pd.DataFrame
         if parquet_path.exists():
             try:
@@ -4390,17 +4414,52 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 data = table.to_pandas()
                 data = cls._decode_df_from_parquet(data, encoded_cols)
             except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as e:
+                legacy_pkl = parquet_path.with_suffix(".pkl")
+                if not legacy_pkl.exists():
+                    raise
                 logging.warning(
-                    f"Failed to load parquet WAR ({parquet_path}): {e}, falling back to pickle"
+                    f"Failed to load parquet WAR ({parquet_path}): {e}, falling back to legacy pickle"
                 )
-                with open(df_pickle_path, "rb") as f:
+                with open(legacy_pkl, "rb") as f:
                     data = pd.read_pickle(f)
         else:
-            with open(df_pickle_path, "rb") as f:
+            # Parquet missing — try the legacy pickle fallback
+            legacy_pkl = parquet_path.with_suffix(".pkl")
+            logging.warning(
+                f"Parquet WAR not found at {parquet_path}, loading legacy pickle at {legacy_pkl}"
+            )
+            with open(legacy_pkl, "rb") as f:
                 data = pd.read_pickle(f)
+
         with open(json_path, "r") as f:
             metadata = json.load(f)
         return cls(data, **metadata)
+
+    @classmethod
+    def load_pickle_and_json(cls, folder_path=None, pickle_name=None, json_name=None):
+        """Deprecated: use :meth:`load_parquet_and_json` instead.
+
+        This alias is retained so external callers don't break immediately.
+        The loader already prefers parquet over pickle; this shim maps the
+        old ``pickle_name`` argument to ``parquet_name`` (the parquet file
+        will be resolved from the same stem).
+        """
+        import warnings
+
+        warnings.warn(
+            "load_pickle_and_json is deprecated; use load_parquet_and_json instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        parquet_name = None
+        if pickle_name is not None:
+            p = Path(pickle_name)
+            parquet_name = str(p.with_suffix(".parquet"))
+        return cls.load_parquet_and_json(
+            folder_path=folder_path,
+            parquet_name=parquet_name,
+            json_name=json_name,
+        )
 
     def aggregate_time_windows(
         self, groupby: list[str] | str = ["animalday", "isday"]
