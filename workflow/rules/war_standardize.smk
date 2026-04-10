@@ -13,10 +13,10 @@ rule war_standardize:
     Standardize quality-filtered WARs: channel reordering, padding, unique hash
     """
     input:
-        war_pkl="results/wars_quality_filtered/{animal}/war.pkl",
+        war_parquet="results/wars_quality_filtered/{animal}/war.parquet",
         war_json="results/wars_quality_filtered/{animal}/war.json",
     output:
-        war_pkl="results/wars_standardized/{animal}/war.pkl",
+        war_parquet="results/wars_standardized/{animal}/war.parquet",
         war_json="results/wars_standardized/{animal}/war.json",
     threads: 1
     retries:

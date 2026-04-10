@@ -13,10 +13,10 @@ checkpoint war_fragment_filtering:
     Apply fragment filtering to standardized WARs (no channel filtering)
     """
     input:
-        war_pkl="results/wars_standardized/{animal}/war.pkl",
+        war_parquet="results/wars_standardized/{animal}/war.parquet",
         war_json="results/wars_standardized/{animal}/war.json",
     output:
-        war_pkl="results/wars_fragment_filtered/{animal}/war.pkl",
+        war_parquet="results/wars_fragment_filtered/{animal}/war.parquet",
         war_json="results/wars_fragment_filtered/{animal}/war.json",
     threads:
         config["cluster"]["war_fragment_filter"]["threads"]

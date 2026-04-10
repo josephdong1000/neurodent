@@ -12,10 +12,10 @@ checkpoint war_flattening:
     Flatten filtered WARs by aggregating time windows for each animal individually
     """
     input:
-        war_pkl="results/wars_fragment_filtered/{animal}/war.pkl",
+        war_parquet="results/wars_fragment_filtered/{animal}/war.parquet",
         war_json="results/wars_fragment_filtered/{animal}/war.json",
     output:
-        war_pkl="results/wars_flattened/{animal}/war.pkl",
+        war_parquet="results/wars_flattened/{animal}/war.parquet",
         war_json="results/wars_flattened/{animal}/war.json",
     threads: config["cluster"]["war_flattening"]["threads"]
     retries:
@@ -39,10 +39,10 @@ rule war_flattening_manual:
     Flatten manually channel-filtered WARs by aggregating time windows
     """
     input:
-        war_pkl="results/wars_channel_filtered_manual/{animal}/war.pkl",
+        war_parquet="results/wars_channel_filtered_manual/{animal}/war.parquet",
         war_json="results/wars_channel_filtered_manual/{animal}/war.json",
     output:
-        war_pkl="results/wars_flattened_manual/{animal}/war.pkl",
+        war_parquet="results/wars_flattened_manual/{animal}/war.parquet",
         war_json="results/wars_flattened_manual/{animal}/war.json",
     threads: config["cluster"]["war_flattening"]["threads"]
     retries:
@@ -66,10 +66,10 @@ rule war_flattening_lof:
     Flatten LOF channel-filtered WARs by aggregating time windows
     """
     input:
-        war_pkl="results/wars_channel_filtered_lof/{animal}/war.pkl",
+        war_parquet="results/wars_channel_filtered_lof/{animal}/war.parquet",
         war_json="results/wars_channel_filtered_lof/{animal}/war.json",
     output:
-        war_pkl="results/wars_flattened_lof/{animal}/war.pkl",
+        war_parquet="results/wars_flattened_lof/{animal}/war.parquet",
         war_json="results/wars_flattened_lof/{animal}/war.json",
     threads: config["cluster"]["war_flattening"]["threads"]
     retries:

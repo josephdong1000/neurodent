@@ -18,7 +18,7 @@ rule war_generation:
     4. Saves both WAR and FDSAR results
     """
     output:
-        war_pkl="results/wars/{animal}/war.pkl",
+        war_parquet="results/wars/{animal}/war.parquet",
         war_json="results/wars/{animal}/war.json",
         fdsar_dir=directory("results/fdsars/{animal}"),
     params:

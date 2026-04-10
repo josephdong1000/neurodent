@@ -12,10 +12,10 @@ rule war_channel_filtering_manual:
     Apply manual bad channel filtering using config/samples.json bad channel lists
     """
     input:
-        war_pkl="results/wars_fragment_filtered/{animal}/war.pkl",
+        war_parquet="results/wars_fragment_filtered/{animal}/war.parquet",
         war_json="results/wars_fragment_filtered/{animal}/war.json",
     output:
-        war_pkl="results/wars_channel_filtered_manual/{animal}/war.pkl",
+        war_parquet="results/wars_channel_filtered_manual/{animal}/war.parquet",
         war_json="results/wars_channel_filtered_manual/{animal}/war.json",
     threads: 1
     retries:
@@ -42,10 +42,10 @@ rule war_channel_filtering_lof:
     Apply LOF-based bad channel filtering using pre-computed LOF scores
     """
     input:
-        war_pkl="results/wars_fragment_filtered/{animal}/war.pkl",
+        war_parquet="results/wars_fragment_filtered/{animal}/war.parquet",
         war_json="results/wars_fragment_filtered/{animal}/war.json",
     output:
-        war_pkl="results/wars_channel_filtered_lof/{animal}/war.pkl",
+        war_parquet="results/wars_channel_filtered_lof/{animal}/war.parquet",
         war_json="results/wars_channel_filtered_lof/{animal}/war.json",
     threads: 1
     retries:

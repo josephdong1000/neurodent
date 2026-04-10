@@ -8,7 +8,7 @@ This script is a refactored version of the pipeline-war-* scripts,
 designed to work with the Snakemake workflow.
 
 Input: Raw EEG data files
-Output: WAR pickle and JSON files
+Output: WAR parquet and JSON files
 """
 
 import warnings
@@ -265,7 +265,7 @@ def main():
     war, fdsar_list = generate_war_for_animal(samples_config, config, animal_folder, animal_id, channel_subset, logger)
 
     # Save WAR (now includes nspike/lognspike features)
-    war.save_pickle_and_json(Path(snakemake.output.war_pkl).parent, filename="war", slugify_filename=False)
+    war.save_parquet_and_json(Path(snakemake.output.war_parquet).parent, filename="war", slugify_filename=False)
     logger.info(f"Successfully saved WAR for {animal_folder} {animal_id}")
     del war  # Free WAR DataFrame before FDSAR saves
 
@@ -294,7 +294,7 @@ if __name__ == "__main__":
     # Optional memray memory profiling (context manager wraps main)
     if memray_enabled:
         import memray
-        memray_path = Path(snakemake.output.war_pkl).parent / "memray.bin"
+        memray_path = Path(snakemake.output.war_parquet).parent / "memray.bin"
         tracker_ctx = memray.Tracker(
             destination=memray.FileDestination(str(memray_path), overwrite=True)
         )
@@ -309,7 +309,7 @@ if __name__ == "__main__":
             profiler.enable()
             main()
             profiler.disable()
-            prof_path = Path(snakemake.output.war_pkl).parent / "profile.prof"
+            prof_path = Path(snakemake.output.war_parquet).parent / "profile.prof"
             profiler.dump_stats(str(prof_path))
             print(f"Profile saved to {prof_path}")
             print(f"Analyze with: python -m snakeviz {prof_path}")
