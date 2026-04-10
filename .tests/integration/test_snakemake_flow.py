@@ -187,7 +187,7 @@ class TestSnakemakePipelineRun:
         """Remove output directories created by the test.
 
         The ``war_generation`` rule outputs three artifacts that all need cleanup:
-        - ``results/wars/{animal}/``    — WAR pickle + JSON
+        - ``results/wars/{animal}/``    — WAR parquet + JSON
         - ``results/fdsars/{animal}/``  — FDSAR spike detection directory
         - ``logs/war_generation/``      — Snakemake job logs
         """
@@ -199,14 +199,14 @@ class TestSnakemakePipelineRun:
             shutil.rmtree(_REPO_ROOT / subdir, ignore_errors=True)
 
     def test_war_generation_produces_outputs(self):
-        """``war_generation`` runs to completion and produces WAR ``.pkl`` and ``.json``."""
-        war_pkl = _REPO_ROOT / f"results/wars/{self.ANIMAL}/war.pkl"
+        """``war_generation`` runs to completion and produces WAR ``.parquet`` and ``.json``."""
+        war_parquet = _REPO_ROOT / f"results/wars/{self.ANIMAL}/war.parquet"
         war_json = _REPO_ROOT / f"results/wars/{self.ANIMAL}/war.json"
 
         self._cleanup()
         try:
             result = self._run_snakemake(
-                [f"results/wars/{self.ANIMAL}/war.pkl"],
+                [f"results/wars/{self.ANIMAL}/war.parquet"],
                 extra_args=["--forcerun", "war_generation"],
             )
             assert result.returncode == 0, (
@@ -215,21 +215,26 @@ class TestSnakemakePipelineRun:
                 f"stdout:\n{result.stdout}\n"
                 f"stderr:\n{result.stderr}"
             )
-            assert war_pkl.exists(), f"Expected WAR pickle not created: {war_pkl}"
+            assert war_parquet.exists(), f"Expected WAR parquet not created: {war_parquet}"
             assert war_json.exists(), f"Expected WAR JSON not created: {war_json}"
+            # Pickle should no longer be produced
+            war_pkl = _REPO_ROOT / f"results/wars/{self.ANIMAL}/war.pkl"
+            assert not war_pkl.exists(), (
+                f"Pickle file should no longer be produced: {war_pkl}"
+            )
         finally:
             self._cleanup()
 
     def test_war_generation_with_memray(self):
         """``war_generation`` with NEURODENT_MEMRAY=1 produces ``memray.bin`` alongside WAR outputs."""
-        war_pkl = _REPO_ROOT / f"results/wars/{self.ANIMAL}/war.pkl"
+        war_parquet = _REPO_ROOT / f"results/wars/{self.ANIMAL}/war.parquet"
         war_json = _REPO_ROOT / f"results/wars/{self.ANIMAL}/war.json"
         memray_bin = _REPO_ROOT / f"results/wars/{self.ANIMAL}/memray.bin"
 
         self._cleanup()
         try:
             result = self._run_snakemake(
-                [f"results/wars/{self.ANIMAL}/war.pkl"],
+                [f"results/wars/{self.ANIMAL}/war.parquet"],
                 extra_args=["--forcerun", "war_generation"],
                 extra_env={"NEURODENT_MEMRAY": "1"},
             )
@@ -240,7 +245,7 @@ class TestSnakemakePipelineRun:
                 f"stderr:\n{result.stderr}"
             )
             # WAR outputs still produced
-            assert war_pkl.exists(), f"Expected WAR pickle not created: {war_pkl}"
+            assert war_parquet.exists(), f"Expected WAR parquet not created: {war_parquet}"
             assert war_json.exists(), f"Expected WAR JSON not created: {war_json}"
             # memray.bin produced and non-empty
             assert memray_bin.exists(), f"Expected memray.bin not created: {memray_bin}"
