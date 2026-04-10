@@ -209,9 +209,9 @@ analysis:
 cluster:
   war_generation:
     time: "6h"
-    mem_mb: 70_000
+    mem_mb: 50_000
     nodes: 1
-    threads: 10
+    threads: 4
     interface: null
     retries: 2
 

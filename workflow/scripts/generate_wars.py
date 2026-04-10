@@ -57,6 +57,8 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
     try:
         with (
             LocalCluster(
+                n_workers=snakemake.threads,
+                threads_per_worker=1,
                 interface=config["cluster"]["war_generation"]["interface"],
             ) as cluster,
             Client(cluster) as client,
