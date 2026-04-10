@@ -79,6 +79,6 @@ Claude Opus 4.6 via GitHub Copilot and Claude Code was used to assist with code 
 
 # Acknowledgements
 
-We acknowledge contributions from Jessica Lahr and Ananya Madhira.  This project benefited from insights and best practices described in Peter K. G. Williams’s *One Good Tutorial*. This work was supported by the Eunice Kennedy Shriver National Institute of Child Health and Human Development (NICHD), National Institutes of Health [P50HD105354]; and by generous donations toward the Marsh Refractory Epilepsy Foundation.
+We acknowledge contributions from Jessica Lahr and Ananya Madhira.  This project benefited from insights and best practices described in Peter K. G. Williams’s *One Good Tutorial*. This work was supported by the Eunice Kennedy Shriver National Institute of Child Health and Human Development (NICHD), National Institutes of Health [P50HD105354]; and by generous donations toward the Marsh Refractory Epilepsy Research Program.
 
 # References
