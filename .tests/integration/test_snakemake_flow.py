@@ -128,12 +128,16 @@ class TestSnakemakePipelineRun:
     ``.tests/integration/data/``.  They verify that the pipeline runs to
     completion and produces the expected output artifacts.
 
-    Only the ``war_generation`` rule is exercised so that the test stays fast
-    while still covering the most critical data-loading and analysis path.
+    Tests range from a narrow ``war_generation``-only smoke test (for fast
+    feedback on the most critical data-loading and analysis path) up to the
+    authoritative ``test_full_pipeline_all_target`` which runs every rule
+    wired into the default ``all`` target.
     """
 
-    # Animal slug produced by Django's slugify("A10") → "a10"
+    # Animal slugs produced by Django's slugify() on the mini_real sample IDs.
+    # A10 → "a10", F22 → "f22"
     ANIMAL = "a10"
+    ANIMALS = ("a10", "f22")
     DATASET = "mini_real"
 
     @classmethod
@@ -165,7 +169,8 @@ class TestSnakemakePipelineRun:
         ]
         if extra_args:
             cmd.extend(extra_args)
-        cmd.extend(["--"] + targets)
+        if targets:
+            cmd.extend(["--"] + targets)
 
         env = {
             **os.environ,
@@ -184,24 +189,69 @@ class TestSnakemakePipelineRun:
         )
 
     def _cleanup(self) -> None:
-        """Remove output directories created by the test.
+        """Remove output directories created by the pipeline tests.
 
-        The ``war_generation`` rule outputs three artifacts that all need cleanup:
-        - ``results/wars/{animal}/``    — WAR parquet + JSON
-        - ``results/fdsars/{animal}/``  — FDSAR spike detection directory
-        - ``logs/war_generation/``      — Snakemake job logs
+        This is a superset that wipes every per-animal and experiment-level
+        results/logs directory the full Snakemake DAG can produce, so it's
+        safe to call from both the narrower ``test_war_generation_*`` /
+        ``test_downstream_chain_*`` tests and from the full-pipeline test.
         """
-        for subdir in (
-            f"results/wars/{self.ANIMAL}",
-            f"results/fdsars/{self.ANIMAL}",
-            f"results/wars_quality_filtered/{self.ANIMAL}",
-            f"results/wars_standardized/{self.ANIMAL}",
-            f"results/wars_fragment_filtered/{self.ANIMAL}",
+        # Per-animal results directories (one per animal slug).
+        per_animal_results = (
+            "results/wars",
+            "results/fdsars",
+            "results/wars_quality_filtered",
+            "results/wars_standardized",
+            "results/wars_fragment_filtered",
+            "results/wars_channel_filtered_manual",
+            "results/wars_channel_filtered_lof",
+            "results/wars_flattened",
+            "results/wars_flattened_manual",
+            "results/wars_flattened_lof",
+            "results/fdsar_diagnostics",
+            "results/diagnostic_figures_unfiltered",
+            "results/diagnostic_figures_filtered",
+        )
+        for base in per_animal_results:
+            for animal in self.ANIMALS:
+                shutil.rmtree(_REPO_ROOT / base / animal, ignore_errors=True)
+
+        # Experiment-level results directories (one per run, not per-animal).
+        experiment_level_results = (
+            "results/wars_zeitgeber",
+            "results/zeitgeber_plots",
+            "results/relfreq_plots",
+            "results/ep_figures",
+            "results/ep_heatmaps",
+            "results/lof_evaluation",
+            "results/filtering_comparison_plots",
+        )
+        for subdir in experiment_level_results:
+            shutil.rmtree(_REPO_ROOT / subdir, ignore_errors=True)
+
+        # Per-rule log directories.
+        log_dirs = (
             "logs/war_generation",
             "logs/war_quality_filter",
             "logs/war_standardize",
             "logs/war_fragment_filtering",
-        ):
+            "logs/war_channel_filtering_manual",
+            "logs/war_channel_filtering_lof",
+            "logs/war_flattening",
+            "logs/war_flattening_manual",
+            "logs/war_flattening_lof",
+            "logs/fdsar_diagnostics",
+            "logs/diagnostic_figures_unfiltered",
+            "logs/diagnostic_figures_filtered",
+            "logs/war_zeitgeber",
+            "logs/zeitgeber_plots",
+            "logs/war_relfreq_plots",
+            "logs/ep_figures",
+            "logs/ep_heatmaps",
+            "logs/lof_evaluation",
+            "logs/filtering_comparison",
+        )
+        for subdir in log_dirs:
             shutil.rmtree(_REPO_ROOT / subdir, ignore_errors=True)
 
     def test_war_generation_produces_outputs(self):
@@ -317,5 +367,69 @@ class TestSnakemakePipelineRun:
                 assert not (stage_dir / "war.pkl").exists(), (
                     f"Stage '{stage_name}' should not produce war.pkl at {stage_dir}"
                 )
+        finally:
+            self._cleanup()
+
+    def test_full_pipeline_all_target(self):
+        """Run the default ``all`` target end-to-end on mini_real.
+
+        Exercises every rule currently wired into ``workflow/Snakefile``:
+        ``war_generation``, ``fdsar_diagnostics``, ``war_quality_filter``,
+        ``war_standardize``, ``war_fragment_filtering``,
+        ``war_channel_filtering_{manual,lof}``,
+        ``diagnostic_figures_{unfiltered,filtered}``,
+        ``war_flattening{,_manual,_lof}``, ``war_zeitgeber``,
+        ``zeitgeber_plots``, ``war_relfreq_plots``, ``ep_figures``,
+        ``ep_heatmaps``, ``lof_evaluation``, ``filtering_comparison``.
+
+        Snakemake itself enforces that every output declared on ``rule all``
+        was produced — a zero return code from snakemake IS the assertion
+        that every rule ran successfully. Any future rename, input-wiring
+        break, or script import regression that affects any downstream rule
+        will fail here immediately.
+
+        This is the authoritative full-DAG coverage test. It is expensive
+        (full pipeline over two animals) so it is gated by
+        ``@pytest.mark.slow`` and should be run before merging pipeline
+        changes.
+        """
+        self._cleanup()
+        try:
+            result = self._run_snakemake(
+                targets=[],
+                extra_args=["--forcerun", "war_generation"],
+                timeout=1800,  # 30 min headroom; real wall-clock should be < 5 min
+            )
+            assert result.returncode == 0, (
+                f"Full-pipeline 'all' target failed for '{self.DATASET}' dataset.\n"
+                f"stdout:\n{result.stdout}\n"
+                f"stderr:\n{result.stderr}"
+            )
+
+            # Pickle-regression guard: the parquet migration removed all
+            # ``war.pkl`` writes, so no rule should ever produce one again.
+            # Scope to the mini_real animals we just (re)generated so that
+            # stale pickles from unrelated datasets in the same working tree
+            # don't trip the assertion.
+            war_bases = (
+                "results/wars",
+                "results/wars_quality_filtered",
+                "results/wars_standardized",
+                "results/wars_fragment_filtered",
+                "results/wars_channel_filtered_manual",
+                "results/wars_channel_filtered_lof",
+                "results/wars_flattened",
+                "results/wars_flattened_manual",
+                "results/wars_flattened_lof",
+            )
+            pkl_files = [
+                _REPO_ROOT / base / animal / "war.pkl"
+                for base in war_bases
+                for animal in self.ANIMALS
+                if (_REPO_ROOT / base / animal / "war.pkl").exists()
+            ]
+            assert not pkl_files, (
+                f"Legacy war.pkl files produced by the pipeline: {pkl_files}"
+            )
         finally:
             self._cleanup()
