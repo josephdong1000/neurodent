@@ -4369,12 +4369,18 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 if not json_path.exists():
                     raise FileNotFoundError(f"JSON file not found: {json_path}")
             else:
-                json_files = list(folder_path.glob("*.json"))
-                if len(json_files) != 1:
-                    raise ValueError(
-                        f"Expected exactly one json file in {folder_path}, found {len(json_files)}"
-                    )
-                json_path = json_files[0]
+                # Prefer the JSON file that shares the parquet stem
+                # (e.g. war.parquet → war.json).  This avoids false
+                # positives from legacy sidecar files such as
+                # *.parquet.meta.json that may coexist in the folder.
+                json_path = parquet_path.with_suffix(".json")
+                if not json_path.exists():
+                    json_files = list(folder_path.glob("*.json"))
+                    if len(json_files) != 1:
+                        raise ValueError(
+                            f"Expected exactly one json file in {folder_path}, found {len(json_files)}"
+                        )
+                    json_path = json_files[0]
         else:
             if parquet_name is None or json_name is None:
                 raise ValueError(

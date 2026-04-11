@@ -64,7 +64,7 @@ class FrequencyDomainSpikeDetector:
     def detect_spikes_recording(
         recording: "si.BaseRecording",
         detection_params: dict = None,
-        chunk_duration_s: float = 3600,
+        chunk_duration_s: float | None = 3600,
         multiprocess_mode: Literal["dask", "serial"] = "serial",
     ) -> list[np.ndarray]:
         """
