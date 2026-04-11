@@ -194,7 +194,13 @@ class TestSnakemakePipelineRun:
         for subdir in (
             f"results/wars/{self.ANIMAL}",
             f"results/fdsars/{self.ANIMAL}",
+            f"results/wars_quality_filtered/{self.ANIMAL}",
+            f"results/wars_standardized/{self.ANIMAL}",
+            f"results/wars_fragment_filtered/{self.ANIMAL}",
             "logs/war_generation",
+            "logs/war_quality_filter",
+            "logs/war_standardize",
+            "logs/war_fragment_filtering",
         ):
             shutil.rmtree(_REPO_ROOT / subdir, ignore_errors=True)
 
@@ -254,4 +260,62 @@ class TestSnakemakePipelineRun:
             # Also clean up memray.bin
             if memray_bin.exists():
                 memray_bin.unlink()
+            self._cleanup()
+
+    def test_downstream_chain_produces_outputs(self):
+        """Exercise the WAR post-generation chain end-to-end.
+
+        Runs ``war_generation`` → ``war_quality_filter`` (checkpoint) →
+        ``war_standardize`` → ``war_fragment_filtering`` (checkpoint) and
+        asserts that each stage produces the expected ``war.parquet`` +
+        ``war.json`` artifacts and never produces a legacy ``war.pkl``.
+
+        This is the guard that would have caught the orphaned-parquet bug:
+        if any downstream rule reverts to declaring ``war.pkl`` as its
+        tracked output, the missing-file assertions will fire.
+        """
+        stage_dirs = {
+            "quality_filtered": _REPO_ROOT / f"results/wars_quality_filtered/{self.ANIMAL}",
+            "standardized": _REPO_ROOT / f"results/wars_standardized/{self.ANIMAL}",
+            "fragment_filtered": _REPO_ROOT / f"results/wars_fragment_filtered/{self.ANIMAL}",
+        }
+        fragment_parquet = stage_dirs["fragment_filtered"] / "war.parquet"
+        fragment_json = stage_dirs["fragment_filtered"] / "war.json"
+
+        self._cleanup()
+        try:
+            result = self._run_snakemake(
+                [f"results/wars_fragment_filtered/{self.ANIMAL}/war.parquet"],
+                extra_args=["--forcerun", "war_generation"],
+            )
+            assert result.returncode == 0, (
+                f"Snakemake downstream chain run failed for '{self.DATASET}' dataset, "
+                f"animal '{self.ANIMAL}'.\n"
+                f"stdout:\n{result.stdout}\n"
+                f"stderr:\n{result.stderr}"
+            )
+
+            # Final output: fragment-filtered WAR
+            assert fragment_parquet.exists(), (
+                f"Expected fragment-filtered WAR parquet not created: {fragment_parquet}"
+            )
+            assert fragment_json.exists(), (
+                f"Expected fragment-filtered WAR JSON not created: {fragment_json}"
+            )
+
+            # Every intermediate stage must produce parquet + json, never pkl.
+            for stage_name, stage_dir in stage_dirs.items():
+                assert stage_dir.exists(), (
+                    f"Stage '{stage_name}' directory missing: {stage_dir}"
+                )
+                assert (stage_dir / "war.parquet").exists(), (
+                    f"Stage '{stage_name}' missing war.parquet at {stage_dir}"
+                )
+                assert (stage_dir / "war.json").exists(), (
+                    f"Stage '{stage_name}' missing war.json at {stage_dir}"
+                )
+                assert not (stage_dir / "war.pkl").exists(), (
+                    f"Stage '{stage_name}' should not produce war.pkl at {stage_dir}"
+                )
+        finally:
             self._cleanup()

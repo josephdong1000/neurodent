@@ -54,7 +54,7 @@ def _load_war_for_zeitgeber(war_path_info):
 
     Args:
         war_path_info (tuple): Tuple containing:
-            - war_pkl_path (Path): Path to the WAR pickle file.
+            - war_parquet_path (Path): Path to the WAR parquet file.
             - war_json_path (Path): Path to the WAR JSON metadata file.
             - features_to_extract (list[str]): List of features to extract.
             - animal_name (str): Identifier for the animal.
@@ -64,14 +64,14 @@ def _load_war_for_zeitgeber(war_path_info):
         pd.DataFrame: DataFrame containing channel-averaged features and animal identifier.
                       The DataFrame will have columns for each extracted feature and an 'animal' column.
     """
-    war_pkl_path, war_json_path, features_to_extract, animal_name, pipeline_config = war_path_info
+    war_parquet_path, war_json_path, features_to_extract, animal_name, pipeline_config = war_path_info
 
     try:
         logger.info(f"Loading {animal_name}")
 
-        war = visualization.WindowAnalysisResult.load_pickle_and_json(
-            folder_path=war_pkl_path.parent,
-            pickle_name=war_pkl_path.name,
+        war = visualization.WindowAnalysisResult.load_parquet_and_json(
+            folder_path=war_parquet_path.parent,
+            parquet_name=war_parquet_path.name,
             json_name=war_json_path.name,
         )
         

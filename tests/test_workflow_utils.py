@@ -56,39 +56,39 @@ class TestLoadWars:
         mock_war.animal_id = "test_animal"
 
         with patch("neurodent.visualization.WindowAnalysisResult") as mock_war_class:
-            mock_war_class.load_pickle_and_json.return_value = mock_war
+            mock_war_class.load_parquet_and_json.return_value = mock_war
 
-            pkl_paths = [tmp_path / "war1.pkl", tmp_path / "war2.pkl"]
+            parquet_paths = [tmp_path / "war1.parquet", tmp_path / "war2.parquet"]
             json_paths = [tmp_path / "war1.json", tmp_path / "war2.json"]
 
-            result = load_wars(pkl_paths, json_paths)
+            result = load_wars(parquet_paths, json_paths)
 
             assert len(result) == 2
-            assert mock_war_class.load_pickle_and_json.call_count == 2
+            assert mock_war_class.load_parquet_and_json.call_count == 2
 
     def test_load_wars_auto_json_paths(self, tmp_path):
         """Test loading WARs with auto-detected json paths."""
         mock_war = MagicMock()
 
         with patch("neurodent.visualization.WindowAnalysisResult") as mock_war_class:
-            mock_war_class.load_pickle_and_json.return_value = mock_war
+            mock_war_class.load_parquet_and_json.return_value = mock_war
 
-            pkl_paths = [tmp_path / "animal1" / "war.pkl"]
+            parquet_paths = [tmp_path / "animal1" / "war.parquet"]
 
-            result = load_wars(pkl_paths)
+            result = load_wars(parquet_paths)
 
             assert len(result) == 1
             # Verify it auto-derived the json path
-            call_args = mock_war_class.load_pickle_and_json.call_args
+            call_args = mock_war_class.load_parquet_and_json.call_args
             assert call_args.kwargs["json_name"] == "war.json"
 
     def test_load_wars_mismatched_lengths(self, tmp_path):
         """Test that mismatched path lengths raise ValueError."""
-        pkl_paths = [tmp_path / "war1.pkl", tmp_path / "war2.pkl"]
+        parquet_paths = [tmp_path / "war1.parquet", tmp_path / "war2.parquet"]
         json_paths = [tmp_path / "war1.json"]  # Only one json path
 
         with pytest.raises(ValueError, match="must have the same length"):
-            load_wars(pkl_paths, json_paths)
+            load_wars(parquet_paths, json_paths)
 
     def test_load_wars_empty_list(self):
         """Test that empty list raises RuntimeError."""

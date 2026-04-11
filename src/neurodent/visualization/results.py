@@ -2812,7 +2812,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 - All feature values are scalars (float)
 
         Example:
-            >>> war = WindowAnalysisResult.load_pickle_and_json(folder_path, "war.pkl", "war_metadata.json")
+            >>> war = WindowAnalysisResult.load_parquet_and_json(folder_path, "war.parquet", "war_metadata.json")
             >>> # Get channel-averaged zeitgeber features
             >>> df = war.get_channel_averaged_result(["logpsdband", "zcohere", "logrms"])
             >>> print(df.columns)

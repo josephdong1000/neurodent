@@ -52,11 +52,13 @@ def evaluate_lof_accuracy_across_animals(
         all_y_true = []
         all_y_pred = []
 
-        for animal_name, (pkl_file, json_file) in flattened_wars.items():
+        for animal_name, (parquet_file, json_file) in flattened_wars.items():
             try:
                 # Load the flattened WAR
-                war = visualization.WindowAnalysisResult.load_pickle_and_json(
-                    folder_path=Path(pkl_file).parent, pickle_name=Path(pkl_file).name, json_name=Path(json_file).name
+                war = visualization.WindowAnalysisResult.load_parquet_and_json(
+                    folder_path=Path(parquet_file).parent,
+                    parquet_name=Path(parquet_file).name,
+                    json_name=Path(json_file).name,
                 )
 
                 # Get animal folder and ID
@@ -202,7 +204,7 @@ def create_lof_channel_barplot(
     """Create LOF scores vs channels barplot with individual animal bars
 
     Args:
-        flattened_wars: Dictionary mapping animal names to (pkl_file, json_file) tuples
+        flattened_wars: Dictionary mapping animal names to (parquet_file, json_file) tuples
         animal_folder_map: Mapping from animal names to folder names
         animal_id_map: Mapping from animal names to IDs
         evaluation_channels: List of channel abbreviations to include
@@ -214,11 +216,13 @@ def create_lof_channel_barplot(
     animal_channel_data = []  # List of (animal_name, channel_scores_dict)
     animals_processed = 0
 
-    for animal_name, (pkl_file, json_file) in flattened_wars.items():
+    for animal_name, (parquet_file, json_file) in flattened_wars.items():
         try:
             # Load the flattened WAR
-            war = visualization.WindowAnalysisResult.load_pickle_and_json(
-                folder_path=Path(pkl_file).parent, pickle_name=Path(pkl_file).name, json_name=Path(json_file).name
+            war = visualization.WindowAnalysisResult.load_parquet_and_json(
+                folder_path=Path(parquet_file).parent,
+                parquet_name=Path(parquet_file).name,
+                json_name=Path(json_file).name,
             )
 
             # Check if LOF scores are available
@@ -337,7 +341,7 @@ def main():
 
     setup_snakemake_logging(snakemake)
 
-    war_pkl_files = snakemake.input.war_pkls
+    war_parquet_files = snakemake.input.war_parquets
     war_json_files = snakemake.input.war_jsons
     samples_config = snakemake.params.samples_config
     config = snakemake.params.config
@@ -366,14 +370,14 @@ def main():
         f"Threshold range: {threshold_range['min']:.1f} to {threshold_range['max']:.1f}, step {threshold_range['step']:.1f}"
     )
     logging.info(f"Evaluation channels: {evaluation_channels}")
-    logging.info(f"Number of animals: {len(war_pkl_files)}")
+    logging.info(f"Number of animals: {len(war_parquet_files)}")
 
-    # Create mapping from paired pkl/json files to animal names
+    # Create mapping from paired parquet/json files to animal names
     flattened_wars = {}
-    for pkl_file, json_file in zip(war_pkl_files, war_json_files):
-        # Extract animal name from path: results/wars_flattened/{animal}/war.pkl
-        animal_name = Path(pkl_file).parent.name
-        flattened_wars[animal_name] = (pkl_file, json_file)
+    for parquet_file, json_file in zip(war_parquet_files, war_json_files):
+        # Extract animal name from path: results/wars_flattened/{animal}/war.parquet
+        animal_name = Path(parquet_file).parent.name
+        flattened_wars[animal_name] = (parquet_file, json_file)
 
     try:
         # Evaluate LOF accuracy across all thresholds and animals

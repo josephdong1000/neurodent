@@ -32,8 +32,8 @@ def load_wars_from_paths(war_paths, label):
     for path in war_paths:
         try:
             war_dir = Path(path).parent
-            war = visualization.WindowAnalysisResult.load_pickle_and_json(
-                folder_path=war_dir, pickle_name="war.pkl", json_name="war.json"
+            war = visualization.WindowAnalysisResult.load_parquet_and_json(
+                folder_path=war_dir, parquet_name="war.parquet", json_name="war.json"
             )
             war.add_unique_hash()
 

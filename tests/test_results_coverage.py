@@ -570,37 +570,37 @@ class TestEvaluateLOFThreshold:
 
 
 # =========================================================================
-# 18. load_pickle_and_json (lines 4076, 4090, 4092)
+# 18. load_parquet_and_json
 # =========================================================================
 
-class TestLoadPickleAndJson:
+class TestLoadParquetAndJson:
 
     def test_multiple_json_files_raises(self, tmp_path):
-        """Line 4076: multiple json files raises ValueError."""
-        (tmp_path / "data.pkl").write_bytes(b"")
+        """Multiple json files raises ValueError."""
+        (tmp_path / "data.parquet").write_bytes(b"")
         (tmp_path / "a.json").write_text("{}")
         (tmp_path / "b.json").write_text("{}")
         with pytest.raises(ValueError, match="Expected exactly one json"):
-            WindowAnalysisResult.load_pickle_and_json(folder_path=tmp_path)
+            WindowAnalysisResult.load_parquet_and_json(folder_path=tmp_path)
 
-    def test_missing_pickle_raises(self, tmp_path):
-        """Line 4090: missing pickle file raises FileNotFoundError."""
-        fake_pkl = tmp_path / "nonexistent.pkl"
+    def test_missing_parquet_raises(self, tmp_path):
+        """Missing parquet file raises FileNotFoundError."""
+        fake_parquet = tmp_path / "nonexistent.parquet"
         fake_json = tmp_path / "meta.json"
         fake_json.write_text("{}")
-        with pytest.raises(FileNotFoundError, match="Pickle file not found"):
-            WindowAnalysisResult.load_pickle_and_json(
-                pickle_name=str(fake_pkl), json_name=str(fake_json)
+        with pytest.raises(FileNotFoundError, match="Parquet file not found"):
+            WindowAnalysisResult.load_parquet_and_json(
+                parquet_name=str(fake_parquet), json_name=str(fake_json)
             )
 
     def test_missing_json_raises(self, tmp_path):
-        """Line 4092: missing json file raises FileNotFoundError."""
-        fake_pkl = tmp_path / "data.pkl"
-        fake_pkl.write_bytes(b"")
+        """Missing json file raises FileNotFoundError."""
+        fake_parquet = tmp_path / "data.parquet"
+        fake_parquet.write_bytes(b"")
         fake_json = tmp_path / "nonexistent.json"
         with pytest.raises(FileNotFoundError, match="JSON file not found"):
-            WindowAnalysisResult.load_pickle_and_json(
-                pickle_name=str(fake_pkl), json_name=str(fake_json)
+            WindowAnalysisResult.load_parquet_and_json(
+                parquet_name=str(fake_parquet), json_name=str(fake_json)
             )
 
 
@@ -613,11 +613,10 @@ class TestParquetLoading:
     def test_legacy_sidecar_metadata(self, tmp_path):
         """Lines 4110-4116: legacy .meta.json sidecar fallback."""
         war = make_war()
-        war.save_pickle_and_json(tmp_path, filename="test")
+        war.save_parquet_and_json(tmp_path, filename="test")
 
         parquet_path = tmp_path / "test.parquet"
-        json_path = tmp_path / "test.json"
-        assert parquet_path.exists(), "Parquet file should be created by save_pickle_and_json"
+        assert parquet_path.exists(), "Parquet file should be created by save_parquet_and_json"
 
         import pyarrow.parquet as pq
         table = pq.read_table(parquet_path)
@@ -637,22 +636,25 @@ class TestParquetLoading:
         sidecar_path.write_text(json.dumps({"encoded_columns": encoded_cols}))
 
         # Specify json_name explicitly to avoid the "found 2 json" error
-        loaded = WindowAnalysisResult.load_pickle_and_json(
+        loaded = WindowAnalysisResult.load_parquet_and_json(
             folder_path=tmp_path, json_name="test.json"
         )
         assert loaded.animal_id == "A1"
 
     def test_parquet_load_failure_falls_back_to_pickle(self, tmp_path):
-        """Lines 4120-4125: parquet load failure falls back to pickle."""
+        """Parquet load failure falls back to a legacy pickle when available."""
         war = make_war()
-        war.save_pickle_and_json(tmp_path, filename="test")
+        war.save_parquet_and_json(tmp_path, filename="test")
 
         parquet_path = tmp_path / "test.parquet"
-        assert parquet_path.exists(), "Parquet file should be created by save_pickle_and_json"
+        assert parquet_path.exists(), "Parquet file should be created by save_parquet_and_json"
 
-        # Corrupt the parquet file
+        # Simulate an old on-disk WAR: write a legacy pickle alongside the JSON,
+        # then corrupt the parquet so loading has to fall through to the pickle.
+        war.result.to_pickle(tmp_path / "test.pkl")
         parquet_path.write_bytes(b"corrupted data")
-        loaded = WindowAnalysisResult.load_pickle_and_json(folder_path=tmp_path)
+
+        loaded = WindowAnalysisResult.load_parquet_and_json(folder_path=tmp_path)
         assert loaded.animal_id == "A1"
 
 
