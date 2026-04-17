@@ -1,0 +1,18 @@
+# Arx Parv Project - EDF Format
+# Note: all data files that have format _0_Selection{number} were renamed; previously, just _Selection{number}
+
+temp_directory: "/scr1/users/weiy1"
+
+samples:
+  samples_file: "config/samples_arx_parv.json"
+
+analysis:
+  war_generation:
+    pattern:
+      - "{data_root}/{animal}/{index}.EDF"
+    assume_from_number: true
+    datetimes_are_start: true
+    lro_kwargs:
+      mode: "mne"
+      extract_func: "read_raw_edf"
+      multiprocess_mode: "dask"

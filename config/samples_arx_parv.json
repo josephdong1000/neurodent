@@ -1,0 +1,223 @@
+{
+    "data_root": "/mnt/isilon/marsh_single_unit/PythonEEG Data/Arx Parv",
+    
+    "CHNAME_ALIASES": {
+        "Aud": ["E1-REF1", "E9-REF2", "E17-REF3", "E25-REF4"],
+        "Vis": ["E2-REF1", "E10-REF2", "E18-REF3", "E26-REF4"],
+        "Bar": ["E3-REF1", "E11-REF2", "E19-REF3", "E27-REF4"],
+        "Mot": ["E4-REF1", "E12-REF2", "E20-REF3", "E28-REF4"],
+        "Mot": ["E5-REF1", "E13-REF2", "E21-REF3", "E29-REF4"],
+        "Bar": ["E6-REF1", "E14-REF2", "E22-REF3", "E30-REF4"],
+        "Vis": ["E7-REF1", "E15-REF2", "E23-REF3", "E31-REF4"],
+        "Aud": ["E8-REF1", "E16-REF2", "E24-REF3", "E32-REF4"]
+    },
+
+    "LR_ALIASES": {
+        "L": ["E1-REF1", "E2-REF1", "E3-REF1", "E4-REF1", "E9-REF2", "E10-REF2", "E11-REF2", "E12-REF2", "E17-REF3", "E18-REF3", "E19-REF3", "E20-REF3", "E25-REF4", "E26-REF4", "E27-REF4", "E28-REF4"],
+        "R": ["E5-REF1", "E6-REF1", "E7-REF1", "E8-REF1", "E13-REF2", "E14-REF2", "E15-REF2", "E16-REF2", "E21-REF3", "E22-REF3", "E23-REF3", "E24-REF3", "E29-REF4", "E30-REF4", "E31-REF4", "E32-REF4"]
+    },
+
+    "bad_channels": {},
+    "bad_folder_animalday": [],
+
+    "animals": [
+        {
+            "id": "29",
+            "sex": "Unknown",
+            "gene": "Unknown",
+            "manual_datetime": "2011-06-07 16:04:14"
+        },
+        {
+            "id": "32",
+            "sex": "Unknown",
+            "gene": "Unknown",
+            "manual_datetime": "2011-06-07 16:04:14"
+        },
+        {
+            "id": "34",
+            "sex": "Unknown",
+            "gene": "Unknown",
+            "manual_datetime": "2011-06-07 16:04:14"
+        },
+        {
+            "id": "30",
+            "sex": "Unknown",
+            "gene": "Unknown",
+            "manual_datetime": "2011-05-23 18:00:06"
+        },
+        {
+            "id": "21",
+            "sex": "Unknown",
+            "gene": "Unknown",
+            "manual_datetime": "2011-05-23 18:00:06"
+        },
+        {
+            "id": "31",
+            "sex": "Unknown",
+            "gene": "Unknown",
+            "manual_datetime": "2011-05-23 18:00:06"
+        },
+        {
+            "id": "354",
+            "sex": "Male",
+            "gene": "Arx(wt);Parvcre+",
+            "manual_datetime": "2012-03-01 10:57:22"
+        },
+        {
+            "id": "356",
+            "sex": "Male",
+            "gene": "Arx(F/y);Parvcre+",
+            "manual_datetime": "2012-03-01 10:57:22"
+        },
+        {
+            "id": "357",
+            "sex": "Male",
+            "gene": "Arx(F/y);Parvcre+",
+            "manual_datetime": "2012-03-01 10:57:22"
+        },
+        {
+            "id": "387",
+            "sex": "Male",
+            "gene": "Arx(F/y);Parvcre+",
+            "manual_datetime": "2012-06-20 08:34:32"
+        },
+        {
+            "id": "388",
+            "sex": "Female",
+            "gene": "Arx(F/x);Parvcre-",
+            "manual_datetime": "2012-06-20 08:34:32"
+        },
+        {
+            "id": "390",
+            "sex": "Female",
+            "gene": "Arx(F/F);Parvcre-",
+            "manual_datetime": "2012-06-20 08:34:32"
+        },
+        {
+            "id": "400",
+            "sex": "Female",
+            "gene": "Arx(F/F);Parvcre+",
+            "manual_datetime": "2012-06-20 08:34:32"
+        },
+        {
+            "id": "393",
+            "sex": "Male",
+            "gene": "Arx(F/y);Parvcre+",
+            "manual_datetime": "2012-06-15 09:05:55"
+        },
+        {
+            "id": "399",
+            "sex": "Male",
+            "gene": "Arx(F/y);Parvcre+",
+            "manual_datetime": "2012-06-15 09:05:55"
+        },
+        {
+            "id": "385",
+            "sex": "Female",
+            "gene": "Arx(F/F);Parvcre+",
+            "manual_datetime": "2012-06-15 09:05:55"
+        },
+        {
+            "id": "395",
+            "sex": "Male",
+            "gene": "Arx(F/y);Parvcre-",
+            "manual_datetime": "2012-06-15 09:05:55"
+        },
+        {
+            "id": "432",
+            "sex": "Male",
+            "gene": "Arx(F/y);Rosa(YFP/wt);Parvcre-",
+            "manual_datetime": "2012-07-03 09:36:40"
+        },
+        {
+            "id": "435",
+            "sex": "Male",
+            "gene": "Arx(F/y);Rosa(YFP/wt);Parvcre+",
+            "manual_datetime": "2012-07-03 09:36:40"
+        },
+        {
+            "id": "438",
+            "sex": "Female",
+            "gene": "Arx(F/F);Parvcre+",
+            "manual_datetime": "2012-07-03 09:36:40"
+        },
+        {
+            "id": "439",
+            "sex": "Female",
+            "gene": "Arx(F/F);Parvcre-",
+            "manual_datetime": "2012-07-03 09:36:40"
+        },
+        {
+            "id": "440",
+            "sex": "Female",
+            "gene": "Arx(F/F);Parvcre+",
+            "manual_datetime": "2012-07-17 10:57:49"
+        },
+        {
+            "id": "443",
+            "sex": "Male",
+            "gene": "Arx(wt);Parvcre-",
+            "manual_datetime": "2012-07-17 10:57:49"
+        },
+        {
+            "id": "446",
+            "sex": "Male",
+            "gene": "Arx(F/y);Parvcre+",
+            "manual_datetime": "2012-07-17 10:57:49"
+        },
+        {
+            "id": "447",
+            "sex": "Male",
+            "gene": "Arx(F/y);Parvcre+",
+            "manual_datetime": "2012-07-17 10:57:49"
+        },
+        {
+            "id": "700",
+            "sex": "Male",
+            "gene": "Arx(F/y);Parvcre+",
+            "manual_datetime": "2014-01-15 11:15:54"
+        },
+        {
+            "id": "703",
+            "sex": "Male",
+            "gene": "Arx(F/y);Parvcre+",
+            "manual_datetime": "2014-01-15 11:15:54"
+        },
+        {
+            "id": "704",
+            "sex": "Male",
+            "gene": "Arx(F/y);Parvcre+",
+            "manual_datetime": "2014-01-15 11:15:54"
+        },
+        {
+            "id": "705",
+            "sex": "Male",
+            "gene": "Arx(F/y);Parvcre+",
+            "manual_datetime": "2014-01-15 11:15:54"
+        },
+        {
+            "id": "708",
+            "sex": "Male",
+            "gene": "Arx(F/y);Parvcre+",
+            "manual_datetime": "2014-02-25 12:20:27"
+        },
+        {
+            "id": "709",
+            "sex": "Male",
+            "gene": "Arx(F/y);Parvcre+",
+            "manual_datetime": "2014-02-25 12:20:27"
+        },
+        {
+            "id": "710",
+            "sex": "Male",
+            "gene": "Arx(F/y);Parvcre+",
+            "manual_datetime": "2014-02-25 12:20:27"
+        },
+        {
+            "id": "711",
+            "sex": "Male",
+            "gene": "Arx(F/y);Parvcre+",
+            "manual_datetime": "2014-02-25 12:20:27"
+        }
+    ]
+}
