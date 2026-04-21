@@ -71,10 +71,9 @@ def generate_plots(df, output_dir, data_dir, zt_config):
     plotter = ZeitgeberPlotter(df)
     
     # Identify feature columns (numeric columns excluding metadata)
-    metadata_cols = ['animal', 'genotype', 'sex', 'gene', 'total_minutes', 'hour', 'minute',
-                     'genotype_order', 'sex_order', 'timestamp']
-    available_features = [col for col in df.columns 
-                          if col not in metadata_cols and pd.api.types.is_numeric_dtype(df[col])]
+    available_features = [col for col in df.columns
+                          if any(col == feat or col.startswith(feat + "_") for feat in constants.FEATURES)
+                          and pd.api.types.is_numeric_dtype(df[col])]
     
     logger.info(f"Creating zeitgeber plots for {len(available_features)} features")
     

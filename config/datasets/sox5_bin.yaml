@@ -1,0 +1,18 @@
+# Sox5 Project - Binary Format
+# Dataset-specific configuration overrides
+# This file is deep-merged into the main config when active_dataset="sox5_bin"
+
+samples:
+  samples_file: "config/samples.json"
+
+analysis:
+  war_generation:
+    pattern:
+      - "{data_root}/*/*{animal}*/{session}/*-{index}_ColMajor.bin"
+      - "{data_root}/*/*{animal}*/{session}/*-{index}_Meta.csv"
+    assume_from_number: true
+    datetimes_are_start: false
+    lro_kwargs:
+      mode: "si"
+      extract_func: "tests/integration/readers.py:read_bin_csv_pair"
+      multiprocess_mode: "serial"

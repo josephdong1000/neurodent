@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "neurodent"
-version = "0.2.4"
+version = "0.3.0"
 description = "Rodent EEG analysis tools"
 readme = "README.md"
 license = "MIT"
@@ -39,7 +39,6 @@ dependencies = [
     "pyarrow",
     "statannotations",
     "statsmodels",
-    "django",
     "openpyxl",
     "appnope",
     "zarr>=2.18.3",
@@ -109,7 +108,7 @@ Repository = "https://github.com/josephdong1000/neurodent"
 where = ["src"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", ".tests"]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
@@ -123,6 +122,7 @@ markers = [
     "mne: marks tests that require MNE",
     "visualization: marks tests for visualization modules",
     "core: marks tests for core functionality",
+    "mutates_constants: test intentionally mutates neurodent.constants (e.g. via inject_config_aliases)",
 ]
 
 [tool.coverage.run]

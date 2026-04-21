@@ -30,7 +30,7 @@ def test_split_inheritance_synthetic_data():
     
     combined_rec = si.concatenate_recordings([rec1, rec2])
     
-    lro = LongRecordingOrganizer(base_folder_path=None, recording=combined_rec)
+    lro = LongRecordingOrganizer(item=None, recording=combined_rec)
     
     # 2. Manually set metadata matching the 2-file scenario
     lro.file_durations = [2.0, 3.0]
@@ -76,7 +76,7 @@ def test_analysis_pipeline_integration():
     traces = np.random.randn(5000, 2).astype(np.int16)  # 5s @ 1000Hz
     rec = si.NumpyRecording(traces, sampling_frequency=1000.0)
     
-    lro = LongRecordingOrganizer(base_folder_path=None, recording=rec)
+    lro = LongRecordingOrganizer(item=None, recording=rec)
     
     # 2. Add metadata for analysis
     lro.file_durations = [5.0]
@@ -114,7 +114,7 @@ def test_lro_merge_and_analysis_pipeline():
     # 1. Create first LRO with synthetic data
     traces1 = np.random.randn(3000, 2).astype(np.int16)  # 3s @ 1000Hz
     rec1 = si.NumpyRecording(traces1, sampling_frequency=1000.0)
-    lro1 = LongRecordingOrganizer(base_folder_path=None, recording=rec1)
+    lro1 = LongRecordingOrganizer(item=None, recording=rec1)
     
     # Set metadata for LRO1
     t0 = datetime.datetime(2023, 1, 1, 10, 0, 0)
@@ -125,7 +125,7 @@ def test_lro_merge_and_analysis_pipeline():
     # 2. Create second LRO with synthetic data
     traces2 = np.random.randn(2000, 2).astype(np.int16)  # 2s @ 1000Hz
     rec2 = si.NumpyRecording(traces2, sampling_frequency=1000.0)
-    lro2 = LongRecordingOrganizer(base_folder_path=None, recording=rec2)
+    lro2 = LongRecordingOrganizer(item=None, recording=rec2)
     
     # Set metadata for LRO2 (continues from LRO1)
     lro2.file_durations = [2.0]

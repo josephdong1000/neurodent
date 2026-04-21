@@ -1,0 +1,40 @@
+{
+    "data_root": ".tests/integration/data",
+    "animals": [
+        {
+            "id": "A10",
+            "sex": "M",
+            "gene": "WT",
+            "manual_datetime": "2025-05-10 10:00:00"
+        },
+        {
+            "id": "F22",
+            "sex": "F",
+            "gene": "KO",
+            "manual_datetime": "2025-05-10 10:00:00"
+        }
+    ],
+    "LR_ALIASES": {
+        "L": [
+            "0",
+            "1",
+            "2",
+            "3",
+            "4"
+        ],
+        "R": [
+            "5",
+            "6",
+            "7",
+            "8",
+            "9"
+        ]
+    },
+    "CHNAME_ALIASES": {
+        "Aud": ["0", "5"],
+        "Vis": ["1", "6"],
+        "Hip": ["2", "7"],
+        "Bar": ["3", "8"],
+        "Mot": ["4", "9"]
+    }
+}

@@ -21,7 +21,7 @@ def test_lro_merge_preserves_timestamps():
     end_time_2 = start_time_2 + timedelta(seconds=duration_2)
     
     # Mocking LRO 1
-    lro1 = LongRecordingOrganizer(base_folder_path=None, recording=None)
+    lro1 = LongRecordingOrganizer(item=None, recording=None)
     lro1.LongRecording = type('MockRecording', (), {
         'get_num_channels': lambda: 1, 
         'get_sampling_frequency': lambda: 1000,
@@ -34,7 +34,7 @@ def test_lro_merge_preserves_timestamps():
     lro1.labels = {}
 
     # Mocking LRO 2
-    lro2 = LongRecordingOrganizer(base_folder_path=None, recording=None)
+    lro2 = LongRecordingOrganizer(item=None, recording=None)
     lro2.LongRecording = type('MockRecording', (), {
         'get_num_channels': lambda: 1, 
         'get_sampling_frequency': lambda: 1000,
@@ -64,11 +64,11 @@ def test_lro_merge_preserves_timestamps():
 
 def test_lro_merge_timestamps_missing_attributes():
     """Test resilience when file_durations or file_end_datetimes are missing."""
-    lro1 = LongRecordingOrganizer(base_folder_path=None, recording=None)
+    lro1 = LongRecordingOrganizer(item=None, recording=None)
     lro1.meta = type('MockMeta', (), {'n_channels': 1, 'dt_end': None})()
     lro1.labels = {}
     
-    lro2 = LongRecordingOrganizer(base_folder_path=None, recording=None)
+    lro2 = LongRecordingOrganizer(item=None, recording=None)
     lro2.meta = type('MockMeta', (), {'n_channels': 1, 'dt_end': None})()
     lro2.labels = {}
     
@@ -93,13 +93,13 @@ def test_lro_merge_overlap_warning():
     start_time_2 = datetime.datetime(2023, 1, 1, 10, 9, 0)
     end_time_2 = start_time_2 + timedelta(seconds=duration_2)
     
-    lro1 = LongRecordingOrganizer(base_folder_path=None, recording=None)
+    lro1 = LongRecordingOrganizer(item=None, recording=None)
     lro1.meta = type('MockMeta', (), {'n_channels': 1})()
     lro1.labels = {}
     lro1.file_end_datetimes = [end_time_1]
     lro1.file_durations = [duration_1]
 
-    lro2 = LongRecordingOrganizer(base_folder_path=None, recording=None)
+    lro2 = LongRecordingOrganizer(item=None, recording=None)
     lro2.meta = type('MockMeta', (), {'n_channels': 1})()
     lro2.labels = {}
     lro2.file_end_datetimes = [end_time_2]

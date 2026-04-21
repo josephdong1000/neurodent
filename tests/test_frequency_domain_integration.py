@@ -20,12 +20,18 @@ except ImportError:
 
 from neurodent import visualization, core
 from neurodent.core.frequency_domain_spike_detection import FrequencyDomainSpikeDetector
-from neurodent.visualization.frequency_domain_results import FrequencyDomainSpikeAnalysisResult
+from neurodent.visualization.frequency_domain_results import (
+    FrequencyDomainSpikeAnalysisResult,
+)
 
 
-# Test data configuration (matches the pattern from pipeline script)
-TEST_DATA_BASE = Path(__file__).parent.parent / "notebooks" / "tests" / "test-data"
-TEST_ANIMALS = ["A10", "F22"] if TEST_DATA_BASE.exists() else []
+# Test data configuration
+TEST_DATA_BASE = Path(__file__).parent.parent / ".tests" / "integration" / "data"
+TEST_ANIMALS = (
+    ["A10", "F22"]
+    if (TEST_DATA_BASE / "A10" / "A10_recording.edf").exists()
+    else []
+)
 
 # Detection parameters for testing (lowered thresholds for better detection in test data)
 TEST_DETECTION_PARAMS = {
@@ -45,23 +51,31 @@ TEST_DETECTION_PARAMS = {
 class TestFrequencyDomainSpikeDetectionIntegration:
     """Integration tests using real test data."""
 
-    @pytest.fixture(params=TEST_ANIMALS)
+    @pytest.fixture(scope="class", params=TEST_ANIMALS)
     def animal_organizer(self, request):
-        """Create AnimalOrganizer for test animals."""
+        """Create AnimalOrganizer for test animals — shared across tests per animal."""
+        from datetime import datetime as dt
+        from tests.integration.readers import read_bin_csv_pair
         animal_id = request.param
 
-        # Suppress warnings for cleaner test output
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=RuntimeWarning)
             warnings.filterwarnings("ignore", category=UserWarning)
 
             ao = visualization.AnimalOrganizer(
-                TEST_DATA_BASE,
+                [
+                    str(TEST_DATA_BASE / animal_id) + "/{index}_ColMajor.bin",
+                    str(TEST_DATA_BASE / animal_id) + "/{index}_Meta.csv",
+                ],
                 animal_id,
-                mode="concat",
                 assume_from_number=True,
-                skip_days=["bad"],
-                lro_kwargs={"mode": "bin", "multiprocess_mode": "serial", "overwrite_rowbins": False},
+                lro_kwargs={
+                    "mode": "si",
+                    "extract_func": read_bin_csv_pair,
+                    "multiprocess_mode": "serial",
+                    "manual_datetimes": dt(2023, 12, 13, 12, 0, 0),
+                    "datetimes_are_start": True,
+                },
             )
 
         # Verify we have data
@@ -69,18 +83,21 @@ class TestFrequencyDomainSpikeDetectionIntegration:
 
         return ao
 
-    def test_frequency_domain_spike_detection_basic(self, animal_organizer):
-        """Test basic frequency domain spike detection on real data."""
-        # Limit processing time by using max_length
-        max_length = 30000  # ~30 seconds at 1kHz
-
+    @pytest.fixture(scope="class")
+    def fdsar_default(self, animal_organizer):
+        """Default spike detection — cached per animal, shared across tests."""
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=RuntimeWarning)
 
-            # Run frequency domain spike detection
-            fdsar_list = animal_organizer.compute_frequency_domain_spike_analysis(
-                detection_params=TEST_DETECTION_PARAMS, max_length=max_length, multiprocess_mode="serial"
+            return animal_organizer.compute_frequency_domain_spike_analysis(
+                detection_params=TEST_DETECTION_PARAMS,
+                chunk_duration_s=30.0,
+                multiprocess_mode="auto",
             )
+
+    def test_frequency_domain_spike_detection_basic(self, animal_organizer, fdsar_default):
+        """Test basic frequency domain spike detection on real data."""
+        fdsar_list = fdsar_default
 
         # Verify results structure
         assert isinstance(fdsar_list, list)
@@ -113,11 +130,19 @@ class TestFrequencyDomainSpikeDetectionIntegration:
         """Test spike detection with different parameter sets."""
         # Test with multiple parameter combinations
         param_sets = [
-            {**TEST_DETECTION_PARAMS, "freq_slices": (10.0, 20.0), "sneo_percentile": 95.0},
-            {**TEST_DETECTION_PARAMS, "freq_slices": (15.0, 25.0), "sneo_percentile": 98.0},
+            {
+                **TEST_DETECTION_PARAMS,
+                "freq_slices": (10.0, 20.0),
+                "sneo_percentile": 95.0,
+            },
+            {
+                **TEST_DETECTION_PARAMS,
+                "freq_slices": (15.0, 25.0),
+                "sneo_percentile": 98.0,
+            },
         ]
 
-        max_length = 20000  # Shorter for parameter testing
+        chunk_duration_s = 20.0  # Shorter for parameter testing
 
         results = []
         for i, params in enumerate(param_sets):
@@ -125,7 +150,9 @@ class TestFrequencyDomainSpikeDetectionIntegration:
                 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
                 fdsar_list = animal_organizer.compute_frequency_domain_spike_analysis(
-                    detection_params=params, max_length=max_length, multiprocess_mode="serial"
+                    detection_params=params,
+                    chunk_duration_s=chunk_duration_s,
+                    multiprocess_mode="auto",
                 )
 
             results.append(fdsar_list)
@@ -146,19 +173,10 @@ class TestFrequencyDomainSpikeDetectionIntegration:
         # Allow for some variation due to parameter differences
         assert spike_counts_1 >= 0 and spike_counts_2 >= 0
 
-    def test_spikeinterface_compatibility(self, animal_organizer):
+    def test_spikeinterface_compatibility(self, fdsar_default):
         """Test that results are compatible with SpikeInterface infrastructure."""
-        max_length = 15000
-
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", category=RuntimeWarning)
-
-            fdsar_list = animal_organizer.compute_frequency_domain_spike_analysis(
-                detection_params=TEST_DETECTION_PARAMS, max_length=max_length, multiprocess_mode="serial"
-            )
-
         # Test SpikeInterface compatibility
-        for fdsar in fdsar_list:
+        for fdsar in fdsar_default:
             assert fdsar.result_sas is not None
 
             for ch_idx, sa in enumerate(fdsar.result_sas):
@@ -177,18 +195,9 @@ class TestFrequencyDomainSpikeDetectionIntegration:
                     assert isinstance(spike_train, np.ndarray)
                     assert len(spike_train) >= 0
 
-    def test_mne_annotation_creation(self, animal_organizer):
+    def test_mne_annotation_creation(self, fdsar_default):
         """Test that MNE annotations are properly created."""
-        max_length = 15000
-
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", category=RuntimeWarning)
-
-            fdsar_list = animal_organizer.compute_frequency_domain_spike_analysis(
-                detection_params=TEST_DETECTION_PARAMS, max_length=max_length, multiprocess_mode="serial"
-            )
-
-        for fdsar in fdsar_list:
+        for fdsar in fdsar_default:
             raw = fdsar.result_mne
             assert raw is not None
 
@@ -196,7 +205,9 @@ class TestFrequencyDomainSpikeDetectionIntegration:
             annotations = raw.annotations
 
             # Count spike annotations
-            spike_annotations = [desc for desc in annotations.description if desc.startswith("Spike_Ch")]
+            spike_annotations = [
+                desc for desc in annotations.description if desc.startswith("Spike_Ch")
+            ]
 
             # Verify annotation structure
             if len(spike_annotations) > 0:
@@ -216,20 +227,11 @@ class TestFrequencyDomainSpikeDetectionIntegration:
             # Should match (allowing for some tolerance in case of edge effects)
             assert abs(total_from_counts - total_from_annotations) <= 2
 
-    def test_save_and_load_integration(self, animal_organizer, tmp_path):
+    def test_save_and_load_integration(self, fdsar_default, tmp_path):
         """Test saving and loading with real data."""
-        max_length = 10000
-
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", category=RuntimeWarning)
-
-            fdsar_list = animal_organizer.compute_frequency_domain_spike_analysis(
-                detection_params=TEST_DETECTION_PARAMS, max_length=max_length, multiprocess_mode="serial"
-            )
-
         # Test save/load for first result
-        if fdsar_list:
-            fdsar = fdsar_list[0]
+        if fdsar_default:
+            fdsar = fdsar_default[0]
             save_dir = tmp_path / "test_save"
 
             # Save without slugifying to match test expectations
@@ -238,13 +240,20 @@ class TestFrequencyDomainSpikeDetectionIntegration:
                 fdsar.save_fif_and_json(save_dir, slugify_filebase=False)
 
             # Verify files exist
-            assert (save_dir / f"{fdsar.animal_id}-{fdsar.genotype}-{fdsar.animal_day}.json").exists()
-            assert (save_dir / f"{fdsar.animal_id}-{fdsar.genotype}-{fdsar.animal_day}-raw.fif").exists()
+            assert (
+                save_dir / f"{fdsar.animal_id}-{fdsar.genotype}-{fdsar.animal_day}.json"
+            ).exists()
+            assert (
+                save_dir
+                / f"{fdsar.animal_id}-{fdsar.genotype}-{fdsar.animal_day}-raw.fif"
+            ).exists()
 
             # Load
             with warnings.catch_warnings():
                 warnings.filterwarnings("ignore", category=RuntimeWarning)
-                loaded_fdsar = FrequencyDomainSpikeAnalysisResult.load_fif_and_json(save_dir)
+                loaded_fdsar = FrequencyDomainSpikeAnalysisResult.load_fif_and_json(
+                    save_dir
+                )
 
             # Verify loaded data
             assert loaded_fdsar.animal_id == fdsar.animal_id
@@ -252,21 +261,12 @@ class TestFrequencyDomainSpikeDetectionIntegration:
             assert loaded_fdsar.animal_day == fdsar.animal_day
             assert loaded_fdsar.detection_params == fdsar.detection_params
 
-    def test_spike_averaged_plotting(self, animal_organizer, tmp_path):
+    def test_spike_averaged_plotting(self, fdsar_default, tmp_path):
         """Test spike-averaged trace plotting with real data."""
-        max_length = 20000
-
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", category=RuntimeWarning)
-
-            fdsar_list = animal_organizer.compute_frequency_domain_spike_analysis(
-                detection_params=TEST_DETECTION_PARAMS, max_length=max_length, multiprocess_mode="serial"
-            )
-
         # Test plotting for first result that has spikes
         plot_dir = tmp_path / "plots"
 
-        for fdsar in fdsar_list:
+        for fdsar in fdsar_default:
             spike_counts = fdsar.get_spike_counts_per_channel()
 
             if sum(spike_counts) > 0:  # Only test if spikes detected
@@ -278,7 +278,9 @@ class TestFrequencyDomainSpikeDetectionIntegration:
                     )
 
                 # Verify return values - convert dict to list for comparison
-                returned_counts_list = [returned_counts[i] for i in range(len(spike_counts))]
+                returned_counts_list = [
+                    returned_counts[i] for i in range(len(spike_counts))
+                ]
                 assert returned_counts_list == spike_counts
 
                 # Check that some files were created
@@ -294,21 +296,34 @@ class TestFrequencyDomainSpikeDetectionIntegration:
 class TestFrequencyDomainSpikeDetectorStandalone:
     """Test FrequencyDomainSpikeDetector directly with real recordings."""
 
-    @pytest.fixture(params=TEST_ANIMALS[:1])  # Test with one animal to save time
+    @pytest.fixture(scope="class", params=TEST_ANIMALS[:1])  # Test with one animal to save time
     def spikeinterface_recording(self, request):
         """Get a SpikeInterface recording from test data."""
         animal_id = request.param
 
+        try:
+            import mne
+        except ImportError:
+            mne = None
+
+        dummy_extract = lambda x, **kw: mne.io.RawArray(
+            np.random.randn(64, 10000), mne.create_info(64, 1000., "eeg")
+        ) if mne else None
+
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=RuntimeWarning)
+            warnings.filterwarnings("ignore", category=UserWarning)
 
             ao = visualization.AnimalOrganizer(
                 TEST_DATA_BASE,
                 animal_id,
-                mode="concat",
-                assume_from_number=True,
-                skip_days=["bad"],
-                lro_kwargs={"mode": "bin", "multiprocess_mode": "serial", "overwrite_rowbins": False},
+                lro_kwargs={
+                    "mode": "mne",
+                    "extract_func": dummy_extract,
+                    "multiprocess_mode": "serial",
+                    "overwrite_rowbins": False,
+                    "intermediate": "bin",
+                },
             )
 
         # Get first recording
@@ -317,16 +332,18 @@ class TestFrequencyDomainSpikeDetectorStandalone:
 
     def test_direct_spike_detection(self, spikeinterface_recording):
         """Test FrequencyDomainSpikeDetector directly on SpikeInterface recording."""
-        max_length = 15000
+        chunk_duration_s = 15.0
 
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=RuntimeWarning)
 
-            spike_indices, mne_raw = FrequencyDomainSpikeDetector.detect_spikes_recording(
-                spikeinterface_recording,
-                detection_params=TEST_DETECTION_PARAMS,
-                max_length=max_length,
-                multiprocess_mode="serial",
+            spike_indices, mne_raw = (
+                FrequencyDomainSpikeDetector.detect_spikes_recording(
+                    spikeinterface_recording,
+                    detection_params=TEST_DETECTION_PARAMS,
+                    chunk_duration_s=chunk_duration_s,
+                    multiprocess_mode="auto",
+                )
             )
 
         # Verify output structure
@@ -344,7 +361,7 @@ class TestFrequencyDomainSpikeDetectorStandalone:
 
     def test_detection_parameter_effects(self, spikeinterface_recording):
         """Test that different parameters produce different results."""
-        max_length = 10000
+        chunk_duration_s = 10.0
 
         # Test with high threshold (should detect fewer spikes)
         high_threshold_params = {**TEST_DETECTION_PARAMS, "sneo_percentile": 99.5}
@@ -358,15 +375,15 @@ class TestFrequencyDomainSpikeDetectorStandalone:
             high_spikes, _ = FrequencyDomainSpikeDetector.detect_spikes_recording(
                 spikeinterface_recording,
                 detection_params=high_threshold_params,
-                max_length=max_length,
-                multiprocess_mode="serial",
+                chunk_duration_s=chunk_duration_s,
+                multiprocess_mode="auto",
             )
 
             low_spikes, _ = FrequencyDomainSpikeDetector.detect_spikes_recording(
                 spikeinterface_recording,
                 detection_params=low_threshold_params,
-                max_length=max_length,
-                multiprocess_mode="serial",
+                chunk_duration_s=chunk_duration_s,
+                multiprocess_mode="auto",
             )
 
         # Count total spikes
@@ -376,4 +393,6 @@ class TestFrequencyDomainSpikeDetectorStandalone:
         # Lower threshold should generally detect more or equal spikes
         assert low_total >= high_total
 
-        logging.info(f"High threshold: {high_total} spikes, Low threshold: {low_total} spikes")
+        logging.info(
+            f"High threshold: {high_total} spikes, Low threshold: {low_total} spikes"
+        )

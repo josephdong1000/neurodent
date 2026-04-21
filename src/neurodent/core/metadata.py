@@ -7,6 +7,9 @@ Functions for loading and enriching animal metadata (sex, gene) from config.
 import logging
 import pandas as pd
 
+from .. import constants
+from .utils import normalize_value_from_aliases
+
 logger = logging.getLogger(__name__)
 
 
@@ -42,6 +45,21 @@ def load_animal_metadata(samples_config: dict) -> dict:
         # This preserves backward compatibility with code expecting these keys
         if "sex" not in metadata_dict[animal_id]:
             metadata_dict[animal_id]["sex"] = None
+        else:
+            # Normalize sex abbreviations to canonical form (e.g. "M" -> "Male")
+            raw_sex = metadata_dict[animal_id]["sex"]
+            if raw_sex is None:
+                pass  # Leave as None
+            else:
+                normalized = normalize_value_from_aliases(raw_sex, constants.SEX_ALIASES)
+                if normalized is None:
+                    logger.warning(
+                        f"Unrecognized sex value '{raw_sex}' for animal '{animal_id}'; "
+                        f"expected one of "
+                        f"{[a for aliases in constants.SEX_ALIASES.values() for a in aliases]}"
+                    )
+                else:
+                    metadata_dict[animal_id]["sex"] = normalized
         if "gene" not in metadata_dict[animal_id]:
             metadata_dict[animal_id]["gene"] = None
     

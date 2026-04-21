@@ -6,10 +6,11 @@ import os
 import platform
 import re
 import sys
+import unicodedata
 import warnings
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Literal, Optional, Union
+from typing import Callable, Literal, Optional, Union
 
 import dateutil.parser
 import numpy as np
@@ -421,6 +422,8 @@ def parse_path_to_animalday(
     **day_parse_kwargs,
 ):
     """
+    DEPRECATED: Use FileDiscoverer with pattern-based discovery instead.
+
     Parses the filename of a binfolder to get the animalday identifier (animal id, genotype, and day).
 
     Args:
@@ -450,6 +453,11 @@ def parse_path_to_animalday(
         ValueError: If mode is invalid or required components cannot be extracted
         TypeError: If filepath is not str or Path
     """
+    warnings.warn(
+        "parse_path_to_animalday is deprecated. Use FileDiscoverer with pattern-based discovery instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
     filepath = Path(filepath)
     match mode:
         case "nest":
@@ -501,11 +509,13 @@ def parse_str_to_genotype(string: str, strict_matching: bool = False) -> str:
         >>> parse_str_to_genotype("WT_KO_comparison", strict_matching=False)  # Uses longest match
         'WT'  # or 'KO' depending on which alias is longer
     """
-    return _get_key_from_match_values(string, constants.GENOTYPE_ALIASES, strict_matching)
+    return _get_key_from_match_values(string, constants.GENOTYPE_ALIASES, strict_matching, alias_name="GENOTYPE_ALIASES")
 
 
 def parse_str_to_animal(string: str, animal_param: tuple[int, str] | str | list[str] = (0, None)) -> str:
     """
+    DEPRECATED: Use FileDiscoverer with {animal} placeholder in pattern instead.
+
     Parses the filename of a binfolder to get the animal id.
 
     Args:
@@ -526,9 +536,9 @@ def parse_str_to_animal(string: str, animal_param: tuple[int, str] | str | list[
         'A10'
 
         # Regex pattern format
-        >>> parse_str_to_animal("WT_A10_2023-01-01_data.bin", r"A\\d+")
+        >>> parse_str_to_animal("WT_A10_2023-01-01_data.bin", r"A\\\\d+")
         'A10'
-        >>> parse_str_to_animal("subject_123_data.bin", r"\\d+")
+        >>> parse_str_to_animal("subject_123_data.bin", r"\\\\d+")
         '123'
 
         # List format: possible IDs to match
@@ -537,6 +547,11 @@ def parse_str_to_animal(string: str, animal_param: tuple[int, str] | str | list[
         >>> parse_str_to_animal("WT_A10_data.bin", ["B15", "C20"])  # No match
         ValueError: No matching ID found in WT_A10_data.bin from possible IDs: ['B15', 'C20']
     """
+    warnings.warn(
+        "parse_str_to_animal is deprecated. Use FileDiscoverer with {animal} placeholder in pattern instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
     if isinstance(animal_param, tuple):
         index, sep = animal_param
         animid = string.split(sep)
@@ -566,6 +581,8 @@ def parse_str_to_day(
     date_patterns: list[tuple[str, str]] = None,
 ) -> datetime:
     """
+    DEPRECATED: Use FileDiscoverer with {session} placeholder in pattern instead.
+
     Parses the filename of a binfolder to get the day.
 
     Args:
@@ -591,12 +608,12 @@ def parse_str_to_day(
 
     Examples:
         >>> # Handle ambiguous date formats with explicit patterns
-        >>> patterns = [(r'(19\d{2}|20\d{2})-(\d{1,2})-(\d{1,2})', '%Y-%m-%d')]
+        >>> patterns = [(r'(19\\d{2}|20\\d{2})-(\\d{1,2})-(\\d{1,2})', '%Y-%m-%d')]
         >>> parse_str_to_day('2001_2023-07-04_data', date_patterns=patterns)
         datetime.datetime(2023, 7, 4, 0, 0)
 
         >>> # European format pattern
-        >>> patterns = [(r'(\d{1,2})/(\d{1,2})/(19\d{2}|20\d{2})', '%d/%m/%Y')]
+        >>> patterns = [(r'(\\d{1,2})/(\\d{1,2})/(19\\d{2}|20\\d{2})', '%d/%m/%Y')]
         >>> parse_str_to_day('04/07/2023_data', date_patterns=patterns)
         datetime.datetime(2023, 7, 4, 0, 0)  # July 4th, not April 7th
 
@@ -605,6 +622,11 @@ def parse_str_to_day(
         Without date_patterns, the function falls back to token-based parsing which may
         be ambiguous for formats like MM/DD/YYYY vs DD/MM/YYYY.
     """
+    warnings.warn(
+        "parse_str_to_day is deprecated. Use FileDiscoverer with {session} placeholder in pattern instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
     if parse_params is None:
         parse_params = {"fuzzy": True}
     elif not isinstance(parse_params, dict):
@@ -784,8 +806,8 @@ def parse_chname_to_abbrev(channel_name: str, assume_from_number=False, strict_m
         return channel_name
 
     try:
-        lr = _get_key_from_match_values(channel_name, constants.LR_ALIASES, strict_matching)
-        chname = _get_key_from_match_values(channel_name, constants.CHNAME_ALIASES, strict_matching)
+        lr = _get_key_from_match_values(channel_name, constants.LR_ALIASES, strict_matching, alias_name="LR_ALIASES")
+        chname = _get_key_from_match_values(channel_name, constants.CHNAME_ALIASES, strict_matching, alias_name="CHNAME_ALIASES")
     except ValueError as e:
         if assume_from_number:
             logging.debug(f"Channel '{channel_name}' does not match name aliases. Attempting to assume from number.")
@@ -815,7 +837,37 @@ def parse_chname_to_abbrev(channel_name: str, assume_from_number=False, strict_m
     return lr + chname
 
 
-def _get_key_from_match_values(input_string: str, alias_dict: dict, strict_matching: bool = True):
+def abbreviate_channel_names(
+    names: list[str],
+    strict_matching: bool = True,
+    assume_from_number: bool = False,
+) -> list[str]:
+    """Abbreviate a list of channel names, falling back to raw names for unparseable entries.
+
+    Args:
+        names: List of channel name strings to abbreviate.
+        strict_matching: Passed to parse_chname_to_abbrev.
+        assume_from_number: Passed to parse_chname_to_abbrev.
+
+    Returns:
+        List of abbreviated channel names (same length as input).
+    """
+    result = []
+    for name in names:
+        try:
+            result.append(
+                parse_chname_to_abbrev(
+                    name,
+                    assume_from_number=assume_from_number,
+                    strict_matching=strict_matching,
+                )
+            )
+        except (ValueError, KeyError, AttributeError):
+            result.append(name)
+    return result
+
+
+def _get_key_from_match_values(input_string: str, alias_dict: dict, strict_matching: bool = True, alias_name: str = "alias"):
     """
     Find the best matching key from alias dictionary.
 
@@ -823,6 +875,7 @@ def _get_key_from_match_values(input_string: str, alias_dict: dict, strict_match
         input_string (str): String to search in
         alias_dict (dict): Dictionary of {key: [aliases]} to match against
         strict_matching (bool): If True, ensures only one alias matches across all keys
+        alias_name (str): Name of the alias dictionary for error messages (e.g., "CHNAME_ALIASES")
 
     Returns:
         str: The key with the best matching alias
@@ -838,9 +891,12 @@ def _get_key_from_match_values(input_string: str, alias_dict: dict, strict_match
     ]
 
     if not matches:
-        alias_examples = {key: aliases[:2] for key, aliases in alias_dict.items()}  # Show first 2 aliases per key
+        alias_examples = {key: aliases[:2] for key, aliases in alias_dict.items()}
         raise ValueError(
-            f"{input_string} does not have any matching values. Available aliases (examples): {alias_examples}"
+            f"'{input_string}' does not match any {alias_name}. "
+            f"Available {alias_name} entries: {alias_examples}. "
+            f"If your data uses non-standard channel names, "
+            f"configure the appropriate aliases in your samples config file."
         )
 
     if strict_matching:
@@ -849,12 +905,38 @@ def _get_key_from_match_values(input_string: str, alias_dict: dict, strict_match
         if len(matching_keys) > 1:
             matched_aliases = {key: [alias for k, alias, _ in matches if k == key] for key in matching_keys}
             raise ValueError(
-                f"Ambiguous match in '{input_string}'. Multiple alias types matched: {matched_aliases}. Use strict_matching=False to allow ambiguous matches."
+                f"Ambiguous match in '{input_string}' for {alias_name}. "
+                f"Multiple keys matched: {matched_aliases}. "
+                f"Use strict_matching=False to allow ambiguous matches."
             )
 
     # Return the key with the longest matching alias
     best_match_key, _, _ = max(matches, key=lambda x: x[2])
     return best_match_key
+
+
+def normalize_value_from_aliases(
+    value: str,
+    alias_dict: dict[str, list[str]],
+) -> str | None:
+    """Normalize a value to its canonical form using an alias dictionary.
+
+    Unlike :func:`_get_key_from_match_values` which uses substring matching for
+    parsing values embedded in filenames, this function performs exact matching
+    for normalizing standalone configuration values.
+
+    Args:
+        value: The raw value to normalize (e.g., ``"M"``, ``"female"``).
+        alias_dict: Dictionary of ``{canonical_key: [aliases]}``.
+
+    Returns:
+        The canonical key if *value* matches any alias, or ``None`` if no match.
+    """
+    # REVIEW the function name should be unified with _get_key_from_match_values
+    for canonical_key, aliases in alias_dict.items():
+        if value in aliases:
+            return canonical_key
+    return None
 
 
 def set_temp_directory(path: str | Path) -> None:
@@ -901,7 +983,10 @@ def get_temp_directory() -> Path:
 
 
 def cache_fragments_to_zarr(
-    np_fragments: np.ndarray, n_fragments: int, tmpdir: Optional[str] = None
+    np_fragments: np.ndarray,
+    n_fragments: int,
+    tmpdir: Optional[str] = None,
+    chunk_size: Optional[int] = None,
 ) -> tuple[str, "zarr.Array"]:
     """
     Cache numpy fragments array to zarr format for efficient memory management.
@@ -916,6 +1001,10 @@ def cache_fragments_to_zarr(
         n_fragments (int): Number of fragments to cache (allows for subset caching).
         tmpdir (str, optional): Directory path for temporary zarr storage. If None,
             uses get_temp_directory(). Defaults to None.
+        chunk_size (int, optional): Number of fragments per zarr chunk along the first
+            axis. Controls the read/write granularity when accessing the zarr array.
+            Smaller values reduce memory overhead per chunk; larger values improve
+            sequential throughput. When None, defaults to ``min(100, n_fragments)``.
 
     Returns:
         tuple[str, zarr.Array]: A tuple containing:
@@ -939,7 +1028,14 @@ def cache_fragments_to_zarr(
     logging.debug(f"Caching numpy array with zarr in {tmppath}")
 
     # Create Zarr array with optimal settings for fragment-wise access
-    chunk_size = min(100, n_fragments)  # Cap at 100 fragments per chunk
+    if chunk_size is None:
+        chunk_size = min(100, n_fragments)  # Cap at 100 fragments per chunk
+    else:
+        if not isinstance(chunk_size, int):
+            raise TypeError("chunk_size must be an integer or None")
+        if chunk_size < 1:
+            raise ValueError("chunk_size must be >= 1 when provided")
+        chunk_size = min(chunk_size, n_fragments)
     zarr_array = zarr.open(
         tmppath,
         mode="w",
@@ -964,6 +1060,135 @@ def cache_fragments_to_zarr(
     logging.debug(f"  - Zarr array chunks: {zarr_array.chunks}")
 
     return tmppath, zarr_array
+
+
+def stream_fragments_to_zarr(
+    get_fragment_fn: Callable[[int], np.ndarray],
+    n_fragments: int,
+    fragment_shape: tuple,
+    fragment_dtype: np.dtype,
+    chunk_size: int,
+    tmpdir: Optional[str] = None,
+) -> str:
+    """Stream recording fragments to a zarr store in memory-bounded batches.
+
+    Unlike :func:`cache_fragments_to_zarr`, this function never holds more than
+    ``chunk_size`` fragments in RAM at once.  It calls ``get_fragment_fn`` one
+    batch at a time, writes each batch to the zarr store, and immediately frees
+    the batch buffer — so peak RAM is proportional to ``chunk_size`` rather than
+    ``n_fragments``.
+
+    Args:
+        get_fragment_fn (Callable[[int], np.ndarray]): A callable that accepts a
+            fragment index (0-based) and returns the corresponding fragment as a
+            NumPy array of shape ``fragment_shape``.
+        n_fragments (int): Total number of fragments to stream.
+        fragment_shape (tuple): Shape of a single fragment (e.g. ``(n_samples,
+            n_channels)``).
+        fragment_dtype (np.dtype): Data-type of the fragment arrays.
+        chunk_size (int): Number of fragments to buffer per batch.  Must be >= 1.
+            Larger values improve sequential write throughput; smaller values
+            reduce peak RAM.
+        tmpdir (str, optional): Directory for the temporary zarr file.  If
+            ``None``, uses :func:`get_temp_directory`.
+
+    Returns:
+        str: Path to the temporary zarr file on disk.
+
+    Raises:
+        ValueError: If ``chunk_size`` < 1.
+        ImportError: If zarr is not available.
+    """
+    if chunk_size < 1:
+        raise ValueError(f"chunk_size must be >= 1, got {chunk_size}")
+
+    if tmpdir is None:
+        tmpdir = get_temp_directory()
+
+    tmppath = os.path.join(tmpdir, f"temp_{os.urandom(24).hex()}.zarr")
+    batch = min(chunk_size, n_fragments)
+
+    logging.debug(
+        f"Streaming {n_fragments} fragments to zarr in batches of {batch} "
+        f"(path: {tmppath})"
+    )
+
+    zarr_array = zarr.open(
+        tmppath,
+        mode="w",
+        shape=(n_fragments,) + fragment_shape,
+        chunks=(batch, -1, -1),
+        dtype=fragment_dtype,
+        compressor=zarr.Blosc(cname="lz4", clevel=3, shuffle=zarr.Blosc.SHUFFLE),
+    )
+
+    for batch_start in range(0, n_fragments, batch):
+        batch_end = min(batch_start + batch, n_fragments)
+        batch_len = batch_end - batch_start
+        np_batch = np.empty((batch_len,) + fragment_shape, dtype=fragment_dtype)
+        for local_idx, global_idx in enumerate(range(batch_start, batch_end)):
+            np_batch[local_idx] = get_fragment_fn(global_idx)
+        zarr_array[batch_start:batch_end] = np_batch
+        del np_batch
+
+    logging.debug(f"  - Zarr array shape: {zarr_array.shape}")
+    logging.debug(f"  - Zarr array chunks: {zarr_array.chunks}")
+    del zarr_array
+
+    return tmppath
+
+
+def chunked_channel_distance_matrix(
+    get_traces_fn: Callable[[int, int], np.ndarray],
+    n_channels: int,
+    n_samples: int,
+    chunk_samples: int,
+) -> np.ndarray:
+    """Compute pairwise Euclidean distance matrix between channels in chunks.
+
+    Instead of loading the full ``(n_samples, n_channels)`` trace matrix at
+    once, this function reads ``chunk_samples`` frames at a time and
+    accumulates squared distances using the identity
+
+        ||c_i - c_j||^2 = ||c_i||^2 + ||c_j||^2 - 2 * c_i · c_j
+
+    so that peak RAM is proportional to ``chunk_samples * n_channels``
+    rather than ``n_samples * n_channels``.
+
+    Args:
+        get_traces_fn: ``fn(start_frame, end_frame) -> np.ndarray`` with
+            shape ``(frames, n_channels)``.  Typically
+            ``recording.get_traces(start_frame=..., end_frame=...,
+            return_scaled=True)``.
+        n_channels: Number of channels.
+        n_samples: Total number of samples in the recording.
+        chunk_samples: Number of samples to read per chunk.
+
+    Returns:
+        np.ndarray: Symmetric ``(n_channels, n_channels)`` Euclidean
+        distance matrix.
+    """
+    if chunk_samples < 1:
+        raise ValueError(f"chunk_samples must be >= 1, got {chunk_samples}")
+
+    sq_dist_accum = np.zeros((n_channels, n_channels), dtype=np.float64)
+
+    for start in range(0, n_samples, chunk_samples):
+        end = min(start + chunk_samples, n_samples)
+        chunk = get_traces_fn(start, end)  # (chunk_len, n_channels)
+        chunk_t = chunk.T  # (n_channels, chunk_len)
+
+        # ||c_i - c_j||^2 = ||c_i||^2 + ||c_j||^2 - 2 * c_i · c_j
+        norms_sq = np.sum(chunk_t ** 2, axis=1)  # (n_channels,)
+        gram = chunk_t @ chunk_t.T  # (n_channels, n_channels)
+        sq_dist_accum += norms_sq[:, None] + norms_sq[None, :] - 2 * gram
+        del chunk, chunk_t, norms_sq, gram
+
+    # Clamp tiny negatives from floating-point arithmetic
+    np.maximum(sq_dist_accum, 0, out=sq_dist_accum)
+    distance_matrix = np.sqrt(sq_dist_accum)
+    del sq_dist_accum
+    return distance_matrix
 
 
 def get_file_stem(filepath: Union[str, Path]) -> str:
@@ -1206,6 +1431,22 @@ class Natural_Neighbor(object):
             data (np.ndarray): Input data array
         """
         self.data = data
+        self._distance_matrix = None
+
+    def read_distance_matrix(self, distance_matrix: np.ndarray):
+        """
+        Load a precomputed distance matrix for neighbor search.
+
+        When a distance matrix is provided, :meth:`algorithm` uses
+        argsort-based neighbor lookup instead of a KDTree, avoiding the
+        need to hold the raw high-dimensional data in memory.
+
+        Args:
+            distance_matrix (np.ndarray): Symmetric (n, n) distance matrix.
+        """
+        self._distance_matrix = distance_matrix
+        # Set data length so existing helpers (asserts, count, etc.) work
+        self.data = np.empty((distance_matrix.shape[0], 0))
 
     def asserts(self):
         """
@@ -1249,6 +1490,24 @@ class Natural_Neighbor(object):
         _, ind = tree.query([inst], r + 1)
         return np.delete(ind[0], 0)
 
+    def _findKNN_precomputed(self, i, r):
+        """
+        Find the r nearest neighbors of point *i* using the precomputed
+        distance matrix (argsort-based, exact).
+
+        Args:
+            i (int): Index of the query point.
+            r (int): Number of neighbors to return.
+
+        Returns:
+            np.ndarray: Array of neighbor indices (excluding point *i*).
+        """
+        dists = self._distance_matrix[i]
+        # argsort gives indices sorted by distance; index 0 is self (distance 0)
+        sorted_idx = np.argsort(dists)
+        # Skip self at position 0 (distance to self is always 0)
+        return sorted_idx[1 : r + 1]
+
     def algorithm(self):
         """
         Execute the Natural Neighbor algorithm.
@@ -1256,19 +1515,37 @@ class Natural_Neighbor(object):
         The algorithm iteratively expands the neighborhood radius until convergence,
         finding mutual neighbors between instances.
 
+        When a precomputed distance matrix is available (see
+        :meth:`read_distance_matrix`), neighbor lookup is performed via
+        argsort instead of a KDTree, which avoids holding the raw
+        high-dimensional data in memory.
+
         Returns:
             int: The final radius value when convergence is reached
         """
-        # Initialize KDTree for efficient neighbor search
-        tree = KDTree(self.data)
+        use_precomputed = (
+            hasattr(self, "_distance_matrix")
+            and self._distance_matrix is not None
+        )
+
+        if not use_precomputed:
+            # Initialize KDTree for efficient neighbor search
+            tree = KDTree(self.data)
+        else:
+            tree = None  # not used in precomputed path
+
         self.asserts()
         flag = 0
         r = 1
 
-        max_r = len(self.data) - 1  # r + 1 must not exceed n_points
+        n_points = len(self.data)
+        max_r = n_points - 1  # r + 1 must not exceed n_points
         while flag == 0:
-            for i in range(len(self.data)):
-                knn = self.findKNN(self.data[i], r, tree)
+            for i in range(n_points):
+                if use_precomputed:
+                    knn = self._findKNN_precomputed(i, r)
+                else:
+                    knn = self.findKNN(self.data[i], r, tree)
                 n = knn[-1]
                 self.knn[i].add(n)
                 if i in self.knn[n] and (i, n) not in self.nan_edges:
@@ -1506,3 +1783,34 @@ def convert_intan_chname_mne(mne_obj):
     for i in range(len(mne_obj.info['ch_names'])):
         mne_obj.info['ch_names'][i] = parse_chname_to_abbrev(channel_name = mne_obj.info['ch_names'][i], assume_from_number=True, strict_matching=False)
     return mne_obj
+
+
+def slugify(value, allow_unicode=False):
+    """Convert a string to a URL-friendly slug.
+
+    Converts to ASCII (unless *allow_unicode* is ``True``), lowercases,
+    removes non-alphanumeric characters (except hyphens and underscores),
+    and converts spaces and repeated dashes to single dashes.
+
+    Drop-in replacement for ``django.utils.text.slugify`` using only the
+    standard library.
+
+    Args:
+        value: The string to slugify.
+        allow_unicode: If ``True``, keep Unicode characters instead of
+            transliterating to ASCII.
+
+    Returns:
+        str: A URL-safe slug string.
+    """
+    value = str(value)
+    if allow_unicode:
+        value = unicodedata.normalize("NFKC", value)
+    else:
+        value = (
+            unicodedata.normalize("NFKD", value)
+            .encode("ascii", "ignore")
+            .decode("ascii")
+        )
+    value = re.sub(r"[^\w\s-]", "", value.lower())
+    return re.sub(r"[-\s]+", "-", value).strip("-_")

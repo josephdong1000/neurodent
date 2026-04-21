@@ -7,7 +7,7 @@ This corresponds to the pipeline-epfig-so functionality in the original workflow
 """
 
 
-checkpoint flatten_wars:
+checkpoint war_flattening:
     """
     Flatten filtered WARs by aggregating time windows for each animal individually
     """
@@ -28,13 +28,13 @@ checkpoint flatten_wars:
         mem_mb=increment_memory(config["cluster"]["war_flattening"]["mem_mb"]),
         nodes=config["cluster"]["war_flattening"]["nodes"],
     log:
-        stdout="logs/war_flattening/{animal}.stdout",
-        stderr="logs/war_flattening/{animal}.stderr",
+        stdout="logs/war_flattening/{animal}.out",
+        stderr="logs/war_flattening/{animal}.err",
     script:
         "../scripts/flatten_wars.py"
 
 
-rule flatten_wars_manual:
+rule war_flattening_manual:
     """
     Flatten manually channel-filtered WARs by aggregating time windows
     """
@@ -55,13 +55,13 @@ rule flatten_wars_manual:
         mem_mb=increment_memory(config["cluster"]["war_flattening"]["mem_mb"]),
         nodes=config["cluster"]["war_flattening"]["nodes"],
     log:
-        stdout="logs/war_flattening/{animal}_manual.stdout",
-        stderr="logs/war_flattening/{animal}_manual.stderr",
+        stdout="logs/war_flattening_manual/{animal}.out",
+        stderr="logs/war_flattening_manual/{animal}.err",
     script:
         "../scripts/flatten_wars.py"
 
 
-rule flatten_wars_lof:
+rule war_flattening_lof:
     """
     Flatten LOF channel-filtered WARs by aggregating time windows
     """
@@ -82,7 +82,7 @@ rule flatten_wars_lof:
         mem_mb=increment_memory(config["cluster"]["war_flattening"]["mem_mb"]),
         nodes=config["cluster"]["war_flattening"]["nodes"],
     log:
-        stdout="logs/war_flattening/{animal}_lof.stdout",
-        stderr="logs/war_flattening/{animal}_lof.stderr",
+        stdout="logs/war_flattening_lof/{animal}.out",
+        stderr="logs/war_flattening_lof/{animal}.err",
     script:
         "../scripts/flatten_wars.py"

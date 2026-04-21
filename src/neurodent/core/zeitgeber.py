@@ -9,8 +9,9 @@ import logging
 import pandas as pd
 import numpy as np
 from pathlib import Path
-from .. import visualization
+from .. import constants, visualization
 from . import metadata as metadata_module
+from .utils import normalize_value_from_aliases
 
 logger = logging.getLogger(__name__)
 
@@ -35,18 +36,13 @@ def get_expanded_feature_names(base_features):
     expanded_features = []
     
     for feature in base_features:
-        if feature in constants.BAND_FEATURES or feature in constants.BANDED_MATRIX_FEATURES:
+        ftype = constants.FEATURE_TYPES.get(feature)
+        if ftype is not None and ftype.is_dict_stored:
             # Expand into per-band features (e.g. zcohere -> zcohere_delta, zcohere_theta, ...)
             for band in constants.BAND_NAMES:
                 expanded_features.append(f"{feature}_{band}")
-        elif feature in constants.SIMPLE_MATRIX_FEATURES:
-            # Simple matrix features are NOT banded - keep as single column (e.g. zpcorr, pcorr)
-            expanded_features.append(feature)
-        elif feature in constants.LINEAR_FEATURES or feature in constants.HIST_FEATURES:
-            # Keep as is
-            expanded_features.append(feature)
         else:
-            # Unknown feature type, assume it's a single column
+            # LINEAR, SIMPLE_MATRIX, HIST, and unknown features remain as single columns
             expanded_features.append(feature)
             
     return expanded_features
@@ -284,7 +280,9 @@ def transform_time_axis(df, time_range=(0, 48), shift=0):
     df = df.copy()
 
     if "genotype" in df.columns and "sex" not in df.columns:
-        df["sex"] = df["genotype"].str[0].map({"F": "Female", "M": "Male"})
+        df["sex"] = df["genotype"].str[0].apply(
+            lambda x: normalize_value_from_aliases(x, constants.SEX_ALIASES)
+        )
 
     if "genotype" in df.columns and "gene" not in df.columns:
         df["gene"] = df["genotype"].str[2:]
@@ -355,7 +353,7 @@ def enrich_genotype_metadata(df, genotype_pattern=None, sex_mapper=None, genotyp
             else:
                 sex_char, gene = None, genotype_key
             
-            sex = {"M": "Male", "F": "Female", "m": "Male", "f": "Female"}.get(sex_char)
+            sex = normalize_value_from_aliases(sex_char, constants.SEX_ALIASES) if sex_char else None
             animal_metadata_converted[animal_id] = {"sex": sex, "gene": gene}
         
         return metadata_module.enrich_metadata(df, animal_metadata_converted)

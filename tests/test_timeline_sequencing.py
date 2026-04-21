@@ -19,6 +19,9 @@ class TestTimelineSequencing:
         ao._compute_global_timeline = AnimalOrganizer._compute_global_timeline.__get__(ao, AnimalOrganizer)
         # Also need to bind _sort_lros_by_median_time because _compute_global_timeline uses it
         ao._sort_lros_by_median_time = AnimalOrganizer._sort_lros_by_median_time.__get__(ao, AnimalOrganizer)
+        # Bind helpers that _compute_global_timeline uses
+        ao._get_item_name = AnimalOrganizer._get_item_name.__get__(ao, AnimalOrganizer)
+        ao._is_item_file = AnimalOrganizer._is_item_file.__get__(ao, AnimalOrganizer)
         
         # Mock dependencies
         ao._resolve_timestamp_input = MagicMock(side_effect=lambda x, y: pd.to_datetime(x))
@@ -160,5 +163,212 @@ class TestTimelineSequencing:
         # Keys in result are folder names
         assert result["folder1"] == pd.to_datetime("2025-01-01 12:00:00")
         assert result["folder2"] == pd.to_datetime("2025-01-01 14:00:00")
+
+    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    def test_session_keyed_dict(self, mock_lro_cls, ao):
+        """
+        Test that a dict keyed by session names (matching animalday_to_items keys)
+        is correctly handled — each session gets its own timestamp as the start time
+        and a timeline is computed for items within each session.
+
+        This is the format used when per-animal manual_datetime is a dict in the
+        unified config, e.g.:
+            "manual_datetime": {
+                "010822_cohort4_group2_M3_MHET_files0-12": "2022-01-08 18:55:02",
+                "010822_cohort4_group2_M3_MHET_files13-21": "2022-01-08 23:25:03"
+            }
+        """
+        # Mock LRO so _compute_global_timeline can estimate durations
+        def side_effect(*args, **kwargs):
+            m = MagicMock()
+            m.LongRecording.get_duration.return_value = 3600.0
+            return m
+
+        mock_lro_cls.side_effect = side_effect
+
+        # Each session has one item (folder), session keys match manual_datetimes keys
+        animalday_to_items = {
+            "010822_files0-12": ["/data/010822_files0-12"],
+            "010822_files13-21": ["/data/010822_files13-21"],
+        }
+
+        manual_datetimes = {
+            "010822_files0-12": "2022-01-08 18:55:02",
+            "010822_files13-21": "2022-01-08 23:25:03",
+        }
+        base_lro_kwargs = {"datetimes_are_start": True}
+
+        result = ao._process_manual_datetimes(
+            manual_datetimes, animalday_to_items, base_lro_kwargs
+        )
+
+        # Each session's single item should get a timeline-computed timestamp
+        assert "010822_files0-12" in result
+        assert "010822_files13-21" in result
+        # Start time matches the session's manual timestamp
+        assert result["010822_files0-12"] == pd.to_datetime("2022-01-08 18:55:02")
+        assert result["010822_files13-21"] == pd.to_datetime("2022-01-08 23:25:03")
+
+    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    def test_session_keyed_dict_multi_item_sessions(self, mock_lro_cls, ao):
+        """
+        Test session-keyed dict when sessions contain multiple items.
+        Each session's timestamp is used as the start for its items,
+        and a per-session timeline is computed.
+        """
+        durations = {
+            "/data/sess1/file_a": 1800.0,
+            "/data/sess1/file_b": 1800.0,
+            "/data/sess2/file_c": 3600.0,
+        }
+
+        def side_effect(folder, **kwargs):
+            m = MagicMock()
+            m.LongRecording.get_duration.return_value = durations.get(str(folder), 3600.0)
+            return m
+
+        mock_lro_cls.side_effect = side_effect
+
+        animalday_to_items = {
+            "session1": ["/data/sess1/file_a", "/data/sess1/file_b"],
+            "session2": ["/data/sess2/file_c"],
+        }
+
+        manual_datetimes = {
+            "session1": "2022-01-08 10:00:00",
+            "session2": "2022-01-08 14:00:00",
+        }
+        base_lro_kwargs = {"datetimes_are_start": True}
+
+        result = ao._process_manual_datetimes(
+            manual_datetimes, animalday_to_items, base_lro_kwargs
+        )
+
+        # session1 items: file_a at 10:00, file_b at 10:00 + 1800s = 10:30
+        assert result["file_a"] == pd.to_datetime("2022-01-08 10:00:00")
+        assert result["file_b"] == pd.to_datetime("2022-01-08 10:30:00")
+        # session2 item: file_c at 14:00
+        assert result["file_c"] == pd.to_datetime("2022-01-08 14:00:00")
+
+    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    def test_datetimes_are_start_false_sequencing(self, mock_lro_cls, ao):
+        """
+        Regression test: when datetimes_are_start=False, _compute_global_timeline
+        works backwards from end times to produce start times. Verify that the
+        returned timestamps are correct start times and form a non-overlapping
+        sequence.
+
+        This catches a bug where _compute_global_timeline always returns start
+        times, but _create_long_recordings passed them downstream with the
+        original datetimes_are_start=False flag — causing LROs to misinterpret
+        start times as end times and creating massive timestamp overlaps.
+        """
+        def side_effect(*args, **kwargs):
+            m = MagicMock()
+            m.LongRecording.get_duration.return_value = 3600.0  # 1 hour
+            return m
+
+        mock_lro_cls.side_effect = side_effect
+
+        # Two sessions, each with one folder. End times provided.
+        animalday_to_items = {
+            "session1": ["/data/sess1/folder_a"],
+            "session2": ["/data/sess2/folder_b"],
+        }
+
+        # These are END times (datetimes_are_start=False)
+        manual_datetimes = {
+            "session1": "2025-01-01 13:00:00",  # ends at 13:00
+            "session2": "2025-01-01 15:00:00",  # ends at 15:00
+        }
+        base_lro_kwargs = {"datetimes_are_start": False}
+
+        result = ao._process_manual_datetimes(
+            manual_datetimes, animalday_to_items, base_lro_kwargs
+        )
+
+        # _compute_global_timeline should return START times computed from end times
+        # session1: start = 13:00 - 1h = 12:00
+        # session2: start = 15:00 - 1h = 14:00
+        assert result["folder_a"] == pd.to_datetime("2025-01-01 12:00:00")
+        assert result["folder_b"] == pd.to_datetime("2025-01-01 14:00:00")
+
+        # Timestamps must be sequenced (no overlap)
+        assert result["folder_b"] > result["folder_a"]
+
+        # Gap between computed start times is preserved (12:00 → 14:00 = 2 hours)
+        gap = result["folder_b"] - result["folder_a"]
+        assert gap == timedelta(hours=2)
+
+    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    def test_create_long_recordings_forces_datetimes_are_start_true(
+        self, mock_lro_cls, ao
+    ):
+        """
+        Regression test for the actual bug fix in _create_long_recordings:
+        when _processed_timestamps is set, downstream LongRecordingOrganizer
+        must always receive datetimes_are_start=True, even if the original
+        lro_kwargs had datetimes_are_start=False (end-time inputs).
+
+        This verifies the fix in AnimalOrganizer._create_long_recordings that
+        sets kwargs["datetimes_are_start"] = True when injecting
+        _processed_timestamps, since _compute_global_timeline always produces
+        start times regardless of the original datetimes_are_start value.
+        """
+        mock_lro_instance = MagicMock()
+        mock_lro_cls.return_value = mock_lro_instance
+
+        # Bind _create_long_recordings as a real method on the mock AO
+        ao._create_long_recordings = AnimalOrganizer._create_long_recordings.__get__(
+            ao, AnimalOrganizer
+        )
+
+        # Pre-populate state that _create_long_recordings reads
+        ao._animalday_folder_groups = {
+            "session1": ["/data/sess1/folder_a"],
+            "session2": ["/data/sess2/folder_b"],
+        }
+        ao.unique_animaldays = ["session1", "session2"]
+        # _processed_timestamps holds start times (output of _compute_global_timeline)
+        ao._processed_timestamps = {
+            "folder_a": pd.to_datetime("2025-01-01 12:00:00"),
+            "folder_b": pd.to_datetime("2025-01-01 14:00:00"),
+        }
+
+        # Simulate the bug scenario: original lro_kwargs had datetimes_are_start=False
+        lro_kwargs = {"datetimes_are_start": False}
+
+        ao._create_long_recordings(lro_kwargs)
+
+        # Both LRO constructor calls must receive datetimes_are_start=True,
+        # not the original False — because _processed_timestamps are always start times.
+        assert mock_lro_cls.call_count == 2
+        for call in mock_lro_cls.call_args_list:
+            _, kwargs = call
+            assert kwargs.get("datetimes_are_start") is True, (
+                f"Expected datetimes_are_start=True but got {kwargs.get('datetimes_are_start')!r}. "
+                "LongRecordingOrganizer must receive start times when _processed_timestamps is used."
+            )
+
+    def test_session_keyed_dict_missing_session_raises(self, ao):
+        """
+        Test that a session-keyed dict raises ValueError if some sessions
+        are missing from the manual_datetimes dict.
+        """
+        animalday_to_items = {
+            "session1": ["/data/sess1/file_a"],
+            "session2": ["/data/sess2/file_b"],
+        }
+
+        # Only one session covered
+        manual_datetimes = {
+            "session1": "2022-01-08 10:00:00",
+        }
+        base_lro_kwargs = {}
+
+        with pytest.raises(ValueError, match="Missing entries in manual_datetimes for sessions"):
+            ao._process_manual_datetimes(
+                manual_datetimes, animalday_to_items, base_lro_kwargs
+            )
 
 

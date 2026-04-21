@@ -149,18 +149,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/2d/6a/885bc91484e1aa8f618f6f0228d76d0e67000b0fdd6090673b777e311913/asciitree-0.3.3.tar.gz", hash = "sha256:4aa4b9b649f85e3fcb343363d97564aa1fb62e249677f2e18a96765145cc0f6e", size = 3951, upload-time = "2016-09-05T19:10:42.681Z" }
 
 [[package]]
-name = "asgiref"
-version = "3.10.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "typing-extensions", marker = "python_full_version < '3.11'" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/46/08/4dfec9b90758a59acc6be32ac82e98d1fbfc321cb5cfa410436dbacf821c/asgiref-3.10.0.tar.gz", hash = "sha256:d89f2d8cd8b56dada7d52fa7dc8075baa08fb836560710d38c292a7a3f78c04e", size = 37483, upload-time = "2025-10-05T09:15:06.557Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/17/9c/fc2331f538fbf7eedba64b2052e99ccf9ba9d6888e2f41441ee28847004b/asgiref-3.10.0-py3-none-any.whl", hash = "sha256:aef8a81283a34d0ab31630c9b7dfe70c812c95eba78171367ca8745e88124734", size = 24050, upload-time = "2025-10-05T09:15:05.11Z" },
-]
-
-[[package]]
 name = "asttokens"
 version = "3.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -942,20 +930,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/e3/14/ab9efdf175763c7ef9daafab7142e4557e65e223ac8efb152383025fbbaa/distributed-2025.10.0.tar.gz", hash = "sha256:b6aed021b246fa9e632d87922d6d1ed8d4671a47de2cf671ad9e2932108ace8c", size = 1101527, upload-time = "2025-10-14T19:50:30.879Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e6/86/7c764bef28f5183bd67e548c60afb9fe3eb7a6d58eb321b72c4c4d2be021/distributed-2025.10.0-py3-none-any.whl", hash = "sha256:613281c2796e4b3f349c9a1c0ef95b84a6b58f7a17d93206758a6902bd96913d", size = 1009444, upload-time = "2025-10-14T19:50:28.132Z" },
-]
-
-[[package]]
-name = "django"
-version = "5.2.7"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "asgiref" },
-    { name = "sqlparse" },
-    { name = "tzdata", marker = "sys_platform == 'win32'" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/b1/96/bd84e2bb997994de8bcda47ae4560991084e86536541d7214393880f01a8/django-5.2.7.tar.gz", hash = "sha256:e0f6f12e2551b1716a95a63a1366ca91bbcd7be059862c1b18f989b1da356cdd", size = 10865812, upload-time = "2025-10-01T14:22:12.081Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/8f/ef/81f3372b5dd35d8d354321155d1a38894b2b766f576d0abffac4d8ae78d9/django-5.2.7-py3-none-any.whl", hash = "sha256:59a13a6515f787dec9d97a0438cd2efac78c8aca1c80025244b0fe507fe0754b", size = 8307145, upload-time = "2025-10-01T14:22:49.476Z" },
 ]
 
 [[package]]
@@ -2444,13 +2418,12 @@ wheels = [
 
 [[package]]
 name = "neurodent"
-version = "0.2.4"
+version = "0.3.0"
 source = { editable = "." }
 dependencies = [
     { name = "appnope" },
     { name = "dask", extra = ["distributed"] },
     { name = "dask-jobqueue" },
-    { name = "django" },
     { name = "matplotlib" },
     { name = "mne" },
     { name = "mne-connectivity" },
@@ -2528,7 +2501,6 @@ requires-dist = [
     { name = "appnope" },
     { name = "dask", extras = ["distributed"] },
     { name = "dask-jobqueue" },
-    { name = "django" },
     { name = "edfio", marker = "extra == 'readers'", specifier = ">=0.4.12" },
     { name = "factory-boy", marker = "extra == 'dev'", specifier = ">=3.2.0" },
     { name = "faker", marker = "extra == 'dev'", specifier = ">=18.0.0" },
@@ -4733,15 +4705,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/32/d5/0e66097fc64fa266f29a7963296b40a80d6a997b7ac13806183700676f86/sqlalchemy-2.0.44-cp313-cp313-win32.whl", hash = "sha256:ee51625c2d51f8baadf2829fae817ad0b66b140573939dd69284d2ba3553ae73", size = 2101275, upload-time = "2025-10-10T15:03:26.096Z" },
     { url = "https://files.pythonhosted.org/packages/03/51/665617fe4f8c6450f42a6d8d69243f9420f5677395572c2fe9d21b493b7b/sqlalchemy-2.0.44-cp313-cp313-win_amd64.whl", hash = "sha256:c1c80faaee1a6c3428cecf40d16a2365bcf56c424c92c2b6f0f9ad204b899e9e", size = 2127901, upload-time = "2025-10-10T15:03:27.548Z" },
     { url = "https://files.pythonhosted.org/packages/9c/5e/6a29fa884d9fb7ddadf6b69490a9d45fded3b38541713010dad16b77d015/sqlalchemy-2.0.44-py3-none-any.whl", hash = "sha256:19de7ca1246fbef9f9d1bff8f1ab25641569df226364a0e40457dc5457c54b05", size = 1928718, upload-time = "2025-10-10T15:29:45.32Z" },
-]
-
-[[package]]
-name = "sqlparse"
-version = "0.5.3"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/e5/40/edede8dd6977b0d3da179a342c198ed100dd2aba4be081861ee5911e4da4/sqlparse-0.5.3.tar.gz", hash = "sha256:09f67787f56a0b16ecdbde1bfc7f5d9c3371ca683cfeaa8e6ff60b4807ec9272", size = 84999, upload-time = "2024-12-10T12:05:30.728Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/a9/5c/bfd6bd0bf979426d405cc6e71eceb8701b148b16c21d2dc3c261efc61c7b/sqlparse-0.5.3-py3-none-any.whl", hash = "sha256:cf2196ed3418f3ba5de6af7e82c694a9fbdbfecccdfc72e281548517081f16ca", size = 44415, upload-time = "2024-12-10T12:05:27.824Z" },
 ]
 
 [[package]]

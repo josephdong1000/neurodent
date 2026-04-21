@@ -4,6 +4,10 @@ Unit tests for neurodent.visualization module.
 Legacy ResultsVisualizer and standalone plotting function tests have been removed because their functionality is now handled by AnimalPlotter and ExperimentPlotter.
 """
 
+import json
+import tempfile
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -13,7 +17,6 @@ from unittest.mock import Mock, patch, MagicMock
 from neurodent.visualization import (
     WindowAnalysisResult,
     AnimalFeatureParser,
-    SpikeAnalysisResult,
     AnimalPlotter,
     ExperimentPlotter,
 )
@@ -30,6 +33,7 @@ class TestAnimalFeatureParser:
     @pytest.fixture
     def sample_df(self):
         """Create a sample DataFrame for testing."""
+        n_chan = 3
         data = {
             "rms": [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]],
             "duration": [1.0, 2.0, 1.5],
@@ -37,6 +41,26 @@ class TestAnimalFeatureParser:
                 {"alpha": [1.0, 2.0], "beta": [3.0, 4.0]},
                 {"alpha": [5.0, 6.0], "beta": [7.0, 8.0]},
                 {"alpha": [9.0, 10.0], "beta": [11.0, 12.0]},
+            ],
+            "psdslope": [
+                [[0.1, 0.2], [0.3, 0.4], [0.5, 0.6]],
+                [[0.7, 0.8], [0.9, 1.0], [1.1, 1.2]],
+                [[1.3, 1.4], [1.5, 1.6], [1.7, 1.8]],
+            ],
+            "pcorr": [
+                np.eye(n_chan).tolist(),
+                (np.eye(n_chan) * 2).tolist(),
+                (np.eye(n_chan) * 3).tolist(),
+            ],
+            "cohere": [
+                {"alpha": np.ones((n_chan, n_chan)).tolist(), "beta": (np.ones((n_chan, n_chan)) * 2).tolist()},
+                {"alpha": (np.ones((n_chan, n_chan)) * 3).tolist(), "beta": (np.ones((n_chan, n_chan)) * 4).tolist()},
+                {"alpha": (np.ones((n_chan, n_chan)) * 5).tolist(), "beta": (np.ones((n_chan, n_chan)) * 6).tolist()},
+            ],
+            "psd": [
+                (np.array([1.0, 2.0, 3.0]), np.array([[10.0, 20.0, 30.0], [40.0, 50.0, 60.0]])),
+                (np.array([1.0, 2.0, 3.0]), np.array([[70.0, 80.0, 90.0], [100.0, 110.0, 120.0]])),
+                (np.array([1.0, 2.0, 3.0]), np.array([[130.0, 140.0, 150.0], [160.0, 170.0, 180.0]])),
             ],
         }
         return pd.DataFrame(data)
@@ -60,6 +84,119 @@ class TestAnimalFeatureParser:
         assert "beta" in result
         assert len(result["alpha"]) == 2
         assert len(result["beta"]) == 2
+        # Verify weighted average: (val*1.0 + val*2.0 + val*1.5) / 4.5
+        expected_alpha = np.array([5.4444, 6.4444])
+        expected_beta = np.array([7.4444, 8.4444])
+        np.testing.assert_array_almost_equal(result["alpha"], expected_alpha, decimal=3)
+        np.testing.assert_array_almost_equal(result["beta"], expected_beta, decimal=3)
+
+    def test_average_feature_linear_2d(self, parser, sample_df):
+        """Test averaging LINEAR_2D feature (psdslope)."""
+        result = parser._average_feature(sample_df, "psdslope", "duration")
+        assert isinstance(result, np.ndarray)
+        assert result.shape == (3, 2)  # (n_chan, n_components)
+        w = np.array([1.0, 2.0, 1.5])
+        raw = np.array([
+            [[0.1, 0.2], [0.3, 0.4], [0.5, 0.6]],
+            [[0.7, 0.8], [0.9, 1.0], [1.1, 1.2]],
+            [[1.3, 1.4], [1.5, 1.6], [1.7, 1.8]],
+        ])
+        expected = np.average(raw, axis=0, weights=w)
+        np.testing.assert_array_almost_equal(result, expected)
+
+    def test_average_feature_simple_matrix(self, parser, sample_df):
+        """Test averaging SIMPLE_MATRIX feature (pcorr)."""
+        result = parser._average_feature(sample_df, "pcorr", "duration")
+        assert isinstance(result, np.ndarray)
+        assert result.shape == (3, 3)  # (n_chan, n_chan)
+        expected = np.eye(3) * (1 * 1.0 + 2 * 2.0 + 3 * 1.5) / 4.5
+        np.testing.assert_array_almost_equal(result, expected)
+
+    def test_average_feature_banded_matrix(self, parser, sample_df):
+        """Test averaging BANDED_MATRIX feature (cohere)."""
+        result = parser._average_feature(sample_df, "cohere", "duration")
+        assert isinstance(result, dict)
+        assert "alpha" in result
+        assert "beta" in result
+        assert np.array(result["alpha"]).shape == (3, 3)
+        expected_alpha = np.ones((3, 3)) * (1 * 1.0 + 3 * 2.0 + 5 * 1.5) / 4.5
+        expected_beta = np.ones((3, 3)) * (2 * 1.0 + 4 * 2.0 + 6 * 1.5) / 4.5
+        np.testing.assert_array_almost_equal(result["alpha"], expected_alpha)
+        np.testing.assert_array_almost_equal(result["beta"], expected_beta)
+
+    def test_average_feature_hist(self, parser, sample_df):
+        """Test averaging HIST feature (psd)."""
+        result = parser._average_feature(sample_df, "psd", "duration")
+        assert isinstance(result, tuple)
+        assert len(result) == 2
+        coords, values = result
+        np.testing.assert_array_equal(coords, [1.0, 2.0, 3.0])
+        assert values.shape == (2, 3)  # (n_freq_rows, n_chan)
+        # Canonical (W=3, C=3, F=2) after extract_hist_data transpose
+        w = np.array([1.0, 2.0, 1.5])
+        canonical = np.array([
+            [[10., 40.], [20., 50.], [30., 60.]],
+            [[70., 100.], [80., 110.], [90., 120.]],
+            [[130., 160.], [140., 170.], [150., 180.]],
+        ])
+        expected_values = np.average(canonical, axis=0, weights=w).T  # (F=2, C=3)
+        np.testing.assert_array_almost_equal(values, expected_values)
+
+    def test_average_feature_no_weights(self, parser, sample_df):
+        """Test averaging with no weight column (uniform weights)."""
+        result = parser._average_feature(sample_df, "rms", weightsname=None)
+        # Uniform weights → simple mean
+        expected = np.mean([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]], axis=0)
+        np.testing.assert_array_almost_equal(result, expected)
+
+    def test_average_feature_no_weights_band(self, parser, sample_df):
+        """Uniform-weight averaging for BAND feature."""
+        result = parser._average_feature(sample_df, "psdband", weightsname=None)
+        # Simple mean across 3 windows:
+        # alpha: [[1,2], [5,6], [9,10]] -> mean = [5, 6]
+        # beta:  [[3,4], [7,8], [11,12]] -> mean = [7, 8]
+        np.testing.assert_array_almost_equal(result["alpha"], [5.0, 6.0])
+        np.testing.assert_array_almost_equal(result["beta"], [7.0, 8.0])
+
+    def test_average_feature_no_weights_linear_2d(self, parser, sample_df):
+        """Uniform-weight averaging for LINEAR_2D feature."""
+        result = parser._average_feature(sample_df, "psdslope", weightsname=None)
+        raw = np.array([
+            [[0.1, 0.2], [0.3, 0.4], [0.5, 0.6]],
+            [[0.7, 0.8], [0.9, 1.0], [1.1, 1.2]],
+            [[1.3, 1.4], [1.5, 1.6], [1.7, 1.8]],
+        ])
+        expected = np.mean(raw, axis=0)
+        np.testing.assert_array_almost_equal(result, expected)
+
+    def test_average_feature_no_weights_simple_matrix(self, parser, sample_df):
+        """Uniform-weight averaging for SIMPLE_MATRIX feature."""
+        result = parser._average_feature(sample_df, "pcorr", weightsname=None)
+        # eye(3)*1, eye(3)*2, eye(3)*3 -> mean = eye(3)*2
+        expected = np.eye(3) * 2.0
+        np.testing.assert_array_almost_equal(result, expected)
+
+    def test_average_feature_no_weights_banded_matrix(self, parser, sample_df):
+        """Uniform-weight averaging for BANDED_MATRIX feature."""
+        result = parser._average_feature(sample_df, "cohere", weightsname=None)
+        # alpha: ones*1, ones*3, ones*5 -> mean = ones*3
+        # beta:  ones*2, ones*4, ones*6 -> mean = ones*4
+        np.testing.assert_array_almost_equal(result["alpha"], np.ones((3, 3)) * 3.0)
+        np.testing.assert_array_almost_equal(result["beta"], np.ones((3, 3)) * 4.0)
+
+    def test_average_feature_no_weights_hist(self, parser, sample_df):
+        """Uniform-weight averaging for HIST feature."""
+        result = parser._average_feature(sample_df, "psd", weightsname=None)
+        coords, values = result
+        np.testing.assert_array_equal(coords, [1.0, 2.0, 3.0])
+        # Canonical (W=3, C=3, F=2) after extract_hist_data transpose
+        canonical = np.array([
+            [[10., 40.], [20., 50.], [30., 60.]],
+            [[70., 100.], [80., 110.], [90., 120.]],
+            [[130., 160.], [140., 170.], [150., 180.]],
+        ])
+        expected_values = np.mean(canonical, axis=0).T  # (F=2, C=3)
+        np.testing.assert_array_almost_equal(values, expected_values)
 
 
 class TestWindowAnalysisResult:
@@ -127,7 +264,7 @@ class TestWindowAnalysisResult:
     def war(self, sample_result_df):
         """Create a WindowAnalysisResult instance."""
         return WindowAnalysisResult(
-            result=sample_result_df, animal_id="A1", genotype="WT", channel_names=["LMot", "RMot"]
+            result=sample_result_df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"]
         )
 
     @pytest.fixture
@@ -137,6 +274,7 @@ class TestWindowAnalysisResult:
             result=filtering_result_df,
             animal_id="A1",
             genotype="WT",
+            sex="Male",
             channel_names=["LMot", "RMot", "LBar"],
             bad_channels_dict={"A1_20230101": ["LMot"], "A1_20230102": ["RMot"]},
         )
@@ -145,6 +283,7 @@ class TestWindowAnalysisResult:
         """Test WindowAnalysisResult initialization."""
         assert war.animal_id == "A1"
         assert war.genotype == "WT"
+        assert war.sex == "Male"
         assert war.channel_names == ["LMot", "RMot"]
         assert len(war.result) == len(sample_result_df)
 
@@ -156,6 +295,7 @@ class TestWindowAnalysisResult:
         # Check that the copy has the same attributes
         assert war_copy.animal_id == filtering_war.animal_id
         assert war_copy.genotype == filtering_war.genotype
+        assert war_copy.sex == filtering_war.sex
         assert war_copy.channel_names == filtering_war.channel_names
         assert war_copy.assume_from_number == filtering_war.assume_from_number
         assert war_copy.suppress_short_interval_error == filtering_war.suppress_short_interval_error
@@ -192,10 +332,70 @@ class TestWindowAnalysisResult:
         assert "psdtotal" in result.columns
         assert "animal" in result.columns  # Metadata columns should be included
 
+    def test_get_result_default_all(self, war):
+        """Test that get_result() with no args returns all features."""
+        result = war.get_result(allow_missing=True)
+        assert "rms" in result.columns
+        assert "psdtotal" in result.columns
+        assert "animal" in result.columns
+
+    def test_get_result_string_input(self, war):
+        """Test that get_result() accepts a single string feature."""
+        result = war.get_result("rms")
+        assert "rms" in result.columns
+        assert "animal" in result.columns
+
+    def test_get_result_exclude_with_none_features(self, war):
+        """Test that exclude works when features=None (all features except excluded)."""
+        result = war.get_result(exclude="rms", allow_missing=True)
+        assert "rms" not in result.columns
+        assert "psdtotal" in result.columns
+        assert "animal" in result.columns
+
+    def test_get_result_feature_fully_excluded(self, war):
+        """Test get_result when the only requested feature is also excluded returns no feature columns."""
+        result = war.get_result(features="rms", exclude="rms")
+        from neurodent import constants
+
+        for col in result.columns:
+            assert col not in constants.FEATURES
+
+    def test_get_result_exclude_superset_of_features(self, war):
+        """Test get_result when exclude contains feature(s) not in features list returns no feature columns."""
+        result = war.get_result(features="rms", exclude=["rms", "psdtotal"])
+        from neurodent import constants
+
+        for col in result.columns:
+            assert col not in constants.FEATURES
+
     def test_get_groupavg_result(self, war):
         """Test getting group average results."""
         # Use groupby on 'animalday' to avoid single-group scalar reduction
         result = war.get_groupavg_result(["rms"], groupby="animalday")
+        assert isinstance(result, pd.DataFrame)
+        assert "rms" in result.columns
+
+    def test_get_groupavg_result_default_all(self, war):
+        """Test that get_groupavg_result() with no args returns all features."""
+        result = war.get_groupavg_result(groupby="animalday")
+        assert isinstance(result, pd.DataFrame)
+        assert "rms" in result.columns
+
+    def test_get_groupavg_result_string_input(self, war):
+        """Test that get_groupavg_result() accepts a single string feature."""
+        result = war.get_groupavg_result("rms", groupby="animalday")
+        assert isinstance(result, pd.DataFrame)
+        assert "rms" in result.columns
+
+    def test_get_grouprows_result_default_all(self, war):
+        """Test that get_grouprows_result() with no args returns all features."""
+        result = war.get_grouprows_result()
+        assert isinstance(result, pd.DataFrame)
+        assert "rms" in result.columns
+
+    def test_get_grouprows_result_string_input(self, war):
+        """Test that get_grouprows_result() accepts a single string feature."""
+        result = war.get_grouprows_result("rms")
         assert isinstance(result, pd.DataFrame)
         assert "rms" in result.columns
 
@@ -220,7 +420,7 @@ class TestWindowAnalysisResult:
 
         # Should generate warning and sort timestamps
         with pytest.warns(UserWarning, match="Timestamps are not sorted"):
-            war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", channel_names=["LMot", "RMot"])
+            war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"])
 
         # Verify timestamps are now sorted
         assert war.result["timestamp"].is_monotonic_increasing
@@ -249,7 +449,7 @@ class TestWindowAnalysisResult:
         # Should not generate any warnings
         with warnings.catch_warnings():
             warnings.simplefilter("error")  # Turn warnings into errors
-            war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", channel_names=["LMot", "RMot"])
+            war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"])
 
         # Verify timestamps remain sorted
         assert war.result["timestamp"].is_monotonic_increasing
@@ -278,7 +478,7 @@ class TestWindowAnalysisResult:
 
         # Should generate warning but not raise error (1/149 = 0.67% < 1% threshold)
         with pytest.warns(UserWarning, match=r"Found \d+ intervals.*shorter than the median duration"):
-            war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", channel_names=["LMot", "RMot"])
+            war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"])
 
     def test_short_intervals_error(self):
         """Test error for too many short intervals between timestamps (> 1% threshold)."""
@@ -302,7 +502,7 @@ class TestWindowAnalysisResult:
 
         # Should raise ValueError (>1% of intervals are short: 2/3 = 66.7%)
         with pytest.raises(ValueError, match=r"Found \d+ intervals.*shorter than the median duration"):
-            WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", channel_names=["LMot", "RMot"])
+            WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"])
 
     def test_suppress_short_intervals_error(self):
         """Test that suppress_short_interval_error parameter suppresses the ValueError."""
@@ -326,13 +526,14 @@ class TestWindowAnalysisResult:
 
         # Should NOT raise ValueError when suppress_short_interval_error=True
         war = WindowAnalysisResult(
-            result=df, animal_id="A1", genotype="WT", channel_names=["LMot", "RMot"], suppress_short_interval_error=True
+            result=df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"], suppress_short_interval_error=True
         )
 
         # Verify the parameter is stored correctly
         assert war.suppress_short_interval_error
         assert war.animal_id == "A1"
         assert war.genotype == "WT"
+        assert war.sex == "Male"
 
     def test_no_short_intervals_check_without_duration(self):
         """Test that short interval check is skipped when duration column is missing."""
@@ -355,7 +556,7 @@ class TestWindowAnalysisResult:
         # Should not raise error or warning about short intervals
         with warnings.catch_warnings():
             warnings.simplefilter("error")  # Turn warnings into errors
-            war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", channel_names=["LMot", "RMot"])
+            war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"])
 
     def test_no_timestamp_validation_without_timestamps(self):
         """Test that timestamp validation is skipped when timestamp column is missing."""
@@ -372,7 +573,7 @@ class TestWindowAnalysisResult:
         # Should not raise any errors or warnings
         with warnings.catch_warnings():
             warnings.simplefilter("error")  # Turn warnings into errors
-            war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", channel_names=["LMot", "RMot"])
+            war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"])
 
     def test_equal_timestamps_handled_correctly(self):
         """Test that equal timestamps (0 second intervals) are handled correctly."""
@@ -397,7 +598,7 @@ class TestWindowAnalysisResult:
         # Should handle duplicate timestamps (0 second interval is < median duration)
         # This should trigger the short interval warning/error logic
         with pytest.raises(ValueError, match=r"Found \d+ intervals.*shorter than the median duration"):
-            WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", channel_names=["LMot", "RMot"])
+            WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"])
 
     def test_edge_case_single_timestamp(self):
         """Test edge case with only one timestamp (no intervals to check)."""
@@ -414,7 +615,7 @@ class TestWindowAnalysisResult:
         # Should not raise any errors (no intervals to check)
         with warnings.catch_warnings():
             warnings.simplefilter("error")  # Turn warnings into errors
-            war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", channel_names=["LMot", "RMot"])
+            war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"])
 
     def test_mixed_duration_intervals(self):
         """Test with mixed durations and corresponding interval validation."""
@@ -441,7 +642,7 @@ class TestWindowAnalysisResult:
         # All intervals should be reasonable relative to durations - no warnings expected
         with warnings.catch_warnings():
             warnings.simplefilter("error")  # Turn warnings into errors
-            war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", channel_names=["LMot", "RMot"])
+            war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"])
 
     def test_boundary_condition_exactly_one_percent(self):
         """Test boundary condition where exactly 1% of intervals are short."""
@@ -467,7 +668,7 @@ class TestWindowAnalysisResult:
 
         # Exactly 1% should trigger warning but not error (1/100 = 1.0%)
         with pytest.warns(UserWarning, match=r"Found \d+ intervals.*shorter than the median duration"):
-            war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", channel_names=["LMot", "RMot"])
+            war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"])
 
     def test_fragment_durations_stored_and_used(self):
         """Test that fragment durations are stored and used in weighted averaging."""
@@ -484,7 +685,7 @@ class TestWindowAnalysisResult:
         }
         df = pd.DataFrame(data)
 
-        war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", channel_names=["LMot", "RMot"])
+        war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"])
 
         # Verify duration column exists
         assert "duration" in war.result.columns
@@ -516,7 +717,7 @@ class TestWindowAnalysisResult:
         }
         df = pd.DataFrame(data)
 
-        war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", channel_names=["LMot", "RMot"])
+        war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"])
 
         # Aggregate by animalday
         war.aggregate_time_windows(groupby=["animalday"])
@@ -546,7 +747,7 @@ class TestWindowAnalysisResult:
         }
         df = pd.DataFrame(data)
 
-        war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", channel_names=["LMot", "RMot"])
+        war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"])
 
         with tempfile.TemporaryDirectory() as tmpdir:
             save_path = Path(tmpdir)
@@ -573,7 +774,7 @@ class TestWindowAnalysisResult:
         }
         df = pd.DataFrame(data)
 
-        war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", channel_names=["LMot", "RMot"])
+        war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"])
 
         # Should handle missing duration gracefully (falls back to uniform weights)
         result = war.get_groupavg_result(["rms"], groupby="animalday")
@@ -634,6 +835,7 @@ class TestWindowAnalysisResultFiltering:
             result=filtering_result_df,
             animal_id="A1",
             genotype="WT",
+            sex="Male",
             channel_names=["LMot", "RMot", "LBar"],
             bad_channels_dict={"A1_20230101": ["LMot"], "A1_20230102": ["RMot"]},
         )
@@ -822,6 +1024,7 @@ class TestWindowAnalysisResultFiltering:
             assert filtered is not filtering_war
             assert filtered.animal_id == filtering_war.animal_id
             assert filtered.genotype == filtering_war.genotype
+            assert filtered.sex == filtering_war.sex
             assert filtered.channel_names == filtering_war.channel_names
 
     def test_method_chaining(self, filtering_war):
@@ -849,6 +1052,7 @@ class TestWindowAnalysisResultFiltering:
 
         assert filtered.animal_id == filtering_war.animal_id
         assert filtered.genotype == filtering_war.genotype
+        assert filtered.sex == filtering_war.sex
         assert filtered.channel_names == filtering_war.channel_names
         assert filtered.assume_from_number == filtering_war.assume_from_number
         assert filtered.bad_channels_dict == filtering_war.bad_channels_dict
@@ -866,7 +1070,7 @@ class TestWindowAnalysisResultFiltering:
         )
 
         war = WindowAnalysisResult(
-            result=df, animal_id="A1", genotype="WT", channel_names=["LMot", "RMot"], bad_channels_dict={}
+            result=df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"], bad_channels_dict={}
         )
 
         # Empty bad_channels_dict should mean "no bad channels" and not raise an error
@@ -897,6 +1101,7 @@ class TestWindowAnalysisResultFiltering:
             result=df,
             animal_id="A1",
             genotype="WT",
+            sex="Male",
             channel_names=["LMot", "RMot"],
             bad_channels_dict={"A1_20230101": ["LMot"]},  # Missing A1_20230102
         )
@@ -913,7 +1118,7 @@ class TestWindowAnalysisResultFiltering:
         """Test morphological smoothing without duration column."""
         df = pd.DataFrame({"animal": ["A1"] * 5, "animalday": ["A1_20230101"] * 5, "rms": [[100, 200]] * 5})
 
-        war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", channel_names=["LMot", "RMot"])
+        war = WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"])
 
         config = {"high_rms": {"max_rms": 500}}
 
@@ -948,6 +1153,225 @@ class TestWindowAnalysisResultFiltering:
             np.testing.assert_array_equal(args[0], mask)
             assert args[1] == 8.0
             assert isinstance(filtered, WindowAnalysisResult)
+
+
+class TestWindowAnalysisResultRemapChannels:
+    """Test WindowAnalysisResult.reorder_and_pad_channels() FeatureType dispatch."""
+
+    @pytest.fixture
+    def remap_war(self):
+        """Create a WAR with all feature types for remap testing (2 channels → 3)."""
+        n_rows = 3
+        n_chan = 2
+        n_freq = 4
+        ch_names = ["LMot", "RMot"]
+        rng = np.random.default_rng(99)
+
+        data = {
+            "animal": ["A1"] * n_rows,
+            "animalday": ["A1_day1"] * n_rows,
+            "genotype": ["WT"] * n_rows,
+            "duration": [4.0] * n_rows,
+            "rms": [rng.random(n_chan).tolist() for _ in range(n_rows)],
+            "psdslope": [rng.random((n_chan, 2)).tolist() for _ in range(n_rows)],
+            "psdband": [
+                {b: rng.random(n_chan).tolist() for b in constants.BAND_NAMES}
+                for _ in range(n_rows)
+            ],
+            "pcorr": [rng.random((n_chan, n_chan)).tolist() for _ in range(n_rows)],
+            "cohere": [
+                {b: rng.random((n_chan, n_chan)).tolist() for b in constants.BAND_NAMES}
+                for _ in range(n_rows)
+            ],
+            "psd": [
+                (np.linspace(1, 40, n_freq), rng.random((n_freq, n_chan)))
+                for _ in range(n_rows)
+            ],
+        }
+        return WindowAnalysisResult(
+            result=pd.DataFrame(data),
+            animal_id="A1",
+            genotype="WT",
+            channel_names=ch_names,
+        )
+
+    def test_remap_channels_linear(self, remap_war):
+        """Test remap_channels for LINEAR feature (rms)."""
+        target = ["LMot", "RMot", "LBar"]
+        result = remap_war.reorder_and_pad_channels(target, use_abbrevs=False, inplace=False)
+        for row in result["rms"]:
+            arr = np.array(row)
+            assert arr.shape == (3,)
+            assert np.isnan(arr[2])  # LBar should be NaN-padded
+            assert not np.isnan(arr[0])
+
+    def test_remap_channels_linear_2d(self, remap_war):
+        """Test remap_channels for LINEAR_2D feature (psdslope)."""
+        target = ["LMot", "RMot", "LBar"]
+        result = remap_war.reorder_and_pad_channels(target, use_abbrevs=False, inplace=False)
+        for row in result["psdslope"]:
+            arr = np.array(row)
+            assert arr.shape == (3, 2)
+            assert np.all(np.isnan(arr[2]))  # LBar padded
+
+    def test_remap_channels_band(self, remap_war):
+        """Test remap_channels for BAND feature (psdband)."""
+        target = ["LMot", "RMot", "LBar"]
+        result = remap_war.reorder_and_pad_channels(target, use_abbrevs=False, inplace=False)
+        for row_dict in result["psdband"]:
+            assert set(row_dict.keys()) == set(constants.BAND_NAMES)
+            for band_vals in row_dict.values():
+                arr = np.array(band_vals)
+                assert arr.shape == (3,)
+                assert np.isnan(arr[2])
+
+    def test_remap_channels_simple_matrix(self, remap_war):
+        """Test remap_channels for SIMPLE_MATRIX feature (pcorr)."""
+        target = ["LMot", "RMot", "LBar"]
+        result = remap_war.reorder_and_pad_channels(target, use_abbrevs=False, inplace=False)
+        for row in result["pcorr"]:
+            arr = np.array(row)
+            assert arr.shape == (3, 3)
+            # LBar row/col should be NaN
+            assert np.all(np.isnan(arr[2, :]))
+            assert np.all(np.isnan(arr[:, 2]))
+
+    def test_remap_channels_banded_matrix(self, remap_war):
+        """Test remap_channels for BANDED_MATRIX feature (cohere)."""
+        target = ["LMot", "RMot", "LBar"]
+        result = remap_war.reorder_and_pad_channels(target, use_abbrevs=False, inplace=False)
+        for row_dict in result["cohere"]:
+            assert set(row_dict.keys()) == set(constants.BAND_NAMES)
+            for band_mat in row_dict.values():
+                arr = np.array(band_mat)
+                assert arr.shape == (3, 3)
+                assert np.all(np.isnan(arr[2, :]))
+                assert np.all(np.isnan(arr[:, 2]))
+
+    def test_remap_channels_hist(self, remap_war):
+        """Test remap_channels for HIST feature (psd)."""
+        target = ["LMot", "RMot", "LBar"]
+        result = remap_war.reorder_and_pad_channels(target, use_abbrevs=False, inplace=False)
+        for item in result["psd"]:
+            coords, vals = item
+            arr = np.array(vals)
+            assert arr.shape[-1] == 3  # 3 target channels
+            assert np.all(np.isnan(arr[..., 2]))
+
+    def test_remap_channels_inplace(self, remap_war):
+        """Test remap_channels with inplace=True updates instance state."""
+        target = ["LMot", "RMot", "LBar"]
+        remap_war.reorder_and_pad_channels(target, use_abbrevs=False, inplace=True)
+        assert remap_war.channel_names == target
+        # Verify data was updated
+        arr = np.array(remap_war.result["rms"].iloc[0])
+        assert arr.shape == (3,)
+
+
+class TestApplyFilter:
+    """Test WindowAnalysisResult._apply_filter() FeatureType dispatch."""
+
+    @pytest.fixture
+    def filter_war(self):
+        """Create a WAR with all feature types for filter testing."""
+        n_rows = 3
+        n_chan = 2
+        n_freq = 4
+        rng = np.random.default_rng(77)
+
+        data = {
+            "animal": ["A1"] * n_rows,
+            "animalday": ["A1_day1"] * n_rows,
+            "genotype": ["WT"] * n_rows,
+            "duration": [4.0] * n_rows,
+            "rms": [rng.random(n_chan).tolist() for _ in range(n_rows)],
+            "psdslope": [rng.random((n_chan, 2)).tolist() for _ in range(n_rows)],
+            "psdband": [
+                {b: rng.random(n_chan).tolist() for b in constants.BAND_NAMES}
+                for _ in range(n_rows)
+            ],
+            "pcorr": [rng.random((n_chan, n_chan)).tolist() for _ in range(n_rows)],
+            "cohere": [
+                {b: rng.random((n_chan, n_chan)).tolist() for b in constants.BAND_NAMES}
+                for _ in range(n_rows)
+            ],
+            "psd": [
+                (np.linspace(1, 40, n_freq), rng.random((n_freq, n_chan)))
+                for _ in range(n_rows)
+            ],
+        }
+        return WindowAnalysisResult(
+            result=pd.DataFrame(data),
+            animal_id="A1",
+            genotype="WT",
+            channel_names=["LMot", "RMot"],
+        )
+
+    @pytest.fixture
+    def mask(self):
+        """Boolean mask: keep all except row 0, channel 1."""
+        m = np.ones((3, 2), dtype=bool)
+        m[0, 1] = False
+        return m
+
+    def test_apply_filter_linear(self, filter_war, mask):
+        """Test _apply_filter for LINEAR feature (rms)."""
+        result = filter_war._apply_filter(mask)
+        vals = np.array(result["rms"].tolist())
+        assert np.isnan(vals[0, 1])
+        assert not np.isnan(vals[0, 0])
+
+    def test_apply_filter_linear_2d(self, filter_war, mask):
+        """Test _apply_filter for LINEAR_2D feature (psdslope)."""
+        result = filter_war._apply_filter(mask)
+        vals = np.array(result["psdslope"].tolist())
+        # Masked position: all components should be NaN
+        assert np.all(np.isnan(vals[0, 1, :]))
+        assert not np.any(np.isnan(vals[0, 0, :]))
+
+    def test_apply_filter_band(self, filter_war, mask):
+        """Test _apply_filter for BAND feature (psdband)."""
+        result = filter_war._apply_filter(mask)
+        for band in constants.BAND_NAMES:
+            val = np.array(result["psdband"].iloc[0][band])
+            assert np.isnan(val[1])  # channel 1 masked
+            assert not np.isnan(val[0])
+
+    def test_apply_filter_simple_matrix(self, filter_war, mask):
+        """Test _apply_filter for SIMPLE_MATRIX feature (pcorr)."""
+        result = filter_war._apply_filter(mask)
+        mat = np.array(result["pcorr"].iloc[0])
+        # Channel 1 masked → row 1 and col 1 should be NaN
+        assert np.isnan(mat[1, 0])
+        assert np.isnan(mat[0, 1])
+        assert not np.isnan(mat[0, 0])
+
+    def test_apply_filter_banded_matrix(self, filter_war, mask):
+        """Test _apply_filter for BANDED_MATRIX feature (cohere)."""
+        result = filter_war._apply_filter(mask)
+        row_dict = result["cohere"].iloc[0]
+        for band_mat in row_dict.values():
+            mat = np.array(band_mat)
+            assert np.isnan(mat[1, 0])
+            assert np.isnan(mat[0, 1])
+            assert not np.isnan(mat[0, 0])
+
+    def test_apply_filter_hist(self, filter_war, mask):
+        """Test _apply_filter for HIST feature (psd)."""
+        result = filter_war._apply_filter(mask)
+        coords, vals = result["psd"].iloc[0]
+        arr = np.array(vals)
+        # mask shape is (n_rows, n_chan), broadcast to (n_rows, n_freq, n_chan)
+        # row 0, channel 1 should be NaN
+        assert np.all(np.isnan(arr[:, 1]))
+        assert not np.any(np.isnan(arr[:, 0]))
+
+    def test_apply_filter_all_true_preserves_data(self, filter_war):
+        """Test that an all-True mask preserves all data (no NaNs introduced)."""
+        mask = np.ones((3, 2), dtype=bool)
+        result = filter_war._apply_filter(mask)
+        vals = np.array(result["rms"].tolist())
+        assert not np.any(np.isnan(vals))
 
 
 class TestAnimalPlotter:
@@ -1086,6 +1510,141 @@ class TestAnimalPlotter:
         plotter.plot_coherecorr_spectral(features=["cohere", "pcorr"])
         mock_subplots.assert_called()
 
+    def test_get_linear_feature_linear(self, plotter):
+        """Test __get_linear_feature dispatches LINEAR features correctly."""
+        n_time, n_chan = 5, 2
+        group = pd.DataFrame({
+            "rms": [np.random.rand(n_chan).tolist() for _ in range(n_time)],
+        })
+        # Access name-mangled private method
+        result = plotter._AnimalPlotter__get_linear_feature(group, "rms", score_type="none")
+        # LINEAR features are expanded with a trailing dim: (n_time, n_chan, 1)
+        assert result.shape == (n_time, n_chan, 1)
+
+    def test_get_linear_feature_linear_2d(self, plotter):
+        """Test __get_linear_feature dispatches LINEAR_2D features correctly."""
+        n_time, n_chan, n_components = 5, 2, 2
+        group = pd.DataFrame({
+            "psdslope": [np.random.rand(n_chan, n_components).tolist() for _ in range(n_time)],
+        })
+        result = plotter._AnimalPlotter__get_linear_feature(group, "psdslope", score_type="none")
+        # LINEAR_2D keeps all components → (n_time, n_chan, n_components)
+        assert result.shape == (n_time, n_chan, n_components)
+
+    def test_get_linear_feature_band(self, plotter):
+        """Test __get_linear_feature dispatches BAND features correctly."""
+        n_time, n_chan = 5, 2
+        n_bands = len(constants.BAND_NAMES)
+        group = pd.DataFrame({
+            "psdband": [
+                {b: np.random.rand(n_chan).tolist() for b in constants.BAND_NAMES}
+                for _ in range(n_time)
+            ],
+        })
+        result = plotter._AnimalPlotter__get_linear_feature(group, "psdband", score_type="none")
+        assert result.shape == (n_time, n_chan, n_bands)
+
+    def test_get_linear_feature_simple_matrix(self, plotter):
+        """Test __get_linear_feature dispatches SIMPLE_MATRIX features correctly."""
+        n_time, n_chan = 5, 2
+        group = pd.DataFrame({
+            "pcorr": [np.random.rand(n_chan, n_chan).tolist() for _ in range(n_time)],
+        })
+        # triag=True: extracts lower triangle (1 pair for 2x2)
+        result = plotter._AnimalPlotter__get_linear_feature(group, "pcorr", score_type="none", triag=True)
+        expected_pairs = n_chan * (n_chan - 1) // 2
+        assert result.shape == (n_time, expected_pairs, 1)
+
+    def test_get_linear_feature_banded_matrix(self, plotter):
+        """Test __get_linear_feature dispatches BANDED_MATRIX features correctly."""
+        n_time, n_chan = 5, 2
+        n_bands = len(constants.BAND_NAMES)
+        group = pd.DataFrame({
+            "cohere": [
+                {b: np.random.rand(n_chan, n_chan).tolist() for b in constants.BAND_NAMES}
+                for _ in range(n_time)
+            ],
+        })
+        result = plotter._AnimalPlotter__get_linear_feature(group, "cohere", score_type="none", triag=True)
+        expected_pairs = n_chan * (n_chan - 1) // 2
+        assert result.shape == (n_time, expected_pairs, n_bands)
+
+    def test_plot_linear_temporalgroup_yticks_linear(self, plotter):
+        """Test that LINEAR features get correct ytick labels."""
+        import matplotlib.pyplot as plt
+        n_time, n_chan = 5, 2
+        group = pd.DataFrame({
+            "rms": [np.random.rand(n_chan).tolist() for _ in range(n_time)],
+            "duration": [1.0] * n_time,
+        })
+        fig, ax = plt.subplots()
+        plotter._plot_linear_temporalgroup(group, "rms", ax)
+        labels = [t.get_text() for t in ax.get_yticklabels()]
+        assert labels == ["rms"]
+        plt.close(fig)
+
+    def test_plot_linear_temporalgroup_yticks_linear_2d(self, plotter):
+        """Test that LINEAR_2D features get psdslope/psdintercept ytick labels."""
+        import matplotlib.pyplot as plt
+        n_time, n_chan = 5, 2
+        group = pd.DataFrame({
+            "psdslope": [np.random.rand(n_chan, 2).tolist() for _ in range(n_time)],
+            "duration": [1.0] * n_time,
+        })
+        fig, ax = plt.subplots()
+        plotter._plot_linear_temporalgroup(group, "psdslope", ax)
+        labels = [t.get_text() for t in ax.get_yticklabels()]
+        assert labels == ["psdslope", "psdintercept"]
+        plt.close(fig)
+
+    def test_plot_linear_temporalgroup_yticks_band(self, plotter):
+        """Test that BAND features get frequency band ytick labels."""
+        import matplotlib.pyplot as plt
+        n_time, n_chan = 5, 2
+        group = pd.DataFrame({
+            "psdband": [
+                {b: np.random.rand(n_chan).tolist() for b in constants.BAND_NAMES}
+                for _ in range(n_time)
+            ],
+            "duration": [1.0] * n_time,
+        })
+        fig, ax = plt.subplots()
+        plotter._plot_linear_temporalgroup(group, "psdband", ax)
+        labels = [t.get_text() for t in ax.get_yticklabels()]
+        assert labels == constants.BAND_NAMES
+        plt.close(fig)
+
+    def test_plot_linear_temporalgroup_yticks_invalid_feature(self, plotter):
+        """Test that unsupported FeatureTypes for ytick labels raise ValueError."""
+        import matplotlib.pyplot as plt
+        n_time, n_chan = 5, 2
+        # Use a HIST feature (psd) which is not supported for ytick labels
+        group = pd.DataFrame({
+            "psd": [
+                (np.linspace(0, 50, 10).tolist(), np.random.rand(10, n_chan).tolist())
+                for _ in range(n_time)
+            ],
+            "duration": [1.0] * n_time,
+        })
+        fig, ax = plt.subplots()
+        # psd will fail in __get_linear_feature, not in ytick setting
+        with pytest.raises(ValueError, match="Unsupported FeatureType.*for feature extraction"):
+            plotter._plot_linear_temporalgroup(group, "psd", ax)
+        plt.close(fig)
+
+    def test_get_linear_feature_invalid_feature(self, plotter):
+        """Test that unsupported FeatureTypes for feature extraction raise ValueError."""
+        n_time, n_chan = 5, 2
+        # Use a HIST feature (psd) which should raise in __get_linear_feature
+        group = pd.DataFrame({
+            "psd": [
+                (np.linspace(0, 50, 10).tolist(), np.random.rand(10, n_chan).tolist())
+                for _ in range(n_time)
+            ],
+        })
+        with pytest.raises(ValueError, match="Unsupported FeatureType.*for feature extraction"):
+            plotter._AnimalPlotter__get_linear_feature(group, "psd", score_type="none")
+
 
 class TestExperimentPlotter:
     """Test ExperimentPlotter class."""
@@ -1211,14 +1770,12 @@ class TestExperimentPlotter:
                 }
             )
         )
-        from neurodent.visualization.plotting.experiment import df_normalize_baseline
-
-        # Patch df_normalize_baseline to just return the input DataFrame
-        import neurodent.visualization.plotting.experiment as expmod
-
-        expmod.df_normalize_baseline = lambda **kwargs: kwargs["df"]
-        result = plotter.plot_diffheatmap(feature="cohere", groupby=["genotype", "channel"], baseline_key="WT")
-        assert result == mock_grid
+        with patch(
+            "neurodent.visualization.plotting.experiment.df_normalize_baseline",
+            side_effect=lambda **kwargs: kwargs["df"],
+        ):
+            result = plotter.plot_diffheatmap(feature="cohere", groupby=["genotype", "channel"], baseline_key="WT")
+            assert result == mock_grid
 
     @patch("seaborn.FacetGrid")
     def test_plot_qqplot(self, mock_facetgrid, plotter):
@@ -1245,59 +1802,1109 @@ class TestExperimentPlotter:
             plotter.plot_qqplot(feature="cohere", groupby=["genotype", "channel"])
 
 
-class TestSpikeAnalysisResult:
-    """Test SpikeAnalysisResult class."""
+class TestExperimentPlotterFeatureDispatch:
+    """Test ExperimentPlotter.pull_timeseries_dataframe FeatureType dispatch paths."""
 
     @pytest.fixture
-    def mock_sas(self):
-        """Create mock SortingAnalyzer objects."""
-        sa1 = MagicMock()
-        sa2 = MagicMock()
-        # Mock sampling frequencies to be the same
-        sa1.recording.get_sampling_frequency.return_value = 1000.0
-        sa2.recording.get_sampling_frequency.return_value = 1000.0
-        # Mock channel count and IDs
-        sa1.recording.get_num_channels.return_value = 1
-        sa2.recording.get_num_channels.return_value = 1
-        sa1.recording.get_channel_ids.return_value = np.array(["0"])
-        sa2.recording.get_channel_ids.return_value = np.array(["1"])
-        # Mock spike times
-        sa1.get_spike_times.return_value = [0.1, 0.2, 0.3]
-        sa2.get_spike_times.return_value = [0.1, 0.2, 0.3]
-        return [sa1, sa2]
+    def feature_plotter(self):
+        """Create an ExperimentPlotter with real WAR-structured DataFrames."""
+        rng = np.random.default_rng(seed=42)
+        n_rows = 4
+        n_chan = 2
+        n_freq = 5
+        n_bands = len(constants.BAND_NAMES)
+        ch_names = ["LM", "RM"]
 
-    @pytest.fixture
-    def sar(self, mock_sas):
-        """Create a SpikeAnalysisResult instance."""
-        return SpikeAnalysisResult(
-            result_sas=mock_sas,
-            animal_id="test_animal",
-            genotype="WT",
-            animal_day="20230101",
-            channel_names=["LMot", "RMot"],
+        war = MagicMock(spec=WindowAnalysisResult)
+        war.animal_id = "A1"
+        war.channel_names = ch_names
+        war.channel_abbrevs = ch_names
+
+        df = pd.DataFrame({
+            "genotype": ["WT"] * n_rows,
+            "rms": [rng.random(n_chan).tolist() for _ in range(n_rows)],
+            "psdslope": [rng.random((n_chan, 2)).tolist() for _ in range(n_rows)],
+            "psdband": [
+                {b: rng.random(n_chan).tolist() for b in constants.BAND_NAMES}
+                for _ in range(n_rows)
+            ],
+            "pcorr": [rng.random((n_chan, n_chan)).tolist() for _ in range(n_rows)],
+            "cohere": [
+                {b: rng.random((n_chan, n_chan)).tolist() for b in constants.BAND_NAMES}
+                for _ in range(n_rows)
+            ],
+            "psd": [
+                (np.linspace(1, 40, n_freq), rng.random((n_freq, n_chan)))
+                for _ in range(n_rows)
+            ],
+        })
+        war.get_result.return_value = df
+
+        plot_order = {"channel": ch_names + ["average", "all"], "genotype": ["WT"]}
+        plotter = ExperimentPlotter([war], plot_order=plot_order)
+        return plotter
+
+    def test_pull_linear_feature(self, feature_plotter):
+        """Test pull_timeseries_dataframe with LINEAR feature, collapse_channels=False."""
+        df = feature_plotter.pull_timeseries_dataframe(
+            feature="rms", groupby=["genotype"], channels="all"
+        )
+        assert isinstance(df, pd.DataFrame)
+        assert "rms" in df.columns
+        assert "channel" in df.columns
+        assert set(df["channel"].unique()) == {"LM", "RM"}
+
+    def test_pull_linear_feature_collapsed(self, feature_plotter):
+        """Test pull_timeseries_dataframe with LINEAR feature, collapse_channels=True."""
+        df = feature_plotter.pull_timeseries_dataframe(
+            feature="rms", groupby=["genotype"], collapse_channels=True
+        )
+        assert isinstance(df, pd.DataFrame)
+        assert "rms" in df.columns
+        assert (df["channel"] == "average").all()
+
+    def test_pull_linear_2d_feature(self, feature_plotter):
+        """Test pull_timeseries_dataframe with LINEAR_2D, collapse_channels=False."""
+        df = feature_plotter.pull_timeseries_dataframe(
+            feature="psdslope", groupby=["genotype"], channels="all"
+        )
+        assert isinstance(df, pd.DataFrame)
+        assert "psdslope" in df.columns
+        # LINEAR_2D extracts first component (slope); values should be scalar
+        assert all(isinstance(v, (int, float, np.floating)) for v in df["psdslope"])
+
+    def test_pull_linear_2d_feature_collapsed(self, feature_plotter):
+        """Test pull_timeseries_dataframe with LINEAR_2D, collapse_channels=True."""
+        df = feature_plotter.pull_timeseries_dataframe(
+            feature="psdslope", groupby=["genotype"], collapse_channels=True
+        )
+        assert isinstance(df, pd.DataFrame)
+        assert "psdslope" in df.columns
+        assert (df["channel"] == "average").all()
+        assert all(isinstance(v, (int, float, np.floating)) for v in df["psdslope"])
+
+    def test_pull_band_feature(self, feature_plotter):
+        """Test pull_timeseries_dataframe with BAND, collapse_channels=False."""
+        df = feature_plotter.pull_timeseries_dataframe(
+            feature="psdband", groupby=["genotype"], channels="all"
+        )
+        assert isinstance(df, pd.DataFrame)
+        assert "psdband" in df.columns
+        assert "band" in df.columns
+        assert set(df["band"].unique()) == set(constants.BAND_NAMES)
+
+    def test_pull_band_feature_collapsed(self, feature_plotter):
+        """Test pull_timeseries_dataframe with BAND, collapse_channels=True."""
+        df = feature_plotter.pull_timeseries_dataframe(
+            feature="psdband", groupby=["genotype"], collapse_channels=True
+        )
+        assert isinstance(df, pd.DataFrame)
+        assert "psdband" in df.columns
+        assert "band" in df.columns
+        assert (df["channel"] == "average").all()
+        assert set(df["band"].unique()) == set(constants.BAND_NAMES)
+
+    def test_pull_simple_matrix_feature(self, feature_plotter):
+        """Test pull_timeseries_dataframe with SIMPLE_MATRIX, collapse_channels=True."""
+        df = feature_plotter.pull_timeseries_dataframe(
+            feature="pcorr", groupby=["genotype"], collapse_channels=True
+        )
+        assert isinstance(df, pd.DataFrame)
+        assert "pcorr" in df.columns
+        assert (df["channel"] == "average").all()
+
+    def test_pull_simple_matrix_feature_not_collapsed(self, feature_plotter):
+        """Test pull_timeseries_dataframe with SIMPLE_MATRIX, collapse_channels=False."""
+        df = feature_plotter.pull_timeseries_dataframe(
+            feature="pcorr", groupby=["genotype"], collapse_channels=False
+        )
+        assert isinstance(df, pd.DataFrame)
+        assert "pcorr" in df.columns
+        assert (df["channel"] == "all").all()
+
+    def test_pull_banded_matrix_feature(self, feature_plotter):
+        """Test pull_timeseries_dataframe with BANDED_MATRIX, collapse_channels=False."""
+        df = feature_plotter.pull_timeseries_dataframe(
+            feature="cohere", groupby=["genotype"], collapse_channels=False
+        )
+        assert isinstance(df, pd.DataFrame)
+        assert "cohere" in df.columns
+
+    def test_pull_banded_matrix_feature_collapsed(self, feature_plotter):
+        """Test pull_timeseries_dataframe with BANDED_MATRIX, collapse_channels=True."""
+        df = feature_plotter.pull_timeseries_dataframe(
+            feature="cohere", groupby=["genotype"], collapse_channels=True
+        )
+        assert isinstance(df, pd.DataFrame)
+        assert "cohere" in df.columns
+        assert "channel" in df.columns
+        assert (df["channel"] == "average").all()
+
+    def test_pull_hist_feature(self, feature_plotter):
+        """Test pull_timeseries_dataframe with HIST, collapse_channels=False."""
+        df = feature_plotter.pull_timeseries_dataframe(
+            feature="psd", groupby=["genotype"], channels="all"
+        )
+        assert isinstance(df, pd.DataFrame)
+        assert "psd" in df.columns
+        assert "freq" in df.columns
+
+    def test_pull_hist_feature_collapsed(self, feature_plotter):
+        """Test pull_timeseries_dataframe with HIST, collapse_channels=True."""
+        df = feature_plotter.pull_timeseries_dataframe(
+            feature="psd", groupby=["genotype"], collapse_channels=True
+        )
+        assert isinstance(df, pd.DataFrame)
+        assert "psd" in df.columns
+        assert "freq" in df.columns
+        assert (df["channel"] == "average").all()
+
+    def test_pull_missing_feature_raises(self, feature_plotter):
+        """Test that missing features raise ValueError."""
+        with pytest.raises(ValueError, match="feature not found"):
+            feature_plotter.pull_timeseries_dataframe(
+                feature="nonexistent_feature", groupby=["genotype"]
+            )
+
+
+class TestFeatureUtils:
+    """Test shared feature extraction utilities in feature_utils module."""
+
+    def test_extract_linear_array_1d(self):
+        """Test extracting 1-D (scalar per channel) linear feature."""
+        from neurodent.visualization.feature_utils import extract_linear_array
+
+        series = pd.Series([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+        result = extract_linear_array(series)
+        assert result.shape == (2, 3)
+        np.testing.assert_array_equal(result[0], [1.0, 2.0, 3.0])
+        np.testing.assert_array_equal(result[1], [4.0, 5.0, 6.0])
+
+    def test_extract_linear_array_2d(self):
+        """Test extracting 2-D (multi-component per channel) linear feature."""
+        from neurodent.visualization.feature_utils import extract_linear_array
+
+        series = pd.Series([
+            [[1.0, 2.0], [3.0, 4.0]],
+            [[5.0, 6.0], [7.0, 8.0]],
+        ])
+        result = extract_linear_array(series)
+        assert result.shape == (2, 2, 2)
+        np.testing.assert_array_equal(result[0, 0], [1.0, 2.0])
+
+    def test_extract_band_dict(self):
+        """Test extracting band-keyed dict feature to array."""
+        from neurodent.visualization.feature_utils import extract_band_dict
+
+        series = pd.Series([
+            {"delta": [1.0, 2.0], "theta": [3.0, 4.0]},
+            {"delta": [5.0, 6.0], "theta": [7.0, 8.0]},
+        ])
+        vals, keys = extract_band_dict(series)
+        assert keys == ["delta", "theta"]
+        # Canonical shape: (n_windows, n_channels, n_bands)
+        assert vals.shape == (2, 2, 2)
+        # vals[window, channel, band] — channel 0, all bands, window 0
+        np.testing.assert_array_equal(vals[0, 0], [1.0, 3.0])  # ch0: delta=1.0, theta=3.0
+
+    def test_repack_band_dict(self):
+        """Test repacking array back to list of band dicts."""
+        from neurodent.visualization.feature_utils import extract_band_dict, repack_band_dict
+
+        original = pd.Series([
+            {"delta": [1.0, 2.0], "theta": [3.0, 4.0]},
+            {"delta": [5.0, 6.0], "theta": [7.0, 8.0]},
+        ])
+        vals, keys = extract_band_dict(original)
+        repacked = repack_band_dict(vals, keys)
+        assert len(repacked) == 2
+        assert list(repacked[0].keys()) == ["delta", "theta"]
+        np.testing.assert_array_equal(repacked[0]["delta"], [1.0, 2.0])
+        np.testing.assert_array_equal(repacked[1]["theta"], [7.0, 8.0])
+
+    def test_extract_band_dict_round_trip(self):
+        """Test that extract → repack round-trips correctly."""
+        from neurodent.visualization.feature_utils import extract_band_dict, repack_band_dict
+
+        original = pd.Series([
+            {"alpha": [0.1, 0.2], "beta": [0.3, 0.4], "gamma": [0.5, 0.6]},
+            {"alpha": [0.7, 0.8], "beta": [0.9, 1.0], "gamma": [1.1, 1.2]},
+        ])
+        vals, keys = extract_band_dict(original)
+        repacked = repack_band_dict(vals, keys)
+        for i in range(len(original)):
+            for k in original.iloc[i].keys():
+                np.testing.assert_array_almost_equal(
+                    repacked[i][k], original.iloc[i][k]
+                )
+
+    def test_extract_hist_data_tuples(self):
+        """Test extracting histogram data from tuple format (pickle origin)."""
+        from neurodent.visualization.feature_utils import extract_hist_data
+
+        series = pd.Series([
+            (np.array([1.0, 2.0, 3.0]), np.array([10.0, 20.0, 30.0])),
+            (np.array([1.0, 2.0, 3.0]), np.array([40.0, 50.0, 60.0])),
+        ])
+        coords, values = extract_hist_data(series)
+        assert coords.shape == (2, 3)
+        # 1-D values per cell (single-channel) → singleton channel dim inserted, shape (W, C, F)
+        assert values.shape == (2, 1, 3)
+        np.testing.assert_array_equal(coords[0], [1.0, 2.0, 3.0])
+        np.testing.assert_array_equal(values[1, 0], [40.0, 50.0, 60.0])
+
+    def test_extract_hist_data_lists(self):
+        """Test extracting histogram data from list format (parquet origin)."""
+        from neurodent.visualization.feature_utils import extract_hist_data
+
+        series = pd.Series([
+            [[1.0, 2.0, 3.0], [10.0, 20.0, 30.0]],
+            [[1.0, 2.0, 3.0], [40.0, 50.0, 60.0]],
+        ])
+        coords, values = extract_hist_data(series)
+        assert coords.shape == (2, 3)
+        # 1-D values per cell (single-channel) → singleton channel dim inserted, shape (W, C, F)
+        assert values.shape == (2, 1, 3)
+        np.testing.assert_array_equal(values[0, 0], [10.0, 20.0, 30.0])
+
+    def test_extract_hist_data_multichannel(self):
+        """Test extracting histogram data where values are 2-D (F, C) per cell."""
+        from neurodent.visualization.feature_utils import extract_hist_data
+
+        n_freq, n_chan = 4, 3
+        coords_row = np.arange(n_freq, dtype=float)
+        # Per-cell values are (F, C) = (4, 3)
+        vals_row0 = np.arange(n_freq * n_chan, dtype=float).reshape(n_freq, n_chan)
+        vals_row1 = vals_row0 + 100.0
+        series = pd.Series([
+            (coords_row, vals_row0),
+            (coords_row, vals_row1),
+        ])
+        coords, values = extract_hist_data(series)
+        assert coords.shape == (2, n_freq)
+        # Canonical shape: (W, C, F)
+        assert values.shape == (2, n_chan, n_freq)
+        # Channel 0 of window 0 should equal the first row of vals_row0 transposed
+        np.testing.assert_array_equal(values[0, 0], vals_row0[:, 0])
+
+    def test_extract_linear_array_ragged_raises(self):
+        """Test that ragged input raises ValueError."""
+        from neurodent.visualization.feature_utils import extract_linear_array
+
+        series = pd.Series([[1.0, 2.0, 3.0], [4.0, 5.0]])
+        with pytest.raises(ValueError, match="Ragged input"):
+            extract_linear_array(series)
+
+    def test_extract_band_dict_ragged_raises(self):
+        """Test that ragged band values raise ValueError."""
+        from neurodent.visualization.feature_utils import extract_band_dict
+
+        series = pd.Series([
+            {"delta": [1.0, 2.0], "theta": [3.0, 4.0]},
+            {"delta": [5.0, 6.0, 7.0], "theta": [8.0]},
+        ])
+        with pytest.raises(ValueError, match="Ragged input"):
+            extract_band_dict(series)
+
+    def test_extract_hist_data_ragged_raises(self):
+        """Test that ragged histogram data raises ValueError."""
+        from neurodent.visualization.feature_utils import extract_hist_data
+
+        series = pd.Series([
+            (np.array([1.0, 2.0, 3.0]), np.array([10.0, 20.0, 30.0])),
+            (np.array([1.0, 2.0]), np.array([40.0, 50.0])),
+        ])
+        with pytest.raises(ValueError, match="Ragged input"):
+            extract_hist_data(series)
+
+    def test_extract_linear_array_ftype_validation(self):
+        """Test ftype param validates ndim."""
+        from neurodent.visualization.feature_utils import extract_linear_array
+        series = pd.Series([[1.0, 2.0], [3.0, 4.0]])
+        # Correct ftype should pass
+        result = extract_linear_array(series, ftype=constants.FeatureType.LINEAR)
+        assert result.shape == (2, 2)
+        # Wrong ftype should raise
+        with pytest.raises(ValueError, match="Expected 3-D"):
+            extract_linear_array(series, ftype=constants.FeatureType.LINEAR_2D)
+
+    def test_extract_band_dict_ftype_validation(self):
+        """Test ftype param validates ndim."""
+        from neurodent.visualization.feature_utils import extract_band_dict
+        series = pd.Series([{"delta": [1.0, 2.0], "theta": [3.0, 4.0]}])
+        # Correct ftype should pass
+        vals, keys = extract_band_dict(series, ftype=constants.FeatureType.BAND)
+        assert vals.shape == (1, 2, 2)
+        # Wrong ftype (expects 4-D) should raise
+        with pytest.raises(ValueError, match="Expected 4-D"):
+            extract_band_dict(series, ftype=constants.FeatureType.BANDED_MATRIX)
+
+    def test_extract_hist_data_ftype_validation(self):
+        """Test ftype param validates feature type."""
+        from neurodent.visualization.feature_utils import extract_hist_data
+        series = pd.Series([
+            (np.array([1.0, 2.0]), np.array([10.0, 20.0])),
+        ])
+        # Correct ftype should pass
+        coords, values = extract_hist_data(series, ftype=constants.FeatureType.HIST)
+        assert coords.shape == (1, 2)
+        # Wrong ftype should raise
+        with pytest.raises(ValueError, match="expects FeatureType.HIST"):
+            extract_hist_data(series, ftype=constants.FeatureType.LINEAR)
+
+
+class TestFlattenFeatureForPlotting:
+    """Test flatten_feature_for_plotting utility."""
+
+    def test_flatten_linear(self):
+        from neurodent.visualization.feature_utils import flatten_feature_for_plotting
+        vals = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])  # (2, 3)
+        result = flatten_feature_for_plotting(vals, constants.FeatureType.LINEAR)
+        assert result.shape == (2, 3, 1)
+        np.testing.assert_array_equal(result[:, :, 0], vals)
+
+    def test_flatten_linear_2d(self):
+        from neurodent.visualization.feature_utils import flatten_feature_for_plotting
+        vals = np.array([[[1.0, 2.0], [3.0, 4.0]]])  # (1, 2, 2)
+        result = flatten_feature_for_plotting(vals, constants.FeatureType.LINEAR_2D)
+        assert result.shape == (1, 2, 2)
+        np.testing.assert_array_equal(result, vals)
+
+    def test_flatten_band(self):
+        from neurodent.visualization.feature_utils import flatten_feature_for_plotting
+        vals = np.array([[[10.0, 20.0, 30.0], [40.0, 50.0, 60.0]]])  # (1, 2, 3)
+        result = flatten_feature_for_plotting(vals, constants.FeatureType.BAND)
+        assert result.shape == (1, 2, 3)
+        np.testing.assert_array_equal(result, vals)
+        np.testing.assert_array_equal(result[0, 0], [10.0, 20.0, 30.0])
+        np.testing.assert_array_equal(result[0, 1], [40.0, 50.0, 60.0])
+
+    def test_flatten_simple_matrix_triag(self):
+        from neurodent.visualization.feature_utils import flatten_feature_for_plotting
+        vals = np.array([[[0.0, 0.1, 0.2],
+                          [0.3, 0.0, 0.4],
+                          [0.5, 0.6, 0.0]]])  # (1, 3, 3)
+        result = flatten_feature_for_plotting(vals, constants.FeatureType.SIMPLE_MATRIX, triag=True)
+        # tril_indices(3, k=-1) -> (1,0)=0.3, (2,0)=0.5, (2,1)=0.6
+        assert result.shape == (1, 3, 1)
+        np.testing.assert_array_equal(result[0, :, 0], [0.3, 0.5, 0.6])
+
+    def test_flatten_simple_matrix_no_triag(self):
+        from neurodent.visualization.feature_utils import flatten_feature_for_plotting
+        vals = np.array([[[1.0, 2.0], [3.0, 4.0]]])  # (1, 2, 2)
+        result = flatten_feature_for_plotting(vals, constants.FeatureType.SIMPLE_MATRIX, triag=False)
+        assert result.shape == (1, 4, 1)
+        np.testing.assert_array_equal(result[0, :, 0], [1.0, 2.0, 3.0, 4.0])
+
+    def test_flatten_banded_matrix_triag(self):
+        from neurodent.visualization.feature_utils import flatten_feature_for_plotting
+        vals = np.zeros((1, 3, 3, 2))
+        vals[0, 1, 0, 0] = 10.0; vals[0, 1, 0, 1] = 11.0
+        vals[0, 2, 0, 0] = 20.0; vals[0, 2, 0, 1] = 21.0
+        vals[0, 2, 1, 0] = 30.0; vals[0, 2, 1, 1] = 31.0
+        result = flatten_feature_for_plotting(vals, constants.FeatureType.BANDED_MATRIX, triag=True)
+        # tril_indices(3, k=-1) -> pairs: (1,0), (2,0), (2,1)
+        assert result.shape == (1, 3, 2)
+        np.testing.assert_array_equal(result[0, 0], [10.0, 11.0])
+        np.testing.assert_array_equal(result[0, 1], [20.0, 21.0])
+        np.testing.assert_array_equal(result[0, 2], [30.0, 31.0])
+
+    def test_flatten_banded_matrix_no_triag(self):
+        from neurodent.visualization.feature_utils import flatten_feature_for_plotting
+        vals = np.arange(8, dtype=float).reshape(1, 2, 2, 2)
+        result = flatten_feature_for_plotting(vals, constants.FeatureType.BANDED_MATRIX, triag=False)
+        assert result.shape == (1, 4, 2)
+        np.testing.assert_array_equal(result[0, 0], [0.0, 1.0])
+        np.testing.assert_array_equal(result[0, 1], [2.0, 3.0])
+        np.testing.assert_array_equal(result[0, 2], [4.0, 5.0])
+        np.testing.assert_array_equal(result[0, 3], [6.0, 7.0])
+
+    def test_flatten_unsupported_raises(self):
+        from neurodent.visualization.feature_utils import flatten_feature_for_plotting
+        vals = np.array([[1.0, 2.0, 3.0]])
+        with pytest.raises(ValueError, match="Unsupported FeatureType"):
+            flatten_feature_for_plotting(vals, constants.FeatureType.HIST)
+
+
+class TestCollapseFeatureChannels:
+    """Test collapse_feature_channels utility."""
+
+    def test_collapse_linear(self):
+        from neurodent.visualization.feature_utils import collapse_feature_channels
+        vals = np.array([[1.0, 3.0], [5.0, 7.0]])  # (2 windows, 2 channels)
+        result = collapse_feature_channels(vals, constants.FeatureType.LINEAR)
+        np.testing.assert_array_equal(result, [2.0, 6.0])
+
+    def test_collapse_linear_2d(self):
+        from neurodent.visualization.feature_utils import collapse_feature_channels
+        vals = np.array([[[1.0, 2.0], [3.0, 4.0]]])  # (1, 2 chan, 2 comp)
+        result = collapse_feature_channels(vals, constants.FeatureType.LINEAR_2D)
+        assert result.shape == (1, 2)
+        np.testing.assert_array_equal(result[0], [2.0, 3.0])
+
+    def test_collapse_band(self):
+        from neurodent.visualization.feature_utils import collapse_feature_channels
+        # Canonical shape: (n_windows, n_channels, n_bands)
+        vals = np.array([[[1.0, 5.0], [3.0, 7.0]]])  # (1, 2 chan, 2 bands)
+        result = collapse_feature_channels(vals, constants.FeatureType.BAND)
+        assert result.shape == (1, 2)
+        np.testing.assert_array_equal(result[0], [2.0, 6.0])
+
+    def test_collapse_simple_matrix(self):
+        from neurodent.visualization.feature_utils import collapse_feature_channels
+        # 2x2 symmetric matrix, tril pair = (1,0) only
+        vals = np.array([[[0.0, 0.5], [0.5, 0.0]]])  # (1, 2, 2)
+        result = collapse_feature_channels(vals, constants.FeatureType.SIMPLE_MATRIX)
+        assert result.shape == (1,)
+        np.testing.assert_almost_equal(result[0], 0.5)
+
+    def test_collapse_banded_matrix(self):
+        from neurodent.visualization.feature_utils import collapse_feature_channels
+        # Canonical shape: (n_windows, n_chan, n_chan, n_bands)
+        vals = np.zeros((1, 2, 2, 2))
+        vals[0, 1, 0, 0] = 0.8  # ch_row=1, ch_col=0, band=0
+        vals[0, 1, 0, 1] = 0.6  # ch_row=1, ch_col=0, band=1
+        result = collapse_feature_channels(vals, constants.FeatureType.BANDED_MATRIX)
+        assert result.shape == (1, 2)
+        np.testing.assert_almost_equal(result[0, 0], 0.8)
+        np.testing.assert_almost_equal(result[0, 1], 0.6)
+
+    def test_collapse_hist(self):
+        from neurodent.visualization.feature_utils import collapse_feature_channels
+        vals = np.array([[[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]])  # (1, 2 chan, 3 freq)
+        result = collapse_feature_channels(vals, constants.FeatureType.HIST)
+        assert result.shape == (1, 3)
+        np.testing.assert_array_equal(result[0], [2.5, 3.5, 4.5])
+
+    def test_collapse_hist_via_function(self):
+        """Verify HIST is supported in collapse_feature_channels."""
+        from neurodent.visualization.feature_utils import collapse_feature_channels
+        vals = np.array([[[1.0, 2.0], [3.0, 4.0]]])  # (1, 2 chan, 2 freq)
+        result = collapse_feature_channels(vals, constants.FeatureType.HIST)
+        assert result.shape == (1, 2)
+
+    def test_collapse_linear_with_nan(self):
+        """NaN values are skipped by nanmean."""
+        from neurodent.visualization.feature_utils import collapse_feature_channels
+        vals = np.array([[1.0, np.nan, 3.0], [4.0, 5.0, np.nan]])  # (2, 3)
+        result = collapse_feature_channels(vals, constants.FeatureType.LINEAR)
+        # nanmean([1, nan, 3])=2.0; nanmean([4, 5, nan])=4.5
+        np.testing.assert_array_almost_equal(result, [2.0, 4.5])
+
+    def test_collapse_simple_matrix_3x3(self):
+        """3x3 matrix: 3 tril pairs averaged."""
+        from neurodent.visualization.feature_utils import collapse_feature_channels
+        mat = np.array([[[0.0, 0.1, 0.2],
+                         [0.3, 0.0, 0.4],
+                         [0.5, 0.6, 0.0]]])  # (1, 3, 3)
+        result = collapse_feature_channels(mat, constants.FeatureType.SIMPLE_MATRIX)
+        # tril_indices(3, k=-1): (1,0)=0.3, (2,0)=0.5, (2,1)=0.6 -> mean
+        assert result.shape == (1,)
+        np.testing.assert_almost_equal(result[0], np.mean([0.3, 0.5, 0.6]))
+
+    def test_collapse_banded_matrix_with_nan(self):
+        """NaN in one tril pair is skipped by nanmean."""
+        from neurodent.visualization.feature_utils import collapse_feature_channels
+        vals = np.zeros((1, 3, 3, 1))
+        vals[0, 1, 0, 0] = 0.6
+        vals[0, 2, 0, 0] = np.nan
+        vals[0, 2, 1, 0] = 0.8
+        result = collapse_feature_channels(vals, constants.FeatureType.BANDED_MATRIX)
+        # tril pairs: (1,0)=0.6, (2,0)=nan, (2,1)=0.8 -> nanmean=0.7
+        assert result.shape == (1, 1)
+        np.testing.assert_almost_equal(result[0, 0], 0.7)
+
+    def test_collapse_linear_single_channel(self):
+        """Single channel: mean is identity."""
+        from neurodent.visualization.feature_utils import collapse_feature_channels
+        vals = np.array([[5.0], [10.0]])  # (2, 1)
+        result = collapse_feature_channels(vals, constants.FeatureType.LINEAR)
+        np.testing.assert_array_equal(result, [5.0, 10.0])
+
+
+class TestExtractFeature:
+    """Test extract_feature utility."""
+
+    def test_extract_linear(self):
+        from neurodent.visualization.feature_utils import extract_feature
+        series = pd.Series([[1.0, 2.0], [3.0, 4.0]])
+        vals, keys = extract_feature(series, constants.FeatureType.LINEAR)
+        assert vals.shape == (2, 2)
+        assert keys is None
+        np.testing.assert_array_equal(vals[0], [1.0, 2.0])
+        np.testing.assert_array_equal(vals[1], [3.0, 4.0])
+
+    def test_extract_linear_2d(self):
+        from neurodent.visualization.feature_utils import extract_feature
+        series = pd.Series([[[1.0, 2.0], [3.0, 4.0]]])
+        vals, keys = extract_feature(series, constants.FeatureType.LINEAR_2D)
+        assert vals.shape == (1, 2, 2)
+        assert keys is None
+        np.testing.assert_array_equal(vals[0, 0], [1.0, 2.0])
+        np.testing.assert_array_equal(vals[0, 1], [3.0, 4.0])
+
+    def test_extract_simple_matrix(self):
+        from neurodent.visualization.feature_utils import extract_feature
+        series = pd.Series([[[0.0, 0.5], [0.5, 0.0]]])
+        vals, keys = extract_feature(series, constants.FeatureType.SIMPLE_MATRIX)
+        assert vals.shape == (1, 2, 2)
+        assert keys is None
+        np.testing.assert_array_equal(vals[0], [[0.0, 0.5], [0.5, 0.0]])
+
+    def test_extract_band(self):
+        from neurodent.visualization.feature_utils import extract_feature
+        series = pd.Series([{"delta": [1.0, 2.0], "theta": [3.0, 4.0]}])
+        vals, keys = extract_feature(series, constants.FeatureType.BAND)
+        assert vals.shape == (1, 2, 2)  # (W, C, B)
+        assert keys == ["delta", "theta"]
+        # After transpose (W, B, C) -> (W, C, B): ch0=[delta=1, theta=3], ch1=[delta=2, theta=4]
+        np.testing.assert_array_equal(vals[0, 0], [1.0, 3.0])
+        np.testing.assert_array_equal(vals[0, 1], [2.0, 4.0])
+
+    def test_extract_banded_matrix(self):
+        from neurodent.visualization.feature_utils import extract_feature
+        series = pd.Series([{"delta": [[0.0, 0.5], [0.5, 0.0]]}])
+        vals, keys = extract_feature(series, constants.FeatureType.BANDED_MATRIX)
+        assert vals.shape == (1, 2, 2, 1)  # (W, C, C, B)
+        assert keys == ["delta"]
+        np.testing.assert_array_equal(vals[0, :, :, 0], [[0.0, 0.5], [0.5, 0.0]])
+
+
+class TestFormatChannelData:
+    """Test format_channel_data utility with numeric validity."""
+
+    def test_format_linear_collapsed(self):
+        from neurodent.visualization.feature_utils import format_channel_data
+        vals = np.array([[1.0, 3.0], [5.0, 7.0]])  # (2 win, 2 chan)
+        result = format_channel_data(vals, constants.FeatureType.LINEAR, collapse_channels=True)
+        assert "average" in result
+        np.testing.assert_array_almost_equal(result["average"], [2.0, 6.0])
+
+    def test_format_linear_per_channel(self):
+        from neurodent.visualization.feature_utils import format_channel_data
+        vals = np.array([[1.0, 3.0], [5.0, 7.0]])  # (2 win, 2 chan)
+        result = format_channel_data(
+            vals, constants.FeatureType.LINEAR, collapse_channels=False,
+            ch_to_idx={"LM": 0, "RM": 1}, channels=["LM", "RM"], ch_names=["LM", "RM"],
+        )
+        assert set(result.keys()) == {"LM", "RM"}
+        assert result["LM"] == [1.0, 5.0]
+        assert result["RM"] == [3.0, 7.0]
+
+    def test_format_band_collapsed(self):
+        from neurodent.visualization.feature_utils import format_channel_data
+        # Canonical: (W, C, B)
+        vals = np.array([[[1.0, 5.0], [3.0, 7.0]]])  # (1, 2 chan, 2 bands)
+        result = format_channel_data(vals, constants.FeatureType.BAND, collapse_channels=True)
+        assert "average" in result
+        np.testing.assert_array_almost_equal(result["average"], [[2.0, 6.0]])
+
+    def test_format_band_per_channel(self):
+        from neurodent.visualization.feature_utils import format_channel_data
+        vals = np.array([[[1.0, 5.0], [3.0, 7.0]]])  # (1, 2 chan, 2 bands)
+        result = format_channel_data(
+            vals, constants.FeatureType.BAND, collapse_channels=False,
+            ch_to_idx={"LM": 0, "RM": 1}, channels=["LM", "RM"], ch_names=["LM", "RM"],
+        )
+        assert set(result.keys()) == {"LM", "RM"}
+        np.testing.assert_array_almost_equal(result["LM"], [[1.0, 5.0]])
+
+    def test_format_simple_matrix_collapsed(self):
+        from neurodent.visualization.feature_utils import format_channel_data
+        vals = np.array([[[0.0, 0.5], [0.5, 0.0]]])  # (1, 2, 2)
+        result = format_channel_data(vals, constants.FeatureType.SIMPLE_MATRIX, collapse_channels=True)
+        assert "average" in result
+        np.testing.assert_array_almost_equal(result["average"], [0.5])
+
+    def test_format_simple_matrix_not_collapsed(self):
+        from neurodent.visualization.feature_utils import format_channel_data
+        vals = np.array([[[0.0, 0.5], [0.5, 0.0]]])  # (1, 2, 2)
+        result = format_channel_data(vals, constants.FeatureType.SIMPLE_MATRIX, collapse_channels=False)
+        assert "all" in result
+
+    def test_format_banded_matrix_collapsed(self):
+        from neurodent.visualization.feature_utils import format_channel_data
+        vals = np.zeros((1, 2, 2, 2))
+        vals[0, 1, 0, 0] = 0.8
+        vals[0, 1, 0, 1] = 0.6
+        result = format_channel_data(vals, constants.FeatureType.BANDED_MATRIX, collapse_channels=True)
+        assert "average" in result
+        np.testing.assert_array_almost_equal(result["average"], [[0.8, 0.6]])
+
+    def test_format_banded_matrix_not_collapsed(self):
+        from neurodent.visualization.feature_utils import format_channel_data
+        vals = np.zeros((1, 2, 2, 2))
+        result = format_channel_data(vals, constants.FeatureType.BANDED_MATRIX, collapse_channels=False)
+        assert "all" in result
+
+    def test_format_hist_collapsed(self):
+        from neurodent.visualization.feature_utils import format_channel_data
+        vals = np.array([[[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]])  # (1, 2 chan, 3 freq)
+        result = format_channel_data(vals, constants.FeatureType.HIST, collapse_channels=True)
+        assert "average" in result
+        np.testing.assert_array_almost_equal(result["average"], [[2.5, 3.5, 4.5]])
+
+    def test_format_hist_per_channel(self):
+        from neurodent.visualization.feature_utils import format_channel_data
+        vals = np.array([[[1.0, 2.0], [3.0, 4.0]]])  # (1, 2 chan, 2 freq)
+        result = format_channel_data(
+            vals, constants.FeatureType.HIST, collapse_channels=False,
+            ch_to_idx={"LM": 0, "RM": 1}, channels=["LM", "RM"], ch_names=["LM", "RM"],
+        )
+        assert set(result.keys()) == {"LM", "RM"}
+        np.testing.assert_array_almost_equal(result["LM"], [[1.0, 2.0]])
+
+    def test_format_channel_subset(self):
+        """Only requested channels are included in the result."""
+        from neurodent.visualization.feature_utils import format_channel_data
+        vals = np.array([[1.0, 3.0, 5.0]])  # (1, 3 chan)
+        result = format_channel_data(
+            vals, constants.FeatureType.LINEAR, collapse_channels=False,
+            ch_to_idx={"A": 0, "B": 1, "C": 2}, channels=["A", "C"], ch_names=["A", "B", "C"],
+        )
+        assert set(result.keys()) == {"A", "C"}
+        assert result["A"] == [1.0]
+        assert result["C"] == [5.0]
+
+
+class TestPipelineComposition:
+    """End-to-end numerical tests: extract -> collapse -> format -> flatten.
+
+    Verifies that values survive the full pipeline correctly and that
+    channel ordering is preserved through transpositions.
+    """
+
+    def test_pipeline_linear(self):
+        """LINEAR: extract -> format(collapsed) -> format(per-channel) -> flatten."""
+        from neurodent.visualization.feature_utils import (
+            extract_feature, format_channel_data, flatten_feature_for_plotting,
+        )
+        # 2 windows, 2 channels: ch0=[1, 3], ch1=[2, 4]
+        series = pd.Series([[1.0, 2.0], [3.0, 4.0]])
+        vals, keys = extract_feature(series, constants.FeatureType.LINEAR)
+
+        assert vals.shape == (2, 2)
+        np.testing.assert_array_equal(vals, [[1.0, 2.0], [3.0, 4.0]])
+
+        # Collapsed: average over channels
+        fmt = format_channel_data(vals, constants.FeatureType.LINEAR, collapse_channels=True)
+        np.testing.assert_array_almost_equal(fmt["average"], [1.5, 3.5])
+
+        # Per-channel: verify channel identity
+        fmt_ch = format_channel_data(
+            vals, constants.FeatureType.LINEAR, collapse_channels=False,
+            ch_to_idx={"A": 0, "B": 1}, channels=["A", "B"], ch_names=["A", "B"],
+        )
+        assert fmt_ch["A"] == [1.0, 3.0]
+        assert fmt_ch["B"] == [2.0, 4.0]
+
+        # Flatten
+        flat = flatten_feature_for_plotting(vals, constants.FeatureType.LINEAR)
+        assert flat.shape == (2, 2, 1)
+        np.testing.assert_array_equal(flat[:, :, 0], vals)
+
+    def test_pipeline_linear_2d(self):
+        """LINEAR_2D: extract -> format(collapsed) -> flatten."""
+        from neurodent.visualization.feature_utils import (
+            extract_feature, format_channel_data, flatten_feature_for_plotting,
+        )
+        # 1 window, 2 channels, 2 components
+        series = pd.Series([[[1.0, 2.0], [3.0, 4.0]]])
+        vals, keys = extract_feature(series, constants.FeatureType.LINEAR_2D)
+
+        assert vals.shape == (1, 2, 2)
+        np.testing.assert_array_equal(vals[0], [[1.0, 2.0], [3.0, 4.0]])
+
+        # Collapsed: mean over channels axis
+        fmt = format_channel_data(vals, constants.FeatureType.LINEAR_2D, collapse_channels=True)
+        np.testing.assert_array_almost_equal(fmt["average"], [[2.0, 3.0]])
+
+        flat = flatten_feature_for_plotting(vals, constants.FeatureType.LINEAR_2D)
+        assert flat.shape == (1, 2, 2)
+        np.testing.assert_array_equal(flat, vals)
+
+    def test_pipeline_band(self):
+        """BAND: extract (with transpose) -> format -> repack round-trip -> flatten."""
+        from neurodent.visualization.feature_utils import (
+            extract_feature, format_channel_data, flatten_feature_for_plotting,
+            repack_band_dict,
+        )
+        # 2 windows, 2 channels, 2 bands (alpha, beta)
+        series = pd.Series([
+            {"alpha": [10.0, 20.0], "beta": [30.0, 40.0]},
+            {"alpha": [50.0, 60.0], "beta": [70.0, 80.0]},
+        ])
+        vals, keys = extract_feature(series, constants.FeatureType.BAND)
+
+        assert vals.shape == (2, 2, 2)  # (W=2, C=2, B=2)
+        assert keys == ["alpha", "beta"]
+        # After transpose (W, B, C) -> (W, C, B):
+        # ch0 gets [alpha, beta] = [10, 30] and [50, 70]
+        np.testing.assert_array_equal(vals[0, 0], [10.0, 30.0])
+        np.testing.assert_array_equal(vals[0, 1], [20.0, 40.0])
+        np.testing.assert_array_equal(vals[1, 0], [50.0, 70.0])
+        np.testing.assert_array_equal(vals[1, 1], [60.0, 80.0])
+
+        # Collapsed: average over channels
+        fmt = format_channel_data(vals, constants.FeatureType.BAND, collapse_channels=True)
+        np.testing.assert_array_almost_equal(
+            fmt["average"], [[15.0, 35.0], [55.0, 75.0]]
         )
 
-    def test_init(self, sar, mock_sas):
-        """Test SpikeAnalysisResult initialization."""
-        assert sar.animal_id == "test_animal"
-        assert sar.genotype == "WT"
-        assert sar.animal_day == "20230101"
-        assert sar.channel_names == ["LMot", "RMot"]
-        assert len(sar.result_sas) == 2
+        # Round-trip: repack and verify original dict structure
+        repacked = repack_band_dict(vals, keys)
+        np.testing.assert_array_equal(repacked[0]["alpha"], [10.0, 20.0])
+        np.testing.assert_array_equal(repacked[0]["beta"], [30.0, 40.0])
 
-    @patch("mne.io.RawArray")
-    def test_convert_to_mne(self, mock_raw, sar):
-        """Test conversion to MNE format."""
-        mock_raw_instance = Mock()
-        mock_set_annotations = Mock()
-        mock_raw_instance.set_annotations.return_value = mock_set_annotations
-        mock_raw.return_value = mock_raw_instance
+        # Flatten (identity for BAND)
+        flat = flatten_feature_for_plotting(vals, constants.FeatureType.BAND)
+        np.testing.assert_array_equal(flat, vals)
 
-        result = sar.convert_to_mne(chunk_len=60)
+    def test_pipeline_simple_matrix(self):
+        """SIMPLE_MATRIX: extract -> collapse (tril) -> flatten (tril)."""
+        from neurodent.visualization.feature_utils import (
+            extract_feature, format_channel_data, flatten_feature_for_plotting,
+        )
+        # 1 window, 2x2 symmetric matrix
+        series = pd.Series([[[0.0, 0.3], [0.3, 0.0]]])
+        vals, keys = extract_feature(series, constants.FeatureType.SIMPLE_MATRIX)
 
-        assert result == mock_set_annotations
-        mock_raw.assert_called()
-        mock_raw_instance.set_annotations.assert_called_once()
+        assert vals.shape == (1, 2, 2)
+        np.testing.assert_array_equal(vals[0], [[0.0, 0.3], [0.3, 0.0]])
+
+        # Collapsed: tril pair (1,0) = 0.3
+        fmt = format_channel_data(vals, constants.FeatureType.SIMPLE_MATRIX, collapse_channels=True)
+        np.testing.assert_array_almost_equal(fmt["average"], [0.3])
+
+        # Flatten triag: 1 pair
+        flat = flatten_feature_for_plotting(vals, constants.FeatureType.SIMPLE_MATRIX, triag=True)
+        assert flat.shape == (1, 1, 1)
+        np.testing.assert_array_equal(flat[0, 0, 0], 0.3)
+
+    def test_pipeline_banded_matrix(self):
+        """BANDED_MATRIX: extract (transpose) -> collapse -> repack round-trip -> flatten."""
+        from neurodent.visualization.feature_utils import (
+            extract_feature, format_channel_data, flatten_feature_for_plotting,
+            repack_band_dict,
+        )
+        # 1 window, 2x2 matrix, 1 band
+        series = pd.Series([{"delta": [[0.0, 0.5], [0.7, 0.0]]}])
+        vals, keys = extract_feature(series, constants.FeatureType.BANDED_MATRIX)
+
+        assert vals.shape == (1, 2, 2, 1)  # (W, C, C, B)
+        assert keys == ["delta"]
+        np.testing.assert_array_equal(vals[0, :, :, 0], [[0.0, 0.5], [0.7, 0.0]])
+
+        # Collapsed: tril pair (1,0) = 0.7
+        fmt = format_channel_data(vals, constants.FeatureType.BANDED_MATRIX, collapse_channels=True)
+        np.testing.assert_array_almost_equal(fmt["average"], [[0.7]])
+
+        # Round-trip repack
+        repacked = repack_band_dict(vals, keys)
+        np.testing.assert_array_equal(repacked[0]["delta"], [[0.0, 0.5], [0.7, 0.0]])
+
+        # Flatten triag: 1 pair, 1 band
+        flat = flatten_feature_for_plotting(vals, constants.FeatureType.BANDED_MATRIX, triag=True)
+        assert flat.shape == (1, 1, 1)
+        np.testing.assert_array_equal(flat[0, 0, 0], 0.7)
+
+    def test_pipeline_channel_ordering_preserved(self):
+        """Verify that channel identity is preserved through the full pipeline."""
+        from neurodent.visualization.feature_utils import (
+            extract_feature, format_channel_data, flatten_feature_for_plotting,
+        )
+        # 3 channels with distinct values so mis-ordering is immediately obvious
+        series = pd.Series([[100.0, 200.0, 300.0]])
+        vals, _ = extract_feature(series, constants.FeatureType.LINEAR)
+
+        # Per-channel format
+        fmt = format_channel_data(
+            vals, constants.FeatureType.LINEAR, collapse_channels=False,
+            ch_to_idx={"LMot": 0, "RMot": 1, "LBar": 2},
+            channels=["LMot", "RMot", "LBar"],
+            ch_names=["LMot", "RMot", "LBar"],
+        )
+        assert fmt["LMot"] == [100.0]
+        assert fmt["RMot"] == [200.0]
+        assert fmt["LBar"] == [300.0]
+
+        # Flatten preserves channel positions
+        flat = flatten_feature_for_plotting(vals, constants.FeatureType.LINEAR)
+        np.testing.assert_array_equal(flat[0, 0, 0], 100.0)
+        np.testing.assert_array_equal(flat[0, 1, 0], 200.0)
+        np.testing.assert_array_equal(flat[0, 2, 0], 300.0)
+
+    def test_channel_ordering_band_round_trip(self):
+        """BAND: verify channel identity survives extract -> repack -> format."""
+        from neurodent.visualization.feature_utils import (
+            extract_band_dict, repack_band_dict, format_channel_data,
+        )
+        # ch0=[1,2,3] across 3 bands, ch1=[4,5,6] — distinct per channel
+        series = pd.Series([
+            {"delta": [1.0, 4.0], "theta": [2.0, 5.0], "alpha": [3.0, 6.0]},
+        ])
+        vals, keys = extract_band_dict(series, ftype=constants.FeatureType.BAND)
+        # Canonical (W=1, C=2, B=3): ch0=[1,2,3], ch1=[4,5,6]
+        np.testing.assert_array_equal(vals[0, 0], [1.0, 2.0, 3.0])
+        np.testing.assert_array_equal(vals[0, 1], [4.0, 5.0, 6.0])
+
+        # Repack preserves original dict structure
+        repacked = repack_band_dict(vals, keys)
+        np.testing.assert_array_equal(repacked[0]["delta"], [1.0, 4.0])
+        np.testing.assert_array_equal(repacked[0]["theta"], [2.0, 5.0])
+        np.testing.assert_array_equal(repacked[0]["alpha"], [3.0, 6.0])
+
+        # Per-channel format preserves identity
+        fmt = format_channel_data(
+            vals, constants.FeatureType.BAND, collapse_channels=False,
+            ch_to_idx={"ch0": 0, "ch1": 1}, channels=["ch0", "ch1"], ch_names=["ch0", "ch1"],
+        )
+        np.testing.assert_array_almost_equal(fmt["ch0"], [[1.0, 2.0, 3.0]])
+        np.testing.assert_array_almost_equal(fmt["ch1"], [[4.0, 5.0, 6.0]])
+
+    def test_channel_ordering_hist_extract_format(self):
+        """HIST: verify channel identity survives the (F,C) -> (W,C,F) transpose."""
+        from neurodent.visualization.feature_utils import (
+            extract_hist_data, format_channel_data,
+        )
+        # 1 window, per-cell values shape (F=3, C=2): col0=ch0, col1=ch1
+        vals_cell = np.array([[1.0, 10.0], [2.0, 20.0], [3.0, 30.0]])  # (F=3, C=2)
+        coords_cell = np.array([10.0, 20.0, 30.0])
+        series = pd.Series([(coords_cell, vals_cell)])
+        coords, values = extract_hist_data(series, ftype=constants.FeatureType.HIST)
+        # Canonical (W=1, C=2, F=3)
+        assert values.shape == (1, 2, 3)
+        np.testing.assert_array_equal(values[0, 0], [1.0, 2.0, 3.0])
+        np.testing.assert_array_equal(values[0, 1], [10.0, 20.0, 30.0])
+
+        # Per-channel format preserves identity through the transpose
+        fmt = format_channel_data(
+            values, constants.FeatureType.HIST, collapse_channels=False,
+            ch_to_idx={"A": 0, "B": 1}, channels=["A", "B"], ch_names=["A", "B"],
+        )
+        np.testing.assert_array_almost_equal(fmt["A"], [[1.0, 2.0, 3.0]])
+        np.testing.assert_array_almost_equal(fmt["B"], [[10.0, 20.0, 30.0]])
+
+    def test_channel_ordering_banded_matrix_round_trip(self):
+        """BANDED_MATRIX: verify (row, col) ordering survives extract -> repack -> flatten."""
+        from neurodent.visualization.feature_utils import (
+            extract_band_dict, repack_band_dict, flatten_feature_for_plotting,
+        )
+        # 3x3 matrix with unique values at each (i,j), 1 band
+        mat = np.arange(9, dtype=float).reshape(3, 3)
+        series = pd.Series([{"delta": mat.tolist()}])
+        vals, keys = extract_band_dict(series, ftype=constants.FeatureType.BANDED_MATRIX)
+        # Canonical (W=1, C=3, C=3, B=1)
+        np.testing.assert_array_equal(vals[0, :, :, 0], mat)
+
+        # Repack preserves matrix
+        repacked = repack_band_dict(vals, keys)
+        np.testing.assert_array_equal(repacked[0]["delta"], mat)
+
+        # Flatten triag: tril_indices(3, k=-1) -> (1,0)=3, (2,0)=6, (2,1)=7
+        flat = flatten_feature_for_plotting(vals, constants.FeatureType.BANDED_MATRIX, triag=True)
+        assert flat.shape == (1, 3, 1)
+        np.testing.assert_array_equal(flat[0, :, 0], [3.0, 6.0, 7.0])
+
+
+class TestBinSpikeTimes:
+    """Test bin_spike_times and _bin_spike_df numerical correctness."""
+
+    def test_bin_spike_times_basic(self):
+        from neurodent.visualization.results import bin_spike_times
+        counts = bin_spike_times([5.0, 15.0, 25.0], [10.0, 10.0, 10.0])
+        assert counts == [1, 1, 1]
+
+    def test_bin_spike_times_empty(self):
+        from neurodent.visualization.results import bin_spike_times
+        counts = bin_spike_times([], [10.0, 10.0])
+        assert counts == [0, 0]
+
+    def test_bin_spike_times_boundary(self):
+        from neurodent.visualization.results import bin_spike_times
+        # bin_edges = [0, 10, 20]; np.histogram: bins are [left, right) except last [left, right]
+        counts = bin_spike_times([0.0, 10.0, 20.0], [10.0, 10.0])
+        # 0.0 in [0,10), 10.0 in [10,20], 20.0 in [10,20]
+        assert counts == [1, 2]
+
+    def test_bin_spike_times_multiple_per_bin(self):
+        from neurodent.visualization.results import bin_spike_times
+        counts = bin_spike_times([1.0, 2.0, 3.0, 15.0], [10.0, 10.0])
+        assert counts == [3, 1]
+
+    def test_bin_spike_df_basic(self):
+        from neurodent.visualization.results import _bin_spike_df
+        df = pd.DataFrame({"duration": [10.0, 10.0, 10.0]})
+        spikes_channel = [[5.0, 15.0], [25.0]]
+        result = _bin_spike_df(df, spikes_channel)
+        assert result.shape == (3, 2)
+        np.testing.assert_array_equal(result[:, 0], [1, 1, 0])
+        np.testing.assert_array_equal(result[:, 1], [0, 0, 1])
+
+    def test_bin_spike_df_empty_channel(self):
+        from neurodent.visualization.results import _bin_spike_df
+        df = pd.DataFrame({"duration": [5.0, 5.0]})
+        spikes_channel = [[], [1.0, 6.0]]
+        result = _bin_spike_df(df, spikes_channel)
+        assert result.shape == (2, 2)
+        np.testing.assert_array_equal(result[:, 0], [0, 0])
+        np.testing.assert_array_equal(result[:, 1], [1, 1])
+
+
+class TestAverageAcrossChannels:
+    """Test WindowAnalysisResult._average_across_channels numerical correctness."""
+
+    @pytest.fixture
+    def minimal_war(self):
+        df = pd.DataFrame({
+            "animal": ["A1", "A1"],
+            "animalday": ["A1_d1", "A1_d1"],
+            "genotype": ["WT", "WT"],
+            "duration": [1.0, 1.0],
+        })
+        return WindowAnalysisResult(
+            result=df, animal_id="A1", genotype="WT", sex="Male",
+            channel_names=["LMot", "RMot", "LBar"],
+        )
+
+    def test_average_vector(self, minimal_war):
+        """1D features: nanmean across channels."""
+        df = pd.DataFrame({"rms": [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]})
+        result = minimal_war._average_across_channels(df, ["rms"])
+        np.testing.assert_array_almost_equal(result["rms"].values, [2.0, 5.0])
+
+    def test_average_matrix_upper_tri(self, minimal_war):
+        """2D matrix: mean of upper triangle (k=1)."""
+        mat = np.array([[0.0, 0.2, 0.4],
+                        [0.2, 0.0, 0.6],
+                        [0.4, 0.6, 0.0]])
+        df = pd.DataFrame({"pcorr_delta": [mat]})
+        result = minimal_war._average_across_channels(df, ["pcorr_delta"])
+        # triu_indices(3, k=1): (0,1)=0.2, (0,2)=0.4, (1,2)=0.6 -> mean=0.4
+        np.testing.assert_almost_equal(result["pcorr_delta"].iloc[0], 0.4)
+
+    def test_average_matrix_with_nan(self, minimal_war):
+        """NaN in upper triangle is skipped by nanmean."""
+        mat = np.array([[0.0, np.nan, 0.4],
+                        [0.2, 0.0, 0.6],
+                        [0.4, 0.6, 0.0]])
+        df = pd.DataFrame({"feat": [mat]})
+        result = minimal_war._average_across_channels(df, ["feat"])
+        # triu(k=1): nan, 0.4, 0.6 -> nanmean = 0.5
+        np.testing.assert_almost_equal(result["feat"].iloc[0], 0.5)
+
+    def test_average_small_matrix(self, minimal_war):
+        """1x1 matrix: falls back to nanmean of entire matrix."""
+        mat = np.array([[5.0]])
+        df = pd.DataFrame({"feat": [mat]})
+        result = minimal_war._average_across_channels(df, ["feat"])
+        np.testing.assert_almost_equal(result["feat"].iloc[0], 5.0)
+
+    def test_average_scalar_passthrough(self, minimal_war):
+        """Scalar features left unchanged."""
+        df = pd.DataFrame({"scalar_feat": [3.14, 2.72]})
+        result = minimal_war._average_across_channels(df, ["scalar_feat"])
+        np.testing.assert_array_almost_equal(result["scalar_feat"].values, [3.14, 2.72])
+
+    def test_average_missing_column_skipped(self, minimal_war):
+        """Missing column does not crash; present column still averaged."""
+        df = pd.DataFrame({"rms": [[1.0, 2.0, 3.0]]})
+        result = minimal_war._average_across_channels(df, ["rms", "nonexistent"])
+        assert "nonexistent" not in result.columns
+        np.testing.assert_almost_equal(result["rms"].iloc[0], 2.0)
+
+
+class TestExtractBandFeatures:
+    """Test WindowAnalysisResult._extract_band_features numerical correctness."""
+
+    @pytest.fixture
+    def minimal_war(self):
+        df = pd.DataFrame({
+            "animal": ["A1", "A1"],
+            "animalday": ["A1_d1", "A1_d1"],
+            "genotype": ["WT", "WT"],
+            "duration": [1.0, 1.0],
+        })
+        return WindowAnalysisResult(
+            result=df, animal_id="A1", genotype="WT", sex="Male",
+            channel_names=["LMot", "RMot", "LBar"],
+        )
+
+    def test_extract_band_features_basic(self, minimal_war):
+        """Dict unpacking produces correct per-band columns."""
+        df = pd.DataFrame({
+            "psdband": [
+                {"delta": [1.0, 2.0, 3.0], "theta": [4.0, 5.0, 6.0]},
+                {"delta": [7.0, 8.0, 9.0], "theta": [10.0, 11.0, 12.0]},
+            ]
+        })
+        result = minimal_war._extract_band_features(df, "psdband", ["delta", "theta"])
+        np.testing.assert_array_equal(result["psdband_delta"].iloc[0], [1.0, 2.0, 3.0])
+        np.testing.assert_array_equal(result["psdband_theta"].iloc[1], [10.0, 11.0, 12.0])
+
+    def test_extract_band_features_missing_band(self, minimal_war):
+        """Missing band key fills with NaN array."""
+        df = pd.DataFrame({
+            "psdband": [{"delta": [1.0, 2.0, 3.0]}]
+        })
+        result = minimal_war._extract_band_features(df, "psdband", ["delta", "theta"])
+        np.testing.assert_array_equal(result["psdband_delta"].iloc[0], [1.0, 2.0, 3.0])
+        assert np.all(np.isnan(result["psdband_theta"].iloc[0]))
+
+    def test_extract_band_features_missing_column(self, minimal_war):
+        """Feature column not in df returns df unchanged."""
+        df = pd.DataFrame({"other": [1.0]})
+        result = minimal_war._extract_band_features(df, "psdband", ["delta"])
+        assert "psdband_delta" not in result.columns
+
+
+class TestExtractBandedMatrixFeatures:
+    """Test WindowAnalysisResult._extract_banded_matrix_features numerical correctness."""
+
+    @pytest.fixture
+    def minimal_war(self):
+        df = pd.DataFrame({
+            "animal": ["A1"],
+            "animalday": ["A1_d1"],
+            "genotype": ["WT"],
+            "duration": [1.0],
+        })
+        return WindowAnalysisResult(
+            result=df, animal_id="A1", genotype="WT", sex="Male",
+            channel_names=["LMot", "RMot", "LBar"],
+        )
+
+    def test_extract_banded_matrix_dict_format(self, minimal_war):
+        """Dict storage: per-band 2D matrices extracted to separate columns."""
+        mat_a = np.array([[0.0, 0.1, 0.2], [0.1, 0.0, 0.3], [0.2, 0.3, 0.0]])
+        mat_b = np.array([[0.0, 0.4, 0.5], [0.4, 0.0, 0.6], [0.5, 0.6, 0.0]])
+        df = pd.DataFrame({"cohere": [{"alpha": mat_a, "beta": mat_b}]})
+        result = minimal_war._extract_banded_matrix_features(df, "cohere", ["alpha", "beta"])
+        np.testing.assert_array_equal(result["cohere_alpha"].iloc[0], mat_a)
+        np.testing.assert_array_equal(result["cohere_beta"].iloc[0], mat_b)
+
+    def test_extract_banded_matrix_3d_format(self, minimal_war):
+        """3D array format: slice per band index."""
+        mat_3d = np.arange(18, dtype=float).reshape(2, 3, 3)
+        df = pd.DataFrame({"cohere": [mat_3d]})
+        result = minimal_war._extract_banded_matrix_features(df, "cohere", ["alpha", "beta"])
+        np.testing.assert_array_equal(result["cohere_alpha"].iloc[0], mat_3d[0, :, :])
+        np.testing.assert_array_equal(result["cohere_beta"].iloc[0], mat_3d[1, :, :])
+
+    def test_extract_banded_matrix_missing_band(self, minimal_war):
+        """Missing band key fills with NaN matrix."""
+        mat_a = np.eye(3)
+        df = pd.DataFrame({"cohere": [{"alpha": mat_a}]})
+        result = minimal_war._extract_banded_matrix_features(df, "cohere", ["alpha", "beta"])
+        np.testing.assert_array_equal(result["cohere_alpha"].iloc[0], mat_a)
+        assert np.all(np.isnan(result["cohere_beta"].iloc[0]))
+
+    def test_extract_banded_matrix_2d_raises(self, minimal_war):
+        """2D array input raises ValueError."""
+        mat_2d = np.eye(3)
+        df = pd.DataFrame({"cohere": [mat_2d]})
+        with pytest.raises(ValueError, match="stored as a 2D array"):
+            minimal_war._extract_banded_matrix_features(df, "cohere", ["alpha"])
 
 
 class TestDataProcessingForVisualization:
@@ -1321,6 +2928,83 @@ class TestDataProcessingForVisualization:
 
         assert isinstance(result, pd.DataFrame)
         assert "rms" in result.columns
+
+    def test_df_normalize_baseline_subtract_values(self):
+        """Verify subtracted values are numerically correct."""
+        from neurodent.visualization.plotting.experiment import df_normalize_baseline
+
+        df = pd.DataFrame({
+            "genotype": ["WT", "WT", "KO", "KO"],
+            "condition": ["baseline", "treatment", "baseline", "treatment"],
+            "rms": [100.0, 120.0, 90.0, 110.0],
+        })
+        result = df_normalize_baseline(
+            df=df, feature="rms", groupby=["genotype"],
+            baseline_key="baseline", baseline_groupby=["condition"],
+            operation="subtract",
+        )
+        wt_base = result[(result["genotype"] == "WT") & (result["condition"] == "baseline")]["rms"].iloc[0]
+        wt_treat = result[(result["genotype"] == "WT") & (result["condition"] == "treatment")]["rms"].iloc[0]
+        ko_treat = result[(result["genotype"] == "KO") & (result["condition"] == "treatment")]["rms"].iloc[0]
+        np.testing.assert_almost_equal(wt_base, 0.0)
+        np.testing.assert_almost_equal(wt_treat, 20.0)
+        np.testing.assert_almost_equal(ko_treat, 20.0)
+
+    def test_df_normalize_baseline_divide_values(self):
+        """Verify divided values are numerically correct."""
+        from neurodent.visualization.plotting.experiment import df_normalize_baseline
+
+        df = pd.DataFrame({
+            "genotype": ["WT", "WT"],
+            "condition": ["baseline", "treatment"],
+            "rms": [100.0, 150.0],
+        })
+        result = df_normalize_baseline(
+            df=df, feature="rms", groupby=["genotype"],
+            baseline_key="baseline", baseline_groupby=["condition"],
+            operation="divide",
+        )
+        treatment = result[result["condition"] == "treatment"]["rms"].iloc[0]
+        np.testing.assert_almost_equal(treatment, 1.5)
+
+    def test_df_normalize_baseline_remove_baseline(self):
+        """Baseline rows removed after normalization."""
+        from neurodent.visualization.plotting.experiment import df_normalize_baseline
+
+        df = pd.DataFrame({
+            "genotype": ["WT", "WT"],
+            "condition": ["baseline", "treatment"],
+            "rms": [100.0, 150.0],
+        })
+        result = df_normalize_baseline(
+            df=df, feature="rms", groupby=["genotype"],
+            baseline_key="baseline", baseline_groupby=["condition"],
+            remove_baseline=True,
+        )
+        assert len(result) == 1
+        assert result["condition"].iloc[0] == "treatment"
+        np.testing.assert_almost_equal(result["rms"].iloc[0], 50.0)
+
+    def test_df_normalize_baseline_per_group(self):
+        """Per-genotype baselines via remaining_groupby."""
+        from neurodent.visualization.plotting.experiment import df_normalize_baseline
+
+        df = pd.DataFrame({
+            "genotype": ["WT", "WT", "KO", "KO"],
+            "condition": ["baseline", "treatment", "baseline", "treatment"],
+            "rms": [100.0, 130.0, 200.0, 250.0],
+        })
+        result = df_normalize_baseline(
+            df=df, feature="rms",
+            groupby=["genotype", "condition"],
+            baseline_key="baseline",
+            baseline_groupby=["condition"],
+            operation="subtract",
+        )
+        wt_treat = result[(result["genotype"] == "WT") & (result["condition"] == "treatment")]["rms"].iloc[0]
+        ko_treat = result[(result["genotype"] == "KO") & (result["condition"] == "treatment")]["rms"].iloc[0]
+        np.testing.assert_almost_equal(wt_treat, 30.0)
+        np.testing.assert_almost_equal(ko_treat, 50.0)
 
 
 class TestPlotCustomization:
@@ -1387,6 +3071,7 @@ class TestWindowAnalysisResultLOF:
             result=test_df,
             animal_id="A1",
             genotype="WT",
+            sex="Male",
             channel_names=["LMot", "RMot"],
             lof_scores_dict=sample_lof_scores_dict,
         )
@@ -1471,7 +3156,7 @@ class TestWindowAnalysisResultLOF:
                 "timestamp": pd.to_datetime(["2023-01-01 10:00:00", "2023-01-01 10:04:00"]),
             }
         )
-        war = WindowAnalysisResult(result=test_df, animal_id="A1", genotype="WT", channel_names=["LMot", "RMot"])
+        war = WindowAnalysisResult(result=test_df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"])
 
         # After __init__, missing sessions should be auto-populated with empty LOF scores
         # Both lof_scores AND channel_names should be empty to maintain invariant
@@ -1492,7 +3177,7 @@ class TestWindowAnalysisResultLOF:
             }
         )
         war = WindowAnalysisResult(
-            result=test_df, animal_id="A1", genotype="WT", channel_names=["LMot", "RMot"], lof_scores_dict={}
+            result=test_df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"], lof_scores_dict={}
         )
 
         # After __init__, empty dict should be populated with all sessions
@@ -1517,6 +3202,7 @@ class TestWindowAnalysisResultLOF:
             json_dict = {
                 "animal_id": war_with_lof.animal_id,
                 "genotype": war_with_lof.genotype,
+                "sex": war_with_lof.sex,
                 "channel_names": war_with_lof.channel_names,
                 "assume_from_number": war_with_lof.assume_from_number,
                 "bad_channels_dict": getattr(war_with_lof, "bad_channels_dict", {}),
@@ -1564,6 +3250,7 @@ class TestWindowAnalysisResultLOF:
             result=test_df,
             animal_id="A1",
             genotype="WT",
+            sex="Male",
             channel_names=["LMot", "RMot"],
             lof_scores_dict=invalid_lof_dict,
         )
@@ -1722,7 +3409,7 @@ class TestWindowAnalysisResultLOF:
                 "timestamp": pd.to_datetime(["2023-01-01 10:00:00", "2023-01-01 10:04:00"]),
             }
         )
-        war = WindowAnalysisResult(result=test_df, animal_id="A1", genotype="WT", channel_names=["LMot", "RMot"])
+        war = WindowAnalysisResult(result=test_df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"])
 
         ground_truth = {"day1": {"LMot"}}
 
@@ -1790,7 +3477,7 @@ class TestWindowAnalysisResultPickleJsonParameters:
             }
         )
 
-        war = WindowAnalysisResult(result=test_df, animal_id="A1", genotype="WT", channel_names=["LMot", "RMot"])
+        war = WindowAnalysisResult(result=test_df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"])
 
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
@@ -1827,6 +3514,7 @@ class TestWindowAnalysisResultPickleJsonParameters:
 
         assert loaded_war.animal_id == original_war.animal_id
         assert loaded_war.genotype == original_war.genotype
+        assert loaded_war.sex == original_war.sex
         assert loaded_war.channel_names == original_war.channel_names
         pd.testing.assert_frame_equal(loaded_war.result, original_war.result)
 
@@ -1958,6 +3646,262 @@ class TestWindowAnalysisResultPickleJsonParameters:
         assert loaded_war.animal_id == original_war.animal_id
         pd.testing.assert_frame_equal(loaded_war.result, original_war.result)
 
+    def test_load_old_json_without_sex(self):
+        """Test backward compatibility: old JSON files without 'sex' load with sex='Unknown'."""
+        import json
+        import tempfile
+        from pathlib import Path
+
+        test_df = pd.DataFrame(
+            {
+                "animal": ["A1"] * 2,
+                "animalday": ["day1", "day1"],
+                "genotype": ["WT"] * 2,
+                "duration": [4.0] * 2,
+                "rms": [[100.0, 110.0], [200.0, 210.0]],
+                "timestamp": pd.to_datetime(["2023-01-01 10:00:00", "2023-01-01 10:04:00"]),
+            }
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir = Path(tmpdir)
+
+            # Save pickle
+            test_df.to_pickle(tmpdir / "war.pkl")
+
+            # Save JSON without sex (simulating old format)
+            old_json = {
+                "animal_id": "A1",
+                "genotype": "WT",
+                "channel_names": ["LMot", "RMot"],
+                "assume_from_number": False,
+                "bad_channels_dict": {},
+                "suppress_short_interval_error": False,
+                "lof_scores_dict": {},
+            }
+            with open(tmpdir / "war.json", "w") as f:
+                json.dump(old_json, f)
+
+            # Load should succeed with sex="Unknown" (the default)
+            loaded_war = WindowAnalysisResult.load_pickle_and_json(folder_path=str(tmpdir))
+            assert loaded_war.animal_id == "A1"
+            assert loaded_war.genotype == "WT"
+            assert loaded_war.sex == "Unknown"
+            assert loaded_war.channel_names == ["LMot", "RMot"]
+class TestParquetSaveLoad:
+    """Test parquet save/load functionality for WindowAnalysisResult."""
+
+    @pytest.fixture
+    def war_with_complex_columns(self):
+        """Create a WAR with complex (object-type) columns typical of real usage."""
+        data = {
+            "animalday": ["A1_20230101"] * 3,
+            "genotype": ["WT"] * 3,
+            "timestamp": pd.to_datetime(
+                ["2023-01-01 10:00:00", "2023-01-01 10:04:00", "2023-01-01 10:08:00"]
+            ),
+            "duration": [240.0, 245.0, 235.0],
+            "rms": [[100.0, 110.0], [200.0, 210.0], [150.0, 160.0]],
+            "psd": [
+                (np.array([1.0, 2.0]), np.array([10.0, 20.0])),
+                (np.array([3.0, 4.0]), np.array([30.0, 40.0])),
+                (np.array([5.0, 6.0]), np.array([50.0, 60.0])),
+            ],
+            "cohere": [
+                {"ch1_ch2": np.array([0.1, 0.2])},
+                {"ch1_ch2": np.array([0.3, 0.4])},
+                {"ch1_ch2": np.array([0.5, 0.6])},
+            ],
+        }
+        df = pd.DataFrame(data)
+        return WindowAnalysisResult(
+            result=df,
+            animal_id="A1",
+            genotype="WT",
+            channel_names=["LMot", "RMot"],
+        )
+
+    def test_parquet_round_trip(self, war_with_complex_columns):
+        """Test that save with parquet + load produces equivalent data."""
+        war = war_with_complex_columns
+        with tempfile.TemporaryDirectory() as tmpdir:
+            war.save_pickle_and_json(tmpdir, filename="war")
+
+            # Verify parquet file was created
+            assert (Path(tmpdir) / "war.parquet").exists()
+            # No sidecar meta file — metadata is embedded in parquet
+            assert not (Path(tmpdir) / "war.parquet.meta.json").exists()
+
+            # Load (should prefer parquet)
+            loaded = WindowAnalysisResult.load_pickle_and_json(
+                folder_path=tmpdir, pickle_name="war.pkl", json_name="war.json"
+            )
+            assert loaded.animal_id == war.animal_id
+            assert loaded.genotype == war.genotype
+            assert loaded.channel_names == war.channel_names
+
+            # Scalar columns should match
+            assert loaded.result["duration"].tolist() == war.result["duration"].tolist()
+
+            # List columns should round-trip (values come back as plain lists)
+            for i in range(len(war.result)):
+                assert loaded.result["rms"].iloc[i] == war.result["rms"].iloc[i]
+
+    def test_auto_discovery_with_parquet_files(self, war_with_complex_columns):
+        """Test that auto-discovery works when parquet files are present."""
+        war = war_with_complex_columns
+        with tempfile.TemporaryDirectory() as tmpdir:
+            war.save_pickle_and_json(tmpdir, filename="war")
+
+            loaded = WindowAnalysisResult.load_pickle_and_json(folder_path=tmpdir)
+            assert loaded.animal_id == war.animal_id
+
+    def test_fallback_to_pickle_when_no_parquet(self, war_with_complex_columns):
+        """Test that loading falls back to pickle when parquet files are absent."""
+        war = war_with_complex_columns
+        with tempfile.TemporaryDirectory() as tmpdir:
+            war.save_pickle_and_json(tmpdir, filename="war")
+            # Remove parquet to force pickle fallback
+            (Path(tmpdir) / "war.parquet").unlink()
+
+            loaded = WindowAnalysisResult.load_pickle_and_json(
+                folder_path=tmpdir, pickle_name="war.pkl", json_name="war.json"
+            )
+            assert loaded.animal_id == war.animal_id
+            assert loaded.result["duration"].tolist() == war.result["duration"].tolist()
+
+    def test_metadata_embedded_in_parquet(self, war_with_complex_columns):
+        """Test that encoded column metadata is stored in parquet schema metadata."""
+        import pyarrow.parquet as pq
+
+        war = war_with_complex_columns
+        with tempfile.TemporaryDirectory() as tmpdir:
+            war.save_pickle_and_json(tmpdir, filename="war")
+
+            table = pq.read_table(Path(tmpdir) / "war.parquet")
+            schema_meta = table.schema.metadata
+            assert b"neurodent" in schema_meta
+
+            nd_meta = json.loads(schema_meta[b"neurodent"])
+            assert "encoded_columns" in nd_meta
+            assert "rms" in nd_meta["encoded_columns"]
+
+    def test_encode_decode_round_trip(self):
+        """Test _encode_df_for_parquet and _decode_df_from_parquet directly."""
+        df = pd.DataFrame(
+            {
+                "scalar": [1.0, 2.0, 3.0],
+                "string_col": ["a", "b", "c"],
+                "list_col": [[1, 2], [3, 4], [5, 6]],
+                "dict_col": [{"x": 1}, {"y": 2}, {"z": 3}],
+                "array_col": [np.array([1.0, 2.0]), np.array([3.0, 4.0]), np.array([5.0, 6.0])],
+                "none_col": [None, [1], None],
+            }
+        )
+
+        encoded, cols = WindowAnalysisResult._encode_df_for_parquet(df)
+
+        # Scalar and string columns should NOT be encoded
+        assert "scalar" not in cols
+        assert "string_col" not in cols
+
+        # Complex columns should be encoded
+        assert "list_col" in cols
+        assert "dict_col" in cols
+        assert "array_col" in cols
+
+        # Encoded values should be JSON strings
+        for col in cols:
+            for val in encoded[col].dropna():
+                assert isinstance(val, str)
+
+        # Decode and verify round-trip
+        decoded = WindowAnalysisResult._decode_df_from_parquet(encoded, cols)
+        for i in range(len(df)):
+            # list_col stays as plain list after JSON round-trip (no numpy conversion)
+            assert decoded["list_col"].iloc[i] == df["list_col"].iloc[i]
+            assert decoded["dict_col"].iloc[i] == df["dict_col"].iloc[i]
+            # array_col comes back as a plain list; verify values match
+            np.testing.assert_array_equal(
+                decoded["array_col"].iloc[i], df["array_col"].iloc[i]
+            )
+
+    def test_parquet_file_has_content(self, war_with_complex_columns):
+        """Test that the parquet file has meaningful content matching the DataFrame."""
+        war = war_with_complex_columns
+        with tempfile.TemporaryDirectory() as tmpdir:
+            war.save_pickle_and_json(tmpdir, filename="war")
+            pq_path = Path(tmpdir) / "war.parquet"
+            assert pq_path.stat().st_size > 0
+
+            reloaded = pd.read_parquet(pq_path, engine="pyarrow")
+            assert len(reloaded) == len(war.result)
+            assert set(war.result.columns).issubset(set(reloaded.columns))
+
+    def test_save_load_speed(self):
+        """Test that parquet load time is comparable to pickle after warm-up.
+
+        Uses a realistically-sized DataFrame (200 rows) so that pyarrow's
+        fixed per-call overhead is amortised and the comparison reflects
+        actual I/O performance rather than interpreter start-up noise.
+        """
+        import time
+
+        n_rows = 200
+        rng = np.random.default_rng(42)
+        data = {
+            "animalday": [f"A1_{i:08d}" for i in range(n_rows)],
+            "genotype": ["WT"] * n_rows,
+            "timestamp": pd.date_range("2023-01-01", periods=n_rows, freq="5min"),
+            "duration": [240.0] * n_rows,
+            "rms": [rng.uniform(100, 200, 2).tolist() for _ in range(n_rows)],
+            "psd": [
+                (rng.uniform(0, 10, 8).tolist(), rng.uniform(0, 100, 8).tolist())
+                for _ in range(n_rows)
+            ],
+            "cohere": [
+                {"ch1_ch2": rng.uniform(0, 1, 4).tolist()}
+                for _ in range(n_rows)
+            ],
+        }
+        war = WindowAnalysisResult(
+            result=pd.DataFrame(data),
+            animal_id="A1",
+            genotype="WT",
+            channel_names=["LMot", "RMot"],
+        )
+        with tempfile.TemporaryDirectory() as tmpdir:
+            war.save_pickle_and_json(tmpdir, filename="war")
+
+            pkl_path = Path(tmpdir) / "war.pkl"
+            pq_path = Path(tmpdir) / "war.parquet"
+            assert pkl_path.exists()
+            assert pq_path.exists()
+
+            # Warm-up: first load amortises import / JIT costs
+            pd.read_pickle(pkl_path)
+            pd.read_parquet(pq_path, engine="pyarrow")
+
+            n_iters = 20
+
+            start = time.perf_counter()
+            for _ in range(n_iters):
+                pd.read_pickle(pkl_path)
+            pkl_time = time.perf_counter() - start
+
+            start = time.perf_counter()
+            for _ in range(n_iters):
+                pd.read_parquet(pq_path, engine="pyarrow")
+            pq_time = time.perf_counter() - start
+
+            # With a realistically-sized DataFrame the gap between parquet
+            # and pickle narrows substantially.  A 10x bound guards against
+            # pathological regressions while remaining stable on CI runners.
+            assert pq_time < pkl_time * 10, (
+                f"Parquet load ({pq_time:.3f}s) is unreasonably slower "
+                f"than pickle ({pkl_time:.3f}s)"
+            )
+
 
 class TestAnimalOrganizerLOF:
     """Test LOF functionality integration with AnimalOrganizer (mocked)."""
@@ -1998,6 +3942,7 @@ class TestAnimalOrganizerLOF:
         ao.animaldays = ["day1", "day2"]
         ao.animal_id = "A1"
         ao.genotype = "WT"
+        ao.sex = "Male"
         ao.channel_names = ["LMot", "RMot"]
         ao.assume_from_number = False
         ao.bad_channels_dict = {}
@@ -2049,6 +3994,7 @@ class TestAnimalOrganizerLOF:
             ao.features_df,
             ao.animal_id,
             ao.genotype,
+            ao.sex,
             ao.channel_names,
             ao.assume_from_number,
             ao.bad_channels_dict,

@@ -14,7 +14,8 @@ used by the :mod:`neurodent.core` and :mod:`neurodent.visualization` modules.
     # {'delta': (1, 4), 'theta': (4, 8), 'alpha': (8, 13), 'beta': (13, 25), 'gamma': (25, 40)}
 
     # Available features
-    constants.LINEAR_FEATURES   # ['rms', 'ampvar', 'psdtotal', 'psdslope', 'nspike', ...]
+    constants.LINEAR_FEATURES   # ['rms', 'ampvar', 'psdtotal', 'nspike', ...]
+    constants.LINEAR_2D_FEATURES  # ['psdslope']
     constants.BAND_FEATURES     # ['psdband', 'psdfrac', 'logpsdband', 'logpsdfrac']
     constants.MATRIX_FEATURES   # ['cohere', 'zcohere', 'imcoh', 'zimcoh', 'pcorr', 'zpcorr']
 
@@ -39,13 +40,14 @@ To override defaults, import and modify before running analysis:
 
 - :doc:`/quickstart/configuration` - Full customization guide
 - :mod:`neurodent.constants.analysis` - Feature and frequency definitions
-- :mod:`neurodent.constants.config` - Sampling and sorting parameters
+- :mod:`neurodent.constants.config` - Sampling parameters
 """
 
 # Re-export everything for backward compatibility
 from .mappings import (
     DEFAULT_ID_TO_LR,
     GENOTYPE_ALIASES,
+    SEX_ALIASES,
     CHNAME_ALIASES,
     LR_ALIASES,
     DEFAULT_ID_TO_NAME,
@@ -60,7 +62,10 @@ from .mappings import (
 ANIMAL_METADATA: dict = {}
 
 from .analysis import (
+    FeatureType,
+    FEATURE_SHAPES,
     LINEAR_FEATURES,
+    LINEAR_2D_FEATURES,
     BAND_FEATURES,
     MATRIX_FEATURES,
     BANDED_MATRIX_FEATURES,
@@ -68,6 +73,8 @@ from .analysis import (
     HIST_FEATURES,
     FEATURES,
     WAR_FEATURES,
+    FEATURE_TYPES,
+    classify_feature,
 
     FREQ_BANDS,
     BAND_NAMES,
@@ -84,15 +91,13 @@ from .config import (
     GLOBAL_SAMPLING_RATE,
     GLOBAL_DTYPE,
     LINE_FREQ,
-    SORTING_PARAMS,
-    SCHEME2_SORTING_PARAMS,
-    WAVEFORM_PARAMS,
 )
 
 __all__ = [
     # Mappings
     "DEFAULT_ID_TO_LR",
     "GENOTYPE_ALIASES",
+    "SEX_ALIASES",
     "ANIMAL_METADATA",
     "CHNAME_ALIASES",
     "LR_ALIASES",
@@ -101,8 +106,14 @@ __all__ = [
     "DATEPARSER_PATTERNS_TO_REMOVE",
     "DEFAULT_DAY",
     "FEATURE_LABELS",
+    # Feature Typing
+    "FeatureType",
+    "FEATURE_SHAPES",
+    "FEATURE_TYPES",
+    "classify_feature",
     # Feature & Frequency Definitions
     "LINEAR_FEATURES",
+    "LINEAR_2D_FEATURES",
     "BAND_FEATURES",
     "MATRIX_FEATURES",
     "BANDED_MATRIX_FEATURES",
@@ -122,7 +133,4 @@ __all__ = [
     "GLOBAL_SAMPLING_RATE",
     "GLOBAL_DTYPE",
     "LINE_FREQ",
-    "SORTING_PARAMS",
-    "SCHEME2_SORTING_PARAMS",
-    "WAVEFORM_PARAMS",
 ]

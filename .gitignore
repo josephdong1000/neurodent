@@ -8,10 +8,6 @@
 **/test-*.xlsx
 **/wars-*/*
 **/sars-*/*
-!notebooks/tests/test-data/A10*
-!notebooks/tests/test-data/F22*
-!notebooks/tests/test-wars/A10*
-!notebooks/tests/test-wars/F22*
 
 /build/*
 /ddfs/*
@@ -23,6 +19,11 @@ dist/
 /.venv/
 /venv-*/
 **/.*/
+!.github/
+!.github/**
+!.tests/
+!.tests/**
+!.snakemake-workflow-catalog.yml
 **/__pycache__/
 **/__pycache__/*
 /__pycache__/
@@ -36,13 +37,17 @@ slurm-*.out
 **/.DS_Store
 notebooks/tests/test_all_functions_Yong.ipynb
 
-/notebooks/tests/test-data
 *.pkl
 *.bin
 *.csv
 *.gz
 .DS_Store
 *.dat
+
+# Example data for integration testing (after *.bin, *.csv so negations take effect)
+!tests/integration/generate.py
+!tests/integration/readers.py
+!.tests/integration/data/**
 .coverage
 .coverage.*
 coverage.xml
@@ -55,5 +60,8 @@ CLAUDE.md
 config/config.local.yaml
 
 docs/_build/
-docs/quickstart/output/
+*.doctree
+environment.pickle
 **/generated/
+.snakemake/
+coverage.xml

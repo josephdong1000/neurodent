@@ -25,6 +25,26 @@ Install NeuRodent using pip:
 
    **New to Python?** Pip is Python's package installer that comes bundled with Python. Open your terminal and copy-paste the command above, then press Enter. This will automatically download and install NeuRodent and all its dependencies.
 
+Install with conda
+------------------
+
+If you use Anaconda or Miniconda, you can install NeuRodent from conda-forge:
+
+.. code-block:: bash
+
+   conda install -c conda-forge neurodent
+
+.. note::
+
+   **New to conda?** Conda is a cross-platform package and environment manager. If you don't have it installed, visit `Miniconda <https://docs.anaconda.com/miniconda/>`_ to get started with a minimal installation.
+
+To create a dedicated environment for NeuRodent:
+
+.. code-block:: bash
+
+   conda create -n neurodent-env python=3.10 neurodent -c conda-forge
+   conda activate neurodent-env
+
 Verifying Installation
 ----------------------
 

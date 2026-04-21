@@ -13,7 +13,7 @@ def test_reproduce_metadata_mismatch_bug():
     duration_1 = 600.0
     end_time_1 = datetime.datetime(2023, 1, 1, 10, 0, 0)
     
-    lro1 = LongRecordingOrganizer(base_folder_path=None, recording=None)
+    lro1 = LongRecordingOrganizer(item=None, recording=None)
     lro1.LongRecording = type('MockRecording', (), {})() # Mock object
     lro1.meta = type('MockMeta', (), {'dt_end': end_time_1})()
     lro1.file_end_datetimes = [end_time_1]
@@ -23,7 +23,7 @@ def test_reproduce_metadata_mismatch_bug():
     # LRO 2: Missing timestamps (e.g. parsing failed), but has durations
     duration_2 = 300.0
     
-    lro2 = LongRecordingOrganizer(base_folder_path=None, recording=None)
+    lro2 = LongRecordingOrganizer(item=None, recording=None)
     lro2.LongRecording = type('MockRecording', (), {})()
     lro2.meta = type('MockMeta', (), {'dt_end': None})()
     

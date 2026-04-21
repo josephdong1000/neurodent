@@ -1,0 +1,112 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+# TODO: This schema is a work in progress and should be extended to cover
+# all supported configuration keys as the pipeline evolves.
+description: Configuration schema for the neurodent Snakemake pipeline
+type: object
+required:
+  - temp_directory
+  - samples
+  - analysis
+properties:
+  temp_directory:
+    type: string
+    description: Path to temporary directory for intermediate files
+  active_dataset:
+    type: string
+    description: Name of the active dataset configuration
+  samples:
+    type: object
+    properties:
+      truncate_animals:
+        description: Limit to first N animals (null for no limit)
+        type: ["integer", "null"]
+      quality_filter:
+        type: object
+        properties:
+          exclude_unknown_genotypes:
+            type: boolean
+          exclude_bad_animaldays:
+            type: boolean
+  analysis:
+    type: object
+    description: Analysis parameters
+    properties:
+      war_generation:
+        type: object
+        description: WAR generation parameters
+        properties:
+          compute_windowed_analysis:
+            type: object
+            description: Parameters forwarded to AnimalOrganizer.compute_windowed_analysis()
+            properties:
+              features:
+                type: array
+                description: Features to compute. Use ["all"] for all supported features.
+                items:
+                  type: string
+              multiprocess_mode:
+                type: string
+                description: "'dask' for parallel computation or 'serial' for single-threaded"
+                enum: ["dask", "serial"]
+              chunk_duration_s:
+                description: >
+                  Duration in seconds of data to buffer in RAM at one time when
+                  streaming to zarr. null = allocate all fragments at once (high
+                  throughput, high RAM). Set to a number (e.g. 250) to cap peak
+                  RAM use. Only has an effect when multiprocess_mode is "dask".
+                type: ["number", "null"]
+      frequency_domain_spike_detection:
+        type: object
+        description: Spike detection parameters
+        properties:
+          chunk_duration_s:
+            description: >
+              Duration in seconds of each processing chunk for spike detection.
+              The full recording is always analysed; this parameter controls
+              peak RAM by processing overlapping chunks of the given duration.
+              null = load the full recording at once (fastest, highest RAM).
+            type: ["number", "null"]
+          export_chunk_duration_s:
+            type: number
+            description: >
+              Duration in seconds of each chunk read when exporting traces to
+              .fif files. Smaller values reduce peak RAM during export.
+          spike_averaged_traces:
+            type: object
+            description: Parameters for spike-averaged trace plots and epoch exports
+            properties:
+              tmin:
+                type: number
+                description: Epoch start time relative to spike (seconds)
+              tmax:
+                type: number
+                description: Epoch end time relative to spike (seconds)
+              baseline:
+                description: Baseline correction window [tmin, tmax] or null
+                type: ["array", "null"]
+              save_epochs:
+                type: boolean
+                description: Whether to save epoch data as .fif files
+              figure_format:
+                type: string
+                description: Output format for spike-averaged-trace figures
+              dpi:
+                type: integer
+                description: Figure resolution in dots per inch
+      channel_filter_config:
+        type: object
+        description: Channel filtering configurations
+        properties:
+          lof:
+            type: object
+            description: LOF-based bad channel detection parameters
+            properties:
+              reject_lof_threshold:
+                type: number
+                description: LOF score threshold above which channels are considered bad
+              lof_chunk_duration_s:
+                type: number
+                description: >
+                  Duration in seconds of each chunk used for pairwise-distance
+                  computation in LOF bad-channel detection.  Lower values reduce
+                  peak RAM at the cost of more I/O passes over the recording.

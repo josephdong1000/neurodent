@@ -2,9 +2,8 @@ name: Test, Build Package, and Generate Documentation
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [main]
   pull_request:
-    branches: [ main, master ]
   workflow_dispatch:
 
 jobs:
@@ -19,10 +18,10 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
 
     - name: Install uv
-      uses: astral-sh/setup-uv@v6
+      uses: astral-sh/setup-uv@v7
       with:
         enable-cache: true
         python-version: ${{ matrix.python-version }}
@@ -72,10 +71,10 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       
     - name: Install uv
-      uses: astral-sh/setup-uv@v6
+      uses: astral-sh/setup-uv@v7
       with:
         python-version: '3.10.8'
         
@@ -91,7 +90,7 @@ jobs:
         tar -tzf dist/*.tar.gz | head -20
         
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: python-package
         path: dist/
@@ -104,7 +103,7 @@ jobs:
 
     steps:
     - name: Checkout code with full history
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         fetch-depth: 0  # Fetch all history for all tags and branches
         fetch-tags: true  # Explicitly fetch tags
@@ -113,7 +112,7 @@ jobs:
       uses: pandoc/actions/setup@v1
 
     - name: Install uv
-      uses: astral-sh/setup-uv@v6
+      uses: astral-sh/setup-uv@v7
       with:
         python-version: '3.10.8'
 
@@ -176,7 +175,7 @@ jobs:
         ls -la build/html/
 
     - name: Upload documentation artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: documentation
         path: build/html/
@@ -197,7 +196,7 @@ jobs:
 
     steps:
     - name: Download documentation artifact
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v7
       with:
         name: documentation
         path: build/html
@@ -209,6 +208,11 @@ jobs:
         echo ""
         echo "=== Verify .nojekyll exists ==="
         ls -la build/html/.nojekyll
+
+    - name: Remove Sphinx build artifacts before deploy
+      run: |
+        find build/html -name '.doctrees' -type d -exec rm -rf {} + 2>/dev/null || true
+        find build/html -name 'environment.pickle' -delete 2>/dev/null || true
 
     - name: Deploy to GitHub Pages
       uses: peaceiris/actions-gh-pages@v4

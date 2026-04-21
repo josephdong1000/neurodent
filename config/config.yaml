@@ -1,14 +1,20 @@
 # NeuRodent Snakemake Pipeline Configuration
 # =====================================
 
+# Dataset selection
+# Set NEURODENT_DATASET environment variable or change active_dataset below
+# Dataset configs are in config/datasets/{dataset_name}.yaml
+active_dataset: "sox5_bin"
+
 # Core directories and paths
 temp_directory: "/scr1/users/dongjp"
 
 # Sample configuration
+# Note: samples_file is set by active_dataset (see datasets section above)
 samples:
-  # Sample metadata file path
-  samples_file: "config/samples.json"
-  
+  # Limit to first N animals (null = no limit, useful for testing)
+  truncate_animals: null
+
   # Quality filtering parameters
   quality_filter:
     exclude_unknown_genotypes: true
@@ -17,19 +23,18 @@ samples:
 # Analysis parameters
 analysis:
   # WAR generation parameters
+  # Note: mode, file_pattern, and some lro_kwargs are set by active_dataset (see datasets section above)
+  # The settings below are shared across all datasets or serve as defaults
   war_generation:
-    mode: "concat"
-    file_pattern: "*.nwb"
-    day_sep: null
     assume_from_number: true
-    skip_days: ["bad"]
-    day_parse_kwargs:
-      date_patterns:
-        - ["\\d{6}", "%y%m%d"]
+    skip_sessions: ["*bad*"]
     lro_kwargs:
-      mode: "si"
       multiprocess_mode: "dask"
       overwrite_rowbins: false # REVIEW function of this parameter when mode is not "bin"
+    compute_windowed_analysis:
+      features: ["all"]             # Feature list; "all" computes every supported feature
+      multiprocess_mode: "dask"     # "dask" (parallel) or "serial"
+      chunk_duration_s: 3600           # seconds of data to buffer at a time (null = single bulk allocation, fast but high RAM)
 
   # Frequency domain spike detection parameters
   frequency_domain_spike_detection:
@@ -50,6 +55,10 @@ analysis:
 
     # Processing parameters
     multiprocess_mode: "dask"    # "dask" or "serial"
+    chunk_duration_s: 3600           # seconds per chunk for spike detection (null = load full recording at once)
+
+    # .fif export parameters
+    export_chunk_duration_s: 60    # seconds per chunk when reading traces to write .fif (lower = less RAM)
 
     # Visualization parameters
     spike_averaged_traces:
@@ -90,6 +99,7 @@ analysis:
       reject_lof_threshold: 2.5  # LOF threshold above which channels are considered bad
       reject_channels: []  # List of channels to reject globally
       min_valid_channels: 3
+      lof_chunk_duration_s: 60  # seconds per chunk for pairwise-distance computation in LOF
 
   # Data aggregation parameters (applied after filtering)
   aggregation:

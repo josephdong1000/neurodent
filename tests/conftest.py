@@ -8,7 +8,9 @@ import matplotlib
 
 matplotlib.use("Agg")
 
+import copy
 import tempfile
+import warnings
 from pathlib import Path
 from typing import Generator
 
@@ -18,6 +20,10 @@ import pytest
 from unittest.mock import Mock
 
 from neurodent import constants
+
+
+class ConstantsMutatedWarning(UserWarning):
+    """Emitted when a test mutates global constants without the ``mutates_constants`` marker."""
 
 
 @pytest.fixture(scope="session")
@@ -161,9 +167,44 @@ def mock_mne():
 
 
 @pytest.fixture(autouse=True)
-def setup_test_environment():
-    """Setup test environment before each test."""
+def setup_test_environment(request):
+    """Save and restore mutable module-level constants around each test.
+
+    Uses :func:`copy.deepcopy` so that *in-place* mutations of nested
+    containers (e.g. ``constants.CHNAME_ALIASES["Aud"].append(...)``) are
+    also properly restored, not just full reassignments.
+
+    If constants are mutated during a test that is **not** decorated with
+    ``@pytest.mark.mutates_constants``, a :class:`ConstantsMutatedWarning`
+    is emitted.  This makes accidental side-effects from production code
+    visible in the test output instead of being silently masked.  Tests
+    that intentionally call :func:`~neurodent.workflow.utils.inject_config_aliases`
+    should carry the marker so the warning is suppressed.
+    """
+    orig = {
+        "GENOTYPE_ALIASES": copy.deepcopy(constants.GENOTYPE_ALIASES),
+        "CHNAME_ALIASES": copy.deepcopy(constants.CHNAME_ALIASES),
+        "LR_ALIASES": copy.deepcopy(constants.LR_ALIASES),
+        "ANIMAL_METADATA": copy.deepcopy(constants.ANIMAL_METADATA),
+    }
+
     yield
+
+    changed = [k for k, v in orig.items() if getattr(constants, k) != v]
+
+    # Restore original values so no test can leak state
+    for k, v in orig.items():
+        setattr(constants, k, v)
+
+    if changed and not request.node.get_closest_marker("mutates_constants"):
+        warnings.warn(
+            f"Test mutated global constants {changed} without "
+            "@pytest.mark.mutates_constants marker. If intentional, "
+            "add the marker; otherwise check for side-effects in the "
+            "code under test.",
+            ConstantsMutatedWarning,
+            stacklevel=1,
+        )
 
 
 @pytest.fixture(scope="session")
@@ -268,100 +309,30 @@ def mock_long_recording_organizer():
     return _create_mock_lro
 
 
-@pytest.fixture
-def create_test_directory_structure():
-    """
-    Factory fixture for creating test directory structures.
+# ============================================================================
+# EXAMPLE DATASET FIXTURE
+# ============================================================================
+# Provides a minimal synthetic EEG dataset on disk for integration testing
+# the Snakemake pipeline without requiring real recordings.
+# ============================================================================
 
-    This reduces duplication in tests that need to create temporary
-    directories with specific layouts (e.g., for AnimalOrganizer tests).
 
-    Usage:
-        def test_something(create_test_directory_structure):
-            base_path, dirs = create_test_directory_structure(
-                mode="concat",
-                animal_id="A123"
-            )
-            # Use the created structure...
+@pytest.fixture(scope="session")
+def example_dataset(tmp_path_factory):
+    """Generate a minimal synthetic NWB dataset for pipeline integration tests.
+
+    Creates a directory tree under ``tmp_path`` with two animals
+    (ExWT, ExKO), each with one 5-second NWB recording session. The returned
+    dict contains the data root path and a ``samples_config`` dict ready
+    to be used with ``inject_config_aliases`` or pipeline scripts.
 
     Returns:
-        Callable that creates directory structures and returns paths
+        dict with keys ``data_root``, ``samples_config``, ``animals``,
+        ``session_folder``.
     """
-    import tempfile
-    import shutil
-    from pathlib import Path
+    from tests.integration.generate import create_synthetic_dataset
 
-    created_temps = []
+    tmp_path = tmp_path_factory.mktemp("dataset")
+    return create_synthetic_dataset(tmp_path)
 
-    def _create_structure(mode="concat", animal_id="A123", genotype="WT", include_files=True, base_path=None):
-        """
-        Create a test directory structure.
 
-        Args:
-            mode: Directory mode ("concat", "nest", "noday", "base")
-            animal_id: Animal identifier
-            genotype: Animal genotype
-            include_files: Whether to include test files (for filtering tests)
-            base_path: Optional base path (creates temp dir if None)
-
-        Returns:
-            tuple: (base_path, dict with 'directories' and 'files' lists)
-        """
-        if base_path is None:
-            temp_dir = tempfile.mkdtemp()
-            created_temps.append(temp_dir)
-            base_path = Path(temp_dir)
-        else:
-            base_path = Path(base_path)
-
-        result = {"directories": [], "files": []}
-
-        if mode == "nest":
-            # Create animal subfolder structure
-            animal_dir = base_path / f"{genotype}_{animal_id}_data"
-            animal_dir.mkdir(exist_ok=True)
-
-            day1_dir = animal_dir / f"{genotype}_2023-01-01"
-            day2_dir = animal_dir / f"{genotype}_2023-01-02"
-            day1_dir.mkdir(exist_ok=True)
-            day2_dir.mkdir(exist_ok=True)
-            result["directories"].extend([day1_dir, day2_dir])
-
-            if include_files:
-                edf_file = animal_dir / "recording.edf"
-                bin_file = animal_dir / "data.bin"
-                edf_file.touch()
-                bin_file.touch()
-                result["files"].extend([edf_file, bin_file])
-
-        elif mode in ["concat", "noday"]:
-            day1_dir = base_path / f"{genotype}_{animal_id}_2023-01-01"
-            day2_dir = base_path / f"{genotype}_{animal_id}_2023-01-02"
-            day1_dir.mkdir(exist_ok=True)
-
-            if mode == "concat":
-                day2_dir.mkdir(exist_ok=True)
-                result["directories"].extend([day1_dir, day2_dir])
-            else:
-                result["directories"].append(day1_dir)
-
-            if include_files:
-                for ext in ["edf", "bin", "json"]:
-                    f = base_path / f"{genotype}_{animal_id}_recording.{ext}"
-                    f.touch()
-                    result["files"].append(f)
-
-        elif mode == "base":
-            if include_files:
-                for ext in ["edf", "bin"]:
-                    f = base_path / f"recording.{ext}"
-                    f.touch()
-                    result["files"].append(f)
-
-        return base_path, result
-
-    yield _create_structure
-
-    # Cleanup
-    for temp_dir in created_temps:
-        shutil.rmtree(temp_dir, ignore_errors=True)

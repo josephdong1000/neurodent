@@ -122,6 +122,38 @@ class TestEnrichMetadata:
         assert pd.isna(result["gene"].iloc[0]) or result["gene"].iloc[0] is None
 
 
+class TestSexNormalization:
+    """Tests for sex normalization via SEX_ALIASES."""
+
+    @pytest.mark.parametrize("raw,expected", [
+        ("M", "Male"),
+        ("m", "Male"),
+        ("male", "Male"),
+        ("Male", "Male"),
+        ("F", "Female"),
+        ("f", "Female"),
+        ("female", "Female"),
+        ("Female", "Female"),
+    ])
+    def test_alias_resolves_to_canonical(self, raw, expected):
+        config = {"ANIMAL_METADATA": [{"id": "A1", "sex": raw}]}
+        result = metadata.load_animal_metadata(config)
+        assert result["A1"]["sex"] == expected
+
+    def test_unknown_passes_through_with_warning(self, caplog):
+        import logging
+        with caplog.at_level(logging.WARNING):
+            config = {"ANIMAL_METADATA": [{"id": "A1", "sex": "UNKNOWN"}]}
+            result = metadata.load_animal_metadata(config)
+        assert result["A1"]["sex"] == "UNKNOWN"
+        assert "Unrecognized sex value" in caplog.text
+
+    def test_none_stays_none(self):
+        config = {"ANIMAL_METADATA": [{"id": "A1", "sex": None}]}
+        result = metadata.load_animal_metadata(config)
+        assert result["A1"]["sex"] is None
+
+
 class TestLoadAnimalMetadataEdgeCases:
     """Edge case tests for load_animal_metadata."""
 
@@ -166,6 +198,7 @@ class TestLoadAnimalMetadataEdgeCases:
         assert result["M1"]["gene"] is None
 
 
+@pytest.mark.mutates_constants
 class TestInjectConfigAliases:
     """Tests for inject_config_aliases function."""
 

@@ -3,9 +3,8 @@
 .. autosummary::
    :nosignatures:
 
-   DDFBinaryMetadata
+   RecordingMetadata
    LongRecordingOrganizer
    LongRecordingAnalyzer
    FragmentAnalyzer
-   MountainSortAnalyzer
    FrequencyDomainSpikeDetector

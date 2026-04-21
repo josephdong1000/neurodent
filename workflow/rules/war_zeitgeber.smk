@@ -7,7 +7,7 @@ This implements the pipeline-alphadelta.py functionality to process features
 with respect to zeitgeber time rather than fragment index.
 """
 
-rule extract_zeitgeber_features:
+rule war_zeitgeber:
     """
     Extract zeitgeber time features from all fragment-filtered WARs
     """
@@ -28,7 +28,7 @@ rule extract_zeitgeber_features:
         mem_mb=increment_memory(config["cluster"]["war_zeitgeber"]["mem_mb"]),
         nodes=config["cluster"]["war_zeitgeber"]["nodes"],
     log:
-        stdout="logs/war_zeitgeber/extract_zeitgeber_features.stdout",
-        stderr="logs/war_zeitgeber/extract_zeitgeber_features.stderr",
+        stdout="logs/war_zeitgeber/war_zeitgeber.out",
+        stderr="logs/war_zeitgeber/war_zeitgeber.err",
     script:
         "../scripts/extract_zeitgeber_features.py"

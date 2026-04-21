@@ -24,15 +24,16 @@ from neurodent.workflow import setup_snakemake_logging, inject_config_aliases
 
 def get_ground_truth_bad_channels(samples_config, animal_folder, animal_id):
     """Extract ground truth bad channels for a specific animal from samples.json"""
-    animal_key = f"{animal_folder} {animal_id}"
     samples_bad_channels = samples_config.get("bad_channels", {})
-    bad_channels_dict = samples_bad_channels.get(animal_key, {})
+    bad_channels_dict = samples_bad_channels.get(animal_id, {})
 
-    # Convert to set format for each animal-day
-    # Use the full animalday_session key as-is since it matches LOF scores format
+    # Convert to set format for each session
     ground_truth = {}
-    for animalday_session, bad_channels_list in bad_channels_dict.items():
-        ground_truth[animalday_session] = set(bad_channels_list)
+    all_bad = set(bad_channels_dict.get("_all", []))
+    for session, bad_channels_list in bad_channels_dict.items():
+        if session == "_all":
+            continue
+        ground_truth[session] = set(bad_channels_list) | all_bad
 
     return ground_truth
 

@@ -7,7 +7,7 @@ This corresponds to the pipeline-war-* scripts in the original workflow.
 """
 
 
-rule make_war:
+rule war_generation:
     """
     Generate WAR (Windowed Analysis Results) with integrated spike detection for a specific animal.
 
@@ -36,7 +36,7 @@ rule make_war:
         mem_mb=increment_memory(config["cluster"]["war_generation"]["mem_mb"]),
         nodes=config["cluster"]["war_generation"]["nodes"],
     log:
-        stdout="logs/war_generation/{animal}.stdout",
-        stderr="logs/war_generation/{animal}.stderr",
+        stdout="logs/war_generation/{animal}.out",
+        stderr="logs/war_generation/{animal}.err",
     script:
         "../scripts/generate_wars.py"
