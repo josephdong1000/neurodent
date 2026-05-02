@@ -2407,7 +2407,10 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 f"Target channels must be unique. Found duplicates: {duplicates}"
             )
 
-        result = self.result.copy()
+        if inplace:
+            result = self.result
+        else:
+            result = self.result.copy()
 
         channel_map = {ch: i for i, ch in enumerate(target_channels)}
         channel_names = self.channel_names if not use_abbrevs else self.channel_abbrevs
@@ -2443,8 +2446,10 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 if ftype is constants.FeatureType.BAND:
                     # new_vals is (W, n_target, B) — canonical, pass directly to repack
                     result[feature] = repack_band_dict(new_vals, keys)
+                    del vals, keys, new_vals
                 else:
                     result[feature] = [list(x) for x in new_vals]
+                    del vals, new_vals
 
             elif ftype.is_matrix:
                 if ftype is constants.FeatureType.BANDED_MATRIX:
@@ -2460,6 +2465,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                                 if ch2 in channel_map:
                                     new_vals[:, channel_map[ch1], channel_map[ch2], :] = vals[:, i, j, :]
                     result[feature] = repack_band_dict(new_vals, keys)
+                    del vals, keys, new_vals
                 else:
                     vals = extract_linear_array(result[feature])
                     # vals is canonical (W, C, C) for SIMPLE_MATRIX
@@ -2472,6 +2478,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                                 if ch2 in channel_map:
                                     new_vals[:, channel_map[ch1], channel_map[ch2]] = vals[:, i, j]
                     result[feature] = [list(x) for x in new_vals]
+                    del vals, new_vals
 
             elif ftype is constants.FeatureType.HIST:
                 coords, vals = extract_hist_data(result[feature])
@@ -2488,6 +2495,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 result[feature] = [
                     (coords[i], new_vals[i].T) for i in range(len(coords))
                 ]
+                del coords, vals, new_vals
 
             else:
                 raise ValueError(
@@ -3975,11 +3983,13 @@ class WindowAnalysisResult(AnimalFeatureParser):
             else:
                 columns[col] = ser.to_numpy()
         table = pa.table(columns)
+        del columns
         neurodent_meta = json.dumps({"encoded_columns": encoded_cols}).encode()
         existing_meta = table.schema.metadata or {}
         merged_meta = {**existing_meta, b"neurodent": neurodent_meta}
         table = table.replace_schema_metadata(merged_meta)
         pq.write_table(table, filepath + ".parquet")
+        del table
         logging.info(f"Saved WAR to {filepath + '.parquet'}")
 
         json_dict = {

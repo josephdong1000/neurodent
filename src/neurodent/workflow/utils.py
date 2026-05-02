@@ -6,6 +6,7 @@ This module provides utilities that reduce boilerplate in Snakemake workflow scr
 
 import copy
 import logging
+import os
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -53,6 +54,7 @@ def setup_snakemake_logging(snakemake) -> logging.Logger:
         The logger will write to ``logs/my_rule/{animal}.out``.
     """
     log_path = snakemake.log[0]
+    os.makedirs(os.path.dirname(log_path), exist_ok=True)
     log_file = open(log_path, "w")
 
     # Redirect stdout and stderr to the log file
