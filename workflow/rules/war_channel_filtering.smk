@@ -7,13 +7,23 @@ This enables comparison between manual bad channel lists and LOF-based detection
 """
 
 
+def _war_fragment_filtered_parquet(wildcards):
+    """Return path to fragment-filtered war.parquet after the checkpoint has run."""
+    return checkpoints.war_fragment_filtering.get(animal=wildcards.animal).output.war_parquet
+
+
+def _war_fragment_filtered_json(wildcards):
+    """Return path to fragment-filtered war.json after the checkpoint has run."""
+    return checkpoints.war_fragment_filtering.get(animal=wildcards.animal).output.war_json
+
+
 rule war_channel_filtering_manual:
     """
     Apply manual bad channel filtering using config/samples.json bad channel lists
     """
     input:
-        war_parquet="results/wars_fragment_filtered/{animal}/war.parquet",
-        war_json="results/wars_fragment_filtered/{animal}/war.json",
+        war_parquet=_war_fragment_filtered_parquet,
+        war_json=_war_fragment_filtered_json,
     output:
         war_parquet="results/wars_channel_filtered_manual/{animal}/war.parquet",
         war_json="results/wars_channel_filtered_manual/{animal}/war.json",
@@ -42,8 +52,8 @@ rule war_channel_filtering_lof:
     Apply LOF-based bad channel filtering using pre-computed LOF scores
     """
     input:
-        war_parquet="results/wars_fragment_filtered/{animal}/war.parquet",
-        war_json="results/wars_fragment_filtered/{animal}/war.json",
+        war_parquet=_war_fragment_filtered_parquet,
+        war_json=_war_fragment_filtered_json,
     output:
         war_parquet="results/wars_channel_filtered_lof/{animal}/war.parquet",
         war_json="results/wars_channel_filtered_lof/{animal}/war.json",

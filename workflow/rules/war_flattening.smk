@@ -7,13 +7,23 @@ This corresponds to the pipeline-epfig-so functionality in the original workflow
 """
 
 
+def _war_fragment_filtered_parquet(wildcards):
+    """Return path to fragment-filtered war.parquet after the checkpoint has run."""
+    return checkpoints.war_fragment_filtering.get(animal=wildcards.animal).output.war_parquet
+
+
+def _war_fragment_filtered_json(wildcards):
+    """Return path to fragment-filtered war.json after the checkpoint has run."""
+    return checkpoints.war_fragment_filtering.get(animal=wildcards.animal).output.war_json
+
+
 checkpoint war_flattening:
     """
     Flatten filtered WARs by aggregating time windows for each animal individually
     """
     input:
-        war_parquet="results/wars_fragment_filtered/{animal}/war.parquet",
-        war_json="results/wars_fragment_filtered/{animal}/war.json",
+        war_parquet=_war_fragment_filtered_parquet,
+        war_json=_war_fragment_filtered_json,
     output:
         war_parquet="results/wars_flattened/{animal}/war.parquet",
         war_json="results/wars_flattened/{animal}/war.json",
