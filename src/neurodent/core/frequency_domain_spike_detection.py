@@ -198,24 +198,22 @@ class FrequencyDomainSpikeDetector:
         sampling_freq = recording.get_sampling_frequency()
         n_channels = chunk_data.shape[0]
 
-        # Preprocess chunk in place
-        chunk_data = FrequencyDomainSpikeDetector._preprocess_array(
-            chunk_data, sampling_freq, params
-        )
-
         # Run spike detection per channel
         match multiprocess_mode:
             case "dask":
                 if dask is None:
                     raise ImportError("dask is required for multiprocess_mode='dask'")
                 spike_tasks = [
-                    dask.delayed(FrequencyDomainSpikeDetector._detect_spikes_channel)(
+                    dask.delayed(FrequencyDomainSpikeDetector._filter_and_detect_channel)(
                         chunk_data[ch, :], sampling_freq, params
                     )
                     for ch in range(n_channels)
                 ]
                 chunk_spikes_per_channel = list(dask.compute(*spike_tasks))
             case _:
+                chunk_data = FrequencyDomainSpikeDetector._preprocess_array(
+                    chunk_data, sampling_freq, params
+                )
                 chunk_spikes_per_channel = [
                     FrequencyDomainSpikeDetector._detect_spikes_channel(
                         chunk_data[ch, :], sampling_freq, params
@@ -232,6 +230,30 @@ class FrequencyDomainSpikeDetector:
             mask = (spikes_local >= offset_in_read) & (spikes_local < offset_out_read)
             result.append(spikes_local[mask] - offset_in_read + valid_start)
         return result
+
+    @staticmethod
+    def _filter_and_detect_channel(
+        raw_1d: np.ndarray, sampling_freq: float, params: dict
+    ) -> np.ndarray:
+        """Filter and detect spikes for a single channel.
+
+        Fuses per-channel preprocessing and spike detection into one task,
+        enabling Dask to parallelize both steps across channels.
+
+        Args:
+            raw_1d: Shape ``(n_samples,)`` — raw unfiltered channel data.
+            sampling_freq: Sampling rate in Hz.
+            params: Detection parameter dict.
+
+        Returns:
+            Spike sample indices for this channel.
+        """
+        filtered = FrequencyDomainSpikeDetector._preprocess_array(
+            raw_1d[np.newaxis, :], sampling_freq, params
+        )[0]
+        return FrequencyDomainSpikeDetector._detect_spikes_channel(
+            filtered, sampling_freq, params
+        )
 
     @staticmethod
     def _preprocess_array(
