@@ -23,11 +23,13 @@ class TestTimelineSequencing:
         # Bind helpers that _compute_global_timeline uses
         ao._get_item_name = AnimalOrganizer._get_item_name.__get__(ao, AnimalOrganizer)
         ao._is_item_file = AnimalOrganizer._is_item_file.__get__(ao, AnimalOrganizer)
-        
+        ao._items_have_index = AnimalOrganizer._items_have_index.__get__(ao, AnimalOrganizer)
+        ao._session_sort_key = AnimalOrganizer._session_sort_key.__get__(ao, AnimalOrganizer)
+
         # Mock dependencies
         ao._resolve_timestamp_input = MagicMock(side_effect=lambda x, y: pd.to_datetime(x))
         ao._get_folders_for_animal = MagicMock(side_effect=lambda aid, mapping: [f for folders in mapping.values() for f in folders])
-        
+
         return ao
 
     @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
@@ -410,6 +412,48 @@ class TestTimelineSequencing:
         assert result["rec_A_data.bin"] == pd.to_datetime("2025-01-01 12:00:00")  # index 1
         assert result["rec_B_data.bin"] == pd.to_datetime("2025-01-01 13:00:00")  # index 2
         assert result["rec_C_data.bin"] == pd.to_datetime("2025-01-01 14:00:00")  # index 3
+
+    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    def test_index_metadata_overrides_filename_sort(self, mock_lro_cls, ao):
+        """
+        Test that index metadata is used for sorting even when filenames
+        would sort in a completely different order.
+
+        This test uses filenames with irrelevant data that would naturally
+        sort differently from the index values, proving that the index
+        metadata is what determines the order.
+        """
+        def side_effect(*args, **kwargs):
+            m = MagicMock()
+            m.LongRecording.get_duration.return_value = 3600.0
+            return m
+
+        mock_lro_cls.side_effect = side_effect
+
+        # Filenames that sort alphabetically as: aardvark < monkey < zebra
+        # But indices are: 3, 1, 2 (monkey first, zebra second, aardvark third)
+        items = [
+            DiscoveredFile(path="/data/irrelevant/zebra_data.bin", metadata={"animal": "M1", "session": "day1", "index": "2"}),
+            DiscoveredFile(path="/data/irrelevant/monkey_data.bin", metadata={"animal": "M1", "session": "day1", "index": "1"}),
+            DiscoveredFile(path="/data/irrelevant/aardvark_data.bin", metadata={"animal": "M1", "session": "day1", "index": "3"}),
+        ]
+
+        animalday_to_items = {"day1": items}
+        base_datetime = pd.to_datetime("2025-01-01 12:00:00")
+        base_lro_kwargs = {"datetimes_are_start": True}
+
+        result = ao._compute_global_timeline(
+            base_datetime, animalday_to_items, base_lro_kwargs,
+            original_manual_datetimes=base_datetime,
+        )
+
+        # Items should be ordered by index (1, 2, 3), not filename natural sort
+        # If sorted by filename: aardvark (index=3), monkey (index=1), zebra (index=2)
+        # If sorted by index: monkey (index=1), zebra (index=2), aardvark (index=3) ← correct
+        assert result["monkey_data.bin"] == pd.to_datetime("2025-01-01 12:00:00")  # index 1, first
+        assert result["zebra_data.bin"] == pd.to_datetime("2025-01-01 13:00:00")   # index 2, second
+        assert result["aardvark_data.bin"] == pd.to_datetime("2025-01-01 14:00:00") # index 3, third
+
 
     @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
     def test_index_metadata_sort_list_datetime(self, mock_lro_cls, ao):
