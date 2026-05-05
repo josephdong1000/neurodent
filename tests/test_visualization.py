@@ -3985,6 +3985,84 @@ class TestParquetSaveLoad:
                 assert decoded["cohere"].iloc[i] == war.result["cohere"].iloc[i]
 
 
+class TestMemoryPressure:
+    """Verify that load/save paths don't hold unnecessary copies of WAR data."""
+
+    @pytest.fixture
+    def war_for_memory_test(self):
+        """Create a WAR large enough that data dominates over fixed overhead."""
+        n_rows = 500
+        n_ch = 8
+        n_freq = 64
+        rng = np.random.default_rng(42)
+        data = {
+            "animalday": ["A1_20230101"] * n_rows,
+            "genotype": ["WT"] * n_rows,
+            "timestamp": pd.date_range("2023-01-01", periods=n_rows, freq="4min"),
+            "duration": rng.uniform(230, 250, n_rows).tolist(),
+            "rms": [rng.random(n_ch).tolist() for _ in range(n_rows)],
+            "psd": [
+                (rng.random(n_freq).tolist(), rng.random((n_ch, n_freq)).tolist())
+                for _ in range(n_rows)
+            ],
+        }
+        return WindowAnalysisResult(
+            pd.DataFrame(data), animal_id="A1", genotype="WT",
+            channel_names=["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"],
+            suppress_short_interval_error=True,
+        )
+
+    def test_load_parquet_peak_memory(self, war_for_memory_test):
+        """Peak memory during load_parquet_and_json should stay under 5x the parquet file size.
+
+        Regression guard: without ``del table`` after ``to_pandas()`` and
+        without the in-place decode (no ``df.copy()``), peak reaches ~6x+.
+        """
+        import tracemalloc
+
+        war = war_for_memory_test
+        with tempfile.TemporaryDirectory() as tmpdir:
+            war.save_parquet_and_json(tmpdir, filename="war")
+            pq_size = (Path(tmpdir) / "war.parquet").stat().st_size
+
+            tracemalloc.start()
+            loaded = WindowAnalysisResult.load_parquet_and_json(folder_path=tmpdir)
+            _, peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+
+            # Loaded data should be correct
+            assert loaded.animal_id == war.animal_id
+            assert len(loaded.result) == len(war.result)
+
+            # Peak memory should not exceed 5x the parquet file size.
+            # Before the del-table + in-place-decode fixes, this ratio was ~6x+.
+            ratio = peak / max(pq_size, 1)
+            assert ratio < 5, (
+                f"Peak memory during load is {ratio:.1f}x the parquet file size "
+                f"({peak / 1e6:.1f} MB vs {pq_size / 1e6:.1f} MB). "
+                f"Likely a missing del or unnecessary copy."
+            )
+
+    def test_save_parquet_peak_memory(self, war_for_memory_test):
+        """Peak memory during save_parquet_and_json should stay under 5x the parquet file size."""
+        import tracemalloc
+
+        war = war_for_memory_test
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tracemalloc.start()
+            war.save_parquet_and_json(tmpdir, filename="war")
+            _, peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+
+            pq_size = (Path(tmpdir) / "war.parquet").stat().st_size
+            ratio = peak / max(pq_size, 1)
+            assert ratio < 5, (
+                f"Peak memory during save is {ratio:.1f}x the parquet file size "
+                f"({peak / 1e6:.1f} MB vs {pq_size / 1e6:.1f} MB). "
+                f"Likely a missing del or unnecessary copy."
+            )
+
+
 class TestAnimalOrganizerLOF:
     """Test LOF functionality integration with AnimalOrganizer (mocked)."""
 
