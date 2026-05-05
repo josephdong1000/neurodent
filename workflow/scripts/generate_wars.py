@@ -292,12 +292,19 @@ if __name__ == "__main__":
     profile_enabled = os.environ.get("NEURODENT_PROFILE")
 
     # Optional memray memory profiling (context manager wraps main)
+    # memray is Linux-only; gracefully disable on other platforms
     if memray_enabled:
-        import memray
-        memray_path = Path(snakemake.output.war_parquet).parent / "memray.bin"
-        tracker_ctx = memray.Tracker(
-            destination=memray.FileDestination(str(memray_path), overwrite=True)
-        )
+        import sys
+        if sys.platform == "linux":
+            import memray
+            memray_path = Path(snakemake.output.war_parquet).parent / "memray.bin"
+            tracker_ctx = memray.Tracker(
+                destination=memray.FileDestination(str(memray_path), overwrite=True)
+            )
+        else:
+            from contextlib import nullcontext
+            tracker_ctx = nullcontext()
+            print(f"Warning: NEURODENT_MEMRAY set but memray is Linux-only (current platform: {sys.platform}). Profiling disabled.")
     else:
         from contextlib import nullcontext
         tracker_ctx = nullcontext()

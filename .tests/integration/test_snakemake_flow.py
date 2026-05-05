@@ -209,8 +209,7 @@ class TestSnakemakePipelineRun:
             "results/wars_flattened_manual",
             "results/wars_flattened_lof",
             "results/fdsar_diagnostics",
-            "results/diagnostic_figures_unfiltered",
-            "results/diagnostic_figures_filtered",
+            "results/diagnostic_figures",
         )
         for base in per_animal_results:
             for animal in self.ANIMALS:
