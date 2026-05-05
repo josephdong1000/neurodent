@@ -480,31 +480,41 @@ def test_pattern_with_irrelevant_path_data_and_index_sort(tmp_path, monkeypatch)
     from neurodent.core.discovery import DiscoveredFile
     import pandas as pd
 
-    # Create file structure with irrelevant directory names that sort differently from indices
-    # {animal}/{session}/{irrelevant_dir}/{index}/*.bin
-    # Irrelevant dirs chosen so full path sorting differs from index sorting:
-    # - "run999/001/data1.bin" would sort LAST alphabetically (run999 > run001)
-    # - "run001/002/data2.bin" would sort FIRST alphabetically
-    # - "run500/003/data3.bin" would sort in the MIDDLE
-    # Expected sort by path: run001/002/data2, run500/003/data3, run999/001/data1
-    # Expected sort by index: 001, 002, 003
+    # Create file structure with 10 files where:
+    # - Irrelevant directory names sort completely differently from indices
+    # - Filenames are intentionally out of order (not data1, data2, data3... but scrambled)
+    # This proves that ONLY sorting by {index} metadata gives correct ordering
+    #
+    # Directory structure: {animal}/{session}/{irrelevant_dir}/{index}/{filename}.bin
+    # Filenames are deliberately scrambled: zebra, monkey, aardvark, etc.
+    # If sorted by filename: aardvark < banana < cherry < ... < zebra (wrong order)
+    # If sorted by index: 001, 002, 003, ..., 010 (correct order)
 
     session_dir = tmp_path / "A10" / "session1"
 
-    # File with index 001 in "run999" dir (path would sort last, but index is first)
-    dir1 = session_dir / "run999" / "001"
-    dir1.mkdir(parents=True)
-    (dir1 / "data1.bin").touch()
+    # Create 10 files with:
+    # - Indices: 001 through 010 (sequential, correct order)
+    # - Directory names: intentionally scrambled to sort differently
+    # - Filenames: alphabetically scrambled to not match index order
 
-    # File with index 002 in "run001" dir (path would sort first, but index is second)
-    dir2 = session_dir / "run001" / "002"
-    dir2.mkdir(parents=True)
-    (dir2 / "data2.bin").touch()
+    files_config = [
+        # (irrelevant_dir, index, filename)
+        ("run999", "001", "zebra.bin"),      # index=001, filename sorts last, dir sorts last
+        ("run001", "002", "monkey.bin"),     # index=002, filename sorts middle, dir sorts first
+        ("run700", "003", "aardvark.bin"),   # index=003, filename sorts first, dir sorts middle
+        ("run200", "004", "turtle.bin"),     # index=004
+        ("run850", "005", "banana.bin"),     # index=005
+        ("run100", "006", "xylophone.bin"),  # index=006
+        ("run950", "007", "cherry.bin"),     # index=007
+        ("run300", "008", "walrus.bin"),     # index=008
+        ("run600", "009", "elephant.bin"),   # index=009
+        ("run400", "010", "quokka.bin"),     # index=010
+    ]
 
-    # File with index 003 in "run500" dir (path would sort middle, index is third)
-    dir3 = session_dir / "run500" / "003"
-    dir3.mkdir(parents=True)
-    (dir3 / "data3.bin").touch()
+    for irrelevant_dir, index, filename in files_config:
+        file_dir = session_dir / irrelevant_dir / index
+        file_dir.mkdir(parents=True)
+        (file_dir / filename).touch()
 
     # Mock _create_long_recordings to prevent actual LRO creation
     # Instead, capture what would be passed to timeline computation
@@ -526,7 +536,7 @@ def test_pattern_with_irrelevant_path_data_and_index_sort(tmp_path, monkeypatch)
     # Verify discovery
     assert len(ao._animalday_folder_groups) == 1
     assert "session1" in ao._animalday_folder_groups
-    assert len(ao._animalday_folder_groups["session1"]) == 3
+    assert len(ao._animalday_folder_groups["session1"]) == 10  # Now we have 10 files
 
     # Verify all discovered items are DiscoveredFile with index metadata
     items = ao._animalday_folder_groups["session1"]
@@ -541,9 +551,9 @@ def test_pattern_with_irrelevant_path_data_and_index_sort(tmp_path, monkeypatch)
 
     # Verify the index values are captured correctly
     indices = sorted([item.metadata["index"] for item in items])
-    assert indices == ["001", "002", "003"]
+    assert indices == ["001", "002", "003", "004", "005", "006", "007", "008", "009", "010"]
 
-    # Now test that _compute_global_timeline sorts by index, not by directory name
+    # Now test that _compute_global_timeline sorts by index, not by directory name or filename
     # Mock LongRecordingOrganizer to avoid file I/O
     with patch("neurodent.visualization.results.core.LongRecordingOrganizer") as mock_lro_cls:
         def side_effect(*args, **kwargs):
@@ -583,14 +593,27 @@ def test_pattern_with_irrelevant_path_data_and_index_sort(tmp_path, monkeypatch)
             original_manual_datetimes=base_datetime,
         )
 
-        # Verify timeline is sorted by index (001, 002, 003), not by path (run001/002, run500/003, run999/001)
-        # If sorted by full path: run001/002/data2.bin (index 002), run500/003/data3.bin (index 003), run999/001/data1.bin (index 001)
-        # If sorted by index: 001, 002, 003 ← correct
+        # Verify timeline is sorted by index (001-010), NOT by filename or path
+        # If sorted by filename alphabetically: aardvark, banana, cherry, elephant, monkey, quokka, turtle, walrus, xylophone, zebra
+        # If sorted by index: 001, 002, 003, 004, 005, 006, 007, 008, 009, 010 ← correct
 
-        # Verify temporal ordering matches index ordering, not path ordering
-        # Index 001 should be first (data1.bin from run999)
-        # Index 002 should be second (data2.bin from run001)
-        # Index 003 should be third (data3.bin from run500)
-        assert result["data1.bin"] == pd.to_datetime("2025-01-01 10:00:00")  # First by index (001, in run999)
-        assert result["data2.bin"] == pd.to_datetime("2025-01-01 11:00:00")  # Second by index (002, in run001)
-        assert result["data3.bin"] == pd.to_datetime("2025-01-01 12:00:00")  # Third by index (003, in run500)
+        # Expected order by index with their filenames:
+        expected_order = [
+            ("zebra.bin", "001", 0),       # index 001, hour 0
+            ("monkey.bin", "002", 1),      # index 002, hour 1
+            ("aardvark.bin", "003", 2),    # index 003, hour 2
+            ("turtle.bin", "004", 3),      # index 004, hour 3
+            ("banana.bin", "005", 4),      # index 005, hour 4
+            ("xylophone.bin", "006", 5),   # index 006, hour 5
+            ("cherry.bin", "007", 6),      # index 007, hour 6
+            ("walrus.bin", "008", 7),      # index 008, hour 7
+            ("elephant.bin", "009", 8),    # index 009, hour 8
+            ("quokka.bin", "010", 9),      # index 010, hour 9
+        ]
+
+        for filename, index, hour_offset in expected_order:
+            expected_time = base_datetime + pd.Timedelta(hours=hour_offset)
+            assert result[filename] == expected_time, (
+                f"{filename} (index {index}) should be at hour {hour_offset}, "
+                f"but got {result[filename]}"
+            )
