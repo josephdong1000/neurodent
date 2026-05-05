@@ -462,3 +462,135 @@ def test_sort_lros_handles_multifile_discovered_files():
     # df1 (earlier timestamp) should come first
     assert result[0][0] is df1
     assert result[1][0] is df2
+
+
+def test_pattern_with_irrelevant_path_data_and_index_sort(tmp_path, monkeypatch):
+    """
+    Integration test: pattern with irrelevant directory data between {session} and {index}.
+
+    This tests the scenario described in the PR comment where a pattern like
+    "{animal}/{session}/*/{index}/filename.ext" has irrelevant data (the asterisk)
+    that could cause incorrect sorting if used instead of {index} metadata.
+
+    The test verifies that:
+    1. Files are discovered correctly with the wildcard pattern
+    2. Files are sorted by {index} metadata, not by the irrelevant directory names
+    3. Timeline computation uses index-based ordering
+    """
+    from neurodent.core.discovery import DiscoveredFile
+    import pandas as pd
+
+    # Create file structure with irrelevant directory names that sort differently from indices
+    # {animal}/{session}/{irrelevant_dir}/{index}/*.bin
+    # Irrelevant dirs chosen so full path sorting differs from index sorting:
+    # - "run999/001/data1.bin" would sort LAST alphabetically (run999 > run001)
+    # - "run001/002/data2.bin" would sort FIRST alphabetically
+    # - "run500/003/data3.bin" would sort in the MIDDLE
+    # Expected sort by path: run001/002/data2, run500/003/data3, run999/001/data1
+    # Expected sort by index: 001, 002, 003
+
+    session_dir = tmp_path / "A10" / "session1"
+
+    # File with index 001 in "run999" dir (path would sort last, but index is first)
+    dir1 = session_dir / "run999" / "001"
+    dir1.mkdir(parents=True)
+    (dir1 / "data1.bin").touch()
+
+    # File with index 002 in "run001" dir (path would sort first, but index is second)
+    dir2 = session_dir / "run001" / "002"
+    dir2.mkdir(parents=True)
+    (dir2 / "data2.bin").touch()
+
+    # File with index 003 in "run500" dir (path would sort middle, index is third)
+    dir3 = session_dir / "run500" / "003"
+    dir3.mkdir(parents=True)
+    (dir3 / "data3.bin").touch()
+
+    # Mock _create_long_recordings to prevent actual LRO creation
+    # Instead, capture what would be passed to timeline computation
+    captured_items = []
+
+    def mock_create_long_recordings(self, lro_kwargs):
+        # Capture the discovered items for verification
+        captured_items.extend(self._animalday_folder_groups.get("session1", []))
+
+    monkeypatch.setattr(results.AnimalOrganizer, "_create_long_recordings", mock_create_long_recordings)
+
+    # Use pattern with wildcard between session and index
+    pattern = str(tmp_path) + "/{animal}/{session}/*/{index}/*.bin"
+    ao = results.AnimalOrganizer(
+        pattern=pattern,
+        animal_id="A10",
+    )
+
+    # Verify discovery
+    assert len(ao._animalday_folder_groups) == 1
+    assert "session1" in ao._animalday_folder_groups
+    assert len(ao._animalday_folder_groups["session1"]) == 3
+
+    # Verify all discovered items are DiscoveredFile with index metadata
+    items = ao._animalday_folder_groups["session1"]
+    for item in items:
+        assert isinstance(item, DiscoveredFile)
+        assert hasattr(item, "metadata")
+        assert "index" in item.metadata
+        assert "animal" in item.metadata
+        assert item.metadata["animal"] == "A10"
+        assert "session" in item.metadata
+        assert item.metadata["session"] == "session1"
+
+    # Verify the index values are captured correctly
+    indices = sorted([item.metadata["index"] for item in items])
+    assert indices == ["001", "002", "003"]
+
+    # Now test that _compute_global_timeline sorts by index, not by directory name
+    # Mock LongRecordingOrganizer to avoid file I/O
+    with patch("neurodent.visualization.results.core.LongRecordingOrganizer") as mock_lro_cls:
+        def side_effect(*args, **kwargs):
+            m = MagicMock()
+            m.LongRecording.get_duration.return_value = 3600.0  # 1 hour per file
+            return m
+
+        mock_lro_cls.side_effect = side_effect
+
+        animalday_to_items = {"session1": items}
+        base_datetime = pd.to_datetime("2025-01-01 10:00:00")
+        base_lro_kwargs = {"datetimes_are_start": True}
+
+        # Bind the real _compute_global_timeline method
+        ao_instance = MagicMock(spec=results.AnimalOrganizer)
+        ao_instance._compute_global_timeline = results.AnimalOrganizer._compute_global_timeline.__get__(
+            ao_instance, results.AnimalOrganizer
+        )
+        ao_instance._items_have_index = results.AnimalOrganizer._items_have_index.__get__(
+            ao_instance, results.AnimalOrganizer
+        )
+        ao_instance._session_sort_key = results.AnimalOrganizer._session_sort_key.__get__(
+            ao_instance, results.AnimalOrganizer
+        )
+        ao_instance._get_item_name = results.AnimalOrganizer._get_item_name.__get__(
+            ao_instance, results.AnimalOrganizer
+        )
+        ao_instance._sort_lros_by_median_time = results.AnimalOrganizer._sort_lros_by_median_time.__get__(
+            ao_instance, results.AnimalOrganizer
+        )
+        ao_instance._is_item_file = results.AnimalOrganizer._is_item_file.__get__(
+            ao_instance, results.AnimalOrganizer
+        )
+
+        result = ao_instance._compute_global_timeline(
+            base_datetime, animalday_to_items, base_lro_kwargs,
+            original_manual_datetimes=base_datetime,
+        )
+
+        # Verify timeline is sorted by index (001, 002, 003), not by path (run001/002, run500/003, run999/001)
+        # If sorted by full path: run001/002/data2.bin (index 002), run500/003/data3.bin (index 003), run999/001/data1.bin (index 001)
+        # If sorted by index: 001, 002, 003 ← correct
+
+        # Verify temporal ordering matches index ordering, not path ordering
+        # Index 001 should be first (data1.bin from run999)
+        # Index 002 should be second (data2.bin from run001)
+        # Index 003 should be third (data3.bin from run500)
+        assert result["data1.bin"] == pd.to_datetime("2025-01-01 10:00:00")  # First by index (001, in run999)
+        assert result["data2.bin"] == pd.to_datetime("2025-01-01 11:00:00")  # Second by index (002, in run001)
+        assert result["data3.bin"] == pd.to_datetime("2025-01-01 12:00:00")  # Third by index (003, in run500)
