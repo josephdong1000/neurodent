@@ -4086,9 +4086,8 @@ class WindowAnalysisResult(AnimalFeatureParser):
         here.  This avoids over-converting list-based features and keeps the
         per-cell cost to a single ``json.loads`` call.
         """
-        df_copy = df.copy()
         for col in encoded_cols:
-            if col not in df_copy.columns:
+            if col not in df.columns:
                 continue
             # Some parquet engines may already return Python objects for nulls;
             # only attempt json.loads on actual string values.
@@ -4100,9 +4099,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
                         return v
                 return v
 
-            df_copy[col] = df_copy[col].apply(_try_load)
+            df[col] = df[col].apply(_try_load)
 
-        return df_copy
+        return df
 
     def get_bad_channels_by_lof_threshold(self, lof_threshold: float) -> dict:
         """Apply LOF threshold directly to stored scores to get bad channels.
@@ -4428,6 +4427,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                         encoded_cols = pq_meta.get("encoded_columns", [])
 
                 data = table.to_pandas()
+                del table
                 data = cls._decode_df_from_parquet(data, encoded_cols)
             except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as e:
                 legacy_pkl = parquet_path.with_suffix(".pkl")
