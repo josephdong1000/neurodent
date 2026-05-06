@@ -504,6 +504,32 @@ class TestWindowAnalysisResult:
         with pytest.raises(ValueError, match=r"Found \d+ intervals.*shorter than the median duration"):
             WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"])
 
+    def test_short_intervals_error_includes_diagnostic(self):
+        """Error message includes overlapping pairs and the datetimes_are_start hint."""
+        data = {
+            "animal": ["A1"] * 4,
+            "animalday": ["A1_day1", "A1_day1", "A1_day2", "A1_day2"],
+            "genotype": ["WT"] * 4,
+            "timestamp": pd.to_datetime(
+                [
+                    "2023-01-01 10:00:00",
+                    "2023-01-01 10:00:30",  # 30s gap (short)
+                    "2023-01-01 10:01:00",  # 30s gap (short)
+                    "2023-01-01 10:04:00",
+                ]
+            ),
+            "duration": [240.0] * 4,
+            "rms": [[100.0, 110.0]] * 4,
+        }
+        df = pd.DataFrame(data)
+
+        with pytest.raises(ValueError) as exc_info:
+            WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"])
+
+        msg = str(exc_info.value)
+        assert "datetimes_are_start" in msg
+        assert "A1_day" in msg  # animalday context included
+
     def test_suppress_short_intervals_error(self):
         """Test that suppress_short_interval_error parameter suppresses the ValueError."""
         # Create DataFrame where >1% of intervals are short (same as test_short_intervals_error)
@@ -753,8 +779,8 @@ class TestWindowAnalysisResult:
             save_path = Path(tmpdir)
 
             # Save and load
-            war.save_pickle_and_json(save_path)
-            loaded_war = WindowAnalysisResult.load_pickle_and_json(save_path)
+            war.save_parquet_and_json(save_path)
+            loaded_war = WindowAnalysisResult.load_parquet_and_json(save_path)
 
             # Verify durations preserved
             assert "duration" in loaded_war.result.columns
@@ -3192,7 +3218,7 @@ class TestWindowAnalysisResultLOF:
         from pathlib import Path
 
         # Mock the save method to bypass the long_recordings dependency
-        with patch.object(war_with_lof, "save_pickle_and_json") as mock_save:
+        with patch.object(war_with_lof, "save_parquet_and_json") as mock_save:
             # Test the JSON creation part directly
             lof_scores_dict = {}
             # Simulate the LOF collection that normally happens in save
@@ -3456,8 +3482,8 @@ class TestWindowAnalysisResultLOF:
             war_with_lof.evaluate_lof_threshold_binary(ground_truth)
 
 
-class TestWindowAnalysisResultPickleJsonParameters:
-    """Test pickle_name and json_name parameters in load_pickle_and_json."""
+class TestWindowAnalysisResultParquetJsonParameters:
+    """Test parquet_name and json_name parameters in load_parquet_and_json."""
 
     @pytest.fixture
     def temp_war_files(self):
@@ -3483,26 +3509,26 @@ class TestWindowAnalysisResultPickleJsonParameters:
             tmpdir = Path(tmpdir)
 
             # Save with default names
-            war.save_pickle_and_json(tmpdir, filename="war")
+            war.save_parquet_and_json(tmpdir, filename="war")
 
             # Create subdirectory structure
             subdir = tmpdir / "subdir"
             subdir.mkdir()
-            war.save_pickle_and_json(subdir, filename="nested_war")
+            war.save_parquet_and_json(subdir, filename="nested_war")
 
             # Also save with custom names at root level
-            war.save_pickle_and_json(tmpdir, filename="custom_war")
+            war.save_parquet_and_json(tmpdir, filename="custom_war")
 
             yield {"tmpdir": tmpdir, "subdir": subdir, "war": war}
 
     def test_load_default_behavior(self, temp_war_files):
-        """Test that default behavior (no pickle_name/json_name) still works."""
+        """Test that default behavior (no parquet_name/json_name) still works."""
         tmpdir = temp_war_files["tmpdir"]
         original_war = temp_war_files["war"]
 
         # Remove other files to test single file case
         for f in tmpdir.glob("*"):
-            if f.name not in ["war.pkl", "war.json"]:
+            if f.name not in ["war.parquet", "war.json"]:
                 if f.is_file():
                     f.unlink()
                 else:
@@ -3510,7 +3536,7 @@ class TestWindowAnalysisResultPickleJsonParameters:
 
                     shutil.rmtree(f)
 
-        loaded_war = WindowAnalysisResult.load_pickle_and_json(folder_path=str(tmpdir))
+        loaded_war = WindowAnalysisResult.load_parquet_and_json(folder_path=str(tmpdir))
 
         assert loaded_war.animal_id == original_war.animal_id
         assert loaded_war.genotype == original_war.genotype
@@ -3519,12 +3545,12 @@ class TestWindowAnalysisResultPickleJsonParameters:
         pd.testing.assert_frame_equal(loaded_war.result, original_war.result)
 
     def test_load_with_exact_filenames(self, temp_war_files):
-        """Test loading with exact pickle_name and json_name."""
+        """Test loading with exact parquet_name and json_name."""
         tmpdir = temp_war_files["tmpdir"]
         original_war = temp_war_files["war"]
 
-        loaded_war = WindowAnalysisResult.load_pickle_and_json(
-            folder_path=str(tmpdir), pickle_name="custom_war.pkl", json_name="custom_war.json"
+        loaded_war = WindowAnalysisResult.load_parquet_and_json(
+            folder_path=str(tmpdir), parquet_name="custom_war.parquet", json_name="custom_war.json"
         )
 
         assert loaded_war.animal_id == original_war.animal_id
@@ -3535,8 +3561,8 @@ class TestWindowAnalysisResultPickleJsonParameters:
         tmpdir = temp_war_files["tmpdir"]
         original_war = temp_war_files["war"]
 
-        loaded_war = WindowAnalysisResult.load_pickle_and_json(
-            folder_path=str(tmpdir), pickle_name="subdir/nested_war.pkl", json_name="subdir/nested_war.json"
+        loaded_war = WindowAnalysisResult.load_parquet_and_json(
+            folder_path=str(tmpdir), parquet_name="subdir/nested_war.parquet", json_name="subdir/nested_war.json"
         )
 
         assert loaded_war.animal_id == original_war.animal_id
@@ -3547,11 +3573,11 @@ class TestWindowAnalysisResultPickleJsonParameters:
         tmpdir = temp_war_files["tmpdir"]
         original_war = temp_war_files["war"]
 
-        pickle_path = tmpdir / "custom_war.pkl"
+        parquet_path = tmpdir / "custom_war.parquet"
         json_path = tmpdir / "custom_war.json"
 
-        loaded_war = WindowAnalysisResult.load_pickle_and_json(
-            folder_path=str(tmpdir), pickle_name=str(pickle_path), json_name=str(json_path)
+        loaded_war = WindowAnalysisResult.load_parquet_and_json(
+            folder_path=str(tmpdir), parquet_name=str(parquet_path), json_name=str(json_path)
         )
 
         assert loaded_war.animal_id == original_war.animal_id
@@ -3562,21 +3588,23 @@ class TestWindowAnalysisResultPickleJsonParameters:
         tmpdir = temp_war_files["tmpdir"]
         original_war = temp_war_files["war"]
 
-        pickle_path = tmpdir / "custom_war.pkl"
+        parquet_path = tmpdir / "custom_war.parquet"
         json_path = tmpdir / "custom_war.json"
 
-        loaded_war = WindowAnalysisResult.load_pickle_and_json(pickle_name=str(pickle_path), json_name=str(json_path))
+        loaded_war = WindowAnalysisResult.load_parquet_and_json(
+            parquet_name=str(parquet_path), json_name=str(json_path)
+        )
 
         assert loaded_war.animal_id == original_war.animal_id
         pd.testing.assert_frame_equal(loaded_war.result, original_war.result)
 
-    def test_load_pickle_not_found(self, temp_war_files):
-        """Test error when pickle file not found."""
+    def test_load_parquet_not_found(self, temp_war_files):
+        """Test error when parquet file not found."""
         tmpdir = temp_war_files["tmpdir"]
 
-        with pytest.raises(FileNotFoundError, match="Pickle file not found"):
-            WindowAnalysisResult.load_pickle_and_json(
-                folder_path=str(tmpdir), pickle_name="nonexistent.pkl", json_name="war.json"
+        with pytest.raises(FileNotFoundError, match="Parquet file not found"):
+            WindowAnalysisResult.load_parquet_and_json(
+                folder_path=str(tmpdir), parquet_name="nonexistent.parquet", json_name="war.json"
             )
 
     def test_load_json_not_found(self, temp_war_files):
@@ -3584,62 +3612,62 @@ class TestWindowAnalysisResultPickleJsonParameters:
         tmpdir = temp_war_files["tmpdir"]
 
         with pytest.raises(FileNotFoundError, match="JSON file not found"):
-            WindowAnalysisResult.load_pickle_and_json(
-                folder_path=str(tmpdir), pickle_name="war.pkl", json_name="nonexistent.json"
+            WindowAnalysisResult.load_parquet_and_json(
+                folder_path=str(tmpdir), parquet_name="war.parquet", json_name="nonexistent.json"
             )
 
     def test_load_multiple_files_without_specification(self, temp_war_files):
         """Test error when multiple files exist but none specified."""
         tmpdir = temp_war_files["tmpdir"]
 
-        # There should be multiple .pkl and .json files in tmpdir
-        pkl_files = list(tmpdir.glob("*.pkl"))
+        # There should be multiple .parquet and .json files in tmpdir
+        parquet_files = list(tmpdir.glob("*.parquet"))
         json_files = list(tmpdir.glob("*.json"))
 
         # Ensure we have multiple files
-        assert len(pkl_files) > 1
+        assert len(parquet_files) > 1
         assert len(json_files) > 1
 
-        with pytest.raises(ValueError, match="Expected exactly one pickle file"):
-            WindowAnalysisResult.load_pickle_and_json(folder_path=str(tmpdir))
+        with pytest.raises(ValueError, match="Expected exactly one parquet file"):
+            WindowAnalysisResult.load_parquet_and_json(folder_path=str(tmpdir))
 
     def test_load_no_files_found(self):
         """Test error when no files are found."""
         import tempfile
 
         with tempfile.TemporaryDirectory() as empty_dir:
-            with pytest.raises(ValueError, match="Expected exactly one pickle file"):
-                WindowAnalysisResult.load_pickle_and_json(folder_path=empty_dir)
+            with pytest.raises(ValueError, match="Expected exactly one parquet file"):
+                WindowAnalysisResult.load_parquet_and_json(folder_path=empty_dir)
 
     def test_load_invalid_folder_path(self):
         """Test error with invalid folder path."""
         with pytest.raises(ValueError, match="Folder path .* does not exist"):
-            WindowAnalysisResult.load_pickle_and_json(folder_path="/nonexistent/path")
+            WindowAnalysisResult.load_parquet_and_json(folder_path="/nonexistent/path")
 
     def test_load_missing_parameters(self):
         """Test error when required parameters are missing."""
-        # Neither folder_path nor both pickle_name/json_name provided
+        # Neither folder_path nor both parquet_name/json_name provided
         with pytest.raises(ValueError, match="Either folder_path must be provided"):
-            WindowAnalysisResult.load_pickle_and_json()
+            WindowAnalysisResult.load_parquet_and_json()
 
-        # Only one of pickle_name/json_name provided without folder_path
+        # Only one of parquet_name/json_name provided without folder_path
         with pytest.raises(ValueError, match="Either folder_path must be provided"):
-            WindowAnalysisResult.load_pickle_and_json(pickle_name="/some/path.pkl")
+            WindowAnalysisResult.load_parquet_and_json(parquet_name="/some/path.parquet")
 
         with pytest.raises(ValueError, match="Either folder_path must be provided"):
-            WindowAnalysisResult.load_pickle_and_json(json_name="/some/path.json")
+            WindowAnalysisResult.load_parquet_and_json(json_name="/some/path.json")
 
     def test_load_mixed_absolute_relative_paths(self, temp_war_files):
         """Test mixing absolute and relative paths."""
         tmpdir = temp_war_files["tmpdir"]
         original_war = temp_war_files["war"]
 
-        # Absolute pickle path, relative json path
-        pickle_path = tmpdir / "custom_war.pkl"
+        # Absolute parquet path, relative json path
+        parquet_path = tmpdir / "custom_war.parquet"
 
-        loaded_war = WindowAnalysisResult.load_pickle_and_json(
+        loaded_war = WindowAnalysisResult.load_parquet_and_json(
             folder_path=str(tmpdir),
-            pickle_name=str(pickle_path),  # Absolute
+            parquet_name=str(parquet_path),  # Absolute
             json_name="custom_war.json",  # Relative
         )
 
@@ -3666,7 +3694,7 @@ class TestWindowAnalysisResultPickleJsonParameters:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
-            # Save pickle
+            # Save legacy pickle (simulates an old WAR written before the parquet migration)
             test_df.to_pickle(tmpdir / "war.pkl")
 
             # Save JSON without sex (simulating old format)
@@ -3682,8 +3710,8 @@ class TestWindowAnalysisResultPickleJsonParameters:
             with open(tmpdir / "war.json", "w") as f:
                 json.dump(old_json, f)
 
-            # Load should succeed with sex="Unknown" (the default)
-            loaded_war = WindowAnalysisResult.load_pickle_and_json(folder_path=str(tmpdir))
+            # Load should succeed via the legacy pickle fallback, with sex="Unknown" default
+            loaded_war = WindowAnalysisResult.load_parquet_and_json(folder_path=str(tmpdir))
             assert loaded_war.animal_id == "A1"
             assert loaded_war.genotype == "WT"
             assert loaded_war.sex == "Unknown"
@@ -3725,16 +3753,17 @@ class TestParquetSaveLoad:
         """Test that save with parquet + load produces equivalent data."""
         war = war_with_complex_columns
         with tempfile.TemporaryDirectory() as tmpdir:
-            war.save_pickle_and_json(tmpdir, filename="war")
+            war.save_parquet_and_json(tmpdir, filename="war")
 
             # Verify parquet file was created
             assert (Path(tmpdir) / "war.parquet").exists()
+            # Verify pickle is NOT written any more
+            assert not (Path(tmpdir) / "war.pkl").exists()
             # No sidecar meta file — metadata is embedded in parquet
             assert not (Path(tmpdir) / "war.parquet.meta.json").exists()
 
-            # Load (should prefer parquet)
-            loaded = WindowAnalysisResult.load_pickle_and_json(
-                folder_path=tmpdir, pickle_name="war.pkl", json_name="war.json"
+            loaded = WindowAnalysisResult.load_parquet_and_json(
+                folder_path=tmpdir, parquet_name="war.parquet", json_name="war.json"
             )
             assert loaded.animal_id == war.animal_id
             assert loaded.genotype == war.genotype
@@ -3751,21 +3780,26 @@ class TestParquetSaveLoad:
         """Test that auto-discovery works when parquet files are present."""
         war = war_with_complex_columns
         with tempfile.TemporaryDirectory() as tmpdir:
-            war.save_pickle_and_json(tmpdir, filename="war")
+            war.save_parquet_and_json(tmpdir, filename="war")
 
-            loaded = WindowAnalysisResult.load_pickle_and_json(folder_path=tmpdir)
+            loaded = WindowAnalysisResult.load_parquet_and_json(folder_path=tmpdir)
             assert loaded.animal_id == war.animal_id
 
     def test_fallback_to_pickle_when_no_parquet(self, war_with_complex_columns):
-        """Test that loading falls back to pickle when parquet files are absent."""
+        """Test that loading falls back to a legacy pickle when parquet is absent.
+
+        Simulates an old on-disk WAR (written before the parquet migration) by
+        hand-writing a ``war.pkl`` alongside the JSON — no parquet.
+        """
         war = war_with_complex_columns
         with tempfile.TemporaryDirectory() as tmpdir:
-            war.save_pickle_and_json(tmpdir, filename="war")
-            # Remove parquet to force pickle fallback
+            # Save via the new API, then drop parquet and write a legacy pickle
+            war.save_parquet_and_json(tmpdir, filename="war")
             (Path(tmpdir) / "war.parquet").unlink()
+            war.result.to_pickle(Path(tmpdir) / "war.pkl")
 
-            loaded = WindowAnalysisResult.load_pickle_and_json(
-                folder_path=tmpdir, pickle_name="war.pkl", json_name="war.json"
+            loaded = WindowAnalysisResult.load_parquet_and_json(
+                folder_path=tmpdir, parquet_name="war.parquet", json_name="war.json"
             )
             assert loaded.animal_id == war.animal_id
             assert loaded.result["duration"].tolist() == war.result["duration"].tolist()
@@ -3776,7 +3810,7 @@ class TestParquetSaveLoad:
 
         war = war_with_complex_columns
         with tempfile.TemporaryDirectory() as tmpdir:
-            war.save_pickle_and_json(tmpdir, filename="war")
+            war.save_parquet_and_json(tmpdir, filename="war")
 
             table = pq.read_table(Path(tmpdir) / "war.parquet")
             schema_meta = table.schema.metadata
@@ -3830,7 +3864,7 @@ class TestParquetSaveLoad:
         """Test that the parquet file has meaningful content matching the DataFrame."""
         war = war_with_complex_columns
         with tempfile.TemporaryDirectory() as tmpdir:
-            war.save_pickle_and_json(tmpdir, filename="war")
+            war.save_parquet_and_json(tmpdir, filename="war")
             pq_path = Path(tmpdir) / "war.parquet"
             assert pq_path.stat().st_size > 0
 
@@ -3839,11 +3873,10 @@ class TestParquetSaveLoad:
             assert set(war.result.columns).issubset(set(reloaded.columns))
 
     def test_save_load_speed(self):
-        """Test that parquet load time is comparable to pickle after warm-up.
+        """Sanity-check that parquet save + load is fast enough for realistic rows.
 
         Uses a realistically-sized DataFrame (200 rows) so that pyarrow's
-        fixed per-call overhead is amortised and the comparison reflects
-        actual I/O performance rather than interpreter start-up noise.
+        fixed per-call overhead is amortised.
         """
         import time
 
@@ -3871,35 +3904,162 @@ class TestParquetSaveLoad:
             channel_names=["LMot", "RMot"],
         )
         with tempfile.TemporaryDirectory() as tmpdir:
-            war.save_pickle_and_json(tmpdir, filename="war")
+            war.save_parquet_and_json(tmpdir, filename="war")
 
-            pkl_path = Path(tmpdir) / "war.pkl"
             pq_path = Path(tmpdir) / "war.parquet"
-            assert pkl_path.exists()
             assert pq_path.exists()
+            # Pickle should no longer be produced
+            assert not (Path(tmpdir) / "war.pkl").exists()
 
             # Warm-up: first load amortises import / JIT costs
-            pd.read_pickle(pkl_path)
             pd.read_parquet(pq_path, engine="pyarrow")
 
             n_iters = 20
-
-            start = time.perf_counter()
-            for _ in range(n_iters):
-                pd.read_pickle(pkl_path)
-            pkl_time = time.perf_counter() - start
-
             start = time.perf_counter()
             for _ in range(n_iters):
                 pd.read_parquet(pq_path, engine="pyarrow")
             pq_time = time.perf_counter() - start
 
-            # With a realistically-sized DataFrame the gap between parquet
-            # and pickle narrows substantially.  A 10x bound guards against
-            # pathological regressions while remaining stable on CI runners.
-            assert pq_time < pkl_time * 10, (
-                f"Parquet load ({pq_time:.3f}s) is unreasonably slower "
-                f"than pickle ({pkl_time:.3f}s)"
+            # 200 rows × 20 iterations should comfortably finish in < 5s on CI runners.
+            assert pq_time < 5.0, f"Parquet load time {pq_time:.3f}s is unreasonably slow"
+
+    def test_save_parquet_bypasses_encode_df_for_parquet(self):
+        """Verify save_parquet_and_json builds a column dict directly
+        instead of calling _encode_df_for_parquet (which does df.copy()).
+
+        The old path created 2-3 redundant copies of the DataFrame via
+        df.copy() + pa.Table.from_pandas(). The new path builds a column
+        dict and uses pa.table() — no DataFrame copy.
+        """
+        from unittest.mock import patch
+
+        n_rows = 50
+        rng = np.random.default_rng(99)
+        data = {
+            "animalday": [f"A1_day{i}" for i in range(n_rows)],
+            "genotype": ["WT"] * n_rows,
+            "timestamp": pd.date_range("2023-01-01", periods=n_rows, freq="5min"),
+            "duration": [240.0] * n_rows,
+            "rms": [rng.uniform(100, 200, 4).tolist() for _ in range(n_rows)],
+            "cohere": [
+                {"ch1_ch2": rng.uniform(0, 1, 8).tolist()}
+                for _ in range(n_rows)
+            ],
+        }
+        war = WindowAnalysisResult(
+            result=pd.DataFrame(data),
+            animal_id="A1",
+            genotype="WT",
+            channel_names=["LMot", "RMot", "LAud", "RAud"],
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Patch _encode_df_for_parquet to verify it is NOT called
+            with patch.object(
+                WindowAnalysisResult, "_encode_df_for_parquet",
+                wraps=WindowAnalysisResult._encode_df_for_parquet,
+            ) as mock_encode:
+                war.save_parquet_and_json(tmpdir, filename="war")
+                mock_encode.assert_not_called()
+
+            # Verify the parquet file is valid and round-trips correctly
+            pq_path = Path(tmpdir) / "war.parquet"
+            assert pq_path.exists()
+
+            import pyarrow.parquet as pq
+            table = pq.read_table(pq_path)
+
+            # Check neurodent metadata with encoded columns list
+            nd_meta = json.loads(table.schema.metadata[b"neurodent"])
+            assert "rms" in nd_meta["encoded_columns"]
+            assert "cohere" in nd_meta["encoded_columns"]
+            assert "duration" not in nd_meta["encoded_columns"]
+
+            # Decode and verify values round-trip
+            reloaded = table.to_pandas()
+            encoded_cols = nd_meta["encoded_columns"]
+            decoded = WindowAnalysisResult._decode_df_from_parquet(reloaded, encoded_cols)
+            assert len(decoded) == n_rows
+            for i in range(min(5, n_rows)):
+                assert decoded["rms"].iloc[i] == war.result["rms"].iloc[i]
+                assert decoded["cohere"].iloc[i] == war.result["cohere"].iloc[i]
+
+
+class TestMemoryPressure:
+    """Verify that load/save paths don't hold unnecessary copies of WAR data."""
+
+    @pytest.fixture
+    def war_for_memory_test(self):
+        """Create a WAR large enough that data dominates over fixed overhead."""
+        n_rows = 500
+        n_ch = 8
+        n_freq = 64
+        rng = np.random.default_rng(42)
+        data = {
+            "animalday": ["A1_20230101"] * n_rows,
+            "genotype": ["WT"] * n_rows,
+            "timestamp": pd.date_range("2023-01-01", periods=n_rows, freq="4min"),
+            "duration": rng.uniform(230, 250, n_rows).tolist(),
+            "rms": [rng.random(n_ch).tolist() for _ in range(n_rows)],
+            "psd": [
+                (rng.random(n_freq).tolist(), rng.random((n_ch, n_freq)).tolist())
+                for _ in range(n_rows)
+            ],
+        }
+        return WindowAnalysisResult(
+            pd.DataFrame(data), animal_id="A1", genotype="WT",
+            channel_names=["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"],
+            suppress_short_interval_error=True,
+        )
+
+    def test_load_parquet_peak_memory(self, war_for_memory_test):
+        """Peak memory during load_parquet_and_json should stay under 5x the parquet file size.
+
+        Regression guard: without ``del table`` after ``to_pandas()`` and
+        without the in-place decode (no ``df.copy()``), peak reaches ~6x+.
+        """
+        import tracemalloc
+
+        war = war_for_memory_test
+        with tempfile.TemporaryDirectory() as tmpdir:
+            war.save_parquet_and_json(tmpdir, filename="war")
+            pq_size = (Path(tmpdir) / "war.parquet").stat().st_size
+
+            tracemalloc.start()
+            loaded = WindowAnalysisResult.load_parquet_and_json(folder_path=tmpdir)
+            _, peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+
+            # Loaded data should be correct
+            assert loaded.animal_id == war.animal_id
+            assert len(loaded.result) == len(war.result)
+
+            # Peak memory should not exceed 5x the parquet file size.
+            # Before the del-table + in-place-decode fixes, this ratio was ~6x+.
+            ratio = peak / max(pq_size, 1)
+            assert ratio < 5, (
+                f"Peak memory during load is {ratio:.1f}x the parquet file size "
+                f"({peak / 1e6:.1f} MB vs {pq_size / 1e6:.1f} MB). "
+                f"Likely a missing del or unnecessary copy."
+            )
+
+    def test_save_parquet_peak_memory(self, war_for_memory_test):
+        """Peak memory during save_parquet_and_json should stay under 5x the parquet file size."""
+        import tracemalloc
+
+        war = war_for_memory_test
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tracemalloc.start()
+            war.save_parquet_and_json(tmpdir, filename="war")
+            _, peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+
+            pq_size = (Path(tmpdir) / "war.parquet").stat().st_size
+            ratio = peak / max(pq_size, 1)
+            assert ratio < 5, (
+                f"Peak memory during save is {ratio:.1f}x the parquet file size "
+                f"({peak / 1e6:.1f} MB vs {pq_size / 1e6:.1f} MB). "
+                f"Likely a missing del or unnecessary copy."
             )
 
 

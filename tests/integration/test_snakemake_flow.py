@@ -39,6 +39,7 @@ def _bin_csv_extractor(discovered_file, **kwargs):
     directly to this callable.
     """
     import csv
+    import os
     import spikeinterface.core as si_core
 
     bin_path = [p for p in discovered_file.paths if p.endswith(".bin")][0]
@@ -50,7 +51,25 @@ def _bin_csv_extractor(discovered_file, **kwargs):
 
     n_channels = len(rows)
     sampling_rate = float(rows[0]["sampling_rate"])
-    data = np.fromfile(bin_path, dtype=np.float32).reshape(-1, n_channels)
+    file_size = os.path.getsize(bin_path)
+    bytes_per_frame = np.dtype(np.float32).itemsize * n_channels
+    remainder = file_size % bytes_per_frame
+    if remainder != 0:
+        raise ValueError(
+            f"Binary file size ({file_size} bytes) is not divisible by the "
+            f"expected frame size ({bytes_per_frame} bytes = "
+            f"{np.dtype(np.float32).itemsize} bytes/float32 × {n_channels} channels). "
+            f"Remainder: {remainder} bytes. "
+            f"This usually means either:\n"
+            f"  1. The number of channels in the CSV metadata ({n_channels}) "
+            f"does not match the binary — check '{csv_path}'.\n"
+            f"  2. The binary file is corrupt or was truncated during "
+            f"transfer — re-export or re-copy '{bin_path}'.\n"
+            f"  3. The binary uses a different dtype (e.g. float64 or int16) "
+            f"instead of float32."
+        )
+    n_samples = file_size // bytes_per_frame
+    data = np.memmap(bin_path, dtype=np.float32, mode="r", shape=(n_samples, n_channels), order="F")
 
     return si_core.NumpyRecording(
         traces_list=[data],

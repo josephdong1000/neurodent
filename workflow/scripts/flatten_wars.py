@@ -8,7 +8,7 @@ for individual animals. Based on pipeline-epfig-so.py but adapted for Snakemake
 workflow integration.
 
 Input: Filtered WARs (filtering and channel reordering already applied)
-Output: Individual aggregated WARs saved as pickle and json in wars_flattened/
+Output: Individual aggregated WARs saved as parquet and json in wars_flattened/
 """
 
 from pathlib import Path
@@ -24,10 +24,10 @@ def main():
     logger = setup_snakemake_logging(snakemake)
 
     # Get parameters from snakemake
-    input_war_dir = Path(snakemake.input.war_pkl).parent
-    war_pkl_name = Path(snakemake.input.war_pkl).name
+    input_war_dir = Path(snakemake.input.war_parquet).parent
+    war_parquet_name = Path(snakemake.input.war_parquet).name
     war_json_name = Path(snakemake.input.war_json).name
-    output_war_pkl = snakemake.output.war_pkl
+    output_war_parquet = snakemake.output.war_parquet
     config = snakemake.params.config
     samples_config = snakemake.params.samples_config
 
@@ -45,15 +45,15 @@ def main():
     try:
         # Load the filtered WAR
         logger.info(f"Loading WAR from: {input_war_dir}")
-        war = visualization.WindowAnalysisResult.load_pickle_and_json(
-            folder_path=input_war_dir, pickle_name=war_pkl_name, json_name=war_json_name
+        war = visualization.WindowAnalysisResult.load_parquet_and_json(
+            folder_path=input_war_dir, parquet_name=war_parquet_name, json_name=war_json_name
         )
 
         # Aggregate time windows using configurable groupby
         war.aggregate_time_windows(groupby=groupby_params)
 
-        # Save aggregated WAR as both pickle and json
-        war.save_pickle_and_json(Path(output_war_pkl).parent)
+        # Save aggregated WAR as parquet and json
+        war.save_parquet_and_json(Path(output_war_parquet).parent)
 
         logger.info(f"Successfully aggregated and saved {animal_name}")
 

@@ -12,7 +12,7 @@ rule war_zeitgeber:
     Extract zeitgeber time features from all fragment-filtered WARs
     """
     input:
-        war_pkl=get_all_fragment_filtered_pkl,
+        war_parquet=get_all_fragment_filtered_parquet,
         war_json=get_all_fragment_filtered_json,
     output:
         zeitgeber_features="results/wars_zeitgeber/zeitgeber_features.pkl",

@@ -64,9 +64,9 @@ class FrequencyDomainSpikeDetector:
     def detect_spikes_recording(
         recording: "si.BaseRecording",
         detection_params: dict = None,
-        chunk_duration_s: float = 3600,
+        chunk_duration_s: float | None = 3600,
         multiprocess_mode: Literal["dask", "serial"] = "serial",
-    ) -> tuple[list[np.ndarray], "mne.io.RawArray"]:
+    ) -> list[np.ndarray]:
         """
         Detect spikes in a recording using frequency-domain analysis.
 
@@ -84,14 +84,7 @@ class FrequencyDomainSpikeDetector:
             multiprocess_mode (Literal["dask", "serial"]): Processing mode
 
         Returns:
-            tuple: (spike_indices_per_channel, mne_raw_with_annotations)
-                - spike_indices_per_channel: List of arrays with spike sample indices per channel
-                - mne_raw_with_annotations: MNE RawArray built from the
-                  **raw/unfiltered** recording traces, with spike annotations.
-                  Spike detection itself is performed on preprocessed
-                  (filtered) chunks; the unfiltered signal is stored so that
-                  downstream consumers can inspect waveform context without
-                  filtering artifacts.
+            list[np.ndarray]: Spike sample indices per channel.
         """
         if not SPIKEINTERFACE_AVAILABLE:
             raise ImportError(
@@ -164,23 +157,7 @@ class FrequencyDomainSpikeDetector:
         for ch in range(n_channels):
             spike_indices_per_channel[ch] = np.unique(spike_indices_per_channel[ch])
 
-        # Build MNE RawArray from the *unfiltered* recording traces.
-        # Note: spike detection is performed on preprocessed (filtered) chunks,
-        # but the returned MNE object contains the original raw/unfiltered
-        # signal so that downstream consumers can inspect the waveform context
-        # around each detected spike without filtering artifacts.
-        raw_data = recording.get_traces(return_in_uV=True).T  # (channels, samples)
-        info = mne.create_info(
-            ch_names=channel_names, sfreq=sampling_freq, ch_types="eeg"
-        )
-        mne_raw = mne.io.RawArray(data=raw_data, info=info)
-
-        # Add spike annotations to MNE object
-        mne_raw_with_annotations = FrequencyDomainSpikeDetector._add_spike_annotations(
-            mne_raw, spike_indices_per_channel, sampling_freq
-        )
-
-        return spike_indices_per_channel, mne_raw_with_annotations
+        return spike_indices_per_channel
 
     @staticmethod
     def _detect_spikes_chunk(
@@ -221,24 +198,22 @@ class FrequencyDomainSpikeDetector:
         sampling_freq = recording.get_sampling_frequency()
         n_channels = chunk_data.shape[0]
 
-        # Preprocess chunk in place
-        chunk_data = FrequencyDomainSpikeDetector._preprocess_array(
-            chunk_data, sampling_freq, params
-        )
-
         # Run spike detection per channel
         match multiprocess_mode:
             case "dask":
                 if dask is None:
                     raise ImportError("dask is required for multiprocess_mode='dask'")
                 spike_tasks = [
-                    dask.delayed(FrequencyDomainSpikeDetector._detect_spikes_channel)(
+                    dask.delayed(FrequencyDomainSpikeDetector._filter_and_detect_channel)(
                         chunk_data[ch, :], sampling_freq, params
                     )
                     for ch in range(n_channels)
                 ]
                 chunk_spikes_per_channel = list(dask.compute(*spike_tasks))
             case _:
+                chunk_data = FrequencyDomainSpikeDetector._preprocess_array(
+                    chunk_data, sampling_freq, params
+                )
                 chunk_spikes_per_channel = [
                     FrequencyDomainSpikeDetector._detect_spikes_channel(
                         chunk_data[ch, :], sampling_freq, params
@@ -255,6 +230,30 @@ class FrequencyDomainSpikeDetector:
             mask = (spikes_local >= offset_in_read) & (spikes_local < offset_out_read)
             result.append(spikes_local[mask] - offset_in_read + valid_start)
         return result
+
+    @staticmethod
+    def _filter_and_detect_channel(
+        raw_1d: np.ndarray, sampling_freq: float, params: dict
+    ) -> np.ndarray:
+        """Filter and detect spikes for a single channel.
+
+        Fuses per-channel preprocessing and spike detection into one task,
+        enabling Dask to parallelize both steps across channels.
+
+        Args:
+            raw_1d: Shape ``(n_samples,)`` — raw unfiltered channel data.
+            sampling_freq: Sampling rate in Hz.
+            params: Detection parameter dict.
+
+        Returns:
+            Spike sample indices for this channel.
+        """
+        filtered = FrequencyDomainSpikeDetector._preprocess_array(
+            raw_1d[np.newaxis, :], sampling_freq, params
+        )[0]
+        return FrequencyDomainSpikeDetector._detect_spikes_channel(
+            filtered, sampling_freq, params
+        )
 
     @staticmethod
     def _preprocess_array(
@@ -736,6 +735,6 @@ class FrequencyDomainSpikeDetector:
                 duration=[a["duration"] for a in spike_annotations],
                 description=[a["description"] for a in spike_annotations],
             )
-            mne_raw = mne_raw.copy().set_annotations(annotations)
+            mne_raw.set_annotations(annotations)
 
         return mne_raw
