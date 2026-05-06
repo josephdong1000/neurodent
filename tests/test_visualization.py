@@ -2001,14 +2001,27 @@ class TestExperimentPlotterFeatureDispatch:
             )
 
         # Verify that different bands have different data
-        # Group by band and check that each band has the expected number of entries
-        grouped = df.groupby("band")
-        for band_name, group in grouped:
-            assert len(group) > 0, f"Band {band_name} has no data"
-            # Each band group should have matrices of the correct shape
-            for idx, row in group.iterrows():
-                cohere_matrix = np.array(row["cohere"])
-                assert cohere_matrix.shape == (n_chan, n_chan)
+        # Collect all matrices for each band
+        band_matrices = {}
+        for band_name in constants.BAND_NAMES:
+            band_data = df[df["band"] == band_name]
+            assert len(band_data) > 0, f"Band {band_name} has no data"
+            # Collect all matrices for this band
+            matrices = [np.array(row["cohere"]) for _, row in band_data.iterrows()]
+            band_matrices[band_name] = np.array(matrices)
+
+        # Verify that matrices from different bands are actually different
+        # Since the fixture uses random data with a fixed seed, different bands should have different values
+        band_names = list(band_matrices.keys())
+        for i in range(len(band_names)):
+            for j in range(i + 1, len(band_names)):
+                band1, band2 = band_names[i], band_names[j]
+                matrices1, matrices2 = band_matrices[band1], band_matrices[band2]
+                # At least some values should differ between bands
+                assert not np.allclose(matrices1, matrices2), (
+                    f"Bands {band1} and {band2} have identical data - "
+                    f"band axis may not be correctly exploded"
+                )
 
     def test_pull_band_feature_shape_correctness(self, feature_plotter):
         """Test BAND feature shape correctness: verifies band axis is iterated correctly.
@@ -2029,6 +2042,27 @@ class TestExperimentPlotterFeatureDispatch:
             assert isinstance(psdband_val, (int, float, np.number)), (
                 f"Expected scalar psdband value, got {type(psdband_val)} for band={row['band']}"
             )
+
+        # Verify that different bands have different data values
+        # Collect all values for each band
+        band_values = {}
+        for band_name in constants.BAND_NAMES:
+            band_data = df[df["band"] == band_name]
+            assert len(band_data) > 0, f"Band {band_name} has no data"
+            values = np.array([row["psdband"] for _, row in band_data.iterrows()])
+            band_values[band_name] = values
+
+        # Verify that values from different bands are actually different
+        band_names = list(band_values.keys())
+        for i in range(len(band_names)):
+            for j in range(i + 1, len(band_names)):
+                band1, band2 = band_names[i], band_names[j]
+                values1, values2 = band_values[band1], band_values[band2]
+                # At least some values should differ between bands
+                assert not np.allclose(values1, values2), (
+                    f"Bands {band1} and {band2} have identical data - "
+                    f"band axis may not be correctly exploded"
+                )
 
     def test_pull_band_feature_logpsdband_shape_correctness(self, feature_plotter):
         """Test BAND feature (logpsdband) shape correctness."""
