@@ -685,8 +685,10 @@ class AnimalPlotter(viz.AnimalFeatureParser):
             )
 
             # Flatten across channels (take mean across channels)
+            # For multi-dimensional features, also collapse any trailing semantic axes
+            # (components for LINEAR_2D, bands for BAND/BANDED_MATRIX)
             if feature_data.ndim > 2:
-                feature_data = np.nanmean(feature_data, axis=1).squeeze()
+                feature_data = np.nanmean(feature_data, axis=(1, 2))
             else:
                 feature_data = feature_data.squeeze()
 

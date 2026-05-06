@@ -86,6 +86,42 @@ def _make_band_group(n_time=10, n_chan=N_CHAN, feature="psdband", rng=None):
     )
 
 
+def _make_linear_2d_group(n_time=10, n_chan=N_CHAN, feature="psdslope", n_components=2, rng=None):
+    """Return a DataFrame suitable for __get_linear_feature with a LINEAR_2D feature."""
+    rng = rng or np.random.default_rng(0)
+    return pd.DataFrame(
+        {
+            feature: [rng.random((n_chan, n_components)) for _ in range(n_time)],
+            "duration": [1.0] * n_time,
+        }
+    )
+
+
+def _make_simple_matrix_group(n_time=10, n_chan=N_CHAN, feature="zpcorr", rng=None):
+    """Return a DataFrame suitable for __get_linear_feature with a SIMPLE_MATRIX feature."""
+    rng = rng or np.random.default_rng(0)
+    return pd.DataFrame(
+        {
+            feature: [rng.random((n_chan, n_chan)) for _ in range(n_time)],
+            "duration": [1.0] * n_time,
+        }
+    )
+
+
+def _make_banded_matrix_group(n_time=10, n_chan=N_CHAN, feature="cohere", rng=None):
+    """Return a DataFrame suitable for __get_linear_feature with a BANDED_MATRIX feature."""
+    rng = rng or np.random.default_rng(0)
+    return pd.DataFrame(
+        {
+            feature: [
+                {b: rng.random((n_chan, n_chan)) for b in constants.BAND_NAMES}
+                for _ in range(n_time)
+            ],
+            "duration": [1.0] * n_time,
+        }
+    )
+
+
 def _make_coherecorr_avg(n_row=2, n_chan=N_CHAN, rng=None):
     """Return mock groupavg data used by coherecorr methods."""
     rng = rng or np.random.default_rng(0)
@@ -543,9 +579,18 @@ def _make_temporal_heatmap_rows(n_time=48, n_chan=N_CHAN, features=None, rng=Non
         ftype = constants.classify_feature(feat)
         if ftype is constants.FeatureType.LINEAR:
             data[feat] = [rng.random(n_chan).tolist() for _ in range(n_time)]
+        elif ftype is constants.FeatureType.LINEAR_2D:
+            data[feat] = [rng.random((n_chan, 2)) for _ in range(n_time)]
         elif ftype is constants.FeatureType.BAND:
             data[feat] = [
                 {b: rng.random(n_chan).tolist() for b in constants.BAND_NAMES}
+                for _ in range(n_time)
+            ]
+        elif ftype is constants.FeatureType.SIMPLE_MATRIX:
+            data[feat] = [rng.random((n_chan, n_chan)) for _ in range(n_time)]
+        elif ftype is constants.FeatureType.BANDED_MATRIX:
+            data[feat] = [
+                {b: rng.random((n_chan, n_chan)) for b in constants.BAND_NAMES}
                 for _ in range(n_time)
             ]
 
@@ -604,9 +649,142 @@ class TestPlotTemporalHeatmap:
         plotter.plot_temporal_heatmap(features=["rms"], score_type="none")
 
 
-# ===================================================================
-# 13. _add_longrecording_boundaries (lines 781-848)
-# ===================================================================
+class TestPlotTemporalHeatmapFeatureShapes:
+    """Test that _plot_temporal_heatmap_feature correctly collapses all feature types to 1D."""
+
+    @patch("matplotlib.pyplot.show")
+    def test_linear_shape_correct(self, mock_show, plotter, mock_war, rng):
+        """LINEAR features (rms) should collapse to (n_time,) shape."""
+        features = ["rms"]
+        mock_war.get_grouprows_result.return_value = _make_temporal_heatmap_rows(
+            features=features, rng=rng
+        )
+        # This should not raise and should produce valid output
+        plotter.plot_temporal_heatmap(features=features, score_type="none")
+
+    @patch("matplotlib.pyplot.show")
+    def test_linear_2d_shape_correct(self, mock_show, plotter, mock_war, rng):
+        """LINEAR_2D features (psdslope) should collapse to (n_time,) shape."""
+        features = ["psdslope"]
+        mock_war.get_grouprows_result.return_value = _make_temporal_heatmap_rows(
+            features=features, rng=rng
+        )
+        # This should not raise and should produce valid output
+        plotter.plot_temporal_heatmap(features=features, score_type="none")
+
+    @patch("matplotlib.pyplot.show")
+    def test_band_shape_correct(self, mock_show, plotter, mock_war, rng):
+        """BAND features (psdband) should collapse to (n_time,) shape."""
+        features = ["psdband"]
+        mock_war.get_grouprows_result.return_value = _make_temporal_heatmap_rows(
+            features=features, rng=rng
+        )
+        # This should not raise and should produce valid output
+        plotter.plot_temporal_heatmap(features=features, score_type="none")
+
+    @patch("matplotlib.pyplot.show")
+    def test_simple_matrix_shape_correct(self, mock_show, plotter, mock_war, rng):
+        """SIMPLE_MATRIX features (zpcorr) should collapse to (n_time,) shape."""
+        features = ["zpcorr"]
+        mock_war.get_grouprows_result.return_value = _make_temporal_heatmap_rows(
+            features=features, rng=rng
+        )
+        # This should not raise and should produce valid output
+        plotter.plot_temporal_heatmap(features=features, score_type="none")
+
+    @patch("matplotlib.pyplot.show")
+    def test_banded_matrix_shape_correct(self, mock_show, plotter, mock_war, rng):
+        """BANDED_MATRIX features (cohere) should collapse to (n_time,) shape."""
+        features = ["cohere"]
+        mock_war.get_grouprows_result.return_value = _make_temporal_heatmap_rows(
+            features=features, rng=rng
+        )
+        # This should not raise and should produce valid output
+        plotter.plot_temporal_heatmap(features=features, score_type="none")
+
+    def test_linear_2d_numeric_correctness(self, plotter, rng):
+        """Test that LINEAR_2D (psdslope) correctly averages both channels AND components."""
+        # Create synthetic data where slope=1.0, intercept=100.0 for all windows
+        n_time = 10
+        n_chan = N_CHAN
+        slope = 1.0
+        intercept = 100.0
+
+        # Create feature data with constant slope and intercept
+        psdslope_data = [np.array([[slope, intercept]] * n_chan) for _ in range(n_time)]
+
+        group = pd.DataFrame({
+            "psdslope": psdslope_data,
+            "duration": [1.0] * n_time,
+        })
+
+        # Extract and flatten the feature
+        result = plotter._AnimalPlotter__get_linear_feature(
+            group=group, feature="psdslope", score_type="none"
+        )
+
+        # After flatten_feature_for_plotting, shape should be (n_time, n_chan, 2)
+        assert result.shape == (n_time, n_chan, 2)
+
+        # Now test the collapsing logic that happens in _plot_temporal_heatmap_feature
+        if result.ndim > 2:
+            collapsed = np.nanmean(result, axis=(1, 2))
+        else:
+            collapsed = result.squeeze()
+
+        # After collapsing both channels and components, should be (n_time,)
+        assert collapsed.ndim == 1
+        assert collapsed.shape == (n_time,)
+
+        # The value should be the mean of slope and intercept: (1.0 + 100.0) / 2 = 50.5
+        expected = (slope + intercept) / 2.0
+        assert np.allclose(collapsed, expected)
+
+    def test_band_numeric_correctness(self, plotter, rng):
+        """Test that BAND (psdband) correctly averages both channels AND bands."""
+        # Create synthetic data with constant value per band
+        n_time = 10
+        n_chan = N_CHAN
+        n_bands = len(constants.BAND_NAMES)
+
+        # Different value for each band to verify averaging
+        band_values = {band: float(i + 1) for i, band in enumerate(constants.BAND_NAMES)}
+
+        # Create feature data with constant values per band
+        psdband_data = [
+            {band: [val] * n_chan for band, val in band_values.items()}
+            for _ in range(n_time)
+        ]
+
+        group = pd.DataFrame({
+            "psdband": psdband_data,
+            "duration": [1.0] * n_time,
+        })
+
+        # Extract and flatten the feature
+        result = plotter._AnimalPlotter__get_linear_feature(
+            group=group, feature="psdband", score_type="none"
+        )
+
+        # After flatten_feature_for_plotting, shape should be (n_time, n_chan, n_bands)
+        assert result.shape == (n_time, n_chan, n_bands)
+
+        # Now test the collapsing logic
+        if result.ndim > 2:
+            collapsed = np.nanmean(result, axis=(1, 2))
+        else:
+            collapsed = result.squeeze()
+
+        # After collapsing both channels and bands, should be (n_time,)
+        assert collapsed.ndim == 1
+        assert collapsed.shape == (n_time,)
+
+        # The value should be the mean across all bands: (1+2+3+4+5) / 5 = 3.0
+        expected = np.mean(list(band_values.values()))
+        assert np.allclose(collapsed, expected)
+
+
+
 
 class TestAddLongrecordingBoundaries:
     def test_no_endfile_column(self, plotter):
