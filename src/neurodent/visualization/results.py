@@ -33,6 +33,11 @@ from ..core.frequency_domain_spike_detection import FrequencyDomainSpikeDetector
 from ..core.utils import abbreviate_channel_names, filepath_to_index, parse_chname_to_abbrev, slugify
 from .feature_utils import extract_linear_array, extract_band_dict, repack_band_dict, extract_hist_data
 
+try:
+    import spikeinterface.preprocessing as spre
+except ImportError:  # pragma: no cover
+    spre = None
+
 
 class AnimalFeatureParser:
     def _average_feature(
@@ -281,6 +286,52 @@ class AnimalOrganizer(AnimalFeatureParser):
             return Path(item[0]).name
         return Path(item).name
 
+    def _get_item_key(self, item):
+        """Return a unique key for the item, suitable for dict lookups across sessions.
+
+        Unlike _get_item_name() which returns only the filename (e.g. 'file-0.bin'),
+        this returns the full path, ensuring items with the same filename in different
+        session directories get distinct keys.
+        """
+        from ..core.discovery import DiscoveredFile
+
+        if isinstance(item, DiscoveredFile):
+            paths = item.get_path_list()
+            return str(paths[0]) if paths else "unknown"
+        if isinstance(item, (list, tuple)):
+            return str(item[0])
+        return str(item)
+
+    @staticmethod
+    def _validate_timestamp_ordering(timestamp_dict):
+        """Validate that computed timestamps have no duplicates.
+
+        Catches key collisions (duplicate keys silently overwriting produce
+        equal timestamps for different items) and misconfigured manual_datetimes
+        that assign the same start time to multiple items.
+
+        Only checks datetime values; lists/functions are passed through unvalidated.
+        """
+        datetime_items = {
+            k: v for k, v in timestamp_dict.items()
+            if isinstance(v, datetime)
+        }
+        if len(datetime_items) < 2:
+            return
+        sorted_items = sorted(datetime_items.items(), key=lambda x: x[1])
+        for i in range(1, len(sorted_items)):
+            prev_key, prev_ts = sorted_items[i - 1]
+            curr_key, curr_ts = sorted_items[i]
+            if curr_ts <= prev_ts:
+                raise ValueError(
+                    f"Timestamp collision: {prev_key} ({prev_ts}) and "
+                    f"{curr_key} ({curr_ts}) have equal or overlapping timestamps. "
+                    f"This may indicate duplicate files mapping to the same "
+                    f"{{index}} in the file pattern, or a manual_datetimes "
+                    f"configuration that assigns the same start time to "
+                    f"multiple items."
+                )
+
     def _is_item_file(self, item):
         """Helper to check if an item represents a file(s) rather than a directory."""
         from ..core.discovery import DiscoveredFile
@@ -381,6 +432,22 @@ class AnimalOrganizer(AnimalFeatureParser):
                 matching_folders.extend(folders)
         return matching_folders
 
+    def _items_have_index(self, items):
+        """Check if items carry {index} metadata."""
+        return (
+            items
+            and hasattr(items[0], "metadata")
+            and "index" in getattr(items[0], "metadata", {})
+        )
+
+    def _session_sort_key(self, items):
+        """Return sort-key function: use {index} metadata if available, else filename."""
+        from ..core.discovery import _natural_sort_key
+
+        if self._items_have_index(items):
+            return lambda f: _natural_sort_key(f.metadata["index"])
+        return lambda f: _natural_sort_key(self._get_item_name(f))
+
     def _compute_global_timeline(
         self,
         base_datetime,
@@ -403,16 +470,20 @@ class AnimalOrganizer(AnimalFeatureParser):
             if isinstance(original_manual_datetimes, list):
                 for animalday in sorted(animalday_to_items.keys(), key=_natural_sort_key):
                     items = animalday_to_items[animalday]
-                    ordered_items.extend(items)
+                    sorted_items = sorted(items, key=self._session_sort_key(items))
+                    ordered_items.extend(sorted_items)
             else:
                 for animalday in sorted(animalday_to_items.keys(), key=_natural_sort_key):
                     items = animalday_to_items[animalday]
-                    sorted_items = sorted(items, key=lambda f: _natural_sort_key(self._get_item_name(f)))
+                    sorted_items = sorted(items, key=self._session_sort_key(items))
                     ordered_items.extend(sorted_items)
         else:
             for animalday in sorted(animalday_to_items.keys(), key=_natural_sort_key):
                 items = animalday_to_items[animalday]
-                if len(items) > 1:
+                if self._items_have_index(items):
+                    sorted_items = sorted(items, key=self._session_sort_key(items))
+                    ordered_items.extend(sorted_items)
+                elif len(items) > 1:
                     item_lro_pairs = []
                     for item in items:
                         try:
@@ -526,25 +597,53 @@ class AnimalOrganizer(AnimalFeatureParser):
                         f"Failed to load item {self._get_item_name(item)} for duration estimation: {e}"
                     ) from e
 
+        # Filter out zero-duration items (empty/corrupt files) from the
+        # timeline.  These items remain in _animalday_folder_groups and will
+        # be handled by _filter_zero_sample_lros() during LRO creation.
+        zero_items = [
+            item for item in ordered_items if item_durations.get(item, 0) == 0
+        ]
+        if zero_items:
+            for item in zero_items:
+                logging.warning(
+                    f"Skipping zero-duration item '{self._get_item_name(item)}' "
+                    f"from timeline computation (empty or corrupt file)"
+                )
+            ordered_items = [
+                item for item in ordered_items if item not in zero_items
+            ]
+            for item in zero_items:
+                item_durations.pop(item, None)
+
         datetimes_are_start = base_lro_kwargs.get("datetimes_are_start", True)
         result = {}
 
         if datetimes_are_start:
             current_start_time = base_datetime
             for item in ordered_items:
-                item_name = self._get_item_name(item)
-                result[item_name] = current_start_time
+                item_key = self._get_item_key(item)
+                result[item_key] = current_start_time
                 current_start_time = current_start_time + timedelta(
                     seconds=item_durations[item]
                 )
         else:
             current_end_time = base_datetime
             for item in reversed(ordered_items):
-                item_name = self._get_item_name(item)
+                item_key = self._get_item_key(item)
                 duration = item_durations[item]
                 start_time = current_end_time - timedelta(seconds=duration)
-                result[item_name] = start_time
+                result[item_key] = start_time
                 current_end_time = start_time
+
+        # Validate monotonicity of computed timestamps in item order
+        for i in range(1, len(ordered_items)):
+            prev_key = self._get_item_key(ordered_items[i - 1])
+            curr_key = self._get_item_key(ordered_items[i])
+            if result[curr_key] < result[prev_key]:
+                raise ValueError(
+                    f"Timeline computation produced non-monotonic timestamps: "
+                    f"{prev_key} ({result[prev_key]}) > {curr_key} ({result[curr_key]})"
+                )
 
         total_duration = sum(item_durations.values())
         logging.info(
@@ -585,9 +684,10 @@ class AnimalOrganizer(AnimalFeatureParser):
                 for item in animal_items:
                     fname = self._get_item_name(item)
                     context_path = self._get_context_path(item)
-                    out[fname] = self._resolve_timestamp_input(
+                    out[self._get_item_key(item)] = self._resolve_timestamp_input(
                         manual_datetimes[fname], context_path
                     )
+                self._validate_timestamp_ordering(out)
                 return out
 
             elif has_session_keys:
@@ -611,7 +711,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                         sess_ts, context_path
                     )
                     sess_item_dict = {
-                        self._get_item_name(f): [f] for f in sess_items
+                        self._get_item_key(f): [f] for f in sess_items
                     }
                     sess_timeline = self._compute_global_timeline(
                         resolved_dt,
@@ -620,6 +720,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                         original_manual_datetimes=sess_ts,
                     )
                     out.update(sess_timeline)
+                self._validate_timestamp_ordering(out)
                 return out
 
             else:
@@ -661,35 +762,36 @@ class AnimalOrganizer(AnimalFeatureParser):
             out = {}
             for animalday, items in animalday_to_items.items():
                 for item in items:
-                    item_name = self._get_item_name(item)
                     context_path = self._get_context_path(item)
-                    out[item_name] = self._resolve_timestamp_input(
+                    out[self._get_item_key(item)] = self._resolve_timestamp_input(
                         manual_datetimes, context_path
                     )
+            self._validate_timestamp_ordering(out)
             return out
 
     def _create_long_recordings(self, lro_kwargs: dict):
         """Create LongRecordingOrganizer instances for each unique animalday."""
         self.long_recordings: list[core.LongRecordingOrganizer] = []
+        skipped_animaldays: list[str] = []
         for animalday, items in self._animalday_folder_groups.items():
             kwargs = lro_kwargs.copy()
             if getattr(self, "_processed_timestamps", None) is not None:
-                # _processed_timestamps is keyed by item name, not animalday
+                # _processed_timestamps is keyed by full item path, not animalday
                 if len(items) == 1:
-                    item_name = self._get_item_name(items[0])
-                    if item_name in self._processed_timestamps:
-                        kwargs["manual_datetimes"] = self._processed_timestamps[item_name]
+                    item_key = self._get_item_key(items[0])
+                    if item_key in self._processed_timestamps:
+                        kwargs["manual_datetimes"] = self._processed_timestamps[item_key]
                         kwargs["datetimes_are_start"] = True  # _compute_global_timeline always returns start times
                         logging.debug(
-                            f"Using processed timestamp for {item_name}: {kwargs['manual_datetimes']}"
+                            f"Using processed timestamp for {item_key}: {kwargs['manual_datetimes']}"
                         )
                 else:
                     # For multi-item animaldays, collect per-item timestamps as a list
                     item_timestamps = []
                     for item in items:
-                        item_name = self._get_item_name(item)
-                        if item_name in self._processed_timestamps:
-                            item_timestamps.append(self._processed_timestamps[item_name])
+                        item_key = self._get_item_key(item)
+                        if item_key in self._processed_timestamps:
+                            item_timestamps.append(self._processed_timestamps[item_key])
                     if item_timestamps:
                         kwargs["manual_datetimes"] = item_timestamps
                         kwargs["datetimes_are_start"] = True  # _compute_global_timeline always returns start times
@@ -713,18 +815,46 @@ class AnimalOrganizer(AnimalFeatureParser):
                 item_lro_pairs = []
                 for item in items:
                     individual_kwargs = kwargs.copy()
+                    # Remove session-level timestamp list; replaced per-item
+                    # below.  Items missing from _processed_timestamps (e.g.,
+                    # zero-byte files skipped from timeline) must not inherit
+                    # the session list, which would cause a length mismatch.
+                    individual_kwargs.pop("manual_datetimes", None)
+                    individual_kwargs.pop("datetimes_are_start", None)
                     # Distribute per-item timestamp so each LRO gets its own
                     if getattr(self, "_processed_timestamps", None) is not None:
-                        item_name = self._get_item_name(item)
-                        if item_name in self._processed_timestamps:
+                        item_key = self._get_item_key(item)
+                        if item_key in self._processed_timestamps:
                             individual_kwargs["manual_datetimes"] = (
-                                self._processed_timestamps[item_name]
+                                self._processed_timestamps[item_key]
                             )
                             individual_kwargs["datetimes_are_start"] = True  # _compute_global_timeline always returns start times
                     individual_lro = core.LongRecordingOrganizer(
                         item, **individual_kwargs
                     )
                     item_lro_pairs.append((item, individual_lro))
+
+                # Filter out 0-sample LROs (from failed/empty file pairs) before
+                # merging. A 0-sample base LRO causes merge metadata failures, and
+                # downstream _iter_valid_recordings() cannot recover from that.
+                valid_pairs, skipped_names = self._filter_zero_sample_lros(
+                    item_lro_pairs, self._get_item_name
+                )
+                if skipped_names:
+                    logging.warning(
+                        f"Skipping {len(skipped_names)} 0-sample LRO(s) for "
+                        f"'{animalday}' before merge: {skipped_names}"
+                    )
+                if not valid_pairs:
+                    logging.error(
+                        f"Skipping animalday '{animalday}' entirely: all {len(item_lro_pairs)} "
+                        f"file(s) produced 0-sample LROs. Each file may have been corrupt, "
+                        f"empty, or failed during loading (check earlier warnings above for "
+                        f"root causes per file). Skipped files: {skipped_names}"
+                    )
+                    skipped_animaldays.append(animalday)
+                    continue
+                item_lro_pairs = valid_pairs
 
                 sorted_folder_lro_pairs = self._sort_lros_by_median_time(item_lro_pairs)
 
@@ -759,6 +889,35 @@ class AnimalOrganizer(AnimalFeatureParser):
 
             self.long_recordings.append(lro)
 
+        if skipped_animaldays:
+            self.unique_animaldays = [
+                ad for ad in self.unique_animaldays if ad not in skipped_animaldays
+            ]
+            self.animaldays = self.unique_animaldays
+
+        if not self.long_recordings:
+            raise RuntimeError(
+                f"No recordings were loaded for this animal. "
+                f"All {len(skipped_animaldays)} animalday(s) were skipped because every "
+                f"file produced a 0-sample LRO. This usually indicates a misconfiguration "
+                f"(wrong file pattern, wrong data root, or corrupt data). "
+                f"Skipped animaldays: {skipped_animaldays}. "
+                f"Check the warnings above for per-file root causes."
+            )
+
+        # It is possible for long_recordings to contain only 0-sample placeholder LROs.
+        # In that case, _iter_valid_recordings() will yield nothing and downstream analysis
+        # (e.g. concatenating results) will fail with a less informative error.
+        # Guard against this by raising early if there are no valid (nonzero-sample) LROs.
+        valid_long_recordings = list(self._iter_valid_recordings())
+        if not valid_long_recordings:
+            raise RuntimeError(
+                "No valid (nonzero-sample) recordings were loaded for this animal. "
+                "One or more LongRecordingOrganizer instances were created, but all of "
+                "them contain 0 samples. This usually indicates a misconfiguration "
+                "(wrong file pattern, wrong data root, or corrupt data). "
+                "Check the warnings above for per-file root causes."
+            )
         self._log_timeline_summary()
 
         if len(self.long_recordings) != len(self.unique_animaldays):
@@ -1064,6 +1223,47 @@ class AnimalOrganizer(AnimalFeatureParser):
         for lrec in self.long_recordings:
             lrec.cleanup_rec()
 
+    @staticmethod
+    def _filter_zero_sample_lros(lro_pairs, get_name):
+        """Remove 0-sample LROs from *lro_pairs* before a merge loop.
+
+        A 0-sample LRO used as the **base** of a merge causes
+        ``si.concatenate_recordings`` to fail or produce corrupt metadata.
+        This helper removes such LROs up-front so every caller's merge loop
+        starts from a valid base.
+
+        This is intentionally separate from the ``merge()`` check in
+        ``LongRecordingOrganizer``, which only guards against a 0-sample
+        *other_lro* being merged in.  Together the two checks cover all cases:
+        base=0-sample (this helper) and other_lro=0-sample (``merge()``).
+
+        Args:
+            lro_pairs: Iterable of ``(key, lro)`` pairs.  *key* is whatever
+                the caller uses to name the LRO (item path, string tag, …).
+            get_name: Callable ``(key) -> str`` used to produce a human-readable
+                name for warning messages.
+
+        Returns:
+            ``(valid_pairs, skipped_names)`` where *valid_pairs* is a list of
+            ``(key, lro)`` pairs with 0-sample entries removed and
+            *skipped_names* is a list of names of the removed LROs.
+        """
+        valid_pairs = []
+        skipped_names = []
+        for key, lro in lro_pairs:
+            try:
+                if (
+                    hasattr(lro, "LongRecording")
+                    and lro.LongRecording is not None
+                    and lro.LongRecording.get_total_samples() == 0
+                ):
+                    skipped_names.append(get_name(key))
+                    continue
+            except (TypeError, AttributeError):
+                pass  # Non-SI or mock — keep it
+            valid_pairs.append((key, lro))
+        return valid_pairs, skipped_names
+
     def _iter_valid_recordings(self):
         """Yield (index, lrec) pairs, skipping recordings with zero samples.
 
@@ -1249,36 +1449,48 @@ class AnimalOrganizer(AnimalFeatureParser):
                     logging.debug("Converting LongRecording to numpy array")
 
                     n_fragments_war = max(lan.n_fragments - 1, 1)
-                    first_fragment = lan.get_fragment_np(0)
+                    n_samples_per_frag = int(window_s * lan.f_s)
+
+                    # Apply notch filter once to the entire recording (lazy SI wrapper)
+                    rec = lrec.LongRecording
+                    if lan.apply_notch_filter:
+                        if spre is not None:
+                            rec = spre.notch_filter(rec, freq=constants.LINE_FREQ)
+                        else:
+                            logging.warning(
+                                "apply_notch_filter=True but spikeinterface.preprocessing "
+                                "is not available; notch filter will be skipped."
+                            )
 
                     if chunk_duration_s is not None:
                         # Convert seconds → number of fragments
                         n_frag_per_chunk = max(1, int(chunk_duration_s / window_s))
-                        # Streaming path: stream fragments to zarr in batches,
+                        # Streaming path: stream recording to zarr in batches,
                         # keeping only `n_frag_per_chunk` fragments in RAM at a time.
-                        tmppath = core.utils.stream_fragments_to_zarr(
-                            lan.get_fragment_np,
+                        tmppath = core.utils.stream_recording_to_zarr(
+                            rec,
                             n_fragments_war,
-                            first_fragment.shape,
-                            first_fragment.dtype,
+                            n_samples_per_frag,
                             n_frag_per_chunk,
                         )
                     else:
-                        # Default path: allocate the full array then write to zarr in
-                        # one shot.  Maximises throughput on high-memory systems.
-                        np_fragments = np.empty(
-                            (n_fragments_war,) + first_fragment.shape,
-                            dtype=first_fragment.dtype,
+                        # Default path: read all traces at once then write to zarr.
+                        # Maximises throughput on high-memory systems.
+                        total_samples = n_fragments_war * n_samples_per_frag
+                        all_traces = rec.get_traces(
+                            start_frame=0,
+                            end_frame=total_samples,
+                            return_scaled=True,
+                        )
+                        np_fragments = all_traces.reshape(
+                            n_fragments_war, n_samples_per_frag, rec.get_num_channels()
                         )
                         logging.debug(f"np_fragments.shape: {np_fragments.shape}")
-                        for idx in range(n_fragments_war):
-                            np_fragments[idx] = lan.get_fragment_np(idx)
-
                         # Cache fragments to zarr
                         tmppath, _ = core.utils.cache_fragments_to_zarr(
                             np_fragments, n_fragments_war
                         )
-                        del np_fragments
+                        del all_traces, np_fragments
 
                     logging.debug("Processing metadata serially")
                     metadatas = [
@@ -1436,7 +1648,7 @@ class AnimalOrganizer(AnimalFeatureParser):
 
             try:
                 # Run frequency domain spike detection
-                spike_indices_per_channel, mne_raw_with_annotations = (
+                spike_indices_per_channel = (
                     FrequencyDomainSpikeDetector.detect_spikes_recording(
                         rec,
                         detection_params=detection_params,
@@ -1448,7 +1660,7 @@ class AnimalOrganizer(AnimalFeatureParser):
                 # Create FrequencyDomainSpikeAnalysisResult
                 fdsar = FrequencyDomainSpikeAnalysisResult.from_detection_results(
                     spike_indices_per_channel=spike_indices_per_channel,
-                    mne_raw_with_annotations=mne_raw_with_annotations,
+                    recording=rec,
                     detection_params=detection_params or {},
                     animal_id=self.animal_id,
                     genotype=self.genotype,
@@ -1642,14 +1854,34 @@ class AnimalOrganizer(AnimalFeatureParser):
                     f"Merging into single LRO (mimicking normal __init__ behavior)."
                 )
 
-                # Sort by median time (same logic as normal __init__)
+                # Filter out 0-sample LROs before the merge loop.  A 0-sample
+                # base LRO makes si.concatenate_recordings fail; using the same
+                # helper as _create_long_recordings keeps the two code paths
+                # consistent.
                 lro_pairs = [(f"lro_{idx}", lro) for idx, lro in lro_group]
+                valid_pairs, skipped_names = cls._filter_zero_sample_lros(
+                    lro_pairs, lambda k: k
+                )
+                if skipped_names:
+                    logging.warning(
+                        f"Skipping {len(skipped_names)} 0-sample LRO(s) for "
+                        f"'{animalday}' before merge: {skipped_names}"
+                    )
+                if not valid_pairs:
+                    logging.warning(
+                        f"All {len(lro_group)} LRO(s) for '{animalday}' are "
+                        f"0-sample; skipping this date."
+                    )
+                    continue
+                lro_pairs = valid_pairs
+
+                # Sort by median time (same logic as normal __init__)
                 sorted_pairs = cls._sort_lros_by_median_time_static(lro_pairs)
 
                 # Merge all LROs into the first one (in temporal order)
                 base_lro = sorted_pairs[0][1]
-                original_idx = lro_group[0][0]
-                logging.info(f"Base LRO: index {original_idx}")
+                base_tag = sorted_pairs[0][0]
+                logging.info(f"Base LRO: {base_tag}")
 
                 for i, (_, lro) in enumerate(sorted_pairs[1:], 1):
                     try:
@@ -1669,17 +1901,29 @@ class AnimalOrganizer(AnimalFeatureParser):
                     f"Successfully merged {len(lro_group)} LROs for {animalday}"
                 )
 
-        # Step 3: Set merged LROs and animaldays
+        # Step 3: Ensure at least one date produced a valid (non-empty) merged LRO.
+        # If every date group was filtered out as 0-sample, merged_lros is empty
+        # and downstream methods (e.g. compute_windowed_analysis) would fail with
+        # less informative errors.  Raise early, consistent with the normal
+        # __init__ path which raises when nothing is loadable.
+        if not merged_lros:
+            raise ValueError(
+                f"No non-empty local recording objects (LROs) could be loaded. "
+                f"All date groups were 0-sample. Cannot construct an "
+                f"AnimalOrganizer with no recordings."
+            )
+
+        # Step 4: Set merged LROs and animaldays
         ao.long_recordings = merged_lros
         ao.unique_animaldays = merged_animaldays
         ao.animaldays = (
             merged_animaldays.copy()
         )  # Create separate list for compatibility
 
-        # Step 4: Validate and reconcile channel names across all merged LROs
+        # Step 5: Validate and reconcile channel names across all merged LROs
         ao.channel_names = cls._validate_channel_names(merged_lros)
 
-        # Step 5: CRITICAL VALIDATION - ensure no duplicates after merge
+        # Step 6: CRITICAL VALIDATION - ensure no duplicates after merge
         if len(ao.long_recordings) != len(set(ao.unique_animaldays)):
             duplicate_dates = [
                 date
@@ -1699,7 +1943,7 @@ class AnimalOrganizer(AnimalFeatureParser):
             f"{len(ao.unique_animaldays)} unique animaldays (no duplicates)"
         )
 
-        # Step 6: Initialize default attributes for factory-created instances
+        # Step 7: Initialize default attributes for factory-created instances
         cls._init_factory_defaults(ao, animal_id, merged_lros)
 
         logging.info(
@@ -2077,10 +2321,37 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     f"that are shorter than the median duration of {median_duration:.1f}s"
                 )
 
-                if (
-                    pct_short > 1.0 and not self.suppress_short_interval_error
-                ):  # More than 1% of intervals are short
-                    raise ValueError(warning_msg)
+                if pct_short > 1.0 and not self.suppress_short_interval_error:
+                    # Build a diagnostic showing the first few overlapping pairs
+                    # so the user can identify which sessions have bad timestamps.
+                    short_positions = np.flatnonzero(short_intervals.to_numpy())[:5]
+                    diag_lines = []
+                    has_animalday = "animalday" in self.result.columns
+                    for pos in short_positions:
+                        # Offset by 1 to map from sliced short_intervals (which
+                        # dropped the first NaT row) back to original DataFrame
+                        # positions. Without this, pos=0 wraps to iloc[-1].
+                        actual_pos = pos + 1
+                        prev_row = self.result.iloc[actual_pos - 1]
+                        curr_row = self.result.iloc[actual_pos]
+                        gap = timestamp_diffs.iloc[actual_pos]
+                        prev_ad = f" ({prev_row['animalday']})" if has_animalday else ""
+                        curr_ad = f" ({curr_row['animalday']})" if has_animalday else ""
+                        diag_lines.append(
+                            f"  {prev_row['timestamp']}{prev_ad} -> "
+                            f"{curr_row['timestamp']}{curr_ad}: gap={gap}"
+                        )
+                    diag = "\n".join(diag_lines)
+                    raise ValueError(
+                        f"{warning_msg}\n"
+                        f"First overlapping pairs (of {n_short} total):\n{diag}\n"
+                        f"Hint: if using datetimes_are_start=False, the backward "
+                        f"computation assumes contiguous files. Large gaps between "
+                        f"files in a session will push computed start times too far "
+                        f"back, overlapping adjacent sessions. Consider providing "
+                        f"per-file timestamps or set suppress_short_interval_error=True "
+                        f"to downgrade this to a warning."
+                    )
                 elif not self.suppress_short_interval_error:
                     warnings.warn(warning_msg)
 
@@ -2156,7 +2427,10 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 f"Target channels must be unique. Found duplicates: {duplicates}"
             )
 
-        result = self.result.copy()
+        if inplace:
+            result = self.result
+        else:
+            result = self.result.copy()
 
         channel_map = {ch: i for i, ch in enumerate(target_channels)}
         channel_names = self.channel_names if not use_abbrevs else self.channel_abbrevs
@@ -2192,8 +2466,10 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 if ftype is constants.FeatureType.BAND:
                     # new_vals is (W, n_target, B) — canonical, pass directly to repack
                     result[feature] = repack_band_dict(new_vals, keys)
+                    del vals, keys, new_vals
                 else:
                     result[feature] = [list(x) for x in new_vals]
+                    del vals, new_vals
 
             elif ftype.is_matrix:
                 if ftype is constants.FeatureType.BANDED_MATRIX:
@@ -2209,6 +2485,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                                 if ch2 in channel_map:
                                     new_vals[:, channel_map[ch1], channel_map[ch2], :] = vals[:, i, j, :]
                     result[feature] = repack_band_dict(new_vals, keys)
+                    del vals, keys, new_vals
                 else:
                     vals = extract_linear_array(result[feature])
                     # vals is canonical (W, C, C) for SIMPLE_MATRIX
@@ -2221,6 +2498,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                                 if ch2 in channel_map:
                                     new_vals[:, channel_map[ch1], channel_map[ch2]] = vals[:, i, j]
                     result[feature] = [list(x) for x in new_vals]
+                    del vals, new_vals
 
             elif ftype is constants.FeatureType.HIST:
                 coords, vals = extract_hist_data(result[feature])
@@ -2237,6 +2515,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 result[feature] = [
                     (coords[i], new_vals[i].T) for i in range(len(coords))
                 ]
+                del coords, vals, new_vals
 
             else:
                 raise ValueError(
@@ -2561,7 +2840,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 - All feature values are scalars (float)
 
         Example:
-            >>> war = WindowAnalysisResult.load_pickle_and_json(folder_path, "war.pkl", "war_metadata.json")
+            >>> war = WindowAnalysisResult.load_parquet_and_json(folder_path, "war.parquet", "war_metadata.json")
             >>> # Get channel-averaged zeitgeber features
             >>> df = war.get_channel_averaged_result(["logpsdband", "zcohere", "logrms"])
             >>> print(df.columns)
@@ -3664,7 +3943,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 )
         return result
 
-    def save_pickle_and_json(
+    def save_parquet_and_json(
         self,
         folder: str | Path,
         make_folder=True,
@@ -3675,8 +3954,8 @@ class WindowAnalysisResult(AnimalFeatureParser):
         """Archive window analysis result into the folder specified, as a parquet and json file.
 
         The result DataFrame is saved as a Parquet file (stable across pandas
-        versions).  A pickle copy is also written for backward compatibility
-        with older workflows.
+        versions).  Metadata (animal_id, channel_names, bad_channels_dict,
+        lof_scores_dict, etc.) is written alongside as a JSON sidecar.
 
         Args:
             folder (str | Path): Destination folder to save results to
@@ -3697,21 +3976,40 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
         filepath = str(folder / filename)
 
-        # Write pickle for backward compatibility with existing workflows
-        self.result.to_pickle(filepath + ".pkl")
-        logging.info(f"Saved WAR to {filepath + '.pkl'}")
-
         # Write parquet as the primary stable format.
         # Object-like columns (lists/dicts/ndarrays) are JSON-encoded per-cell.
         # The list of encoded columns is stored in the parquet schema metadata
         # so they can be decoded on load.
-        pq_df, encoded_cols = self._encode_df_for_parquet(self.result)
-        table = pa.Table.from_pandas(pq_df)
+        #
+        # Build a column dict directly (avoids df.copy() and from_pandas()
+        # which together create 2-3 redundant copies of the DataFrame).
+        columns = {}
+        encoded_cols: list[str] = []
+        for col in self.result.columns:
+            ser = self.result[col]
+            needs_encoding = False
+            if ser.dtype == object:
+                sample = ser.dropna().head(20)
+                for v in sample:
+                    if not isinstance(v, (str, int, float, bool, type(None))):
+                        needs_encoding = True
+                        break
+            if needs_encoding:
+                encoded_cols.append(col)
+                columns[col] = [
+                    json.dumps(x, cls=WindowAnalysisResult._NumpyEncoder, ensure_ascii=False)
+                    for x in ser
+                ]
+            else:
+                columns[col] = ser.to_numpy()
+        table = pa.table(columns)
+        del columns
         neurodent_meta = json.dumps({"encoded_columns": encoded_cols}).encode()
         existing_meta = table.schema.metadata or {}
         merged_meta = {**existing_meta, b"neurodent": neurodent_meta}
         table = table.replace_schema_metadata(merged_meta)
         pq.write_table(table, filepath + ".parquet")
+        del table
         logging.info(f"Saved WAR to {filepath + '.parquet'}")
 
         json_dict = {
@@ -3732,6 +4030,23 @@ class WindowAnalysisResult(AnimalFeatureParser):
         with open(filepath + ".json", "w") as f:
             json.dump(json_dict, f, indent=2)
             logging.info(f"Saved WAR to {filepath + '.json'}")
+
+    def save_pickle_and_json(self, *args, **kwargs):
+        """Deprecated: use :meth:`save_parquet_and_json` instead.
+
+        This alias is retained so external callers don't break immediately. It
+        no longer writes a pickle file — only parquet + json. The name is
+        misleading and will be removed in a future release.
+        """
+        import warnings
+
+        warnings.warn(
+            "save_pickle_and_json is deprecated and no longer writes a pickle file; "
+            "use save_parquet_and_json instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.save_parquet_and_json(*args, **kwargs)
 
     class _NumpyEncoder(json.JSONEncoder):
         """JSON encoder that handles numpy types transparently.
@@ -3791,9 +4106,8 @@ class WindowAnalysisResult(AnimalFeatureParser):
         here.  This avoids over-converting list-based features and keeps the
         per-cell cost to a single ``json.loads`` call.
         """
-        df_copy = df.copy()
         for col in encoded_cols:
-            if col not in df_copy.columns:
+            if col not in df.columns:
                 continue
             # Some parquet engines may already return Python objects for nulls;
             # only attempt json.loads on actual string values.
@@ -3805,9 +4119,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
                         return v
                 return v
 
-            df_copy[col] = df_copy[col].apply(_try_load)
+            df[col] = df[col].apply(_try_load)
 
-        return df_copy
+        return df
 
     def get_bad_channels_by_lof_threshold(self, lof_threshold: float) -> dict:
         """Apply LOF threshold directly to stored scores to get bad channels.
@@ -4017,22 +4331,29 @@ class WindowAnalysisResult(AnimalFeatureParser):
         return y_true_list, y_pred_list
 
     @classmethod
-    def load_pickle_and_json(cls, folder_path=None, pickle_name=None, json_name=None):
-        """Load WindowAnalysisResult from folder
+    def load_parquet_and_json(cls, folder_path=None, parquet_name=None, json_name=None):
+        """Load WindowAnalysisResult from folder.
+
+        Reads ``war.parquet`` (the result DataFrame) plus ``war.json`` (the
+        WAR metadata: animal_id, channel_names, bad_channels_dict, etc.).
+
+        For backward compatibility, if the resolved parquet file does not
+        exist but a matching ``.pkl`` file does, the loader falls back to
+        reading the legacy pickle format. No pickle files are written.
 
         Args:
-            folder_path (str, optional): Path of folder containing .pkl and .json files. Defaults to None.
-            pickle_name (str, optional): Name of the pickle file. Can be just the filename (e.g. "war.pkl")
-                or a path relative to folder_path (e.g. "subdir/war.pkl"). If None and folder_path is provided,
-                expects exactly one .pkl file in folder_path. Defaults to None.
+            folder_path (str, optional): Path of folder containing .parquet and .json files. Defaults to None.
+            parquet_name (str, optional): Name of the parquet file. Can be just the filename (e.g. "war.parquet")
+                or a path relative to folder_path (e.g. "subdir/war.parquet"). If None and folder_path is provided,
+                expects exactly one .parquet file in folder_path. Defaults to None.
             json_name (str, optional): Name of the JSON file. Can be just the filename (e.g. "war.json")
                 or a path relative to folder_path (e.g. "subdir/war.json"). If None and folder_path is provided,
                 expects exactly one .json file in folder_path. Defaults to None.
 
         Raises:
             ValueError: folder_path does not exist
-            ValueError: Expected exactly one pickle and one json file in folder_path (when pickle_name/json_name not specified)
-            FileNotFoundError: Specified pickle_name or json_name not found
+            ValueError: Expected exactly one parquet and one json file in folder_path (when parquet_name/json_name not specified)
+            FileNotFoundError: Specified parquet_name or json_name not found
 
         Returns:
             result: WindowAnalysisResult object
@@ -4042,57 +4363,67 @@ class WindowAnalysisResult(AnimalFeatureParser):
             if not folder_path.exists():
                 raise ValueError(f"Folder path {folder_path} does not exist")
 
-            if pickle_name is not None:
-                # Handle pickle_name as either absolute path or relative to folder_path
-                pickle_path = Path(pickle_name)
-                if pickle_path.is_absolute():
-                    df_pickle_path = pickle_path
-                else:
-                    df_pickle_path = folder_path / pickle_name
-
-                if not df_pickle_path.exists():
-                    raise FileNotFoundError(f"Pickle file not found: {df_pickle_path}")
+            if parquet_name is not None:
+                # Handle parquet_name as either absolute path or relative to folder_path
+                p = Path(parquet_name)
+                parquet_path = p if p.is_absolute() else folder_path / parquet_name
+                if not parquet_path.exists():
+                    # Allow falling back to legacy pickle with the same stem
+                    legacy_pkl = parquet_path.with_suffix(".pkl")
+                    if not legacy_pkl.exists():
+                        raise FileNotFoundError(
+                            f"Parquet file not found: {parquet_path} (and no legacy pickle at {legacy_pkl})"
+                        )
             else:
-                pkl_files = list(folder_path.glob("*.pkl"))
-                if len(pkl_files) != 1:
+                pq_files = list(folder_path.glob("*.parquet"))
+                if len(pq_files) == 1:
+                    parquet_path = pq_files[0]
+                elif len(pq_files) == 0:
+                    # Legacy layout: fall back to a single pickle file
+                    pkl_files = list(folder_path.glob("*.pkl"))
+                    if len(pkl_files) != 1:
+                        raise ValueError(
+                            f"Expected exactly one parquet file in {folder_path}, found {len(pq_files)}"
+                        )
+                    parquet_path = pkl_files[0].with_suffix(".parquet")
+                else:
                     raise ValueError(
-                        f"Expected exactly one pickle file in {folder_path}, found {len(pkl_files)}"
+                        f"Expected exactly one parquet file in {folder_path}, found {len(pq_files)}"
                     )
-                df_pickle_path = pkl_files[0]
 
             if json_name is not None:
                 # Handle json_name as either absolute path or relative to folder_path
-                json_path = Path(json_name)
-                if json_path.is_absolute():
-                    json_path = json_path
-                else:
-                    json_path = folder_path / json_name
-
+                jp = Path(json_name)
+                json_path = jp if jp.is_absolute() else folder_path / json_name
                 if not json_path.exists():
                     raise FileNotFoundError(f"JSON file not found: {json_path}")
             else:
-                json_files = list(folder_path.glob("*.json"))
-                if len(json_files) != 1:
-                    raise ValueError(
-                        f"Expected exactly one json file in {folder_path}, found {len(json_files)}"
-                    )
-                json_path = json_files[0]
+                # Prefer the JSON file that shares the parquet stem
+                # (e.g. war.parquet → war.json).  This avoids false
+                # positives from legacy sidecar files such as
+                # *.parquet.meta.json that may coexist in the folder.
+                json_path = parquet_path.with_suffix(".json")
+                if not json_path.exists():
+                    json_files = list(folder_path.glob("*.json"))
+                    if len(json_files) != 1:
+                        raise ValueError(
+                            f"Expected exactly one json file in {folder_path}, found {len(json_files)}"
+                        )
+                    json_path = json_files[0]
         else:
-            if pickle_name is None or json_name is None:
+            if parquet_name is None or json_name is None:
                 raise ValueError(
-                    "Either folder_path must be provided, or both pickle_name and json_name must be provided as absolute paths"
+                    "Either folder_path must be provided, or both parquet_name and json_name must be provided as absolute paths"
                 )
 
-            df_pickle_path = Path(pickle_name)
+            parquet_path = Path(parquet_name)
             json_path = Path(json_name)
 
-            if not df_pickle_path.exists():
-                raise FileNotFoundError(f"Pickle file not found: {df_pickle_path}")
+            if not parquet_path.exists() and not parquet_path.with_suffix(".pkl").exists():
+                raise FileNotFoundError(f"Parquet file not found: {parquet_path}")
             if not json_path.exists():
                 raise FileNotFoundError(f"JSON file not found: {json_path}")
 
-        # Prefer Parquet if available (parquet is more stable across pandas versions)
-        parquet_path = df_pickle_path.with_suffix(".parquet")
         data: pd.DataFrame
         if parquet_path.exists():
             try:
@@ -4116,19 +4447,55 @@ class WindowAnalysisResult(AnimalFeatureParser):
                         encoded_cols = pq_meta.get("encoded_columns", [])
 
                 data = table.to_pandas()
+                del table
                 data = cls._decode_df_from_parquet(data, encoded_cols)
             except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as e:
+                legacy_pkl = parquet_path.with_suffix(".pkl")
+                if not legacy_pkl.exists():
+                    raise
                 logging.warning(
-                    f"Failed to load parquet WAR ({parquet_path}): {e}, falling back to pickle"
+                    f"Failed to load parquet WAR ({parquet_path}): {e}, falling back to legacy pickle"
                 )
-                with open(df_pickle_path, "rb") as f:
+                with open(legacy_pkl, "rb") as f:
                     data = pd.read_pickle(f)
         else:
-            with open(df_pickle_path, "rb") as f:
+            # Parquet missing — try the legacy pickle fallback
+            legacy_pkl = parquet_path.with_suffix(".pkl")
+            logging.warning(
+                f"Parquet WAR not found at {parquet_path}, loading legacy pickle at {legacy_pkl}"
+            )
+            with open(legacy_pkl, "rb") as f:
                 data = pd.read_pickle(f)
+
         with open(json_path, "r") as f:
             metadata = json.load(f)
         return cls(data, **metadata)
+
+    @classmethod
+    def load_pickle_and_json(cls, folder_path=None, pickle_name=None, json_name=None):
+        """Deprecated: use :meth:`load_parquet_and_json` instead.
+
+        This alias is retained so external callers don't break immediately.
+        The loader already prefers parquet over pickle; this shim maps the
+        old ``pickle_name`` argument to ``parquet_name`` (the parquet file
+        will be resolved from the same stem).
+        """
+        import warnings
+
+        warnings.warn(
+            "load_pickle_and_json is deprecated; use load_parquet_and_json instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        parquet_name = None
+        if pickle_name is not None:
+            p = Path(pickle_name)
+            parquet_name = str(p.with_suffix(".parquet"))
+        return cls.load_parquet_and_json(
+            folder_path=folder_path,
+            parquet_name=parquet_name,
+            json_name=json_name,
+        )
 
     def aggregate_time_windows(
         self, groupby: list[str] | str = ["animalday", "isday"]

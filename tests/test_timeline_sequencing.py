@@ -1,4 +1,6 @@
 
+import logging
+
 import pytest
 from unittest.mock import MagicMock, patch
 from pathlib import Path
@@ -6,6 +8,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 
 from neurodent.visualization import AnimalOrganizer
+from neurodent.core.discovery import DiscoveredFile
 
 class TestTimelineSequencing:
     @pytest.fixture
@@ -21,12 +24,18 @@ class TestTimelineSequencing:
         ao._sort_lros_by_median_time = AnimalOrganizer._sort_lros_by_median_time.__get__(ao, AnimalOrganizer)
         # Bind helpers that _compute_global_timeline uses
         ao._get_item_name = AnimalOrganizer._get_item_name.__get__(ao, AnimalOrganizer)
+        ao._get_item_key = AnimalOrganizer._get_item_key.__get__(ao, AnimalOrganizer)
+        ao._validate_timestamp_ordering = AnimalOrganizer._validate_timestamp_ordering
         ao._is_item_file = AnimalOrganizer._is_item_file.__get__(ao, AnimalOrganizer)
-        
+        ao._items_have_index = AnimalOrganizer._items_have_index.__get__(ao, AnimalOrganizer)
+        ao._session_sort_key = AnimalOrganizer._session_sort_key.__get__(ao, AnimalOrganizer)
+        # Bind _iter_valid_recordings so the post-load guard in _create_long_recordings works
+        ao._iter_valid_recordings = AnimalOrganizer._iter_valid_recordings.__get__(ao, AnimalOrganizer)
+
         # Mock dependencies
         ao._resolve_timestamp_input = MagicMock(side_effect=lambda x, y: pd.to_datetime(x))
         ao._get_folders_for_animal = MagicMock(side_effect=lambda aid, mapping: [f for folders in mapping.values() for f in folders])
-        
+
         return ao
 
     @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
@@ -59,12 +68,12 @@ class TestTimelineSequencing:
         # when a single start timestamp is provided.
         result = ao._process_manual_datetimes(manual_datetimes, animalday_to_folders, base_lro_kwargs)
         
-        # Verification
-        assert "M1_day1" in result
-        assert "M1_day2" in result
-        
-        t1 = result["M1_day1"]
-        t2 = result["M1_day2"] # _compute_global_timeline sorts folders by name
+        # Verification — keys are now full paths (from _get_item_key)
+        assert "/data/M1_day1" in result
+        assert "/data/M1_day2" in result
+
+        t1 = result["/data/M1_day1"]
+        t2 = result["/data/M1_day2"] # _compute_global_timeline sorts folders by name
         
         print(f"T1: {t1}, T2: {t2}")
         
@@ -111,12 +120,11 @@ class TestTimelineSequencing:
         # Execute
         result = ao._process_manual_datetimes(manual_datetimes, animalday_to_folders, base_lro_kwargs)
         
-        # Timepoints
-        # Keys are folder names (basenames)
-        t1 = result["Nov28"]
-        t2 = result["Nov29"]
-        t3 = result["Nov30"]
-        t4 = result["Dec01"]
+        # Timepoints — keys are full paths (from _get_item_key)
+        t1 = result["/data/Nov28"]
+        t2 = result["/data/Nov29"]
+        t3 = result["/data/Nov30"]
+        t4 = result["/data/Dec01"]
         
         print(f"T1: {t1}")
         print(f"T2: {t2}")
@@ -159,10 +167,9 @@ class TestTimelineSequencing:
         # Execute
         result = ao._process_manual_datetimes(manual_datetimes, animalday_to_folders, base_lro_kwargs)
         
-        # Verification
-        # Keys in result are folder names
-        assert result["folder1"] == pd.to_datetime("2025-01-01 12:00:00")
-        assert result["folder2"] == pd.to_datetime("2025-01-01 14:00:00")
+        # Verification — keys are now full paths (from _get_item_key)
+        assert result["/data/folder1"] == pd.to_datetime("2025-01-01 12:00:00")
+        assert result["/data/folder2"] == pd.to_datetime("2025-01-01 14:00:00")
 
     @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
     def test_session_keyed_dict(self, mock_lro_cls, ao):
@@ -203,11 +210,12 @@ class TestTimelineSequencing:
         )
 
         # Each session's single item should get a timeline-computed timestamp
-        assert "010822_files0-12" in result
-        assert "010822_files13-21" in result
+        # Keys are now full paths (from _get_item_key)
+        assert "/data/010822_files0-12" in result
+        assert "/data/010822_files13-21" in result
         # Start time matches the session's manual timestamp
-        assert result["010822_files0-12"] == pd.to_datetime("2022-01-08 18:55:02")
-        assert result["010822_files13-21"] == pd.to_datetime("2022-01-08 23:25:03")
+        assert result["/data/010822_files0-12"] == pd.to_datetime("2022-01-08 18:55:02")
+        assert result["/data/010822_files13-21"] == pd.to_datetime("2022-01-08 23:25:03")
 
     @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
     def test_session_keyed_dict_multi_item_sessions(self, mock_lro_cls, ao):
@@ -245,10 +253,11 @@ class TestTimelineSequencing:
         )
 
         # session1 items: file_a at 10:00, file_b at 10:00 + 1800s = 10:30
-        assert result["file_a"] == pd.to_datetime("2022-01-08 10:00:00")
-        assert result["file_b"] == pd.to_datetime("2022-01-08 10:30:00")
+        # Keys are now full paths (from _get_item_key)
+        assert result["/data/sess1/file_a"] == pd.to_datetime("2022-01-08 10:00:00")
+        assert result["/data/sess1/file_b"] == pd.to_datetime("2022-01-08 10:30:00")
         # session2 item: file_c at 14:00
-        assert result["file_c"] == pd.to_datetime("2022-01-08 14:00:00")
+        assert result["/data/sess2/file_c"] == pd.to_datetime("2022-01-08 14:00:00")
 
     @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
     def test_datetimes_are_start_false_sequencing(self, mock_lro_cls, ao):
@@ -290,14 +299,15 @@ class TestTimelineSequencing:
         # _compute_global_timeline should return START times computed from end times
         # session1: start = 13:00 - 1h = 12:00
         # session2: start = 15:00 - 1h = 14:00
-        assert result["folder_a"] == pd.to_datetime("2025-01-01 12:00:00")
-        assert result["folder_b"] == pd.to_datetime("2025-01-01 14:00:00")
+        # Keys are now full paths (from _get_item_key)
+        assert result["/data/sess1/folder_a"] == pd.to_datetime("2025-01-01 12:00:00")
+        assert result["/data/sess2/folder_b"] == pd.to_datetime("2025-01-01 14:00:00")
 
         # Timestamps must be sequenced (no overlap)
-        assert result["folder_b"] > result["folder_a"]
+        assert result["/data/sess2/folder_b"] > result["/data/sess1/folder_a"]
 
         # Gap between computed start times is preserved (12:00 → 14:00 = 2 hours)
-        gap = result["folder_b"] - result["folder_a"]
+        gap = result["/data/sess2/folder_b"] - result["/data/sess1/folder_a"]
         assert gap == timedelta(hours=2)
 
     @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
@@ -330,9 +340,10 @@ class TestTimelineSequencing:
         }
         ao.unique_animaldays = ["session1", "session2"]
         # _processed_timestamps holds start times (output of _compute_global_timeline)
+        # Keys are full paths (from _get_item_key)
         ao._processed_timestamps = {
-            "folder_a": pd.to_datetime("2025-01-01 12:00:00"),
-            "folder_b": pd.to_datetime("2025-01-01 14:00:00"),
+            "/data/sess1/folder_a": pd.to_datetime("2025-01-01 12:00:00"),
+            "/data/sess2/folder_b": pd.to_datetime("2025-01-01 14:00:00"),
         }
 
         # Simulate the bug scenario: original lro_kwargs had datetimes_are_start=False
@@ -371,4 +382,346 @@ class TestTimelineSequencing:
                 manual_datetimes, animalday_to_items, base_lro_kwargs
             )
 
+    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    def test_index_metadata_sort_scalar_datetime(self, mock_lro_cls, ao):
+        """
+        When items carry {index} metadata (from DiscoveredFile), sorting within
+        a session should use the index value, not the filename.
 
+        Here filenames sort differently from indices:
+        - rec_A_data.bin (index="1") should come first
+        - rec_B_data.bin (index="2") should come second
+        - rec_C_data.bin (index="3") should come third
+        """
+        def side_effect(*args, **kwargs):
+            m = MagicMock()
+            m.LongRecording.get_duration.return_value = 3600.0
+            return m
+
+        mock_lro_cls.side_effect = side_effect
+
+        # DiscoveredFile items where filename order != index order
+        items = [
+            DiscoveredFile(path="/data/day1/rec_C_data.bin", metadata={"animal": "M1", "session": "day1", "index": "3"}),
+            DiscoveredFile(path="/data/day1/rec_A_data.bin", metadata={"animal": "M1", "session": "day1", "index": "1"}),
+            DiscoveredFile(path="/data/day1/rec_B_data.bin", metadata={"animal": "M1", "session": "day1", "index": "2"}),
+        ]
+
+        animalday_to_items = {"day1": items}
+        base_datetime = pd.to_datetime("2025-01-01 12:00:00")
+        base_lro_kwargs = {"datetimes_are_start": True}
+
+        result = ao._compute_global_timeline(
+            base_datetime, animalday_to_items, base_lro_kwargs,
+            original_manual_datetimes=base_datetime,
+        )
+
+        # Items should be ordered by index (1, 2, 3), not filename (A, B, C)
+        # _get_item_key returns full paths for DiscoveredFile items
+        assert result["/data/day1/rec_A_data.bin"] == pd.to_datetime("2025-01-01 12:00:00")  # index 1
+        assert result["/data/day1/rec_B_data.bin"] == pd.to_datetime("2025-01-01 13:00:00")  # index 2
+        assert result["/data/day1/rec_C_data.bin"] == pd.to_datetime("2025-01-01 14:00:00")  # index 3
+
+    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    def test_index_metadata_overrides_filename_sort(self, mock_lro_cls, ao):
+        """
+        Test that index metadata is used for sorting even when filenames
+        would sort in a completely different order.
+
+        This test uses filenames with irrelevant data that would naturally
+        sort differently from the index values, proving that the index
+        metadata is what determines the order.
+        """
+        def side_effect(*args, **kwargs):
+            m = MagicMock()
+            m.LongRecording.get_duration.return_value = 3600.0
+            return m
+
+        mock_lro_cls.side_effect = side_effect
+
+        # Filenames that sort alphabetically as: aardvark < monkey < zebra
+        # But indices are: 3, 1, 2 (monkey first, zebra second, aardvark third)
+        items = [
+            DiscoveredFile(path="/data/irrelevant/zebra_data.bin", metadata={"animal": "M1", "session": "day1", "index": "2"}),
+            DiscoveredFile(path="/data/irrelevant/monkey_data.bin", metadata={"animal": "M1", "session": "day1", "index": "1"}),
+            DiscoveredFile(path="/data/irrelevant/aardvark_data.bin", metadata={"animal": "M1", "session": "day1", "index": "3"}),
+        ]
+
+        animalday_to_items = {"day1": items}
+        base_datetime = pd.to_datetime("2025-01-01 12:00:00")
+        base_lro_kwargs = {"datetimes_are_start": True}
+
+        result = ao._compute_global_timeline(
+            base_datetime, animalday_to_items, base_lro_kwargs,
+            original_manual_datetimes=base_datetime,
+        )
+
+        # Items should be ordered by index (1, 2, 3), not filename natural sort
+        # If sorted by filename: aardvark (index=3), monkey (index=1), zebra (index=2)
+        # If sorted by index: monkey (index=1), zebra (index=2), aardvark (index=3) ← correct
+        # _get_item_key returns full paths for DiscoveredFile items
+        assert result["/data/irrelevant/monkey_data.bin"] == pd.to_datetime("2025-01-01 12:00:00")  # index 1, first
+        assert result["/data/irrelevant/zebra_data.bin"] == pd.to_datetime("2025-01-01 13:00:00")   # index 2, second
+        assert result["/data/irrelevant/aardvark_data.bin"] == pd.to_datetime("2025-01-01 14:00:00") # index 3, third
+
+
+    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    def test_index_metadata_sort_list_datetime(self, mock_lro_cls, ao):
+        """
+        When original_manual_datetimes is a list and items carry {index} metadata,
+        items within each session should be sorted by index before being paired
+        with the list timestamps.
+        """
+        def side_effect(*args, **kwargs):
+            m = MagicMock()
+            m.LongRecording.get_duration.return_value = 1800.0
+            return m
+
+        mock_lro_cls.side_effect = side_effect
+
+        items = [
+            DiscoveredFile(path="/data/day1/rec_B.bin", metadata={"animal": "M1", "session": "day1", "index": "2"}),
+            DiscoveredFile(path="/data/day1/rec_A.bin", metadata={"animal": "M1", "session": "day1", "index": "1"}),
+        ]
+
+        animalday_to_items = {"day1": items}
+        base_datetime = pd.to_datetime("2025-01-01 10:00:00")
+        base_lro_kwargs = {"datetimes_are_start": True}
+        # One timestamp per item, paired in sorted order
+        list_datetimes = ["2025-01-01 10:00:00", "2025-01-01 11:00:00"]
+
+        result = ao._compute_global_timeline(
+            base_datetime, animalday_to_items, base_lro_kwargs,
+            original_manual_datetimes=list_datetimes,
+        )
+
+        # index=1 (rec_A.bin) should pair with first timestamp,
+        # index=2 (rec_B.bin) with second
+        # Timeline uses base_datetime + cumulative durations (1800s each)
+        # _get_item_key returns full paths for DiscoveredFile items
+        assert result["/data/day1/rec_A.bin"] == pd.to_datetime("2025-01-01 10:00:00")
+        assert result["/data/day1/rec_B.bin"] == pd.to_datetime("2025-01-01 10:30:00")
+
+    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    def test_index_metadata_sort_no_manual_datetimes(self, mock_lro_cls, ao):
+        """
+        When no manual_datetimes are provided and items carry {index} metadata,
+        sorting within a session should use the index value instead of falling
+        back to LRO median-time sorting.
+        """
+        durations = {
+            "/data/day1/rec_Z.bin": 1800.0,
+            "/data/day1/rec_A.bin": 3600.0,
+            "/data/day1/rec_M.bin": 900.0,
+        }
+
+        def side_effect(folder, **kwargs):
+            import os as _os
+            m = MagicMock()
+            m.LongRecording.get_duration.return_value = durations.get(_os.fspath(folder), 3600.0)
+            return m
+
+        mock_lro_cls.side_effect = side_effect
+
+        items = [
+            DiscoveredFile(path="/data/day1/rec_Z.bin", metadata={"animal": "M1", "session": "day1", "index": "2"}),
+            DiscoveredFile(path="/data/day1/rec_A.bin", metadata={"animal": "M1", "session": "day1", "index": "3"}),
+            DiscoveredFile(path="/data/day1/rec_M.bin", metadata={"animal": "M1", "session": "day1", "index": "1"}),
+        ]
+
+        animalday_to_items = {"day1": items}
+        base_datetime = pd.to_datetime("2025-01-01 08:00:00")
+        base_lro_kwargs = {"datetimes_are_start": True}
+
+        result = ao._compute_global_timeline(
+            base_datetime, animalday_to_items, base_lro_kwargs,
+            original_manual_datetimes=None,
+        )
+
+        # Sorted by index: rec_M (1, 900s), rec_Z (2, 1800s), rec_A (3, 3600s)
+        # _get_item_key returns full paths for DiscoveredFile items
+        assert result["/data/day1/rec_M.bin"] == pd.to_datetime("2025-01-01 08:00:00")       # index 1, duration 900s
+        assert result["/data/day1/rec_Z.bin"] == pd.to_datetime("2025-01-01 08:15:00")       # index 2, duration 1800s
+        assert result["/data/day1/rec_A.bin"] == pd.to_datetime("2025-01-01 08:45:00")       # index 3, duration 3600s
+
+    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    def test_no_index_metadata_falls_back_to_filename(self, mock_lro_cls, ao):
+        """
+        When items don't carry {index} metadata (plain strings/paths), sorting
+        should fall back to filename-based natural sort (existing behavior).
+        """
+        def side_effect(*args, **kwargs):
+            m = MagicMock()
+            m.LongRecording.get_duration.return_value = 3600.0
+            return m
+
+        mock_lro_cls.side_effect = side_effect
+
+        # Plain string paths (no metadata)
+        animalday_to_items = {
+            "day1": ["/data/day1/file_2", "/data/day1/file_1", "/data/day1/file_10"],
+        }
+        base_datetime = pd.to_datetime("2025-01-01 12:00:00")
+        base_lro_kwargs = {"datetimes_are_start": True}
+
+        result = ao._compute_global_timeline(
+            base_datetime, animalday_to_items, base_lro_kwargs,
+            original_manual_datetimes=base_datetime,
+        )
+
+        # Natural sort: file_1 < file_2 < file_10
+        # _get_item_key returns full paths for string items
+        assert result["/data/day1/file_1"] == pd.to_datetime("2025-01-01 12:00:00")
+        assert result["/data/day1/file_2"] == pd.to_datetime("2025-01-01 13:00:00")
+        assert result["/data/day1/file_10"] == pd.to_datetime("2025-01-01 14:00:00")
+
+    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    def test_index_metadata_sort_across_sessions(self, mock_lro_cls, ao):
+        """
+        Verify that index-based sorting is applied independently per session,
+        and overlapping index ranges across sessions don't cause interleaving.
+        """
+        def side_effect(*args, **kwargs):
+            m = MagicMock()
+            m.LongRecording.get_duration.return_value = 1800.0
+            return m
+
+        mock_lro_cls.side_effect = side_effect
+
+        animalday_to_items = {
+            "session1": [
+                DiscoveredFile(path="/data/s1/rec_B.bin", metadata={"animal": "M1", "session": "session1", "index": "2"}),
+                DiscoveredFile(path="/data/s1/rec_A.bin", metadata={"animal": "M1", "session": "session1", "index": "1"}),
+            ],
+            "session2": [
+                DiscoveredFile(path="/data/s2/rec_D.bin", metadata={"animal": "M1", "session": "session2", "index": "2"}),
+                DiscoveredFile(path="/data/s2/rec_C.bin", metadata={"animal": "M1", "session": "session2", "index": "1"}),
+            ],
+        }
+        base_datetime = pd.to_datetime("2025-01-01 10:00:00")
+        base_lro_kwargs = {"datetimes_are_start": True}
+
+        result = ao._compute_global_timeline(
+            base_datetime, animalday_to_items, base_lro_kwargs,
+            original_manual_datetimes=base_datetime,
+        )
+
+        # Session1 sorted by index: rec_A (1) then rec_B (2)
+        # Session2 sorted by index: rec_C (1) then rec_D (2)
+        # Sessions are processed in order: session1 then session2
+        # _get_item_key returns full paths for DiscoveredFile items
+        assert result["/data/s1/rec_A.bin"] == pd.to_datetime("2025-01-01 10:00:00")
+        assert result["/data/s1/rec_B.bin"] == pd.to_datetime("2025-01-01 10:30:00")
+        assert result["/data/s2/rec_C.bin"] == pd.to_datetime("2025-01-01 11:00:00")
+        assert result["/data/s2/rec_D.bin"] == pd.to_datetime("2025-01-01 11:30:00")
+
+class TestZeroSampleLROFiltering:
+    @pytest.fixture
+    def ao(self):
+        ao = MagicMock(spec=AnimalOrganizer)
+        ao.animal_id = "M1"
+        ao._sort_lros_by_median_time = AnimalOrganizer._sort_lros_by_median_time.__get__(
+            ao, AnimalOrganizer
+        )
+        # Static methods needed by _create_long_recordings
+        ao._sort_lros_by_median_time_static = AnimalOrganizer._sort_lros_by_median_time_static
+        ao._filter_zero_sample_lros = AnimalOrganizer._filter_zero_sample_lros
+        ao._get_item_name = AnimalOrganizer._get_item_name.__get__(ao, AnimalOrganizer)
+        ao._get_item_key = AnimalOrganizer._get_item_key.__get__(ao, AnimalOrganizer)
+        ao._is_item_file = AnimalOrganizer._is_item_file.__get__(ao, AnimalOrganizer)
+        # Bind _iter_valid_recordings so the post-load guard in _create_long_recordings works
+        ao._iter_valid_recordings = AnimalOrganizer._iter_valid_recordings.__get__(ao, AnimalOrganizer)
+        return ao
+
+    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    def test_partial_zero_sample_lros_filtered_before_merge(
+        self, mock_lro_cls, ao, caplog
+    ):
+        """0-sample LROs are removed before merge; valid LROs proceed."""
+        lro_valid = MagicMock()
+        lro_valid.LongRecording = MagicMock()
+        lro_valid.LongRecording.get_total_samples.return_value = 100
+        lro_valid.LongRecording.get_duration.return_value = 3600.0
+
+        lro_empty = MagicMock()
+        lro_empty.LongRecording = MagicMock()
+        lro_empty.LongRecording.get_total_samples.return_value = 0
+
+        def side_effect(folder, **kwargs):
+            if "folder_a" in str(folder):
+                return lro_empty
+            return lro_valid
+
+        mock_lro_cls.side_effect = side_effect
+
+        ao._create_long_recordings = AnimalOrganizer._create_long_recordings.__get__(
+            ao, AnimalOrganizer
+        )
+        ao._animalday_folder_groups = {
+            "session1": ["/data/folder_a", "/data/folder_b"]
+        }
+        ao.unique_animaldays = ["session1"]
+        ao._processed_timestamps = None
+
+        with caplog.at_level(logging.WARNING):
+            ao._create_long_recordings({})
+
+        assert len(ao.long_recordings) == 1
+        assert ao.long_recordings[0] is lro_valid
+        assert "folder_a" in caplog.text
+
+    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    def test_all_zero_sample_lros_all_animaldays_raises(self, mock_lro_cls, ao):
+        """When every animalday is all-0-sample (nothing loaded), raises RuntimeError."""
+        def side_effect(folder, **kwargs):
+            m = MagicMock()
+            m.LongRecording = MagicMock()
+            m.LongRecording.get_total_samples.return_value = 0
+            return m
+
+        mock_lro_cls.side_effect = side_effect
+
+        ao._create_long_recordings = AnimalOrganizer._create_long_recordings.__get__(
+            ao, AnimalOrganizer
+        )
+        ao._animalday_folder_groups = {
+            "session1": ["/data/folder_a", "/data/folder_b"]
+        }
+        ao.unique_animaldays = ["session1"]
+        ao._processed_timestamps = None
+
+        with pytest.raises(RuntimeError, match="No recordings were loaded"):
+            ao._create_long_recordings({})
+
+    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    def test_mixed_animaldays_skips_bad_keeps_good(self, mock_lro_cls, ao):
+        """One all-0-sample animalday is skipped; a valid animalday still loads."""
+        call_count = [0]
+
+        def side_effect(folder, **kwargs):
+            call_count[0] += 1
+            m = MagicMock()
+            m.LongRecording = MagicMock()
+            # session1 items both 0-sample; session2 item valid
+            m.LongRecording.get_total_samples.return_value = (
+                0 if "folder_a" in folder or "folder_b" in folder else 100
+            )
+            return m
+
+        mock_lro_cls.side_effect = side_effect
+
+        ao._create_long_recordings = AnimalOrganizer._create_long_recordings.__get__(
+            ao, AnimalOrganizer
+        )
+        ao._animalday_folder_groups = {
+            "session1": ["/data/folder_a", "/data/folder_b"],
+            "session2": ["/data/folder_c"],
+        }
+        ao.unique_animaldays = ["session1", "session2"]
+        ao._processed_timestamps = None
+
+        ao._create_long_recordings({})
+
+        assert len(ao.long_recordings) == 1
+        assert "session1" not in ao.unique_animaldays
+        assert "session2" in ao.unique_animaldays

@@ -181,14 +181,14 @@ def get_animal_id(wildcards):
     return ANIMAL_TO_FULL_ID_MAP[wildcards.animal]
 
 
-def get_all_fragment_filtered_pkl(wildcards):
+def get_all_fragment_filtered_parquet(wildcards):
     out = []
     for anim in ANIMALS:
         # Only process animals that have quality-filtered output
         qual_filter_output = checkpoints.war_quality_filter.get(animal=anim).output[0]
-        qual_filenames = glob_wildcards(os.path.join(qual_filter_output, "{filename}.pkl")).filename
+        qual_filenames = glob_wildcards(os.path.join(qual_filter_output, "{filename}.parquet")).filename
         if qual_filenames:  # Only if quality filtering produced files
-            out.append(f"results/wars_fragment_filtered/{Path(qual_filter_output).name}/war.pkl")
+            out.append(f"results/wars_fragment_filtered/{Path(qual_filter_output).name}/war.parquet")
     return out
 
 
@@ -227,7 +227,7 @@ def get_wars_after_quality_filtered(wildcards, filepath_prepend, filepath_append
     for anim in ANIMALS:
         checkpoint_output = checkpoints.war_quality_filter.get(animal=anim).output[0]
         animal_name = Path(checkpoint_output).name
-        qual_filenames = glob.glob(os.path.join(checkpoint_output, "war.pkl"))
+        qual_filenames = glob.glob(os.path.join(checkpoint_output, "war.parquet"))
         if qual_filenames:
             out.append(str(Path(filepath_prepend) / animal_name / filepath_append))
     return out
@@ -237,9 +237,9 @@ def get_all_flattened_manual_wars(wildcards):
     out = []
     for anim in ANIMALS:
         checkpoint_output = checkpoints.war_quality_filter.get(animal=anim).output[0]
-        qual_filenames = glob_wildcards(os.path.join(checkpoint_output, "{filename}.pkl")).filename
+        qual_filenames = glob_wildcards(os.path.join(checkpoint_output, "{filename}.parquet")).filename
         if qual_filenames:
-            out.append(f"results/wars_flattened_manual/{Path(checkpoint_output).name}/war.pkl")
+            out.append(f"results/wars_flattened_manual/{Path(checkpoint_output).name}/war.parquet")
     return out
 
 
@@ -248,9 +248,9 @@ def get_all_flattened_lof_wars(wildcards):
     out = []
     for anim in ANIMALS:
         checkpoint_output = checkpoints.war_quality_filter.get(animal=anim).output[0]
-        qual_filenames = glob_wildcards(os.path.join(checkpoint_output, "{filename}.pkl")).filename
+        qual_filenames = glob_wildcards(os.path.join(checkpoint_output, "{filename}.parquet")).filename
         if qual_filenames:
-            out.append(f"results/wars_flattened_lof/{Path(checkpoint_output).name}/war.pkl")
+            out.append(f"results/wars_flattened_lof/{Path(checkpoint_output).name}/war.parquet")
     return out
 
 
@@ -258,7 +258,7 @@ def get_diagnostic_figures_unfiltered(wildcards):
     outputs = []
     for anim in ANIMALS:
         checkpoint_output = checkpoints.war_quality_filter.get(animal=anim).output[0]
-        hypothetical_war_path = Path(checkpoint_output) / "war.pkl"
+        hypothetical_war_path = Path(checkpoint_output) / "war.parquet"
         if os.path.exists(hypothetical_war_path):
             # print(f"thing exists: {hypothetical_war_path}")
             # outputs.extend(expand("results/diagnostic_figures/{a}/unfiltered", a=glob_wildcards()))
@@ -269,7 +269,7 @@ def get_diagnostic_figures_filtered(wildcards):
     outputs = []
     for anim in ANIMALS:
         checkpoint_output = checkpoints.war_quality_filter.get(animal=anim).output[0]
-        hypothetical_war_path = Path(checkpoint_output) / "war.pkl"
+        hypothetical_war_path = Path(checkpoint_output) / "war.parquet"
         if os.path.exists(hypothetical_war_path):
             # print(f"thing exists: {hypothetical_war_path}")
             # outputs.extend(expand("results/diagnostic_figures/{a}/unfiltered", a=glob_wildcards()))

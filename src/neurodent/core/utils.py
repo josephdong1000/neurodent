@@ -1013,7 +1013,14 @@ def cache_fragments_to_zarr(
 
     Raises:
         ImportError: If zarr is not available
+        ValueError: If ``chunk_size`` is not None and is less than 1
     """
+    if chunk_size is not None and chunk_size < 1:
+        raise ValueError(
+            f"chunk_size must be >= 1, got {chunk_size!r}. "
+            "Pass None to use the default chunk size."
+        )
+
     try:
         import zarr
     except ImportError:
@@ -1130,6 +1137,90 @@ def stream_fragments_to_zarr(
             np_batch[local_idx] = get_fragment_fn(global_idx)
         zarr_array[batch_start:batch_end] = np_batch
         del np_batch
+
+    logging.debug(f"  - Zarr array shape: {zarr_array.shape}")
+    logging.debug(f"  - Zarr array chunks: {zarr_array.chunks}")
+    del zarr_array
+
+    return tmppath
+
+
+def stream_recording_to_zarr(
+    recording,
+    n_fragments: int,
+    n_samples_per_frag: int,
+    n_frag_per_chunk: int,
+    tmpdir: Optional[str] = None,
+) -> str:
+    """Stream a SpikeInterface recording to a zarr store in memory-bounded batches.
+
+    Reads chunk-sized slices from ``recording.get_traces()``, reshapes each
+    chunk to ``(n_frags_in_chunk, n_samples_per_frag, n_channels)``, and
+    writes it to a zarr store.  Peak RAM is proportional to ``n_frag_per_chunk``
+    rather than ``n_fragments``.
+
+    Args:
+        recording: A SpikeInterface ``BaseRecording`` object (may be a lazy
+            wrapper such as a ``NotchFilterRecording``).
+        n_fragments (int): Total number of fragments to stream.
+        n_samples_per_frag (int): Number of samples in each fragment.
+        n_frag_per_chunk (int): Number of fragments to buffer per batch.
+            Must be >= 1.  Larger values improve sequential write throughput;
+            smaller values reduce peak RAM.
+        tmpdir (str, optional): Directory for the temporary zarr file.  If
+            ``None``, uses :func:`get_temp_directory`.
+
+    Returns:
+        str: Path to the temporary zarr file on disk.
+
+    Raises:
+        ValueError: If ``n_frag_per_chunk`` < 1.
+        ImportError: If zarr is not available.
+    """
+    if n_frag_per_chunk < 1:
+        raise ValueError(f"n_frag_per_chunk must be >= 1, got {n_frag_per_chunk}")
+
+    try:
+        import zarr
+    except ImportError:
+        raise ImportError("zarr package is required for fragment caching")
+
+    if tmpdir is None:
+        tmpdir = get_temp_directory()
+
+    n_channels = recording.get_num_channels()
+    fragment_dtype = recording.get_dtype()
+    tmppath = os.path.join(tmpdir, f"temp_{os.urandom(24).hex()}.zarr")
+    # Cap the batch size so we never request more fragments than exist
+    batch_size = min(n_frag_per_chunk, n_fragments)
+
+    logging.debug(
+        f"Streaming recording ({n_fragments} fragments × {n_samples_per_frag} samples) "
+        f"to zarr in batches of {batch_size} (path: {tmppath})"
+    )
+
+    zarr_array = zarr.open(
+        tmppath,
+        mode="w",
+        shape=(n_fragments, n_samples_per_frag, n_channels),
+        chunks=(batch_size, -1, -1),
+        dtype=fragment_dtype,
+        compressor=zarr.Blosc(cname="lz4", clevel=3, shuffle=zarr.Blosc.SHUFFLE),
+    )
+
+    for batch_start in range(0, n_fragments, batch_size):
+        batch_end = min(batch_start + batch_size, n_fragments)
+        start_sample = batch_start * n_samples_per_frag
+        end_sample = batch_end * n_samples_per_frag
+        chunk_traces = recording.get_traces(
+            start_frame=start_sample, end_frame=end_sample, return_scaled=True
+        )
+        chunk_fragments = chunk_traces.reshape(
+            batch_end - batch_start, n_samples_per_frag, n_channels
+        )
+        zarr_array[batch_start:batch_end] = chunk_fragments
+        # Explicitly free each batch to keep peak RAM bounded to batch_size fragments
+        del chunk_traces, chunk_fragments
 
     logging.debug(f"  - Zarr array shape: {zarr_array.shape}")
     logging.debug(f"  - Zarr array chunks: {zarr_array.chunks}")

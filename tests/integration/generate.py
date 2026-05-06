@@ -266,8 +266,8 @@ def _write_bin_csv_pair(
             + 5 * rng.standard_normal(n_samples)
         ).astype(DTYPE)
 
-    # Write column-major binary
-    data.tofile(str(bin_path))
+    # Write column-major binary (Fortran order: channels are contiguous)
+    data.flatten(order="F").tofile(str(bin_path))
 
     # Write CSV metadata
     with open(csv_path, "w", newline="") as f:

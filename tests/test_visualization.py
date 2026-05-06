@@ -84,18 +84,33 @@ class TestAnimalFeatureParser:
         assert "beta" in result
         assert len(result["alpha"]) == 2
         assert len(result["beta"]) == 2
+        # Verify weighted average: (val*1.0 + val*2.0 + val*1.5) / 4.5
+        expected_alpha = np.array([5.4444, 6.4444])
+        expected_beta = np.array([7.4444, 8.4444])
+        np.testing.assert_array_almost_equal(result["alpha"], expected_alpha, decimal=3)
+        np.testing.assert_array_almost_equal(result["beta"], expected_beta, decimal=3)
 
     def test_average_feature_linear_2d(self, parser, sample_df):
         """Test averaging LINEAR_2D feature (psdslope)."""
         result = parser._average_feature(sample_df, "psdslope", "duration")
         assert isinstance(result, np.ndarray)
         assert result.shape == (3, 2)  # (n_chan, n_components)
+        w = np.array([1.0, 2.0, 1.5])
+        raw = np.array([
+            [[0.1, 0.2], [0.3, 0.4], [0.5, 0.6]],
+            [[0.7, 0.8], [0.9, 1.0], [1.1, 1.2]],
+            [[1.3, 1.4], [1.5, 1.6], [1.7, 1.8]],
+        ])
+        expected = np.average(raw, axis=0, weights=w)
+        np.testing.assert_array_almost_equal(result, expected)
 
     def test_average_feature_simple_matrix(self, parser, sample_df):
         """Test averaging SIMPLE_MATRIX feature (pcorr)."""
         result = parser._average_feature(sample_df, "pcorr", "duration")
         assert isinstance(result, np.ndarray)
         assert result.shape == (3, 3)  # (n_chan, n_chan)
+        expected = np.eye(3) * (1 * 1.0 + 2 * 2.0 + 3 * 1.5) / 4.5
+        np.testing.assert_array_almost_equal(result, expected)
 
     def test_average_feature_banded_matrix(self, parser, sample_df):
         """Test averaging BANDED_MATRIX feature (cohere)."""
@@ -104,6 +119,10 @@ class TestAnimalFeatureParser:
         assert "alpha" in result
         assert "beta" in result
         assert np.array(result["alpha"]).shape == (3, 3)
+        expected_alpha = np.ones((3, 3)) * (1 * 1.0 + 3 * 2.0 + 5 * 1.5) / 4.5
+        expected_beta = np.ones((3, 3)) * (2 * 1.0 + 4 * 2.0 + 6 * 1.5) / 4.5
+        np.testing.assert_array_almost_equal(result["alpha"], expected_alpha)
+        np.testing.assert_array_almost_equal(result["beta"], expected_beta)
 
     def test_average_feature_hist(self, parser, sample_df):
         """Test averaging HIST feature (psd)."""
@@ -113,6 +132,15 @@ class TestAnimalFeatureParser:
         coords, values = result
         np.testing.assert_array_equal(coords, [1.0, 2.0, 3.0])
         assert values.shape == (2, 3)  # (n_freq_rows, n_chan)
+        # Canonical (W=3, C=3, F=2) after extract_hist_data transpose
+        w = np.array([1.0, 2.0, 1.5])
+        canonical = np.array([
+            [[10., 40.], [20., 50.], [30., 60.]],
+            [[70., 100.], [80., 110.], [90., 120.]],
+            [[130., 160.], [140., 170.], [150., 180.]],
+        ])
+        expected_values = np.average(canonical, axis=0, weights=w).T  # (F=2, C=3)
+        np.testing.assert_array_almost_equal(values, expected_values)
 
     def test_average_feature_no_weights(self, parser, sample_df):
         """Test averaging with no weight column (uniform weights)."""
@@ -120,6 +148,55 @@ class TestAnimalFeatureParser:
         # Uniform weights → simple mean
         expected = np.mean([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]], axis=0)
         np.testing.assert_array_almost_equal(result, expected)
+
+    def test_average_feature_no_weights_band(self, parser, sample_df):
+        """Uniform-weight averaging for BAND feature."""
+        result = parser._average_feature(sample_df, "psdband", weightsname=None)
+        # Simple mean across 3 windows:
+        # alpha: [[1,2], [5,6], [9,10]] -> mean = [5, 6]
+        # beta:  [[3,4], [7,8], [11,12]] -> mean = [7, 8]
+        np.testing.assert_array_almost_equal(result["alpha"], [5.0, 6.0])
+        np.testing.assert_array_almost_equal(result["beta"], [7.0, 8.0])
+
+    def test_average_feature_no_weights_linear_2d(self, parser, sample_df):
+        """Uniform-weight averaging for LINEAR_2D feature."""
+        result = parser._average_feature(sample_df, "psdslope", weightsname=None)
+        raw = np.array([
+            [[0.1, 0.2], [0.3, 0.4], [0.5, 0.6]],
+            [[0.7, 0.8], [0.9, 1.0], [1.1, 1.2]],
+            [[1.3, 1.4], [1.5, 1.6], [1.7, 1.8]],
+        ])
+        expected = np.mean(raw, axis=0)
+        np.testing.assert_array_almost_equal(result, expected)
+
+    def test_average_feature_no_weights_simple_matrix(self, parser, sample_df):
+        """Uniform-weight averaging for SIMPLE_MATRIX feature."""
+        result = parser._average_feature(sample_df, "pcorr", weightsname=None)
+        # eye(3)*1, eye(3)*2, eye(3)*3 -> mean = eye(3)*2
+        expected = np.eye(3) * 2.0
+        np.testing.assert_array_almost_equal(result, expected)
+
+    def test_average_feature_no_weights_banded_matrix(self, parser, sample_df):
+        """Uniform-weight averaging for BANDED_MATRIX feature."""
+        result = parser._average_feature(sample_df, "cohere", weightsname=None)
+        # alpha: ones*1, ones*3, ones*5 -> mean = ones*3
+        # beta:  ones*2, ones*4, ones*6 -> mean = ones*4
+        np.testing.assert_array_almost_equal(result["alpha"], np.ones((3, 3)) * 3.0)
+        np.testing.assert_array_almost_equal(result["beta"], np.ones((3, 3)) * 4.0)
+
+    def test_average_feature_no_weights_hist(self, parser, sample_df):
+        """Uniform-weight averaging for HIST feature."""
+        result = parser._average_feature(sample_df, "psd", weightsname=None)
+        coords, values = result
+        np.testing.assert_array_equal(coords, [1.0, 2.0, 3.0])
+        # Canonical (W=3, C=3, F=2) after extract_hist_data transpose
+        canonical = np.array([
+            [[10., 40.], [20., 50.], [30., 60.]],
+            [[70., 100.], [80., 110.], [90., 120.]],
+            [[130., 160.], [140., 170.], [150., 180.]],
+        ])
+        expected_values = np.mean(canonical, axis=0).T  # (F=2, C=3)
+        np.testing.assert_array_almost_equal(values, expected_values)
 
 
 class TestWindowAnalysisResult:
@@ -427,6 +504,32 @@ class TestWindowAnalysisResult:
         with pytest.raises(ValueError, match=r"Found \d+ intervals.*shorter than the median duration"):
             WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"])
 
+    def test_short_intervals_error_includes_diagnostic(self):
+        """Error message includes overlapping pairs and the datetimes_are_start hint."""
+        data = {
+            "animal": ["A1"] * 4,
+            "animalday": ["A1_day1", "A1_day1", "A1_day2", "A1_day2"],
+            "genotype": ["WT"] * 4,
+            "timestamp": pd.to_datetime(
+                [
+                    "2023-01-01 10:00:00",
+                    "2023-01-01 10:00:30",  # 30s gap (short)
+                    "2023-01-01 10:01:00",  # 30s gap (short)
+                    "2023-01-01 10:04:00",
+                ]
+            ),
+            "duration": [240.0] * 4,
+            "rms": [[100.0, 110.0]] * 4,
+        }
+        df = pd.DataFrame(data)
+
+        with pytest.raises(ValueError) as exc_info:
+            WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"])
+
+        msg = str(exc_info.value)
+        assert "datetimes_are_start" in msg
+        assert "A1_day" in msg  # animalday context included
+
     def test_suppress_short_intervals_error(self):
         """Test that suppress_short_interval_error parameter suppresses the ValueError."""
         # Create DataFrame where >1% of intervals are short (same as test_short_intervals_error)
@@ -676,8 +779,8 @@ class TestWindowAnalysisResult:
             save_path = Path(tmpdir)
 
             # Save and load
-            war.save_pickle_and_json(save_path)
-            loaded_war = WindowAnalysisResult.load_pickle_and_json(save_path)
+            war.save_parquet_and_json(save_path)
+            loaded_war = WindowAnalysisResult.load_parquet_and_json(save_path)
 
             # Verify durations preserved
             assert "duration" in loaded_war.result.columns
@@ -1693,14 +1796,12 @@ class TestExperimentPlotter:
                 }
             )
         )
-        from neurodent.visualization.plotting.experiment import df_normalize_baseline
-
-        # Patch df_normalize_baseline to just return the input DataFrame
-        import neurodent.visualization.plotting.experiment as expmod
-
-        expmod.df_normalize_baseline = lambda **kwargs: kwargs["df"]
-        result = plotter.plot_diffheatmap(feature="cohere", groupby=["genotype", "channel"], baseline_key="WT")
-        assert result == mock_grid
+        with patch(
+            "neurodent.visualization.plotting.experiment.df_normalize_baseline",
+            side_effect=lambda **kwargs: kwargs["df"],
+        ):
+            result = plotter.plot_diffheatmap(feature="cohere", groupby=["genotype", "channel"], baseline_key="WT")
+            assert result == mock_grid
 
     @patch("seaborn.FacetGrid")
     def test_plot_qqplot(self, mock_facetgrid, plotter):
@@ -2083,61 +2184,70 @@ class TestFlattenFeatureForPlotting:
 
     def test_flatten_linear(self):
         from neurodent.visualization.feature_utils import flatten_feature_for_plotting
-        vals = np.random.rand(4, 3)  # (n_time, n_chan)
+        vals = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])  # (2, 3)
         result = flatten_feature_for_plotting(vals, constants.FeatureType.LINEAR)
-        assert result.shape == (4, 3, 1)
+        assert result.shape == (2, 3, 1)
+        np.testing.assert_array_equal(result[:, :, 0], vals)
 
     def test_flatten_linear_2d(self):
         from neurodent.visualization.feature_utils import flatten_feature_for_plotting
-        vals = np.random.rand(4, 3, 2)  # (n_time, n_chan, n_comp)
+        vals = np.array([[[1.0, 2.0], [3.0, 4.0]]])  # (1, 2, 2)
         result = flatten_feature_for_plotting(vals, constants.FeatureType.LINEAR_2D)
-        assert result.shape == (4, 3, 2)
+        assert result.shape == (1, 2, 2)
+        np.testing.assert_array_equal(result, vals)
 
     def test_flatten_band(self):
         from neurodent.visualization.feature_utils import flatten_feature_for_plotting
-        # Canonical input: (n_time, n_chan, n_bands)
-        vals = np.random.rand(4, 3, 5)  # (n_time, n_chan, n_bands)
+        vals = np.array([[[10.0, 20.0, 30.0], [40.0, 50.0, 60.0]]])  # (1, 2, 3)
         result = flatten_feature_for_plotting(vals, constants.FeatureType.BAND)
-        # No transpose needed — output is (n_time, n_chan, n_bands)
-        assert result.shape == (4, 3, 5)
+        assert result.shape == (1, 2, 3)
+        np.testing.assert_array_equal(result, vals)
+        np.testing.assert_array_equal(result[0, 0], [10.0, 20.0, 30.0])
+        np.testing.assert_array_equal(result[0, 1], [40.0, 50.0, 60.0])
 
     def test_flatten_simple_matrix_triag(self):
         from neurodent.visualization.feature_utils import flatten_feature_for_plotting
-        n_chan = 3
-        vals = np.random.rand(4, n_chan, n_chan)  # (n_time, n_chan, n_chan)
+        vals = np.array([[[0.0, 0.1, 0.2],
+                          [0.3, 0.0, 0.4],
+                          [0.5, 0.6, 0.0]]])  # (1, 3, 3)
         result = flatten_feature_for_plotting(vals, constants.FeatureType.SIMPLE_MATRIX, triag=True)
-        n_pairs = n_chan * (n_chan - 1) // 2
-        assert result.shape == (4, n_pairs, 1)
+        # tril_indices(3, k=-1) -> (1,0)=0.3, (2,0)=0.5, (2,1)=0.6
+        assert result.shape == (1, 3, 1)
+        np.testing.assert_array_equal(result[0, :, 0], [0.3, 0.5, 0.6])
 
     def test_flatten_simple_matrix_no_triag(self):
         from neurodent.visualization.feature_utils import flatten_feature_for_plotting
-        n_chan = 3
-        vals = np.random.rand(4, n_chan, n_chan)
+        vals = np.array([[[1.0, 2.0], [3.0, 4.0]]])  # (1, 2, 2)
         result = flatten_feature_for_plotting(vals, constants.FeatureType.SIMPLE_MATRIX, triag=False)
-        assert result.shape == (4, n_chan * n_chan, 1)
+        assert result.shape == (1, 4, 1)
+        np.testing.assert_array_equal(result[0, :, 0], [1.0, 2.0, 3.0, 4.0])
 
     def test_flatten_banded_matrix_triag(self):
         from neurodent.visualization.feature_utils import flatten_feature_for_plotting
-        n_chan = 3
-        n_bands = 5
-        # Canonical input: (n_time, n_chan, n_chan, n_bands)
-        vals = np.random.rand(4, n_chan, n_chan, n_bands)
+        vals = np.zeros((1, 3, 3, 2))
+        vals[0, 1, 0, 0] = 10.0; vals[0, 1, 0, 1] = 11.0
+        vals[0, 2, 0, 0] = 20.0; vals[0, 2, 0, 1] = 21.0
+        vals[0, 2, 1, 0] = 30.0; vals[0, 2, 1, 1] = 31.0
         result = flatten_feature_for_plotting(vals, constants.FeatureType.BANDED_MATRIX, triag=True)
-        n_pairs = n_chan * (n_chan - 1) // 2
-        assert result.shape == (4, n_pairs, n_bands)
+        # tril_indices(3, k=-1) -> pairs: (1,0), (2,0), (2,1)
+        assert result.shape == (1, 3, 2)
+        np.testing.assert_array_equal(result[0, 0], [10.0, 11.0])
+        np.testing.assert_array_equal(result[0, 1], [20.0, 21.0])
+        np.testing.assert_array_equal(result[0, 2], [30.0, 31.0])
 
     def test_flatten_banded_matrix_no_triag(self):
         from neurodent.visualization.feature_utils import flatten_feature_for_plotting
-        n_chan = 3
-        n_bands = 5
-        # Canonical input: (n_time, n_chan, n_chan, n_bands)
-        vals = np.random.rand(4, n_chan, n_chan, n_bands)
+        vals = np.arange(8, dtype=float).reshape(1, 2, 2, 2)
         result = flatten_feature_for_plotting(vals, constants.FeatureType.BANDED_MATRIX, triag=False)
-        assert result.shape == (4, n_chan * n_chan, n_bands)
+        assert result.shape == (1, 4, 2)
+        np.testing.assert_array_equal(result[0, 0], [0.0, 1.0])
+        np.testing.assert_array_equal(result[0, 1], [2.0, 3.0])
+        np.testing.assert_array_equal(result[0, 2], [4.0, 5.0])
+        np.testing.assert_array_equal(result[0, 3], [6.0, 7.0])
 
     def test_flatten_unsupported_raises(self):
         from neurodent.visualization.feature_utils import flatten_feature_for_plotting
-        vals = np.random.rand(4, 3)
+        vals = np.array([[1.0, 2.0, 3.0]])
         with pytest.raises(ValueError, match="Unsupported FeatureType"):
             flatten_feature_for_plotting(vals, constants.FeatureType.HIST)
 
@@ -2199,6 +2309,44 @@ class TestCollapseFeatureChannels:
         result = collapse_feature_channels(vals, constants.FeatureType.HIST)
         assert result.shape == (1, 2)
 
+    def test_collapse_linear_with_nan(self):
+        """NaN values are skipped by nanmean."""
+        from neurodent.visualization.feature_utils import collapse_feature_channels
+        vals = np.array([[1.0, np.nan, 3.0], [4.0, 5.0, np.nan]])  # (2, 3)
+        result = collapse_feature_channels(vals, constants.FeatureType.LINEAR)
+        # nanmean([1, nan, 3])=2.0; nanmean([4, 5, nan])=4.5
+        np.testing.assert_array_almost_equal(result, [2.0, 4.5])
+
+    def test_collapse_simple_matrix_3x3(self):
+        """3x3 matrix: 3 tril pairs averaged."""
+        from neurodent.visualization.feature_utils import collapse_feature_channels
+        mat = np.array([[[0.0, 0.1, 0.2],
+                         [0.3, 0.0, 0.4],
+                         [0.5, 0.6, 0.0]]])  # (1, 3, 3)
+        result = collapse_feature_channels(mat, constants.FeatureType.SIMPLE_MATRIX)
+        # tril_indices(3, k=-1): (1,0)=0.3, (2,0)=0.5, (2,1)=0.6 -> mean
+        assert result.shape == (1,)
+        np.testing.assert_almost_equal(result[0], np.mean([0.3, 0.5, 0.6]))
+
+    def test_collapse_banded_matrix_with_nan(self):
+        """NaN in one tril pair is skipped by nanmean."""
+        from neurodent.visualization.feature_utils import collapse_feature_channels
+        vals = np.zeros((1, 3, 3, 1))
+        vals[0, 1, 0, 0] = 0.6
+        vals[0, 2, 0, 0] = np.nan
+        vals[0, 2, 1, 0] = 0.8
+        result = collapse_feature_channels(vals, constants.FeatureType.BANDED_MATRIX)
+        # tril pairs: (1,0)=0.6, (2,0)=nan, (2,1)=0.8 -> nanmean=0.7
+        assert result.shape == (1, 1)
+        np.testing.assert_almost_equal(result[0, 0], 0.7)
+
+    def test_collapse_linear_single_channel(self):
+        """Single channel: mean is identity."""
+        from neurodent.visualization.feature_utils import collapse_feature_channels
+        vals = np.array([[5.0], [10.0]])  # (2, 1)
+        result = collapse_feature_channels(vals, constants.FeatureType.LINEAR)
+        np.testing.assert_array_equal(result, [5.0, 10.0])
+
 
 class TestExtractFeature:
     """Test extract_feature utility."""
@@ -2210,6 +2358,7 @@ class TestExtractFeature:
         assert vals.shape == (2, 2)
         assert keys is None
         np.testing.assert_array_equal(vals[0], [1.0, 2.0])
+        np.testing.assert_array_equal(vals[1], [3.0, 4.0])
 
     def test_extract_linear_2d(self):
         from neurodent.visualization.feature_utils import extract_feature
@@ -2217,6 +2366,8 @@ class TestExtractFeature:
         vals, keys = extract_feature(series, constants.FeatureType.LINEAR_2D)
         assert vals.shape == (1, 2, 2)
         assert keys is None
+        np.testing.assert_array_equal(vals[0, 0], [1.0, 2.0])
+        np.testing.assert_array_equal(vals[0, 1], [3.0, 4.0])
 
     def test_extract_simple_matrix(self):
         from neurodent.visualization.feature_utils import extract_feature
@@ -2224,6 +2375,7 @@ class TestExtractFeature:
         vals, keys = extract_feature(series, constants.FeatureType.SIMPLE_MATRIX)
         assert vals.shape == (1, 2, 2)
         assert keys is None
+        np.testing.assert_array_equal(vals[0], [[0.0, 0.5], [0.5, 0.0]])
 
     def test_extract_band(self):
         from neurodent.visualization.feature_utils import extract_feature
@@ -2231,6 +2383,9 @@ class TestExtractFeature:
         vals, keys = extract_feature(series, constants.FeatureType.BAND)
         assert vals.shape == (1, 2, 2)  # (W, C, B)
         assert keys == ["delta", "theta"]
+        # After transpose (W, B, C) -> (W, C, B): ch0=[delta=1, theta=3], ch1=[delta=2, theta=4]
+        np.testing.assert_array_equal(vals[0, 0], [1.0, 3.0])
+        np.testing.assert_array_equal(vals[0, 1], [2.0, 4.0])
 
     def test_extract_banded_matrix(self):
         from neurodent.visualization.feature_utils import extract_feature
@@ -2238,6 +2393,7 @@ class TestExtractFeature:
         vals, keys = extract_feature(series, constants.FeatureType.BANDED_MATRIX)
         assert vals.shape == (1, 2, 2, 1)  # (W, C, C, B)
         assert keys == ["delta"]
+        np.testing.assert_array_equal(vals[0, :, :, 0], [[0.0, 0.5], [0.5, 0.0]])
 
 
 class TestFormatChannelData:
@@ -2337,6 +2493,446 @@ class TestFormatChannelData:
         assert result["C"] == [5.0]
 
 
+class TestPipelineComposition:
+    """End-to-end numerical tests: extract -> collapse -> format -> flatten.
+
+    Verifies that values survive the full pipeline correctly and that
+    channel ordering is preserved through transpositions.
+    """
+
+    def test_pipeline_linear(self):
+        """LINEAR: extract -> format(collapsed) -> format(per-channel) -> flatten."""
+        from neurodent.visualization.feature_utils import (
+            extract_feature, format_channel_data, flatten_feature_for_plotting,
+        )
+        # 2 windows, 2 channels: ch0=[1, 3], ch1=[2, 4]
+        series = pd.Series([[1.0, 2.0], [3.0, 4.0]])
+        vals, keys = extract_feature(series, constants.FeatureType.LINEAR)
+
+        assert vals.shape == (2, 2)
+        np.testing.assert_array_equal(vals, [[1.0, 2.0], [3.0, 4.0]])
+
+        # Collapsed: average over channels
+        fmt = format_channel_data(vals, constants.FeatureType.LINEAR, collapse_channels=True)
+        np.testing.assert_array_almost_equal(fmt["average"], [1.5, 3.5])
+
+        # Per-channel: verify channel identity
+        fmt_ch = format_channel_data(
+            vals, constants.FeatureType.LINEAR, collapse_channels=False,
+            ch_to_idx={"A": 0, "B": 1}, channels=["A", "B"], ch_names=["A", "B"],
+        )
+        assert fmt_ch["A"] == [1.0, 3.0]
+        assert fmt_ch["B"] == [2.0, 4.0]
+
+        # Flatten
+        flat = flatten_feature_for_plotting(vals, constants.FeatureType.LINEAR)
+        assert flat.shape == (2, 2, 1)
+        np.testing.assert_array_equal(flat[:, :, 0], vals)
+
+    def test_pipeline_linear_2d(self):
+        """LINEAR_2D: extract -> format(collapsed) -> flatten."""
+        from neurodent.visualization.feature_utils import (
+            extract_feature, format_channel_data, flatten_feature_for_plotting,
+        )
+        # 1 window, 2 channels, 2 components
+        series = pd.Series([[[1.0, 2.0], [3.0, 4.0]]])
+        vals, keys = extract_feature(series, constants.FeatureType.LINEAR_2D)
+
+        assert vals.shape == (1, 2, 2)
+        np.testing.assert_array_equal(vals[0], [[1.0, 2.0], [3.0, 4.0]])
+
+        # Collapsed: mean over channels axis
+        fmt = format_channel_data(vals, constants.FeatureType.LINEAR_2D, collapse_channels=True)
+        np.testing.assert_array_almost_equal(fmt["average"], [[2.0, 3.0]])
+
+        flat = flatten_feature_for_plotting(vals, constants.FeatureType.LINEAR_2D)
+        assert flat.shape == (1, 2, 2)
+        np.testing.assert_array_equal(flat, vals)
+
+    def test_pipeline_band(self):
+        """BAND: extract (with transpose) -> format -> repack round-trip -> flatten."""
+        from neurodent.visualization.feature_utils import (
+            extract_feature, format_channel_data, flatten_feature_for_plotting,
+            repack_band_dict,
+        )
+        # 2 windows, 2 channels, 2 bands (alpha, beta)
+        series = pd.Series([
+            {"alpha": [10.0, 20.0], "beta": [30.0, 40.0]},
+            {"alpha": [50.0, 60.0], "beta": [70.0, 80.0]},
+        ])
+        vals, keys = extract_feature(series, constants.FeatureType.BAND)
+
+        assert vals.shape == (2, 2, 2)  # (W=2, C=2, B=2)
+        assert keys == ["alpha", "beta"]
+        # After transpose (W, B, C) -> (W, C, B):
+        # ch0 gets [alpha, beta] = [10, 30] and [50, 70]
+        np.testing.assert_array_equal(vals[0, 0], [10.0, 30.0])
+        np.testing.assert_array_equal(vals[0, 1], [20.0, 40.0])
+        np.testing.assert_array_equal(vals[1, 0], [50.0, 70.0])
+        np.testing.assert_array_equal(vals[1, 1], [60.0, 80.0])
+
+        # Collapsed: average over channels
+        fmt = format_channel_data(vals, constants.FeatureType.BAND, collapse_channels=True)
+        np.testing.assert_array_almost_equal(
+            fmt["average"], [[15.0, 35.0], [55.0, 75.0]]
+        )
+
+        # Round-trip: repack and verify original dict structure
+        repacked = repack_band_dict(vals, keys)
+        np.testing.assert_array_equal(repacked[0]["alpha"], [10.0, 20.0])
+        np.testing.assert_array_equal(repacked[0]["beta"], [30.0, 40.0])
+
+        # Flatten (identity for BAND)
+        flat = flatten_feature_for_plotting(vals, constants.FeatureType.BAND)
+        np.testing.assert_array_equal(flat, vals)
+
+    def test_pipeline_simple_matrix(self):
+        """SIMPLE_MATRIX: extract -> collapse (tril) -> flatten (tril)."""
+        from neurodent.visualization.feature_utils import (
+            extract_feature, format_channel_data, flatten_feature_for_plotting,
+        )
+        # 1 window, 2x2 symmetric matrix
+        series = pd.Series([[[0.0, 0.3], [0.3, 0.0]]])
+        vals, keys = extract_feature(series, constants.FeatureType.SIMPLE_MATRIX)
+
+        assert vals.shape == (1, 2, 2)
+        np.testing.assert_array_equal(vals[0], [[0.0, 0.3], [0.3, 0.0]])
+
+        # Collapsed: tril pair (1,0) = 0.3
+        fmt = format_channel_data(vals, constants.FeatureType.SIMPLE_MATRIX, collapse_channels=True)
+        np.testing.assert_array_almost_equal(fmt["average"], [0.3])
+
+        # Flatten triag: 1 pair
+        flat = flatten_feature_for_plotting(vals, constants.FeatureType.SIMPLE_MATRIX, triag=True)
+        assert flat.shape == (1, 1, 1)
+        np.testing.assert_array_equal(flat[0, 0, 0], 0.3)
+
+    def test_pipeline_banded_matrix(self):
+        """BANDED_MATRIX: extract (transpose) -> collapse -> repack round-trip -> flatten."""
+        from neurodent.visualization.feature_utils import (
+            extract_feature, format_channel_data, flatten_feature_for_plotting,
+            repack_band_dict,
+        )
+        # 1 window, 2x2 matrix, 1 band
+        series = pd.Series([{"delta": [[0.0, 0.5], [0.7, 0.0]]}])
+        vals, keys = extract_feature(series, constants.FeatureType.BANDED_MATRIX)
+
+        assert vals.shape == (1, 2, 2, 1)  # (W, C, C, B)
+        assert keys == ["delta"]
+        np.testing.assert_array_equal(vals[0, :, :, 0], [[0.0, 0.5], [0.7, 0.0]])
+
+        # Collapsed: tril pair (1,0) = 0.7
+        fmt = format_channel_data(vals, constants.FeatureType.BANDED_MATRIX, collapse_channels=True)
+        np.testing.assert_array_almost_equal(fmt["average"], [[0.7]])
+
+        # Round-trip repack
+        repacked = repack_band_dict(vals, keys)
+        np.testing.assert_array_equal(repacked[0]["delta"], [[0.0, 0.5], [0.7, 0.0]])
+
+        # Flatten triag: 1 pair, 1 band
+        flat = flatten_feature_for_plotting(vals, constants.FeatureType.BANDED_MATRIX, triag=True)
+        assert flat.shape == (1, 1, 1)
+        np.testing.assert_array_equal(flat[0, 0, 0], 0.7)
+
+    def test_pipeline_channel_ordering_preserved(self):
+        """Verify that channel identity is preserved through the full pipeline."""
+        from neurodent.visualization.feature_utils import (
+            extract_feature, format_channel_data, flatten_feature_for_plotting,
+        )
+        # 3 channels with distinct values so mis-ordering is immediately obvious
+        series = pd.Series([[100.0, 200.0, 300.0]])
+        vals, _ = extract_feature(series, constants.FeatureType.LINEAR)
+
+        # Per-channel format
+        fmt = format_channel_data(
+            vals, constants.FeatureType.LINEAR, collapse_channels=False,
+            ch_to_idx={"LMot": 0, "RMot": 1, "LBar": 2},
+            channels=["LMot", "RMot", "LBar"],
+            ch_names=["LMot", "RMot", "LBar"],
+        )
+        assert fmt["LMot"] == [100.0]
+        assert fmt["RMot"] == [200.0]
+        assert fmt["LBar"] == [300.0]
+
+        # Flatten preserves channel positions
+        flat = flatten_feature_for_plotting(vals, constants.FeatureType.LINEAR)
+        np.testing.assert_array_equal(flat[0, 0, 0], 100.0)
+        np.testing.assert_array_equal(flat[0, 1, 0], 200.0)
+        np.testing.assert_array_equal(flat[0, 2, 0], 300.0)
+
+    def test_channel_ordering_band_round_trip(self):
+        """BAND: verify channel identity survives extract -> repack -> format."""
+        from neurodent.visualization.feature_utils import (
+            extract_band_dict, repack_band_dict, format_channel_data,
+        )
+        # ch0=[1,2,3] across 3 bands, ch1=[4,5,6] — distinct per channel
+        series = pd.Series([
+            {"delta": [1.0, 4.0], "theta": [2.0, 5.0], "alpha": [3.0, 6.0]},
+        ])
+        vals, keys = extract_band_dict(series, ftype=constants.FeatureType.BAND)
+        # Canonical (W=1, C=2, B=3): ch0=[1,2,3], ch1=[4,5,6]
+        np.testing.assert_array_equal(vals[0, 0], [1.0, 2.0, 3.0])
+        np.testing.assert_array_equal(vals[0, 1], [4.0, 5.0, 6.0])
+
+        # Repack preserves original dict structure
+        repacked = repack_band_dict(vals, keys)
+        np.testing.assert_array_equal(repacked[0]["delta"], [1.0, 4.0])
+        np.testing.assert_array_equal(repacked[0]["theta"], [2.0, 5.0])
+        np.testing.assert_array_equal(repacked[0]["alpha"], [3.0, 6.0])
+
+        # Per-channel format preserves identity
+        fmt = format_channel_data(
+            vals, constants.FeatureType.BAND, collapse_channels=False,
+            ch_to_idx={"ch0": 0, "ch1": 1}, channels=["ch0", "ch1"], ch_names=["ch0", "ch1"],
+        )
+        np.testing.assert_array_almost_equal(fmt["ch0"], [[1.0, 2.0, 3.0]])
+        np.testing.assert_array_almost_equal(fmt["ch1"], [[4.0, 5.0, 6.0]])
+
+    def test_channel_ordering_hist_extract_format(self):
+        """HIST: verify channel identity survives the (F,C) -> (W,C,F) transpose."""
+        from neurodent.visualization.feature_utils import (
+            extract_hist_data, format_channel_data,
+        )
+        # 1 window, per-cell values shape (F=3, C=2): col0=ch0, col1=ch1
+        vals_cell = np.array([[1.0, 10.0], [2.0, 20.0], [3.0, 30.0]])  # (F=3, C=2)
+        coords_cell = np.array([10.0, 20.0, 30.0])
+        series = pd.Series([(coords_cell, vals_cell)])
+        coords, values = extract_hist_data(series, ftype=constants.FeatureType.HIST)
+        # Canonical (W=1, C=2, F=3)
+        assert values.shape == (1, 2, 3)
+        np.testing.assert_array_equal(values[0, 0], [1.0, 2.0, 3.0])
+        np.testing.assert_array_equal(values[0, 1], [10.0, 20.0, 30.0])
+
+        # Per-channel format preserves identity through the transpose
+        fmt = format_channel_data(
+            values, constants.FeatureType.HIST, collapse_channels=False,
+            ch_to_idx={"A": 0, "B": 1}, channels=["A", "B"], ch_names=["A", "B"],
+        )
+        np.testing.assert_array_almost_equal(fmt["A"], [[1.0, 2.0, 3.0]])
+        np.testing.assert_array_almost_equal(fmt["B"], [[10.0, 20.0, 30.0]])
+
+    def test_channel_ordering_banded_matrix_round_trip(self):
+        """BANDED_MATRIX: verify (row, col) ordering survives extract -> repack -> flatten."""
+        from neurodent.visualization.feature_utils import (
+            extract_band_dict, repack_band_dict, flatten_feature_for_plotting,
+        )
+        # 3x3 matrix with unique values at each (i,j), 1 band
+        mat = np.arange(9, dtype=float).reshape(3, 3)
+        series = pd.Series([{"delta": mat.tolist()}])
+        vals, keys = extract_band_dict(series, ftype=constants.FeatureType.BANDED_MATRIX)
+        # Canonical (W=1, C=3, C=3, B=1)
+        np.testing.assert_array_equal(vals[0, :, :, 0], mat)
+
+        # Repack preserves matrix
+        repacked = repack_band_dict(vals, keys)
+        np.testing.assert_array_equal(repacked[0]["delta"], mat)
+
+        # Flatten triag: tril_indices(3, k=-1) -> (1,0)=3, (2,0)=6, (2,1)=7
+        flat = flatten_feature_for_plotting(vals, constants.FeatureType.BANDED_MATRIX, triag=True)
+        assert flat.shape == (1, 3, 1)
+        np.testing.assert_array_equal(flat[0, :, 0], [3.0, 6.0, 7.0])
+
+
+class TestBinSpikeTimes:
+    """Test bin_spike_times and _bin_spike_df numerical correctness."""
+
+    def test_bin_spike_times_basic(self):
+        from neurodent.visualization.results import bin_spike_times
+        counts = bin_spike_times([5.0, 15.0, 25.0], [10.0, 10.0, 10.0])
+        assert counts == [1, 1, 1]
+
+    def test_bin_spike_times_empty(self):
+        from neurodent.visualization.results import bin_spike_times
+        counts = bin_spike_times([], [10.0, 10.0])
+        assert counts == [0, 0]
+
+    def test_bin_spike_times_boundary(self):
+        from neurodent.visualization.results import bin_spike_times
+        # bin_edges = [0, 10, 20]; np.histogram: bins are [left, right) except last [left, right]
+        counts = bin_spike_times([0.0, 10.0, 20.0], [10.0, 10.0])
+        # 0.0 in [0,10), 10.0 in [10,20], 20.0 in [10,20]
+        assert counts == [1, 2]
+
+    def test_bin_spike_times_multiple_per_bin(self):
+        from neurodent.visualization.results import bin_spike_times
+        counts = bin_spike_times([1.0, 2.0, 3.0, 15.0], [10.0, 10.0])
+        assert counts == [3, 1]
+
+    def test_bin_spike_df_basic(self):
+        from neurodent.visualization.results import _bin_spike_df
+        df = pd.DataFrame({"duration": [10.0, 10.0, 10.0]})
+        spikes_channel = [[5.0, 15.0], [25.0]]
+        result = _bin_spike_df(df, spikes_channel)
+        assert result.shape == (3, 2)
+        np.testing.assert_array_equal(result[:, 0], [1, 1, 0])
+        np.testing.assert_array_equal(result[:, 1], [0, 0, 1])
+
+    def test_bin_spike_df_empty_channel(self):
+        from neurodent.visualization.results import _bin_spike_df
+        df = pd.DataFrame({"duration": [5.0, 5.0]})
+        spikes_channel = [[], [1.0, 6.0]]
+        result = _bin_spike_df(df, spikes_channel)
+        assert result.shape == (2, 2)
+        np.testing.assert_array_equal(result[:, 0], [0, 0])
+        np.testing.assert_array_equal(result[:, 1], [1, 1])
+
+
+class TestAverageAcrossChannels:
+    """Test WindowAnalysisResult._average_across_channels numerical correctness."""
+
+    @pytest.fixture
+    def minimal_war(self):
+        df = pd.DataFrame({
+            "animal": ["A1", "A1"],
+            "animalday": ["A1_d1", "A1_d1"],
+            "genotype": ["WT", "WT"],
+            "duration": [1.0, 1.0],
+        })
+        return WindowAnalysisResult(
+            result=df, animal_id="A1", genotype="WT", sex="Male",
+            channel_names=["LMot", "RMot", "LBar"],
+        )
+
+    def test_average_vector(self, minimal_war):
+        """1D features: nanmean across channels."""
+        df = pd.DataFrame({"rms": [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]})
+        result = minimal_war._average_across_channels(df, ["rms"])
+        np.testing.assert_array_almost_equal(result["rms"].values, [2.0, 5.0])
+
+    def test_average_matrix_upper_tri(self, minimal_war):
+        """2D matrix: mean of upper triangle (k=1)."""
+        mat = np.array([[0.0, 0.2, 0.4],
+                        [0.2, 0.0, 0.6],
+                        [0.4, 0.6, 0.0]])
+        df = pd.DataFrame({"pcorr_delta": [mat]})
+        result = minimal_war._average_across_channels(df, ["pcorr_delta"])
+        # triu_indices(3, k=1): (0,1)=0.2, (0,2)=0.4, (1,2)=0.6 -> mean=0.4
+        np.testing.assert_almost_equal(result["pcorr_delta"].iloc[0], 0.4)
+
+    def test_average_matrix_with_nan(self, minimal_war):
+        """NaN in upper triangle is skipped by nanmean."""
+        mat = np.array([[0.0, np.nan, 0.4],
+                        [0.2, 0.0, 0.6],
+                        [0.4, 0.6, 0.0]])
+        df = pd.DataFrame({"feat": [mat]})
+        result = minimal_war._average_across_channels(df, ["feat"])
+        # triu(k=1): nan, 0.4, 0.6 -> nanmean = 0.5
+        np.testing.assert_almost_equal(result["feat"].iloc[0], 0.5)
+
+    def test_average_small_matrix(self, minimal_war):
+        """1x1 matrix: falls back to nanmean of entire matrix."""
+        mat = np.array([[5.0]])
+        df = pd.DataFrame({"feat": [mat]})
+        result = minimal_war._average_across_channels(df, ["feat"])
+        np.testing.assert_almost_equal(result["feat"].iloc[0], 5.0)
+
+    def test_average_scalar_passthrough(self, minimal_war):
+        """Scalar features left unchanged."""
+        df = pd.DataFrame({"scalar_feat": [3.14, 2.72]})
+        result = minimal_war._average_across_channels(df, ["scalar_feat"])
+        np.testing.assert_array_almost_equal(result["scalar_feat"].values, [3.14, 2.72])
+
+    def test_average_missing_column_skipped(self, minimal_war):
+        """Missing column does not crash; present column still averaged."""
+        df = pd.DataFrame({"rms": [[1.0, 2.0, 3.0]]})
+        result = minimal_war._average_across_channels(df, ["rms", "nonexistent"])
+        assert "nonexistent" not in result.columns
+        np.testing.assert_almost_equal(result["rms"].iloc[0], 2.0)
+
+
+class TestExtractBandFeatures:
+    """Test WindowAnalysisResult._extract_band_features numerical correctness."""
+
+    @pytest.fixture
+    def minimal_war(self):
+        df = pd.DataFrame({
+            "animal": ["A1", "A1"],
+            "animalday": ["A1_d1", "A1_d1"],
+            "genotype": ["WT", "WT"],
+            "duration": [1.0, 1.0],
+        })
+        return WindowAnalysisResult(
+            result=df, animal_id="A1", genotype="WT", sex="Male",
+            channel_names=["LMot", "RMot", "LBar"],
+        )
+
+    def test_extract_band_features_basic(self, minimal_war):
+        """Dict unpacking produces correct per-band columns."""
+        df = pd.DataFrame({
+            "psdband": [
+                {"delta": [1.0, 2.0, 3.0], "theta": [4.0, 5.0, 6.0]},
+                {"delta": [7.0, 8.0, 9.0], "theta": [10.0, 11.0, 12.0]},
+            ]
+        })
+        result = minimal_war._extract_band_features(df, "psdband", ["delta", "theta"])
+        np.testing.assert_array_equal(result["psdband_delta"].iloc[0], [1.0, 2.0, 3.0])
+        np.testing.assert_array_equal(result["psdband_theta"].iloc[1], [10.0, 11.0, 12.0])
+
+    def test_extract_band_features_missing_band(self, minimal_war):
+        """Missing band key fills with NaN array."""
+        df = pd.DataFrame({
+            "psdband": [{"delta": [1.0, 2.0, 3.0]}]
+        })
+        result = minimal_war._extract_band_features(df, "psdband", ["delta", "theta"])
+        np.testing.assert_array_equal(result["psdband_delta"].iloc[0], [1.0, 2.0, 3.0])
+        assert np.all(np.isnan(result["psdband_theta"].iloc[0]))
+
+    def test_extract_band_features_missing_column(self, minimal_war):
+        """Feature column not in df returns df unchanged."""
+        df = pd.DataFrame({"other": [1.0]})
+        result = minimal_war._extract_band_features(df, "psdband", ["delta"])
+        assert "psdband_delta" not in result.columns
+
+
+class TestExtractBandedMatrixFeatures:
+    """Test WindowAnalysisResult._extract_banded_matrix_features numerical correctness."""
+
+    @pytest.fixture
+    def minimal_war(self):
+        df = pd.DataFrame({
+            "animal": ["A1"],
+            "animalday": ["A1_d1"],
+            "genotype": ["WT"],
+            "duration": [1.0],
+        })
+        return WindowAnalysisResult(
+            result=df, animal_id="A1", genotype="WT", sex="Male",
+            channel_names=["LMot", "RMot", "LBar"],
+        )
+
+    def test_extract_banded_matrix_dict_format(self, minimal_war):
+        """Dict storage: per-band 2D matrices extracted to separate columns."""
+        mat_a = np.array([[0.0, 0.1, 0.2], [0.1, 0.0, 0.3], [0.2, 0.3, 0.0]])
+        mat_b = np.array([[0.0, 0.4, 0.5], [0.4, 0.0, 0.6], [0.5, 0.6, 0.0]])
+        df = pd.DataFrame({"cohere": [{"alpha": mat_a, "beta": mat_b}]})
+        result = minimal_war._extract_banded_matrix_features(df, "cohere", ["alpha", "beta"])
+        np.testing.assert_array_equal(result["cohere_alpha"].iloc[0], mat_a)
+        np.testing.assert_array_equal(result["cohere_beta"].iloc[0], mat_b)
+
+    def test_extract_banded_matrix_3d_format(self, minimal_war):
+        """3D array format: slice per band index."""
+        mat_3d = np.arange(18, dtype=float).reshape(2, 3, 3)
+        df = pd.DataFrame({"cohere": [mat_3d]})
+        result = minimal_war._extract_banded_matrix_features(df, "cohere", ["alpha", "beta"])
+        np.testing.assert_array_equal(result["cohere_alpha"].iloc[0], mat_3d[0, :, :])
+        np.testing.assert_array_equal(result["cohere_beta"].iloc[0], mat_3d[1, :, :])
+
+    def test_extract_banded_matrix_missing_band(self, minimal_war):
+        """Missing band key fills with NaN matrix."""
+        mat_a = np.eye(3)
+        df = pd.DataFrame({"cohere": [{"alpha": mat_a}]})
+        result = minimal_war._extract_banded_matrix_features(df, "cohere", ["alpha", "beta"])
+        np.testing.assert_array_equal(result["cohere_alpha"].iloc[0], mat_a)
+        assert np.all(np.isnan(result["cohere_beta"].iloc[0]))
+
+    def test_extract_banded_matrix_2d_raises(self, minimal_war):
+        """2D array input raises ValueError."""
+        mat_2d = np.eye(3)
+        df = pd.DataFrame({"cohere": [mat_2d]})
+        with pytest.raises(ValueError, match="stored as a 2D array"):
+            minimal_war._extract_banded_matrix_features(df, "cohere", ["alpha"])
+
+
 class TestDataProcessingForVisualization:
     """Test data processing functions for visualization."""
 
@@ -2358,6 +2954,83 @@ class TestDataProcessingForVisualization:
 
         assert isinstance(result, pd.DataFrame)
         assert "rms" in result.columns
+
+    def test_df_normalize_baseline_subtract_values(self):
+        """Verify subtracted values are numerically correct."""
+        from neurodent.visualization.plotting.experiment import df_normalize_baseline
+
+        df = pd.DataFrame({
+            "genotype": ["WT", "WT", "KO", "KO"],
+            "condition": ["baseline", "treatment", "baseline", "treatment"],
+            "rms": [100.0, 120.0, 90.0, 110.0],
+        })
+        result = df_normalize_baseline(
+            df=df, feature="rms", groupby=["genotype"],
+            baseline_key="baseline", baseline_groupby=["condition"],
+            operation="subtract",
+        )
+        wt_base = result[(result["genotype"] == "WT") & (result["condition"] == "baseline")]["rms"].iloc[0]
+        wt_treat = result[(result["genotype"] == "WT") & (result["condition"] == "treatment")]["rms"].iloc[0]
+        ko_treat = result[(result["genotype"] == "KO") & (result["condition"] == "treatment")]["rms"].iloc[0]
+        np.testing.assert_almost_equal(wt_base, 0.0)
+        np.testing.assert_almost_equal(wt_treat, 20.0)
+        np.testing.assert_almost_equal(ko_treat, 20.0)
+
+    def test_df_normalize_baseline_divide_values(self):
+        """Verify divided values are numerically correct."""
+        from neurodent.visualization.plotting.experiment import df_normalize_baseline
+
+        df = pd.DataFrame({
+            "genotype": ["WT", "WT"],
+            "condition": ["baseline", "treatment"],
+            "rms": [100.0, 150.0],
+        })
+        result = df_normalize_baseline(
+            df=df, feature="rms", groupby=["genotype"],
+            baseline_key="baseline", baseline_groupby=["condition"],
+            operation="divide",
+        )
+        treatment = result[result["condition"] == "treatment"]["rms"].iloc[0]
+        np.testing.assert_almost_equal(treatment, 1.5)
+
+    def test_df_normalize_baseline_remove_baseline(self):
+        """Baseline rows removed after normalization."""
+        from neurodent.visualization.plotting.experiment import df_normalize_baseline
+
+        df = pd.DataFrame({
+            "genotype": ["WT", "WT"],
+            "condition": ["baseline", "treatment"],
+            "rms": [100.0, 150.0],
+        })
+        result = df_normalize_baseline(
+            df=df, feature="rms", groupby=["genotype"],
+            baseline_key="baseline", baseline_groupby=["condition"],
+            remove_baseline=True,
+        )
+        assert len(result) == 1
+        assert result["condition"].iloc[0] == "treatment"
+        np.testing.assert_almost_equal(result["rms"].iloc[0], 50.0)
+
+    def test_df_normalize_baseline_per_group(self):
+        """Per-genotype baselines via remaining_groupby."""
+        from neurodent.visualization.plotting.experiment import df_normalize_baseline
+
+        df = pd.DataFrame({
+            "genotype": ["WT", "WT", "KO", "KO"],
+            "condition": ["baseline", "treatment", "baseline", "treatment"],
+            "rms": [100.0, 130.0, 200.0, 250.0],
+        })
+        result = df_normalize_baseline(
+            df=df, feature="rms",
+            groupby=["genotype", "condition"],
+            baseline_key="baseline",
+            baseline_groupby=["condition"],
+            operation="subtract",
+        )
+        wt_treat = result[(result["genotype"] == "WT") & (result["condition"] == "treatment")]["rms"].iloc[0]
+        ko_treat = result[(result["genotype"] == "KO") & (result["condition"] == "treatment")]["rms"].iloc[0]
+        np.testing.assert_almost_equal(wt_treat, 30.0)
+        np.testing.assert_almost_equal(ko_treat, 50.0)
 
 
 class TestPlotCustomization:
@@ -2545,7 +3218,7 @@ class TestWindowAnalysisResultLOF:
         from pathlib import Path
 
         # Mock the save method to bypass the long_recordings dependency
-        with patch.object(war_with_lof, "save_pickle_and_json") as mock_save:
+        with patch.object(war_with_lof, "save_parquet_and_json") as mock_save:
             # Test the JSON creation part directly
             lof_scores_dict = {}
             # Simulate the LOF collection that normally happens in save
@@ -2809,8 +3482,8 @@ class TestWindowAnalysisResultLOF:
             war_with_lof.evaluate_lof_threshold_binary(ground_truth)
 
 
-class TestWindowAnalysisResultPickleJsonParameters:
-    """Test pickle_name and json_name parameters in load_pickle_and_json."""
+class TestWindowAnalysisResultParquetJsonParameters:
+    """Test parquet_name and json_name parameters in load_parquet_and_json."""
 
     @pytest.fixture
     def temp_war_files(self):
@@ -2836,26 +3509,26 @@ class TestWindowAnalysisResultPickleJsonParameters:
             tmpdir = Path(tmpdir)
 
             # Save with default names
-            war.save_pickle_and_json(tmpdir, filename="war")
+            war.save_parquet_and_json(tmpdir, filename="war")
 
             # Create subdirectory structure
             subdir = tmpdir / "subdir"
             subdir.mkdir()
-            war.save_pickle_and_json(subdir, filename="nested_war")
+            war.save_parquet_and_json(subdir, filename="nested_war")
 
             # Also save with custom names at root level
-            war.save_pickle_and_json(tmpdir, filename="custom_war")
+            war.save_parquet_and_json(tmpdir, filename="custom_war")
 
             yield {"tmpdir": tmpdir, "subdir": subdir, "war": war}
 
     def test_load_default_behavior(self, temp_war_files):
-        """Test that default behavior (no pickle_name/json_name) still works."""
+        """Test that default behavior (no parquet_name/json_name) still works."""
         tmpdir = temp_war_files["tmpdir"]
         original_war = temp_war_files["war"]
 
         # Remove other files to test single file case
         for f in tmpdir.glob("*"):
-            if f.name not in ["war.pkl", "war.json"]:
+            if f.name not in ["war.parquet", "war.json"]:
                 if f.is_file():
                     f.unlink()
                 else:
@@ -2863,7 +3536,7 @@ class TestWindowAnalysisResultPickleJsonParameters:
 
                     shutil.rmtree(f)
 
-        loaded_war = WindowAnalysisResult.load_pickle_and_json(folder_path=str(tmpdir))
+        loaded_war = WindowAnalysisResult.load_parquet_and_json(folder_path=str(tmpdir))
 
         assert loaded_war.animal_id == original_war.animal_id
         assert loaded_war.genotype == original_war.genotype
@@ -2872,12 +3545,12 @@ class TestWindowAnalysisResultPickleJsonParameters:
         pd.testing.assert_frame_equal(loaded_war.result, original_war.result)
 
     def test_load_with_exact_filenames(self, temp_war_files):
-        """Test loading with exact pickle_name and json_name."""
+        """Test loading with exact parquet_name and json_name."""
         tmpdir = temp_war_files["tmpdir"]
         original_war = temp_war_files["war"]
 
-        loaded_war = WindowAnalysisResult.load_pickle_and_json(
-            folder_path=str(tmpdir), pickle_name="custom_war.pkl", json_name="custom_war.json"
+        loaded_war = WindowAnalysisResult.load_parquet_and_json(
+            folder_path=str(tmpdir), parquet_name="custom_war.parquet", json_name="custom_war.json"
         )
 
         assert loaded_war.animal_id == original_war.animal_id
@@ -2888,8 +3561,8 @@ class TestWindowAnalysisResultPickleJsonParameters:
         tmpdir = temp_war_files["tmpdir"]
         original_war = temp_war_files["war"]
 
-        loaded_war = WindowAnalysisResult.load_pickle_and_json(
-            folder_path=str(tmpdir), pickle_name="subdir/nested_war.pkl", json_name="subdir/nested_war.json"
+        loaded_war = WindowAnalysisResult.load_parquet_and_json(
+            folder_path=str(tmpdir), parquet_name="subdir/nested_war.parquet", json_name="subdir/nested_war.json"
         )
 
         assert loaded_war.animal_id == original_war.animal_id
@@ -2900,11 +3573,11 @@ class TestWindowAnalysisResultPickleJsonParameters:
         tmpdir = temp_war_files["tmpdir"]
         original_war = temp_war_files["war"]
 
-        pickle_path = tmpdir / "custom_war.pkl"
+        parquet_path = tmpdir / "custom_war.parquet"
         json_path = tmpdir / "custom_war.json"
 
-        loaded_war = WindowAnalysisResult.load_pickle_and_json(
-            folder_path=str(tmpdir), pickle_name=str(pickle_path), json_name=str(json_path)
+        loaded_war = WindowAnalysisResult.load_parquet_and_json(
+            folder_path=str(tmpdir), parquet_name=str(parquet_path), json_name=str(json_path)
         )
 
         assert loaded_war.animal_id == original_war.animal_id
@@ -2915,21 +3588,23 @@ class TestWindowAnalysisResultPickleJsonParameters:
         tmpdir = temp_war_files["tmpdir"]
         original_war = temp_war_files["war"]
 
-        pickle_path = tmpdir / "custom_war.pkl"
+        parquet_path = tmpdir / "custom_war.parquet"
         json_path = tmpdir / "custom_war.json"
 
-        loaded_war = WindowAnalysisResult.load_pickle_and_json(pickle_name=str(pickle_path), json_name=str(json_path))
+        loaded_war = WindowAnalysisResult.load_parquet_and_json(
+            parquet_name=str(parquet_path), json_name=str(json_path)
+        )
 
         assert loaded_war.animal_id == original_war.animal_id
         pd.testing.assert_frame_equal(loaded_war.result, original_war.result)
 
-    def test_load_pickle_not_found(self, temp_war_files):
-        """Test error when pickle file not found."""
+    def test_load_parquet_not_found(self, temp_war_files):
+        """Test error when parquet file not found."""
         tmpdir = temp_war_files["tmpdir"]
 
-        with pytest.raises(FileNotFoundError, match="Pickle file not found"):
-            WindowAnalysisResult.load_pickle_and_json(
-                folder_path=str(tmpdir), pickle_name="nonexistent.pkl", json_name="war.json"
+        with pytest.raises(FileNotFoundError, match="Parquet file not found"):
+            WindowAnalysisResult.load_parquet_and_json(
+                folder_path=str(tmpdir), parquet_name="nonexistent.parquet", json_name="war.json"
             )
 
     def test_load_json_not_found(self, temp_war_files):
@@ -2937,62 +3612,62 @@ class TestWindowAnalysisResultPickleJsonParameters:
         tmpdir = temp_war_files["tmpdir"]
 
         with pytest.raises(FileNotFoundError, match="JSON file not found"):
-            WindowAnalysisResult.load_pickle_and_json(
-                folder_path=str(tmpdir), pickle_name="war.pkl", json_name="nonexistent.json"
+            WindowAnalysisResult.load_parquet_and_json(
+                folder_path=str(tmpdir), parquet_name="war.parquet", json_name="nonexistent.json"
             )
 
     def test_load_multiple_files_without_specification(self, temp_war_files):
         """Test error when multiple files exist but none specified."""
         tmpdir = temp_war_files["tmpdir"]
 
-        # There should be multiple .pkl and .json files in tmpdir
-        pkl_files = list(tmpdir.glob("*.pkl"))
+        # There should be multiple .parquet and .json files in tmpdir
+        parquet_files = list(tmpdir.glob("*.parquet"))
         json_files = list(tmpdir.glob("*.json"))
 
         # Ensure we have multiple files
-        assert len(pkl_files) > 1
+        assert len(parquet_files) > 1
         assert len(json_files) > 1
 
-        with pytest.raises(ValueError, match="Expected exactly one pickle file"):
-            WindowAnalysisResult.load_pickle_and_json(folder_path=str(tmpdir))
+        with pytest.raises(ValueError, match="Expected exactly one parquet file"):
+            WindowAnalysisResult.load_parquet_and_json(folder_path=str(tmpdir))
 
     def test_load_no_files_found(self):
         """Test error when no files are found."""
         import tempfile
 
         with tempfile.TemporaryDirectory() as empty_dir:
-            with pytest.raises(ValueError, match="Expected exactly one pickle file"):
-                WindowAnalysisResult.load_pickle_and_json(folder_path=empty_dir)
+            with pytest.raises(ValueError, match="Expected exactly one parquet file"):
+                WindowAnalysisResult.load_parquet_and_json(folder_path=empty_dir)
 
     def test_load_invalid_folder_path(self):
         """Test error with invalid folder path."""
         with pytest.raises(ValueError, match="Folder path .* does not exist"):
-            WindowAnalysisResult.load_pickle_and_json(folder_path="/nonexistent/path")
+            WindowAnalysisResult.load_parquet_and_json(folder_path="/nonexistent/path")
 
     def test_load_missing_parameters(self):
         """Test error when required parameters are missing."""
-        # Neither folder_path nor both pickle_name/json_name provided
+        # Neither folder_path nor both parquet_name/json_name provided
         with pytest.raises(ValueError, match="Either folder_path must be provided"):
-            WindowAnalysisResult.load_pickle_and_json()
+            WindowAnalysisResult.load_parquet_and_json()
 
-        # Only one of pickle_name/json_name provided without folder_path
+        # Only one of parquet_name/json_name provided without folder_path
         with pytest.raises(ValueError, match="Either folder_path must be provided"):
-            WindowAnalysisResult.load_pickle_and_json(pickle_name="/some/path.pkl")
+            WindowAnalysisResult.load_parquet_and_json(parquet_name="/some/path.parquet")
 
         with pytest.raises(ValueError, match="Either folder_path must be provided"):
-            WindowAnalysisResult.load_pickle_and_json(json_name="/some/path.json")
+            WindowAnalysisResult.load_parquet_and_json(json_name="/some/path.json")
 
     def test_load_mixed_absolute_relative_paths(self, temp_war_files):
         """Test mixing absolute and relative paths."""
         tmpdir = temp_war_files["tmpdir"]
         original_war = temp_war_files["war"]
 
-        # Absolute pickle path, relative json path
-        pickle_path = tmpdir / "custom_war.pkl"
+        # Absolute parquet path, relative json path
+        parquet_path = tmpdir / "custom_war.parquet"
 
-        loaded_war = WindowAnalysisResult.load_pickle_and_json(
+        loaded_war = WindowAnalysisResult.load_parquet_and_json(
             folder_path=str(tmpdir),
-            pickle_name=str(pickle_path),  # Absolute
+            parquet_name=str(parquet_path),  # Absolute
             json_name="custom_war.json",  # Relative
         )
 
@@ -3019,7 +3694,7 @@ class TestWindowAnalysisResultPickleJsonParameters:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
-            # Save pickle
+            # Save legacy pickle (simulates an old WAR written before the parquet migration)
             test_df.to_pickle(tmpdir / "war.pkl")
 
             # Save JSON without sex (simulating old format)
@@ -3035,8 +3710,8 @@ class TestWindowAnalysisResultPickleJsonParameters:
             with open(tmpdir / "war.json", "w") as f:
                 json.dump(old_json, f)
 
-            # Load should succeed with sex="Unknown" (the default)
-            loaded_war = WindowAnalysisResult.load_pickle_and_json(folder_path=str(tmpdir))
+            # Load should succeed via the legacy pickle fallback, with sex="Unknown" default
+            loaded_war = WindowAnalysisResult.load_parquet_and_json(folder_path=str(tmpdir))
             assert loaded_war.animal_id == "A1"
             assert loaded_war.genotype == "WT"
             assert loaded_war.sex == "Unknown"
@@ -3078,16 +3753,17 @@ class TestParquetSaveLoad:
         """Test that save with parquet + load produces equivalent data."""
         war = war_with_complex_columns
         with tempfile.TemporaryDirectory() as tmpdir:
-            war.save_pickle_and_json(tmpdir, filename="war")
+            war.save_parquet_and_json(tmpdir, filename="war")
 
             # Verify parquet file was created
             assert (Path(tmpdir) / "war.parquet").exists()
+            # Verify pickle is NOT written any more
+            assert not (Path(tmpdir) / "war.pkl").exists()
             # No sidecar meta file — metadata is embedded in parquet
             assert not (Path(tmpdir) / "war.parquet.meta.json").exists()
 
-            # Load (should prefer parquet)
-            loaded = WindowAnalysisResult.load_pickle_and_json(
-                folder_path=tmpdir, pickle_name="war.pkl", json_name="war.json"
+            loaded = WindowAnalysisResult.load_parquet_and_json(
+                folder_path=tmpdir, parquet_name="war.parquet", json_name="war.json"
             )
             assert loaded.animal_id == war.animal_id
             assert loaded.genotype == war.genotype
@@ -3104,21 +3780,26 @@ class TestParquetSaveLoad:
         """Test that auto-discovery works when parquet files are present."""
         war = war_with_complex_columns
         with tempfile.TemporaryDirectory() as tmpdir:
-            war.save_pickle_and_json(tmpdir, filename="war")
+            war.save_parquet_and_json(tmpdir, filename="war")
 
-            loaded = WindowAnalysisResult.load_pickle_and_json(folder_path=tmpdir)
+            loaded = WindowAnalysisResult.load_parquet_and_json(folder_path=tmpdir)
             assert loaded.animal_id == war.animal_id
 
     def test_fallback_to_pickle_when_no_parquet(self, war_with_complex_columns):
-        """Test that loading falls back to pickle when parquet files are absent."""
+        """Test that loading falls back to a legacy pickle when parquet is absent.
+
+        Simulates an old on-disk WAR (written before the parquet migration) by
+        hand-writing a ``war.pkl`` alongside the JSON — no parquet.
+        """
         war = war_with_complex_columns
         with tempfile.TemporaryDirectory() as tmpdir:
-            war.save_pickle_and_json(tmpdir, filename="war")
-            # Remove parquet to force pickle fallback
+            # Save via the new API, then drop parquet and write a legacy pickle
+            war.save_parquet_and_json(tmpdir, filename="war")
             (Path(tmpdir) / "war.parquet").unlink()
+            war.result.to_pickle(Path(tmpdir) / "war.pkl")
 
-            loaded = WindowAnalysisResult.load_pickle_and_json(
-                folder_path=tmpdir, pickle_name="war.pkl", json_name="war.json"
+            loaded = WindowAnalysisResult.load_parquet_and_json(
+                folder_path=tmpdir, parquet_name="war.parquet", json_name="war.json"
             )
             assert loaded.animal_id == war.animal_id
             assert loaded.result["duration"].tolist() == war.result["duration"].tolist()
@@ -3129,7 +3810,7 @@ class TestParquetSaveLoad:
 
         war = war_with_complex_columns
         with tempfile.TemporaryDirectory() as tmpdir:
-            war.save_pickle_and_json(tmpdir, filename="war")
+            war.save_parquet_and_json(tmpdir, filename="war")
 
             table = pq.read_table(Path(tmpdir) / "war.parquet")
             schema_meta = table.schema.metadata
@@ -3183,7 +3864,7 @@ class TestParquetSaveLoad:
         """Test that the parquet file has meaningful content matching the DataFrame."""
         war = war_with_complex_columns
         with tempfile.TemporaryDirectory() as tmpdir:
-            war.save_pickle_and_json(tmpdir, filename="war")
+            war.save_parquet_and_json(tmpdir, filename="war")
             pq_path = Path(tmpdir) / "war.parquet"
             assert pq_path.stat().st_size > 0
 
@@ -3192,11 +3873,10 @@ class TestParquetSaveLoad:
             assert set(war.result.columns).issubset(set(reloaded.columns))
 
     def test_save_load_speed(self):
-        """Test that parquet load time is comparable to pickle after warm-up.
+        """Sanity-check that parquet save + load is fast enough for realistic rows.
 
         Uses a realistically-sized DataFrame (200 rows) so that pyarrow's
-        fixed per-call overhead is amortised and the comparison reflects
-        actual I/O performance rather than interpreter start-up noise.
+        fixed per-call overhead is amortised.
         """
         import time
 
@@ -3224,35 +3904,162 @@ class TestParquetSaveLoad:
             channel_names=["LMot", "RMot"],
         )
         with tempfile.TemporaryDirectory() as tmpdir:
-            war.save_pickle_and_json(tmpdir, filename="war")
+            war.save_parquet_and_json(tmpdir, filename="war")
 
-            pkl_path = Path(tmpdir) / "war.pkl"
             pq_path = Path(tmpdir) / "war.parquet"
-            assert pkl_path.exists()
             assert pq_path.exists()
+            # Pickle should no longer be produced
+            assert not (Path(tmpdir) / "war.pkl").exists()
 
             # Warm-up: first load amortises import / JIT costs
-            pd.read_pickle(pkl_path)
             pd.read_parquet(pq_path, engine="pyarrow")
 
             n_iters = 20
-
-            start = time.perf_counter()
-            for _ in range(n_iters):
-                pd.read_pickle(pkl_path)
-            pkl_time = time.perf_counter() - start
-
             start = time.perf_counter()
             for _ in range(n_iters):
                 pd.read_parquet(pq_path, engine="pyarrow")
             pq_time = time.perf_counter() - start
 
-            # With a realistically-sized DataFrame the gap between parquet
-            # and pickle narrows substantially.  A 10x bound guards against
-            # pathological regressions while remaining stable on CI runners.
-            assert pq_time < pkl_time * 10, (
-                f"Parquet load ({pq_time:.3f}s) is unreasonably slower "
-                f"than pickle ({pkl_time:.3f}s)"
+            # 200 rows × 20 iterations should comfortably finish in < 5s on CI runners.
+            assert pq_time < 5.0, f"Parquet load time {pq_time:.3f}s is unreasonably slow"
+
+    def test_save_parquet_bypasses_encode_df_for_parquet(self):
+        """Verify save_parquet_and_json builds a column dict directly
+        instead of calling _encode_df_for_parquet (which does df.copy()).
+
+        The old path created 2-3 redundant copies of the DataFrame via
+        df.copy() + pa.Table.from_pandas(). The new path builds a column
+        dict and uses pa.table() — no DataFrame copy.
+        """
+        from unittest.mock import patch
+
+        n_rows = 50
+        rng = np.random.default_rng(99)
+        data = {
+            "animalday": [f"A1_day{i}" for i in range(n_rows)],
+            "genotype": ["WT"] * n_rows,
+            "timestamp": pd.date_range("2023-01-01", periods=n_rows, freq="5min"),
+            "duration": [240.0] * n_rows,
+            "rms": [rng.uniform(100, 200, 4).tolist() for _ in range(n_rows)],
+            "cohere": [
+                {"ch1_ch2": rng.uniform(0, 1, 8).tolist()}
+                for _ in range(n_rows)
+            ],
+        }
+        war = WindowAnalysisResult(
+            result=pd.DataFrame(data),
+            animal_id="A1",
+            genotype="WT",
+            channel_names=["LMot", "RMot", "LAud", "RAud"],
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Patch _encode_df_for_parquet to verify it is NOT called
+            with patch.object(
+                WindowAnalysisResult, "_encode_df_for_parquet",
+                wraps=WindowAnalysisResult._encode_df_for_parquet,
+            ) as mock_encode:
+                war.save_parquet_and_json(tmpdir, filename="war")
+                mock_encode.assert_not_called()
+
+            # Verify the parquet file is valid and round-trips correctly
+            pq_path = Path(tmpdir) / "war.parquet"
+            assert pq_path.exists()
+
+            import pyarrow.parquet as pq
+            table = pq.read_table(pq_path)
+
+            # Check neurodent metadata with encoded columns list
+            nd_meta = json.loads(table.schema.metadata[b"neurodent"])
+            assert "rms" in nd_meta["encoded_columns"]
+            assert "cohere" in nd_meta["encoded_columns"]
+            assert "duration" not in nd_meta["encoded_columns"]
+
+            # Decode and verify values round-trip
+            reloaded = table.to_pandas()
+            encoded_cols = nd_meta["encoded_columns"]
+            decoded = WindowAnalysisResult._decode_df_from_parquet(reloaded, encoded_cols)
+            assert len(decoded) == n_rows
+            for i in range(min(5, n_rows)):
+                assert decoded["rms"].iloc[i] == war.result["rms"].iloc[i]
+                assert decoded["cohere"].iloc[i] == war.result["cohere"].iloc[i]
+
+
+class TestMemoryPressure:
+    """Verify that load/save paths don't hold unnecessary copies of WAR data."""
+
+    @pytest.fixture
+    def war_for_memory_test(self):
+        """Create a WAR large enough that data dominates over fixed overhead."""
+        n_rows = 500
+        n_ch = 8
+        n_freq = 64
+        rng = np.random.default_rng(42)
+        data = {
+            "animalday": ["A1_20230101"] * n_rows,
+            "genotype": ["WT"] * n_rows,
+            "timestamp": pd.date_range("2023-01-01", periods=n_rows, freq="4min"),
+            "duration": rng.uniform(230, 250, n_rows).tolist(),
+            "rms": [rng.random(n_ch).tolist() for _ in range(n_rows)],
+            "psd": [
+                (rng.random(n_freq).tolist(), rng.random((n_ch, n_freq)).tolist())
+                for _ in range(n_rows)
+            ],
+        }
+        return WindowAnalysisResult(
+            pd.DataFrame(data), animal_id="A1", genotype="WT",
+            channel_names=["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"],
+            suppress_short_interval_error=True,
+        )
+
+    def test_load_parquet_peak_memory(self, war_for_memory_test):
+        """Peak memory during load_parquet_and_json should stay under 5x the parquet file size.
+
+        Regression guard: without ``del table`` after ``to_pandas()`` and
+        without the in-place decode (no ``df.copy()``), peak reaches ~6x+.
+        """
+        import tracemalloc
+
+        war = war_for_memory_test
+        with tempfile.TemporaryDirectory() as tmpdir:
+            war.save_parquet_and_json(tmpdir, filename="war")
+            pq_size = (Path(tmpdir) / "war.parquet").stat().st_size
+
+            tracemalloc.start()
+            loaded = WindowAnalysisResult.load_parquet_and_json(folder_path=tmpdir)
+            _, peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+
+            # Loaded data should be correct
+            assert loaded.animal_id == war.animal_id
+            assert len(loaded.result) == len(war.result)
+
+            # Peak memory should not exceed 5x the parquet file size.
+            # Before the del-table + in-place-decode fixes, this ratio was ~6x+.
+            ratio = peak / max(pq_size, 1)
+            assert ratio < 5, (
+                f"Peak memory during load is {ratio:.1f}x the parquet file size "
+                f"({peak / 1e6:.1f} MB vs {pq_size / 1e6:.1f} MB). "
+                f"Likely a missing del or unnecessary copy."
+            )
+
+    def test_save_parquet_peak_memory(self, war_for_memory_test):
+        """Peak memory during save_parquet_and_json should stay under 5x the parquet file size."""
+        import tracemalloc
+
+        war = war_for_memory_test
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tracemalloc.start()
+            war.save_parquet_and_json(tmpdir, filename="war")
+            _, peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+
+            pq_size = (Path(tmpdir) / "war.parquet").stat().st_size
+            ratio = peak / max(pq_size, 1)
+            assert ratio < 5, (
+                f"Peak memory during save is {ratio:.1f}x the parquet file size "
+                f"({peak / 1e6:.1f} MB vs {pq_size / 1e6:.1f} MB). "
+                f"Likely a missing del or unnecessary copy."
             )
 
 

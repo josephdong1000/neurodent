@@ -23,7 +23,7 @@ handling everything from raw data loading to feature extraction.
 
     # 3. Access results (WindowAnalysisResult)
     df = war.result  # pandas DataFrame with all features
-    war.save_pickle_and_json('output/')
+    war.save_parquet_and_json('output/')
 
 The lower-level classes can also be used directly:
 

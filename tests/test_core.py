@@ -1592,6 +1592,142 @@ class TestZeroSampleRecordingCheck:
 
         assert not any("0-sample recording" in msg for msg in caplog.messages)
 
+    @pytest.mark.skipif(si is None, reason="SpikeInterface not available")
+    def test_multi_file_extract_func_crash_creates_placeholder(self, temp_dir, caplog):
+        """Crashing extract_func on a multi-file DiscoveredFile yields a 0-sample placeholder.
+
+        This guards against corrupt/empty file pairs (e.g. header-only CSV) killing
+        the entire animal's pipeline run instead of just skipping the bad file.
+        """
+        import logging as _logging
+        from neurodent.core.discovery import DiscoveredFile
+
+        df = DiscoveredFile(
+            paths=("/tmp/bad.bin", "/tmp/bad.csv"), metadata={"session": "s1"}
+        )
+        organizer = LongRecordingOrganizer(None, mode=None)
+        organizer.item = df
+        organizer.n_truncate = 0
+        organizer.truncate = False
+        organizer.manual_datetimes = None
+        organizer.datetimes_are_start = True
+
+        def crashing_extract_func(discovered_file, **kwargs):
+            raise ValueError("CSV metadata file has no data rows (header-only): bad.csv")
+
+        with caplog.at_level(_logging.WARNING):
+            organizer.convert_file_with_si_to_recording(crashing_extract_func)
+
+        assert organizer.LongRecording is not None
+        assert any("extract_func failed" in msg for msg in caplog.messages)
+        assert any("0-sample" in msg for msg in caplog.messages)
+
+    @pytest.mark.skipif(si is None, reason="SpikeInterface not available")
+    def test_multi_file_extract_func_unexpected_error_propagates(self, temp_dir):
+        """Non-file-data errors (e.g. RuntimeError) are NOT swallowed."""
+        from neurodent.core.discovery import DiscoveredFile
+
+        df = DiscoveredFile(
+            paths=("/tmp/bad.bin", "/tmp/bad.csv"), metadata={"session": "s1"}
+        )
+        organizer = LongRecordingOrganizer(None, mode=None)
+        organizer.item = df
+        organizer.n_truncate = 0
+        organizer.truncate = False
+        organizer.manual_datetimes = None
+        organizer.datetimes_are_start = True
+
+        def buggy_extract_func(discovered_file, **kwargs):
+            raise RuntimeError("unexpected internal error")
+
+        with pytest.raises(RuntimeError, match="unexpected internal error"):
+            organizer.convert_file_with_si_to_recording(buggy_extract_func)
+
+
+@pytest.mark.core
+@pytest.mark.spikeinterface
+class TestReadBinCsvPair:
+    """Tests for read_bin_csv_pair validation of malformed file pairs."""
+
+    @pytest.fixture
+    def temp_dir(self, tmp_path):
+        return tmp_path
+
+    def test_empty_csv_raises(self, temp_dir):
+        """header-only CSV (no data rows) raises ValueError with clear message."""
+        from tests.integration.readers import read_bin_csv_pair
+        from neurodent.core.discovery import DiscoveredFile
+
+        bin_path = str(temp_dir / "test.bin")
+        csv_path = str(temp_dir / "test.csv")
+
+        np.zeros(100, dtype=np.float32).tofile(bin_path)
+        with open(csv_path, "w") as f:
+            f.write("Entity,BinColumn,Label,ProbeInfo,SampleRate,Units,Precision,LastEdit\n")
+
+        df = DiscoveredFile(paths=(bin_path, csv_path), metadata={"session": "s1"})
+        with pytest.raises(ValueError, match="CSV metadata file has no data rows"):
+            read_bin_csv_pair(df)
+
+    def test_empty_bin_raises(self, temp_dir):
+        """Zero-byte .bin file raises ValueError with clear message."""
+        from tests.integration.readers import read_bin_csv_pair
+        from neurodent.core.discovery import DiscoveredFile
+
+        bin_path = str(temp_dir / "test.bin")
+        csv_path = str(temp_dir / "test.csv")
+
+        open(bin_path, "wb").close()  # empty file
+        with open(csv_path, "w") as f:
+            f.write("Entity,BinColumn,Label,ProbeInfo,SampleRate,Units,Precision,LastEdit\n")
+            f.write("0,0,LMot,,1000.0,uV,float32,2022-01-01\n")
+
+        df = DiscoveredFile(paths=(bin_path, csv_path), metadata={"session": "s1"})
+        with pytest.raises(ValueError, match="Binary file is empty"):
+            read_bin_csv_pair(df)
+
+    def test_fortran_order_channels_read_correctly(self, temp_dir):
+        """Column-major (Fortran-order) binary is read with correct channel assignment.
+
+        Writes a file where each channel has a distinct constant value,
+        stored in Fortran order (all samples of ch0, then ch1, etc.).
+        Verifies that read_bin_csv_pair returns each channel with its
+        expected value — a C-order reader would garble the channels.
+        """
+        from tests.integration.readers import read_bin_csv_pair
+        from neurodent.core.discovery import DiscoveredFile
+
+        n_channels = 3
+        n_samples = 200
+        fs = 1000.0
+
+        # Each channel has a distinct constant: ch0=10, ch1=20, ch2=30
+        data = np.column_stack(
+            [np.full(n_samples, (ch + 1) * 10.0, dtype=np.float32) for ch in range(n_channels)]
+        )
+
+        # Write in Fortran order (column-major): all ch0 samples, then ch1, then ch2
+        bin_path = str(temp_dir / "test_ColMajor.bin")
+        data.flatten(order="F").tofile(bin_path)
+
+        csv_path = str(temp_dir / "test_Meta.csv")
+        with open(csv_path, "w") as f:
+            f.write("Entity,BinColumn,Label,ProbeInfo,SampleRate,Units,Precision,LastEdit\n")
+            for ch in range(n_channels):
+                f.write(f"{ch},{ch},Ch{ch},,{fs},uV,float32,2022-01-01\n")
+
+        df = DiscoveredFile(paths=(bin_path, csv_path), metadata={"session": "s1"})
+        rec = read_bin_csv_pair(df)
+        traces = rec.get_traces(return_scaled=True)
+
+        assert traces.shape == (n_samples, n_channels)
+        for ch in range(n_channels):
+            expected = (ch + 1) * 10.0
+            np.testing.assert_allclose(
+                traces[:, ch], expected,
+                err_msg=f"Channel {ch} should be all {expected} but got mean={traces[:, ch].mean():.1f}",
+            )
+
 
 @pytest.mark.core
 @pytest.mark.spikeinterface
