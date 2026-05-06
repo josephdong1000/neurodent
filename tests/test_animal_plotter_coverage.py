@@ -739,6 +739,186 @@ class TestPlotTemporalHeatmapFeatureShapes:
         # The value should be the original value (averaged across channels)
         assert np.allclose(collapsed, value)
 
+    def test_temporal_heatmap_shape_validation_linear(self, plotter, rng):
+        """Test shape validation for LINEAR feature (rms) at each step."""
+        n_time = 10
+        n_chan = N_CHAN
+        value = 5.0
+
+        # Create constant-value feature data
+        rms_data = [[value] * n_chan for _ in range(n_time)]
+        group = pd.DataFrame({
+            "rms": rms_data,
+            "duration": [1.0] * n_time,
+        })
+
+        # Step 1: __get_linear_feature should return (n_time, n_chan, 1)
+        feature_data = plotter._AnimalPlotter__get_linear_feature(
+            group=group, feature="rms", score_type="none"
+        )
+        assert feature_data.shape == (n_time, n_chan, 1), \
+            f"Expected (n_time, n_chan, 1), got {feature_data.shape}"
+
+        # Step 2: After np.nanmean(axis=1), should be (n_time, 1)
+        feature_data = np.nanmean(feature_data, axis=1)
+        assert feature_data.shape == (n_time, 1), \
+            f"Expected (n_time, 1), got {feature_data.shape}"
+
+        # Step 3: After squeeze, should be (n_time,)
+        feature_data = feature_data.squeeze()
+        assert feature_data.ndim == 1 and feature_data.shape[0] == n_time, \
+            f"Expected 1D array of length {n_time}, got shape {feature_data.shape}"
+
+        # Step 4: Values should be correct (averaged across channels)
+        assert np.allclose(feature_data, value), \
+            f"Expected all values to be {value}, got {feature_data}"
+
+    def test_temporal_heatmap_shape_validation_linear_2d(self, plotter, rng):
+        """Test shape validation for LINEAR_2D feature (psdslope) at each step."""
+        n_time = 10
+        n_chan = N_CHAN
+        n_components = 2
+        slope_value = 1.0
+        intercept_value = 100.0
+
+        # Create constant-value feature data with distinct slope and intercept
+        psdslope_data = [
+            np.array([[slope_value, intercept_value]] * n_chan)
+            for _ in range(n_time)
+        ]
+        group = pd.DataFrame({
+            "psdslope": psdslope_data,
+            "duration": [1.0] * n_time,
+        })
+
+        # Step 1: __get_linear_feature should return (n_time, n_chan, n_components)
+        feature_data = plotter._AnimalPlotter__get_linear_feature(
+            group=group, feature="psdslope", score_type="none"
+        )
+        assert feature_data.shape == (n_time, n_chan, n_components), \
+            f"Expected (n_time, n_chan, n_components), got {feature_data.shape}"
+
+        # Step 2: After np.nanmean(axis=1), should be (n_time, n_components)
+        feature_data = np.nanmean(feature_data, axis=1)
+        assert feature_data.shape == (n_time, n_components), \
+            f"Expected (n_time, n_components), got {feature_data.shape}"
+
+        # Step 3: Values should be correct (averaged across channels, NOT across components)
+        # Slope component (index 0) should all be slope_value
+        assert np.allclose(feature_data[:, 0], slope_value), \
+            f"Expected slope values to be {slope_value}, got {feature_data[:, 0]}"
+        # Intercept component (index 1) should all be intercept_value
+        assert np.allclose(feature_data[:, 1], intercept_value), \
+            f"Expected intercept values to be {intercept_value}, got {feature_data[:, 1]}"
+
+    def test_temporal_heatmap_shape_validation_band(self, plotter, rng):
+        """Test shape validation for BAND feature (psdband) at each step."""
+        n_time = 10
+        n_chan = N_CHAN
+        n_bands = N_BANDS
+        band_values = [1.0, 2.0, 3.0, 4.0, 5.0]  # Distinct value per band
+
+        # Create constant-value feature data with distinct values per band
+        psdband_data = [
+            {band: [band_values[i]] * n_chan for i, band in enumerate(constants.BAND_NAMES)}
+            for _ in range(n_time)
+        ]
+        group = pd.DataFrame({
+            "psdband": psdband_data,
+            "duration": [1.0] * n_time,
+        })
+
+        # Step 1: __get_linear_feature should return (n_time, n_chan, n_bands)
+        feature_data = plotter._AnimalPlotter__get_linear_feature(
+            group=group, feature="psdband", score_type="none"
+        )
+        assert feature_data.shape == (n_time, n_chan, n_bands), \
+            f"Expected (n_time, n_chan, n_bands), got {feature_data.shape}"
+
+        # Step 2: After np.nanmean(axis=1), should be (n_time, n_bands)
+        feature_data = np.nanmean(feature_data, axis=1)
+        assert feature_data.shape == (n_time, n_bands), \
+            f"Expected (n_time, n_bands), got {feature_data.shape}"
+
+        # Step 3: Values should be correct (averaged across channels, NOT across bands)
+        for i, expected_value in enumerate(band_values):
+            assert np.allclose(feature_data[:, i], expected_value), \
+                f"Expected band {i} values to be {expected_value}, got {feature_data[:, i]}"
+
+    def test_temporal_heatmap_shape_validation_simple_matrix(self, plotter, rng):
+        """Test shape validation for SIMPLE_MATRIX feature (zpcorr) at each step."""
+        n_time = 10
+        n_chan = N_CHAN
+        n_pairs = n_chan * (n_chan - 1) // 2
+        value = 0.5
+
+        # Create constant-value feature data
+        zpcorr_data = [
+            np.full((n_chan, n_chan), value)
+            for _ in range(n_time)
+        ]
+        group = pd.DataFrame({
+            "zpcorr": zpcorr_data,
+            "duration": [1.0] * n_time,
+        })
+
+        # Step 1: __get_linear_feature should return (n_time, n_pairs, 1)
+        feature_data = plotter._AnimalPlotter__get_linear_feature(
+            group=group, feature="zpcorr", score_type="none"
+        )
+        assert feature_data.shape == (n_time, n_pairs, 1), \
+            f"Expected (n_time, n_pairs, 1), got {feature_data.shape}"
+
+        # Step 2: After np.nanmean(axis=1), should be (n_time, 1)
+        feature_data = np.nanmean(feature_data, axis=1)
+        assert feature_data.shape == (n_time, 1), \
+            f"Expected (n_time, 1), got {feature_data.shape}"
+
+        # Step 3: After squeeze, should be (n_time,)
+        feature_data = feature_data.squeeze()
+        assert feature_data.ndim == 1 and feature_data.shape[0] == n_time, \
+            f"Expected 1D array of length {n_time}, got shape {feature_data.shape}"
+
+        # Step 4: Values should be correct (averaged across channel pairs)
+        assert np.allclose(feature_data, value), \
+            f"Expected all values to be {value}, got {feature_data}"
+
+    def test_temporal_heatmap_shape_validation_banded_matrix(self, plotter, rng):
+        """Test shape validation for BANDED_MATRIX feature (cohere) at each step."""
+        n_time = 10
+        n_chan = N_CHAN
+        n_pairs = n_chan * (n_chan - 1) // 2
+        n_bands = N_BANDS
+        band_values = [0.1, 0.2, 0.3, 0.4, 0.5]  # Distinct value per band
+
+        # Create constant-value feature data with distinct values per band
+        cohere_data = [
+            {band: np.full((n_chan, n_chan), band_values[i])
+             for i, band in enumerate(constants.BAND_NAMES)}
+            for _ in range(n_time)
+        ]
+        group = pd.DataFrame({
+            "cohere": cohere_data,
+            "duration": [1.0] * n_time,
+        })
+
+        # Step 1: __get_linear_feature should return (n_time, n_pairs, n_bands)
+        feature_data = plotter._AnimalPlotter__get_linear_feature(
+            group=group, feature="cohere", score_type="none"
+        )
+        assert feature_data.shape == (n_time, n_pairs, n_bands), \
+            f"Expected (n_time, n_pairs, n_bands), got {feature_data.shape}"
+
+        # Step 2: After np.nanmean(axis=1), should be (n_time, n_bands)
+        feature_data = np.nanmean(feature_data, axis=1)
+        assert feature_data.shape == (n_time, n_bands), \
+            f"Expected (n_time, n_bands), got {feature_data.shape}"
+
+        # Step 3: Values should be correct (averaged across channel pairs, NOT across bands)
+        for i, expected_value in enumerate(band_values):
+            assert np.allclose(feature_data[:, i], expected_value), \
+                f"Expected band {i} values to be {expected_value}, got {feature_data[:, i]}"
+
 
 
 class TestAddLongrecordingBoundaries:

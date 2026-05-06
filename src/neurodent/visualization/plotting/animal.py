@@ -684,6 +684,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
             )
 
             # Get feature data and flatten across channels
+            # Returns shape: (n_time, n_features, n_components) via flatten_feature_for_plotting
             feature_data = self.__get_linear_feature(
                 group=df_day, feature=feature, score_type=score_type
             )
@@ -691,12 +692,16 @@ class AnimalPlotter(viz.AnimalFeatureParser):
             # Classify feature to get its type metadata
             ftype = constants.classify_feature(feature)
 
-            # After __get_linear_feature, the shape is (n_time, n_features, n_components) where:
-            # - n_features is n_channels for LINEAR/LINEAR_2D/BAND, or n_pairs for matrix features
-            # - n_components is 1 for LINEAR/SIMPLE_MATRIX, or the semantic dimension count
+            # Collapse the middle axis (channels or channel-pairs) to get (n_time, n_components).
+            # Shape transitions by feature type:
+            #   LINEAR:         (n_time, n_chan, 1)        → (n_time, 1)
+            #   LINEAR_2D:      (n_time, n_chan, 2)        → (n_time, 2)
+            #   BAND:           (n_time, n_chan, n_bands)  → (n_time, n_bands)
+            #   SIMPLE_MATRIX:  (n_time, n_pairs, 1)      → (n_time, 1)
+            #   BANDED_MATRIX:  (n_time, n_pairs, n_bands) → (n_time, n_bands)
             #
-            # Average over the middle axis (n_features) to get (n_time, n_components)
-            # For features without semantic dimensions, n_components=1 so result is (n_time, 1)
+            # This averages across channels/channel-pairs but PRESERVES semantic dimensions
+            # (components, bands), which are handled separately below.
             feature_data = np.nanmean(feature_data, axis=1)
 
             # Handle features with semantic dimensions (components, bands, freq_bins).
