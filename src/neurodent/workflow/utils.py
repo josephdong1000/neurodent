@@ -510,6 +510,57 @@ def expand_animals_config(samples_config: dict) -> dict:
     return result
 
 
+def get_discovery_animal_filter(
+    source_animal_id: str,
+    is_joint: bool,
+    animal_groups: dict[str, str],
+) -> str:
+    """Determine the animal filter value for discovery.
+
+    For joint sessions with 'group', use the group name for {animal} placeholder.
+    For joint sessions without 'group', use the animal id.
+    For non-joint sessions, use the animal id as usual.
+
+    Parameters
+    ----------
+    source_animal_id : str
+        The animal ID from the configuration
+    is_joint : bool
+        Whether this is a joint session
+    animal_groups : dict[str, str]
+        Mapping of animal_id to group name
+
+    Returns
+    -------
+    str
+        The value to use for {animal} placeholder in discovery pattern
+
+    Examples
+    --------
+    Regular non-joint animal::
+
+        >>> get_discovery_animal_filter("A10", False, {})
+        'A10'
+
+    Joint session with group (e.g., arx_rosa)::
+
+        >>> groups = {"ArxRosa-1017": "Arx Rosa 1017 1015", "ArxRosa-1015": "Arx Rosa 1017 1015"}
+        >>> get_discovery_animal_filter("ArxRosa-1017", True, groups)
+        'Arx Rosa 1017 1015'
+
+    Joint session without group (e.g., jess_rhd where folders contain animal IDs)::
+
+        >>> get_discovery_animal_filter("AP3B2het-207-M", True, {})
+        'AP3B2het-207-M'
+    """
+    if is_joint and source_animal_id in animal_groups:
+        # Use group name for discovery (folder contains group name, not individual animal ID)
+        return animal_groups[source_animal_id]
+    else:
+        # Joint session without group OR regular non-joint session: use animal ID
+        return source_animal_id
+
+
 def resolve_animal_pattern(
     pattern_config,
     animal_id: str,

@@ -828,3 +828,60 @@ class TestExpandAnimalsConfig:
         # Should succeed - different groups can have same channel names
         assert result["_animal_channels"]["A10"] == ["Ch0", "Ch1"]
         assert result["_animal_channels"]["F22"] == ["Ch0", "Ch1"]
+
+
+class TestGetDiscoveryAnimalFilter:
+    """Test the get_discovery_animal_filter function."""
+
+    def test_regular_non_joint_animal(self):
+        """Regular non-joint animals use their animal ID."""
+        from neurodent.workflow.utils import get_discovery_animal_filter
+
+        result = get_discovery_animal_filter("A10", is_joint=False, animal_groups={})
+        assert result == "A10"
+
+    def test_joint_without_group(self):
+        """Joint session without group uses animal ID (e.g., jess_rhd)."""
+        from neurodent.workflow.utils import get_discovery_animal_filter
+
+        result = get_discovery_animal_filter("AP3B2het-207-M", is_joint=True, animal_groups={})
+        assert result == "AP3B2het-207-M"
+
+    def test_joint_with_group(self):
+        """Joint session with group uses group name (e.g., arx_rosa)."""
+        from neurodent.workflow.utils import get_discovery_animal_filter
+
+        animal_groups = {
+            "ArxRosa-1017": "Arx Rosa 1017 1015",
+            "ArxRosa-1015": "Arx Rosa 1017 1015",
+        }
+        result = get_discovery_animal_filter("ArxRosa-1017", is_joint=True, animal_groups=animal_groups)
+        assert result == "Arx Rosa 1017 1015"
+
+    def test_joint_with_group_second_animal(self):
+        """Both animals in same group return same group name."""
+        from neurodent.workflow.utils import get_discovery_animal_filter
+
+        animal_groups = {
+            "ArxRosa-1017": "Arx Rosa 1017 1015",
+            "ArxRosa-1015": "Arx Rosa 1017 1015",
+        }
+        result1 = get_discovery_animal_filter("ArxRosa-1017", is_joint=True, animal_groups=animal_groups)
+        result2 = get_discovery_animal_filter("ArxRosa-1015", is_joint=True, animal_groups=animal_groups)
+        assert result1 == result2 == "Arx Rosa 1017 1015"
+
+    def test_non_joint_ignores_groups(self):
+        """Non-joint animals ignore the groups dict and use animal ID."""
+        from neurodent.workflow.utils import get_discovery_animal_filter
+
+        animal_groups = {"A10": "SomeGroup"}
+        result = get_discovery_animal_filter("A10", is_joint=False, animal_groups=animal_groups)
+        assert result == "A10"
+
+    def test_joint_animal_not_in_groups_uses_id(self):
+        """Joint animal not in groups dict falls back to animal ID."""
+        from neurodent.workflow.utils import get_discovery_animal_filter
+
+        animal_groups = {"OtherAnimal": "SomeGroup"}
+        result = get_discovery_animal_filter("A10", is_joint=True, animal_groups=animal_groups)
+        assert result == "A10"
