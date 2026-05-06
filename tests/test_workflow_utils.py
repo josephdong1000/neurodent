@@ -697,3 +697,108 @@ class TestExpandAnimalsConfig:
         result = expand_animals_config(cfg)
         meta = result["ANIMAL_METADATA"][0]
         assert "exclude" not in meta
+
+    def test_builds_animal_channels(self):
+        """_animal_channels dict is built from animals' channels field."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "A10", "gene": "WT", "sex": "M", "channels": ["Ch0", "Ch1", "Ch2"]},
+                {"id": "F22", "gene": "KO", "sex": "F"},
+            ],
+        }
+        result = expand_animals_config(cfg)
+        assert "_animal_channels" in result
+        assert result["_animal_channels"]["A10"] == ["Ch0", "Ch1", "Ch2"]
+        assert "F22" not in result["_animal_channels"]
+
+    def test_builds_animal_groups(self):
+        """_animal_groups dict is built from animals' group field."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "A10", "gene": "WT", "sex": "M", "channels": ["Ch0"], "group": "SharedGroup"},
+                {"id": "F22", "gene": "KO", "sex": "F"},
+            ],
+        }
+        result = expand_animals_config(cfg)
+        assert "_animal_groups" in result
+        assert result["_animal_groups"]["A10"] == "SharedGroup"
+        assert "F22" not in result["_animal_groups"]
+
+    def test_channels_and_group_not_in_metadata(self):
+        """channels and group keys are excluded from ANIMAL_METADATA."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "A10", "gene": "WT", "sex": "M", "channels": ["Ch0"], "group": "Group1"},
+            ],
+        }
+        result = expand_animals_config(cfg)
+        meta = result["ANIMAL_METADATA"][0]
+        assert "channels" not in meta
+        assert "group" not in meta
+
+    def test_backward_compat_derives_channels_from_joint_sessions(self):
+        """Legacy joint_sessions is auto-converted to _animal_channels with deprecation warning."""
+        import warnings
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "A10", "gene": "WT", "sex": "M"},
+                {"id": "F22", "gene": "KO", "sex": "F"},
+            ],
+            "joint_sessions": {
+                "Session1": {
+                    "A10": ["Ch0", "Ch1"],
+                    "F22": ["Ch2", "Ch3"],
+                }
+            },
+        }
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            result = expand_animals_config(cfg)
+            assert len(w) == 1
+            assert issubclass(w[0].category, DeprecationWarning)
+            assert "joint_sessions" in str(w[0].message)
+
+        assert "_animal_channels" in result
+        assert result["_animal_channels"]["A10"] == ["Ch0", "Ch1"]
+        assert result["_animal_channels"]["F22"] == ["Ch2", "Ch3"]
+
+    def test_backward_compat_verifies_channel_consistency(self):
+        """Legacy joint_sessions verifies channel consistency across sessions."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "A10", "gene": "WT", "sex": "M"},
+            ],
+            "joint_sessions": {
+                "Session1": {"A10": ["Ch0", "Ch1"]},
+                "Session2": {"A10": ["Ch0", "Ch2"]},  # Inconsistent!
+            },
+        }
+        with pytest.raises(ValueError, match="Inconsistent channel lists"):
+            expand_animals_config(cfg)
+
+    def test_backward_compat_new_format_takes_precedence(self):
+        """If animals have channels field, legacy joint_sessions is ignored (no warning)."""
+        import warnings
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "A10", "gene": "WT", "sex": "M", "channels": ["Ch0", "Ch1"]},
+            ],
+            "joint_sessions": {
+                "Session1": {"A10": ["Ch2", "Ch3"]},  # Should be ignored
+            },
+        }
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            result = expand_animals_config(cfg)
+            # No deprecation warning because new format is used
+            deprecation_warnings = [x for x in w if issubclass(x.category, DeprecationWarning)]
+            assert len(deprecation_warnings) == 0
+
+        # Should use the new format, not the legacy one
+        assert result["_animal_channels"]["A10"] == ["Ch0", "Ch1"]
