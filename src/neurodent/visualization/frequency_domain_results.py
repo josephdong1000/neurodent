@@ -95,7 +95,7 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
     def from_detection_results(
         cls,
         spike_indices_per_channel: list[np.ndarray],
-        mne_raw_with_annotations: mne.io.RawArray,
+        recording: "si.BaseRecording",
         detection_params: dict,
         animal_id: str = None,
         genotype: str = None,
@@ -109,7 +109,8 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
 
         Args:
             spike_indices_per_channel: List of spike sample indices per channel
-            mne_raw_with_annotations: MNE RawArray with spike annotations
+            recording: SpikeInterface recording. Traces are read directly
+                from this object (zero-copy) to build SortingAnalyzers.
             detection_params: Parameters used for detection
             animal_id: Identifier for the animal
             genotype: Genotype of animal
@@ -127,13 +128,12 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
         # Convert to SpikeInterface format for compatibility
         result_sas = cls._convert_to_spikeinterface(
             spike_indices_per_channel,
-            mne_raw_with_annotations
+            recording,
         )
 
-        channel_names = mne_raw_with_annotations.ch_names
+        channel_names = [str(ch) for ch in recording.get_channel_ids()]
 
-        # Create instance with SAS first, then set MNE
-        instance = cls(
+        return cls(
             result_sas=result_sas,
             result_mne=None,
             spike_indices=spike_indices_per_channel,
@@ -147,15 +147,10 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
             assume_from_number=assume_from_number,
         )
 
-        # Now set the MNE object after initialization
-        instance.result_mne = mne_raw_with_annotations
-
-        return instance
-
     @staticmethod
     def _convert_to_spikeinterface(
         spike_indices_per_channel: list[np.ndarray],
-        mne_raw: mne.io.RawArray
+        recording: "si.BaseRecording",
     ) -> list[si.SortingAnalyzer]:
         """
         Convert spike detection results to SpikeInterface SortingAnalyzers.
@@ -163,9 +158,14 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
         Uses NumpySorting.from_unit_dict to create compatible objects that work
         with existing WindowAnalysisResult.read_sars_spikes() infrastructure.
 
+        No data is read from the recording here — traces are only accessed
+        later during ``.fif`` export via ``convert_sa_to_np()``, which reads
+        in small chunks.
+
         Args:
             spike_indices_per_channel: List of spike indices per channel
-            mne_raw: MNE RawArray with the original data
+            recording: SpikeInterface recording. Passed through to
+                SortingAnalyzers without reading traces.
 
         Returns:
             list[si.SortingAnalyzer]: SortingAnalyzers for each channel
@@ -173,32 +173,29 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
         if not SPIKEINTERFACE_AVAILABLE:
             raise ImportError("SpikeInterface is required for conversion")
 
-        # Create SpikeInterface recording from MNE data
-        data = mne_raw.get_data()  # Shape: (n_channels, n_times)
-        data = data.T  # SpikeInterface expects (n_times, n_channels)
-        sampling_freq = mne_raw.info['sfreq']
-        channel_ids = mne_raw.ch_names
+        sampling_freq = recording.get_sampling_frequency()
+        channel_ids = recording.get_channel_ids()
 
-        # Create base recording with channel IDs
-        recording = si.NumpyRecording(data, sampling_frequency=sampling_freq, channel_ids=channel_ids)
-
-        # Set a simple linear probe
+        # Set a probe if the recording doesn't already have one.
+        # create_sorting_analyzer requires a probe, but we avoid reading
+        # any trace data — only metadata is added.
         from probeinterface import Probe
-        probe = Probe(ndim=2)
-        probe.set_contacts(
-            positions=[(0, i) for i in range(len(channel_ids))],
-            shapes='circle',
-            shape_params={'radius': 10}
-        )
-        probe.set_device_channel_indices(list(range(len(channel_ids))))
-        recording = recording.set_probe(probe)
+        try:
+            recording.get_probegroup()
+        except ValueError:
+            probe = Probe(ndim=2)
+            probe.set_contacts(
+                positions=[(0, i) for i in range(len(channel_ids))],
+                shapes='circle',
+                shape_params={'radius': 10}
+            )
+            probe.set_device_channel_indices(list(range(len(channel_ids))))
+            recording.set_probe(probe, in_place=True)
 
         sorting_analyzers = []
 
         for ch_idx, spike_indices in enumerate(spike_indices_per_channel):
-            # Create single-channel recording using actual recording channel IDs
-            actual_channel_ids = recording.get_channel_ids()
-            channel_id = actual_channel_ids[ch_idx]
+            channel_id = channel_ids[ch_idx]
             channel_recording = recording.select_channels([channel_id])
 
             if len(spike_indices) > 0:
@@ -245,6 +242,12 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
             if self.result_sas:
                 result_mne = FrequencyDomainSpikeAnalysisResult.convert_sas_to_mne(
                     self.result_sas, chunk_duration_s, multiprocess_mode=multiprocess_mode,
+                )
+                from neurodent.core.frequency_domain_spike_detection import (
+                    FrequencyDomainSpikeDetector,
+                )
+                FrequencyDomainSpikeDetector._add_spike_annotations(
+                    result_mne, self.spike_indices, result_mne.info['sfreq']
                 )
                 if save_raw:
                     self.result_mne = result_mne
@@ -373,7 +376,7 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
             data = json.load(f)
 
         # Load MNE data
-        result_mne = mne.io.read_raw_fif(fif_path, preload=True)
+        result_mne = mne.io.read_raw_fif(fif_path, preload=False)
 
         # Extract spike indices from MNE annotations
         spike_indices = cls._extract_spike_indices_from_mne(result_mne)

@@ -13,7 +13,7 @@ rule lof_evaluation:
     Evaluate LOF accuracy across all flattened WARs using ground truth bad channels
     """
     input:
-        war_pkls=lambda wc: get_wars_after_quality_filtered(wc, filepath_prepend="results/wars_flattened_manual", filepath_append="war.pkl"),
+        war_parquets=lambda wc: get_wars_after_quality_filtered(wc, filepath_prepend="results/wars_flattened_manual", filepath_append="war.parquet"),
         war_jsons=lambda wc: get_wars_after_quality_filtered(wc, filepath_prepend="results/wars_flattened_manual", filepath_append="war.json"),
     output:
         results_csv="results/lof_evaluation/lof_accuracy_results.csv",

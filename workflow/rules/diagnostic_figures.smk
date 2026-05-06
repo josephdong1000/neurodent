@@ -12,10 +12,8 @@ rule diagnostic_figures_unfiltered:
     Generate diagnostic figures from quality-filtered (unfiltered) data
     """
     input:
-        war_pkl="results/wars_quality_filtered/{animal}/war.pkl",
-        war_json="results/wars_quality_filtered/{animal}/war.json",
-        # war_pkl=lambda wc: Path(checkpoints.war_quality_filter.get(**wc).output[0]) / "war.pkl",
-        # war_json=lambda wc: Path(checkpoints.war_quality_filter.get(**wc).output[0]) / "war.json",
+        war_parquet=lambda wc: Path(checkpoints.war_quality_filter.get(**wc).output[0]) / "war.parquet",
+        war_json=lambda wc: Path(checkpoints.war_quality_filter.get(**wc).output[0]) / "war.json",
     output:
         figure_dir=directory("results/diagnostic_figures/{animal}/unfiltered/"),
     params:
@@ -42,10 +40,8 @@ rule diagnostic_figures_filtered:
     Generate diagnostic figures from fragment-filtered data
     """
     input:
-        war_pkl="results/wars_fragment_filtered/{animal}/war.pkl",
-        war_json="results/wars_fragment_filtered/{animal}/war.json",
-        # war_pkl=lambda wc: Path(checkpoints.war_fragment_filtering.get(**wc).output[0]) / "war.pkl",
-        # war_json=lambda wc: Path(checkpoints.war_fragment_filtering.get(**wc).output[0]) / "war.json",
+        war_parquet=lambda wc: checkpoints.war_fragment_filtering.get(**wc).output.war_parquet,
+        war_json=lambda wc: checkpoints.war_fragment_filtering.get(**wc).output.war_json,
     output:
         figure_dir=directory("results/diagnostic_figures/{animal}/filtered/"),
     params:

@@ -231,7 +231,7 @@ def main():
     logger.info("EP statistical figures generation started")
 
     # Get parameters from snakemake
-    war_pkl_files = snakemake.input.war_pkl
+    war_parquet_files = snakemake.input.war_parquet
     war_json_files = snakemake.input.war_json
     config = snakemake.params.config
     samples_config = snakemake.params.samples_config
@@ -245,10 +245,10 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
     data_dir.mkdir(parents=True, exist_ok=True)
 
-    logger.info(f"Loading {len(war_pkl_files)} flattened WARs")
+    logger.info(f"Loading {len(war_parquet_files)} flattened WARs")
 
     # Load WARs using the workflow utility
-    wars = load_wars(war_pkl_files, war_json_files)
+    wars = load_wars(war_parquet_files, war_json_files)
     for war in wars:
         logger.info(f"Loaded WAR for {war.animal_id} ({war.genotype})")
 

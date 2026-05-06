@@ -13,7 +13,7 @@ checkpoint war_quality_filter:
     Filter WARs based on quality criteria and symlink good ones to filtered directory
     """
     input:
-        war_pkl="results/wars/{animal}/war.pkl",
+        war_parquet="results/wars/{animal}/war.parquet",
         war_json="results/wars/{animal}/war.json",
     output:
         directory("results/wars_quality_filtered/{animal}"),

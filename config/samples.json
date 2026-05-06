@@ -544,7 +544,8 @@
         },
         {
             "id": "group9_M1_Cage1",
-            "gene": "Unknown"
+            "gene": "Unknown",
+            "exclude": true
         },
         {
             "id": "group9_M2_Cage 3",

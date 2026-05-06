@@ -17,7 +17,7 @@ rule war_relfreq_plots:
     Generate relative frequency distribution plots from channel-filtered WARs
     """
     input:
-        war_pkl=lambda wc: get_wars_after_quality_filtered(wc, filepath_prepend="results/wars_channel_filtered_manual", filepath_append="war.pkl"),
+        war_parquet=lambda wc: get_wars_after_quality_filtered(wc, filepath_prepend="results/wars_channel_filtered_manual", filepath_append="war.parquet"),
         war_json=lambda wc: get_wars_after_quality_filtered(wc, filepath_prepend="results/wars_channel_filtered_manual", filepath_append="war.json"),
     output:
         figure_dir=directory("results/relfreq_plots/"),

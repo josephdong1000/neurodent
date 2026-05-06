@@ -6,6 +6,7 @@ This module provides utilities that reduce boilerplate in Snakemake workflow scr
 
 import copy
 import logging
+import os
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -53,6 +54,7 @@ def setup_snakemake_logging(snakemake) -> logging.Logger:
         The logger will write to ``logs/my_rule/{animal}.out``.
     """
     log_path = snakemake.log[0]
+    os.makedirs(os.path.dirname(log_path), exist_ok=True)
     log_file = open(log_path, "w")
 
     # Redirect stdout and stderr to the log file
@@ -98,25 +100,28 @@ def inject_config_aliases(samples_config: dict):
 
 
 def load_wars(
-    pkl_paths: list[str | Path],
+    parquet_paths: list[str | Path],
     json_paths: list[str | Path] | None = None,
 ) -> list["WindowAnalysisResult"]:
-    """Load multiple WindowAnalysisResult objects from pickle/json file pairs.
+    """Load multiple WindowAnalysisResult objects from parquet/json file pairs.
 
     General-purpose utility for loading WAR files. Works with any list of paths,
     not tied to Snakemake.
 
     Args:
-        pkl_paths: Paths to .pkl files containing WindowAnalysisResult data.
+        parquet_paths: Paths to .parquet files containing WindowAnalysisResult data.
+            For backward compatibility, legacy .pkl paths are also accepted — the
+            loader will resolve the corresponding .parquet file next to them and
+            fall back to the pickle only if the parquet is missing.
         json_paths: Optional paths to corresponding .json metadata files.
-            If None, assumes json files are in the same directory as pkl files
-            with the same basename but .json extension.
+            If None, assumes json files are in the same directory as the parquet
+            files with the same basename but .json extension.
 
     Returns:
         List of loaded WindowAnalysisResult objects.
 
     Raises:
-        FileNotFoundError: If a pkl or json file does not exist.
+        FileNotFoundError: If a parquet or json file does not exist.
         RuntimeError: If no WARs could be loaded.
 
     Example:
@@ -125,35 +130,39 @@ def load_wars(
             from neurodent.workflow import load_wars
 
             wars = load_wars(
-                pkl_paths=["data/animal1/war.pkl", "data/animal2/war.pkl"],
+                parquet_paths=["data/animal1/war.parquet", "data/animal2/war.parquet"],
                 json_paths=["data/animal1/war.json", "data/animal2/war.json"],
             )
 
         Load WARs with auto-detected json paths::
 
-            wars = load_wars(pkl_paths=["data/animal1/war.pkl"])
+            wars = load_wars(parquet_paths=["data/animal1/war.parquet"])
             # Automatically looks for data/animal1/war.json
     """
     from neurodent import visualization
 
-    # If json_paths not provided, derive from pkl_paths
+    # If json_paths not provided, derive from parquet_paths
     if json_paths is None:
-        json_paths = [Path(p).with_suffix(".json") for p in pkl_paths]
+        json_paths = [Path(p).with_suffix(".json") for p in parquet_paths]
 
-    if len(pkl_paths) != len(json_paths):
+    if len(parquet_paths) != len(json_paths):
         raise ValueError(
-            f"pkl_paths ({len(pkl_paths)}) and json_paths ({len(json_paths)}) "
+            f"parquet_paths ({len(parquet_paths)}) and json_paths ({len(json_paths)}) "
             "must have the same length"
         )
 
     wars = []
-    for pkl_path, json_path in zip(pkl_paths, json_paths):
-        pkl_path = Path(pkl_path)
+    for parquet_path, json_path in zip(parquet_paths, json_paths):
+        parquet_path = Path(parquet_path)
         json_path = Path(json_path)
 
-        war = visualization.WindowAnalysisResult.load_pickle_and_json(
-            folder_path=pkl_path.parent,
-            pickle_name=pkl_path.name,
+        # Accept legacy .pkl input by swapping the suffix
+        if parquet_path.suffix == ".pkl":
+            parquet_path = parquet_path.with_suffix(".parquet")
+
+        war = visualization.WindowAnalysisResult.load_parquet_and_json(
+            folder_path=parquet_path.parent,
+            parquet_name=parquet_path.name,
             json_name=json_path.name,
         )
         wars.append(war)
@@ -329,10 +338,14 @@ def expand_animals_config(samples_config: dict) -> dict:
     if "animals" not in result:
         return result
 
-    animals_list = result["animals"]
+    # Filter out excluded animals from the working list and from result["animals"]
+    # so downstream consumers (e.g. the Snakefile) don't need their own exclude check.
+    # The excluded entries are preserved in the on-disk samples.json for documentation.
+    animals_list = [a for a in result["animals"] if not a.get("exclude", False)]
+    result["animals"] = animals_list
 
     # Keys that are per-animal overrides (not core metadata)
-    _OVERRIDE_KEYS = {"pattern", "lro_kwargs", "day_parse_kwargs", "manual_datetime", "datetimes_are_start", "bad_channels"}
+    _OVERRIDE_KEYS = {"pattern", "lro_kwargs", "day_parse_kwargs", "manual_datetime", "datetimes_are_start", "bad_channels", "exclude"}
     _METADATA_SKIP = _OVERRIDE_KEYS  # excluded from ANIMAL_METADATA entries
 
     # --- Build ANIMAL_METADATA ---

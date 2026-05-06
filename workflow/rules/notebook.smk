@@ -16,7 +16,7 @@ rule notebook:
     outputs serves as a comprehensive analysis report.
     """
     input:
-        war_files=lambda wc: get_wars_after_quality_filtered(wc, filepath_prepend="results/wars_flattened_manual", filepath_append="war.pkl"),
+        war_files=lambda wc: get_wars_after_quality_filtered(wc, filepath_prepend="results/wars_flattened_manual", filepath_append="war.parquet"),
     output:
         # Executed notebook with embedded outputs
         notebook="results/notebooks/war_data_explorer.ipynb"

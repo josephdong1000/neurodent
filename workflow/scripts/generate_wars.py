@@ -8,7 +8,7 @@ This script is a refactored version of the pipeline-war-* scripts,
 designed to work with the Snakemake workflow.
 
 Input: Raw EEG data files
-Output: WAR pickle and JSON files
+Output: WAR parquet and JSON files
 """
 
 import warnings
@@ -57,6 +57,8 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
     try:
         with (
             LocalCluster(
+                n_workers=snakemake.threads,
+                threads_per_worker=1,
                 interface=config["cluster"]["war_generation"]["interface"],
             ) as cluster,
             Client(cluster) as client,
@@ -236,6 +238,11 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
             logger.info(f"Integrating spike features into WAR for {animal_key}")
             war = war.read_sars_spikes(fdsar_list, read_mode="sa", inplace=True)
 
+            # Release AnimalOrganizer to free memmap-backed recording references.
+            # war is self-contained (DataFrame + metadata), fdsar_list SAs still
+            # hold per-channel recording refs needed for .fif export.
+            del ao, all_lros
+
         return war, fdsar_list
     except Exception as e:
         logger.error(f"Failed to generate WAR for {animal_key}: {e}")
@@ -258,8 +265,9 @@ def main():
     war, fdsar_list = generate_war_for_animal(samples_config, config, animal_folder, animal_id, channel_subset, logger)
 
     # Save WAR (now includes nspike/lognspike features)
-    war.save_pickle_and_json(Path(snakemake.output.war_pkl).parent, filename="war", slugify_filename=False)
+    war.save_parquet_and_json(Path(snakemake.output.war_parquet).parent, filename="war", slugify_filename=False)
     logger.info(f"Successfully saved WAR for {animal_folder} {animal_id}")
+    del war  # Free WAR DataFrame before FDSAR saves
 
     # Save FDSAR results - each animalday gets its own subdirectory
     fdsar_base_dir = Path(snakemake.output.fdsar_dir)
@@ -274,20 +282,47 @@ def main():
 
         fdsar.save_fif_and_json(animalday_dir, convert_to_mne=True, slugify_filebase=False, overwrite=True, chunk_duration_s=fdsar_export_chunk_duration_s)
         logger.info(f"Saved FDSAR for {fdsar.animal_id} {fdsar.animal_day} to {animalday_dir}")
+        fdsar.result_sas = None  # Release memmap-backed recording references
 
     logger.info(f"Successfully saved {len(fdsar_list)} FDSAR results to {fdsar_base_dir}")
 
 
 if __name__ == "__main__":
-    if os.environ.get("NEURODENT_PROFILE"):
-        import cProfile
-        profiler = cProfile.Profile()
-        profiler.enable()
-        main()
-        profiler.disable()
-        prof_path = Path(snakemake.output.war_pkl).parent / "profile.prof"
-        profiler.dump_stats(str(prof_path))
-        print(f"Profile saved to {prof_path}")
-        print("Analyze with: python -m snakeviz {prof_path}")
+    memray_enabled = os.environ.get("NEURODENT_MEMRAY")
+    profile_enabled = os.environ.get("NEURODENT_PROFILE")
+
+    # Optional memray memory profiling (context manager wraps main)
+    # memray is Linux-only; gracefully disable on other platforms
+    if memray_enabled:
+        import sys
+        if sys.platform == "linux":
+            import memray
+            memray_path = Path(snakemake.output.war_parquet).parent / "memray.bin"
+            tracker_ctx = memray.Tracker(
+                destination=memray.FileDestination(str(memray_path), overwrite=True)
+            )
+        else:
+            from contextlib import nullcontext
+            tracker_ctx = nullcontext()
+            print(f"Warning: NEURODENT_MEMRAY set but memray is Linux-only (current platform: {sys.platform}). Profiling disabled.")
     else:
-        main()
+        from contextlib import nullcontext
+        tracker_ctx = nullcontext()
+
+    with tracker_ctx:
+        if profile_enabled:
+            import cProfile
+            profiler = cProfile.Profile()
+            profiler.enable()
+            main()
+            profiler.disable()
+            prof_path = Path(snakemake.output.war_parquet).parent / "profile.prof"
+            profiler.dump_stats(str(prof_path))
+            print(f"Profile saved to {prof_path}")
+            print(f"Analyze with: python -m snakeviz {prof_path}")
+        else:
+            main()
+
+    if memray_enabled:
+        print(f"Memray profile saved to {memray_path}")
+        print(f"Generate flamegraph: python -m memray flamegraph {memray_path}")

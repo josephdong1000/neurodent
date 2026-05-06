@@ -97,26 +97,26 @@ def melt_banded_feature(df, feature):
 def extract_feature_from_war(args):
     """
     Worker function: Load WAR, extract feature data, return small DataFrame only.
-    
+
     WAR is garbage collected when function returns, keeping only the extracted data.
-    
+
     Args:
         args: Tuple of (war_path_info, feature, collapse_channels)
-            war_path_info: Tuple of (war_pkl_path, war_json_path, animal_name)
+            war_path_info: Tuple of (war_parquet_path, war_json_path, animal_name)
             feature: Feature name to extract
             collapse_channels: Whether to average across channels
-    
+
     Returns:
         pd.DataFrame: Small DataFrame with just the extracted feature data
     """
     war_path_info, feature, collapse_channels = args
-    war_pkl_path, war_json_path, animal_name = war_path_info
-    
+    war_parquet_path, war_json_path, animal_name = war_path_info
+
     try:
         # Load WAR
-        war = visualization.WindowAnalysisResult.load_pickle_and_json(
-            folder_path=war_pkl_path.parent, 
-            pickle_name=war_pkl_path.name, 
+        war = visualization.WindowAnalysisResult.load_parquet_and_json(
+            folder_path=war_parquet_path.parent,
+            parquet_name=war_parquet_path.name,
             json_name=war_json_path.name
         )
         
@@ -326,7 +326,7 @@ def main():
     log_memory_usage(logger, "startup")
 
     # Get parameters from snakemake
-    war_pkl_files = snakemake.input.war_pkl
+    war_parquet_files = snakemake.input.war_parquet
     war_json_files = snakemake.input.war_json
     config = snakemake.params.config
     samples_config = snakemake.params.samples_config
@@ -340,25 +340,25 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
     data_dir.mkdir(parents=True, exist_ok=True)
 
-    logger.info(f"Processing {len(war_pkl_files)} channel-filtered WARs")
+    logger.info(f"Processing {len(war_parquet_files)} channel-filtered WARs")
 
     # Get number of threads for parallel extraction
     threads = snakemake.threads
     logger.info(f"Using {threads} threads for parallel feature extraction")
 
-    # Validate that PKL and JSON inputs match
-    if len(war_pkl_files) != len(war_json_files):
+    # Validate that parquet and JSON inputs match
+    if len(war_parquet_files) != len(war_json_files):
         raise ValueError(
-            f"Mismatch between PKL files ({len(war_pkl_files)}) and JSON files ({len(war_json_files)})"
+            f"Mismatch between parquet files ({len(war_parquet_files)}) and JSON files ({len(war_json_files)})"
         )
 
     # Prepare WAR information for parallel extraction
     war_infos = []
-    for pkl_file, json_file in zip(war_pkl_files, war_json_files):
-        pkl_path = Path(pkl_file)
+    for parquet_file, json_file in zip(war_parquet_files, war_json_files):
+        parquet_path = Path(parquet_file)
         json_path = Path(json_file)
-        animal_name = pkl_path.parent.name
-        war_infos.append((pkl_path, json_path, animal_name))
+        animal_name = parquet_path.parent.name
+        war_infos.append((parquet_path, json_path, animal_name))
 
     # Get relfreq configuration
     relfreq_config = config["analysis"]["relfreq_plots"]

@@ -23,7 +23,12 @@ from neurodent.workflow import setup_snakemake_logging, inject_config_aliases
 
 def load_fdsar_results(fdsar_base_dir: Path):
     """
-    Load all FDSAR results from a directory containing per-animalday subdirectories.
+    Yield FDSAR results one at a time from a directory of per-animalday subdirectories.
+
+    Yields one :class:`FrequencyDomainSpikeAnalysisResult` at a time so that
+    only a single FDSAR is live in memory during iteration.  Each result's
+    ``.fif`` file is opened with ``preload=False`` (memory-mapped), so peak
+    RAM is proportional to epoch-window size rather than full-recording size.
 
     Expected structure:
         fdsar_base_dir/
@@ -39,44 +44,33 @@ def load_fdsar_results(fdsar_base_dir: Path):
     if not fdsar_base_dir.exists():
         raise ValueError(f"FDSAR directory does not exist: {fdsar_base_dir}")
 
-    fdsar_list = []
-
     # Find all subdirectories that contain FDSAR results
     subdirs = [d for d in fdsar_base_dir.iterdir() if d.is_dir()]
 
     if not subdirs:
         logging.warning(f"No subdirectories found in {fdsar_base_dir}")
-        return fdsar_list
+        return
 
     logging.info(f"Found {len(subdirs)} potential FDSAR subdirectories in {fdsar_base_dir}")
 
     for subdir in sorted(subdirs):
-        # Check if this subdirectory contains FDSAR files
         try:
             logging.info(f"Loading FDSAR from {subdir.name}")
-            fdsar = FrequencyDomainSpikeAnalysisResult.load_fif_and_json(subdir)
-            fdsar_list.append(fdsar)
+            yield FrequencyDomainSpikeAnalysisResult.load_fif_and_json(subdir)
         except Exception as e:
             logging.error(f"Failed to load FDSAR from {subdir}: {e}")
             raise
 
-    return fdsar_list
 
-
-def generate_diagnostics(fdsar_list: list[FrequencyDomainSpikeAnalysisResult], output_dir: Path, sat_config: dict):
+def generate_diagnostics(fdsar_iter, output_dir: Path, sat_config: dict):
     """Generate diagnostic plots for all FDSAR results"""
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    if not fdsar_list:
-        logging.warning("No FDSAR results to process")
-        return
-
-    logging.info(f"Generating diagnostics for {len(fdsar_list)} FDSAR results")
-
     total_spikes = 0
-    for i, fdsar in enumerate(fdsar_list):
-        logging.info(f"Processing FDSAR {i + 1}/{len(fdsar_list)}: {fdsar.animal_id} - {fdsar.animal_day}")
+    i = 0
+    for i, fdsar in enumerate(fdsar_iter, start=1):
+        logging.info(f"Processing FDSAR {i}: {fdsar.animal_id} - {fdsar.animal_day}")
 
         spike_counts = fdsar.get_spike_counts_per_channel()
         session_total = sum(spike_counts)
@@ -110,6 +104,10 @@ def generate_diagnostics(fdsar_list: list[FrequencyDomainSpikeAnalysisResult], o
             logging.error(f"  Failed to generate diagnostic plots: {e}")
             raise
 
+    if not i:
+        logging.warning("No FDSAR results to process")
+        return
+
     logging.info(f"Total spikes across all sessions: {total_spikes}")
 
 
@@ -139,16 +137,14 @@ def main():
     )
 
     logger.info(f"Loading FDSAR results from: {fdsar_dir}")
-    fdsar_list = load_fdsar_results(fdsar_dir)
-
-    if not fdsar_list:
-        logger.warning("No FDSAR results found, creating empty output directory")
-        output_dir.mkdir(parents=True, exist_ok=True)
-        return
+    fdsar_iter = load_fdsar_results(fdsar_dir)
 
     # Generate diagnostics
+    # Note: load_fdsar_results() returns a generator (always truthy), so
+    # emptiness is handled inside generate_diagnostics() via the `if not i`
+    # guard after iteration completes.
     logger.info(f"Generating diagnostics to: {output_dir}")
-    generate_diagnostics(fdsar_list, output_dir, sat_config)
+    generate_diagnostics(fdsar_iter, output_dir, sat_config)
 
     logger.info("FDSAR diagnostics generation completed successfully")
 
