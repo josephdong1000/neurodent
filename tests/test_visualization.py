@@ -1854,8 +1854,20 @@ class TestExperimentPlotterFeatureDispatch:
                 {b: rng.random(n_chan).tolist() for b in constants.BAND_NAMES}
                 for _ in range(n_rows)
             ],
+            "logpsdband": [
+                {b: rng.random(n_chan).tolist() for b in constants.BAND_NAMES}
+                for _ in range(n_rows)
+            ],
+            "psdfrac": [
+                {b: rng.random(n_chan).tolist() for b in constants.BAND_NAMES}
+                for _ in range(n_rows)
+            ],
             "pcorr": [rng.random((n_chan, n_chan)).tolist() for _ in range(n_rows)],
             "cohere": [
+                {b: rng.random((n_chan, n_chan)).tolist() for b in constants.BAND_NAMES}
+                for _ in range(n_rows)
+            ],
+            "imcoh": [
                 {b: rng.random((n_chan, n_chan)).tolist() for b in constants.BAND_NAMES}
                 for _ in range(n_rows)
             ],
@@ -2016,6 +2028,49 @@ class TestExperimentPlotterFeatureDispatch:
             # After pull_timeseries_dataframe, BAND features should be scalar per channel per band
             assert isinstance(psdband_val, (int, float, np.number)), (
                 f"Expected scalar psdband value, got {type(psdband_val)} for band={row['band']}"
+            )
+
+    def test_pull_band_feature_logpsdband_shape_correctness(self, feature_plotter):
+        """Test BAND feature (logpsdband) shape correctness."""
+        df = feature_plotter.pull_timeseries_dataframe(
+            feature="logpsdband", groupby=["genotype"], collapse_channels=False
+        )
+        assert "band" in df.columns
+        assert set(df["band"].unique()) == set(constants.BAND_NAMES)
+
+        for idx, row in df.iterrows():
+            val = row["logpsdband"]
+            assert isinstance(val, (int, float, np.number)), (
+                f"Expected scalar, got {type(val)} for band={row['band']}"
+            )
+
+    def test_pull_band_feature_psdfrac_shape_correctness(self, feature_plotter):
+        """Test BAND feature (psdfrac) shape correctness."""
+        df = feature_plotter.pull_timeseries_dataframe(
+            feature="psdfrac", groupby=["genotype"], collapse_channels=False
+        )
+        assert "band" in df.columns
+        assert set(df["band"].unique()) == set(constants.BAND_NAMES)
+
+        for idx, row in df.iterrows():
+            val = row["psdfrac"]
+            assert isinstance(val, (int, float, np.number)), (
+                f"Expected scalar, got {type(val)} for band={row['band']}"
+            )
+
+    def test_pull_banded_matrix_imcoh_shape_correctness(self, feature_plotter):
+        """Test BANDED_MATRIX feature (imcoh) shape correctness."""
+        df = feature_plotter.pull_timeseries_dataframe(
+            feature="imcoh", groupby=["genotype"], collapse_channels=False
+        )
+        assert "band" in df.columns
+        assert set(df["band"].unique()) == set(constants.BAND_NAMES)
+
+        n_chan = len(feature_plotter.all_channel_names)
+        for idx, row in df.iterrows():
+            matrix = np.array(row["imcoh"])
+            assert matrix.shape == (n_chan, n_chan), (
+                f"Expected shape ({n_chan}, {n_chan}), got {matrix.shape} for band={row['band']}"
             )
 
     def test_pull_hist_feature(self, feature_plotter):

@@ -354,9 +354,24 @@ class ExperimentPlotter:
                 lambda x: x[0]
             )  # get first component (e.g. slope from [slope, intercept])
         elif ftype.is_dict_stored:
-            df[feature] = df[feature].apply(
-                lambda x: list(zip(np.moveaxis(np.asarray(x), -1, 0).tolist(), constants.BAND_NAMES))
-            )
+            # For dict-stored features (BAND, BANDED_MATRIX), the band axis is always
+            # the last semantic axis. Use moveaxis to bring it to front for iteration.
+            band_axis_idx = ftype.semantic_axes.get("bands")
+            if band_axis_idx is None:
+                raise ValueError(f"Feature type {ftype} is marked as dict_stored but has no 'bands' semantic axis")
+
+            # After format_channel_data, per-row data has shape:
+            # - BAND: (C, B) where band_axis_idx=1 (relative to per-row data, not extracted)
+            # - BANDED_MATRIX: (C, C, B) where band_axis_idx=2
+            # We need to move the band axis to position 0 to iterate over bands
+            def explode_bands(x):
+                """Move band axis to front and zip with band names."""
+                arr = np.asarray(x)
+                # The band axis is at the last position in the per-row data
+                arr_bands_first = np.moveaxis(arr, -1, 0)
+                return list(zip(arr_bands_first.tolist(), constants.BAND_NAMES))
+
+            df[feature] = df[feature].apply(explode_bands)
             df = df.explode(feature)
             df[[feature, "band"]] = pd.DataFrame(df[feature].tolist(), index=df.index)
 
