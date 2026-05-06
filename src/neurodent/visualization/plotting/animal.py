@@ -691,9 +691,13 @@ class AnimalPlotter(viz.AnimalFeatureParser):
             # Classify feature to get its type metadata
             ftype = constants.classify_feature(feature)
 
-            # Collapse channel axes using the feature type's metadata.
-            # This uses ftype.channel_axes instead of hardcoding axis positions.
-            feature_data = collapse_feature_channels(feature_data, ftype)
+            # After __get_linear_feature, the shape is (n_time, n_features, n_components) where:
+            # - n_features is n_channels for LINEAR/LINEAR_2D/BAND, or n_pairs for matrix features
+            # - n_components is 1 for LINEAR/SIMPLE_MATRIX, or the semantic dimension count
+            #
+            # Average over the middle axis (n_features) to get (n_time, n_components)
+            # For features without semantic dimensions, n_components=1 so result is (n_time, 1)
+            feature_data = np.nanmean(feature_data, axis=1)
 
             # Handle features with semantic dimensions (components, bands, freq_bins).
             # For LINEAR_2D, BAND, BANDED_MATRIX: plot one heatmap per semantic dimension.
@@ -707,11 +711,11 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                         f"Consider using a different visualization for HIST features."
                     )
 
-                # After collapse_feature_channels, the expected shapes are:
+                # After averaging over channels, the expected shapes are:
                 # LINEAR_2D: (n_time, n_components)
                 # BAND: (n_time, n_bands)
                 # BANDED_MATRIX: (n_time, n_bands)
-                # The semantic axis is at index 1 after collapsing channels
+                # The semantic axis is at index 1 (or 0 if squeezed to 1D)
 
                 # Handle edge case: if feature_data is 1D, it means there was only 1 semantic dimension
                 # (e.g., 1 channel pair for BANDED_MATRIX or data got squeezed)
