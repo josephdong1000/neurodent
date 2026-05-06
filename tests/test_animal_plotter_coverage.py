@@ -650,11 +650,11 @@ class TestPlotTemporalHeatmap:
 
 
 class TestPlotTemporalHeatmapFeatureShapes:
-    """Test that _plot_temporal_heatmap_feature correctly collapses all feature types to 1D."""
+    """Test that _plot_temporal_heatmap_feature correctly handles different feature types."""
 
     @patch("matplotlib.pyplot.show")
     def test_linear_shape_correct(self, mock_show, plotter, mock_war, rng):
-        """LINEAR features (rms) should collapse to (n_time,) shape."""
+        """LINEAR features (rms) should work correctly."""
         features = ["rms"]
         mock_war.get_grouprows_result.return_value = _make_temporal_heatmap_rows(
             features=features, rng=rng
@@ -663,28 +663,30 @@ class TestPlotTemporalHeatmapFeatureShapes:
         plotter.plot_temporal_heatmap(features=features, score_type="none")
 
     @patch("matplotlib.pyplot.show")
-    def test_linear_2d_shape_correct(self, mock_show, plotter, mock_war, rng):
-        """LINEAR_2D features (psdslope) should collapse to (n_time,) shape."""
+    def test_linear_2d_raises_error(self, mock_show, plotter, mock_war, rng):
+        """LINEAR_2D features (psdslope) should raise an error due to semantic dimensions."""
         features = ["psdslope"]
         mock_war.get_grouprows_result.return_value = _make_temporal_heatmap_rows(
             features=features, rng=rng
         )
-        # This should not raise and should produce valid output
-        plotter.plot_temporal_heatmap(features=features, score_type="none")
+        # Should raise ValueError because psdslope has 'components' semantic dimension
+        with pytest.raises(ValueError, match="semantic dimensions.*components"):
+            plotter.plot_temporal_heatmap(features=features, score_type="none")
 
     @patch("matplotlib.pyplot.show")
-    def test_band_shape_correct(self, mock_show, plotter, mock_war, rng):
-        """BAND features (psdband) should collapse to (n_time,) shape."""
+    def test_band_raises_error(self, mock_show, plotter, mock_war, rng):
+        """BAND features (psdband) should raise an error due to semantic dimensions."""
         features = ["psdband"]
         mock_war.get_grouprows_result.return_value = _make_temporal_heatmap_rows(
             features=features, rng=rng
         )
-        # This should not raise and should produce valid output
-        plotter.plot_temporal_heatmap(features=features, score_type="none")
+        # Should raise ValueError because psdband has 'bands' semantic dimension
+        with pytest.raises(ValueError, match="semantic dimensions.*bands"):
+            plotter.plot_temporal_heatmap(features=features, score_type="none")
 
     @patch("matplotlib.pyplot.show")
     def test_simple_matrix_shape_correct(self, mock_show, plotter, mock_war, rng):
-        """SIMPLE_MATRIX features (zpcorr) should collapse to (n_time,) shape."""
+        """SIMPLE_MATRIX features (zpcorr) should work correctly."""
         features = ["zpcorr"]
         mock_war.get_grouprows_result.return_value = _make_temporal_heatmap_rows(
             features=features, rng=rng
@@ -693,95 +695,52 @@ class TestPlotTemporalHeatmapFeatureShapes:
         plotter.plot_temporal_heatmap(features=features, score_type="none")
 
     @patch("matplotlib.pyplot.show")
-    def test_banded_matrix_shape_correct(self, mock_show, plotter, mock_war, rng):
-        """BANDED_MATRIX features (cohere) should collapse to (n_time,) shape."""
+    def test_banded_matrix_raises_error(self, mock_show, plotter, mock_war, rng):
+        """BANDED_MATRIX features (cohere) should raise an error due to semantic dimensions."""
         features = ["cohere"]
         mock_war.get_grouprows_result.return_value = _make_temporal_heatmap_rows(
             features=features, rng=rng
         )
-        # This should not raise and should produce valid output
-        plotter.plot_temporal_heatmap(features=features, score_type="none")
+        # Should raise ValueError because cohere has 'bands' semantic dimension
+        with pytest.raises(ValueError, match="semantic dimensions.*bands"):
+            plotter.plot_temporal_heatmap(features=features, score_type="none")
 
-    def test_linear_2d_numeric_correctness(self, plotter, rng):
-        """Test that LINEAR_2D (psdslope) correctly averages both channels AND components."""
-        # Create synthetic data where slope=1.0, intercept=100.0 for all windows
+    def test_average_feature_over_channels_integration(self, plotter, rng):
+        """Test that collapse_feature_channels is used correctly for LINEAR features."""
+        # Create synthetic data for a LINEAR feature
         n_time = 10
         n_chan = N_CHAN
-        slope = 1.0
-        intercept = 100.0
+        value = 42.0
 
-        # Create feature data with constant slope and intercept
-        psdslope_data = [np.array([[slope, intercept]] * n_chan) for _ in range(n_time)]
+        # Create feature data with constant value across all channels
+        rms_data = [[value] * n_chan for _ in range(n_time)]
 
         group = pd.DataFrame({
-            "psdslope": psdslope_data,
+            "rms": rms_data,
             "duration": [1.0] * n_time,
         })
 
         # Extract and flatten the feature
         result = plotter._AnimalPlotter__get_linear_feature(
-            group=group, feature="psdslope", score_type="none"
+            group=group, feature="rms", score_type="none"
         )
 
-        # After flatten_feature_for_plotting, shape should be (n_time, n_chan, 2)
-        assert result.shape == (n_time, n_chan, 2)
+        # After flatten_feature_for_plotting, shape should be (n_time, n_chan, 1) for LINEAR
+        assert result.shape == (n_time, n_chan, 1)
 
-        # Now test the collapsing logic that happens in _plot_temporal_heatmap_feature
-        if result.ndim > 2:
-            collapsed = np.nanmean(result, axis=(1, 2))
-        else:
-            collapsed = result.squeeze()
+        # Now test the collapsing logic using collapse_feature_channels
+        from neurodent.visualization.feature_utils import collapse_feature_channels
+        from neurodent.constants import classify_feature
 
-        # After collapsing both channels and components, should be (n_time,)
+        ftype = classify_feature("rms")
+        collapsed = collapse_feature_channels(result, ftype).squeeze()
+
+        # After collapsing channels and squeezing, should be (n_time,) for LINEAR
         assert collapsed.ndim == 1
         assert collapsed.shape == (n_time,)
 
-        # The value should be the mean of slope and intercept: (1.0 + 100.0) / 2 = 50.5
-        expected = (slope + intercept) / 2.0
-        assert np.allclose(collapsed, expected)
-
-    def test_band_numeric_correctness(self, plotter, rng):
-        """Test that BAND (psdband) correctly averages both channels AND bands."""
-        # Create synthetic data with constant value per band
-        n_time = 10
-        n_chan = N_CHAN
-        n_bands = len(constants.BAND_NAMES)
-
-        # Different value for each band to verify averaging
-        band_values = {band: float(i + 1) for i, band in enumerate(constants.BAND_NAMES)}
-
-        # Create feature data with constant values per band
-        psdband_data = [
-            {band: [val] * n_chan for band, val in band_values.items()}
-            for _ in range(n_time)
-        ]
-
-        group = pd.DataFrame({
-            "psdband": psdband_data,
-            "duration": [1.0] * n_time,
-        })
-
-        # Extract and flatten the feature
-        result = plotter._AnimalPlotter__get_linear_feature(
-            group=group, feature="psdband", score_type="none"
-        )
-
-        # After flatten_feature_for_plotting, shape should be (n_time, n_chan, n_bands)
-        assert result.shape == (n_time, n_chan, n_bands)
-
-        # Now test the collapsing logic
-        if result.ndim > 2:
-            collapsed = np.nanmean(result, axis=(1, 2))
-        else:
-            collapsed = result.squeeze()
-
-        # After collapsing both channels and bands, should be (n_time,)
-        assert collapsed.ndim == 1
-        assert collapsed.shape == (n_time,)
-
-        # The value should be the mean across all bands: (1+2+3+4+5) / 5 = 3.0
-        expected = np.mean(list(band_values.values()))
-        assert np.allclose(collapsed, expected)
+        # The value should be the original value (averaged across channels)
+        assert np.allclose(collapsed, value)
 
 
 

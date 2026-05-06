@@ -11,7 +11,11 @@ from scipy.stats import gzscore, linregress, zscore
 
 from ... import constants
 from ... import visualization as viz
-from ..feature_utils import flatten_feature_for_plotting, extract_feature
+from ..feature_utils import (
+    flatten_feature_for_plotting,
+    extract_feature,
+    collapse_feature_channels,
+)
 
 
 class AnimalPlotter(viz.AnimalFeatureParser):
@@ -684,13 +688,26 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                 group=df_day, feature=feature, score_type=score_type
             )
 
-            # Flatten across channels (take mean across channels)
-            # For multi-dimensional features, also collapse any trailing semantic axes
-            # (components for LINEAR_2D, bands for BAND/BANDED_MATRIX)
-            if feature_data.ndim > 2:
-                feature_data = np.nanmean(feature_data, axis=(1, 2))
-            else:
-                feature_data = feature_data.squeeze()
+            # Classify feature to get its type metadata
+            ftype = constants.classify_feature(feature)
+
+            # Temporal heatmaps display a single scalar per time window.
+            # Features with semantic dimensions (components, bands, freq_bins)
+            # cannot be meaningfully reduced to a single scalar — averaging
+            # slope+intercept or averaging across frequency bands loses information.
+            if ftype.semantic_axes:
+                semantic_dims = ", ".join(ftype.semantic_axes.keys())
+                raise ValueError(
+                    f"Feature '{feature}' has semantic dimensions ({semantic_dims}) "
+                    f"that cannot be meaningfully collapsed to a single scalar for "
+                    f"temporal heatmap plotting. Consider plotting individual components "
+                    f"or bands separately, or use a different visualization."
+                )
+
+            # Collapse channel axes using the feature type's metadata.
+            # This uses ftype.channel_axes instead of hardcoding axis positions.
+            # Squeeze to ensure we get 1D output (e.g., LINEAR returns (n_time, 1) -> (n_time,))
+            feature_data = collapse_feature_channels(feature_data, ftype).squeeze()
 
             # Create time bins for the heatmap (24 hours)
             time_bins = np.linspace(0, 24, n_bins + 1)  # 25 edges for 24 bins
