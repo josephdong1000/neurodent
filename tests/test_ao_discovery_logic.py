@@ -587,6 +587,9 @@ def test_pattern_with_irrelevant_path_data_and_index_sort(tmp_path, monkeypatch)
         ao_instance._is_item_file = results.AnimalOrganizer._is_item_file.__get__(
             ao_instance, results.AnimalOrganizer
         )
+        ao_instance._get_item_key = results.AnimalOrganizer._get_item_key.__get__(
+            ao_instance, results.AnimalOrganizer
+        )
 
         result = ao_instance._compute_global_timeline(
             base_datetime, animalday_to_items, base_lro_kwargs,
@@ -611,9 +614,18 @@ def test_pattern_with_irrelevant_path_data_and_index_sort(tmp_path, monkeypatch)
             ("quokka.bin", "010", 9),      # index 010, hour 9
         ]
 
+        # _get_item_key returns full paths; build a lookup from filename to the
+        # actual key present in the result dict (avoids path-separator mismatches
+        # on Windows where DiscoveredFile.path and _get_item_key may differ).
+        filename_to_key = {}
+        for key in result:
+            fname = Path(key).name
+            filename_to_key[fname] = key
+
         for filename, index, hour_offset in expected_order:
             expected_time = base_datetime + pd.Timedelta(hours=hour_offset)
-            assert result[filename] == expected_time, (
+            key = filename_to_key[filename]
+            assert result[key] == expected_time, (
                 f"{filename} (index {index}) should be at hour {hour_offset}, "
-                f"but got {result[filename]}"
+                f"but got {result.get(key)}"
             )
