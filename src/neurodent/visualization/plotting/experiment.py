@@ -367,6 +367,20 @@ class ExperimentPlotter:
             def explode_bands(x):
                 """Move band axis to front and zip with band names."""
                 arr = np.asarray(x)
+                expected_band_count = len(constants.BAND_NAMES)
+
+                if arr.ndim == 0:
+                    raise ValueError(
+                        f"Expected banded data for feature '{feature}', but received a scalar value"
+                    )
+
+                actual_band_count = arr.shape[-1]
+                if actual_band_count != expected_band_count:
+                    raise ValueError(
+                        f"Feature '{feature}' has {actual_band_count} bands on the last axis, "
+                        f"but expected {expected_band_count} to match constants.BAND_NAMES"
+                    )
+
                 # The band axis is at the last position in the per-row data
                 arr_bands_first = np.moveaxis(arr, -1, 0)
                 return list(zip(arr_bands_first.tolist(), constants.BAND_NAMES))
