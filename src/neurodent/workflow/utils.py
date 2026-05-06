@@ -256,6 +256,8 @@ def expand_animals_config(samples_config: dict) -> dict:
       (built from per-animal ``bad_channels`` entries)
     * ``_animal_overrides`` – animal_id → per-animal overrides dict (pattern,
       lro_kwargs, day_parse_kwargs)
+    * ``_animal_channels`` – animal_id → channel list mapping (for joint sessions)
+    * ``_animal_groups`` – animal_id → group string mapping (for joint sessions)
 
     ``data_root`` is the canonical path key.  If the legacy key
     ``data_parent_folder`` is present it is migrated to ``data_root``.
@@ -328,6 +330,31 @@ def expand_animals_config(samples_config: dict) -> dict:
         ... })
         >>> cfg["bad_channels"]["A10"]
         {'Session1': ['LHip'], 'Session2': ['RMot']}
+
+    Joint sessions with channels::
+
+        >>> cfg = expand_animals_config({
+        ...     "data_root": "/data",
+        ...     "animals": [
+        ...         {"id": "A10", "gene": "WT", "sex": "M",
+        ...          "channels": ["Ch0", "Ch1", "Ch2", "Ch3"]},
+        ...     ],
+        ... })
+        >>> cfg["_animal_channels"]["A10"]
+        ['Ch0', 'Ch1', 'Ch2', 'Ch3']
+
+    Joint sessions with group::
+
+        >>> cfg = expand_animals_config({
+        ...     "data_root": "/data",
+        ...     "animals": [
+        ...         {"id": "A10", "gene": "WT", "sex": "M",
+        ...          "channels": ["Ch0", "Ch1"],
+        ...          "group": "SharedGroup"},
+        ...     ],
+        ... })
+        >>> cfg["_animal_groups"]["A10"]
+        'SharedGroup'
     """
     result = copy.deepcopy(samples_config)
 
@@ -345,7 +372,7 @@ def expand_animals_config(samples_config: dict) -> dict:
     result["animals"] = animals_list
 
     # Keys that are per-animal overrides (not core metadata)
-    _OVERRIDE_KEYS = {"pattern", "lro_kwargs", "day_parse_kwargs", "manual_datetime", "datetimes_are_start", "bad_channels", "exclude"}
+    _OVERRIDE_KEYS = {"pattern", "lro_kwargs", "day_parse_kwargs", "manual_datetime", "datetimes_are_start", "bad_channels", "exclude", "channels", "group"}
     _METADATA_SKIP = _OVERRIDE_KEYS  # excluded from ANIMAL_METADATA entries
 
     # --- Build ANIMAL_METADATA ---
@@ -388,6 +415,54 @@ def expand_animals_config(samples_config: dict) -> dict:
             elif isinstance(bc, dict):
                 # Dict format: session → bad channels mapping
                 result["bad_channels"][animal["id"]] = bc
+
+    # --- Build _animal_channels and _animal_groups ---
+    animal_channels: dict[str, list[str]] = {}
+    animal_groups: dict[str, str] = {}
+
+    for animal in animals_list:
+        if "channels" in animal:
+            animal_channels[animal["id"]] = animal["channels"]
+        if "group" in animal:
+            animal_groups[animal["id"]] = animal["group"]
+
+    if animal_channels:
+        result["_animal_channels"] = animal_channels
+    if animal_groups:
+        result["_animal_groups"] = animal_groups
+
+    # --- Backward compatibility: derive channels/groups from legacy joint_sessions ---
+    if "joint_sessions" in result and result["joint_sessions"]:
+        # Check if any animals already have channels defined
+        has_new_format = any("channels" in a for a in animals_list)
+
+        if not has_new_format:
+            # Auto-derive from legacy format with deprecation warning
+            import warnings
+            warnings.warn(
+                "The 'joint_sessions' configuration format is deprecated. "
+                "Please migrate to the unified 'animals' format by adding 'channels' "
+                "and optionally 'group' fields to animal entries. "
+                "See the migration guide for details.",
+                DeprecationWarning,
+                stacklevel=2
+            )
+
+            # Derive channels from joint_sessions
+            if "_animal_channels" not in result:
+                result["_animal_channels"] = {}
+
+            for session_name, animals_dict in result["joint_sessions"].items():
+                for animal_id, channels in animals_dict.items():
+                    if animal_id in result["_animal_channels"]:
+                        # Verify consistency
+                        if result["_animal_channels"][animal_id] != channels:
+                            raise ValueError(
+                                f"Inconsistent channel lists for {animal_id} across joint sessions. "
+                                f"Expected {result['_animal_channels'][animal_id]}, got {channels} in {session_name}."
+                            )
+                    else:
+                        result["_animal_channels"][animal_id] = channels
 
     # --- Build _animal_overrides ---
     overrides: dict[str, dict] = {}

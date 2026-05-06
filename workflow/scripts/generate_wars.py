@@ -86,12 +86,11 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
             for folder_info in animal_folders:
                 # Unpack tuple from Snakefile
                 folder_path, source_animal_id, session_key = folder_info
-                
+
                 logger.info(f"Loading session: {folder_path} (ID in metadata: {source_animal_id})")
-                
-                # Check if this specific session is a joint session
-                # We check if the session_key exists in the joint_sessions config
-                is_joint = session_key in samples_config.get("joint_sessions", {})
+
+                # Check if this animal has channels defined (indicates joint session)
+                is_joint = source_animal_id in samples_config.get("_animal_channels", {})
 
                 # Apply session-specific overrides from dataset config
                 session_analysis_config = analysis_config.copy()
@@ -158,27 +157,41 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
                 )
                 logger.info(f"  -> Discovery pattern: {discovery_pattern}")
 
-                # For joint sessions, don't filter by animal_id during discovery
-                # since all files belong to all animals in the joint session
-                ao_animal_id = None if is_joint else source_animal_id
+                # Determine the animal filter value for discovery
+                # For joint sessions with 'group', use the group name for {animal} placeholder
+                # For joint sessions without 'group', use the animal id
+                # For non-joint sessions, use the animal id as usual
+                animal_groups = samples_config.get("_animal_groups", {})
+                if is_joint and source_animal_id in animal_groups:
+                    # Use group name for discovery (folder contains group name, not individual animal ID)
+                    discovery_animal_filter = animal_groups[source_animal_id]
+                    logger.info(f"  -> Using group '{discovery_animal_filter}' for {animal} placeholder in discovery")
+                elif is_joint:
+                    # Joint session without group: use animal ID for discovery
+                    # (folder contains individual animal IDs)
+                    discovery_animal_filter = source_animal_id
+                    logger.info(f"  -> Using animal ID '{discovery_animal_filter}' for discovery (joint session without group)")
+                else:
+                    # Regular non-joint session
+                    discovery_animal_filter = source_animal_id
 
                 # Create AO for this session using pattern-based discovery
                 session_ao = visualization.AnimalOrganizer(
                     discovery_pattern,
-                    animal_id=ao_animal_id,
+                    animal_id=discovery_animal_filter,
                     skip_sessions=session_analysis_config.get("skip_sessions", session_analysis_config.get("skip_days", [])),
                     assume_from_number=session_analysis_config["assume_from_number"],
                     lro_kwargs=session_lro_kwargs,
                 )
 
-                
+
                 if is_joint and channel_subset is not None:
                      logger.info(f"  -> Joint session detected. Filtering to channels: {channel_subset}")
                      # Split to only the channels assigned to this animal
                      # source_animal_id is the key in the splits dict
                      splits = session_ao.split(groups={source_animal_id: channel_subset})
                      session_ao = splits[source_animal_id]
-                
+
                 # Collect LROs
                 all_lros.extend(session_ao.long_recordings)
             
