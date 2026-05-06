@@ -360,10 +360,15 @@ class ExperimentPlotter:
             if band_axis_idx is None:
                 raise ValueError(f"Feature type {ftype} is marked as dict_stored but has no 'bands' semantic axis")
 
-            # After format_channel_data, per-row data has shape:
-            # - BAND: (C, B) where band_axis_idx=1 (relative to per-row data, not extracted)
-            # - BANDED_MATRIX: (C, C, B) where band_axis_idx=2
-            # We need to move the band axis to position 0 to iterate over bands
+            # Verify that bands is indeed the last semantic axis in the extracted shape
+            # This validates the FeatureType metadata is consistent with our expectations
+            expected_last_axis = len(ftype.channel_axes) + 1  # W + channel axes + band axis
+            if band_axis_idx != expected_last_axis:
+                raise ValueError(
+                    f"Feature type {ftype} has bands at axis {band_axis_idx}, "
+                    f"but expected it at axis {expected_last_axis} (last semantic axis)"
+                )
+
             def explode_bands(x):
                 """Move band axis to front and zip with band names."""
                 arr = np.asarray(x)
@@ -374,14 +379,19 @@ class ExperimentPlotter:
                         f"Expected banded data for feature '{feature}', but received a scalar value"
                     )
 
+                # The band axis is always the last axis in the per-row data
+                # After format_channel_data + melt:
+                # - For BAND (non-matrix): per-channel data is (B,), band axis at -1
+                # - For BANDED_MATRIX (matrix): data is (C, C, B), band axis at -1
                 actual_band_count = arr.shape[-1]
                 if actual_band_count != expected_band_count:
                     raise ValueError(
-                        f"Feature '{feature}' has {actual_band_count} bands on the last axis, "
-                        f"but expected {expected_band_count} to match constants.BAND_NAMES"
+                        f"Feature '{feature}' has {actual_band_count} bands at the last axis, "
+                        f"but expected {expected_band_count} to match constants.BAND_NAMES. "
+                        f"Data shape: {arr.shape}"
                     )
 
-                # The band axis is at the last position in the per-row data
+                # Move the band axis (last position) to position 0 for iteration
                 arr_bands_first = np.moveaxis(arr, -1, 0)
                 return list(zip(arr_bands_first.tolist(), constants.BAND_NAMES))
 
