@@ -23,6 +23,8 @@ class TestTimelineSortingCrash:
         ao._get_item_name = AnimalOrganizer._get_item_name.__get__(ao, AnimalOrganizer)
         ao._get_item_key = AnimalOrganizer._get_item_key.__get__(ao, AnimalOrganizer)
         ao._is_item_file = AnimalOrganizer._is_item_file.__get__(ao, AnimalOrganizer)
+        ao._items_have_index = AnimalOrganizer._items_have_index.__get__(ao, AnimalOrganizer)
+        ao._session_sort_key = AnimalOrganizer._session_sort_key.__get__(ao, AnimalOrganizer)
 
         animalday_to_folders = {
             "Day1": ["/data/filename_20250101.rhd", "/data/filename_20250102.rhd"]

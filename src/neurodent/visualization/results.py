@@ -432,6 +432,22 @@ class AnimalOrganizer(AnimalFeatureParser):
                 matching_folders.extend(folders)
         return matching_folders
 
+    def _items_have_index(self, items):
+        """Check if items carry {index} metadata."""
+        return (
+            items
+            and hasattr(items[0], "metadata")
+            and "index" in getattr(items[0], "metadata", {})
+        )
+
+    def _session_sort_key(self, items):
+        """Return sort-key function: use {index} metadata if available, else filename."""
+        from ..core.discovery import _natural_sort_key
+
+        if self._items_have_index(items):
+            return lambda f: _natural_sort_key(f.metadata["index"])
+        return lambda f: _natural_sort_key(self._get_item_name(f))
+
     def _compute_global_timeline(
         self,
         base_datetime,
@@ -454,16 +470,20 @@ class AnimalOrganizer(AnimalFeatureParser):
             if isinstance(original_manual_datetimes, list):
                 for animalday in sorted(animalday_to_items.keys(), key=_natural_sort_key):
                     items = animalday_to_items[animalday]
-                    ordered_items.extend(items)
+                    sorted_items = sorted(items, key=self._session_sort_key(items))
+                    ordered_items.extend(sorted_items)
             else:
                 for animalday in sorted(animalday_to_items.keys(), key=_natural_sort_key):
                     items = animalday_to_items[animalday]
-                    sorted_items = sorted(items, key=lambda f: _natural_sort_key(self._get_item_name(f)))
+                    sorted_items = sorted(items, key=self._session_sort_key(items))
                     ordered_items.extend(sorted_items)
         else:
             for animalday in sorted(animalday_to_items.keys(), key=_natural_sort_key):
                 items = animalday_to_items[animalday]
-                if len(items) > 1:
+                if self._items_have_index(items):
+                    sorted_items = sorted(items, key=self._session_sort_key(items))
+                    ordered_items.extend(sorted_items)
+                elif len(items) > 1:
                     item_lro_pairs = []
                     for item in items:
                         try:

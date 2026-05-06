@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 
 from neurodent.visualization import AnimalOrganizer
+from neurodent.core.discovery import DiscoveredFile
 
 class TestTimelineSequencing:
     @pytest.fixture
@@ -26,13 +27,15 @@ class TestTimelineSequencing:
         ao._get_item_key = AnimalOrganizer._get_item_key.__get__(ao, AnimalOrganizer)
         ao._validate_timestamp_ordering = AnimalOrganizer._validate_timestamp_ordering
         ao._is_item_file = AnimalOrganizer._is_item_file.__get__(ao, AnimalOrganizer)
+        ao._items_have_index = AnimalOrganizer._items_have_index.__get__(ao, AnimalOrganizer)
+        ao._session_sort_key = AnimalOrganizer._session_sort_key.__get__(ao, AnimalOrganizer)
         # Bind _iter_valid_recordings so the post-load guard in _create_long_recordings works
         ao._iter_valid_recordings = AnimalOrganizer._iter_valid_recordings.__get__(ao, AnimalOrganizer)
 
         # Mock dependencies
         ao._resolve_timestamp_input = MagicMock(side_effect=lambda x, y: pd.to_datetime(x))
         ao._get_folders_for_animal = MagicMock(side_effect=lambda aid, mapping: [f for folders in mapping.values() for f in folders])
-        
+
         return ao
 
     @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
@@ -379,6 +382,238 @@ class TestTimelineSequencing:
                 manual_datetimes, animalday_to_items, base_lro_kwargs
             )
 
+    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    def test_index_metadata_sort_scalar_datetime(self, mock_lro_cls, ao):
+        """
+        When items carry {index} metadata (from DiscoveredFile), sorting within
+        a session should use the index value, not the filename.
+
+        Here filenames sort differently from indices:
+        - rec_A_data.bin (index="1") should come first
+        - rec_B_data.bin (index="2") should come second
+        - rec_C_data.bin (index="3") should come third
+        """
+        def side_effect(*args, **kwargs):
+            m = MagicMock()
+            m.LongRecording.get_duration.return_value = 3600.0
+            return m
+
+        mock_lro_cls.side_effect = side_effect
+
+        # DiscoveredFile items where filename order != index order
+        items = [
+            DiscoveredFile(path="/data/day1/rec_C_data.bin", metadata={"animal": "M1", "session": "day1", "index": "3"}),
+            DiscoveredFile(path="/data/day1/rec_A_data.bin", metadata={"animal": "M1", "session": "day1", "index": "1"}),
+            DiscoveredFile(path="/data/day1/rec_B_data.bin", metadata={"animal": "M1", "session": "day1", "index": "2"}),
+        ]
+
+        animalday_to_items = {"day1": items}
+        base_datetime = pd.to_datetime("2025-01-01 12:00:00")
+        base_lro_kwargs = {"datetimes_are_start": True}
+
+        result = ao._compute_global_timeline(
+            base_datetime, animalday_to_items, base_lro_kwargs,
+            original_manual_datetimes=base_datetime,
+        )
+
+        # Items should be ordered by index (1, 2, 3), not filename (A, B, C)
+        # _get_item_key returns full paths for DiscoveredFile items
+        assert result["/data/day1/rec_A_data.bin"] == pd.to_datetime("2025-01-01 12:00:00")  # index 1
+        assert result["/data/day1/rec_B_data.bin"] == pd.to_datetime("2025-01-01 13:00:00")  # index 2
+        assert result["/data/day1/rec_C_data.bin"] == pd.to_datetime("2025-01-01 14:00:00")  # index 3
+
+    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    def test_index_metadata_overrides_filename_sort(self, mock_lro_cls, ao):
+        """
+        Test that index metadata is used for sorting even when filenames
+        would sort in a completely different order.
+
+        This test uses filenames with irrelevant data that would naturally
+        sort differently from the index values, proving that the index
+        metadata is what determines the order.
+        """
+        def side_effect(*args, **kwargs):
+            m = MagicMock()
+            m.LongRecording.get_duration.return_value = 3600.0
+            return m
+
+        mock_lro_cls.side_effect = side_effect
+
+        # Filenames that sort alphabetically as: aardvark < monkey < zebra
+        # But indices are: 3, 1, 2 (monkey first, zebra second, aardvark third)
+        items = [
+            DiscoveredFile(path="/data/irrelevant/zebra_data.bin", metadata={"animal": "M1", "session": "day1", "index": "2"}),
+            DiscoveredFile(path="/data/irrelevant/monkey_data.bin", metadata={"animal": "M1", "session": "day1", "index": "1"}),
+            DiscoveredFile(path="/data/irrelevant/aardvark_data.bin", metadata={"animal": "M1", "session": "day1", "index": "3"}),
+        ]
+
+        animalday_to_items = {"day1": items}
+        base_datetime = pd.to_datetime("2025-01-01 12:00:00")
+        base_lro_kwargs = {"datetimes_are_start": True}
+
+        result = ao._compute_global_timeline(
+            base_datetime, animalday_to_items, base_lro_kwargs,
+            original_manual_datetimes=base_datetime,
+        )
+
+        # Items should be ordered by index (1, 2, 3), not filename natural sort
+        # If sorted by filename: aardvark (index=3), monkey (index=1), zebra (index=2)
+        # If sorted by index: monkey (index=1), zebra (index=2), aardvark (index=3) ← correct
+        # _get_item_key returns full paths for DiscoveredFile items
+        assert result["/data/irrelevant/monkey_data.bin"] == pd.to_datetime("2025-01-01 12:00:00")  # index 1, first
+        assert result["/data/irrelevant/zebra_data.bin"] == pd.to_datetime("2025-01-01 13:00:00")   # index 2, second
+        assert result["/data/irrelevant/aardvark_data.bin"] == pd.to_datetime("2025-01-01 14:00:00") # index 3, third
+
+
+    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    def test_index_metadata_sort_list_datetime(self, mock_lro_cls, ao):
+        """
+        When original_manual_datetimes is a list and items carry {index} metadata,
+        items within each session should be sorted by index before being paired
+        with the list timestamps.
+        """
+        def side_effect(*args, **kwargs):
+            m = MagicMock()
+            m.LongRecording.get_duration.return_value = 1800.0
+            return m
+
+        mock_lro_cls.side_effect = side_effect
+
+        items = [
+            DiscoveredFile(path="/data/day1/rec_B.bin", metadata={"animal": "M1", "session": "day1", "index": "2"}),
+            DiscoveredFile(path="/data/day1/rec_A.bin", metadata={"animal": "M1", "session": "day1", "index": "1"}),
+        ]
+
+        animalday_to_items = {"day1": items}
+        base_datetime = pd.to_datetime("2025-01-01 10:00:00")
+        base_lro_kwargs = {"datetimes_are_start": True}
+        # One timestamp per item, paired in sorted order
+        list_datetimes = ["2025-01-01 10:00:00", "2025-01-01 11:00:00"]
+
+        result = ao._compute_global_timeline(
+            base_datetime, animalday_to_items, base_lro_kwargs,
+            original_manual_datetimes=list_datetimes,
+        )
+
+        # index=1 (rec_A.bin) should pair with first timestamp,
+        # index=2 (rec_B.bin) with second
+        # Timeline uses base_datetime + cumulative durations (1800s each)
+        # _get_item_key returns full paths for DiscoveredFile items
+        assert result["/data/day1/rec_A.bin"] == pd.to_datetime("2025-01-01 10:00:00")
+        assert result["/data/day1/rec_B.bin"] == pd.to_datetime("2025-01-01 10:30:00")
+
+    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    def test_index_metadata_sort_no_manual_datetimes(self, mock_lro_cls, ao):
+        """
+        When no manual_datetimes are provided and items carry {index} metadata,
+        sorting within a session should use the index value instead of falling
+        back to LRO median-time sorting.
+        """
+        durations = {
+            "/data/day1/rec_Z.bin": 1800.0,
+            "/data/day1/rec_A.bin": 3600.0,
+            "/data/day1/rec_M.bin": 900.0,
+        }
+
+        def side_effect(folder, **kwargs):
+            import os as _os
+            m = MagicMock()
+            m.LongRecording.get_duration.return_value = durations.get(_os.fspath(folder), 3600.0)
+            return m
+
+        mock_lro_cls.side_effect = side_effect
+
+        items = [
+            DiscoveredFile(path="/data/day1/rec_Z.bin", metadata={"animal": "M1", "session": "day1", "index": "2"}),
+            DiscoveredFile(path="/data/day1/rec_A.bin", metadata={"animal": "M1", "session": "day1", "index": "3"}),
+            DiscoveredFile(path="/data/day1/rec_M.bin", metadata={"animal": "M1", "session": "day1", "index": "1"}),
+        ]
+
+        animalday_to_items = {"day1": items}
+        base_datetime = pd.to_datetime("2025-01-01 08:00:00")
+        base_lro_kwargs = {"datetimes_are_start": True}
+
+        result = ao._compute_global_timeline(
+            base_datetime, animalday_to_items, base_lro_kwargs,
+            original_manual_datetimes=None,
+        )
+
+        # Sorted by index: rec_M (1, 900s), rec_Z (2, 1800s), rec_A (3, 3600s)
+        # _get_item_key returns full paths for DiscoveredFile items
+        assert result["/data/day1/rec_M.bin"] == pd.to_datetime("2025-01-01 08:00:00")       # index 1, duration 900s
+        assert result["/data/day1/rec_Z.bin"] == pd.to_datetime("2025-01-01 08:15:00")       # index 2, duration 1800s
+        assert result["/data/day1/rec_A.bin"] == pd.to_datetime("2025-01-01 08:45:00")       # index 3, duration 3600s
+
+    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    def test_no_index_metadata_falls_back_to_filename(self, mock_lro_cls, ao):
+        """
+        When items don't carry {index} metadata (plain strings/paths), sorting
+        should fall back to filename-based natural sort (existing behavior).
+        """
+        def side_effect(*args, **kwargs):
+            m = MagicMock()
+            m.LongRecording.get_duration.return_value = 3600.0
+            return m
+
+        mock_lro_cls.side_effect = side_effect
+
+        # Plain string paths (no metadata)
+        animalday_to_items = {
+            "day1": ["/data/day1/file_2", "/data/day1/file_1", "/data/day1/file_10"],
+        }
+        base_datetime = pd.to_datetime("2025-01-01 12:00:00")
+        base_lro_kwargs = {"datetimes_are_start": True}
+
+        result = ao._compute_global_timeline(
+            base_datetime, animalday_to_items, base_lro_kwargs,
+            original_manual_datetimes=base_datetime,
+        )
+
+        # Natural sort: file_1 < file_2 < file_10
+        # _get_item_key returns full paths for string items
+        assert result["/data/day1/file_1"] == pd.to_datetime("2025-01-01 12:00:00")
+        assert result["/data/day1/file_2"] == pd.to_datetime("2025-01-01 13:00:00")
+        assert result["/data/day1/file_10"] == pd.to_datetime("2025-01-01 14:00:00")
+
+    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    def test_index_metadata_sort_across_sessions(self, mock_lro_cls, ao):
+        """
+        Verify that index-based sorting is applied independently per session,
+        and overlapping index ranges across sessions don't cause interleaving.
+        """
+        def side_effect(*args, **kwargs):
+            m = MagicMock()
+            m.LongRecording.get_duration.return_value = 1800.0
+            return m
+
+        mock_lro_cls.side_effect = side_effect
+
+        animalday_to_items = {
+            "session1": [
+                DiscoveredFile(path="/data/s1/rec_B.bin", metadata={"animal": "M1", "session": "session1", "index": "2"}),
+                DiscoveredFile(path="/data/s1/rec_A.bin", metadata={"animal": "M1", "session": "session1", "index": "1"}),
+            ],
+            "session2": [
+                DiscoveredFile(path="/data/s2/rec_D.bin", metadata={"animal": "M1", "session": "session2", "index": "2"}),
+                DiscoveredFile(path="/data/s2/rec_C.bin", metadata={"animal": "M1", "session": "session2", "index": "1"}),
+            ],
+        }
+        base_datetime = pd.to_datetime("2025-01-01 10:00:00")
+        base_lro_kwargs = {"datetimes_are_start": True}
+
+        result = ao._compute_global_timeline(
+            base_datetime, animalday_to_items, base_lro_kwargs,
+            original_manual_datetimes=base_datetime,
+        )
+
+        # Session1 sorted by index: rec_A (1) then rec_B (2)
+        # Session2 sorted by index: rec_C (1) then rec_D (2)
+        # Sessions are processed in order: session1 then session2
+        # _get_item_key returns full paths for DiscoveredFile items
+        assert result["/data/s1/rec_A.bin"] == pd.to_datetime("2025-01-01 10:00:00")
+        assert result["/data/s1/rec_B.bin"] == pd.to_datetime("2025-01-01 10:30:00")
+        assert result["/data/s2/rec_C.bin"] == pd.to_datetime("2025-01-01 11:00:00")
+        assert result["/data/s2/rec_D.bin"] == pd.to_datetime("2025-01-01 11:30:00")
 
 class TestZeroSampleLROFiltering:
     @pytest.fixture
