@@ -251,6 +251,23 @@ estimation with short epochs and to avoid insufficient cycles warnings.
 BAND_NAMES = [k for k, _ in FREQ_BANDS.items()]
 """Ordered list of frequency band names: ['delta', 'theta', 'alpha', 'beta', 'gamma']."""
 
+# ---------------------------------------------------------------------------
+# Semantic dimension labels
+# ---------------------------------------------------------------------------
+
+COMPONENT_LABELS = {
+    "psdslope": ["slope", "intercept"],
+}
+"""Mapping of feature names to their component dimension labels.
+
+For LINEAR_2D features that have multiple components (e.g., psdslope has slope
+and intercept), this provides human-readable labels for each component.
+"""
+
+# ---------------------------------------------------------------------------
+# Frequency band parameters
+# ---------------------------------------------------------------------------
+
 FREQ_BAND_TOTAL = (1, 40)
 """Total frequency range covered by all bands (min, max) in Hz."""
 

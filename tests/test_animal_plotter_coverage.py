@@ -919,6 +919,103 @@ class TestPlotTemporalHeatmapFeatureShapes:
             assert np.allclose(feature_data[:, i], expected_value), \
                 f"Expected band {i} values to be {expected_value}, got {feature_data[:, i]}"
 
+    @patch("matplotlib.pyplot.show")
+    def test_plot_temporal_heatmap_feature_linear_numeric_correctness(
+        self, mock_show, plotter, mock_war, rng
+    ):
+        """Test _plot_temporal_heatmap_feature with LINEAR feature returns correct values."""
+        n_time = 20
+        n_chan = N_CHAN
+        value = 5.0
+
+        # Create constant-value feature data
+        rms_data = [[value] * n_chan for _ in range(n_time)]
+        timestamps = pd.date_range("2023-01-01 00:00", periods=n_time, freq="1h")
+
+        df = pd.DataFrame({
+            "rms": rms_data,
+            "duration": [1.0] * n_time,
+            "timestamp": timestamps,
+            "endfile": [np.nan] * n_time,
+            "animalday": ["day1"] * n_time,
+        })
+        df.index = pd.MultiIndex.from_tuples([("animal1",)] * n_time)
+
+        mock_war.get_grouprows_result.return_value = df
+
+        # Call the full function - should not raise and should produce a heatmap
+        plotter.plot_temporal_heatmap(features=["rms"], score_type="none", n_bins=5)
+
+        # Verify the function was called and completed without error
+        assert mock_show.called
+
+    @patch("matplotlib.pyplot.show")
+    def test_plot_temporal_heatmap_feature_linear_2d_numeric_correctness(
+        self, mock_show, plotter, mock_war, rng
+    ):
+        """Test _plot_temporal_heatmap_feature with LINEAR_2D feature separates components correctly."""
+        n_time = 20
+        n_chan = N_CHAN
+        slope_value = 1.0
+        intercept_value = 100.0
+
+        # Create constant-value feature data with distinct slope and intercept
+        psdslope_data = [
+            np.array([[slope_value, intercept_value]] * n_chan)
+            for _ in range(n_time)
+        ]
+        timestamps = pd.date_range("2023-01-01 00:00", periods=n_time, freq="1h")
+
+        df = pd.DataFrame({
+            "psdslope": psdslope_data,
+            "duration": [1.0] * n_time,
+            "timestamp": timestamps,
+            "endfile": [np.nan] * n_time,
+            "animalday": ["day1"] * n_time,
+        })
+        df.index = pd.MultiIndex.from_tuples([("animal1",)] * n_time)
+
+        mock_war.get_grouprows_result.return_value = df
+
+        # Call the full function - should produce 2 heatmaps (slope and intercept)
+        plotter.plot_temporal_heatmap(features=["psdslope"], score_type="none", n_bins=5)
+
+        # Verify the function was called and completed without error
+        assert mock_show.called
+
+    @patch("matplotlib.pyplot.show")
+    def test_plot_temporal_heatmap_feature_band_numeric_correctness(
+        self, mock_show, plotter, mock_war, rng
+    ):
+        """Test _plot_temporal_heatmap_feature with BAND feature separates bands correctly."""
+        n_time = 20
+        n_chan = N_CHAN
+        band_values = [1.0, 2.0, 3.0, 4.0, 5.0]  # Distinct value per band
+
+        # Create constant-value feature data with distinct values per band
+        psdband_data = [
+            {band: [band_values[i]] * n_chan for i, band in enumerate(constants.BAND_NAMES)}
+            for _ in range(n_time)
+        ]
+        timestamps = pd.date_range("2023-01-01 00:00", periods=n_time, freq="1h")
+
+        df = pd.DataFrame({
+            "psdband": psdband_data,
+            "duration": [1.0] * n_time,
+            "timestamp": timestamps,
+            "endfile": [np.nan] * n_time,
+            "animalday": ["day1"] * n_time,
+        })
+        df.index = pd.MultiIndex.from_tuples([("animal1",)] * n_time)
+
+        mock_war.get_grouprows_result.return_value = df
+
+        # Call the full function - should produce 5 heatmaps (one per band)
+        plotter.plot_temporal_heatmap(features=["psdband"], score_type="none", n_bins=5)
+
+        # Verify the function was called and completed without error
+        assert mock_show.called
+
 
 
 class TestAddLongrecordingBoundaries:

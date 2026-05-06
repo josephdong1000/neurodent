@@ -753,15 +753,17 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                     semantic_axis_name = list(ftype.semantic_axes.keys())[0]
                     n_semantic = feature_data.shape[semantic_axis_idx]
 
-                    # Get semantic dimension labels
+                    # Get semantic dimension labels from constants
                     if semantic_axis_name == "components":
-                        # For psdslope: ["slope", "intercept"]
-                        semantic_labels = ["slope", "intercept"][:n_semantic]
+                        # For LINEAR_2D features, use feature-specific component labels
+                        semantic_labels = constants.COMPONENT_LABELS.get(
+                            feature, [f"component_{i}" for i in range(n_semantic)]
+                        )[:n_semantic]
                     elif semantic_axis_name == "bands":
-                        # For BAND/BANDED_MATRIX features
+                        # For BAND/BANDED_MATRIX features, use standard band names
                         semantic_labels = constants.BAND_NAMES[:n_semantic]
                     else:
-                        # Fallback to generic labels
+                        # Fallback to generic labels for unknown semantic dimension types
                         semantic_labels = [f"{semantic_axis_name}_{i}" for i in range(n_semantic)]
 
                     # Plot one heatmap per semantic dimension
