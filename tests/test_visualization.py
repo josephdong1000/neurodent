@@ -1966,6 +1966,58 @@ class TestExperimentPlotterFeatureDispatch:
         assert "channel" in df.columns
         assert (df["channel"] == "average").all()
 
+    def test_pull_banded_matrix_shape_correctness(self, feature_plotter):
+        """Test BANDED_MATRIX shape correctness: verifies band axis is iterated correctly.
+
+        Regression test for issue where cohere/imcoh heatmaps displayed as (8,5) instead of (8,8)
+        due to incorrect iteration over the band axis in pull_timeseries_dataframe.
+        """
+        df = feature_plotter.pull_timeseries_dataframe(
+            feature="cohere", groupby=["genotype"], collapse_channels=False
+        )
+        # Each row should have a band value
+        assert "band" in df.columns
+        assert set(df["band"].unique()) == set(constants.BAND_NAMES)
+
+        # Each row's cohere value should be a matrix of shape (n_chan, n_chan)
+        n_chan = len(feature_plotter.all_channel_names)
+        for idx, row in df.iterrows():
+            cohere_matrix = np.array(row["cohere"])
+            assert cohere_matrix.shape == (n_chan, n_chan), (
+                f"Expected cohere matrix shape ({n_chan}, {n_chan}), "
+                f"got {cohere_matrix.shape} for band={row['band']}"
+            )
+
+        # Verify that different bands have different data
+        # Group by band and check that each band has the expected number of entries
+        grouped = df.groupby("band")
+        for band_name, group in grouped:
+            assert len(group) > 0, f"Band {band_name} has no data"
+            # Each band group should have matrices of the correct shape
+            for idx, row in group.iterrows():
+                cohere_matrix = np.array(row["cohere"])
+                assert cohere_matrix.shape == (n_chan, n_chan)
+
+    def test_pull_band_feature_shape_correctness(self, feature_plotter):
+        """Test BAND feature shape correctness: verifies band axis is iterated correctly.
+
+        Tests that BAND features (like psdband) also work correctly with the moveaxis fix.
+        """
+        df = feature_plotter.pull_timeseries_dataframe(
+            feature="psdband", groupby=["genotype"], collapse_channels=False
+        )
+        # Each row should have a band value
+        assert "band" in df.columns
+        assert set(df["band"].unique()) == set(constants.BAND_NAMES)
+
+        # Each row's psdband value should be a scalar (after extraction)
+        for idx, row in df.iterrows():
+            psdband_val = row["psdband"]
+            # After pull_timeseries_dataframe, BAND features should be scalar per channel per band
+            assert isinstance(psdband_val, (int, float, np.number)), (
+                f"Expected scalar psdband value, got {type(psdband_val)} for band={row['band']}"
+            )
+
     def test_pull_hist_feature(self, feature_plotter):
         """Test pull_timeseries_dataframe with HIST, collapse_channels=False."""
         df = feature_plotter.pull_timeseries_dataframe(

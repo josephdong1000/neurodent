@@ -355,7 +355,7 @@ class ExperimentPlotter:
             )  # get first component (e.g. slope from [slope, intercept])
         elif ftype.is_dict_stored:
             df[feature] = df[feature].apply(
-                lambda x: list(zip(x, constants.BAND_NAMES))
+                lambda x: list(zip(np.moveaxis(np.asarray(x), -1, 0).tolist(), constants.BAND_NAMES))
             )
             df = df.explode(feature)
             df[[feature, "band"]] = pd.DataFrame(df[feature].tolist(), index=df.index)
