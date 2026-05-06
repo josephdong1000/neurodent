@@ -426,6 +426,33 @@ def expand_animals_config(samples_config: dict) -> dict:
         if "group" in animal:
             animal_groups[animal["id"]] = animal["group"]
 
+    # Validate no overlapping channels within the same group
+    if animal_channels and animal_groups:
+        # Group animals by their group name
+        groups_to_animals: dict[str, list[str]] = {}
+        for animal_id, group_name in animal_groups.items():
+            groups_to_animals.setdefault(group_name, []).append(animal_id)
+
+        # Check for channel overlaps within each group
+        for group_name, animal_ids in groups_to_animals.items():
+            # Get all channels for animals in this group
+            all_channels_in_group: list[tuple[str, str]] = []  # (animal_id, channel)
+            for animal_id in animal_ids:
+                if animal_id in animal_channels:
+                    for channel in animal_channels[animal_id]:
+                        all_channels_in_group.append((animal_id, channel))
+
+            # Check for duplicates
+            seen_channels: dict[str, str] = {}  # channel -> first animal_id
+            for animal_id, channel in all_channels_in_group:
+                if channel in seen_channels:
+                    raise ValueError(
+                        f"Channel '{channel}' is assigned to both '{seen_channels[channel]}' "
+                        f"and '{animal_id}' in group '{group_name}'. "
+                        f"Animals in the same joint recording cannot share channels."
+                    )
+                seen_channels[channel] = animal_id
+
     if animal_channels:
         result["_animal_channels"] = animal_channels
     if animal_groups:
@@ -443,7 +470,7 @@ def expand_animals_config(samples_config: dict) -> dict:
                 "The 'joint_sessions' configuration format is deprecated. "
                 "Please migrate to the unified 'animals' format by adding 'channels' "
                 "and optionally 'group' fields to animal entries. "
-                "See the migration guide for details.",
+                "See the animals configuration documentation for details.",
                 DeprecationWarning,
                 stacklevel=2
             )

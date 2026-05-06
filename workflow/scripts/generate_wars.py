@@ -158,22 +158,10 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
                 logger.info(f"  -> Discovery pattern: {discovery_pattern}")
 
                 # Determine the animal filter value for discovery
-                # For joint sessions with 'group', use the group name for {animal} placeholder
-                # For joint sessions without 'group', use the animal id
-                # For non-joint sessions, use the animal id as usual
                 animal_groups = samples_config.get("_animal_groups", {})
-                if is_joint and source_animal_id in animal_groups:
-                    # Use group name for discovery (folder contains group name, not individual animal ID)
-                    discovery_animal_filter = animal_groups[source_animal_id]
-                    logger.info(f"  -> Using group '{discovery_animal_filter}' for {animal} placeholder in discovery")
-                elif is_joint:
-                    # Joint session without group: use animal ID for discovery
-                    # (folder contains individual animal IDs)
-                    discovery_animal_filter = source_animal_id
-                    logger.info(f"  -> Using animal ID '{discovery_animal_filter}' for discovery (joint session without group)")
-                else:
-                    # Regular non-joint session
-                    discovery_animal_filter = source_animal_id
+                discovery_animal_filter = get_discovery_animal_filter(
+                    source_animal_id, is_joint, animal_groups, logger
+                )
 
                 # Create AO for this session using pattern-based discovery
                 session_ao = visualization.AnimalOrganizer(
@@ -300,7 +288,51 @@ def main():
     logger.info(f"Successfully saved {len(fdsar_list)} FDSAR results to {fdsar_base_dir}")
 
 
+def get_discovery_animal_filter(
+    source_animal_id: str,
+    is_joint: bool,
+    animal_groups: dict[str, str],
+    logger,
+) -> str:
+    """Determine the animal filter value for discovery.
+
+    For joint sessions with 'group', use the group name for {animal} placeholder.
+    For joint sessions without 'group', use the animal id.
+    For non-joint sessions, use the animal id as usual.
+
+    Parameters
+    ----------
+    source_animal_id : str
+        The animal ID from the configuration
+    is_joint : bool
+        Whether this is a joint session
+    animal_groups : dict[str, str]
+        Mapping of animal_id to group name
+    logger : logging.Logger
+        Logger for info messages
+
+    Returns
+    -------
+    str
+        The value to use for {animal} placeholder in discovery pattern
+    """
+    if is_joint and source_animal_id in animal_groups:
+        # Use group name for discovery (folder contains group name, not individual animal ID)
+        discovery_filter = animal_groups[source_animal_id]
+        logger.info(f"  -> Using group '{discovery_filter}' for {{animal}} placeholder in discovery")
+        return discovery_filter
+    elif is_joint:
+        # Joint session without group: use animal ID for discovery
+        # (folder contains individual animal IDs)
+        logger.info(f"  -> Using animal ID '{source_animal_id}' for discovery (joint session without group)")
+        return source_animal_id
+    else:
+        # Regular non-joint session
+        return source_animal_id
+
+
 if __name__ == "__main__":
+
     memray_enabled = os.environ.get("NEURODENT_MEMRAY")
     profile_enabled = os.environ.get("NEURODENT_PROFILE")
 

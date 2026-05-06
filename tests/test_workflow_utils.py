@@ -802,3 +802,29 @@ class TestExpandAnimalsConfig:
 
         # Should use the new format, not the legacy one
         assert result["_animal_channels"]["A10"] == ["Ch0", "Ch1"]
+
+    def test_validates_no_overlapping_channels_in_group(self):
+        """Animals in the same group cannot share channels."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "A10", "gene": "WT", "sex": "M", "channels": ["Ch0", "Ch1"], "group": "Group1"},
+                {"id": "F22", "gene": "KO", "sex": "F", "channels": ["Ch1", "Ch2"], "group": "Group1"},  # Ch1 overlaps!
+            ],
+        }
+        with pytest.raises(ValueError, match="Channel 'Ch1' is assigned to both"):
+            expand_animals_config(cfg)
+
+    def test_allows_same_channels_in_different_groups(self):
+        """Same channel names can be used in different groups (different recordings)."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "A10", "gene": "WT", "sex": "M", "channels": ["Ch0", "Ch1"], "group": "Group1"},
+                {"id": "F22", "gene": "KO", "sex": "F", "channels": ["Ch0", "Ch1"], "group": "Group2"},
+            ],
+        }
+        result = expand_animals_config(cfg)
+        # Should succeed - different groups can have same channel names
+        assert result["_animal_channels"]["A10"] == ["Ch0", "Ch1"]
+        assert result["_animal_channels"]["F22"] == ["Ch0", "Ch1"]
