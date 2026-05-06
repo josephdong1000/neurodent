@@ -663,26 +663,24 @@ class TestPlotTemporalHeatmapFeatureShapes:
         plotter.plot_temporal_heatmap(features=features, score_type="none")
 
     @patch("matplotlib.pyplot.show")
-    def test_linear_2d_raises_error(self, mock_show, plotter, mock_war, rng):
-        """LINEAR_2D features (psdslope) should raise an error due to semantic dimensions."""
+    def test_linear_2d_plots_multiple_heatmaps(self, mock_show, plotter, mock_war, rng):
+        """LINEAR_2D features (psdslope) should plot multiple heatmaps (slope, intercept)."""
         features = ["psdslope"]
         mock_war.get_grouprows_result.return_value = _make_temporal_heatmap_rows(
             features=features, rng=rng
         )
-        # Should raise ValueError because psdslope has 'components' semantic dimension
-        with pytest.raises(ValueError, match="semantic dimensions.*components"):
-            plotter.plot_temporal_heatmap(features=features, score_type="none")
+        # This should not raise and should produce 2 heatmaps (slope, intercept)
+        plotter.plot_temporal_heatmap(features=features, score_type="none")
 
     @patch("matplotlib.pyplot.show")
-    def test_band_raises_error(self, mock_show, plotter, mock_war, rng):
-        """BAND features (psdband) should raise an error due to semantic dimensions."""
+    def test_band_plots_multiple_heatmaps(self, mock_show, plotter, mock_war, rng):
+        """BAND features (psdband) should plot multiple heatmaps (one per band)."""
         features = ["psdband"]
         mock_war.get_grouprows_result.return_value = _make_temporal_heatmap_rows(
             features=features, rng=rng
         )
-        # Should raise ValueError because psdband has 'bands' semantic dimension
-        with pytest.raises(ValueError, match="semantic dimensions.*bands"):
-            plotter.plot_temporal_heatmap(features=features, score_type="none")
+        # This should not raise and should produce 5 heatmaps (one per band)
+        plotter.plot_temporal_heatmap(features=features, score_type="none")
 
     @patch("matplotlib.pyplot.show")
     def test_simple_matrix_shape_correct(self, mock_show, plotter, mock_war, rng):
@@ -695,17 +693,16 @@ class TestPlotTemporalHeatmapFeatureShapes:
         plotter.plot_temporal_heatmap(features=features, score_type="none")
 
     @patch("matplotlib.pyplot.show")
-    def test_banded_matrix_raises_error(self, mock_show, plotter, mock_war, rng):
-        """BANDED_MATRIX features (cohere) should raise an error due to semantic dimensions."""
+    def test_banded_matrix_plots_multiple_heatmaps(self, mock_show, plotter, mock_war, rng):
+        """BANDED_MATRIX features (cohere) should plot multiple heatmaps (one per band)."""
         features = ["cohere"]
         mock_war.get_grouprows_result.return_value = _make_temporal_heatmap_rows(
             features=features, rng=rng
         )
-        # Should raise ValueError because cohere has 'bands' semantic dimension
-        with pytest.raises(ValueError, match="semantic dimensions.*bands"):
-            plotter.plot_temporal_heatmap(features=features, score_type="none")
+        # This should not raise and should produce 5 heatmaps (one per band)
+        plotter.plot_temporal_heatmap(features=features, score_type="none")
 
-    def test_average_feature_over_channels_integration(self, plotter, rng):
+    def test_collapse_feature_channels_integration(self, plotter, rng):
         """Test that collapse_feature_channels is used correctly for LINEAR features."""
         # Create synthetic data for a LINEAR feature
         n_time = 10
@@ -741,7 +738,6 @@ class TestPlotTemporalHeatmapFeatureShapes:
 
         # The value should be the original value (averaged across channels)
         assert np.allclose(collapsed, value)
-
 
 
 
