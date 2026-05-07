@@ -14,7 +14,6 @@ from ... import visualization as viz
 from ..feature_utils import (
     flatten_feature_for_plotting,
     extract_feature,
-    collapse_feature_channels,
 )
 
 
