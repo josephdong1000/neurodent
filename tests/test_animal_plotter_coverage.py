@@ -958,11 +958,24 @@ class TestPlotTemporalHeatmapFeatureShapes:
 
         mock_war.get_grouprows_result.return_value = df
 
-        # Call the full function - should not raise and should produce a heatmap
-        plotter.plot_temporal_heatmap(features=["rms"], score_type="none", n_bins=5)
+        # Patch ax.imshow to capture the heatmap matrix
+        with patch("matplotlib.pyplot.subplots") as mock_subplots:
+            mock_fig = MagicMock()
+            mock_ax = MagicMock()
+            mock_subplots.return_value = (mock_fig, mock_ax)
 
-        # Verify the function was called and completed without error
-        assert mock_show.called
+            plotter.plot_temporal_heatmap(features=["rms"], score_type="none", n_bins=5)
+
+            # Verify imshow was called with heatmap data
+            assert mock_ax.imshow.called, "Expected ax.imshow to be called"
+            heatmap_matrix = mock_ax.imshow.call_args[0][0]
+
+            # All values in the heatmap should be the constant value (averaged across channels)
+            # Filter out NaN values (bins with no data)
+            non_nan_values = heatmap_matrix[~np.isnan(heatmap_matrix)]
+            if len(non_nan_values) > 0:
+                assert np.allclose(non_nan_values, value), \
+                    f"Expected all heatmap values to be {value}, got {non_nan_values}"
 
     @patch("matplotlib.pyplot.show")
     def test_plot_temporal_heatmap_feature_linear_2d_numeric_correctness(
@@ -992,11 +1005,31 @@ class TestPlotTemporalHeatmapFeatureShapes:
 
         mock_war.get_grouprows_result.return_value = df
 
-        # Call the full function - should produce 2 heatmaps (slope and intercept)
-        plotter.plot_temporal_heatmap(features=["psdslope"], score_type="none", n_bins=5)
+        # Patch ax.imshow to capture the heatmap matrices for both components
+        with patch("matplotlib.pyplot.subplots") as mock_subplots:
+            mock_fig = MagicMock()
+            mock_ax = MagicMock()
+            mock_subplots.return_value = (mock_fig, mock_ax)
 
-        # Verify the function was called and completed without error
-        assert mock_show.called
+            plotter.plot_temporal_heatmap(features=["psdslope"], score_type="none", n_bins=5)
+
+            # Should have been called twice (slope and intercept)
+            assert mock_ax.imshow.call_count == 2, \
+                f"Expected 2 calls to ax.imshow, got {mock_ax.imshow.call_count}"
+
+            # First call should be slope heatmap
+            slope_heatmap = mock_ax.imshow.call_args_list[0][0][0]
+            non_nan_slope = slope_heatmap[~np.isnan(slope_heatmap)]
+            if len(non_nan_slope) > 0:
+                assert np.allclose(non_nan_slope, slope_value), \
+                    f"Expected slope heatmap values to be {slope_value}, got {non_nan_slope}"
+
+            # Second call should be intercept heatmap
+            intercept_heatmap = mock_ax.imshow.call_args_list[1][0][0]
+            non_nan_intercept = intercept_heatmap[~np.isnan(intercept_heatmap)]
+            if len(non_nan_intercept) > 0:
+                assert np.allclose(non_nan_intercept, intercept_value), \
+                    f"Expected intercept heatmap values to be {intercept_value}, got {non_nan_intercept}"
 
     @patch("matplotlib.pyplot.show")
     def test_plot_temporal_heatmap_feature_band_numeric_correctness(
@@ -1025,11 +1058,25 @@ class TestPlotTemporalHeatmapFeatureShapes:
 
         mock_war.get_grouprows_result.return_value = df
 
-        # Call the full function - should produce 5 heatmaps (one per band)
-        plotter.plot_temporal_heatmap(features=["psdband"], score_type="none", n_bins=5)
+        # Patch ax.imshow to capture the heatmap matrices for each band
+        with patch("matplotlib.pyplot.subplots") as mock_subplots:
+            mock_fig = MagicMock()
+            mock_ax = MagicMock()
+            mock_subplots.return_value = (mock_fig, mock_ax)
 
-        # Verify the function was called and completed without error
-        assert mock_show.called
+            plotter.plot_temporal_heatmap(features=["psdband"], score_type="none", n_bins=5)
+
+            # Should have been called 5 times (one per band)
+            assert mock_ax.imshow.call_count == 5, \
+                f"Expected 5 calls to ax.imshow, got {mock_ax.imshow.call_count}"
+
+            # Verify each band heatmap has the correct constant value
+            for i, expected_value in enumerate(band_values):
+                band_heatmap = mock_ax.imshow.call_args_list[i][0][0]
+                non_nan_values = band_heatmap[~np.isnan(band_heatmap)]
+                if len(non_nan_values) > 0:
+                    assert np.allclose(non_nan_values, expected_value), \
+                        f"Expected band {i} heatmap values to be {expected_value}, got {non_nan_values}"
 
     @patch("matplotlib.pyplot.show")
     def test_temporal_heatmap_with_longrecording_boundaries(
