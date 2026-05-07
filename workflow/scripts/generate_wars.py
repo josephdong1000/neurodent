@@ -124,16 +124,23 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
                     if animal_id in all_manual_dts:
                         spec = all_manual_dts[animal_id]
                         if isinstance(spec, list):
-                            # Distribute: each AO gets one timestamp from the list
-                            # (one per session folder, matched by index order)
-                            if len(spec) != len(animal_folders):
-                                raise ValueError(
-                                    f"Length of manual_datetimes list ({len(spec)}) for {animal_id} "
-                                    f"does not match number of session folders ({len(animal_folders)})"
-                                )
-                            current_dt = spec[animal_folders.index(folder_info)]
-                            session_lro_kwargs["manual_datetimes"] = current_dt
-                            logger.info(f"  -> Using specific timestamp from list: {current_dt}")
+                            # For pattern-based discovery (unified format), pass the entire list
+                            # to AnimalOrganizer, which will distribute it to discovered sessions.
+                            # For legacy folder-based iteration, distribute per folder.
+                            if folder_path == "":
+                                # Pattern-based discovery: pass entire list
+                                session_lro_kwargs["manual_datetimes"] = spec
+                                logger.info(f"  -> Using manual_datetimes list with {len(spec)} entries for pattern discovery")
+                            else:
+                                # Legacy folder-based: distribute per folder
+                                if len(spec) != len(animal_folders):
+                                    raise ValueError(
+                                        f"Length of manual_datetimes list ({len(spec)}) for {animal_id} "
+                                        f"does not match number of session folders ({len(animal_folders)})"
+                                    )
+                                current_dt = spec[animal_folders.index(folder_info)]
+                                session_lro_kwargs["manual_datetimes"] = current_dt
+                                logger.info(f"  -> Using specific timestamp from list: {current_dt}")
                         else:
                             # Single string/scalar/dict: pass directly
                             session_lro_kwargs["manual_datetimes"] = spec

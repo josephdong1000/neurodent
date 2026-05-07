@@ -458,7 +458,10 @@ def expand_animals_config(samples_config: dict) -> dict:
     if animal_groups:
         result["_animal_groups"] = animal_groups
 
-    # --- Backward compatibility: derive channels/groups from legacy joint_sessions ---
+    # --- Backward compatibility: derive channels from legacy joint_sessions ---
+    # Note: This only derives _animal_channels, not _animal_groups.
+    # For legacy configs where folder names don't contain animal IDs,
+    # migration to the new format with explicit 'group' fields is required.
     if "joint_sessions" in result and result["joint_sessions"]:
         # Check if any animals already have channels defined
         has_new_format = any("channels" in a for a in animals_list)
