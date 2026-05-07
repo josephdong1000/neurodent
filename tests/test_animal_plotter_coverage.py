@@ -669,8 +669,13 @@ class TestPlotTemporalHeatmapFeatureShapes:
         mock_war.get_grouprows_result.return_value = _make_temporal_heatmap_rows(
             features=features, rng=rng
         )
-        # This should not raise and should produce 2 heatmaps (slope, intercept)
-        plotter.plot_temporal_heatmap(features=features, score_type="none")
+
+        # Patch _handle_figure to count calls
+        with patch.object(plotter, '_handle_figure') as mock_handle:
+            plotter.plot_temporal_heatmap(features=features, score_type="none")
+            # Should produce 2 heatmaps (slope, intercept) for the single animalday
+            assert mock_handle.call_count == 2, \
+                f"Expected 2 heatmaps for psdslope, got {mock_handle.call_count}"
 
     @patch("matplotlib.pyplot.show")
     def test_band_plots_multiple_heatmaps(self, mock_show, plotter, mock_war, rng):
@@ -679,8 +684,13 @@ class TestPlotTemporalHeatmapFeatureShapes:
         mock_war.get_grouprows_result.return_value = _make_temporal_heatmap_rows(
             features=features, rng=rng
         )
-        # This should not raise and should produce 5 heatmaps (one per band)
-        plotter.plot_temporal_heatmap(features=features, score_type="none")
+
+        # Patch _handle_figure to count calls
+        with patch.object(plotter, '_handle_figure') as mock_handle:
+            plotter.plot_temporal_heatmap(features=features, score_type="none")
+            # Should produce 5 heatmaps (one per band: delta, theta, alpha, beta, gamma)
+            assert mock_handle.call_count == 5, \
+                f"Expected 5 heatmaps for psdband, got {mock_handle.call_count}"
 
     @patch("matplotlib.pyplot.show")
     def test_simple_matrix_shape_correct(self, mock_show, plotter, mock_war, rng):
@@ -699,8 +709,13 @@ class TestPlotTemporalHeatmapFeatureShapes:
         mock_war.get_grouprows_result.return_value = _make_temporal_heatmap_rows(
             features=features, rng=rng
         )
-        # This should not raise and should produce 5 heatmaps (one per band)
-        plotter.plot_temporal_heatmap(features=features, score_type="none")
+
+        # Patch _handle_figure to count calls
+        with patch.object(plotter, '_handle_figure') as mock_handle:
+            plotter.plot_temporal_heatmap(features=features, score_type="none")
+            # Should produce 5 heatmaps (one per band: delta, theta, alpha, beta, gamma)
+            assert mock_handle.call_count == 5, \
+                f"Expected 5 heatmaps for cohere, got {mock_handle.call_count}"
 
     def test_collapse_feature_channels_integration(self, plotter, rng):
         """Test that collapse_feature_channels is used correctly for LINEAR features."""
@@ -1015,6 +1030,80 @@ class TestPlotTemporalHeatmapFeatureShapes:
 
         # Verify the function was called and completed without error
         assert mock_show.called
+
+    @patch("matplotlib.pyplot.show")
+    def test_temporal_heatmap_with_longrecording_boundaries(
+        self, mock_show, plotter, mock_war, rng
+    ):
+        """Test that _add_longrecording_boundaries is called for temporal heatmaps."""
+        n_time = 20
+        n_chan = N_CHAN
+        value = 5.0
+
+        # Create feature data with endfile markers
+        rms_data = [[value] * n_chan for _ in range(n_time)]
+        timestamps = pd.date_range("2023-01-01 00:00", periods=n_time, freq="1h")
+        endfile = [np.nan] * n_time
+        endfile[10] = "file1.bin"  # Add an endfile marker
+
+        df = pd.DataFrame({
+            "rms": rms_data,
+            "duration": [1.0] * n_time,
+            "timestamp": timestamps,
+            "endfile": endfile,
+            "animalday": ["day1"] * n_time,
+        })
+        df.index = pd.MultiIndex.from_tuples([("animal1",)] * n_time)
+
+        mock_war.get_grouprows_result.return_value = df
+
+        # Patch _add_longrecording_boundaries to verify it's called
+        with patch.object(plotter, '_add_longrecording_boundaries', wraps=plotter._add_longrecording_boundaries) as mock_boundaries:
+            plotter.plot_temporal_heatmap(features=["rms"], score_type="z", n_bins=5)
+            # Should be called once for the single heatmap
+            assert mock_boundaries.call_count == 1, \
+                f"Expected _add_longrecording_boundaries to be called once, got {mock_boundaries.call_count}"
+
+    @patch("matplotlib.pyplot.show")
+    def test_temporal_heatmap_colorbar_labels(
+        self, mock_show, plotter, mock_war, rng
+    ):
+        """Test that colorbar labels include full feature name and score type."""
+        n_time = 20
+        n_chan = N_CHAN
+        value = 5.0
+
+        # Create feature data
+        rms_data = [[value] * n_chan for _ in range(n_time)]
+        timestamps = pd.date_range("2023-01-01 00:00", periods=n_time, freq="1h")
+
+        df = pd.DataFrame({
+            "rms": rms_data,
+            "duration": [1.0] * n_time,
+            "timestamp": timestamps,
+            "endfile": [np.nan] * n_time,
+            "animalday": ["day1"] * n_time,
+        })
+        df.index = pd.MultiIndex.from_tuples([("animal1",)] * n_time)
+
+        mock_war.get_grouprows_result.return_value = df
+
+        # Capture the figure to check colorbar label
+        with patch("matplotlib.pyplot.subplots") as mock_subplots:
+            mock_fig = MagicMock()
+            mock_ax = MagicMock()
+            mock_cbar = MagicMock()
+            mock_subplots.return_value = (mock_fig, mock_ax)
+            mock_fig.colorbar.return_value = mock_cbar
+
+            plotter.plot_temporal_heatmap(features=["rms"], score_type="z", n_bins=5)
+
+            # Verify colorbar.set_label was called with full feature name and score type
+            mock_cbar.set_label.assert_called_once()
+            label = mock_cbar.set_label.call_args[0][0]
+            # Should contain "RMS" (the full name) and "score=z"
+            assert "RMS" in label, f"Expected 'RMS' in colorbar label, got {label}"
+            assert "score=z" in label, f"Expected 'score=z' in colorbar label, got {label}"
 
 
 

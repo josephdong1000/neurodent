@@ -740,6 +740,8 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                         feature=feature,
                         semantic_label=semantic_label,
                         animalday=animalday,
+                        df_day=df_day,
+                        score_type=score_type,
                         n_bins=n_bins,
                         figsize=figsize,
                         cmap=cmap,
@@ -776,6 +778,8 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                             feature=feature,
                             semantic_label=label,
                             animalday=animalday,
+                            df_day=df_day,
+                            score_type=score_type,
                             n_bins=n_bins,
                             figsize=figsize,
                             cmap=cmap,
@@ -792,6 +796,8 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                     feature=feature,
                     semantic_label=None,
                     animalday=animalday,
+                    df_day=df_day,
+                    score_type=score_type,
                     n_bins=n_bins,
                     figsize=figsize,
                     cmap=cmap,
@@ -807,6 +813,8 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         feature,
         semantic_label,
         animalday,
+        df_day,
+        score_type,
         n_bins,
         figsize,
         cmap,
@@ -823,6 +831,8 @@ class AnimalPlotter(viz.AnimalFeatureParser):
             feature: Feature name
             semantic_label: Label for the semantic dimension (e.g., "slope", "delta"), or None
             animalday: Animalday identifier
+            df_day: DataFrame for this animalday (for boundary markers)
+            score_type: Score type (e.g., "z", "none") for labeling
             n_bins: Number of time bins
             figsize: Figure size
             cmap: Colormap
@@ -831,7 +841,6 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         """
         # Create time bins for the heatmap (24 hours)
         time_bins = np.linspace(0, 24, n_bins + 1)  # 25 edges for 24 bins
-        bin_centers = (time_bins[:-1] + time_bins[1:]) / 2
 
         # Create day bins (unique days)
         days = timestamps.dt.date.unique()
@@ -869,18 +878,26 @@ class AnimalPlotter(viz.AnimalFeatureParser):
             **kwargs,
         )
 
-        # Add red boundary lines between longrecording objects
-        # Get the full df_day for this animalday (need to reconstruct it)
-        # This is a limitation of the refactoring - we'd need to pass df_day
-        # For now, skip the boundary lines for semantic-split heatmaps
-        # TODO: Pass df_day if needed
+        # Add red/white boundary lines between longrecording objects
+        self._add_longrecording_boundaries(ax, df_day, time_of_day, days)
 
-        # Add colorbar
+        # Add colorbar with full feature name and score type
         cbar = fig.colorbar(im, ax=ax)
+
+        # Get full feature label from constants
+        feature_label = constants.FEATURE_LABELS.get(feature, feature)
+
+        # Build colorbar label
         if semantic_label:
-            cbar.set_label(f"{feature} - {semantic_label}")
+            if score_type and score_type != "none":
+                cbar.set_label(f"{feature_label} - {semantic_label} (score={score_type})")
+            else:
+                cbar.set_label(f"{feature_label} - {semantic_label}")
         else:
-            cbar.set_label(f"{feature}")
+            if score_type and score_type != "none":
+                cbar.set_label(f"{feature_label} (score={score_type})")
+            else:
+                cbar.set_label(f"{feature_label}")
 
         # Set labels and title
         ax.set_xlabel("Time of Day (hours)")
