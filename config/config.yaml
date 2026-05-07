@@ -30,7 +30,6 @@ analysis:
     skip_sessions: ["*bad*"]
     lro_kwargs:
       multiprocess_mode: "dask"
-      overwrite_rowbins: false # REVIEW function of this parameter when mode is not "bin"
     compute_windowed_analysis:
       features: ["all"]             # Feature list; "all" computes every supported feature
       multiprocess_mode: "dask"     # "dask" (parallel) or "serial"
