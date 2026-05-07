@@ -1011,7 +1011,7 @@ class TestMiniRealDataset:
 class TestJointRecordingSplit:
     """Test joint recording split functionality where animals share a recording file."""
 
-    def test_joint_recording_split(self, tmp_path: Path):
+    def test_joint_recording_split(self):
         """Test splitting A10's 10 channels into two virtual animals (A10-1 and A10-2)."""
         from neurodent import constants
         from neurodent.workflow import inject_config_aliases
