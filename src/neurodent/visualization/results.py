@@ -555,8 +555,6 @@ class AnimalOrganizer(AnimalFeatureParser):
 
             for item, timestamp in item_timestamps:
                 _lro_kwargs = base_lro_kwargs.copy()
-                if self._is_item_file(item) and _lro_kwargs.get("mode") == "mne":
-                    _lro_kwargs["input_type"] = "file"
                 _lro_kwargs["manual_datetimes"] = timestamp
 
                 try:
@@ -578,8 +576,6 @@ class AnimalOrganizer(AnimalFeatureParser):
         else:
             for item in ordered_items:
                 _lro_kwargs = base_lro_kwargs.copy()
-                if self._is_item_file(item) and _lro_kwargs.get("mode") == "mne":
-                    _lro_kwargs["input_type"] = "file"
 
                 try:
                     temp_lro = core.LongRecordingOrganizer(item, **_lro_kwargs)

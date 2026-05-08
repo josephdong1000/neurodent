@@ -4234,3 +4234,120 @@ class TestAnimalOrganizerLOF:
         actual_ch0_scores = set(all_ch0_scores)
         assert actual_ch0_scores == expected_ch0_scores, \
             f"Expected Ch0 scores {expected_ch0_scores}, got {actual_ch0_scores}"
+
+
+class TestComputeGlobalTimelineKwargDiscipline:
+    """Regression tests for kwarg leaks from _compute_global_timeline into the
+    LongRecordingOrganizer (and ultimately into ``extract_func``).
+
+    Background: the arxrosa run failed every EDF animal with
+    ``read_raw_edf() got an unexpected keyword argument 'input_type'``.
+    The cause was a hardcoded ``_lro_kwargs["input_type"] = "file"`` in
+    _compute_global_timeline, intended for the long-dead
+    ``_load_and_process_mne_data`` branch but ending up forwarded all the way
+    to ``mne.io.read_raw_edf`` via ``extract_func(item, **kwargs)``.
+
+    Synthetic test extractors all accept ``**kwargs``, so the leak was invisible
+    until the first end-to-end run with the real (kwarg-strict) MNE reader.
+    """
+
+    @staticmethod
+    def _capture_lro_kwargs(monkeypatch):
+        """Patch core.LongRecordingOrganizer.__init__ to record the kwargs it
+        was called with, returning the capture list.
+
+        We patch via the same module reference that results.py uses
+        (``results.core.LongRecordingOrganizer``) so we stay correct even after
+        tests (e.g. test_imports.TestCircularImports) drop ``neurodent.core``
+        from ``sys.modules`` and force a re-import, which rebinds
+        ``neurodent.core.LongRecordingOrganizer`` to a new class object.
+        """
+        from unittest.mock import MagicMock
+        from neurodent.visualization import results as _results_mod
+
+        captured: list[dict] = []
+
+        def fake_init(self, item, **kwargs):
+            captured.append(dict(kwargs))
+            self.LongRecording = MagicMock()
+            self.LongRecording.get_duration.return_value = 100.0
+
+        monkeypatch.setattr(
+            _results_mod.core.LongRecordingOrganizer, "__init__", fake_init
+        )
+        return captured
+
+    def _make_organizer_shell(self):
+        """Build an AnimalOrganizer instance bypassing __init__'s discovery so
+        we can call _compute_global_timeline in isolation."""
+        from neurodent.visualization.results import AnimalOrganizer
+        ao = AnimalOrganizer.__new__(AnimalOrganizer)
+        ao.animal_id = "test"
+        return ao
+
+    def test_no_input_type_injection_for_mne_mode(self, tmp_path, monkeypatch):
+        """Mode='mne' must not cause input_type to leak into LRO kwargs."""
+        from datetime import datetime
+
+        captured = self._capture_lro_kwargs(monkeypatch)
+        ao = self._make_organizer_shell()
+
+        fake_edf = tmp_path / "fake_session1.edf"
+        fake_edf.write_bytes(b"")
+        base_dt = datetime(2025, 1, 1, 9, 0, 0)
+        base_lro_kwargs = {"mode": "mne", "extract_func": "read_raw_edf"}
+
+        try:
+            ao._compute_global_timeline(
+                base_datetime=base_dt,
+                animalday_to_items={"sess1": [fake_edf]},
+                base_lro_kwargs=base_lro_kwargs,
+                original_manual_datetimes=base_dt,
+            )
+        except Exception:
+            # Tolerate downstream errors after kwarg capture; the assertion below
+            # only cares about which kwargs reached LongRecordingOrganizer.
+            pass
+
+        assert captured, "expected at least one LongRecordingOrganizer instantiation"
+        leaked = [kw for kw in captured if "input_type" in kw]
+        assert not leaked, (
+            "Regression: input_type was injected into LRO kwargs by "
+            f"_compute_global_timeline. Captured: {leaked}"
+        )
+
+    def test_strict_extract_func_signature_simulation(self, tmp_path, monkeypatch):
+        """A 'strict' extract_func (mimics real mne.io.read_raw_edf) should
+        receive only the kwargs the caller actually requested — no extras
+        injected by the timeline code.
+        """
+        from datetime import datetime
+
+        captured = self._capture_lro_kwargs(monkeypatch)
+        ao = self._make_organizer_shell()
+
+        fake_edf = tmp_path / "session_a.edf"
+        fake_edf.write_bytes(b"")
+        base_dt = datetime(2025, 1, 1, 12, 0, 0)
+        # Caller-supplied kwargs only.  Anything beyond these on the way to
+        # the LRO would indicate a leak from inside _compute_global_timeline.
+        base_lro_kwargs = {"mode": "mne", "extract_func": "read_raw_edf"}
+        allowed = set(base_lro_kwargs) | {"manual_datetimes"}
+
+        try:
+            ao._compute_global_timeline(
+                base_datetime=base_dt,
+                animalday_to_items={"sess": [fake_edf]},
+                base_lro_kwargs=base_lro_kwargs,
+                original_manual_datetimes=base_dt,
+            )
+        except Exception:
+            pass
+
+        assert captured, "expected at least one LongRecordingOrganizer instantiation"
+        for kw in captured:
+            extras = set(kw) - allowed
+            assert not extras, (
+                "Regression: _compute_global_timeline injected unexpected LRO "
+                f"kwargs: {extras}.  Allowed only: {allowed}.  Full kwargs: {kw}."
+            )

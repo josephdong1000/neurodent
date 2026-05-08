@@ -335,7 +335,8 @@
             "pattern": "{data_root}/{animal}/20200804_Arx_Rosa_2059_2063_2064_{session}_{index}.rhd",
             "lro_kwargs": {
                 "extract_func": "read_intan",
-                "stream_id": "0"
+                "stream_id": "0",
+                "ignore_integrity_checks": true
             }
         },
         {
@@ -386,7 +387,8 @@
             "pattern": "{data_root}/{animal}/20200804_Arx_Rosa_2059_2063_2064_{session}_{index}.rhd",
             "lro_kwargs": {
                 "extract_func": "read_intan",
-                "stream_id": "0"
+                "stream_id": "0",
+                "ignore_integrity_checks": true
             }
         },
         {
@@ -437,7 +439,8 @@
             "pattern": "{data_root}/{animal}/20200804_Arx_Rosa_2059_2063_2064_{session}_{index}.rhd",
             "lro_kwargs": {
                 "extract_func": "read_intan",
-                "stream_id": "0"
+                "stream_id": "0",
+                "ignore_integrity_checks": true
             }
         },
         {
@@ -488,7 +491,8 @@
             "pattern": "{data_root}/{animal}/20201229_Arx Rosa_3022_3023_3024_{session}_{index}.rhd",
             "lro_kwargs": {
                 "extract_func": "read_intan",
-                "stream_id": "0"
+                "stream_id": "0",
+                "ignore_integrity_checks": true
             }
         },
         {
@@ -539,7 +543,8 @@
             "pattern": "{data_root}/{animal}/20201229_Arx Rosa_3022_3023_3024_{session}_{index}.rhd",
             "lro_kwargs": {
                 "extract_func": "read_intan",
-                "stream_id": "0"
+                "stream_id": "0",
+                "ignore_integrity_checks": true
             }
         },
         {
@@ -590,7 +595,8 @@
             "pattern": "{data_root}/{animal}/20201229_Arx Rosa_3022_3023_3024_{session}_{index}.rhd",
             "lro_kwargs": {
                 "extract_func": "read_intan",
-                "stream_id": "0"
+                "stream_id": "0",
+                "ignore_integrity_checks": true
             }
         }
     ],
