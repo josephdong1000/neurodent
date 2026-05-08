@@ -354,9 +354,48 @@ class ExperimentPlotter:
                 lambda x: x[0]
             )  # get first component (e.g. slope from [slope, intercept])
         elif ftype.is_dict_stored:
-            df[feature] = df[feature].apply(
-                lambda x: list(zip(x, constants.BAND_NAMES))
-            )
+            # For dict-stored features (BAND, BANDED_MATRIX), the band axis is always
+            # the last semantic axis. Use moveaxis to bring it to front for iteration.
+            band_axis_idx = ftype.semantic_axes.get("bands")
+            if band_axis_idx is None:
+                raise ValueError(f"Feature type {ftype} is marked as dict_stored but has no 'bands' semantic axis")
+
+            # Verify that bands is indeed the last semantic axis in the extracted shape
+            # This validates the FeatureType metadata is consistent with our expectations
+            expected_last_axis = len(ftype.channel_axes) + 1  # W + channel axes + band axis
+            if band_axis_idx != expected_last_axis:
+                raise ValueError(
+                    f"Feature type {ftype} has bands at axis {band_axis_idx}, "
+                    f"but expected it at axis {expected_last_axis} (last semantic axis)"
+                )
+
+            def explode_bands(x):
+                """Move band axis to front and zip with band names."""
+                arr = np.asarray(x)
+                expected_band_count = len(constants.BAND_NAMES)
+
+                if arr.ndim == 0:
+                    raise ValueError(
+                        f"Expected banded data for feature '{feature}', but received a scalar value"
+                    )
+
+                # The band axis is always the last axis in the per-row data
+                # After format_channel_data + melt:
+                # - For BAND (non-matrix): per-channel data is (B,), band axis at -1
+                # - For BANDED_MATRIX (matrix): data is (C, C, B), band axis at -1
+                actual_band_count = arr.shape[-1]
+                if actual_band_count != expected_band_count:
+                    raise ValueError(
+                        f"Feature '{feature}' has {actual_band_count} bands at the last axis, "
+                        f"but expected {expected_band_count} to match constants.BAND_NAMES. "
+                        f"Data shape: {arr.shape}"
+                    )
+
+                # Move the band axis (last position) to position 0 for iteration
+                arr_bands_first = np.moveaxis(arr, -1, 0)
+                return list(zip(arr_bands_first.tolist(), constants.BAND_NAMES))
+
+            df[feature] = df[feature].apply(explode_bands)
             df = df.explode(feature)
             df[[feature, "band"]] = pd.DataFrame(df[feature].tolist(), index=df.index)
 

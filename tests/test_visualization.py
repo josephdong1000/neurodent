@@ -1854,8 +1854,20 @@ class TestExperimentPlotterFeatureDispatch:
                 {b: rng.random(n_chan).tolist() for b in constants.BAND_NAMES}
                 for _ in range(n_rows)
             ],
+            "logpsdband": [
+                {b: rng.random(n_chan).tolist() for b in constants.BAND_NAMES}
+                for _ in range(n_rows)
+            ],
+            "psdfrac": [
+                {b: rng.random(n_chan).tolist() for b in constants.BAND_NAMES}
+                for _ in range(n_rows)
+            ],
             "pcorr": [rng.random((n_chan, n_chan)).tolist() for _ in range(n_rows)],
             "cohere": [
+                {b: rng.random((n_chan, n_chan)).tolist() for b in constants.BAND_NAMES}
+                for _ in range(n_rows)
+            ],
+            "imcoh": [
                 {b: rng.random((n_chan, n_chan)).tolist() for b in constants.BAND_NAMES}
                 for _ in range(n_rows)
             ],
@@ -1965,6 +1977,135 @@ class TestExperimentPlotterFeatureDispatch:
         assert "cohere" in df.columns
         assert "channel" in df.columns
         assert (df["channel"] == "average").all()
+
+    def test_pull_banded_matrix_shape_correctness(self, feature_plotter):
+        """Test BANDED_MATRIX shape correctness: verifies band axis is iterated correctly.
+
+        Regression test for issue where cohere/imcoh heatmaps displayed as (8,5) instead of (8,8)
+        due to incorrect iteration over the band axis in pull_timeseries_dataframe.
+        """
+        df = feature_plotter.pull_timeseries_dataframe(
+            feature="cohere", groupby=["genotype"], collapse_channels=False
+        )
+        # Each row should have a band value
+        assert "band" in df.columns
+        assert set(df["band"].unique()) == set(constants.BAND_NAMES)
+
+        # Each row's cohere value should be a matrix of shape (n_chan, n_chan)
+        n_chan = len(feature_plotter.all_channel_names)
+        for idx, row in df.iterrows():
+            cohere_matrix = np.array(row["cohere"])
+            assert cohere_matrix.shape == (n_chan, n_chan), (
+                f"Expected cohere matrix shape ({n_chan}, {n_chan}), "
+                f"got {cohere_matrix.shape} for band={row['band']}"
+            )
+
+        # Verify that different bands have different data
+        # Collect all matrices for each band
+        band_matrices = {}
+        for band_name in constants.BAND_NAMES:
+            band_data = df[df["band"] == band_name]
+            assert len(band_data) > 0, f"Band {band_name} has no data"
+            # Collect all matrices for this band
+            matrices = [np.array(row["cohere"]) for _, row in band_data.iterrows()]
+            band_matrices[band_name] = np.array(matrices)
+
+        # Verify that matrices from different bands are actually different
+        # Since the fixture uses random data with a fixed seed, different bands should have different values
+        band_names = list(band_matrices.keys())
+        for i in range(len(band_names)):
+            for j in range(i + 1, len(band_names)):
+                band1, band2 = band_names[i], band_names[j]
+                matrices1, matrices2 = band_matrices[band1], band_matrices[band2]
+                # At least some values should differ between bands
+                assert not np.allclose(matrices1, matrices2), (
+                    f"Bands {band1} and {band2} have identical data - "
+                    f"band axis may not be correctly exploded"
+                )
+
+    def test_pull_band_feature_shape_correctness(self, feature_plotter):
+        """Test BAND feature shape correctness: verifies band axis is iterated correctly.
+
+        Tests that BAND features (like psdband) also work correctly with the moveaxis fix.
+        """
+        df = feature_plotter.pull_timeseries_dataframe(
+            feature="psdband", groupby=["genotype"], collapse_channels=False
+        )
+        # Each row should have a band value
+        assert "band" in df.columns
+        assert set(df["band"].unique()) == set(constants.BAND_NAMES)
+
+        # Each row's psdband value should be a scalar (after extraction)
+        for idx, row in df.iterrows():
+            psdband_val = row["psdband"]
+            # After pull_timeseries_dataframe, BAND features should be scalar per channel per band
+            assert isinstance(psdband_val, (int, float, np.number)), (
+                f"Expected scalar psdband value, got {type(psdband_val)} for band={row['band']}"
+            )
+
+        # Verify that different bands have different data values
+        # Collect all values for each band
+        band_values = {}
+        for band_name in constants.BAND_NAMES:
+            band_data = df[df["band"] == band_name]
+            assert len(band_data) > 0, f"Band {band_name} has no data"
+            values = np.array([row["psdband"] for _, row in band_data.iterrows()])
+            band_values[band_name] = values
+
+        # Verify that values from different bands are actually different
+        band_names = list(band_values.keys())
+        for i in range(len(band_names)):
+            for j in range(i + 1, len(band_names)):
+                band1, band2 = band_names[i], band_names[j]
+                values1, values2 = band_values[band1], band_values[band2]
+                # At least some values should differ between bands
+                assert not np.allclose(values1, values2), (
+                    f"Bands {band1} and {band2} have identical data - "
+                    f"band axis may not be correctly exploded"
+                )
+
+    def test_pull_band_feature_logpsdband_shape_correctness(self, feature_plotter):
+        """Test BAND feature (logpsdband) shape correctness."""
+        df = feature_plotter.pull_timeseries_dataframe(
+            feature="logpsdband", groupby=["genotype"], collapse_channels=False
+        )
+        assert "band" in df.columns
+        assert set(df["band"].unique()) == set(constants.BAND_NAMES)
+
+        for idx, row in df.iterrows():
+            val = row["logpsdband"]
+            assert isinstance(val, (int, float, np.number)), (
+                f"Expected scalar, got {type(val)} for band={row['band']}"
+            )
+
+    def test_pull_band_feature_psdfrac_shape_correctness(self, feature_plotter):
+        """Test BAND feature (psdfrac) shape correctness."""
+        df = feature_plotter.pull_timeseries_dataframe(
+            feature="psdfrac", groupby=["genotype"], collapse_channels=False
+        )
+        assert "band" in df.columns
+        assert set(df["band"].unique()) == set(constants.BAND_NAMES)
+
+        for idx, row in df.iterrows():
+            val = row["psdfrac"]
+            assert isinstance(val, (int, float, np.number)), (
+                f"Expected scalar, got {type(val)} for band={row['band']}"
+            )
+
+    def test_pull_banded_matrix_imcoh_shape_correctness(self, feature_plotter):
+        """Test BANDED_MATRIX feature (imcoh) shape correctness."""
+        df = feature_plotter.pull_timeseries_dataframe(
+            feature="imcoh", groupby=["genotype"], collapse_channels=False
+        )
+        assert "band" in df.columns
+        assert set(df["band"].unique()) == set(constants.BAND_NAMES)
+
+        n_chan = len(feature_plotter.all_channel_names)
+        for idx, row in df.iterrows():
+            matrix = np.array(row["imcoh"])
+            assert matrix.shape == (n_chan, n_chan), (
+                f"Expected shape ({n_chan}, {n_chan}), got {matrix.shape} for band={row['band']}"
+            )
 
     def test_pull_hist_feature(self, feature_plotter):
         """Test pull_timeseries_dataframe with HIST, collapse_channels=False."""
