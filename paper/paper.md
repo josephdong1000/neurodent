@@ -13,6 +13,12 @@ authors:
 - name: Oh Yongtaek
   orcid: 0000-0002-1723-0553
   affiliation: 1
+- name: Yastika Singh
+  orchid: 0009-0006-2319-5877
+  affiliation: "1, 2"
+- name: Yifan Wei
+  orchid: 0009-0002-6391-0071
+  affiliation: "1, 2"
 - name: Eric D. Marsh
   orcid: 0000-0003-3264-0902
   affiliation: "1, 2"
@@ -73,6 +79,6 @@ Claude Opus 4.6 via GitHub Copilot and Claude Code was used to assist with code 
 
 # Acknowledgements
 
-We acknowledge contributions from Yastika Singh, Yifan Wei, Jessica Lahr, and Ananya Madhira. This project benefited from insights and best practices described in Peter K. G. Williams’s *One Good Tutorial*.
+We acknowledge contributions from Jessica Lahr and Ananya Madhira.  This project benefited from insights and best practices described in Peter K. G. Williams’s *One Good Tutorial*. This work was supported by the Eunice Kennedy Shriver National Institute of Child Health and Human Development (NICHD), National Institutes of Health [P50HD105354]; and by generous donations toward the Marsh Refractory Epilepsy Research Program.
 
 # References
