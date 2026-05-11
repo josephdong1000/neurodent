@@ -19,7 +19,7 @@ from dask.distributed import Client, LocalCluster
 
 from neurodent import constants, core, visualization
 from neurodent.workflow import setup_snakemake_logging, inject_config_aliases
-from neurodent.workflow.utils import apply_path_overrides, resolve_animal_pattern
+from neurodent.workflow.utils import apply_path_overrides, resolve_animal_pattern, get_discovery_animal_filter
 
 
 def load_samples_and_config():
@@ -86,12 +86,11 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
             for folder_info in animal_folders:
                 # Unpack tuple from Snakefile
                 folder_path, source_animal_id, session_key = folder_info
-                
+
                 logger.info(f"Loading session: {folder_path} (ID in metadata: {source_animal_id})")
-                
-                # Check if this specific session is a joint session
-                # We check if the session_key exists in the joint_sessions config
-                is_joint = session_key in samples_config.get("joint_sessions", {})
+
+                # Check if this animal has channels defined (indicates joint session)
+                is_joint = source_animal_id in samples_config.get("_animal_channels", {})
 
                 # Apply session-specific overrides from dataset config
                 session_analysis_config = analysis_config.copy()
@@ -125,16 +124,23 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
                     if animal_id in all_manual_dts:
                         spec = all_manual_dts[animal_id]
                         if isinstance(spec, list):
-                            # Distribute: each AO gets one timestamp from the list
-                            # (one per session folder, matched by index order)
-                            if len(spec) != len(animal_folders):
-                                raise ValueError(
-                                    f"Length of manual_datetimes list ({len(spec)}) for {animal_id} "
-                                    f"does not match number of session folders ({len(animal_folders)})"
-                                )
-                            current_dt = spec[animal_folders.index(folder_info)]
-                            session_lro_kwargs["manual_datetimes"] = current_dt
-                            logger.info(f"  -> Using specific timestamp from list: {current_dt}")
+                            # For pattern-based discovery (unified format), pass the entire list
+                            # to AnimalOrganizer, which will distribute it to discovered sessions.
+                            # For legacy folder-based iteration, distribute per folder.
+                            if folder_path == "":
+                                # Pattern-based discovery: pass entire list
+                                session_lro_kwargs["manual_datetimes"] = spec
+                                logger.info(f"  -> Using manual_datetimes list with {len(spec)} entries for pattern discovery")
+                            else:
+                                # Legacy folder-based: distribute per folder
+                                if len(spec) != len(animal_folders):
+                                    raise ValueError(
+                                        f"Length of manual_datetimes list ({len(spec)}) for {animal_id} "
+                                        f"does not match number of session folders ({len(animal_folders)})"
+                                    )
+                                current_dt = spec[animal_folders.index(folder_info)]
+                                session_lro_kwargs["manual_datetimes"] = current_dt
+                                logger.info(f"  -> Using specific timestamp from list: {current_dt}")
                         else:
                             # Single string/scalar/dict: pass directly
                             session_lro_kwargs["manual_datetimes"] = spec
@@ -158,27 +164,34 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
                 )
                 logger.info(f"  -> Discovery pattern: {discovery_pattern}")
 
-                # For joint sessions, don't filter by animal_id during discovery
-                # since all files belong to all animals in the joint session
-                ao_animal_id = None if is_joint else source_animal_id
+                # Determine the animal filter value for discovery
+                animal_groups = samples_config.get("_animal_groups", {})
+                discovery_animal_filter = get_discovery_animal_filter(
+                    source_animal_id, is_joint, animal_groups
+                )
+                if is_joint and source_animal_id in animal_groups:
+                    logger.info(f"  -> Using group '{discovery_animal_filter}' for {{animal}} placeholder in discovery")
+                elif is_joint:
+                    logger.info(f"  -> Using animal ID '{discovery_animal_filter}' for discovery (joint session without group)")
+
 
                 # Create AO for this session using pattern-based discovery
                 session_ao = visualization.AnimalOrganizer(
                     discovery_pattern,
-                    animal_id=ao_animal_id,
+                    animal_id=discovery_animal_filter,
                     skip_sessions=session_analysis_config.get("skip_sessions", session_analysis_config.get("skip_days", [])),
                     assume_from_number=session_analysis_config["assume_from_number"],
                     lro_kwargs=session_lro_kwargs,
                 )
 
-                
+
                 if is_joint and channel_subset is not None:
                      logger.info(f"  -> Joint session detected. Filtering to channels: {channel_subset}")
                      # Split to only the channels assigned to this animal
                      # source_animal_id is the key in the splits dict
                      splits = session_ao.split(groups={source_animal_id: channel_subset})
                      session_ao = splits[source_animal_id]
-                
+
                 # Collect LROs
                 all_lros.extend(session_ao.long_recordings)
             
@@ -288,6 +301,7 @@ def main():
 
 
 if __name__ == "__main__":
+
     memray_enabled = os.environ.get("NEURODENT_MEMRAY")
     profile_enabled = os.environ.get("NEURODENT_PROFILE")
 

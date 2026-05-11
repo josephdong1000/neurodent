@@ -129,31 +129,12 @@ else:
         "or 'data_folders_to_animal_ids' (legacy format)"
     )
 
-# Build mapping for animals from joint sessions
-# These animals will have their data read from split output folders
-JOINT_ANIMAL_TO_SESSION = {}  # Maps slugified animal name -> (session, original_animal_id)
-
-for session, animals_dict in samples_config.get("joint_sessions", {}).items():
-    for animal_id in animals_dict.keys():
-        slugified_name = slugify(animal_id, allow_unicode=True)
-        
-        JOINT_ANIMAL_TO_SESSION[slugified_name] = (session, animal_id)
-        
-        if slugified_name not in ANIMALS:
-            ANIMALS.append(slugified_name)
-            ANIMAL_TO_FOLDERS_MAP[slugified_name] = []
-            ANIMAL_TO_FULL_ID_MAP[slugified_name] = animal_id
-            
-        # For joint sessions, 'session' is the folder
-        ANIMAL_TO_FOLDERS_MAP[slugified_name].append((session, animal_id, session))
-
 # Optionally limit to first N animals (useful for testing)
 _truncate_animals = config.get("samples", {}).get("truncate_animals", None)
 if _truncate_animals is not None:
     ANIMALS = ANIMALS[:_truncate_animals]
     ANIMAL_TO_FOLDERS_MAP = {k: v for k, v in ANIMAL_TO_FOLDERS_MAP.items() if k in ANIMALS}
     ANIMAL_TO_FULL_ID_MAP = {k: v for k, v in ANIMAL_TO_FULL_ID_MAP.items() if k in ANIMALS}
-    JOINT_ANIMAL_TO_SESSION = {k: v for k, v in JOINT_ANIMAL_TO_SESSION.items() if k in ANIMALS}
     print(f"[info] truncate_animals={_truncate_animals}: running first {len(ANIMALS)} animal(s): {ANIMALS}")
 
 
@@ -171,15 +152,11 @@ def get_animal_folder(wildcards):
 
 def get_joint_session_channels(wildcards):
     """Get channel subset for joint session animals, or None for regular animals.
-    
-    Now looks up based on the animal ID slug. 
-    Assumes if ANY session for this animal is joint, we return the channels for that session.
-    (Merging joint + non-joint sessions for same animal is complex, assumed uniform).
+
+    Uses the new _animal_channels dict from expand_animals_config().
     """
-    if wildcards.animal in JOINT_ANIMAL_TO_SESSION:
-        session, animal_id = JOINT_ANIMAL_TO_SESSION[wildcards.animal]
-        return samples_config["joint_sessions"][session][animal_id]
-    return None
+    animal_id = ANIMAL_TO_FULL_ID_MAP[wildcards.animal]
+    return samples_config.get("_animal_channels", {}).get(animal_id)
 
 
 def get_animal_id(wildcards):

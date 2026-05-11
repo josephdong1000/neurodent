@@ -1007,3 +1007,127 @@ class TestMiniRealDataset:
             constants.GENOTYPE_ALIASES = orig_aliases
 
 
+@pytest.mark.integration
+class TestJointRecordingSplit:
+    """Test joint recording split functionality where animals share a recording file."""
+
+    def test_joint_recording_split(self):
+        """Test splitting A10's 10 channels into two virtual animals (A10-1 and A10-2)."""
+        from neurodent import constants
+        from neurodent.workflow import inject_config_aliases
+        from neurodent.workflow.utils import expand_animals_config
+        from neurodent.visualization import AnimalOrganizer
+
+        # Use existing A10 test data but configure it as a joint recording split
+        # A10-1 gets channels 0-4, A10-2 gets channels 5-9
+        mini_real_data = Path(__file__).resolve().parents[2] / ".tests" / "integration" / "data"
+        config_dict = {
+            "data_root": str(mini_real_data),
+            "animals": [
+                {
+                    "id": "A10-1",
+                    "sex": "M",
+                    "gene": "WT",
+                    "channels": ["0", "1", "2", "3", "4"],
+                    "group": "A10",  # Both animals share the A10 group for discovery
+                    "manual_datetime": "2025-05-10 10:00:00",
+                },
+                {
+                    "id": "A10-2",
+                    "sex": "M",
+                    "gene": "WT",
+                    "channels": ["5", "6", "7", "8", "9"],
+                    "group": "A10",  # Same group, different channels
+                    "manual_datetime": "2025-05-10 10:00:00",
+                },
+            ],
+        }
+
+        orig_metadata = constants.ANIMAL_METADATA
+        orig_aliases = constants.GENOTYPE_ALIASES
+        try:
+            # Test config expansion
+            expanded = expand_animals_config(config_dict)
+
+            # Inject the config so metadata is available
+            inject_config_aliases(expanded)
+
+            # Verify both animals are in the expanded config
+            animal_ids = {a["id"] for a in expanded["animals"]}
+            assert "A10-1" in animal_ids
+            assert "A10-2" in animal_ids
+
+            # Verify group mapping
+            assert expanded["_animal_groups"]["A10-1"] == "A10"
+            assert expanded["_animal_groups"]["A10-2"] == "A10"
+
+            # Verify channel mapping
+            assert expanded["_animal_channels"]["A10-1"] == ["0", "1", "2", "3", "4"]
+            assert expanded["_animal_channels"]["A10-2"] == ["5", "6", "7", "8", "9"]
+
+            # Test channel validation - no overlaps within group
+            channels_a10_1 = set(expanded["_animal_channels"]["A10-1"])
+            channels_a10_2 = set(expanded["_animal_channels"]["A10-2"])
+            assert len(channels_a10_1 & channels_a10_2) == 0, "Channels should not overlap within same group"
+
+            # Test AnimalOrganizer.split() functionality with real mini-real data
+            # Use the group name "A10" in the pattern to discover files for both animals
+            # The pattern matches "Cage 2 A10-0" as the {index} placeholder
+            patterns = [
+                f"{mini_real_data}/A10/{{index}}_ColMajor.bin",
+                f"{mini_real_data}/A10/{{index}}_Meta.csv",
+            ]
+
+            # Test A10-1 (first 5 channels)
+            ao1 = AnimalOrganizer(
+                patterns,
+                animal_id="A10",  # Use the group name for discovery
+                assume_from_number=True,
+                lro_kwargs={
+                    "mode": "si",
+                    "extract_func": _mini_real_extractor,
+                    "multiprocess_mode": "serial",
+                    "manual_datetimes": "2025-05-10 10:00:00",
+                },
+            )
+            assert ao1.animal_id == "A10"
+
+            # Split into two animals with different channel subsets
+            split_groups = {
+                "A10-1": ["0", "1", "2", "3", "4"],
+                "A10-2": ["5", "6", "7", "8", "9"],
+            }
+            split_aos = ao1.split(split_groups)
+
+            # Verify A10-1 split
+            assert "A10-1" in split_aos
+            ao1_split = split_aos["A10-1"]
+            assert ao1_split.animal_id == "A10-1"
+            assert len(ao1_split.long_recordings) >= 1
+            rec1 = ao1_split.long_recordings[0].LongRecording
+            assert rec1 is not None
+            assert rec1.get_num_channels() == 5  # Only 5 channels after split
+            assert rec1.get_sampling_frequency() == 1000.0
+
+            # Verify channel IDs match what we requested
+            channel_ids_1 = rec1.get_channel_ids()
+            assert len(channel_ids_1) == 5
+            expected_channels_1 = {"0", "1", "2", "3", "4"}
+            assert set(channel_ids_1) == expected_channels_1
+
+            # Verify A10-2 split
+            assert "A10-2" in split_aos
+            ao2_split = split_aos["A10-2"]
+            assert ao2_split.animal_id == "A10-2"
+            rec2 = ao2_split.long_recordings[0].LongRecording
+            assert rec2 is not None
+            assert rec2.get_num_channels() == 5
+            channel_ids_2 = rec2.get_channel_ids()
+            expected_channels_2 = {"5", "6", "7", "8", "9"}
+            assert set(channel_ids_2) == expected_channels_2
+
+        finally:
+            constants.ANIMAL_METADATA = orig_metadata
+            constants.GENOTYPE_ALIASES = orig_aliases
+
+

@@ -697,3 +697,191 @@ class TestExpandAnimalsConfig:
         result = expand_animals_config(cfg)
         meta = result["ANIMAL_METADATA"][0]
         assert "exclude" not in meta
+
+    def test_builds_animal_channels(self):
+        """_animal_channels dict is built from animals' channels field."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "A10", "gene": "WT", "sex": "M", "channels": ["Ch0", "Ch1", "Ch2"]},
+                {"id": "F22", "gene": "KO", "sex": "F"},
+            ],
+        }
+        result = expand_animals_config(cfg)
+        assert "_animal_channels" in result
+        assert result["_animal_channels"]["A10"] == ["Ch0", "Ch1", "Ch2"]
+        assert "F22" not in result["_animal_channels"]
+
+    def test_builds_animal_groups(self):
+        """_animal_groups dict is built from animals' group field."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "A10", "gene": "WT", "sex": "M", "channels": ["Ch0"], "group": "SharedGroup"},
+                {"id": "F22", "gene": "KO", "sex": "F"},
+            ],
+        }
+        result = expand_animals_config(cfg)
+        assert "_animal_groups" in result
+        assert result["_animal_groups"]["A10"] == "SharedGroup"
+        assert "F22" not in result["_animal_groups"]
+
+    def test_channels_and_group_not_in_metadata(self):
+        """channels and group keys are excluded from ANIMAL_METADATA."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "A10", "gene": "WT", "sex": "M", "channels": ["Ch0"], "group": "Group1"},
+            ],
+        }
+        result = expand_animals_config(cfg)
+        meta = result["ANIMAL_METADATA"][0]
+        assert "channels" not in meta
+        assert "group" not in meta
+
+    def test_backward_compat_derives_channels_from_joint_sessions(self):
+        """Legacy joint_sessions is auto-converted to _animal_channels with deprecation warning."""
+        import warnings
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "A10", "gene": "WT", "sex": "M"},
+                {"id": "F22", "gene": "KO", "sex": "F"},
+            ],
+            "joint_sessions": {
+                "Session1": {
+                    "A10": ["Ch0", "Ch1"],
+                    "F22": ["Ch2", "Ch3"],
+                }
+            },
+        }
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            result = expand_animals_config(cfg)
+            assert len(w) == 1
+            assert issubclass(w[0].category, DeprecationWarning)
+            assert "joint_sessions" in str(w[0].message)
+
+        assert "_animal_channels" in result
+        assert result["_animal_channels"]["A10"] == ["Ch0", "Ch1"]
+        assert result["_animal_channels"]["F22"] == ["Ch2", "Ch3"]
+
+    def test_backward_compat_verifies_channel_consistency(self):
+        """Legacy joint_sessions verifies channel consistency across sessions."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "A10", "gene": "WT", "sex": "M"},
+            ],
+            "joint_sessions": {
+                "Session1": {"A10": ["Ch0", "Ch1"]},
+                "Session2": {"A10": ["Ch0", "Ch2"]},  # Inconsistent!
+            },
+        }
+        with pytest.raises(ValueError, match="Inconsistent channel lists"):
+            expand_animals_config(cfg)
+
+    def test_backward_compat_new_format_takes_precedence(self):
+        """If animals have channels field, legacy joint_sessions is ignored (no warning)."""
+        import warnings
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "A10", "gene": "WT", "sex": "M", "channels": ["Ch0", "Ch1"]},
+            ],
+            "joint_sessions": {
+                "Session1": {"A10": ["Ch2", "Ch3"]},  # Should be ignored
+            },
+        }
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            result = expand_animals_config(cfg)
+            # No deprecation warning because new format is used
+            deprecation_warnings = [x for x in w if issubclass(x.category, DeprecationWarning)]
+            assert len(deprecation_warnings) == 0
+
+        # Should use the new format, not the legacy one
+        assert result["_animal_channels"]["A10"] == ["Ch0", "Ch1"]
+
+    def test_validates_no_overlapping_channels_in_group(self):
+        """Animals in the same group cannot share channels."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "A10", "gene": "WT", "sex": "M", "channels": ["Ch0", "Ch1"], "group": "Group1"},
+                {"id": "F22", "gene": "KO", "sex": "F", "channels": ["Ch1", "Ch2"], "group": "Group1"},  # Ch1 overlaps!
+            ],
+        }
+        with pytest.raises(ValueError, match="Channel 'Ch1' is assigned to both"):
+            expand_animals_config(cfg)
+
+    def test_allows_same_channels_in_different_groups(self):
+        """Same channel names can be used in different groups (different recordings)."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "A10", "gene": "WT", "sex": "M", "channels": ["Ch0", "Ch1"], "group": "Group1"},
+                {"id": "F22", "gene": "KO", "sex": "F", "channels": ["Ch0", "Ch1"], "group": "Group2"},
+            ],
+        }
+        result = expand_animals_config(cfg)
+        # Should succeed - different groups can have same channel names
+        assert result["_animal_channels"]["A10"] == ["Ch0", "Ch1"]
+        assert result["_animal_channels"]["F22"] == ["Ch0", "Ch1"]
+
+
+class TestGetDiscoveryAnimalFilter:
+    """Test the get_discovery_animal_filter function."""
+
+    def test_regular_non_joint_animal(self):
+        """Regular non-joint animals use their animal ID."""
+        from neurodent.workflow.utils import get_discovery_animal_filter
+
+        result = get_discovery_animal_filter("A10", is_joint=False, animal_groups={})
+        assert result == "A10"
+
+    def test_joint_without_group(self):
+        """Joint session without group uses animal ID (e.g., jess_rhd)."""
+        from neurodent.workflow.utils import get_discovery_animal_filter
+
+        result = get_discovery_animal_filter("AP3B2het-207-M", is_joint=True, animal_groups={})
+        assert result == "AP3B2het-207-M"
+
+    def test_joint_with_group(self):
+        """Joint session with group uses group name (e.g., arx_rosa)."""
+        from neurodent.workflow.utils import get_discovery_animal_filter
+
+        animal_groups = {
+            "ArxRosa-1017": "Arx Rosa 1017 1015",
+            "ArxRosa-1015": "Arx Rosa 1017 1015",
+        }
+        result = get_discovery_animal_filter("ArxRosa-1017", is_joint=True, animal_groups=animal_groups)
+        assert result == "Arx Rosa 1017 1015"
+
+    def test_joint_with_group_second_animal(self):
+        """Both animals in same group return same group name."""
+        from neurodent.workflow.utils import get_discovery_animal_filter
+
+        animal_groups = {
+            "ArxRosa-1017": "Arx Rosa 1017 1015",
+            "ArxRosa-1015": "Arx Rosa 1017 1015",
+        }
+        result1 = get_discovery_animal_filter("ArxRosa-1017", is_joint=True, animal_groups=animal_groups)
+        result2 = get_discovery_animal_filter("ArxRosa-1015", is_joint=True, animal_groups=animal_groups)
+        assert result1 == result2 == "Arx Rosa 1017 1015"
+
+    def test_non_joint_ignores_groups(self):
+        """Non-joint animals ignore the groups dict and use animal ID."""
+        from neurodent.workflow.utils import get_discovery_animal_filter
+
+        animal_groups = {"A10": "SomeGroup"}
+        result = get_discovery_animal_filter("A10", is_joint=False, animal_groups=animal_groups)
+        assert result == "A10"
+
+    def test_joint_animal_not_in_groups_uses_id(self):
+        """Joint animal not in groups dict falls back to animal ID."""
+        from neurodent.workflow.utils import get_discovery_animal_filter
+
+        animal_groups = {"OtherAnimal": "SomeGroup"}
+        result = get_discovery_animal_filter("A10", is_joint=True, animal_groups=animal_groups)
+        assert result == "A10"

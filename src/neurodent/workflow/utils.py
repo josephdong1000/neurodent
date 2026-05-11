@@ -256,6 +256,8 @@ def expand_animals_config(samples_config: dict) -> dict:
       (built from per-animal ``bad_channels`` entries)
     * ``_animal_overrides`` – animal_id → per-animal overrides dict (pattern,
       lro_kwargs, day_parse_kwargs)
+    * ``_animal_channels`` – animal_id → channel list mapping (for joint sessions)
+    * ``_animal_groups`` – animal_id → group string mapping (for joint sessions)
 
     ``data_root`` is the canonical path key.  If the legacy key
     ``data_parent_folder`` is present it is migrated to ``data_root``.
@@ -328,6 +330,31 @@ def expand_animals_config(samples_config: dict) -> dict:
         ... })
         >>> cfg["bad_channels"]["A10"]
         {'Session1': ['LHip'], 'Session2': ['RMot']}
+
+    Joint sessions with channels::
+
+        >>> cfg = expand_animals_config({
+        ...     "data_root": "/data",
+        ...     "animals": [
+        ...         {"id": "A10", "gene": "WT", "sex": "M",
+        ...          "channels": ["Ch0", "Ch1", "Ch2", "Ch3"]},
+        ...     ],
+        ... })
+        >>> cfg["_animal_channels"]["A10"]
+        ['Ch0', 'Ch1', 'Ch2', 'Ch3']
+
+    Joint sessions with group::
+
+        >>> cfg = expand_animals_config({
+        ...     "data_root": "/data",
+        ...     "animals": [
+        ...         {"id": "A10", "gene": "WT", "sex": "M",
+        ...          "channels": ["Ch0", "Ch1"],
+        ...          "group": "SharedGroup"},
+        ...     ],
+        ... })
+        >>> cfg["_animal_groups"]["A10"]
+        'SharedGroup'
     """
     result = copy.deepcopy(samples_config)
 
@@ -345,7 +372,7 @@ def expand_animals_config(samples_config: dict) -> dict:
     result["animals"] = animals_list
 
     # Keys that are per-animal overrides (not core metadata)
-    _OVERRIDE_KEYS = {"pattern", "lro_kwargs", "day_parse_kwargs", "manual_datetime", "datetimes_are_start", "bad_channels", "exclude"}
+    _OVERRIDE_KEYS = {"pattern", "lro_kwargs", "day_parse_kwargs", "manual_datetime", "datetimes_are_start", "bad_channels", "exclude", "channels", "group"}
     _METADATA_SKIP = _OVERRIDE_KEYS  # excluded from ANIMAL_METADATA entries
 
     # --- Build ANIMAL_METADATA ---
@@ -389,6 +416,84 @@ def expand_animals_config(samples_config: dict) -> dict:
                 # Dict format: session → bad channels mapping
                 result["bad_channels"][animal["id"]] = bc
 
+    # --- Build _animal_channels and _animal_groups ---
+    animal_channels: dict[str, list[str]] = {}
+    animal_groups: dict[str, str] = {}
+
+    for animal in animals_list:
+        if "channels" in animal:
+            animal_channels[animal["id"]] = animal["channels"]
+        if "group" in animal:
+            animal_groups[animal["id"]] = animal["group"]
+
+    # Validate no overlapping channels within the same group
+    if animal_channels and animal_groups:
+        # Group animals by their group name
+        groups_to_animals: dict[str, list[str]] = {}
+        for animal_id, group_name in animal_groups.items():
+            groups_to_animals.setdefault(group_name, []).append(animal_id)
+
+        # Check for channel overlaps within each group
+        for group_name, animal_ids in groups_to_animals.items():
+            # Get all channels for animals in this group
+            all_channels_in_group: list[tuple[str, str]] = []  # (animal_id, channel)
+            for animal_id in animal_ids:
+                if animal_id in animal_channels:
+                    for channel in animal_channels[animal_id]:
+                        all_channels_in_group.append((animal_id, channel))
+
+            # Check for duplicates
+            seen_channels: dict[str, str] = {}  # channel -> first animal_id
+            for animal_id, channel in all_channels_in_group:
+                if channel in seen_channels:
+                    raise ValueError(
+                        f"Channel '{channel}' is assigned to both '{seen_channels[channel]}' "
+                        f"and '{animal_id}' in group '{group_name}'. "
+                        f"Animals in the same joint recording cannot share channels."
+                    )
+                seen_channels[channel] = animal_id
+
+    if animal_channels:
+        result["_animal_channels"] = animal_channels
+    if animal_groups:
+        result["_animal_groups"] = animal_groups
+
+    # --- Backward compatibility: derive channels from legacy joint_sessions ---
+    # Note: This only derives _animal_channels, not _animal_groups.
+    # For legacy configs where folder names don't contain animal IDs,
+    # migration to the new format with explicit 'group' fields is required.
+    if "joint_sessions" in result and result["joint_sessions"]:
+        # Check if any animals already have channels defined
+        has_new_format = any("channels" in a for a in animals_list)
+
+        if not has_new_format:
+            # Auto-derive from legacy format with deprecation warning
+            import warnings
+            warnings.warn(
+                "The 'joint_sessions' configuration format is deprecated. "
+                "Please migrate to the unified 'animals' format by adding 'channels' "
+                "and optionally 'group' fields to animal entries. "
+                "See the animals configuration documentation for details.",
+                DeprecationWarning,
+                stacklevel=2
+            )
+
+            # Derive channels from joint_sessions
+            if "_animal_channels" not in result:
+                result["_animal_channels"] = {}
+
+            for session_name, animals_dict in result["joint_sessions"].items():
+                for animal_id, channels in animals_dict.items():
+                    if animal_id in result["_animal_channels"]:
+                        # Verify consistency
+                        if result["_animal_channels"][animal_id] != channels:
+                            raise ValueError(
+                                f"Inconsistent channel lists for {animal_id} across joint sessions. "
+                                f"Expected {result['_animal_channels'][animal_id]}, got {channels} in {session_name}."
+                            )
+                    else:
+                        result["_animal_channels"][animal_id] = channels
+
     # --- Build _animal_overrides ---
     overrides: dict[str, dict] = {}
     for animal in animals_list:
@@ -406,6 +511,57 @@ def expand_animals_config(samples_config: dict) -> dict:
         result["_animal_overrides"] = overrides
 
     return result
+
+
+def get_discovery_animal_filter(
+    source_animal_id: str,
+    is_joint: bool,
+    animal_groups: dict[str, str],
+) -> str:
+    """Determine the animal filter value for discovery.
+
+    For joint sessions with 'group', use the group name for {animal} placeholder.
+    For joint sessions without 'group', use the animal id.
+    For non-joint sessions, use the animal id as usual.
+
+    Parameters
+    ----------
+    source_animal_id : str
+        The animal ID from the configuration
+    is_joint : bool
+        Whether this is a joint session
+    animal_groups : dict[str, str]
+        Mapping of animal_id to group name
+
+    Returns
+    -------
+    str
+        The value to use for {animal} placeholder in discovery pattern
+
+    Examples
+    --------
+    Regular non-joint animal::
+
+        >>> get_discovery_animal_filter("A10", False, {})
+        'A10'
+
+    Joint session with group (e.g., arx_rosa)::
+
+        >>> groups = {"ArxRosa-1017": "Arx Rosa 1017 1015", "ArxRosa-1015": "Arx Rosa 1017 1015"}
+        >>> get_discovery_animal_filter("ArxRosa-1017", True, groups)
+        'Arx Rosa 1017 1015'
+
+    Joint session without group (e.g., jess_rhd where folders contain animal IDs)::
+
+        >>> get_discovery_animal_filter("AP3B2het-207-M", True, {})
+        'AP3B2het-207-M'
+    """
+    if is_joint and source_animal_id in animal_groups:
+        # Use group name for discovery (folder contains group name, not individual animal ID)
+        return animal_groups[source_animal_id]
+    else:
+        # Joint session without group OR regular non-joint session: use animal ID
+        return source_animal_id
 
 
 def resolve_animal_pattern(

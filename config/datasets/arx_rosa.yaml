@@ -1,5 +1,5 @@
 # Arx Rosa Project - Unified Configuration for Mixed Formats
-# This dataset handles both EDF and RHD formats via path-based override system
+# Per-animal pattern and lro_kwargs are now specified in samples_arx_rosa.json
 
 samples:
   samples_file: "config/samples_arx_rosa.json"
@@ -7,35 +7,8 @@ samples:
 # Global defaults for all sessions
 analysis:
   war_generation:
-    pattern: "{index}"  # Files directly in session folders (overridden per session)
+    pattern: "{index}"  # Default pattern (overridden per animal)
     lro_kwargs:
-      mode: "si"  # Use SpikeInterface backend for all formats
+      mode: "si"  # Default: Use SpikeInterface backend
       input_type: "files"  # Multiple files per session
 
-# Path-based overrides by session
-overrides:
-  by_session:
-    "Arx Rosa 1017 1015":
-      "analysis.war_generation.pattern": "{index}.EDF"
-      "analysis.war_generation.lro_kwargs.mode": "mne"
-      "analysis.war_generation.lro_kwargs.extract_func": "read_raw_edf"
-
-    "Arx Rosa 1199 1198 1211 1201":
-      "analysis.war_generation.pattern": "{index}.EDF"
-      "analysis.war_generation.lro_kwargs.mode": "mne"
-      "analysis.war_generation.lro_kwargs.extract_func": "read_raw_edf"
-
-    "Arx Rosa  967 968 969 418":
-      "analysis.war_generation.pattern": "{index}.EDF"
-      "analysis.war_generation.lro_kwargs.mode": "mne"
-      "analysis.war_generation.lro_kwargs.extract_func": "read_raw_edf"
-
-    "Arx Rosa 2059_2063_2064":
-      "analysis.war_generation.pattern": "{index}.rhd"
-      "analysis.war_generation.lro_kwargs.extract_func": "read_intan"
-      "analysis.war_generation.lro_kwargs.stream_id": "0"
-
-    "Arx Rosa 3022 3023 3024":
-      "analysis.war_generation.pattern": "{index}.rhd"
-      "analysis.war_generation.lro_kwargs.extract_func": "read_intan"
-      "analysis.war_generation.lro_kwargs.stream_id": "0"

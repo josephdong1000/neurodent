@@ -24,7 +24,7 @@ rule war_generation:
     params:
         animal_folders=get_animal_folders,
         animal_id=get_animal_id,
-        is_split_recording=lambda wc: wc.animal in JOINT_ANIMAL_TO_SESSION,
+        is_split_recording=lambda wc: get_joint_session_channels(wc) is not None,
         channel_subset=get_joint_session_channels,  # None for regular animals, list for joint sessions
         config=config,
         samples_config=samples_config,
