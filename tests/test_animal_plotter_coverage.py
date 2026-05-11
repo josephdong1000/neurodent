@@ -86,6 +86,42 @@ def _make_band_group(n_time=10, n_chan=N_CHAN, feature="psdband", rng=None):
     )
 
 
+def _make_linear_2d_group(n_time=10, n_chan=N_CHAN, feature="psdslope", n_components=2, rng=None):
+    """Return a DataFrame suitable for __get_linear_feature with a LINEAR_2D feature."""
+    rng = rng or np.random.default_rng(0)
+    return pd.DataFrame(
+        {
+            feature: [rng.random((n_chan, n_components)) for _ in range(n_time)],
+            "duration": [1.0] * n_time,
+        }
+    )
+
+
+def _make_simple_matrix_group(n_time=10, n_chan=N_CHAN, feature="zpcorr", rng=None):
+    """Return a DataFrame suitable for __get_linear_feature with a SIMPLE_MATRIX feature."""
+    rng = rng or np.random.default_rng(0)
+    return pd.DataFrame(
+        {
+            feature: [rng.random((n_chan, n_chan)) for _ in range(n_time)],
+            "duration": [1.0] * n_time,
+        }
+    )
+
+
+def _make_banded_matrix_group(n_time=10, n_chan=N_CHAN, feature="cohere", rng=None):
+    """Return a DataFrame suitable for __get_linear_feature with a BANDED_MATRIX feature."""
+    rng = rng or np.random.default_rng(0)
+    return pd.DataFrame(
+        {
+            feature: [
+                {b: rng.random((n_chan, n_chan)) for b in constants.BAND_NAMES}
+                for _ in range(n_time)
+            ],
+            "duration": [1.0] * n_time,
+        }
+    )
+
+
 def _make_coherecorr_avg(n_row=2, n_chan=N_CHAN, rng=None):
     """Return mock groupavg data used by coherecorr methods."""
     rng = rng or np.random.default_rng(0)
@@ -543,9 +579,18 @@ def _make_temporal_heatmap_rows(n_time=48, n_chan=N_CHAN, features=None, rng=Non
         ftype = constants.classify_feature(feat)
         if ftype is constants.FeatureType.LINEAR:
             data[feat] = [rng.random(n_chan).tolist() for _ in range(n_time)]
+        elif ftype is constants.FeatureType.LINEAR_2D:
+            data[feat] = [rng.random((n_chan, 2)) for _ in range(n_time)]
         elif ftype is constants.FeatureType.BAND:
             data[feat] = [
                 {b: rng.random(n_chan).tolist() for b in constants.BAND_NAMES}
+                for _ in range(n_time)
+            ]
+        elif ftype is constants.FeatureType.SIMPLE_MATRIX:
+            data[feat] = [rng.random((n_chan, n_chan)) for _ in range(n_time)]
+        elif ftype is constants.FeatureType.BANDED_MATRIX:
+            data[feat] = [
+                {b: rng.random((n_chan, n_chan)) for b in constants.BAND_NAMES}
                 for _ in range(n_time)
             ]
 
@@ -604,9 +649,510 @@ class TestPlotTemporalHeatmap:
         plotter.plot_temporal_heatmap(features=["rms"], score_type="none")
 
 
-# ===================================================================
-# 13. _add_longrecording_boundaries (lines 781-848)
-# ===================================================================
+class TestPlotTemporalHeatmapFeatureShapes:
+    """Test that _plot_temporal_heatmap_feature correctly handles different feature types."""
+
+    @patch("matplotlib.pyplot.show")
+    def test_linear_shape_correct(self, mock_show, plotter, mock_war, rng):
+        """LINEAR features (rms) should work correctly."""
+        features = ["rms"]
+        mock_war.get_grouprows_result.return_value = _make_temporal_heatmap_rows(
+            features=features, rng=rng
+        )
+        # This should not raise and should produce valid output
+        plotter.plot_temporal_heatmap(features=features, score_type="none")
+
+    @patch("matplotlib.pyplot.show")
+    def test_linear_2d_plots_multiple_heatmaps(self, mock_show, plotter, mock_war, rng):
+        """LINEAR_2D features (psdslope) should plot multiple heatmaps (slope, intercept)."""
+        features = ["psdslope"]
+        mock_war.get_grouprows_result.return_value = _make_temporal_heatmap_rows(
+            features=features, rng=rng
+        )
+
+        # Patch _handle_figure to count calls
+        with patch.object(plotter, '_handle_figure') as mock_handle:
+            plotter.plot_temporal_heatmap(features=features, score_type="none")
+            # Should produce 2 heatmaps (slope, intercept) for the single animalday
+            assert mock_handle.call_count == 2, \
+                f"Expected 2 heatmaps for psdslope, got {mock_handle.call_count}"
+
+    @patch("matplotlib.pyplot.show")
+    def test_band_plots_multiple_heatmaps(self, mock_show, plotter, mock_war, rng):
+        """BAND features (psdband) should plot multiple heatmaps (one per band)."""
+        features = ["psdband"]
+        mock_war.get_grouprows_result.return_value = _make_temporal_heatmap_rows(
+            features=features, rng=rng
+        )
+
+        # Patch _handle_figure to count calls
+        with patch.object(plotter, '_handle_figure') as mock_handle:
+            plotter.plot_temporal_heatmap(features=features, score_type="none")
+            # Should produce 5 heatmaps (one per band: delta, theta, alpha, beta, gamma)
+            assert mock_handle.call_count == 5, \
+                f"Expected 5 heatmaps for psdband, got {mock_handle.call_count}"
+
+    @patch("matplotlib.pyplot.show")
+    def test_simple_matrix_shape_correct(self, mock_show, plotter, mock_war, rng):
+        """SIMPLE_MATRIX features (zpcorr) should work correctly."""
+        features = ["zpcorr"]
+        mock_war.get_grouprows_result.return_value = _make_temporal_heatmap_rows(
+            features=features, rng=rng
+        )
+        # This should not raise and should produce valid output
+        plotter.plot_temporal_heatmap(features=features, score_type="none")
+
+    @patch("matplotlib.pyplot.show")
+    def test_banded_matrix_plots_multiple_heatmaps(self, mock_show, plotter, mock_war, rng):
+        """BANDED_MATRIX features (cohere) should plot multiple heatmaps (one per band)."""
+        features = ["cohere"]
+        mock_war.get_grouprows_result.return_value = _make_temporal_heatmap_rows(
+            features=features, rng=rng
+        )
+
+        # Patch _handle_figure to count calls
+        with patch.object(plotter, '_handle_figure') as mock_handle:
+            plotter.plot_temporal_heatmap(features=features, score_type="none")
+            # Should produce 5 heatmaps (one per band: delta, theta, alpha, beta, gamma)
+            assert mock_handle.call_count == 5, \
+                f"Expected 5 heatmaps for cohere, got {mock_handle.call_count}"
+
+    def test_collapse_feature_channels_integration(self, plotter, rng):
+        """Test that collapse_feature_channels is used correctly for LINEAR features."""
+        # Create synthetic data for a LINEAR feature
+        n_time = 10
+        n_chan = N_CHAN
+        value = 42.0
+
+        # Create feature data with constant value across all channels
+        rms_data = [[value] * n_chan for _ in range(n_time)]
+
+        group = pd.DataFrame({
+            "rms": rms_data,
+            "duration": [1.0] * n_time,
+        })
+
+        # Extract and flatten the feature
+        result = plotter._AnimalPlotter__get_linear_feature(
+            group=group, feature="rms", score_type="none"
+        )
+
+        # After flatten_feature_for_plotting, shape should be (n_time, n_chan, 1) for LINEAR
+        assert result.shape == (n_time, n_chan, 1)
+
+        # Now test the collapsing logic using collapse_feature_channels
+        from neurodent.visualization.feature_utils import collapse_feature_channels
+        from neurodent.constants import classify_feature
+
+        ftype = classify_feature("rms")
+        collapsed = collapse_feature_channels(result, ftype).squeeze()
+
+        # After collapsing channels and squeezing, should be (n_time,) for LINEAR
+        assert collapsed.ndim == 1
+        assert collapsed.shape == (n_time,)
+
+        # The value should be the original value (averaged across channels)
+        assert np.allclose(collapsed, value)
+
+    def test_temporal_heatmap_shape_validation_linear(self, plotter, rng):
+        """Test shape validation for LINEAR feature (rms) at each step."""
+        n_time = 10
+        n_chan = N_CHAN
+        value = 5.0
+
+        # Create constant-value feature data
+        rms_data = [[value] * n_chan for _ in range(n_time)]
+        group = pd.DataFrame({
+            "rms": rms_data,
+            "duration": [1.0] * n_time,
+        })
+
+        # Step 1: __get_linear_feature should return (n_time, n_chan, 1)
+        feature_data = plotter._AnimalPlotter__get_linear_feature(
+            group=group, feature="rms", score_type="none"
+        )
+        assert feature_data.shape == (n_time, n_chan, 1), \
+            f"Expected (n_time, n_chan, 1), got {feature_data.shape}"
+
+        # Step 2: After np.nanmean(axis=1), should be (n_time, 1)
+        feature_data = np.nanmean(feature_data, axis=1)
+        assert feature_data.shape == (n_time, 1), \
+            f"Expected (n_time, 1), got {feature_data.shape}"
+
+        # Step 3: After squeeze, should be (n_time,)
+        feature_data = feature_data.squeeze()
+        assert feature_data.ndim == 1 and feature_data.shape[0] == n_time, \
+            f"Expected 1D array of length {n_time}, got shape {feature_data.shape}"
+
+        # Step 4: Values should be correct (averaged across channels)
+        assert np.allclose(feature_data, value), \
+            f"Expected all values to be {value}, got {feature_data}"
+
+    def test_temporal_heatmap_shape_validation_linear_2d(self, plotter, rng):
+        """Test shape validation for LINEAR_2D feature (psdslope) at each step."""
+        n_time = 10
+        n_chan = N_CHAN
+        n_components = 2
+        slope_value = 1.0
+        intercept_value = 100.0
+
+        # Create constant-value feature data with distinct slope and intercept
+        psdslope_data = [
+            np.array([[slope_value, intercept_value]] * n_chan)
+            for _ in range(n_time)
+        ]
+        group = pd.DataFrame({
+            "psdslope": psdslope_data,
+            "duration": [1.0] * n_time,
+        })
+
+        # Step 1: __get_linear_feature should return (n_time, n_chan, n_components)
+        feature_data = plotter._AnimalPlotter__get_linear_feature(
+            group=group, feature="psdslope", score_type="none"
+        )
+        assert feature_data.shape == (n_time, n_chan, n_components), \
+            f"Expected (n_time, n_chan, n_components), got {feature_data.shape}"
+
+        # Step 2: After np.nanmean(axis=1), should be (n_time, n_components)
+        feature_data = np.nanmean(feature_data, axis=1)
+        assert feature_data.shape == (n_time, n_components), \
+            f"Expected (n_time, n_components), got {feature_data.shape}"
+
+        # Step 3: Values should be correct (averaged across channels, NOT across components)
+        # Slope component (index 0) should all be slope_value
+        assert np.allclose(feature_data[:, 0], slope_value), \
+            f"Expected slope values to be {slope_value}, got {feature_data[:, 0]}"
+        # Intercept component (index 1) should all be intercept_value
+        assert np.allclose(feature_data[:, 1], intercept_value), \
+            f"Expected intercept values to be {intercept_value}, got {feature_data[:, 1]}"
+
+    def test_temporal_heatmap_shape_validation_band(self, plotter, rng):
+        """Test shape validation for BAND feature (psdband) at each step."""
+        n_time = 10
+        n_chan = N_CHAN
+        n_bands = N_BANDS
+        band_values = [1.0, 2.0, 3.0, 4.0, 5.0]  # Distinct value per band
+
+        # Create constant-value feature data with distinct values per band
+        psdband_data = [
+            {band: [band_values[i]] * n_chan for i, band in enumerate(constants.BAND_NAMES)}
+            for _ in range(n_time)
+        ]
+        group = pd.DataFrame({
+            "psdband": psdband_data,
+            "duration": [1.0] * n_time,
+        })
+
+        # Step 1: __get_linear_feature should return (n_time, n_chan, n_bands)
+        feature_data = plotter._AnimalPlotter__get_linear_feature(
+            group=group, feature="psdband", score_type="none"
+        )
+        assert feature_data.shape == (n_time, n_chan, n_bands), \
+            f"Expected (n_time, n_chan, n_bands), got {feature_data.shape}"
+
+        # Step 2: After np.nanmean(axis=1), should be (n_time, n_bands)
+        feature_data = np.nanmean(feature_data, axis=1)
+        assert feature_data.shape == (n_time, n_bands), \
+            f"Expected (n_time, n_bands), got {feature_data.shape}"
+
+        # Step 3: Values should be correct (averaged across channels, NOT across bands)
+        for i, expected_value in enumerate(band_values):
+            assert np.allclose(feature_data[:, i], expected_value), \
+                f"Expected band {i} values to be {expected_value}, got {feature_data[:, i]}"
+
+    def test_temporal_heatmap_shape_validation_simple_matrix(self, plotter, rng):
+        """Test shape validation for SIMPLE_MATRIX feature (zpcorr) at each step."""
+        n_time = 10
+        n_chan = N_CHAN
+        n_pairs = n_chan * (n_chan - 1) // 2
+        value = 0.5
+
+        # Create constant-value feature data
+        zpcorr_data = [
+            np.full((n_chan, n_chan), value)
+            for _ in range(n_time)
+        ]
+        group = pd.DataFrame({
+            "zpcorr": zpcorr_data,
+            "duration": [1.0] * n_time,
+        })
+
+        # Step 1: __get_linear_feature should return (n_time, n_pairs, 1)
+        feature_data = plotter._AnimalPlotter__get_linear_feature(
+            group=group, feature="zpcorr", score_type="none"
+        )
+        assert feature_data.shape == (n_time, n_pairs, 1), \
+            f"Expected (n_time, n_pairs, 1), got {feature_data.shape}"
+
+        # Step 2: After np.nanmean(axis=1), should be (n_time, 1)
+        feature_data = np.nanmean(feature_data, axis=1)
+        assert feature_data.shape == (n_time, 1), \
+            f"Expected (n_time, 1), got {feature_data.shape}"
+
+        # Step 3: After squeeze, should be (n_time,)
+        feature_data = feature_data.squeeze()
+        assert feature_data.ndim == 1 and feature_data.shape[0] == n_time, \
+            f"Expected 1D array of length {n_time}, got shape {feature_data.shape}"
+
+        # Step 4: Values should be correct (averaged across channel pairs)
+        assert np.allclose(feature_data, value), \
+            f"Expected all values to be {value}, got {feature_data}"
+
+    def test_temporal_heatmap_shape_validation_banded_matrix(self, plotter, rng):
+        """Test shape validation for BANDED_MATRIX feature (cohere) at each step."""
+        n_time = 10
+        n_chan = N_CHAN
+        n_pairs = n_chan * (n_chan - 1) // 2
+        n_bands = N_BANDS
+        band_values = [0.1, 0.2, 0.3, 0.4, 0.5]  # Distinct value per band
+
+        # Create constant-value feature data with distinct values per band
+        cohere_data = [
+            {band: np.full((n_chan, n_chan), band_values[i])
+             for i, band in enumerate(constants.BAND_NAMES)}
+            for _ in range(n_time)
+        ]
+        group = pd.DataFrame({
+            "cohere": cohere_data,
+            "duration": [1.0] * n_time,
+        })
+
+        # Step 1: __get_linear_feature should return (n_time, n_pairs, n_bands)
+        feature_data = plotter._AnimalPlotter__get_linear_feature(
+            group=group, feature="cohere", score_type="none"
+        )
+        assert feature_data.shape == (n_time, n_pairs, n_bands), \
+            f"Expected (n_time, n_pairs, n_bands), got {feature_data.shape}"
+
+        # Step 2: After np.nanmean(axis=1), should be (n_time, n_bands)
+        feature_data = np.nanmean(feature_data, axis=1)
+        assert feature_data.shape == (n_time, n_bands), \
+            f"Expected (n_time, n_bands), got {feature_data.shape}"
+
+        # Step 3: Values should be correct (averaged across channel pairs, NOT across bands)
+        for i, expected_value in enumerate(band_values):
+            assert np.allclose(feature_data[:, i], expected_value), \
+                f"Expected band {i} values to be {expected_value}, got {feature_data[:, i]}"
+
+    @patch("matplotlib.pyplot.show")
+    def test_plot_temporal_heatmap_feature_linear_numeric_correctness(
+        self, mock_show, plotter, mock_war, rng
+    ):
+        """Test _plot_temporal_heatmap_feature with LINEAR feature returns correct values."""
+        n_time = 20
+        n_chan = N_CHAN
+        value = 5.0
+
+        # Create constant-value feature data
+        rms_data = [[value] * n_chan for _ in range(n_time)]
+        timestamps = pd.date_range("2023-01-01 00:00", periods=n_time, freq="1h")
+
+        df = pd.DataFrame({
+            "rms": rms_data,
+            "duration": [1.0] * n_time,
+            "timestamp": timestamps,
+            "endfile": [np.nan] * n_time,
+            "animalday": ["day1"] * n_time,
+        })
+        df.index = pd.MultiIndex.from_tuples([("animal1",)] * n_time)
+
+        mock_war.get_grouprows_result.return_value = df
+
+        # Patch ax.imshow to capture the heatmap matrix
+        with patch("matplotlib.pyplot.subplots") as mock_subplots:
+            mock_fig = MagicMock()
+            mock_ax = MagicMock()
+            mock_subplots.return_value = (mock_fig, mock_ax)
+
+            plotter.plot_temporal_heatmap(features=["rms"], score_type="none", n_bins=5)
+
+            # Verify imshow was called with heatmap data
+            assert mock_ax.imshow.called, "Expected ax.imshow to be called"
+            heatmap_matrix = mock_ax.imshow.call_args[0][0]
+
+            # All values in the heatmap should be the constant value (averaged across channels)
+            # Filter out NaN values (bins with no data)
+            non_nan_values = heatmap_matrix[~np.isnan(heatmap_matrix)]
+            if len(non_nan_values) > 0:
+                assert np.allclose(non_nan_values, value), \
+                    f"Expected all heatmap values to be {value}, got {non_nan_values}"
+
+    @patch("matplotlib.pyplot.show")
+    def test_plot_temporal_heatmap_feature_linear_2d_numeric_correctness(
+        self, mock_show, plotter, mock_war, rng
+    ):
+        """Test _plot_temporal_heatmap_feature with LINEAR_2D feature separates components correctly."""
+        n_time = 20
+        n_chan = N_CHAN
+        slope_value = 1.0
+        intercept_value = 100.0
+
+        # Create constant-value feature data with distinct slope and intercept
+        psdslope_data = [
+            np.array([[slope_value, intercept_value]] * n_chan)
+            for _ in range(n_time)
+        ]
+        timestamps = pd.date_range("2023-01-01 00:00", periods=n_time, freq="1h")
+
+        df = pd.DataFrame({
+            "psdslope": psdslope_data,
+            "duration": [1.0] * n_time,
+            "timestamp": timestamps,
+            "endfile": [np.nan] * n_time,
+            "animalday": ["day1"] * n_time,
+        })
+        df.index = pd.MultiIndex.from_tuples([("animal1",)] * n_time)
+
+        mock_war.get_grouprows_result.return_value = df
+
+        # Patch ax.imshow to capture the heatmap matrices for both components
+        with patch("matplotlib.pyplot.subplots") as mock_subplots:
+            mock_fig = MagicMock()
+            mock_ax = MagicMock()
+            mock_subplots.return_value = (mock_fig, mock_ax)
+
+            plotter.plot_temporal_heatmap(features=["psdslope"], score_type="none", n_bins=5)
+
+            # Should have been called twice (slope and intercept)
+            assert mock_ax.imshow.call_count == 2, \
+                f"Expected 2 calls to ax.imshow, got {mock_ax.imshow.call_count}"
+
+            # First call should be slope heatmap
+            slope_heatmap = mock_ax.imshow.call_args_list[0][0][0]
+            non_nan_slope = slope_heatmap[~np.isnan(slope_heatmap)]
+            if len(non_nan_slope) > 0:
+                assert np.allclose(non_nan_slope, slope_value), \
+                    f"Expected slope heatmap values to be {slope_value}, got {non_nan_slope}"
+
+            # Second call should be intercept heatmap
+            intercept_heatmap = mock_ax.imshow.call_args_list[1][0][0]
+            non_nan_intercept = intercept_heatmap[~np.isnan(intercept_heatmap)]
+            if len(non_nan_intercept) > 0:
+                assert np.allclose(non_nan_intercept, intercept_value), \
+                    f"Expected intercept heatmap values to be {intercept_value}, got {non_nan_intercept}"
+
+    @patch("matplotlib.pyplot.show")
+    def test_plot_temporal_heatmap_feature_band_numeric_correctness(
+        self, mock_show, plotter, mock_war, rng
+    ):
+        """Test _plot_temporal_heatmap_feature with BAND feature separates bands correctly."""
+        n_time = 20
+        n_chan = N_CHAN
+        band_values = [1.0, 2.0, 3.0, 4.0, 5.0]  # Distinct value per band
+
+        # Create constant-value feature data with distinct values per band
+        psdband_data = [
+            {band: [band_values[i]] * n_chan for i, band in enumerate(constants.BAND_NAMES)}
+            for _ in range(n_time)
+        ]
+        timestamps = pd.date_range("2023-01-01 00:00", periods=n_time, freq="1h")
+
+        df = pd.DataFrame({
+            "psdband": psdband_data,
+            "duration": [1.0] * n_time,
+            "timestamp": timestamps,
+            "endfile": [np.nan] * n_time,
+            "animalday": ["day1"] * n_time,
+        })
+        df.index = pd.MultiIndex.from_tuples([("animal1",)] * n_time)
+
+        mock_war.get_grouprows_result.return_value = df
+
+        # Patch ax.imshow to capture the heatmap matrices for each band
+        with patch("matplotlib.pyplot.subplots") as mock_subplots:
+            mock_fig = MagicMock()
+            mock_ax = MagicMock()
+            mock_subplots.return_value = (mock_fig, mock_ax)
+
+            plotter.plot_temporal_heatmap(features=["psdband"], score_type="none", n_bins=5)
+
+            # Should have been called 5 times (one per band)
+            assert mock_ax.imshow.call_count == 5, \
+                f"Expected 5 calls to ax.imshow, got {mock_ax.imshow.call_count}"
+
+            # Verify each band heatmap has the correct constant value
+            for i, expected_value in enumerate(band_values):
+                band_heatmap = mock_ax.imshow.call_args_list[i][0][0]
+                non_nan_values = band_heatmap[~np.isnan(band_heatmap)]
+                if len(non_nan_values) > 0:
+                    assert np.allclose(non_nan_values, expected_value), \
+                        f"Expected band {i} heatmap values to be {expected_value}, got {non_nan_values}"
+
+    @patch("matplotlib.pyplot.show")
+    def test_temporal_heatmap_with_longrecording_boundaries(
+        self, mock_show, plotter, mock_war, rng
+    ):
+        """Test that _add_longrecording_boundaries is called for temporal heatmaps."""
+        n_time = 20
+        n_chan = N_CHAN
+        value = 5.0
+
+        # Create feature data with endfile markers
+        rms_data = [[value] * n_chan for _ in range(n_time)]
+        timestamps = pd.date_range("2023-01-01 00:00", periods=n_time, freq="1h")
+        endfile = [np.nan] * n_time
+        endfile[10] = "file1.bin"  # Add an endfile marker
+
+        df = pd.DataFrame({
+            "rms": rms_data,
+            "duration": [1.0] * n_time,
+            "timestamp": timestamps,
+            "endfile": endfile,
+            "animalday": ["day1"] * n_time,
+        })
+        df.index = pd.MultiIndex.from_tuples([("animal1",)] * n_time)
+
+        mock_war.get_grouprows_result.return_value = df
+
+        # Patch _add_longrecording_boundaries to verify it's called
+        with patch.object(plotter, '_add_longrecording_boundaries', wraps=plotter._add_longrecording_boundaries) as mock_boundaries:
+            plotter.plot_temporal_heatmap(features=["rms"], score_type="z", n_bins=5)
+            # Should be called once for the single heatmap
+            assert mock_boundaries.call_count == 1, \
+                f"Expected _add_longrecording_boundaries to be called once, got {mock_boundaries.call_count}"
+
+    @patch("matplotlib.pyplot.show")
+    def test_temporal_heatmap_colorbar_labels(
+        self, mock_show, plotter, mock_war, rng
+    ):
+        """Test that colorbar labels include full feature name and score type."""
+        n_time = 20
+        n_chan = N_CHAN
+        value = 5.0
+
+        # Create feature data
+        rms_data = [[value] * n_chan for _ in range(n_time)]
+        timestamps = pd.date_range("2023-01-01 00:00", periods=n_time, freq="1h")
+
+        df = pd.DataFrame({
+            "rms": rms_data,
+            "duration": [1.0] * n_time,
+            "timestamp": timestamps,
+            "endfile": [np.nan] * n_time,
+            "animalday": ["day1"] * n_time,
+        })
+        df.index = pd.MultiIndex.from_tuples([("animal1",)] * n_time)
+
+        mock_war.get_grouprows_result.return_value = df
+
+        # Capture the figure to check colorbar label
+        with patch("matplotlib.pyplot.subplots") as mock_subplots:
+            mock_fig = MagicMock()
+            mock_ax = MagicMock()
+            mock_cbar = MagicMock()
+            mock_subplots.return_value = (mock_fig, mock_ax)
+            mock_fig.colorbar.return_value = mock_cbar
+
+            plotter.plot_temporal_heatmap(features=["rms"], score_type="z", n_bins=5)
+
+            # Verify colorbar.set_label was called with full feature name and score type
+            mock_cbar.set_label.assert_called_once()
+            label = mock_cbar.set_label.call_args[0][0]
+            # Should contain "RMS" (the full name) and "score=z"
+            assert "RMS" in label, f"Expected 'RMS' in colorbar label, got {label}"
+            assert "score=z" in label, f"Expected 'score=z' in colorbar label, got {label}"
+
+
 
 class TestAddLongrecordingBoundaries:
     def test_no_endfile_column(self, plotter):
