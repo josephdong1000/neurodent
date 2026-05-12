@@ -24,7 +24,12 @@ import seaborn.objects as so
 from seaborn import axes_style
 
 from neurodent import visualization, constants
-from neurodent.workflow import setup_snakemake_logging, load_wars, inject_config_aliases
+from neurodent.workflow import (
+    setup_snakemake_logging,
+    load_wars,
+    inject_config_aliases,
+    extend_plot_order_from_attr,
+)
 
 def infer_metadata_columns(df):
     """
@@ -259,23 +264,17 @@ def main():
     features = ep_config["features"]
     exclude_features = ep_config.get("exclude_features", [])
 
-    # Create genotype ordering from constants, adding any observed genotypes not in the default list
-    genotype_order = list(constants.DF_SORT_ORDER.get("genotype", []))
-    
-    # Check for genotypes in loaded WARs that aren't in the default list
-    found_genotypes = set()
-    for war in wars:
-        if hasattr(war, "genotype") and war.genotype:
-            found_genotypes.add(war.genotype)
-    
-    # Add any missing genotypes to the order list
-    for gt in found_genotypes:
-        if gt not in genotype_order:
-            logging.info(f"Adding unknown genotype '{gt}' to plot order")
-            genotype_order.append(gt)
-            
+    # Extend the genotype/sex plot orders with any values observed on the
+    # loaded WARs that aren't in the default DF_SORT_ORDER.  Without this,
+    # datasets like arxrosa (every animal has sex='Unknown', genotype='UNKNOWN')
+    # fail strict plot_order validation in sort_dataframe_by_plot_order.
     plot_order = constants.DF_SORT_ORDER.copy()
-    plot_order["genotype"] = genotype_order
+    plot_order["genotype"] = extend_plot_order_from_attr(
+        wars, "genotype", constants.DF_SORT_ORDER.get("genotype", [])
+    )
+    plot_order["sex"] = extend_plot_order_from_attr(
+        wars, "sex", constants.DF_SORT_ORDER.get("sex", [])
+    )
 
     # Create ExperimentPlotter
     logger.info("Creating ExperimentPlotter")

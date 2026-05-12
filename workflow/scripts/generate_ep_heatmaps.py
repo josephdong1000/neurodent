@@ -20,7 +20,12 @@ matplotlib.use("Agg")  # Non-interactive backend
 import matplotlib.colors as colors
 
 from neurodent import visualization, constants
-from neurodent.workflow import setup_snakemake_logging, load_wars, inject_config_aliases
+from neurodent.workflow import (
+    setup_snakemake_logging,
+    load_wars,
+    inject_config_aliases,
+    extend_plot_order_from_attr,
+)
 
 
 def generate_regular_heatmaps(ep, features, output_dir, data_dir, ep_config):
@@ -129,17 +134,12 @@ def generate_difference_heatmaps(wars, features, output_dir, config):
                 logger.warning(f"No wars found for sex {sex}")
                 continue
 
-            # Create genotype ordering from constants
-            genotype_order = list(constants.DF_SORT_ORDER.get("genotype", []))
-            
-            # Add observed genotypes
-            found_genotypes = set(w.genotype for w in sex_wars)
-            for gt in found_genotypes:
-                if gt not in genotype_order:
-                    genotype_order.append(gt)
-
+            # Extend genotype plot order with any values observed on the
+            # sex-filtered WARs that aren't in the default DF_SORT_ORDER.
             plot_order = constants.DF_SORT_ORDER.copy()
-            plot_order["genotype"] = genotype_order
+            plot_order["genotype"] = extend_plot_order_from_attr(
+                sex_wars, "genotype", constants.DF_SORT_ORDER.get("genotype", [])
+            )
 
             ep = visualization.ExperimentPlotter(
                 wars=sex_wars,
@@ -232,23 +232,17 @@ def main():
     ep_config = config["analysis"]["ep_heatmaps"]
     features = ep_config["matrix_features"]
 
-    # Create genotype ordering from constants, adding any observed genotypes not in the default list
-    genotype_order = list(constants.DF_SORT_ORDER.get("genotype", []))
-    
-    # Check for genotypes in loaded WARs that aren't in the default list
-    found_genotypes = set()
-    for war in wars:
-        if hasattr(war, "genotype") and war.genotype:
-            found_genotypes.add(war.genotype)
-    
-    # Add any missing genotypes to the order list
-    for gt in found_genotypes:
-        if gt not in genotype_order:
-            logging.info(f"Adding unknown genotype '{gt}' to plot order")
-            genotype_order.append(gt)
-
+    # Extend the genotype/sex plot orders with any values observed on the
+    # loaded WARs that aren't in the default DF_SORT_ORDER.  Without this,
+    # datasets like arxrosa (every animal has sex='Unknown', genotype='UNKNOWN')
+    # fail strict plot_order validation in sort_dataframe_by_plot_order.
     plot_order = constants.DF_SORT_ORDER.copy()
-    plot_order["genotype"] = genotype_order
+    plot_order["genotype"] = extend_plot_order_from_attr(
+        wars, "genotype", constants.DF_SORT_ORDER.get("genotype", [])
+    )
+    plot_order["sex"] = extend_plot_order_from_attr(
+        wars, "sex", constants.DF_SORT_ORDER.get("sex", [])
+    )
 
     # Create ExperimentPlotter for regular heatmaps
     logger.info("Creating ExperimentPlotter for regular heatmaps")

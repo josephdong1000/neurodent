@@ -786,3 +786,48 @@ def increment_memory(base_memory):
     def mem(wildcards, attempt):
         return base_memory * (2 ** (attempt - 1))
     return mem
+
+
+def extend_plot_order_from_attr(wars, attr: str, base_order):
+    """Extend a plot-order list with the values of *attr* observed on *wars*.
+
+    Mirrors the dynamic-extension pattern used in EP plotting scripts:
+    start from a base order (typically ``constants.DF_SORT_ORDER[attr]``)
+    and append any values seen on the loaded WARs that aren't already in
+    that base.  This keeps strict plot-order validation happy for datasets
+    with non-default category values (e.g. arxrosa, where every animal has
+    ``sex='Unknown'``).
+
+    Args:
+        wars: Iterable of objects exposing ``attr`` (typically
+            :class:`WindowAnalysisResult` instances).
+        attr: The attribute / column name to extend (``"genotype"``,
+            ``"sex"``, ...).
+        base_order: Starting list of category values; not mutated.
+
+    Returns:
+        list: ``list(base_order)`` with any newly-observed truthy values of
+            ``getattr(war, attr)`` appended, preserving insertion order
+            relative to *base_order*.
+
+    Example::
+
+        >>> from neurodent import constants
+        >>> base = constants.DF_SORT_ORDER["sex"]   # ["Male", "Female"]
+        >>> class W: pass
+        >>> w1, w2 = W(), W()
+        >>> w1.sex, w2.sex = "Male", "Unknown"
+        >>> extend_plot_order_from_attr([w1, w2], "sex", base)
+        ['Male', 'Female', 'Unknown']
+    """
+    order = list(base_order)
+    observed = set()
+    for war in wars:
+        v = getattr(war, attr, None)
+        if v:
+            observed.add(v)
+    for v in observed:
+        if v not in order:
+            logging.info(f"Adding unknown {attr} '{v}' to plot order")
+            order.append(v)
+    return order
