@@ -57,7 +57,7 @@ analysis:
     chunk_duration_s: 3600           # seconds per chunk for spike detection (null = load full recording at once)
 
     # .fif export parameters
-    export_chunk_duration_s: 60    # seconds per chunk when reading traces to write .fif (lower = less RAM)
+    export_chunk_duration_s: 3600    # seconds per chunk when reading traces to write .fif (lower = less RAM but more NFS round-trips)
 
     # Visualization parameters
     spike_averaged_traces:
