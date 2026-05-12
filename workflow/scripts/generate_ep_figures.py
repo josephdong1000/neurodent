@@ -29,6 +29,7 @@ from neurodent.workflow import (
     load_wars,
     inject_config_aliases,
     extend_plot_order_from_attr,
+    build_sex_marker_scale,
 )
 
 def infer_metadata_columns(df):
@@ -152,7 +153,7 @@ def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
                 .add(so.Dash(color="k"), so.Agg(), so.Dodge(empty="drop", gap=0.2))
                 .add(so.Range(color="k"), so.Est(errorbar="sd"), so.Dodge(empty="drop", gap=0.2))
                 .add(so.Dot(), so.Dodge(empty="drop", gap=0.2), so.Jitter(0.75, seed=42))
-                .scale(marker=so.Nominal(["o", "s"], order=["Female", "Male"]))
+                .scale(marker=build_sex_marker_scale(df, plot_lib=so))
                 .theme(
                     axes_style("ticks")
                     | sns.plotting_context("talk")
@@ -172,7 +173,7 @@ def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
                 .add(so.Dash(color="k"), so.Agg(), so.Dodge())
                 .add(so.Range(color="k"), so.Est(errorbar="sd"), so.Dodge())
                 .add(so.Dot(), so.Dodge(), so.Jitter(0.75, seed=42))
-                .scale(marker=so.Nominal(["o", "s"], order=["Female", "Male"]))
+                .scale(marker=build_sex_marker_scale(df, plot_lib=so))
                 .theme(
                     axes_style("ticks")
                     | sns.plotting_context("notebook")

@@ -885,3 +885,69 @@ class TestGetDiscoveryAnimalFilter:
         animal_groups = {"OtherAnimal": "SomeGroup"}
         result = get_discovery_animal_filter("A10", is_joint=True, animal_groups=animal_groups)
         assert result == "A10"
+
+
+class TestBuildSexMarkerScale:
+    """Regression tests for ``build_sex_marker_scale``.
+
+    Why this exists: generate_ep_figures.py used to hard-code
+    ``so.Nominal(["o", "s"], order=["Female", "Male"])`` as the marker
+    scale.  seaborn-objects silently drops rows whose sex value isn't in
+    that order, so any dataset with non-canonical sex (e.g. arxrosa,
+    where every animal has sex='Unknown') rendered an *empty* plot
+    without raising — a silent regression observed on run 9000578.
+    The helper builds the scale dynamically from the DataFrame's sex
+    values.
+    """
+
+    @staticmethod
+    def _make_scale(sex_values):
+        """Build a scale from a synthetic df with the given sex values."""
+        import pandas as pd
+        from neurodent.workflow import build_sex_marker_scale
+        df = pd.DataFrame({"sex": sex_values, "y": list(range(len(sex_values)))})
+        return build_sex_marker_scale(df)
+
+    def test_canonical_female_male(self):
+        """Female + Male present → preserves circle / square in canonical order."""
+        scale = self._make_scale(["Female", "Male", "Female", "Male"])
+        assert scale.order == ["Female", "Male"]
+        assert scale.values == ["o", "s"]
+
+    def test_only_male(self):
+        """Single canonical sex → just that marker."""
+        scale = self._make_scale(["Male", "Male"])
+        assert scale.order == ["Male"]
+        assert scale.values == ["s"]
+
+    def test_unknown_only_uses_fallback_marker(self):
+        """arxrosa case: every row has sex='Unknown' → diamond fallback,
+        scale is non-empty so points actually render."""
+        scale = self._make_scale(["Unknown", "Unknown", "Unknown"])
+        assert scale.order == ["Unknown"]
+        assert scale.values == ["D"]
+
+    def test_mixed_canonical_and_unknown(self):
+        """Canonical sexes first, then any non-canonical values appended."""
+        scale = self._make_scale(["Female", "Unknown", "Male"])
+        # Canonical Female, Male come first; Unknown last.
+        assert scale.order[:2] == ["Female", "Male"]
+        assert "Unknown" in scale.order
+        # Markers track order.
+        assert scale.values[scale.order.index("Female")] == "o"
+        assert scale.values[scale.order.index("Male")] == "s"
+        assert scale.values[scale.order.index("Unknown")] == "D"
+
+    def test_drops_nan_values(self):
+        """NaN sex entries are skipped, don't introduce a NaN category."""
+        import numpy as np
+        scale = self._make_scale(["Female", np.nan, "Female"])
+        assert scale.order == ["Female"]
+        assert scale.values == ["o"]
+
+    def test_returns_seaborn_objects_nominal(self):
+        """Smoke-check the returned object's type so accidental refactors
+        that swap to a different scale class get caught."""
+        import seaborn.objects as so
+        scale = self._make_scale(["Female", "Male"])
+        assert isinstance(scale, so.Nominal)

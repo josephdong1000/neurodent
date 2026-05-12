@@ -17,6 +17,7 @@ from .utils import (
     inject_config_aliases,
     expand_animals_config,
     extend_plot_order_from_attr,
+    build_sex_marker_scale,
 )
 
 __all__ = [
@@ -25,4 +26,5 @@ __all__ = [
     "inject_config_aliases",
     "expand_animals_config",
     "extend_plot_order_from_attr",
+    "build_sex_marker_scale",
 ]
