@@ -213,7 +213,7 @@ def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
             p2.save(output_dir / f"bygeno-{feature}.{figure_format}", bbox_inches="tight", dpi=dpi)
 
         elif ftype is constants.FeatureType.HIST:
-            ylim = (1e-4, 1) if feature == "normpsd" else (0.3, 3000)
+            ylim = (1e-4, 1) if feature == "normpsd" else (0.3, 1e5)
             for scale in [so.Continuous(), "log"]:
                 p = (
                     so.Plot(df, x="freq", y=feature, color="gene")
