@@ -57,7 +57,7 @@ Rather than implementing its own file readers, `NeuRodent` delegates data loadin
 
 ![`NeuRodent` package schematic showing data flow through LongRecordingOrganizers (LRO), AnimalOrganizer (AO), WindowAnalysisResult (WAR), FrequencyDomainSpikeAnalysisResult (FDSAR), ZeitgeberAnalysisResult (ZAR), AnimalPlotter (AP), ExperimentPlotter (EP), and ZeitgeberPlotter (ZP) []{label="figure1"}](./2026-05-14%20Neurodent%20JOSS%20Paper%20Figure%20cropped.png)
 
-Within the core library, computation is structured around a hierarchy of organizer classes that mirror the stages of a rodent EEG experiment\autoref{figure1}:
+Within the core library, computation is structured around a hierarchy of organizer classes that mirror the stages of a rodent EEG experiment\autoref{"figure1"}:
 
 - **LongRecordingOrganizer**: one recording session, many channels
 - **AnimalOrganizer**: one animal, many recording sessions
