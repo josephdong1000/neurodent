@@ -77,7 +77,7 @@ Originally designed for EEG analyses for the lead developer, `NeuRodent` is bein
 
 # AI Usage Disclosure
 
-Claude Opus 4.6 via GitHub Copilot and Claude Code was used to assist with code development and documentation writing. AI-generated code and tests were manually reviewed and edited by human authors, and correctness was validated against large datasets used by our group and collaborating groups. All architectural decisions and scientific interpretations were made by human authors.
+No generative AI was used for architectural decisions and scientific interpretations. Claude was used to assist with code development and documentation writing. Code and tests were manually reviewed and edited by human authors, and correctness was validated against large datasets used by our group and collaborating groups.
 
 # Acknowledgements
 
