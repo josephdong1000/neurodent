@@ -55,13 +55,16 @@ The current landscape of electrophysiology and neuroimaging software includes se
 
 Rather than implementing its own file readers, `NeuRodent` delegates data loading to `SpikeInterface` and `MNE-Python` [@Buccino:2020; @Gramfort:2013], which together cover most electrophysiology formats in use. Users may also supply a custom reader function for novel formats. This deferred approach avoids duplicating format-support effort that is already well maintained by those communities and ensures that `NeuRodent` inherits new format support automatically.
 
-Within the core library, computation is structured around a hierarchy of organizer classes that mirror the stages of a rodent EEG experiment:
+![`NeuRodent` package schematic showing data flow through LongRecordingOrganizers (LRO), AnimalOrganizer (AO), WindowAnalysisResult (WAR), FrequencyDomainSpikeAnalysisResult (FDSAR), ZeitgeberAnalysisResult (ZAR), AnimalPlotter (AP), ExperimentPlotter (EP), and ZeitgeberPlotter (ZP) []{label="figure1"}](./2026-05-14%20Neurodent%20JOSS%20Paper%20Figure%20cropped.png)
+
+Within the core library, computation is structured around a hierarchy of organizer classes that mirror the stages of a rodent EEG experiment\autoref{figure1}:
 
 - **LongRecordingOrganizer**: one recording session, many channels
 - **AnimalOrganizer**: one animal, many recording sessions
-- **WindowAnalysisResult**, **FrequencyDomainSpikeAnalysisResult**: analysis results of one animal
+- **WindowAnalysisResult**, **FrequencyDomainSpikeAnalysisResult**, **ZeitgeberAnalysisResult**: analysis results of one animal
 - **AnimalPlotter**: plots from one animal
 - **ExperimentPlotter**: plots from many animals
+- **ZeitgeberPlotter**: plots from many animals
 
 Each of these classes naturally encapsulates a specific scope of rodent EEG/LFP analysis. A nested class hierarchy was chosen over a flat library to make the hierarchy of EEG analysis explicit, with lower level objects composing higher level ones. A practical consequence of this design is that analysis can be embarrassingly parallelized by processing each channel and time window independently. `NeuRodent` uses `Dask` to enable configurable parallel processing of channels and windows, either locally or on a distributed cluster. Adjustable in-memory chunk sizes let users trade throughput for RAM, an important consideration given that EEG recordings can span days or weeks.
 
