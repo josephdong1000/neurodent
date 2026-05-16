@@ -51,9 +51,9 @@ The current landscape of electrophysiology and neuroimaging software includes se
 
 # Software Design
 
-![`NeuRodent` package schematic showing data flow through LongRecordingOrganizers (LRO), AnimalOrganizer (AO), WindowAnalysisResult (WAR), FrequencyDomainSpikeAnalysisResult (FDSAR), ZeitgeberAnalysisResult (ZAR), AnimalPlotter (AP), ExperimentPlotter (EP), and ZeitgeberPlotter (ZP).\label{fig:figure1}](./2026-05-14%20Neurodent%20JOSS%20Paper%20Figure%201%20cropped.png)
+![`NeuRodent` package schematic showing data flow through LongRecordingOrganizers (LRO), AnimalOrganizer (AO), WindowAnalysisResult (WAR), FrequencyDomainSpikeAnalysisResult (FDSAR), ZeitgeberAnalysisResult (ZAR), AnimalPlotter (AP), ExperimentPlotter (EP), and ZeitgeberPlotter (ZP).\label{fig:figure1}](./2026-05-14%20Neurodent%20JOSS%20Paper%20Figure%201%20cropped.png){width="75%"}
 
-![`NeuRodent` `Snakemake` pipeline flowchart showing data flow from raw EEG data to outputs (boxed).\label{fig:figure2}](./2026-05-15%20Neurodent%20JOSS%20paper%20figure%202%20cropped.png)
+![`NeuRodent` `Snakemake` pipeline flowchart showing data flow from raw EEG data to outputs (boxed).\label{fig:figure2}](./2026-05-15%20Neurodent%20JOSS%20paper%20figure%202%20cropped.png){width="75%"}
 
 `NeuRodent` is organized as two independently installable components: a core Python analysis library (\autoref{fig:figure1}), and a `Snakemake` pipeline that orchestrates the library over large datasets (\autoref{fig:figure2}). This layered design balances ease of adoption with scalable deployment: per-session or per-animal analyses can use the core library alone and call it from scripts or notebooks, while multi-animal and multi-session processing can use the `Snakemake` pipeline to gain cluster-level orchestration using SLURM or Kubernetes. The two components are decoupled, ensuring that changes to the pipeline logic do not force changes on users of the core library, and vice versa.
 
