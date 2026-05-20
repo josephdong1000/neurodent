@@ -10,7 +10,7 @@ authors:
 - name: Joseph P. Dong
   orcid: 0009-0001-8636-6534
   affiliation: 1
-- name: Oh Yongtaek
+- name: Yongtaek Oh
   orcid: 0000-0002-1723-0553
   affiliation: 1
 - name: Yastika Singh
@@ -67,7 +67,7 @@ Within the core library, computation is structured around a hierarchy of organiz
 - **AnimalPlotter**: plots from one animal
 - **ExperimentPlotter**, **ZeitgeberPlotter**: plots from many animals
 
-Each of these classes naturally encapsulates a specific scope of rodent EEG/LFP analysis. A nested class hierarchy was chosen over a flat library to make the hierarchy of EEG analysis explicit, with lower level objects composing higher level ones. A practical consequence of this design is that analysis can be embarrassingly parallelized by processing each channel and time window independently. `NeuRodent` uses `Dask` to enable configurable parallel processing of channels and windows, either locally or on a distributed cluster. Adjustable in-memory chunk sizes let users trade throughput for RAM, an important consideration given that EEG recordings can span days or weeks.
+Each of these classes naturally encapsulates a specific scope of rodent EEG/LFP analysis. A nested class hierarchy was chosen over a flat library to make the hierarchy of EEG analysis explicit, with lower level objects composing higher level ones. A practical consequence of this design is that analysis can be parallelized by processing each channel and time window independently. `NeuRodent` uses `Dask` to enable configurable parallel processing of channels and windows, either locally or on a distributed cluster. Adjustable in-memory chunk sizes let users trade throughput for RAM, an important consideration given that EEG recordings can span days or weeks.
 
 `NeuRodent` enables contributors to add new features to compute in windowed analyses by discovering feature computation functions at runtime. This greatly reduces the barrier to contribution for domain scientists who may not be familiar with the broader structure of `NeuRodent`. Artifact rejection is done in a similar fashion, where users can write additional filters and apply them with minimal changes. All computed features are outputted as `pandas` DataFrames saved in Parquet files, which enables downstream workflows in Excel, R, or other analysis tools to interoperate with `NeuRodent` outputs without needing format conversion.
 
