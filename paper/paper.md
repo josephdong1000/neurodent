@@ -10,7 +10,7 @@ authors:
 - name: Joseph P. Dong
   orcid: 0009-0001-8636-6534
   affiliation: 1
-- name: Oh Yongtaek
+- name: Yongtaek Oh
   orcid: 0000-0002-1723-0553
   affiliation: 1
 - name: Yastika Singh
@@ -51,21 +51,27 @@ The current landscape of electrophysiology and neuroimaging software includes se
 
 # Software Design
 
-`NeuRodent` is organized as two independently installable components: a core Python analysis library, and a `Snakemake` pipeline that orchestrates the library over large datasets. This layered design balances ease of adoption with scalable deployment: per-session or per-animal analyses can use the core library alone and call it from scripts or notebooks, while multi-animal and multi-session processing can use the `Snakemake` pipeline to gain cluster-level orchestration using SLURM or Kubernetes. The two components are decoupled, ensuring that changes to the pipeline logic do not force changes on users of the core library, and vice versa.
+![`NeuRodent` package schematic showing data flow through LongRecordingOrganizers (LRO), AnimalOrganizer (AO), WindowAnalysisResult (WAR), FrequencyDomainSpikeAnalysisResult (FDSAR), ZeitgeberAnalysisResult (ZAR), AnimalPlotter (AP), ExperimentPlotter (EP), and ZeitgeberPlotter (ZP).\label{fig:figure1}](./2026-05-14%20Neurodent%20JOSS%20Paper%20Figure%201%20cropped.png){width="75%"}
+
+![`NeuRodent` `Snakemake` pipeline flowchart showing data flow from raw EEG data to outputs (boxed).\label{fig:figure2}](./2026-05-15%20Neurodent%20JOSS%20paper%20figure%202%20cropped.png){width="75%"}
+
+`NeuRodent` is organized as two independently installable components: a core Python analysis library (\autoref{fig:figure1}), and a `Snakemake` pipeline that orchestrates the library over large datasets (\autoref{fig:figure2}). This layered design balances ease of adoption with scalable deployment: per-session or per-animal analyses can use the core library alone and call it from scripts or notebooks, while multi-animal and multi-session processing can use the `Snakemake` pipeline to gain cluster-level orchestration using SLURM or Kubernetes. The two components are decoupled, ensuring that changes to the pipeline logic do not force changes on users of the core library, and vice versa.
 
 Rather than implementing its own file readers, `NeuRodent` delegates data loading to `SpikeInterface` and `MNE-Python` [@Buccino:2020; @Gramfort:2013], which together cover most electrophysiology formats in use. Users may also supply a custom reader function for novel formats. This deferred approach avoids duplicating format-support effort that is already well maintained by those communities and ensures that `NeuRodent` inherits new format support automatically.
 
-Within the core library, computation is structured around a hierarchy of organizer classes that mirror the stages of a rodent EEG experiment:
+Within the core library, computation is structured around a hierarchy of organizer classes that mirror the stages of a rodent EEG experiment (\autoref{fig:figure1}):
 
 - **LongRecordingOrganizer**: one recording session, many channels
 - **AnimalOrganizer**: one animal, many recording sessions
-- **WindowAnalysisResult**, **FrequencyDomainSpikeAnalysisResult**: analysis results of one animal
+- **WindowAnalysisResult**, **FrequencyDomainSpikeAnalysisResult**, **ZeitgeberAnalysisResult**: analysis results of one animal
 - **AnimalPlotter**: plots from one animal
-- **ExperimentPlotter**: plots from many animals
+- **ExperimentPlotter**, **ZeitgeberPlotter**: plots from many animals
 
-Each of these classes naturally encapsulates a specific scope of rodent EEG/LFP analysis. A nested class hierarchy was chosen over a flat library to make the hierarchy of EEG analysis explicit, with lower level objects composing higher level ones. A practical consequence of this design is that analysis can be embarrassingly parallelized by processing each channel and time window independently. `NeuRodent` uses `Dask` to enable configurable parallel processing of channels and windows, either locally or on a distributed cluster. Adjustable in-memory chunk sizes let users trade throughput for RAM, an important consideration given that EEG recordings can span days or weeks.
+Each of these classes naturally encapsulates a specific scope of rodent EEG/LFP analysis. A nested class hierarchy was chosen over a flat library to make the hierarchy of EEG analysis explicit, with lower level objects composing higher level ones. A practical consequence of this design is that analysis can be parallelized by processing each channel and time window independently. `NeuRodent` uses `Dask` to enable configurable parallel processing of channels and windows, either locally or on a distributed cluster. Adjustable in-memory chunk sizes let users trade throughput for RAM, an important consideration given that EEG recordings can span days or weeks.
 
 `NeuRodent` enables contributors to add new features to compute in windowed analyses by discovering feature computation functions at runtime. This greatly reduces the barrier to contribution for domain scientists who may not be familiar with the broader structure of `NeuRodent`. Artifact rejection is done in a similar fashion, where users can write additional filters and apply them with minimal changes. All computed features are outputted as `pandas` DataFrames saved in Parquet files, which enables downstream workflows in Excel, R, or other analysis tools to interoperate with `NeuRodent` outputs without needing format conversion.
+
+Data visualization is provided through the Plotter classes. For individual animals, these include channel coherence and correlation matrices, power spectral density histograms, frequency spectrograms, feature time-series, and feature heatmaps. For experiment-wide groups of animals, these include categorical plots, coherence and correlation matrices, Q–Q plots, and 24-hour feature timecourses.
 
 `NeuRodent` is distributed via PyPI and conda-forge for ease of installation and is published on the `Snakemake` workflow catalog. Continuous integration tests cover more than 90% of the core library, and the full `Snakemake` workflow is additionally tested end-to-end on a miniature example dataset, ensuring that changes to the library do not silently break the `Snakemake` pipeline. Clear explanations of installation instructions and tutorials are provided on the `NeuRodent` documentation website. Contributing guidelines and a Makefile-based development setup are provided so that new contributors can get started with a few commands.
 
@@ -75,7 +81,7 @@ Originally designed for EEG analyses for the lead developer, `NeuRodent` is bein
 
 # AI Usage Disclosure
 
-Claude Opus 4.6 via GitHub Copilot and Claude Code was used to assist with code development and documentation writing. AI-generated code and tests were manually reviewed and edited by human authors, and correctness was validated against large datasets used by our group and collaborating groups. All architectural decisions and scientific interpretations were made by human authors.
+No generative AI was used for architectural decisions and scientific interpretations. Claude was used to assist with code development and documentation writing. Code and tests were manually reviewed and edited by human authors, and correctness was validated against large datasets used by our group and collaborating groups.
 
 # Acknowledgements
 
