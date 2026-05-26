@@ -5,8 +5,8 @@ For every recording under ``DATA_ROOT``, plot a 60s window (starting 60s
 into the file to skip onset transients), apply the pipeline's 60 Hz notch
 (``iirnotch(60, 30, fs)``, matches ``core/analyze_frag.py``), and save:
 
-  results/edf_examination/<folder>/<file-stem>.png        -- one PNG per source file
-  results/edf_examination/<folder>/_combined_<marker>.png -- group of files, joined
+  results/edf_examination/<folder>/<file-stem>.png                 -- one PNG per source file
+  results/edf_examination/<folder>/<folder>_combined_<marker>.png  -- group of files, joined
 
 The "marker" groups files within a folder by their per-recording session token:
   - EDF: ``_``, ``_1_``, ``_2_`` (1017-style) or `` ``, ``-``, `` 1 ``, `` 2 ``
@@ -203,7 +203,7 @@ def save_session_combined_plot(folder, marker, raws, file_list, durations):
     )
     out_dir = SAVE_DIR / folder
     out_dir.mkdir(parents=True, exist_ok=True)
-    fig.savefig(out_dir / f"_combined_{safe_marker(marker)}.png", dpi=80, bbox_inches="tight")
+    fig.savefig(out_dir / f"{folder}_combined_{safe_marker(marker)}.png", dpi=80, bbox_inches="tight")
     plt.close(fig)
 
 
