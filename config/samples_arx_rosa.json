@@ -1,7 +1,7 @@
 {
     "data_parent_folder": "/mnt/isilon/marsh_single_unit/PythonEEG Data/Arx Rosa",
     "_note_channels": "Channel structure varies by session:",
-    "_note_edf": "EDF sessions: 32 total channels split among 2-4 animals (8 or 16 channels each)",
+    "_note_edf": "EDF sessions: 32 total channels, split as 8 channels per animal across REF1/REF2/REF3/REF4 banks. 2-4 animals per folder; bank(s) not assigned to a listed animal are dead/floating or belong to untracked animals.",
     "_note_rhd": "RHD sessions: 128 total channels, 3 animals using ports A/B/C (32 channels each)",
     "_note_brain_regions": "Brain region mappings follow the Marsh-lab Aud/Vis/Hip/Bar/Mot convention. EDF banks (REF1..4) hold 8 channels each: positions 1-4 = L_{Aud,Vis,Bar,Mot}, positions 5-8 = R_{Aud,Vis,Bar,Mot} (no Hip in EDF). RHD ports A/B/C use the standard 10 active IDs: 009/010/012/014/015 (L) and 016/017/019/021/022 (R). L/R hemisphere assignment within each EDF bank is provisional pending anatomy verification.",
     "CHNAME_ALIASES": {
