@@ -442,6 +442,10 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
             save_dir = Path(save_dir)
             save_dir.mkdir(parents=True, exist_ok=True)
 
+        # animal_id may embed genotype/animal_day containing "/" (e.g.
+        # "Arx(F/y); Rosa(+/wt)") — slugify before using it in filenames.
+        safe_id = slugify(animal_id) if animal_id else None
+
         # Initialize event counts dictionary for all channels
         n_ch = len(raw.ch_names)
         event_counts = {ch_idx: 0 for ch_idx in range(n_ch)}
@@ -472,7 +476,7 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
 
             # Save epoch data if requested
             if save_epoch and animal_id and save_dir:
-                saveFile_MNE = f"{animal_id}_fdsar_epoch_{ch_idx}.fif"
+                saveFile_MNE = f"{safe_id}_fdsar_epoch_{ch_idx}.fif"
                 savePath_MNE = save_dir / saveFile_MNE
                 epochs.save(str(savePath_MNE), overwrite=True)
 
@@ -486,7 +490,7 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
                 if save_dir:
                     # Include animal_id in filename to prevent overwriting across days
                     if animal_id:
-                        fig_path = save_dir / f"{animal_id}_{event_name}_fd_detection.png"
+                        fig_path = save_dir / f"{safe_id}_{event_name}_fd_detection.png"
                     else:
                         fig_path = save_dir / f"{event_name}_fd_detection.png"
                     fig[0].savefig(str(fig_path), dpi=300, bbox_inches='tight')

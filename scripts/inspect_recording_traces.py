@@ -5,8 +5,8 @@ For every recording under ``DATA_ROOT``, plot a 60s window (starting 60s
 into the file to skip onset transients), apply the pipeline's 60 Hz notch
 (``iirnotch(60, 30, fs)``, matches ``core/analyze_frag.py``), and save:
 
-  edf_examination/<folder>/<file-stem>.png           -- one PNG per source file
-  edf_examination/<folder>/_combined_<marker>.png    -- group of files, joined
+  results/edf_examination/<folder>/<file-stem>.png        -- one PNG per source file
+  results/edf_examination/<folder>/_combined_<marker>.png -- group of files, joined
 
 The "marker" groups files within a folder by their per-recording session token:
   - EDF: ``_``, ``_1_``, ``_2_`` (1017-style) or `` ``, ``-``, `` 1 ``, `` 2 ``
@@ -38,7 +38,7 @@ from mne.io import BaseRaw, RawArray, read_raw_edf
 from scipy.signal import filtfilt, iirnotch
 
 DATA_ROOT = "/mnt/isilon/marsh_single_unit/PythonEEG Data/Arx Rosa"
-SAVE_DIR = Path("/mnt/isilon/marsh_single_unit/YY_PyEEG/neurodent_Joseph_devtree/edf_examination")
+SAVE_DIR = Path("/mnt/isilon/marsh_single_unit/YY_PyEEG/neurodent_Joseph_devtree/results/edf_examination")
 # Matches the pipeline's notch in core/analyze_frag.py: iirnotch(60, 30, fs)
 NOTCH_FREQ = 60.0
 NOTCH_Q = 30.0
