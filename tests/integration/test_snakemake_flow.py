@@ -538,6 +538,159 @@ class TestPipelineContinuation:
             assert fdsar.animal_id == ao.animal_id
             assert fdsar.genotype is not None
 
+    def test_pipeline_war_save_load_round_trip(self, war_env):
+        """Pipeline-generated WAR survives the save→load round trip losslessly.
+
+        Closes the gap that the synthetic-fixture round-trip tests in
+        tests/test_visualization.py only cover by topology — this exercises
+        the EXACT shapes produced by AnimalOrganizer.compute_windowed_analysis
+        (real LINEAR_2D / BAND / MATRIX / BANDED_MATRIX / HIST cells), through
+        the production save_parquet_and_json / load_parquet_and_json entry
+        points used by every snakemake rule.
+
+        Compares cell-by-cell via JSON normalisation (tolerates the
+        ndarray→list / tuple→list normalisations the load path performs).
+        """
+        import json
+        import tempfile
+        from pathlib import Path
+
+        import numpy as np
+        import pandas as pd
+
+        from neurodent.visualization import WindowAnalysisResult
+
+        _ao, war, _ds = war_env
+
+        def _default(obj):
+            # Unified handler: numpy types first (json's default= would
+            # override _NumpyEncoder.default), then anything else as str.
+            if isinstance(obj, np.ndarray):
+                return obj.tolist()
+            if isinstance(obj, (np.integer,)):
+                return int(obj)
+            if isinstance(obj, (np.floating,)):
+                return float(obj)
+            if isinstance(obj, np.bool_):
+                return bool(obj)
+            return str(obj)
+
+        def _norm(v) -> str:
+            if v is None:
+                return "null"
+            if isinstance(v, float) and np.isnan(v):
+                return "nan"
+            # Save path normalises tz-aware datetime columns to UTC; the
+            # absolute moment is preserved.  Convert any tz-aware Timestamp
+            # to UTC (then naive for canonical string form) so equivalence
+            # is on the moment in time, not on the tz label.
+            if isinstance(v, pd.Timestamp) and v.tz is not None:
+                v = v.tz_convert("UTC").tz_localize(None)
+            return json.dumps(v, sort_keys=True, default=_default)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            war.save_parquet_and_json(tmpdir, filename="war")
+            loaded = WindowAnalysisResult.load_parquet_and_json(folder_path=Path(tmpdir))
+
+        # Structural equivalence
+        assert len(loaded.result) == len(war.result)
+        assert set(loaded.result.columns) == set(war.result.columns)
+        assert loaded.animal_id == war.animal_id
+        assert loaded.genotype == war.genotype
+        assert loaded.channel_names == war.channel_names
+
+        # Cell-by-cell normalised equivalence (every row, every column).
+        for col in war.result.columns:
+            for i in range(len(war.result)):
+                assert _norm(war.result[col].iloc[i]) == _norm(loaded.result[col].iloc[i]), (
+                    f"col={col!r} row={i}\n  before: {war.result[col].iloc[i]!r}\n  "
+                    f"after:  {loaded.result[col].iloc[i]!r}"
+                )
+
+    def test_pipeline_war_streaming_equivalent_to_eager(self, war_env):
+        """Pipeline-generated WAR: streaming reorder_and_pad matches the eager path.
+
+        Same scope as test_pipeline_war_save_load_round_trip but exercises
+        the streaming entry point used by standardize_wars.py in production.
+        """
+        import json
+        import tempfile
+        from pathlib import Path
+
+        import numpy as np
+        import pandas as pd
+
+        from neurodent.visualization import WindowAnalysisResult
+
+        _ao, war, _ds = war_env
+
+        # WAR generation produces 8 channels (LMot..RVis); reorder is a no-op
+        # for matching channels but still exercises every code path.
+        target_channels = war.channel_abbrevs or war.channel_names
+
+        def _default(obj):
+            # Unified handler: numpy types first (json's default= would
+            # override _NumpyEncoder.default), then anything else as str.
+            if isinstance(obj, np.ndarray):
+                return obj.tolist()
+            if isinstance(obj, (np.integer,)):
+                return int(obj)
+            if isinstance(obj, (np.floating,)):
+                return float(obj)
+            if isinstance(obj, np.bool_):
+                return bool(obj)
+            return str(obj)
+
+        def _norm(v) -> str:
+            if v is None:
+                return "null"
+            if isinstance(v, float) and np.isnan(v):
+                return "nan"
+            # Save path normalises tz-aware datetime columns to UTC; the
+            # absolute moment is preserved.  Convert any tz-aware Timestamp
+            # to UTC (then naive for canonical string form) so equivalence
+            # is on the moment in time, not on the tz label.
+            if isinstance(v, pd.Timestamp) and v.tz is not None:
+                v = v.tz_convert("UTC").tz_localize(None)
+            return json.dumps(v, sort_keys=True, default=_default)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            src = tmp / "src"
+            src.mkdir()
+            war.save_parquet_and_json(src, filename="war")
+
+            # Eager: load, reorder, save.
+            eager_dst = tmp / "eager"
+            eager_dst.mkdir()
+            eager_war = WindowAnalysisResult.load_parquet_and_json(folder_path=src)
+            eager_war.reorder_and_pad_channels(target_channels, use_abbrevs=True)
+            eager_war.save_parquet_and_json(eager_dst, filename="war")
+
+            # Streaming: do it via the production entry point in one shot.
+            stream_dst = tmp / "stream"
+            WindowAnalysisResult.stream_reorder_and_pad_to_parquet(
+                src_folder=src,
+                dst_folder=stream_dst,
+                target_channels=target_channels,
+                use_abbrevs=True,
+                batch_size=4,  # multi-batch on a small WAR
+            )
+
+            eager_re = WindowAnalysisResult.load_parquet_and_json(folder_path=eager_dst)
+            stream_re = WindowAnalysisResult.load_parquet_and_json(folder_path=stream_dst)
+
+        assert len(eager_re.result) == len(stream_re.result)
+        assert set(eager_re.result.columns) == set(stream_re.result.columns)
+        assert eager_re.channel_names == stream_re.channel_names
+
+        for col in eager_re.result.columns:
+            for i in range(len(eager_re.result)):
+                assert _norm(eager_re.result[col].iloc[i]) == _norm(stream_re.result[col].iloc[i]), (
+                    f"col={col!r} row={i}\n  eager:  {eager_re.result[col].iloc[i]!r}\n  "
+                    f"stream: {stream_re.result[col].iloc[i]!r}"
+                )
+
 
 # ---------------------------------------------------------------------------
 # Tests — Dual .bin/.csv format (sox5-style with multi-pattern discovery)
@@ -1131,3 +1284,5 @@ class TestJointRecordingSplit:
             constants.GENOTYPE_ALIASES = orig_aliases
 
 
+
+    

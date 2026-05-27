@@ -3972,35 +3972,53 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
         filepath = str(folder / filename)
 
-        # Write parquet as the primary stable format.
-        # Object-like columns (lists/dicts/ndarrays) are JSON-encoded per-cell.
-        # The list of encoded columns is stored in the parquet schema metadata
-        # so they can be decoded on load.
-        #
-        # Build a column dict directly (avoids df.copy() and from_pandas()
-        # which together create 2-3 redundant copies of the DataFrame).
         columns = {}
         encoded_cols: list[str] = []
+        # pd.Timestamp is "basic" here so tz handling stays on the datetime64 path below.
+        BASIC_TYPES = (str, int, float, bool, type(None), pd.Timestamp)
         for col in self.result.columns:
             ser = self.result[col]
             needs_encoding = False
             if ser.dtype == object:
                 sample = ser.dropna().head(20)
                 for v in sample:
-                    if not isinstance(v, (str, int, float, bool, type(None))):
+                    if not isinstance(v, BASIC_TYPES):
                         needs_encoding = True
                         break
             if needs_encoding:
                 encoded_cols.append(col)
-                columns[col] = [
-                    json.dumps(x, cls=WindowAnalysisResult._NumpyEncoder, ensure_ascii=False)
-                    for x in ser
-                ]
+                nested = [WindowAnalysisResult._to_nested_python(x) for x in ser]
+                try:
+                    columns[col] = pa.array(nested)
+                except (pa.lib.ArrowInvalid, pa.lib.ArrowTypeError, AttributeError, TypeError, ValueError):
+                    # Shapes pyarrow can't infer → JSON fallback per cell.
+                    columns[col] = [
+                        json.dumps(x, cls=WindowAnalysisResult._NumpyEncoder, ensure_ascii=False)
+                        for x in nested
+                    ]
+                del nested
             else:
+                if ser.dtype == object:
+                    non_null = ser.dropna()
+                    if len(non_null) > 0 and isinstance(non_null.iloc[0], pd.Timestamp):
+                        ser = pd.to_datetime(ser, errors="coerce")
+                # Normalise tz-aware datetimes to UTC; pyarrow can't serialise
+                # tzlocal at all, and tz+NaT crashes for any tz — strip tz in
+                # that case (lossy on label, lossless on moment).
+                if pd.api.types.is_datetime64_any_dtype(ser):
+                    tz = getattr(getattr(ser, "dt", None), "tz", None)
+                    if tz is not None:
+                        if ser.isna().any():
+                            ser = ser.dt.tz_convert("UTC").dt.tz_localize(None)
+                        else:
+                            ser = ser.dt.tz_convert("UTC")
                 columns[col] = ser.to_numpy()
         table = pa.table(columns)
         del columns
-        neurodent_meta = json.dumps({"encoded_columns": encoded_cols}).encode()
+        # encoding_version=2: encoded_cols are native list/struct; absence/1 = legacy JSON.
+        neurodent_meta = json.dumps(
+            {"encoded_columns": encoded_cols, "encoding_version": 2}
+        ).encode()
         existing_meta = table.schema.metadata or {}
         merged_meta = {**existing_meta, b"neurodent": neurodent_meta}
         table = table.replace_schema_metadata(merged_meta)
@@ -4045,10 +4063,8 @@ class WindowAnalysisResult(AnimalFeatureParser):
         return self.save_parquet_and_json(*args, **kwargs)
 
     class _NumpyEncoder(json.JSONEncoder):
-        """JSON encoder that handles numpy types transparently.
-
-        The stdlib encoder already recurses into lists and dicts, so we only
-        need to override *default* for types it cannot handle natively.
+        """JSON encoder that handles numpy types — used by the JSON fallback
+        path for cells pyarrow can't infer a uniform schema for.
         """
 
         def default(self, o: Any) -> Any:
@@ -4062,14 +4078,68 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 return bool(o)
             return super().default(o)
 
+    _TUPLE_FIELD_PREFIX = "_t"  # tuple round-trip marker for _to/_from nested
+
+    @staticmethod
+    def _to_nested_python(v):
+        """Convert numpy/dict/tuple cells to nested Python so pyarrow can
+        infer native list/struct types.  Tuples become structs with keys
+        ``_t0``, ``_t1``, … so heterogeneous-shape elements survive the
+        round trip.
+        """
+        if isinstance(v, np.ndarray):
+            return v.tolist()
+        if isinstance(v, dict):
+            return {str(k): WindowAnalysisResult._to_nested_python(vv) for k, vv in v.items()}
+        if isinstance(v, tuple):
+            return {
+                f"{WindowAnalysisResult._TUPLE_FIELD_PREFIX}{i}": WindowAnalysisResult._to_nested_python(x)
+                for i, x in enumerate(v)
+            }
+        if isinstance(v, list):
+            return [WindowAnalysisResult._to_nested_python(x) for x in v]
+        if isinstance(v, np.integer):
+            return int(v)
+        if isinstance(v, np.floating):
+            return float(v)
+        if isinstance(v, np.bool_):
+            return bool(v)
+        return v
+
+    @staticmethod
+    def _normalize_arrow_cell(v):
+        """Convert pyarrow's ndarray-leafed cells back to plain Python lists,
+        and reconstruct ``_t0``/``_t1``/… structs as tuples.
+        """
+        if isinstance(v, np.ndarray):
+            if v.dtype == object:
+                return [WindowAnalysisResult._normalize_arrow_cell(x) for x in v]
+            return v.tolist()
+        if isinstance(v, dict):
+            prefix = WindowAnalysisResult._TUPLE_FIELD_PREFIX
+            keys = list(v.keys())
+            if keys and all(k == f"{prefix}{i}" for i, k in enumerate(sorted(keys, key=lambda k: int(k[len(prefix):]) if k.startswith(prefix) and k[len(prefix):].isdigit() else -1))):
+                ordered = sorted(keys, key=lambda k: int(k[len(prefix):]))
+                return tuple(
+                    WindowAnalysisResult._normalize_arrow_cell(v[k]) for k in ordered
+                )
+            return {k: WindowAnalysisResult._normalize_arrow_cell(vv) for k, vv in v.items()}
+        if isinstance(v, list):
+            return [WindowAnalysisResult._normalize_arrow_cell(x) for x in v]
+        return v
+
     @staticmethod
     def _encode_df_for_parquet(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
-        """Return a copy of *df* where complex/object columns have been
-        JSON-encoded as strings so they can be written to Parquet safely.
+        """Return a copy of *df* with complex/object columns converted to
+        nested Python structures (lists / dicts / scalars).
+
+        Pyarrow can store these as native list/struct columns directly,
+        without any JSON string intermediate.  Encoded column names are
+        returned so the caller can stamp them into parquet schema metadata.
 
         Returns:
             (encoded_df, encoded_columns) — the modified DataFrame and the
-            list of column names that were encoded.
+            list of column names that were converted.
         """
         df_copy = df.copy()
         encoded_cols: list[str] = []
@@ -4085,39 +4155,287 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
             if needs_encoding:
                 encoded_cols.append(col)
-                df_copy[col] = ser.apply(
-                    lambda x: json.dumps(x, cls=WindowAnalysisResult._NumpyEncoder, ensure_ascii=False)
-                )
+                df_copy[col] = ser.apply(WindowAnalysisResult._to_nested_python)
 
         return df_copy, encoded_cols
 
     @staticmethod
     def _decode_df_from_parquet(df: pd.DataFrame, encoded_cols: list[str]) -> pd.DataFrame:
-        """Decode JSON-encoded columns back into Python objects.
-
-        Values are returned as plain Python types (lists, dicts, scalars) —
-        the same representation that ``json.loads`` produces.  Consuming code
-        (e.g. ``_apply_filter``) already wraps values with ``np.array()`` /
-        ``np.asarray()`` where needed, so no eager numpy conversion is done
-        here.  This avoids over-converting list-based features and keeps the
-        per-cell cost to a single ``json.loads`` call.
+        """Decode complex columns to plain Python.  Detects legacy JSON-string
+        cells vs native ndarray-leafed cells per column and dispatches.
         """
         for col in encoded_cols:
             if col not in df.columns:
                 continue
-            # Some parquet engines may already return Python objects for nulls;
-            # only attempt json.loads on actual string values.
-            def _try_load(v):
-                if isinstance(v, str):
-                    try:
-                        return json.loads(v)
-                    except json.JSONDecodeError:
-                        return v
-                return v
+            sample = next(
+                (
+                    v
+                    for v in df[col]
+                    if v is not None and not (isinstance(v, float) and np.isnan(v))
+                ),
+                None,
+            )
+            if isinstance(sample, str):
+                def _try_load(v):
+                    if isinstance(v, str):
+                        try:
+                            return json.loads(v)
+                        except json.JSONDecodeError:
+                            return v
+                    return v
 
-            df[col] = df[col].apply(_try_load)
+                df[col] = df[col].apply(_try_load)
+            else:
+                df[col] = df[col].apply(WindowAnalysisResult._normalize_arrow_cell)
 
         return df
+
+    @classmethod
+    def stream_reorder_and_pad_to_parquet(
+        cls,
+        src_folder: str | Path,
+        dst_folder: str | Path,
+        target_channels: list[str],
+        use_abbrevs: bool = True,
+        add_unique_hash: bool = False,
+        unique_hash_length: int = 4,
+        src_filename: str = "war",
+        dst_filename: str = "war",
+        batch_size: int = 5000,
+    ) -> None:
+        """Stream-transform a WAR through ``reorder_and_pad_channels`` (and
+        optionally :meth:`add_unique_hash`) WITHOUT materialising the full
+        DataFrame in memory.
+
+        Reads ``<src_folder>/<src_filename>.{parquet,json}`` in row-group-
+        sized batches, applies the channel reorder + padding per batch, and
+        writes ``<dst_folder>/<dst_filename>.{parquet,json}``.  Output is
+        byte/value-equivalent to::
+
+            war = cls.load_parquet_and_json(src_folder)
+            war.reorder_and_pad_channels(target_channels, use_abbrevs=use_abbrevs)
+            if add_unique_hash:
+                war.add_unique_hash(unique_hash_length)
+            war.save_parquet_and_json(dst_folder)
+
+        Peak memory is bounded by ``batch_size`` rows of pandas data, not by
+        total WAR size — so every per-animal Snakemake rule that adopts this
+        entry point inherits the win.
+
+        Args:
+            src_folder: WAR input folder containing
+                ``<src_filename>.parquet`` + ``<src_filename>.json``.
+            dst_folder: output folder; created if absent.
+            target_channels: target channel order/list.
+            use_abbrevs: match channels by abbreviation (``LMot``/``RMot``/...)
+                if True (default), else by raw name.
+            add_unique_hash: append a random hex suffix to ``animal_id`` (and
+                rewrite ``animal`` / ``animalday`` columns) before saving.
+            unique_hash_length: bytes passed to ``secrets.token_hex``.
+            batch_size: rows per pandas batch / output row group.  Smaller
+                values reduce peak memory at the cost of more parquet I/O
+                round-trips.  Default 5000.
+        """
+        import secrets
+        import gc as _gc
+
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+
+        src_folder = Path(src_folder)
+        dst_folder = Path(dst_folder)
+        dst_folder.mkdir(parents=True, exist_ok=True)
+        src_parquet = src_folder / f"{src_filename}.parquet"
+        src_json = src_folder / f"{src_filename}.json"
+        dst_parquet = dst_folder / f"{dst_filename}.parquet"
+        dst_json = dst_folder / f"{dst_filename}.json"
+
+        metadata = json.loads(src_json.read_text())
+        channel_names = list(metadata.get("channel_names") or [])
+        assume_from_number = metadata.get("assume_from_number", False)
+        channel_abbrevs = abbreviate_channel_names(
+            channel_names,
+            strict_matching=False,
+            assume_from_number=assume_from_number,
+        )
+
+        channel_map = {ch: i for i, ch in enumerate(target_channels)}
+        source_channel_list = channel_abbrevs if use_abbrevs else channel_names
+
+        original_animal_id = metadata.get("animal_id", "") or ""
+        if add_unique_hash:
+            new_animal_id = f"{original_animal_id}_{secrets.token_hex(unique_hash_length)}"
+        else:
+            new_animal_id = original_animal_id
+
+        src_pf = pq.ParquetFile(src_parquet)
+        src_schema_meta = src_pf.schema_arrow.metadata or {}
+        encoded_cols: list[str] = []
+        if b"neurodent" in src_schema_meta:
+            nd_meta = json.loads(src_schema_meta[b"neurodent"])
+            encoded_cols = nd_meta.get("encoded_columns", [])
+
+        column_names = src_pf.schema_arrow.names
+        feature_columns = [c for c in column_names if c in constants.FEATURES]
+
+        writer: pq.ParquetWriter | None = None
+        out_encoded_cols = list(encoded_cols)
+
+        for batch in src_pf.iter_batches(batch_size=batch_size):
+            df = batch.to_pandas(self_destruct=True, split_blocks=True)
+            df = cls._decode_df_from_parquet(df, encoded_cols)
+
+            # Per-batch reorder/pad mirrors reorder_and_pad_channels.
+            for feature in feature_columns:
+                if feature not in df.columns:
+                    continue
+                ftype = constants.classify_feature(feature)
+
+                if ftype in (
+                    constants.FeatureType.LINEAR,
+                    constants.FeatureType.LINEAR_2D,
+                    constants.FeatureType.BAND,
+                ):
+                    if ftype is constants.FeatureType.BAND:
+                        vals, keys = extract_band_dict(df[feature])
+                    else:
+                        vals = extract_linear_array(df[feature])
+                    new_vals = np.full(
+                        (vals.shape[0], len(target_channels), *vals.shape[2:]),
+                        np.nan,
+                    )
+                    for i, ch in enumerate(source_channel_list):
+                        if ch in channel_map:
+                            new_vals[:, channel_map[ch]] = vals[:, i]
+                    if ftype is constants.FeatureType.BAND:
+                        df[feature] = repack_band_dict(new_vals, keys)
+                    else:
+                        df[feature] = [list(x) for x in new_vals]
+                    del vals, new_vals
+
+                elif ftype.is_matrix:
+                    if ftype is constants.FeatureType.BANDED_MATRIX:
+                        vals, keys = extract_band_dict(df[feature])
+                        n_bands = vals.shape[ftype.semantic_axes["bands"]]
+                        new_shape = [
+                            vals.shape[0],
+                            len(target_channels),
+                            len(target_channels),
+                            n_bands,
+                        ]
+                        new_vals = np.full(new_shape, np.nan)
+                        for i, ch1 in enumerate(source_channel_list):
+                            if ch1 in channel_map:
+                                for j, ch2 in enumerate(source_channel_list):
+                                    if ch2 in channel_map:
+                                        new_vals[:, channel_map[ch1], channel_map[ch2], :] = vals[:, i, j, :]
+                        df[feature] = repack_band_dict(new_vals, keys)
+                        del vals, keys, new_vals
+                    else:
+                        vals = extract_linear_array(df[feature])
+                        new_shape = [
+                            vals.shape[0],
+                            len(target_channels),
+                            len(target_channels),
+                        ]
+                        new_vals = np.full(new_shape, np.nan)
+                        for i, ch1 in enumerate(source_channel_list):
+                            if ch1 in channel_map:
+                                for j, ch2 in enumerate(source_channel_list):
+                                    if ch2 in channel_map:
+                                        new_vals[:, channel_map[ch1], channel_map[ch2]] = vals[:, i, j]
+                        df[feature] = [list(x) for x in new_vals]
+                        del vals, new_vals
+
+                elif ftype is constants.FeatureType.HIST:
+                    coords, vals = extract_hist_data(df[feature])
+                    new_vals = np.full(
+                        (
+                            vals.shape[0],
+                            len(target_channels),
+                            vals.shape[ftype.semantic_axes["freq_bins"]],
+                        ),
+                        np.nan,
+                    )
+                    for i, ch in enumerate(source_channel_list):
+                        if ch in channel_map:
+                            new_vals[:, channel_map[ch], :] = vals[:, i, :]
+                    df[feature] = [
+                        (coords[i], new_vals[i].T) for i in range(len(coords))
+                    ]
+                    del coords, vals, new_vals
+
+                else:
+                    raise ValueError(
+                        f"Unsupported FeatureType {ftype} for channel remapping: {feature}"
+                    )
+
+            if add_unique_hash:
+                if "animal" in df.columns:
+                    df["animal"] = new_animal_id
+                if "animalday" in df.columns:
+                    df["animalday"] = df["animalday"].str.replace(
+                        original_animal_id, new_animal_id
+                    )
+
+            out_columns: dict = {}
+            for col in df.columns:
+                ser = df[col]
+                if col in encoded_cols:
+                    nested = [cls._to_nested_python(x) for x in ser]
+                    try:
+                        out_columns[col] = pa.array(nested)
+                    except (pa.lib.ArrowInvalid, pa.lib.ArrowTypeError, AttributeError, TypeError, ValueError):
+                        out_columns[col] = [
+                            json.dumps(x, cls=cls._NumpyEncoder, ensure_ascii=False)
+                            for x in nested
+                        ]
+                    del nested
+                else:
+                    if ser.dtype == object:
+                        non_null = ser.dropna()
+                        if len(non_null) > 0 and isinstance(non_null.iloc[0], pd.Timestamp):
+                            ser = pd.to_datetime(ser, errors="coerce")
+                    if pd.api.types.is_datetime64_any_dtype(ser):
+                        tz = getattr(getattr(ser, "dt", None), "tz", None)
+                        if tz is not None:
+                            if ser.isna().any():
+                                ser = ser.dt.tz_convert("UTC").dt.tz_localize(None)
+                            else:
+                                ser = ser.dt.tz_convert("UTC")
+                    out_columns[col] = ser.to_numpy()
+
+            out_table = pa.table(out_columns)
+            del out_columns
+
+            if writer is None:
+                out_meta = json.dumps(
+                    {"encoded_columns": out_encoded_cols, "encoding_version": 2}
+                ).encode()
+                schema = out_table.schema.with_metadata({b"neurodent": out_meta})
+                writer = pq.ParquetWriter(dst_parquet, schema)
+                out_table = out_table.replace_schema_metadata({b"neurodent": out_meta})
+
+            writer.write_table(out_table)
+            del df, out_table
+            _gc.collect()
+
+        if writer is not None:
+            writer.close()
+
+        out_metadata = dict(metadata)
+        out_metadata["channel_names"] = list(target_channels)
+        out_metadata["assume_from_number"] = False
+        if add_unique_hash:
+            out_metadata["animal_id"] = new_animal_id
+
+        with open(dst_json, "w") as f:
+            json.dump(out_metadata, f, indent=2)
+
+        logging.info(
+            f"Stream-standardised WAR: {src_parquet} -> {dst_parquet} "
+            f"(batch_size={batch_size})"
+        )
 
     def get_bad_channels_by_lof_threshold(self, lof_threshold: float) -> dict:
         """Apply LOF threshold directly to stored scores to get bad channels.
@@ -4442,7 +4760,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
                             pq_meta = json.load(mf)
                         encoded_cols = pq_meta.get("encoded_columns", [])
 
-                data = table.to_pandas()
+                # self_destruct + split_blocks: free Arrow buffers during
+                # conversion and prevent giant BlockManager allocations.
+                data = table.to_pandas(self_destruct=True, split_blocks=True)
                 del table
                 data = cls._decode_df_from_parquet(data, encoded_cols)
             except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as e:

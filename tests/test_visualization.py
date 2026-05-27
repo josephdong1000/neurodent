@@ -3962,7 +3962,13 @@ class TestParquetSaveLoad:
             assert "rms" in nd_meta["encoded_columns"]
 
     def test_encode_decode_round_trip(self):
-        """Test _encode_df_for_parquet and _decode_df_from_parquet directly."""
+        """Test _encode_df_for_parquet and _decode_df_from_parquet directly.
+
+        Updated for encoding_version=2: complex columns are converted to
+        nested Python structures (no JSON intermediate) instead of JSON
+        strings.  Decode is a no-op for cells that are already nested
+        Python (legacy string cells still get json.loads'd).
+        """
         df = pd.DataFrame(
             {
                 "scalar": [1.0, 2.0, 3.0],
@@ -3985,21 +3991,37 @@ class TestParquetSaveLoad:
         assert "dict_col" in cols
         assert "array_col" in cols
 
-        # Encoded values should be JSON strings
+        # Encoded values are nested Python (lists/dicts/scalars), NOT JSON strings.
+        # ndarrays are converted to lists via _to_nested_python.
         for col in cols:
             for val in encoded[col].dropna():
-                assert isinstance(val, str)
+                assert not isinstance(val, str), (
+                    f"{col}: expected nested Python type, got JSON string {val!r}"
+                )
+                assert isinstance(val, (list, dict, int, float, bool))
 
-        # Decode and verify round-trip
+        # Decode is a no-op for native cells (already nested Python).
         decoded = WindowAnalysisResult._decode_df_from_parquet(encoded, cols)
         for i in range(len(df)):
-            # list_col stays as plain list after JSON round-trip (no numpy conversion)
             assert decoded["list_col"].iloc[i] == df["list_col"].iloc[i]
             assert decoded["dict_col"].iloc[i] == df["dict_col"].iloc[i]
-            # array_col comes back as a plain list; verify values match
+            # array_col was converted to a plain Python list at encode time.
             np.testing.assert_array_equal(
                 decoded["array_col"].iloc[i], df["array_col"].iloc[i]
             )
+
+        # Legacy backward-compat: explicit JSON strings should still decode.
+        legacy = pd.DataFrame(
+            {
+                "list_col": [json.dumps([1, 2]), json.dumps([3, 4]), json.dumps([5, 6])],
+                "dict_col": [json.dumps({"x": 1}), json.dumps({"y": 2}), json.dumps({"z": 3})],
+            }
+        )
+        legacy_decoded = WindowAnalysisResult._decode_df_from_parquet(
+            legacy, ["list_col", "dict_col"]
+        )
+        assert legacy_decoded["list_col"].iloc[0] == [1, 2]
+        assert legacy_decoded["dict_col"].iloc[0] == {"x": 1}
 
     def test_parquet_file_has_content(self, war_with_complex_columns):
         """Test that the parquet file has meaningful content matching the DataFrame."""
@@ -4202,6 +4224,335 @@ class TestMemoryPressure:
                 f"({peak / 1e6:.1f} MB vs {pq_size / 1e6:.1f} MB). "
                 f"Likely a missing del or unnecessary copy."
             )
+
+
+class TestStreamReorderAndPad:
+    """Equivalence + memory tests for stream_reorder_and_pad_to_parquet.
+
+    The streaming path must produce the same WAR data on disk as the eager
+    load → reorder_and_pad_channels → save path, while using strictly less
+    peak memory because it never materialises the full DataFrame.
+    """
+
+    @pytest.fixture
+    def synthetic_war(self):
+        """Synthetic WAR with all feature types (LINEAR, LINEAR_2D, BAND,
+        SIMPLE_MATRIX, BANDED_MATRIX, HIST), 4 source channels.
+        """
+        n_rows = 60
+        C = 4
+        BANDS = ["delta", "theta", "alpha", "beta", "gamma"]
+        F = 16
+        rng = np.random.default_rng(123)
+        data = {
+            "animalday": ["A1_20230101"] * n_rows,
+            "animal": ["A1"] * n_rows,
+            "genotype": ["WT"] * n_rows,
+            "timestamp": pd.date_range("2023-01-01", periods=n_rows, freq="1min"),
+            "duration": [60.0] * n_rows,
+            # LINEAR (1D per row)
+            "rms": [rng.random(C).tolist() for _ in range(n_rows)],
+            "logrms": [rng.random(C).tolist() for _ in range(n_rows)],
+            # LINEAR_2D ([slope, intercept] per channel)
+            "psdslope": [
+                [[rng.random(), rng.random()] for _ in range(C)] for _ in range(n_rows)
+            ],
+            # BAND (band dict of 1D)
+            "psdband": [
+                {b: rng.random(C).tolist() for b in BANDS} for _ in range(n_rows)
+            ],
+            # SIMPLE_MATRIX (CxC per row)
+            "pcorr": [rng.random((C, C)).tolist() for _ in range(n_rows)],
+            # BANDED_MATRIX (band dict of CxC)
+            "cohere": [
+                {b: rng.random((C, C)).tolist() for b in BANDS} for _ in range(n_rows)
+            ],
+            # HIST (psd: per-row (coords, (C,F)))
+            "psd": [(np.arange(F).tolist(), rng.random((C, F)).tolist()) for _ in range(n_rows)],
+        }
+        return WindowAnalysisResult(
+            result=pd.DataFrame(data),
+            animal_id="A1",
+            genotype="WT",
+            channel_names=["LMot", "RMot", "LBar", "RBar"],
+            suppress_short_interval_error=True,
+        )
+
+    def test_streaming_equivalent_to_eager(self, synthetic_war):
+        """Streaming path produces the same WAR data as the eager path."""
+        target = ["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"]
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            src = tmp / "src"
+            src.mkdir()
+            synthetic_war.save_parquet_and_json(src, filename="war")
+
+            # Eager path
+            eager_dst = tmp / "eager"
+            eager_dst.mkdir()
+            war_eager = WindowAnalysisResult.load_parquet_and_json(folder_path=src)
+            war_eager.reorder_and_pad_channels(target, use_abbrevs=True)
+            war_eager.save_parquet_and_json(eager_dst, filename="war")
+
+            # Streaming path (batch_size=20 so we exercise multiple row groups)
+            stream_dst = tmp / "stream"
+            WindowAnalysisResult.stream_reorder_and_pad_to_parquet(
+                src_folder=src,
+                dst_folder=stream_dst,
+                target_channels=target,
+                use_abbrevs=True,
+                batch_size=20,
+            )
+
+            # Reload both, compare row-by-row.
+            re_eager = WindowAnalysisResult.load_parquet_and_json(folder_path=eager_dst)
+            re_stream = WindowAnalysisResult.load_parquet_and_json(folder_path=stream_dst)
+
+            assert list(re_eager.result.columns) == list(re_stream.result.columns)
+            assert len(re_eager.result) == len(re_stream.result)
+
+            # JSON-normalised comparison handles ndarray/tuple/list/dict
+            # equivalently (the load-side decode may return lists where the
+            # original held tuples or ndarrays — both serialise the same).
+            encoder = WindowAnalysisResult._NumpyEncoder
+            for col in re_eager.result.columns:
+                for i in range(len(re_eager.result)):
+                    a = re_eager.result[col].iloc[i]
+                    b = re_stream.result[col].iloc[i]
+                    a_norm = json.dumps(a, cls=encoder, sort_keys=True, default=str)
+                    b_norm = json.dumps(b, cls=encoder, sort_keys=True, default=str)
+                    assert a_norm == b_norm, (
+                        f"col={col}, row={i}\n  eager:  {a!r}\n  stream: {b!r}"
+                    )
+
+            # Channel-name JSON metadata should also match.
+            assert re_eager.channel_names == re_stream.channel_names
+            assert re_eager.channel_names == target
+
+    def test_streaming_peak_memory_below_eager(self, synthetic_war):
+        """Streaming peak must be substantially smaller than eager peak.
+
+        Tightened assertion (was ``stream < eager``): streaming should
+        use less than half the eager memory at ``batch_size=10`` (1/6 of
+        the 60-row fixture).  Real arxrosa-scale data observed ~40%; the
+        synthetic fixture sees ~20%; 50% is a comfortable upper bound
+        that catches regressions while tolerating pandas/pyarrow overhead
+        variance across versions.
+        """
+        import tracemalloc
+
+        target = ["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"]
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            src = tmp / "src"
+            src.mkdir()
+            synthetic_war.save_parquet_and_json(src, filename="war")
+            pq_size = (src / "war.parquet").stat().st_size
+
+            tracemalloc.start()
+            stream_dst = tmp / "stream"
+            WindowAnalysisResult.stream_reorder_and_pad_to_parquet(
+                src_folder=src,
+                dst_folder=stream_dst,
+                target_channels=target,
+                use_abbrevs=True,
+                batch_size=10,
+            )
+            _, stream_peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+
+            tracemalloc.start()
+            eager_dst = tmp / "eager"
+            eager_dst.mkdir()
+            war_eager = WindowAnalysisResult.load_parquet_and_json(folder_path=src)
+            war_eager.reorder_and_pad_channels(target, use_abbrevs=True)
+            war_eager.save_parquet_and_json(eager_dst, filename="war")
+            _, eager_peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+
+            ratio = stream_peak / eager_peak
+            assert ratio < 0.5, (
+                f"streaming peak {stream_peak/1e6:.2f} MB is {ratio:.0%} of "
+                f"eager peak {eager_peak/1e6:.2f} MB — expected < 50% (regression?)"
+            )
+            # Absolute ceiling: streaming should fit in ~5x the parquet size.
+            assert stream_peak < 5 * pq_size, (
+                f"streaming peak {stream_peak/1e6:.2f} MB exceeds 5x parquet "
+                f"({pq_size/1e6:.2f} MB) — peak should scale with batch_size, not WAR size"
+            )
+
+    def test_no_json_fallback_for_standard_features(self, synthetic_war):
+        """Every encoded column — including HIST (psd) — uses a native
+        pyarrow list/struct type. The per-cell JSON fallback path should
+        NOT be hit for any of the canonical FeatureTypes.
+
+        Regression guard: HIST stores ``(coords, values)`` tuples per cell.
+        Before the tuple→struct lift, those would fall back to JSON
+        strings.  After: they encode as ``struct<_t0: ..., _t1: ...>``.
+        """
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            synthetic_war.save_parquet_and_json(tmpdir, filename="war")
+            pq_path = Path(tmpdir) / "war.parquet"
+
+            schema = pq.ParquetFile(pq_path).schema_arrow
+            nd = json.loads(schema.metadata[b"neurodent"])
+            assert nd.get("encoding_version") == 2
+
+            for col in nd["encoded_columns"]:
+                ftype = schema.field(col).type
+                assert not pa.types.is_string(ftype), (
+                    f"Column {col!r} fell back to JSON encoding (string). "
+                    f"Expected a native list/struct type."
+                )
+                assert pa.types.is_nested(ftype), (
+                    f"Column {col!r} has non-nested type {ftype}; "
+                    f"expected list or struct."
+                )
+
+    def test_streaming_with_unique_hash(self, synthetic_war):
+        """Streaming with add_unique_hash matches the eager equivalent."""
+        target = ["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            src = tmp / "src"
+            src.mkdir()
+            synthetic_war.save_parquet_and_json(src, filename="war")
+
+            stream_dst = tmp / "stream"
+            WindowAnalysisResult.stream_reorder_and_pad_to_parquet(
+                src_folder=src,
+                dst_folder=stream_dst,
+                target_channels=target,
+                use_abbrevs=True,
+                add_unique_hash=True,
+                unique_hash_length=4,
+                batch_size=20,
+            )
+
+            loaded = WindowAnalysisResult.load_parquet_and_json(folder_path=stream_dst)
+            # animal_id grew by a hash suffix.
+            assert loaded.animal_id.startswith("A1_")
+            assert loaded.animal_id != "A1"
+            # animal column rewritten consistently
+            assert (loaded.result["animal"] == loaded.animal_id).all()
+
+
+class TestTimestampHandling:
+    """Regression tests for the datetime/tz round-trip edge cases pyarrow
+    can't handle natively (tzlocal, tz+NaT, object-dtype Timestamp+None).
+    """
+
+    @staticmethod
+    def _war(ts_series, animal_id="A1"):
+        """Build a minimal WAR with the given timestamp series."""
+        df = pd.DataFrame({
+            "animalday": [f"{animal_id}_d{i}" for i in range(len(ts_series))],
+            "duration": [60.0] * len(ts_series),
+            "timestamp": ts_series,
+            "rms": [[1.0, 2.0]] * len(ts_series),
+        })
+        return WindowAnalysisResult(
+            result=df, animal_id=animal_id, genotype="WT",
+            channel_names=["LMot", "RMot"],
+        )
+
+    def _roundtrip(self, war):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            war.save_parquet_and_json(tmpdir, filename="war")
+            return WindowAnalysisResult.load_parquet_and_json(folder_path=Path(tmpdir))
+
+    @staticmethod
+    def _moments_equal(a: pd.Series, b: pd.Series) -> bool:
+        """Compare two datetime Series by absolute moment, tolerating
+        parquet's ns→us precision conversion."""
+        def _to_utc_us(s):
+            s = s.dt.tz_convert("UTC") if getattr(s.dt, "tz", None) is not None else s.dt.tz_localize("UTC")
+            return s.dt.floor("us")
+        return (_to_utc_us(a).reset_index(drop=True) == _to_utc_us(b).reset_index(drop=True)).all()
+
+    def test_naive_datetime_roundtrip(self):
+        ts = pd.Series(pd.to_datetime(["2023-01-01 10:00", "2023-01-01 10:05", "2023-01-01 10:10"]))
+        loaded = self._roundtrip(self._war(ts))
+        assert self._moments_equal(
+            ts.reset_index(drop=True),
+            loaded.result["timestamp"].reset_index(drop=True),
+        )
+
+    def test_tzlocal_datetime_roundtrip_to_utc(self):
+        """pyarrow can't serialise tzlocal(); save normalises to UTC."""
+        from dateutil.tz import tzlocal
+        ts = pd.Series([
+            pd.Timestamp("2023-01-01 10:00", tz=tzlocal()),
+            pd.Timestamp("2023-01-01 10:05", tz=tzlocal()),
+        ])
+        loaded = self._roundtrip(self._war(ts))
+        loaded_ts = loaded.result["timestamp"]
+        assert getattr(loaded_ts.dt, "tz", None) is not None
+        assert self._moments_equal(ts.reset_index(drop=True), loaded_ts.reset_index(drop=True))
+
+    def test_named_tz_datetime_roundtrip(self):
+        ts = pd.Series([
+            pd.Timestamp("2023-01-01 10:00", tz="America/New_York"),
+            pd.Timestamp("2023-01-01 10:05", tz="America/New_York"),
+        ])
+        loaded = self._roundtrip(self._war(ts))
+        assert self._moments_equal(
+            ts.reset_index(drop=True),
+            loaded.result["timestamp"].reset_index(drop=True),
+        )
+
+    def test_tz_aware_with_nat_strips_tz(self):
+        """tz+NaT crashes pyarrow; save strips tz (lossy on label, lossless on moment)."""
+        ts = pd.Series(pd.to_datetime(["2023-01-01 10:00", "2023-01-01 10:05", "2023-01-01 10:10"]))
+        war = self._war(ts)
+        # Edge case lives on a non-validated column.
+        war.result["end_time"] = pd.Series([
+            pd.Timestamp("2023-01-01 10:00", tz="America/New_York"),
+            pd.NaT,
+            pd.Timestamp("2023-01-01 10:05", tz="America/New_York"),
+        ])
+        loaded = self._roundtrip(war)
+        end = loaded.result["end_time"]
+        assert getattr(end.dt, "tz", None) is None  # tz stripped
+        assert pd.isna(end.iloc[1])
+        # Non-null moments preserved (compare as naive UTC).
+        expected = war.result["end_time"].dt.tz_convert("UTC").dt.tz_localize(None).dt.floor("us")
+        actual = end.dt.floor("us")
+        assert (actual.iloc[0] == expected.iloc[0]) and (actual.iloc[2] == expected.iloc[2])
+
+    def test_object_dtype_timestamp_with_none(self):
+        """Object-dtype Timestamp+None gets coerced to datetime64 before pa.table."""
+        ts = pd.Series(pd.to_datetime(["2023-01-01 10:00", "2023-01-01 10:05", "2023-01-01 10:10"]))
+        war = self._war(ts)
+        war.result["end_time"] = pd.Series([
+            pd.Timestamp("2023-01-01 10:00"),
+            None,
+            pd.Timestamp("2023-01-01 10:05"),
+        ], dtype=object)
+        assert war.result["end_time"].dtype == object
+        loaded = self._roundtrip(war)
+        end = loaded.result["end_time"]
+        assert pd.api.types.is_datetime64_any_dtype(end)
+        assert pd.isna(end.iloc[1])
+        assert end.iloc[0] == pd.Timestamp("2023-01-01 10:00")
+
+    def test_all_null_endfile_column(self):
+        """All-None object column (e.g. ``endfile`` in real WARs) round-trips
+        without crashing.  Sanity check for the integration-WAR case where
+        such columns coexist with tz-aware timestamps.
+        """
+        ts = pd.Series(pd.to_datetime(["2023-01-01", "2023-01-02"]))
+        war = self._war(ts)
+        war.result["endfile"] = [None, None]
+        # Save+load shouldn't raise; endfile reloads as either None or NaN.
+        loaded = self._roundtrip(war)
+        assert "endfile" in loaded.result.columns
+        assert loaded.result["endfile"].isna().all()
 
 
 class TestAnimalOrganizerLOF:
