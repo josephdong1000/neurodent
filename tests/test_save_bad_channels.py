@@ -152,15 +152,23 @@ class TestSaveBadChannels:
         # Check that bad_channels_dict was completely replaced
         assert test_war.bad_channels_dict == new_dict
 
+    @staticmethod
+    def _channel_filter_config(bad_channels, save_bad_channels):
+        """Just the channel-rejection filters, so tests don't need rms/psd data."""
+        return {
+            "reject_channels_by_session": {"save_bad_channels": save_bad_channels},
+            "reject_channels": {
+                "bad_channels": bad_channels,
+                "save_bad_channels": save_bad_channels,
+            },
+        }
+
     def test_filter_all_save_bad_channels_default(self, test_war):
-        """Test filter_all with default save_bad_channels='union'."""
-        original_dict = test_war.bad_channels_dict.copy()
-
-        # Use only the filtering functions we want to test, to avoid missing data issues
-        filters = [test_war.get_filter_reject_channels_by_recording_session, test_war.get_filter_reject_channels]
-
-        # Apply filter_all with bad_channels parameter
-        filtered = test_war.filter_all(bad_channels=["LBar"], filters=filters)
+        """Test apply_filters with default save_bad_channels='union'."""
+        filtered = test_war.apply_filters(
+            filter_config=self._channel_filter_config(["LBar"], "union"),
+            min_valid_channels=1,
+        )
 
         # Check that LBar was added to all sessions in the original instance
         expected_dict = {"A1_20230101": ["LMot", "LBar"], "A1_20230102": ["RMot", "LBar"]}
@@ -173,26 +181,24 @@ class TestSaveBadChannels:
             assert set(filtered.bad_channels_dict[session]) == set(expected_dict[session])
 
     def test_filter_all_save_bad_channels_none(self, test_war):
-        """Test filter_all with save_bad_channels=None."""
+        """Test apply_filters with save_bad_channels=None."""
         original_dict = test_war.bad_channels_dict.copy()
 
-        # Use only the filtering functions we want to test
-        filters = [test_war.get_filter_reject_channels_by_recording_session, test_war.get_filter_reject_channels]
-
-        # Apply filter_all with save_bad_channels=None
-        filtered = test_war.filter_all(bad_channels=["LBar"], save_bad_channels=None, filters=filters)
+        filtered = test_war.apply_filters(
+            filter_config=self._channel_filter_config(["LBar"], None),
+            min_valid_channels=1,
+        )
 
         # Check that bad_channels_dict is unchanged
         assert test_war.bad_channels_dict == original_dict
         assert filtered.bad_channels_dict == original_dict
 
     def test_filter_all_save_bad_channels_overwrite(self, test_war):
-        """Test filter_all with save_bad_channels='overwrite'."""
-        # Use only the filtering functions we want to test
-        filters = [test_war.get_filter_reject_channels_by_recording_session, test_war.get_filter_reject_channels]
-
-        # Apply filter_all with save_bad_channels='overwrite'
-        filtered = test_war.filter_all(bad_channels=["LBar"], save_bad_channels="overwrite", filters=filters)
+        """Test apply_filters with save_bad_channels='overwrite'."""
+        filtered = test_war.apply_filters(
+            filter_config=self._channel_filter_config(["LBar"], "overwrite"),
+            min_valid_channels=1,
+        )
 
         # Check that bad_channels_dict was completely replaced
         expected_dict = {"A1_20230101": ["LBar"], "A1_20230102": ["LBar"]}

@@ -1151,13 +1151,6 @@ class TestWindowAnalysisResultFiltering:
         with pytest.raises(ValueError, match="Cannot calculate window duration"):
             war.apply_filters(config, morphological_smoothing_seconds=8.0)
 
-    def test_filter_morphological_smoothing(self, filtering_war):
-        """Test standalone morphological smoothing filter."""
-        filtered = filtering_war.filter_morphological_smoothing(smoothing_seconds=8.0)
-
-        assert isinstance(filtered, WindowAnalysisResult)
-        assert filtered is not filtering_war
-
     def test_apply_filters_with_morphological_config(self, filtering_war):
         """Test morphological smoothing via configuration."""
         config = {"high_rms": {"max_rms": 500}, "morphological_smoothing": {"smoothing_seconds": 8.0}}
@@ -1177,7 +1170,7 @@ class TestWindowAnalysisResultFiltering:
             mock_smooth.assert_called_once()
             args, kwargs = mock_smooth.call_args
             np.testing.assert_array_equal(args[0], mask)
-            assert args[1] == 8.0
+            assert kwargs["smoothing_seconds"] == 8.0
             assert isinstance(filtered, WindowAnalysisResult)
 
 
@@ -4001,7 +3994,9 @@ class TestParquetSaveLoad:
                 assert isinstance(val, (list, dict, int, float, bool))
 
         # Decode is a no-op for native cells (already nested Python).
-        decoded = WindowAnalysisResult._decode_df_from_parquet(encoded, cols)
+        decoded = WindowAnalysisResult._decode_df_from_parquet(
+            encoded, cols, encoding_version=2
+        )
         for i in range(len(df)):
             assert decoded["list_col"].iloc[i] == df["list_col"].iloc[i]
             assert decoded["dict_col"].iloc[i] == df["dict_col"].iloc[i]
@@ -4141,7 +4136,10 @@ class TestParquetSaveLoad:
             # Decode and verify values round-trip
             reloaded = table.to_pandas()
             encoded_cols = nd_meta["encoded_columns"]
-            decoded = WindowAnalysisResult._decode_df_from_parquet(reloaded, encoded_cols)
+            encoding_version = nd_meta.get("encoding_version", 1)
+            decoded = WindowAnalysisResult._decode_df_from_parquet(
+                reloaded, encoded_cols, encoding_version=encoding_version
+            )
             assert len(decoded) == n_rows
             for i in range(min(5, n_rows)):
                 assert decoded["rms"].iloc[i] == war.result["rms"].iloc[i]
@@ -4227,11 +4225,12 @@ class TestMemoryPressure:
 
 
 class TestStreamReorderAndPad:
-    """Equivalence + memory tests for stream_reorder_and_pad_to_parquet.
+    """Equivalence + memory tests for the lazy WAR reorder+pad chain.
 
-    The streaming path must produce the same WAR data on disk as the eager
-    load → reorder_and_pad_channels → save path, while using strictly less
-    peak memory because it never materialises the full DataFrame.
+    The streaming path (``scan_parquet_and_json`` → ``reorder_and_pad_channels`` →
+    ``save_parquet_and_json``) must produce the same WAR data on disk as
+    the eager ``load_parquet_and_json`` → ``reorder_and_pad_channels`` →
+    ``save_parquet_and_json`` path, while using strictly less peak memory.
     """
 
     @pytest.fixture
@@ -4297,13 +4296,9 @@ class TestStreamReorderAndPad:
 
             # Streaming path (batch_size=20 so we exercise multiple row groups)
             stream_dst = tmp / "stream"
-            WindowAnalysisResult.stream_reorder_and_pad_to_parquet(
-                src_folder=src,
-                dst_folder=stream_dst,
-                target_channels=target,
-                use_abbrevs=True,
-                batch_size=20,
-            )
+            war_lazy = WindowAnalysisResult.scan_parquet_and_json(src, filename="war")
+            war_lazy.reorder_and_pad_channels(target, use_abbrevs=True)
+            war_lazy.save_parquet_and_json(stream_dst, filename="war", batch_size=20)
 
             # Reload both, compare row-by-row.
             re_eager = WindowAnalysisResult.load_parquet_and_json(folder_path=eager_dst)
@@ -4353,13 +4348,9 @@ class TestStreamReorderAndPad:
 
             tracemalloc.start()
             stream_dst = tmp / "stream"
-            WindowAnalysisResult.stream_reorder_and_pad_to_parquet(
-                src_folder=src,
-                dst_folder=stream_dst,
-                target_channels=target,
-                use_abbrevs=True,
-                batch_size=10,
-            )
+            war_lazy = WindowAnalysisResult.scan_parquet_and_json(src, filename="war")
+            war_lazy.reorder_and_pad_channels(target, use_abbrevs=True)
+            war_lazy.save_parquet_and_json(stream_dst, filename="war", batch_size=10)
             _, stream_peak = tracemalloc.get_traced_memory()
             tracemalloc.stop()
 
@@ -4424,15 +4415,10 @@ class TestStreamReorderAndPad:
             synthetic_war.save_parquet_and_json(src, filename="war")
 
             stream_dst = tmp / "stream"
-            WindowAnalysisResult.stream_reorder_and_pad_to_parquet(
-                src_folder=src,
-                dst_folder=stream_dst,
-                target_channels=target,
-                use_abbrevs=True,
-                add_unique_hash=True,
-                unique_hash_length=4,
-                batch_size=20,
-            )
+            war_lazy = WindowAnalysisResult.scan_parquet_and_json(src, filename="war")
+            war_lazy.reorder_and_pad_channels(target, use_abbrevs=True)
+            war_lazy.add_unique_hash(4)
+            war_lazy.save_parquet_and_json(stream_dst, filename="war", batch_size=20)
 
             loaded = WindowAnalysisResult.load_parquet_and_json(folder_path=stream_dst)
             # animal_id grew by a hash suffix.
@@ -4440,6 +4426,429 @@ class TestStreamReorderAndPad:
             assert loaded.animal_id != "A1"
             # animal column rewritten consistently
             assert (loaded.result["animal"] == loaded.animal_id).all()
+
+
+class TestLazyWindowAnalysisResult:
+    """Equivalence + memory tests for the LazyWindowAnalysisResult engine.
+
+    Each lazy chain (apply_filters, aggregate_time_windows, plus the
+    reorder+hash compat path) must produce the same WAR data on disk as
+    the eager mutator + save path, while keeping peak memory bounded by
+    ``batch_size``.
+    """
+
+    @pytest.fixture
+    def lazy_synthetic_war(self):
+        n_rows = 60
+        C = 4
+        BANDS = ["delta", "theta", "alpha", "beta", "gamma"]
+        F = 16
+        rng = np.random.default_rng(321)
+        # Two animaldays so we exercise the by_session filter + groupby aggregation.
+        animaldays = ["A1_20230101"] * 30 + ["A1_20230102"] * 30
+        isday = [True] * 15 + [False] * 15 + [True] * 15 + [False] * 15
+        data = {
+            "animal": ["A1"] * n_rows,
+            "animalday": animaldays,
+            "genotype": ["WT"] * n_rows,
+            "isday": isday,
+            "timestamp": pd.date_range("2023-01-01", periods=n_rows, freq="1min"),
+            "duration": [60.0] * n_rows,
+            "endfile": list(range(n_rows)),
+            "rms": [(rng.random(C) * 600).tolist() for _ in range(n_rows)],
+            "logrms": [np.log(rng.random(C) * 600 + 1).tolist() for _ in range(n_rows)],
+            "psdslope": [
+                [[rng.random(), rng.random()] for _ in range(C)] for _ in range(n_rows)
+            ],
+            "psdband": [
+                {b: rng.random(C).tolist() for b in BANDS} for _ in range(n_rows)
+            ],
+            "psdtotal": [rng.random(C).tolist() for _ in range(n_rows)],
+            "pcorr": [rng.random((C, C)).tolist() for _ in range(n_rows)],
+            "cohere": [
+                {b: rng.random((C, C)).tolist() for b in BANDS} for _ in range(n_rows)
+            ],
+            # HIST cells are (F, C) per the welch output convention.
+            "psd": [(np.arange(F).tolist(), rng.random((F, C)).tolist()) for _ in range(n_rows)],
+        }
+        return WindowAnalysisResult(
+            result=pd.DataFrame(data),
+            animal_id="A1",
+            genotype="WT",
+            channel_names=["LMot", "RMot", "LBar", "RBar"],
+            suppress_short_interval_error=True,
+        )
+
+    @staticmethod
+    def _norm_dataframe(df):
+        """Normalise a DataFrame for cell-wise comparison across eager/lazy."""
+        encoder = WindowAnalysisResult._NumpyEncoder
+        return {
+            col: [
+                json.dumps(df[col].iloc[i], cls=encoder, sort_keys=True, default=str)
+                for i in range(len(df))
+            ]
+            for col in df.columns
+        }
+
+    @staticmethod
+    def _cells_match(a, b, rtol=1e-9, atol=1e-9):
+        """Recursive numerical-tolerant equality check for WAR cell values."""
+        if isinstance(a, dict) and isinstance(b, dict):
+            if set(a.keys()) != set(b.keys()):
+                return False
+            return all(TestLazyWindowAnalysisResult._cells_match(a[k], b[k], rtol, atol) for k in a)
+        if isinstance(a, (tuple, list)) and isinstance(b, (tuple, list)):
+            if len(a) != len(b):
+                return False
+            if all(isinstance(x, (int, float, np.integer, np.floating, type(None))) for x in a + b):
+                return np.allclose(
+                    np.asarray(a, dtype=float), np.asarray(b, dtype=float),
+                    rtol=rtol, atol=atol, equal_nan=True,
+                )
+            return all(TestLazyWindowAnalysisResult._cells_match(x, y, rtol, atol) for x, y in zip(a, b))
+        if isinstance(a, np.ndarray) and isinstance(b, np.ndarray):
+            return np.allclose(a, b, rtol=rtol, atol=atol, equal_nan=True)
+        if isinstance(a, (int, float, np.integer, np.floating)) and isinstance(b, (int, float, np.integer, np.floating)):
+            return np.isclose(a, b, rtol=rtol, atol=atol, equal_nan=True)
+        return a == b
+
+    @classmethod
+    def _columns_match(cls, df_a, df_b, col, rtol=1e-9, atol=1e-9):
+        if len(df_a) != len(df_b):
+            return False
+        for i in range(len(df_a)):
+            if not cls._cells_match(df_a[col].iloc[i], df_b[col].iloc[i], rtol, atol):
+                return False
+        return True
+
+    def test_lazy_apply_filters_per_row_only(self, lazy_synthetic_war):
+        """Lazy apply_filters with per-row filters only matches eager."""
+        config = {
+            "high_rms": {"max_rms": 500},
+            "low_rms": {"min_rms": 10},
+        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            src = tmp / "src"
+            src.mkdir()
+            lazy_synthetic_war.save_parquet_and_json(src, filename="war")
+
+            eager_dst = tmp / "eager"
+            war_eager = WindowAnalysisResult.load_parquet_and_json(folder_path=src)
+            war_eager = war_eager.apply_filters(filter_config=config, min_valid_channels=2)
+            war_eager.save_parquet_and_json(eager_dst, filename="war")
+
+            lazy_dst = tmp / "lazy"
+            war_lazy = WindowAnalysisResult.scan_parquet_and_json(src, filename="war")
+            war_lazy.apply_filters(filter_config=config, min_valid_channels=2)
+            war_lazy.save_parquet_and_json(lazy_dst, filename="war", batch_size=10)
+
+            re_eager = WindowAnalysisResult.load_parquet_and_json(folder_path=eager_dst)
+            re_lazy = WindowAnalysisResult.load_parquet_and_json(folder_path=lazy_dst)
+            assert len(re_eager.result) == len(re_lazy.result)
+            for col in re_eager.result.columns:
+                assert self._columns_match(re_eager.result, re_lazy.result, col), (
+                    f"Column {col} differs between eager and lazy"
+                )
+
+    def test_lazy_apply_filters_with_logrms_range(self, lazy_synthetic_war):
+        """Cross-row logrms_range path produces equivalent output."""
+        config = {
+            "logrms_range": {"z_range": 2},
+            "high_rms": {"max_rms": 500},
+        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            src = tmp / "src"
+            src.mkdir()
+            lazy_synthetic_war.save_parquet_and_json(src, filename="war")
+
+            eager_dst = tmp / "eager"
+            war_eager = WindowAnalysisResult.load_parquet_and_json(folder_path=src)
+            war_eager = war_eager.apply_filters(filter_config=config, min_valid_channels=2)
+            war_eager.save_parquet_and_json(eager_dst, filename="war")
+
+            lazy_dst = tmp / "lazy"
+            war_lazy = WindowAnalysisResult.scan_parquet_and_json(src, filename="war")
+            war_lazy.apply_filters(filter_config=config, min_valid_channels=2)
+            war_lazy.save_parquet_and_json(lazy_dst, filename="war", batch_size=10)
+
+            re_eager = WindowAnalysisResult.load_parquet_and_json(folder_path=eager_dst)
+            re_lazy = WindowAnalysisResult.load_parquet_and_json(folder_path=lazy_dst)
+            assert len(re_eager.result) == len(re_lazy.result)
+            for col in re_eager.result.columns:
+                assert self._columns_match(re_eager.result, re_lazy.result, col), (
+                    f"Column {col} differs between eager and lazy"
+                )
+
+    def test_lazy_aggregate_time_windows_animalday_isday(self, lazy_synthetic_war):
+        """Lazy aggregate_time_windows by (animalday, isday) matches eager."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            src = tmp / "src"
+            src.mkdir()
+            lazy_synthetic_war.save_parquet_and_json(src, filename="war")
+
+            eager_dst = tmp / "eager"
+            war_eager = WindowAnalysisResult.load_parquet_and_json(folder_path=src)
+            war_eager.aggregate_time_windows(groupby=["animalday", "isday"])
+            war_eager.save_parquet_and_json(eager_dst, filename="war")
+
+            lazy_dst = tmp / "lazy"
+            war_lazy = WindowAnalysisResult.scan_parquet_and_json(src, filename="war")
+            war_lazy.aggregate_time_windows(groupby=["animalday", "isday"])
+            war_lazy.save_parquet_and_json(lazy_dst, filename="war", batch_size=10)
+
+            re_eager = WindowAnalysisResult.load_parquet_and_json(folder_path=eager_dst)
+            re_lazy = WindowAnalysisResult.load_parquet_and_json(folder_path=lazy_dst)
+            assert len(re_eager.result) == len(re_lazy.result)
+            # Sort both by groupby keys so row order doesn't matter.
+            keys = ["animalday", "isday"]
+            re_eager_df = re_eager.result.sort_values(keys).reset_index(drop=True)
+            re_lazy_df = re_lazy.result.sort_values(keys).reset_index(drop=True)
+            common = [c for c in re_eager_df.columns if c in re_lazy_df.columns]
+            for col in common:
+                assert self._columns_match(re_eager_df, re_lazy_df, col, rtol=1e-6, atol=1e-6), (
+                    f"Aggregated column {col} differs between eager and lazy"
+                )
+
+    def test_lazy_apply_filters_peak_memory_below_eager(self, lazy_synthetic_war):
+        """apply_filters streaming peak < 50% eager AND < 5× parquet."""
+        import tracemalloc
+
+        config = {
+            "logrms_range": {"z_range": 3},
+            "high_rms": {"max_rms": 500},
+            "low_rms": {"min_rms": 10},
+        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            src = tmp / "src"
+            src.mkdir()
+            lazy_synthetic_war.save_parquet_and_json(src, filename="war")
+            pq_size = (src / "war.parquet").stat().st_size
+
+            tracemalloc.start()
+            lazy_dst = tmp / "lazy"
+            war_lazy = WindowAnalysisResult.scan_parquet_and_json(src, filename="war")
+            war_lazy.apply_filters(filter_config=config, min_valid_channels=2)
+            war_lazy.save_parquet_and_json(lazy_dst, filename="war", batch_size=10)
+            _, lazy_peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+
+            tracemalloc.start()
+            eager_dst = tmp / "eager"
+            war_eager = WindowAnalysisResult.load_parquet_and_json(folder_path=src)
+            war_eager = war_eager.apply_filters(filter_config=config, min_valid_channels=2)
+            war_eager.save_parquet_and_json(eager_dst, filename="war")
+            _, eager_peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+
+            ratio = lazy_peak / eager_peak
+            assert ratio < 0.5, (
+                f"lazy apply_filters peak {lazy_peak/1e6:.2f} MB is {ratio:.0%} of "
+                f"eager peak {eager_peak/1e6:.2f} MB — expected < 50%"
+            )
+            assert lazy_peak < 5 * pq_size, (
+                f"lazy peak {lazy_peak/1e6:.2f} MB exceeds 5× parquet "
+                f"({pq_size/1e6:.2f} MB)"
+            )
+
+    def test_lazy_aggregate_raises_on_non_constant_column(self, lazy_synthetic_war):
+        """Same non-constant-column guard as eager aggregate_time_windows."""
+        # Inject a non-constant value in a normally-constant column.
+        lazy_synthetic_war.result.loc[0, "genotype"] = "MUT"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            src = tmp / "src"
+            src.mkdir()
+            lazy_synthetic_war.save_parquet_and_json(src, filename="war")
+
+            war_lazy = WindowAnalysisResult.scan_parquet_and_json(src, filename="war")
+            war_lazy.aggregate_time_windows(groupby=["animalday", "isday"])
+            with pytest.raises(ValueError, match="not constant"):
+                war_lazy.save_parquet_and_json(tmp / "lazy", filename="war", batch_size=10)
+
+    def test_scan_does_not_materialize_dataframe(self, lazy_synthetic_war):
+        """``scan_parquet_and_json`` reads JSON + parquet schema only — no DataFrame load.
+
+        Regression guard: opening a lazy WAR must NOT pull row data from
+        parquet.  Asserts the scan peak is a small fraction of the eager
+        ``load_parquet_and_json`` peak — the eager path materialises the
+        full DataFrame so any future regression that pulled rows into the
+        scan path would push the ratio toward 1.0.
+        """
+        import tracemalloc
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            src = tmp / "src"
+            src.mkdir()
+            lazy_synthetic_war.save_parquet_and_json(src, filename="war")
+
+            tracemalloc.start()
+            war_lazy = WindowAnalysisResult.scan_parquet_and_json(src, filename="war")
+            # Touch every read-only accessor to be sure none of them lazily load row data.
+            _ = war_lazy.animal_id
+            _ = war_lazy.channel_names
+            _ = war_lazy.channel_abbrevs
+            _ = war_lazy.metadata
+            _ = war_lazy.lof_scores_dict
+            _ = war_lazy.bad_channels_dict
+            _, scan_peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+
+            tracemalloc.start()
+            _ = WindowAnalysisResult.load_parquet_and_json(folder_path=src)
+            _, eager_peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+
+            ratio = scan_peak / eager_peak
+            assert ratio < 0.5, (
+                f"scan peak {scan_peak/1e6:.2f} MB is {ratio:.0%} of eager-load "
+                f"peak {eager_peak/1e6:.2f} MB — DataFrame was likely materialised"
+            )
+
+    def test_lazy_metadata_accessors_match_eager(self, lazy_synthetic_war):
+        """LazyWAR property accessors return the same values as the eager WAR's attrs."""
+        # Seed some metadata-rich state so the comparison is meaningful.
+        lazy_synthetic_war.bad_channels_dict = {
+            "A1_20230101": ["LMot"],
+            "A1_20230102": ["RMot"],
+        }
+        # Provide LOF entries for every animalday in the fixture so the eager
+        # constructor's auto-fill ("Added missing animalday to lof_scores_dict")
+        # doesn't add empty entries that aren't in the on-disk JSON.
+        lazy_synthetic_war.lof_scores_dict = {
+            "A1_20230101": {
+                "lof_scores": [1.0, 1.5, 0.9, 2.1],
+                "channel_names": ["LMot", "RMot", "LBar", "RBar"],
+            },
+            "A1_20230102": {
+                "lof_scores": [0.8, 1.7, 1.2, 1.0],
+                "channel_names": ["LMot", "RMot", "LBar", "RBar"],
+            },
+        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            src = tmp / "src"
+            src.mkdir()
+            lazy_synthetic_war.save_parquet_and_json(src, filename="war")
+
+            eager = WindowAnalysisResult.load_parquet_and_json(folder_path=src)
+            lazy = WindowAnalysisResult.scan_parquet_and_json(src, filename="war")
+
+            assert lazy.animal_id == eager.animal_id
+            assert lazy.channel_names == eager.channel_names
+            assert lazy.channel_abbrevs == eager.channel_abbrevs
+            assert lazy.bad_channels_dict == eager.bad_channels_dict
+            assert lazy.lof_scores_dict == eager.lof_scores_dict
+
+    def test_lazy_get_bad_channels_by_lof_threshold_matches_eager(self, lazy_synthetic_war):
+        """LOF threshold resolution from JSON metadata equals the eager path."""
+        lazy_synthetic_war.lof_scores_dict = {
+            "A1_20230101": {
+                "lof_scores": [1.0, 1.8, 0.9, 2.1],
+                "channel_names": ["LMot", "RMot", "LBar", "RBar"],
+            },
+            "A1_20230102": {
+                "lof_scores": [2.5, 1.0, 1.1, 0.8],
+                "channel_names": ["LMot", "RMot", "LBar", "RBar"],
+            },
+        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            src = tmp / "src"
+            src.mkdir()
+            lazy_synthetic_war.save_parquet_and_json(src, filename="war")
+
+            eager = WindowAnalysisResult.load_parquet_and_json(folder_path=src)
+            lazy = WindowAnalysisResult.scan_parquet_and_json(src, filename="war")
+
+            assert lazy.get_bad_channels_by_lof_threshold(1.5) == eager.get_bad_channels_by_lof_threshold(1.5)
+
+    def test_lazy_chain_reorder_hash_filter(self, lazy_synthetic_war):
+        """A multi-transform chain (reorder + add_unique_hash + apply_filters)
+        produces the same output as the equivalent eager pipeline.
+        """
+        target = ["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"]
+        config = {"high_rms": {"max_rms": 500}}
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            src = tmp / "src"
+            src.mkdir()
+            lazy_synthetic_war.save_parquet_and_json(src, filename="war")
+
+            # Eager: load → reorder → add_unique_hash → apply_filters → save
+            eager_dst = tmp / "eager"
+            war_eager = WindowAnalysisResult.load_parquet_and_json(folder_path=src)
+            war_eager.reorder_and_pad_channels(target, use_abbrevs=True)
+            # Force a deterministic hash so the comparison is reproducible.
+            import secrets as _sec
+            _orig_token_hex = _sec.token_hex
+            _sec.token_hex = lambda n=None: "deadbeef"
+            try:
+                war_eager.add_unique_hash(4)
+                war_eager = war_eager.apply_filters(filter_config=config, min_valid_channels=2)
+                war_eager.save_parquet_and_json(eager_dst, filename="war")
+
+                # Lazy: same chain via the streaming engine
+                lazy_dst = tmp / "lazy"
+                war_lazy = WindowAnalysisResult.scan_parquet_and_json(src, filename="war")
+                war_lazy.reorder_and_pad_channels(target, use_abbrevs=True)
+                war_lazy.add_unique_hash(4)
+                war_lazy.apply_filters(filter_config=config, min_valid_channels=2)
+                war_lazy.save_parquet_and_json(lazy_dst, filename="war", batch_size=10)
+            finally:
+                _sec.token_hex = _orig_token_hex
+
+            re_eager = WindowAnalysisResult.load_parquet_and_json(folder_path=eager_dst)
+            re_lazy = WindowAnalysisResult.load_parquet_and_json(folder_path=lazy_dst)
+            assert re_eager.animal_id == re_lazy.animal_id
+            assert re_eager.channel_names == re_lazy.channel_names
+            assert len(re_eager.result) == len(re_lazy.result)
+            for col in re_eager.result.columns:
+                assert self._columns_match(re_eager.result, re_lazy.result, col), (
+                    f"Column {col} differs between eager and lazy"
+                )
+
+    def test_lazy_save_metadata_round_trip(self, lazy_synthetic_war):
+        """JSON sidecar after lazy save preserves every metadata field a
+        downstream rule depends on (animal_id, channel_names, lof_scores_dict,
+        bad_channels_dict, assume_from_number).
+        """
+        lazy_synthetic_war.bad_channels_dict = {
+            "A1_20230101": ["LMot"],
+            "A1_20230102": ["RMot"],
+        }
+        lazy_synthetic_war.lof_scores_dict = {
+            "A1_20230101": {
+                "lof_scores": [1.0, 1.5, 0.9, 2.1],
+                "channel_names": ["LMot", "RMot", "LBar", "RBar"],
+            }
+        }
+        target = ["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            src = tmp / "src"
+            src.mkdir()
+            lazy_synthetic_war.save_parquet_and_json(src, filename="war")
+
+            war_lazy = WindowAnalysisResult.scan_parquet_and_json(src, filename="war")
+            war_lazy.reorder_and_pad_channels(target, use_abbrevs=True)
+            war_lazy.save_parquet_and_json(tmp / "out", filename="war", batch_size=10)
+
+            out_meta = json.loads((tmp / "out" / "war.json").read_text())
+            # Reorder updates channel_names; non-touched fields propagate unchanged.
+            assert out_meta["channel_names"] == target
+            assert out_meta["animal_id"] == "A1"
+            assert out_meta["lof_scores_dict"] == lazy_synthetic_war.lof_scores_dict
+            assert out_meta["bad_channels_dict"] == lazy_synthetic_war.bad_channels_dict
+            # assume_from_number must be preserved (regression guard for the LOF
+            # channel-filter chain on raw-named channels like ``D-015``).
+            assert out_meta["assume_from_number"] == lazy_synthetic_war.assume_from_number
 
 
 class TestTimestampHandling:

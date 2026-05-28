@@ -316,25 +316,23 @@ class TestGetFilterHighBeta:
     def test_psdband_psdtotal_fallback(self):
         """Lines 3000-3004: use psdband+psdtotal when psdfrac absent."""
         war = make_war()
-        df = war.result.copy()
         n_ch = len(war.channel_names)
-        if "psdfrac" in df.columns:
-            df = df.drop(columns=["psdfrac"])
+        if "psdfrac" in war.result.columns:
+            war.result = war.result.drop(columns=["psdfrac"])
         # beta=0.3, total=1.0 -> proportion=0.3, which is below max_beta_prop=0.4
-        df["psdband"] = [{"beta": np.array([0.3] * n_ch)}] * len(df)
-        df["psdtotal"] = [np.array([1.0] * n_ch)] * len(df)
-        result = war.get_filter_high_beta(df=df)
-        assert result.shape[0] == len(df)
+        war.result["psdband"] = [{"beta": np.array([0.3] * n_ch)}] * len(war.result)
+        war.result["psdtotal"] = [np.array([1.0] * n_ch)] * len(war.result)
+        result = war.get_filter_high_beta()
+        assert result.shape[0] == len(war.result)
         # All windows should pass (0.3 < 0.4 threshold)
         assert result.all(), "All windows should pass with beta proportion 0.3 < 0.4"
 
     def test_missing_psd_features_raises(self):
         """Lines 3005-3008: missing both psdfrac and psdband raises."""
         war = make_war()
-        df = war.result.copy()
-        df = df.drop(columns=["psdfrac", "psdband", "psdtotal"], errors="ignore")
+        war.result = war.result.drop(columns=["psdfrac", "psdband", "psdtotal"], errors="ignore")
         with pytest.raises(ValueError, match="psdfrac or psdband"):
-            war.get_filter_high_beta(df=df)
+            war.get_filter_high_beta()
 
 
 # =========================================================================
@@ -384,13 +382,17 @@ class TestMorphologicalSmoothing:
 class TestFilterAll:
 
     def test_morphological_smoothing_missing_duration_raises(self):
-        """Lines 3313-3316: missing duration column raises ValueError."""
+        """Morphological smoothing requires a 'duration' column; raises if missing."""
         war = make_war(include_duration=False)
-        # Provide a trivial filter so the main filter loop works
-        trivial_filter = lambda df=None, **kw: np.ones((len(war.result), len(war.channel_names)), dtype=bool)
-        trivial_filter.__name__ = "trivial"
+        # Use apply_filters with a single MASK_POST filter so the missing-duration
+        # check fires before any per-row filter needs rms/psd data.
         with pytest.raises(ValueError, match="duration"):
-            war.filter_all(filters=[trivial_filter], morphological_smoothing_seconds=10.0)
+            war.apply_filters(
+                filter_config={
+                    "morphological_smoothing": {"smoothing_seconds": 10.0},
+                },
+                min_valid_channels=0,
+            )
 
     def test_default_all_true_when_no_filters_in_apply_filters(self):
         """Line 3568: empty filter list produces all-True mask."""

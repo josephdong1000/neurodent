@@ -667,15 +667,11 @@ class TestPipelineContinuation:
             eager_war.reorder_and_pad_channels(target_channels, use_abbrevs=True)
             eager_war.save_parquet_and_json(eager_dst, filename="war")
 
-            # Streaming: do it via the production entry point in one shot.
+            # Streaming: scan_parquet_and_json → reorder → save chain (production path).
             stream_dst = tmp / "stream"
-            WindowAnalysisResult.stream_reorder_and_pad_to_parquet(
-                src_folder=src,
-                dst_folder=stream_dst,
-                target_channels=target_channels,
-                use_abbrevs=True,
-                batch_size=4,  # multi-batch on a small WAR
-            )
+            stream_war = WindowAnalysisResult.scan_parquet_and_json(src, filename="war")
+            stream_war.reorder_and_pad_channels(target_channels, use_abbrevs=True)
+            stream_war.save_parquet_and_json(stream_dst, filename="war", batch_size=4)
 
             eager_re = WindowAnalysisResult.load_parquet_and_json(folder_path=eager_dst)
             stream_re = WindowAnalysisResult.load_parquet_and_json(folder_path=stream_dst)
