@@ -26,7 +26,6 @@ def main():
     # Get parameters from snakemake
     input_war_dir = Path(snakemake.input.war_parquet).parent
     war_parquet_name = Path(snakemake.input.war_parquet).name
-    war_json_name = Path(snakemake.input.war_json).name
     output_war_parquet = snakemake.output.war_parquet
     config = snakemake.params.config
     samples_config = snakemake.params.samples_config
@@ -43,17 +42,18 @@ def main():
     logger.info(f"Using groupby parameters: {groupby_params}")
 
     try:
-        # Load the filtered WAR
-        logger.info(f"Loading WAR from: {input_war_dir}")
-        war = visualization.WindowAnalysisResult.load_parquet_and_json(
-            folder_path=input_war_dir, parquet_name=war_parquet_name, json_name=war_json_name
+        src_filename = Path(war_parquet_name).stem
+        dst_filename = Path(output_war_parquet).stem
+        logger.info(
+            f"Stream-flattening: {input_war_dir} -> {Path(output_war_parquet).parent}"
         )
-
-        # Aggregate time windows using configurable groupby
+        war = visualization.WindowAnalysisResult.scan_parquet_and_json(
+            input_war_dir, filename=src_filename
+        )
         war.aggregate_time_windows(groupby=groupby_params)
-
-        # Save aggregated WAR as parquet and json
-        war.save_parquet_and_json(Path(output_war_parquet).parent)
+        war.save_parquet_and_json(
+            Path(output_war_parquet).parent, filename=dst_filename
+        )
 
         logger.info(f"Successfully aggregated and saved {animal_name}")
 

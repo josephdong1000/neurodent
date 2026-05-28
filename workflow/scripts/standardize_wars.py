@@ -75,23 +75,20 @@ def main():
         logger.info(f"Unique hash length: {unique_hash_length}")
 
     try:
-        # Load the quality-filtered WAR
-        logger.info(f"Loading WAR from: {input_war_dir}")
-        war = visualization.WindowAnalysisResult.load_parquet_and_json(
-            folder_path=input_war_dir, parquet_name=war_parquet_name, json_name=war_json_name
+        src_filename = Path(war_parquet_name).stem
+        dst_filename = Path(output_war_parquet).stem
+        logger.info(
+            f"Stream-standardising WAR: {input_war_dir} -> {Path(output_war_parquet).parent}"
         )
-
-        # Apply channel standardization for all downstream steps
-        logger.info("Applying channel reordering and padding")
+        war = visualization.WindowAnalysisResult.scan_parquet_and_json(
+            input_war_dir, filename=src_filename
+        )
         war.reorder_and_pad_channels(channel_reorder, use_abbrevs=use_abbrevs)
-
-        # Add unique hash if requested
         if add_unique_hash:
-            logger.info(f"Adding unique hash with length {unique_hash_length}")
             war.add_unique_hash(unique_hash_length)
-
-        # Save preprocessed WAR as parquet and json
-        war.save_parquet_and_json(Path(output_war_parquet).parent)
+        war.save_parquet_and_json(
+            Path(output_war_parquet).parent, filename=dst_filename
+        )
 
         logger.info(f"Successfully standardized and saved {animal_name}")
 
