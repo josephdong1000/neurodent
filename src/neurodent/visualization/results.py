@@ -3158,6 +3158,22 @@ class WindowAnalysisResult(AnimalFeatureParser):
             assume_from_number=self.assume_from_number,
         )
 
+    @property
+    def path_safe_animal_id(self) -> str:
+        """Slugified :attr:`animal_id` for filesystem paths.
+
+        Use this property whenever building a ``Path`` or filename component
+        from the animal id.  ``animal_id`` itself stays in its display form
+        (which may contain ``/``, ``;``, spaces) for logs and plot labels;
+        ``slugify`` is applied here so callers don't have to remember.
+        """
+        return slugify(self.animal_id)
+
+    @property
+    def path_safe_animaldays(self) -> list[str]:
+        """Slugified :attr:`animaldays` for filesystem paths."""
+        return [slugify(ad) for ad in self.animaldays]
+
     def get_filter_logrms_range(self, *, z_range=3, **kwargs):
         """Filter windows based on log(rms).
 

@@ -11,6 +11,7 @@ from scipy.stats import gzscore, linregress, zscore
 
 from ... import constants
 from ... import visualization as viz
+from ...core.utils import slugify
 from ..feature_utils import (
     flatten_feature_for_plotting,
     extract_feature,
@@ -1018,10 +1019,15 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         if self.save_fig:
             if self.save_path is None:
                 raise ValueError("save_path must be provided when save_fig is True")
-            if title:
-                save_name = f"{self.save_path}_{title}.png"
-            else:
-                save_name = f"{self.save_path}.png"
+            # Defensive sanitize: titles often embed animaldays/genotypes that
+            # contain characters like '/' (valid display, invalid path).  See
+            # `slugify` docstring for the project-wide path-safety convention.
+            safe_title = slugify(title) if title else None
+            save_name = (
+                f"{self.save_path}_{safe_title}.png"
+                if safe_title
+                else f"{self.save_path}.png"
+            )
             fig.savefig(save_name, bbox_inches="tight", dpi=300)
             plt.close(fig)
         else:

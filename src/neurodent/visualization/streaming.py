@@ -37,7 +37,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from .. import constants
-from ..core.utils import abbreviate_channel_names
+from ..core.utils import abbreviate_channel_names, slugify
 from .feature_handlers import handler_for
 from .filters import (
     FILTER_REGISTRY,
@@ -447,6 +447,14 @@ class LazyWindowAnalysisResult:
     @property
     def animal_id(self) -> str:
         return self._metadata.get("animal_id", "") or ""
+
+    @property
+    def path_safe_animal_id(self) -> str:
+        """Slugified :attr:`animal_id` for filesystem paths.
+
+        See :attr:`WindowAnalysisResult.path_safe_animal_id`.
+        """
+        return slugify(self.animal_id)
 
     @property
     def channel_names(self) -> list[str]:

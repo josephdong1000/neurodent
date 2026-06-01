@@ -18,7 +18,6 @@ from pathlib import Path
 from dask.distributed import Client, LocalCluster
 
 from neurodent import constants, core, visualization
-from neurodent.core.utils import slugify
 from neurodent.workflow import setup_snakemake_logging, inject_config_aliases
 from neurodent.workflow.utils import apply_path_overrides, resolve_animal_pattern, get_discovery_animal_filter
 
@@ -290,12 +289,13 @@ def main():
     fdsar_export_chunk_duration_s = fdsar_config.get("export_chunk_duration_s", 60)
 
     for fdsar in fdsar_list:
-        # Create subdirectory for this animalday. Slugify: genotype may contain
-        # "/" (e.g. "Arx(F/y); Rosa(+/wt)"), which would break path construction.
-        animalday_dir = fdsar_base_dir / slugify(f"{fdsar.animal_id}-{fdsar.genotype}-{fdsar.animal_day}")
+        # path_safe_save_stem returns slugified ``{animal_id}-{genotype}-{animal_day}``
+        # so genotypes containing "/" (e.g. ``Arx(F/y); Rosa(+/wt)``) can't break
+        # path construction.  See ``slugify`` for the convention.
+        animalday_dir = fdsar_base_dir / fdsar.path_safe_save_stem
         animalday_dir.mkdir(parents=True, exist_ok=True)
 
-        fdsar.save_fif_and_json(animalday_dir, convert_to_mne=True, slugify_filebase=True, overwrite=True, chunk_duration_s=fdsar_export_chunk_duration_s)
+        fdsar.save_fif_and_json(animalday_dir, convert_to_mne=True, overwrite=True, chunk_duration_s=fdsar_export_chunk_duration_s)
         logger.info(f"Saved FDSAR for {fdsar.animal_id} {fdsar.animal_day} to {animalday_dir}")
         fdsar.result_sas = None  # Release memmap-backed recording references
 

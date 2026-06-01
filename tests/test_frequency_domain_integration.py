@@ -234,19 +234,13 @@ class TestFrequencyDomainSpikeDetectionIntegration:
             fdsar = fdsar_default[0]
             save_dir = tmp_path / "test_save"
 
-            # Save without slugifying to match test expectations
             with warnings.catch_warnings():
                 warnings.filterwarnings("ignore", category=RuntimeWarning)
-                fdsar.save_fif_and_json(save_dir, slugify_filebase=False)
+                fdsar.save_fif_and_json(save_dir)
 
-            # Verify files exist
-            assert (
-                save_dir / f"{fdsar.animal_id}-{fdsar.genotype}-{fdsar.animal_day}.json"
-            ).exists()
-            assert (
-                save_dir
-                / f"{fdsar.animal_id}-{fdsar.genotype}-{fdsar.animal_day}-raw.fif"
-            ).exists()
+            # File names use the canonical path-safe stem (the unsafe branch was removed).
+            assert (save_dir / f"{fdsar.path_safe_save_stem}.json").exists()
+            assert (save_dir / f"{fdsar.path_safe_save_stem}-raw.fif").exists()
 
             # Load
             with warnings.catch_warnings():
