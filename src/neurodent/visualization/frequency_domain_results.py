@@ -26,7 +26,7 @@ except ImportError:  # pragma: no cover
 
 from .. import core
 from ..core.utils import abbreviate_channel_names, slugify
-from .results import AnimalFeatureParser
+from .feature_parser import AnimalFeatureParser
 
 
 class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
