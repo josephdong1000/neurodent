@@ -176,14 +176,19 @@ def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
             p.save(output_dir / f"{feature}.{figure_format}", bbox_inches="tight", dpi=dpi)
 
         elif ftype.is_dict_stored:
-            # By band plot
+            # By band plot — explicit Nominal(order=BAND_NAMES) on x because
+            # seaborn-objects' Dodge/Jitter/Est can drop pd.Categorical order.
+            # See ExperimentPlotter.band_scale docstring.
             p1 = (
                 so.Plot(df, x="band", y=feature, color="gene", marker="sex")
                 .facet(col="isday")
                 .add(so.Dash(color="k"), so.Agg(), so.Dodge())
                 .add(so.Range(color="k"), so.Est(errorbar="sd"), so.Dodge())
                 .add(so.Dot(), so.Dodge(), so.Jitter(0.75, seed=42))
-                .scale(marker=build_sex_marker_scale(df, plot_lib=so))
+                .scale(
+                    x=visualization.ExperimentPlotter.band_scale(plot_lib=so),
+                    marker=build_sex_marker_scale(df, plot_lib=so),
+                )
                 .theme(
                     axes_style("ticks")
                     | sns.plotting_context("notebook")
@@ -195,13 +200,15 @@ def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
             )
             p1.save(output_dir / f"byband-{feature}.{figure_format}", bbox_inches="tight", dpi=dpi)
 
-            # By genotype plot
+            # By genotype plot — same Nominal(order=...) treatment for the
+            # band-as-colour mapping so the legend reads in canonical order.
             p2 = (
                 so.Plot(df, x="gene", y=feature, color="band", marker="sex")
                 .facet(col="isday")
                 .add(so.Dash(color="k"), so.Agg(), so.Dodge())
                 .add(so.Range(color="k"), so.Est(errorbar="sd"), so.Dodge())
                 .add(so.Dot(), so.Dodge(), so.Jitter(0.75, seed=42))
+                .scale(color=visualization.ExperimentPlotter.band_scale(plot_lib=so))
                 .theme(
                     axes_style("ticks")
                     | sns.plotting_context("notebook")

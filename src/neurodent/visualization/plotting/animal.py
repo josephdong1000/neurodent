@@ -299,7 +299,15 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                 f"Unsupported FeatureType {ftype} for feature extraction: {feature}"
             )
 
-        data_X, _keys = extract_feature(group[feature], ftype)
+        data_X, keys = extract_feature(group[feature], ftype)
+
+        if keys is not None and list(keys) != list(constants.BAND_NAMES):
+            raise AssertionError(
+                f"BAND extraction for feature {feature!r} returned non-canonical "
+                f"band order {list(keys)!r}; expected {list(constants.BAND_NAMES)!r}. "
+                f"AnimalPlotter's BAND tick labels assume canonical order — "
+                f"fix the upstream extraction, not this assertion."
+            )
 
         data_X = flatten_feature_for_plotting(data_X, ftype, triag=triag)
 
