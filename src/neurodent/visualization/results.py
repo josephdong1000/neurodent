@@ -3686,7 +3686,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
         existing_meta = table.schema.metadata or {}
         merged_meta = {**existing_meta, b"neurodent": neurodent_meta}
         table = table.replace_schema_metadata(merged_meta)
-        pq.write_table(table, filepath + ".parquet")
+        pq.write_table(
+            table, filepath + ".parquet", compression="zstd", compression_level=4
+        )
         del table
         logging.info(f"Saved WAR to {filepath + '.parquet'}")
 

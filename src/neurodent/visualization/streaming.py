@@ -604,7 +604,9 @@ class LazyWindowAnalysisResult:
                     {"encoded_columns": out_encoded_cols, "encoding_version": 2}
                 ).encode()
                 target_schema = table.schema.with_metadata({b"neurodent": out_meta})
-                writer = pq.ParquetWriter(dst_parquet, target_schema)
+                writer = pq.ParquetWriter(
+                    dst_parquet, target_schema, compression="zstd", compression_level=4
+                )
                 table = table.replace_schema_metadata({b"neurodent": out_meta})
             else:
                 # Re-stamp metadata on subsequent batches (cast if pyarrow inferred a slightly different schema).
@@ -630,7 +632,9 @@ class LazyWindowAnalysisResult:
             existing_meta = table.schema.metadata or {}
             merged_meta = {**existing_meta, b"neurodent": out_meta}
             table = table.replace_schema_metadata(merged_meta)
-            pq.write_table(table, dst_parquet)
+            pq.write_table(
+                table, dst_parquet, compression="zstd", compression_level=4
+            )
         elif writer is not None:
             writer.close()
 
