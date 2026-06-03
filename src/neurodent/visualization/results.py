@@ -3773,9 +3773,30 @@ class WindowAnalysisResult(AnimalFeatureParser):
         return v
 
     @staticmethod
+    def _canonicalise_band_dict(d: dict) -> dict:
+        """Reorder *d* by ``constants.BAND_NAMES`` when it has any band-name keys.
+
+        Pyarrow alphabetises struct fields on the read side of a parquet
+        round-trip (``Table.to_pandas()``), so canonical-order band dicts
+        written to disk come back as ``{"alpha", "beta", "delta", "gamma",
+        "theta"}``. Best-fit reorder: any band-name keys present are
+        promoted to the front in canonical (FREQ_BANDS insertion) order,
+        any non-band keys are appended in their original order.
+        Idempotent — an already-canonical dict round-trips to itself.
+        Dicts with zero band-name overlap are returned unchanged.
+        """
+        band_set = set(constants.BAND_NAMES)
+        if not (set(d.keys()) & band_set):
+            return d
+        band_keys = [b for b in constants.BAND_NAMES if b in d]
+        other_keys = [k for k in d if k not in band_set]
+        return {**{b: d[b] for b in band_keys}, **{k: d[k] for k in other_keys}}
+
+    @staticmethod
     def _normalize_arrow_cell(v):
         """Convert pyarrow's ndarray-leafed cells back to plain Python lists,
-        and reconstruct ``_t0``/``_t1``/… structs as tuples.
+        reconstruct ``_t0``/``_t1``/… structs as tuples, and canonicalise
+        band-keyed dicts via :meth:`_canonicalise_band_dict`.
         """
         if isinstance(v, np.ndarray):
             if v.dtype == object:
@@ -3789,7 +3810,8 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 return tuple(
                     WindowAnalysisResult._normalize_arrow_cell(v[k]) for k in ordered
                 )
-            return {k: WindowAnalysisResult._normalize_arrow_cell(vv) for k, vv in v.items()}
+            decoded = {k: WindowAnalysisResult._normalize_arrow_cell(vv) for k, vv in v.items()}
+            return WindowAnalysisResult._canonicalise_band_dict(decoded)
         if isinstance(v, list):
             return [WindowAnalysisResult._normalize_arrow_cell(x) for x in v]
         return v

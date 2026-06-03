@@ -289,3 +289,310 @@ class TestExtractFeatureBandContract:
         ])
         _, keys = extract_feature(series, constants.FeatureType.BAND)
         assert list(keys) == list(constants.BAND_NAMES)
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Layer 5 — parquet-round-trip canonicalisation
+# ─────────────────────────────────────────────────────────────────────────
+#
+# The Layer-4 tests above all use in-memory dicts and miss the real bug:
+# pyarrow's struct→dict round-trip alphabetises field order on the read
+# side, so a canonical-order dict written to parquet comes back as
+# ``{"alpha", "beta", "delta", "gamma", "theta"}``.  The Layer-3 assertion
+# in AnimalPlotter caught this in production (arxrosa-2064: zcohere with
+# alphabetised keys triggered AssertionError during diagnostic_figures).
+# These tests exercise the FULL parquet round-trip and would have caught
+# that failure before it shipped.
+
+import tempfile
+from pathlib import Path
+
+import pyarrow as pa
+import pyarrow.parquet as pq
+
+
+_ALPHABETICAL_BAND_NAMES = sorted(constants.BAND_NAMES)  # alpha, beta, delta, gamma, theta
+
+
+def _make_band_war(
+    n_rows: int = 4,
+    n_chan: int = 2,
+    feature: str = "psdband",
+    band_order: list[str] | None = None,
+    extra_metadata: bool = True,
+) -> WindowAnalysisResult:
+    """Build a minimal WAR carrying one band-feature column.
+
+    Args:
+        feature: name of the band feature (must be in BAND_FEATURES or
+            BANDED_MATRIX_FEATURES).
+        band_order: which order to insert band keys into each per-row dict
+            (defaults to ``BAND_NAMES``).  Pass alphabetical to simulate
+            post-parquet state coming into a fresh WAR construction.
+    """
+    if band_order is None:
+        band_order = list(constants.BAND_NAMES)
+    rng = np.random.default_rng(0)
+    ftype = constants.classify_feature(feature)
+
+    if ftype is constants.FeatureType.BAND:
+        cells = [
+            {b: rng.random(n_chan).tolist() for b in band_order}
+            for _ in range(n_rows)
+        ]
+    elif ftype is constants.FeatureType.BANDED_MATRIX:
+        cells = [
+            {b: rng.random((n_chan, n_chan)).tolist() for b in band_order}
+            for _ in range(n_rows)
+        ]
+    else:
+        raise ValueError(f"Test fixture only handles band-keyed features, got {ftype}")
+
+    data: dict = {feature: cells, "duration": [3600.0] * n_rows}
+    if extra_metadata:
+        data["animal"] = ["A1"] * n_rows
+        data["animalday"] = ["A1 WT Jan-01-2026"] * n_rows
+        data["genotype"] = ["WT"] * n_rows
+        data["isday"] = [True, False] * (n_rows // 2)
+        data["timestamp"] = pd.date_range("2026-01-01", periods=n_rows, freq="1h")
+    return WindowAnalysisResult(
+        result=pd.DataFrame(data),
+        animal_id="A1",
+        genotype="WT",
+        sex="Male",
+        channel_names=["LMot", "RMot"][:n_chan],
+        suppress_short_interval_error=True,
+    )
+
+
+def _band_keys(cell: dict | list) -> list[str]:
+    """Extract band keys from a decoded cell (top-level dict, or any nested
+    dict whose keys are bands)."""
+    if isinstance(cell, dict):
+        return [k for k in cell if k in set(constants.BAND_NAMES)]
+    raise TypeError(f"Expected dict, got {type(cell).__name__}")
+
+
+class TestCanonicaliseBandDict:
+    """Unit tests for the ``_canonicalise_band_dict`` static method."""
+
+    def test_idempotent_on_canonical_input(self):
+        canonical = {b: i for i, b in enumerate(constants.BAND_NAMES)}
+        out = WindowAnalysisResult._canonicalise_band_dict(canonical)
+        assert list(out.keys()) == list(constants.BAND_NAMES)
+        assert out == canonical
+
+    def test_reorders_alphabetical_input(self):
+        # The exact failure mode from arxrosa-2064.
+        alphabetical = {b: i for i, b in enumerate(_ALPHABETICAL_BAND_NAMES)}
+        out = WindowAnalysisResult._canonicalise_band_dict(alphabetical)
+        assert list(out.keys()) == list(constants.BAND_NAMES)
+        # Values must still match their original band keys (no swap).
+        for b, v in alphabetical.items():
+            assert out[b] == v
+
+    @pytest.mark.parametrize(
+        "subset",
+        [
+            ["delta", "theta"],
+            ["alpha", "beta", "gamma"],
+            ["delta", "alpha", "gamma"],  # non-contiguous in canonical order
+            ["gamma"],                     # singleton
+            ["theta", "delta"],            # 2-element reverse
+        ],
+    )
+    def test_handles_subset(self, subset):
+        """Best-fit: even if dict has only some band keys, they should come
+        out in canonical (BAND_NAMES) order."""
+        # Insert in some non-canonical order.
+        d = {b: i for i, b in enumerate(reversed(subset))}
+        out = WindowAnalysisResult._canonicalise_band_dict(d)
+        expected_order = [b for b in constants.BAND_NAMES if b in subset]
+        assert list(out.keys()) == expected_order
+        assert out == d  # same content, just reordered
+
+    def test_preserves_non_band_keys_at_end(self):
+        d = {
+            "theta": 1,
+            "extra": "metadata",
+            "delta": 2,
+            "another": [1, 2, 3],
+        }
+        out = WindowAnalysisResult._canonicalise_band_dict(d)
+        keys = list(out.keys())
+        # Bands first in canonical order.
+        assert keys[: keys.index("extra")] == ["delta", "theta"]
+        # Non-band keys preserved in original order.
+        assert "extra" in keys and "another" in keys
+        assert keys.index("extra") < keys.index("another")
+
+    def test_leaves_pure_non_band_dict_alone(self):
+        d = {"foo": 1, "bar": 2, "baz": 3}
+        out = WindowAnalysisResult._canonicalise_band_dict(d)
+        assert out is d  # zero band overlap → return unchanged
+
+
+class TestNormalizeArrowCellBandCanonicalisation:
+    """Layer 5's hook into the decode path itself."""
+
+    def test_canonicalises_band_dict(self):
+        alphabetical = {b: float(i) for i, b in enumerate(_ALPHABETICAL_BAND_NAMES)}
+        out = WindowAnalysisResult._normalize_arrow_cell(alphabetical)
+        assert list(out.keys()) == list(constants.BAND_NAMES)
+
+    def test_canonicalises_nested_band_dict_in_list(self):
+        # A list of band dicts (the shape post-`.to_pandas()` for a band column).
+        cells = [{b: float(i) for i, b in enumerate(_ALPHABETICAL_BAND_NAMES)} for _ in range(3)]
+        out = WindowAnalysisResult._normalize_arrow_cell(cells)
+        for c in out:
+            assert list(c.keys()) == list(constants.BAND_NAMES)
+
+    def test_does_not_touch_tuple_encoded_dict(self):
+        """LINEAR_2D tuple-encoded dicts (``_t0``/``_t1``) must still come
+        back as tuples; canonicalisation only fires on band dicts."""
+        d = {"_t0": 1.5, "_t1": 2.5}
+        out = WindowAnalysisResult._normalize_arrow_cell(d)
+        assert isinstance(out, tuple)
+        assert out == (1.5, 2.5)
+
+
+class TestEagerParquetRoundTripBandOrder:
+    """Real save→load via ``save_parquet_and_json`` /
+    ``load_parquet_and_json``.  This is the path that broke arxrosa-2064.
+    """
+
+    @pytest.mark.parametrize(
+        "feature",
+        constants.BAND_FEATURES + constants.BANDED_MATRIX_FEATURES,
+    )
+    def test_all_band_features_roundtrip_canonical(self, feature, tmp_path):
+        """Exhaustive: every band-bearing feature in
+        ``BAND_FEATURES + BANDED_MATRIX_FEATURES`` must round-trip with
+        canonical key order."""
+        war = _make_band_war(feature=feature)
+        war.save_parquet_and_json(tmp_path, filename="war")
+        reloaded = WindowAnalysisResult.load_parquet_and_json(
+            folder_path=tmp_path, parquet_name="war.parquet", json_name="war.json"
+        )
+        for cell in reloaded.result[feature]:
+            assert _band_keys(cell) == list(constants.BAND_NAMES), (
+                f"{feature}: cell came back with non-canonical band order "
+                f"{list(cell.keys())!r}"
+            )
+
+    def test_canonical_input_survives_roundtrip(self, tmp_path):
+        """Pre-Layer-5 this FAILED (pyarrow alphabetises on read).  Post-
+        Layer-5, the decoder fixes it.  Belt-and-suspenders test against
+        future regressions."""
+        war = _make_band_war(feature="psdband", band_order=list(constants.BAND_NAMES))
+        war.save_parquet_and_json(tmp_path, filename="war")
+        reloaded = WindowAnalysisResult.load_parquet_and_json(
+            folder_path=tmp_path, parquet_name="war.parquet", json_name="war.json"
+        )
+        assert _band_keys(reloaded.result["psdband"].iloc[0]) == list(constants.BAND_NAMES)
+
+    def test_alphabetical_input_canonicalised_by_load(self, tmp_path):
+        """If a WAR was built with alphabetical band dicts (simulating
+        a value that's already in the wrong order before save), the load
+        path canonicalises it."""
+        war = _make_band_war(feature="psdband", band_order=_ALPHABETICAL_BAND_NAMES)
+        war.save_parquet_and_json(tmp_path, filename="war")
+        reloaded = WindowAnalysisResult.load_parquet_and_json(
+            folder_path=tmp_path, parquet_name="war.parquet", json_name="war.json"
+        )
+        assert _band_keys(reloaded.result["psdband"].iloc[0]) == list(constants.BAND_NAMES)
+
+
+class TestStreamingParquetRoundTripBandOrder:
+    """Same end-to-end guarantees for the
+    ``LazyWindowAnalysisResult.save_parquet_and_json`` streaming path."""
+
+    def test_streaming_passthrough_canonical(self, tmp_path):
+        """A no-transform scan→save chain emits canonical band cells."""
+        # Step 1: build a WAR and save eagerly so scan_parquet_and_json has
+        # something to read.
+        src_dir = tmp_path / "src"
+        src_dir.mkdir()
+        war = _make_band_war(feature="psdband")
+        war.save_parquet_and_json(src_dir, filename="war")
+
+        # Step 2: open lazily, save with no transforms → pass-through path.
+        dst_dir = tmp_path / "dst"
+        dst_dir.mkdir()
+        lazy = WindowAnalysisResult.scan_parquet_and_json(src_dir, filename="war")
+        lazy.save_parquet_and_json(dst_dir, filename="war")
+
+        # Step 3: load and inspect.
+        reloaded = WindowAnalysisResult.load_parquet_and_json(
+            folder_path=dst_dir, parquet_name="war.parquet", json_name="war.json"
+        )
+        for cell in reloaded.result["psdband"]:
+            assert _band_keys(cell) == list(constants.BAND_NAMES)
+
+
+class TestAnimalPlotterPostParquet:
+    """End-to-end regression: replicates the arxrosa-2064 failure shape.
+
+    Pre-Layer-5, ``plot_coherecorr_spectral`` on a parquet-loaded WAR
+    would raise AssertionError from the Layer-3 guard because the band
+    keys came back alphabetised.  Post-Layer-5, the decoder canonicalises
+    and the assertion is satisfied.
+    """
+
+    def test_get_linear_feature_no_assertion_after_parquet(self, tmp_path):
+        """Most surgical replica: build WAR with a BANDED_MATRIX feature,
+        round-trip via parquet, run AnimalPlotter.__get_linear_feature on
+        it — must not raise the Layer-3 AssertionError."""
+        war = _make_band_war(feature="zcohere", n_chan=2)
+        war.save_parquet_and_json(tmp_path, filename="war")
+        reloaded = WindowAnalysisResult.load_parquet_and_json(
+            folder_path=tmp_path, parquet_name="war.parquet", json_name="war.json"
+        )
+        plotter = AnimalPlotter(reloaded)
+        # Direct access to the mangled private name.
+        result = plotter._AnimalPlotter__get_linear_feature(
+            group=reloaded.result, feature="zcohere"
+        )
+        assert result is not None
+
+    def test_get_linear_feature_no_assertion_for_band(self, tmp_path):
+        """Same guarantee for plain BAND features (psdband)."""
+        war = _make_band_war(feature="psdband", n_chan=2)
+        war.save_parquet_and_json(tmp_path, filename="war")
+        reloaded = WindowAnalysisResult.load_parquet_and_json(
+            folder_path=tmp_path, parquet_name="war.parquet", json_name="war.json"
+        )
+        plotter = AnimalPlotter(reloaded)
+        result = plotter._AnimalPlotter__get_linear_feature(
+            group=reloaded.result, feature="psdband"
+        )
+        assert result is not None
+
+
+class TestPyarrowStructAlphabetisationBehaviour:
+    """Documents *why* Layer 5 exists.
+
+    Pyarrow ≥ 12 stores struct fields in deterministic alphabetical order
+    when converting a list of dicts to a struct array.  This test locks in
+    that assumption — if pyarrow ever changes (or our pyarrow version
+    behaves differently), the test fails and we can revisit Layer 5.
+    """
+
+    def test_pyarrow_struct_round_trip_alphabetises(self, tmp_path):
+        # Build a list of canonical-order dicts → pa.array → parquet → read back.
+        canonical_dicts = [
+            {b: float(i) for i, b in enumerate(constants.BAND_NAMES)}
+            for _ in range(3)
+        ]
+        table = pa.table({"x": pa.array(canonical_dicts)})
+        parquet_path = tmp_path / "raw.parquet"
+        pq.write_table(table, parquet_path, compression="zstd", compression_level=4)
+        loaded = pq.read_table(parquet_path).to_pandas()
+        observed_keys = list(loaded["x"].iloc[0].keys())
+        # If this assertion ever fails (i.e. pyarrow now preserves order),
+        # Layer 5 becomes redundant — keep it anyway for defence and delete
+        # this test.
+        assert observed_keys == _ALPHABETICAL_BAND_NAMES, (
+            f"pyarrow now preserves struct-field order: got {observed_keys!r}. "
+            f"Layer 5's reason-to-exist may no longer apply — review."
+        )
