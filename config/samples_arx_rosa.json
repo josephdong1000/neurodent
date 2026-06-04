@@ -3,33 +3,9 @@
     "_note_channels": "Channel structure varies by session:",
     "_note_edf": "EDF sessions: 32 total channels, split as 8 channels per animal across REF1/REF2/REF3/REF4 banks. 2-4 animals per folder; bank(s) not assigned to a listed animal are dead/floating or belong to untracked animals.",
     "_note_rhd": "RHD sessions: 128 total channels, 3 animals using ports A/B/C (32 channels each)",
-    "_note_brain_regions": "Brain region mappings follow the Marsh-lab Aud/Vis/Hip/Bar/Mot convention. EDF banks (REF1..4) hold 8 channels each: positions 1-4 = L_{Aud,Vis,Bar,Mot}, positions 5-8 = R_{Aud,Vis,Bar,Mot} (no Hip in EDF). RHD ports A/B/C use the standard 10 active IDs: 009/010/012/014/015 (L) and 016/017/019/021/022 (R). L/R hemisphere assignment within each EDF bank is provisional pending anatomy verification.",
+    "_note_brain_regions": "EDF: 8 positions per REF1..4 bank → 5 live + 3 dead. Live: pos 1 (LMot), pos 2 (RMot), pos 4 (LBar — historically 'parietal' in some lab spreadsheets; same cortical area), pos 5 (LHip), pos 6 (RHip). Dead: pos 3, 7, 8 (omitted from each animal's channels). Layout derived from the Becca-era 2014-cohort spreadsheet (animals 967/968/969); applied to 2015 and 2016 cohorts pending optical verification per cohort. RHD: 8 populated channels per port — Vis (D-010/021), Hip (D-012/019), Bar (D-014/017), Mot (D-015/016). Old D-009/022 ('Aud') were phantoms and have been dropped. The legacy NewMontage indices {11,13,15,16,17,18,20,22} are MATLAB row numbers; subtracting 1 gives the 0-indexed Intan labels above. Region labels are inferred (clean L→R mirror montage) and pending Almedia confirmation.",
     "CHNAME_ALIASES": {
-        "Aud": [
-            "EEG E1-REF1",
-            "EEG E5-REF1",
-            "EEG E9-REF2",
-            "EEG E13-REF2",
-            "EEG E17-REF3",
-            "EEG E21-REF3",
-            "EEG E25-REF4",
-            "EEG E29-REF4",
-            "A-009",
-            "A-022",
-            "B-009",
-            "B-022",
-            "C-009",
-            "C-022"
-        ],
         "Vis": [
-            "EEG E2-REF1",
-            "EEG E6-REF1",
-            "EEG E10-REF2",
-            "EEG E14-REF2",
-            "EEG E18-REF3",
-            "EEG E22-REF3",
-            "EEG E26-REF4",
-            "EEG E30-REF4",
             "A-010",
             "A-021",
             "B-010",
@@ -38,6 +14,14 @@
             "C-021"
         ],
         "Hip": [
+            "EEG E5-REF1",
+            "EEG E6-REF1",
+            "EEG E13-REF2",
+            "EEG E14-REF2",
+            "EEG E21-REF3",
+            "EEG E22-REF3",
+            "EEG E29-REF4",
+            "EEG E30-REF4",
             "A-012",
             "A-019",
             "B-012",
@@ -46,14 +30,10 @@
             "C-019"
         ],
         "Bar": [
-            "EEG E3-REF1",
-            "EEG E7-REF1",
-            "EEG E11-REF2",
-            "EEG E15-REF2",
-            "EEG E19-REF3",
-            "EEG E23-REF3",
-            "EEG E27-REF4",
-            "EEG E31-REF4",
+            "EEG E4-REF1",
+            "EEG E12-REF2",
+            "EEG E20-REF3",
+            "EEG E28-REF4",
             "A-014",
             "A-017",
             "B-014",
@@ -62,14 +42,14 @@
             "C-017"
         ],
         "Mot": [
-            "EEG E4-REF1",
-            "EEG E8-REF1",
-            "EEG E12-REF2",
-            "EEG E16-REF2",
-            "EEG E20-REF3",
-            "EEG E24-REF3",
-            "EEG E28-REF4",
-            "EEG E32-REF4",
+            "EEG E1-REF1",
+            "EEG E2-REF1",
+            "EEG E9-REF2",
+            "EEG E10-REF2",
+            "EEG E17-REF3",
+            "EEG E18-REF3",
+            "EEG E25-REF4",
+            "EEG E26-REF4",
             "A-015",
             "A-016",
             "B-015",
@@ -81,69 +61,51 @@
     "LR_ALIASES": {
         "L": [
             "EEG E1-REF1",
-            "EEG E2-REF1",
-            "EEG E3-REF1",
             "EEG E4-REF1",
+            "EEG E5-REF1",
             "EEG E9-REF2",
-            "EEG E10-REF2",
-            "EEG E11-REF2",
             "EEG E12-REF2",
+            "EEG E13-REF2",
             "EEG E17-REF3",
-            "EEG E18-REF3",
-            "EEG E19-REF3",
             "EEG E20-REF3",
+            "EEG E21-REF3",
             "EEG E25-REF4",
-            "EEG E26-REF4",
-            "EEG E27-REF4",
             "EEG E28-REF4",
-            "A-009",
+            "EEG E29-REF4",
             "A-010",
             "A-012",
             "A-014",
             "A-015",
-            "B-009",
             "B-010",
             "B-012",
             "B-014",
             "B-015",
-            "C-009",
             "C-010",
             "C-012",
             "C-014",
             "C-015"
         ],
         "R": [
-            "EEG E5-REF1",
+            "EEG E2-REF1",
             "EEG E6-REF1",
-            "EEG E7-REF1",
-            "EEG E8-REF1",
-            "EEG E13-REF2",
+            "EEG E10-REF2",
             "EEG E14-REF2",
-            "EEG E15-REF2",
-            "EEG E16-REF2",
-            "EEG E21-REF3",
+            "EEG E18-REF3",
             "EEG E22-REF3",
-            "EEG E23-REF3",
-            "EEG E24-REF3",
-            "EEG E29-REF4",
+            "EEG E26-REF4",
             "EEG E30-REF4",
-            "EEG E31-REF4",
-            "EEG E32-REF4",
             "A-016",
             "A-017",
             "A-019",
             "A-021",
-            "A-022",
             "B-016",
             "B-017",
             "B-019",
             "B-021",
-            "B-022",
             "C-016",
             "C-017",
             "C-019",
-            "C-021",
-            "C-022"
+            "C-021"
         ]
     },
     "animals": [
@@ -154,12 +116,9 @@
             "channels": [
                 "EEG E9-REF2",
                 "EEG E10-REF2",
-                "EEG E11-REF2",
                 "EEG E12-REF2",
                 "EEG E13-REF2",
-                "EEG E14-REF2",
-                "EEG E15-REF2",
-                "EEG E16-REF2"
+                "EEG E14-REF2"
             ],
             "group": "Arx Rosa 1017 1015",
             "manual_datetime": {
@@ -180,12 +139,9 @@
             "channels": [
                 "EEG E25-REF4",
                 "EEG E26-REF4",
-                "EEG E27-REF4",
                 "EEG E28-REF4",
                 "EEG E29-REF4",
-                "EEG E30-REF4",
-                "EEG E31-REF4",
-                "EEG E32-REF4"
+                "EEG E30-REF4"
             ],
             "group": "Arx Rosa 1017 1015",
             "manual_datetime": {
@@ -206,12 +162,9 @@
             "channels": [
                 "EEG E1-REF1",
                 "EEG E2-REF1",
-                "EEG E3-REF1",
                 "EEG E4-REF1",
                 "EEG E5-REF1",
-                "EEG E6-REF1",
-                "EEG E7-REF1",
-                "EEG E8-REF1"
+                "EEG E6-REF1"
             ],
             "group": "Arx Rosa 1199 1198 1211 1201",
             "manual_datetime": {
@@ -233,12 +186,9 @@
             "channels": [
                 "EEG E9-REF2",
                 "EEG E10-REF2",
-                "EEG E11-REF2",
                 "EEG E12-REF2",
                 "EEG E13-REF2",
-                "EEG E14-REF2",
-                "EEG E15-REF2",
-                "EEG E16-REF2"
+                "EEG E14-REF2"
             ],
             "group": "Arx Rosa 1199 1198 1211 1201",
             "manual_datetime": {
@@ -260,12 +210,9 @@
             "channels": [
                 "EEG E17-REF3",
                 "EEG E18-REF3",
-                "EEG E19-REF3",
                 "EEG E20-REF3",
                 "EEG E21-REF3",
-                "EEG E22-REF3",
-                "EEG E23-REF3",
-                "EEG E24-REF3"
+                "EEG E22-REF3"
             ],
             "group": "Arx Rosa 1199 1198 1211 1201",
             "manual_datetime": {
@@ -287,12 +234,9 @@
             "channels": [
                 "EEG E25-REF4",
                 "EEG E26-REF4",
-                "EEG E27-REF4",
                 "EEG E28-REF4",
                 "EEG E29-REF4",
-                "EEG E30-REF4",
-                "EEG E31-REF4",
-                "EEG E32-REF4"
+                "EEG E30-REF4"
             ],
             "group": "Arx Rosa 1199 1198 1211 1201",
             "manual_datetime": {
@@ -314,12 +258,9 @@
             "channels": [
                 "EEG E1-REF1",
                 "EEG E2-REF1",
-                "EEG E3-REF1",
                 "EEG E4-REF1",
                 "EEG E5-REF1",
-                "EEG E6-REF1",
-                "EEG E7-REF1",
-                "EEG E8-REF1"
+                "EEG E6-REF1"
             ],
             "group": "Arx Rosa  967 968 969 418",
             "manual_datetime": {
@@ -340,12 +281,9 @@
             "channels": [
                 "EEG E9-REF2",
                 "EEG E10-REF2",
-                "EEG E11-REF2",
                 "EEG E12-REF2",
                 "EEG E13-REF2",
-                "EEG E14-REF2",
-                "EEG E15-REF2",
-                "EEG E16-REF2"
+                "EEG E14-REF2"
             ],
             "group": "Arx Rosa  967 968 969 418",
             "manual_datetime": {
@@ -366,12 +304,9 @@
             "channels": [
                 "EEG E17-REF3",
                 "EEG E18-REF3",
-                "EEG E19-REF3",
                 "EEG E20-REF3",
                 "EEG E21-REF3",
-                "EEG E22-REF3",
-                "EEG E23-REF3",
-                "EEG E24-REF3"
+                "EEG E22-REF3"
             ],
             "group": "Arx Rosa  967 968 969 418",
             "manual_datetime": {
@@ -392,12 +327,9 @@
             "channels": [
                 "EEG E25-REF4",
                 "EEG E26-REF4",
-                "EEG E27-REF4",
                 "EEG E28-REF4",
                 "EEG E29-REF4",
-                "EEG E30-REF4",
-                "EEG E31-REF4",
-                "EEG E32-REF4"
+                "EEG E30-REF4"
             ],
             "group": "Arx Rosa  967 968 969 418",
             "manual_datetime": {
@@ -416,7 +348,6 @@
             "gene": "Arx(F/y)-Rosa(+/wt)-Tam",
             "sex": "Male",
             "channels": [
-                "A-009",
                 "A-010",
                 "A-012",
                 "A-014",
@@ -424,8 +355,7 @@
                 "A-016",
                 "A-017",
                 "A-019",
-                "A-021",
-                "A-022"
+                "A-021"
             ],
             "group": "Arx Rosa 2059_2063_2064",
             "manual_datetime": {
@@ -446,7 +376,6 @@
             "gene": "Arx(F/y)-Rosa(+/wt)-Sham",
             "sex": "Male",
             "channels": [
-                "B-009",
                 "B-010",
                 "B-012",
                 "B-014",
@@ -454,8 +383,7 @@
                 "B-016",
                 "B-017",
                 "B-019",
-                "B-021",
-                "B-022"
+                "B-021"
             ],
             "group": "Arx Rosa 2059_2063_2064",
             "manual_datetime": {
@@ -476,7 +404,6 @@
             "gene": "Arx(F/y)-Rosa(+/wt)-Sham",
             "sex": "Male",
             "channels": [
-                "C-009",
                 "C-010",
                 "C-012",
                 "C-014",
@@ -484,8 +411,7 @@
                 "C-016",
                 "C-017",
                 "C-019",
-                "C-021",
-                "C-022"
+                "C-021"
             ],
             "group": "Arx Rosa 2059_2063_2064",
             "manual_datetime": {
@@ -506,7 +432,6 @@
             "gene": "Arx(F/y)-Rosa(+/wt)",
             "sex": "Male",
             "channels": [
-                "A-009",
                 "A-010",
                 "A-012",
                 "A-014",
@@ -514,8 +439,7 @@
                 "A-016",
                 "A-017",
                 "A-019",
-                "A-021",
-                "A-022"
+                "A-021"
             ],
             "group": "Arx Rosa 3022 3023 3024",
             "manual_datetime": {
@@ -536,7 +460,6 @@
             "gene": "Arx(F/y)-Rosa(+/wt)",
             "sex": "Male",
             "channels": [
-                "B-009",
                 "B-010",
                 "B-012",
                 "B-014",
@@ -544,8 +467,7 @@
                 "B-016",
                 "B-017",
                 "B-019",
-                "B-021",
-                "B-022"
+                "B-021"
             ],
             "group": "Arx Rosa 3022 3023 3024",
             "manual_datetime": {
@@ -566,7 +488,6 @@
             "gene": "Arx(F/y)-Rosa(+/wt)",
             "sex": "Male",
             "channels": [
-                "C-009",
                 "C-010",
                 "C-012",
                 "C-014",
@@ -574,8 +495,7 @@
                 "C-016",
                 "C-017",
                 "C-019",
-                "C-021",
-                "C-022"
+                "C-021"
             ],
             "group": "Arx Rosa 3022 3023 3024",
             "manual_datetime": {
