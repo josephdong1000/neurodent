@@ -149,7 +149,7 @@
     "animals": [
         {
             "id": "ArxRosa-1017",
-            "gene": "Arx(F/y); Rosa(+/wt)",
+            "gene": "Arx(F/y)-Rosa(+/wt)-Sham",
             "sex": "Male",
             "channels": [
                 "EEG E9-REF2",
@@ -175,7 +175,7 @@
         },
         {
             "id": "ArxRosa-1015",
-            "gene": "Arx(F/y); Rosa(+/wt)",
+            "gene": "Arx(F/y)-Rosa(+/wt)-Sham",
             "sex": "Male",
             "channels": [
                 "EEG E25-REF4",
@@ -201,7 +201,7 @@
         },
         {
             "id": "ArxRosa-1199",
-            "gene": "Arx(F/y); Rosa(+/wt)",
+            "gene": "Arx(F/y)-Rosa(+/wt)-Tam",
             "sex": "Male",
             "channels": [
                 "EEG E1-REF1",
@@ -228,7 +228,7 @@
         },
         {
             "id": "ArxRosa-1198",
-            "gene": "Arx(F/y); Rosa(+/wt)",
+            "gene": "Arx(F/y)-Rosa(+/wt)-Tam",
             "sex": "Male",
             "channels": [
                 "EEG E9-REF2",
@@ -255,7 +255,7 @@
         },
         {
             "id": "ArxRosa-1211",
-            "gene": "Arx(F/y); Rosa(+/wt)",
+            "gene": "Arx(F/y)-Rosa(+/wt)-Sham",
             "sex": "Male",
             "channels": [
                 "EEG E17-REF3",
@@ -282,7 +282,7 @@
         },
         {
             "id": "ArxRosa-1201",
-            "gene": "Arx(F/y); Rosa(+/wt)",
+            "gene": "Arx(F/y)-Rosa(+/wt)-Tam",
             "sex": "Male",
             "channels": [
                 "EEG E25-REF4",
@@ -309,7 +309,7 @@
         },
         {
             "id": "ArxRosa-967",
-            "gene": "Arx(F/y); Rosacre(+/wt)",
+            "gene": "Arx(F/y)-Rosa(+/wt)-Tam",
             "sex": "Male",
             "channels": [
                 "EEG E1-REF1",
@@ -335,7 +335,7 @@
         },
         {
             "id": "ArxRosa-968",
-            "gene": "Arx(F/y); Rosacre(+/wt)",
+            "gene": "Arx(F/y)-Rosa(+/wt)-Tam",
             "sex": "Male",
             "channels": [
                 "EEG E9-REF2",
@@ -361,7 +361,7 @@
         },
         {
             "id": "ArxRosa-969",
-            "gene": "Arx(F/y); Rosacre(+/wt)",
+            "gene": "Arx(F/y)-Rosa(+/wt)-Tam",
             "sex": "Male",
             "channels": [
                 "EEG E17-REF3",
@@ -387,7 +387,7 @@
         },
         {
             "id": "ArxRosa-418",
-            "gene": "Arx(F/y); DlxBl6(-); Sry(+)",
+            "gene": "Rosa(+/+)",
             "sex": "Male",
             "channels": [
                 "EEG E25-REF4",
@@ -413,7 +413,7 @@
         },
         {
             "id": "ArxRosa-2059",
-            "gene": "UNKNOWN",
+            "gene": "Arx(F/y)-Rosa(+/wt)-Tam",
             "sex": "Male",
             "channels": [
                 "A-009",
@@ -443,7 +443,7 @@
         },
         {
             "id": "ArxRosa-2063",
-            "gene": "Arx(F/y); Rosa(+/wt)",
+            "gene": "Arx(F/y)-Rosa(+/wt)-Sham",
             "sex": "Male",
             "channels": [
                 "B-009",
@@ -473,7 +473,7 @@
         },
         {
             "id": "ArxRosa-2064",
-            "gene": "Arx(F/y); Rosa(+/wt)",
+            "gene": "Arx(F/y)-Rosa(+/wt)-Sham",
             "sex": "Male",
             "channels": [
                 "C-009",
@@ -503,7 +503,7 @@
         },
         {
             "id": "ArxRosa-3022",
-            "gene": "Arx(F/y); Rosa(+/wt)",
+            "gene": "Arx(F/y)-Rosa(+/wt)",
             "sex": "Male",
             "channels": [
                 "A-009",
@@ -533,7 +533,7 @@
         },
         {
             "id": "ArxRosa-3023",
-            "gene": "Arx(F/y); Rosa(+/wt)",
+            "gene": "Arx(F/y)-Rosa(+/wt)",
             "sex": "Male",
             "channels": [
                 "B-009",
@@ -563,7 +563,7 @@
         },
         {
             "id": "ArxRosa-3024",
-            "gene": "Arx(F/y); Rosa(+/wt)",
+            "gene": "Arx(F/y)-Rosa(+/wt)",
             "sex": "Male",
             "channels": [
                 "C-009",
