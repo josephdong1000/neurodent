@@ -122,15 +122,21 @@
             ],
             "group": "Arx Rosa 1017 1015",
             "manual_datetime": {
-                "_": "2015-02-24 09:56:19",
-                "_1_": "2015-02-25 09:52:45",
-                "_2_": "2015-02-26 09:48:33"
+                "_": "2015-02-24 11:11:00",
+                "_1_": null,
+                "_2_": null
             },
             "pattern": "{data_root}/{animal}/MARSH 20150224ARXROSA10171015{session}Selection{index}.EDF",
             "lro_kwargs": {
                 "mode": "mne",
                 "extract_func": "read_raw_edf"
-            }
+            },
+            "bad_channels": [
+                "LMot",
+                "RMot",
+                "LBar",
+                "LHip"
+            ]
         },
         {
             "id": "ArxRosa-1015",
@@ -145,9 +151,9 @@
             ],
             "group": "Arx Rosa 1017 1015",
             "manual_datetime": {
-                "_": "2015-02-24 09:56:19",
-                "_1_": "2015-02-25 09:52:45",
-                "_2_": "2015-02-26 09:48:33"
+                "_": "2015-02-24 11:11:00",
+                "_1_": null,
+                "_2_": null
             },
             "pattern": "{data_root}/{animal}/MARSH 20150224ARXROSA10171015{session}Selection{index}.EDF",
             "lro_kwargs": {
@@ -168,16 +174,20 @@
             ],
             "group": "Arx Rosa 1199 1198 1211 1201",
             "manual_datetime": {
-                " ": "2016-01-19 12:15:41",
-                "-": "2016-01-19 20:15:41",
-                " 1 ": "2016-01-20 12:11:20",
-                " 2 ": "2016-01-21 12:06:58"
+                " ": "2016-01-19 12:10:00",
+                "-": null,
+                " 1 ": null,
+                " 2 ": null
             },
             "pattern": "{data_root}/{animal}/MARSH 20160113ARXROSA*12h15m{session}Section{index}.EDF",
             "lro_kwargs": {
                 "mode": "mne",
                 "extract_func": "read_raw_edf"
-            }
+            },
+            "bad_channels": [
+                "LMot",
+                "RHip"
+            ]
         },
         {
             "id": "ArxRosa-1198",
@@ -192,16 +202,17 @@
             ],
             "group": "Arx Rosa 1199 1198 1211 1201",
             "manual_datetime": {
-                " ": "2016-01-19 12:15:41",
-                "-": "2016-01-19 20:15:41",
-                " 1 ": "2016-01-20 12:11:20",
-                " 2 ": "2016-01-21 12:06:58"
+                " ": "2016-01-19 12:10:00",
+                "-": null,
+                " 1 ": null,
+                " 2 ": null
             },
             "pattern": "{data_root}/{animal}/MARSH 20160113ARXROSA*12h15m{session}Section{index}.EDF",
             "lro_kwargs": {
                 "mode": "mne",
                 "extract_func": "read_raw_edf"
-            }
+            },
+            "exclude": true
         },
         {
             "id": "ArxRosa-1211",
@@ -216,16 +227,20 @@
             ],
             "group": "Arx Rosa 1199 1198 1211 1201",
             "manual_datetime": {
-                " ": "2016-01-19 12:15:41",
-                "-": "2016-01-19 20:15:41",
-                " 1 ": "2016-01-20 12:11:20",
-                " 2 ": "2016-01-21 12:06:58"
+                " ": "2016-01-19 12:10:00",
+                "-": null,
+                " 1 ": null,
+                " 2 ": null
             },
             "pattern": "{data_root}/{animal}/MARSH 20160113ARXROSA*12h15m{session}Section{index}.EDF",
             "lro_kwargs": {
                 "mode": "mne",
                 "extract_func": "read_raw_edf"
-            }
+            },
+            "bad_channels": [
+                "LBar",
+                "LHip"
+            ]
         },
         {
             "id": "ArxRosa-1201",
@@ -240,16 +255,22 @@
             ],
             "group": "Arx Rosa 1199 1198 1211 1201",
             "manual_datetime": {
-                " ": "2016-01-19 12:15:41",
-                "-": "2016-01-19 20:15:41",
-                " 1 ": "2016-01-20 12:11:20",
-                " 2 ": "2016-01-21 12:06:58"
+                " ": "2016-01-19 12:10:00",
+                "-": null,
+                " 1 ": null,
+                " 2 ": null
             },
             "pattern": "{data_root}/{animal}/MARSH 20160113ARXROSA*12h15m{session}Section{index}.EDF",
             "lro_kwargs": {
                 "mode": "mne",
                 "extract_func": "read_raw_edf"
-            }
+            },
+            "bad_channels": [
+                "LMot",
+                "RMot",
+                "LHip",
+                "RHip"
+            ]
         },
         {
             "id": "ArxRosa-967",
@@ -264,9 +285,9 @@
             ],
             "group": "Arx Rosa  967 968 969 418",
             "manual_datetime": {
-                "_": "2014-11-25 09:41:28",
-                "_1_": "2014-11-26 09:37:10",
-                "_2_": "2014-11-27 09:32:47"
+                "_": "2014-11-25 09:36:00",
+                "_1_": null,
+                "_2_": null
             },
             "pattern": "{data_root}/{animal}/MARSH 20141125ARXROSATAM967968969418{session}Selection{index}.EDF",
             "lro_kwargs": {
@@ -287,15 +308,18 @@
             ],
             "group": "Arx Rosa  967 968 969 418",
             "manual_datetime": {
-                "_": "2014-11-25 09:41:28",
-                "_1_": "2014-11-26 09:37:10",
-                "_2_": "2014-11-27 09:32:47"
+                "_": "2014-11-25 09:36:00",
+                "_1_": null,
+                "_2_": null
             },
             "pattern": "{data_root}/{animal}/MARSH 20141125ARXROSATAM967968969418{session}Selection{index}.EDF",
             "lro_kwargs": {
                 "mode": "mne",
                 "extract_func": "read_raw_edf"
-            }
+            },
+            "bad_channels": [
+                "LMot"
+            ]
         },
         {
             "id": "ArxRosa-969",
@@ -310,15 +334,21 @@
             ],
             "group": "Arx Rosa  967 968 969 418",
             "manual_datetime": {
-                "_": "2014-11-25 09:41:28",
-                "_1_": "2014-11-26 09:37:10",
-                "_2_": "2014-11-27 09:32:47"
+                "_": "2014-11-25 09:36:00",
+                "_1_": null,
+                "_2_": null
             },
             "pattern": "{data_root}/{animal}/MARSH 20141125ARXROSATAM967968969418{session}Selection{index}.EDF",
             "lro_kwargs": {
                 "mode": "mne",
                 "extract_func": "read_raw_edf"
-            }
+            },
+            "bad_channels": [
+                "LMot",
+                "RMot",
+                "LBar",
+                "RHip"
+            ]
         },
         {
             "id": "ArxRosa-418",
@@ -333,15 +363,18 @@
             ],
             "group": "Arx Rosa  967 968 969 418",
             "manual_datetime": {
-                "_": "2014-11-25 09:41:28",
-                "_1_": "2014-11-26 09:37:10",
-                "_2_": "2014-11-27 09:32:47"
+                "_": "2014-11-25 09:36:00",
+                "_1_": null,
+                "_2_": null
             },
             "pattern": "{data_root}/{animal}/MARSH 20141125ARXROSATAM967968969418{session}Selection{index}.EDF",
             "lro_kwargs": {
                 "mode": "mne",
                 "extract_func": "read_raw_edf"
-            }
+            },
+            "bad_channels": [
+                "LBar"
+            ]
         },
         {
             "id": "ArxRosa-2059",

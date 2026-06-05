@@ -488,7 +488,19 @@ class AnimalOrganizer(AnimalFeatureParser):
         animalday_to_items: dict,
         base_lro_kwargs: dict,
         original_manual_datetimes=None,
-    ) -> dict:
+    ) -> tuple[dict, datetime]:
+        """Compute per-item timestamps anchored at *base_datetime*.
+
+        Returns a tuple of ``(timeline, end_dt)`` where:
+
+        - ``timeline`` maps each item's key to its computed start datetime.
+        - ``end_dt`` is the end datetime of the last file in the chain
+          (equals ``base_datetime + sum(durations)`` when datetimes are
+          start times, or ``base_datetime`` when datetimes are end times).
+          ``end_dt`` is what dict-with-null forward cumulation in
+          :meth:`_process_manual_datetimes` uses to chain successive
+          sessions.
+        """
         total_items = sum(len(items) for items in animalday_to_items.values())
         total_animaldays = len(animalday_to_items)
 
@@ -656,6 +668,9 @@ class AnimalOrganizer(AnimalFeatureParser):
                 current_start_time = current_start_time + timedelta(
                     seconds=item_durations[item]
                 )
+            # End of last file (exclusive) — used by dict-with-null forward cumulation
+            # in _process_manual_datetimes to chain successive sessions.
+            end_dt = current_start_time
         else:
             current_end_time = base_datetime
             for item in reversed(ordered_items):
@@ -664,6 +679,8 @@ class AnimalOrganizer(AnimalFeatureParser):
                 start_time = current_end_time - timedelta(seconds=duration)
                 result[item_key] = start_time
                 current_end_time = start_time
+            # base_datetime IS the end of the last file when datetimes are end times.
+            end_dt = base_datetime
 
         # Validate monotonicity of computed timestamps in item order
         for i in range(1, len(ordered_items)):
@@ -679,7 +696,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         logging.info(
             f"Timeline computed: {len(result)} items, total duration {total_duration:.1f}s"
         )
-        return result
+        return result, end_dt
 
     def _process_manual_datetimes(
         self, manual_datetimes, animalday_to_items: dict, base_lro_kwargs: dict
@@ -725,29 +742,129 @@ class AnimalOrganizer(AnimalFeatureParser):
                     f"manual_datetimes keys match sessions for {self.animal_id}. "
                     "Computing per-session timelines."
                 )
-                out = {}
+                # Dict-form session ordering uses *dict insertion order*
+                # (Python 3.7+ contract), NOT _natural_sort_key on
+                # animalday_to_items.  Dict keys are the single canonical
+                # chronological source — see plan: "Allow null in
+                # manual_datetime dict (cumulate forward from prior anchor)".
                 missing_sessions = [
                     k for k in animalday_to_items
                     if k not in manual_datetimes
                 ]
                 if missing_sessions:
                     raise ValueError(
-                        f"Missing entries in manual_datetimes for sessions: {missing_sessions}."
+                        f"Missing entries in manual_datetimes for sessions: "
+                        f"{missing_sessions}. Every discovered session must "
+                        f"be in the manual_datetime dict (use null to cumulate "
+                        f"forward from the previous anchor)."
                     )
-                for sess_key, sess_items in animalday_to_items.items():
+                extra_keys = [
+                    k for k in manual_datetimes
+                    if k not in animalday_to_items
+                ]
+                if extra_keys:
+                    raise ValueError(
+                        f"manual_datetime has keys not in discovered sessions "
+                        f"for '{self.animal_id}': {extra_keys}. Discovered "
+                        f"sessions: {list(animalday_to_items.keys())}."
+                    )
+                # Reject null in non-start-time mode: forward cumulation only
+                # makes sense when timestamps are interpreted as starts.
+                datetimes_are_start = base_lro_kwargs.get(
+                    "datetimes_are_start", True
+                )
+                if not datetimes_are_start and any(
+                    v is None for v in manual_datetimes.values()
+                ):
+                    raise ValueError(
+                        f"manual_datetime contains null values for "
+                        f"'{self.animal_id}', but datetimes_are_start is "
+                        f"False. Null (cumulate forward) is only supported "
+                        f"when timestamps are interpreted as start times."
+                    )
+
+                # Find the first explicit anchor — used to backfill any
+                # null sessions BEFORE it (working backward, assuming
+                # contiguous recording).  Sessions at and after the first
+                # explicit anchor use forward cumulation (current behaviour);
+                # subsequent explicit anchors still act as resets.
+                ordered_keys = list(manual_datetimes.keys())
+                first_explicit_idx = next(
+                    (i for i, v in enumerate(manual_datetimes.values())
+                     if v is not None),
+                    None,
+                )
+                if first_explicit_idx is None:
+                    raise ValueError(
+                        f"manual_datetime for '{self.animal_id}' has no "
+                        f"explicit anchor — every session is null. At least "
+                        f"one session must have a known datetime."
+                    )
+
+                out = {}
+
+                # Backfill prefix nulls (sessions before first_explicit_idx).
+                # Walk backward from the first explicit anchor's start time.
+                if first_explicit_idx > 0:
+                    anchor_key = ordered_keys[first_explicit_idx]
+                    anchor_items = animalday_to_items[anchor_key]
+                    anchor_context = self._get_context_path(anchor_items[0])
+                    next_session_start = self._resolve_timestamp_input(
+                        manual_datetimes[anchor_key], anchor_context
+                    )
+                    # Iterate prefix sessions in REVERSE so each session's
+                    # end_dt equals the next (later) session's start_dt —
+                    # this is the contiguous-recording assumption made
+                    # explicit.
+                    backward_kwargs = dict(base_lro_kwargs)
+                    backward_kwargs["datetimes_are_start"] = False
+                    for prefix_idx in range(first_explicit_idx - 1, -1, -1):
+                        prefix_key = ordered_keys[prefix_idx]
+                        prefix_items = animalday_to_items[prefix_key]
+                        sess_item_dict = {
+                            self._get_item_key(f): [f] for f in prefix_items
+                        }
+                        # next_session_start is treated as the END of this
+                        # prefix session's last file (contiguous).
+                        sess_timeline, _ = self._compute_global_timeline(
+                            next_session_start,
+                            sess_item_dict,
+                            backward_kwargs,
+                            original_manual_datetimes=next_session_start,
+                        )
+                        out.update(sess_timeline)
+                        # This session's start = min of computed file starts.
+                        next_session_start = min(sess_timeline.values())
+
+                # Forward cumulation from the first explicit anchor onward.
+                # Subsequent explicit anchors reset the running chain (no
+                # silent reconciliation — user's explicit values are
+                # authoritative).
+                anchor_end_dt = None
+                for idx in range(first_explicit_idx, len(ordered_keys)):
+                    sess_key = ordered_keys[idx]
                     sess_ts = manual_datetimes[sess_key]
-                    context_path = self._get_context_path(sess_items[0])
-                    resolved_dt = self._resolve_timestamp_input(
-                        sess_ts, context_path
-                    )
+                    sess_items = animalday_to_items[sess_key]
+                    if sess_ts is None:
+                        # anchor_end_dt is guaranteed non-None here because
+                        # idx >= first_explicit_idx and the very first
+                        # iteration sets it.
+                        resolved_dt = anchor_end_dt
+                        sess_input = anchor_end_dt
+                    else:
+                        context_path = self._get_context_path(sess_items[0])
+                        resolved_dt = self._resolve_timestamp_input(
+                            sess_ts, context_path
+                        )
+                        sess_input = sess_ts
                     sess_item_dict = {
                         self._get_item_key(f): [f] for f in sess_items
                     }
-                    sess_timeline = self._compute_global_timeline(
+                    sess_timeline, anchor_end_dt = self._compute_global_timeline(
                         resolved_dt,
                         sess_item_dict,
                         base_lro_kwargs,
-                        original_manual_datetimes=sess_ts,
+                        original_manual_datetimes=sess_input,
                     )
                     out.update(sess_timeline)
                 self._validate_timestamp_ordering(out)
@@ -777,12 +894,13 @@ class AnimalOrganizer(AnimalFeatureParser):
                 logging.info(
                     f"Processing global manual datetimes starting at {start_dt}"
                 )
-                return self._compute_global_timeline(
+                timeline, _end_dt = self._compute_global_timeline(
                     start_dt,
                     animalday_to_items,
                     base_lro_kwargs,
                     original_manual_datetimes=manual_datetimes,
                 )
+                return timeline
             warnings.warn(
                 "String timestamp resolved to non-scalar. Falling back to default processing."
             )
