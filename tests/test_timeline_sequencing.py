@@ -411,7 +411,7 @@ class TestTimelineSequencing:
         base_datetime = pd.to_datetime("2025-01-01 12:00:00")
         base_lro_kwargs = {"datetimes_are_start": True}
 
-        result = ao._compute_global_timeline(
+        result, _end_dt = ao._compute_global_timeline(
             base_datetime, animalday_to_items, base_lro_kwargs,
             original_manual_datetimes=base_datetime,
         )
@@ -451,7 +451,7 @@ class TestTimelineSequencing:
         base_datetime = pd.to_datetime("2025-01-01 12:00:00")
         base_lro_kwargs = {"datetimes_are_start": True}
 
-        result = ao._compute_global_timeline(
+        result, _end_dt = ao._compute_global_timeline(
             base_datetime, animalday_to_items, base_lro_kwargs,
             original_manual_datetimes=base_datetime,
         )
@@ -490,7 +490,7 @@ class TestTimelineSequencing:
         # One timestamp per item, paired in sorted order
         list_datetimes = ["2025-01-01 10:00:00", "2025-01-01 11:00:00"]
 
-        result = ao._compute_global_timeline(
+        result, _end_dt = ao._compute_global_timeline(
             base_datetime, animalday_to_items, base_lro_kwargs,
             original_manual_datetimes=list_datetimes,
         )
@@ -533,7 +533,7 @@ class TestTimelineSequencing:
         base_datetime = pd.to_datetime("2025-01-01 08:00:00")
         base_lro_kwargs = {"datetimes_are_start": True}
 
-        result = ao._compute_global_timeline(
+        result, _end_dt = ao._compute_global_timeline(
             base_datetime, animalday_to_items, base_lro_kwargs,
             original_manual_datetimes=None,
         )
@@ -564,7 +564,7 @@ class TestTimelineSequencing:
         base_datetime = pd.to_datetime("2025-01-01 12:00:00")
         base_lro_kwargs = {"datetimes_are_start": True}
 
-        result = ao._compute_global_timeline(
+        result, _end_dt = ao._compute_global_timeline(
             base_datetime, animalday_to_items, base_lro_kwargs,
             original_manual_datetimes=base_datetime,
         )
@@ -601,7 +601,7 @@ class TestTimelineSequencing:
         base_datetime = pd.to_datetime("2025-01-01 10:00:00")
         base_lro_kwargs = {"datetimes_are_start": True}
 
-        result = ao._compute_global_timeline(
+        result, _end_dt = ao._compute_global_timeline(
             base_datetime, animalday_to_items, base_lro_kwargs,
             original_manual_datetimes=base_datetime,
         )
