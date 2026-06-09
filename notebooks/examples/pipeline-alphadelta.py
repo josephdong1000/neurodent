@@ -117,15 +117,15 @@ logging.info(df.columns)
 df = df[["timestamp", "animal", "genotype", "alphadelta", "delta", "alpha", "logrms", "zpcorr"]]
 df["hour"] = df["timestamp"].dt.hour.copy()
 df["minute"] = df["timestamp"].dt.minute.copy()
-df["total_minutes"] = 60 * (round((df["hour"] * 60 + df["minute"]) / 60) % 24)
+df["zt_minutes"] = 60 * (round((df["hour"] * 60 + df["minute"]) / 60) % 24)
 logging.info(df.columns)
 
 df = (
-    df.groupby(["animal", "genotype", "total_minutes"])
+    df.groupby(["animal", "genotype", "zt_minutes"])
     .agg({"alphadelta": "mean", "delta": "mean", "alpha": "mean", "logrms": "mean", "zpcorr": "mean"})
     .reset_index()
 )
-# df = df.set_index("total_minutes")
+# df = df.set_index("zt_minutes")
 # df = df.copy()
 
 logging.debug(df)

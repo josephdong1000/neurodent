@@ -203,6 +203,75 @@ class TestExtractBandFeatures:
 
 
 # =========================================================================
+# 6b. _extract_linear_2d_features (new for psdslope in get_channel_averaged_result)
+# =========================================================================
+
+class TestExtractLinear2DFeatures:
+    """Cover the LINEAR_2D extraction helper used by
+    :meth:`WindowAnalysisResult.get_channel_averaged_result` for features
+    like ``psdslope`` whose raw cells are ``(n_channels, n_components)``
+    2-D arrays.
+    """
+
+    def test_splits_into_per_component_columns(self):
+        """Happy path: ``psdslope`` cells → ``psdslope_slope`` and
+        ``psdslope_intercept`` columns, each cell a per-channel array."""
+        war = make_war()
+        df = war.result.copy()
+        n_ch = len(war.channel_names)
+        # Per-row: a (n_channels, 2) array. Column 0 = slope, column 1 = intercept.
+        slopes = np.linspace(-2.0, -1.0, n_ch)
+        intercepts = np.linspace(5.0, 6.0, n_ch)
+        cell = np.column_stack([slopes, intercepts])
+        df["psdslope"] = [cell] * len(df)
+
+        result = war._extract_linear_2d_features(df, "psdslope")
+
+        assert "psdslope_slope" in result.columns
+        assert "psdslope_intercept" in result.columns
+        # Cells are per-channel arrays (length n_ch), matching LINEAR shape.
+        for row in result["psdslope_slope"]:
+            assert np.allclose(row, slopes)
+        for row in result["psdslope_intercept"]:
+            assert np.allclose(row, intercepts)
+
+    def test_missing_column_returns_df(self):
+        war = make_war()
+        df = war.result.copy()
+        result = war._extract_linear_2d_features(df, "nonexistent")
+        assert result is df
+        assert "nonexistent_slope" not in result.columns
+
+    def test_no_component_labels_returns_df_with_warning(self):
+        """Feature absent from ``COMPONENT_LABELS`` → warn and pass through."""
+        war = make_war()
+        df = war.result.copy()
+        # Use a real LINEAR_2D feature name, but temporarily empty its
+        # component labels.
+        cell = np.zeros((len(war.channel_names), 2))
+        df["psdslope"] = [cell] * len(df)
+        with patch.object(constants, "COMPONENT_LABELS", {}):
+            with warnings.catch_warnings(record=True):
+                warnings.simplefilter("always")
+                result = war._extract_linear_2d_features(df, "psdslope")
+        assert "psdslope_slope" not in result.columns
+
+    def test_wrong_shape_uses_nans(self):
+        """Cells with the wrong shape produce NaN-filled per-channel arrays."""
+        war = make_war()
+        df = war.result.copy()
+        # Wrong shape: 1-D instead of (n_channels, n_components).
+        df["psdslope"] = [np.array([1.0, 2.0])] * len(df)
+        with warnings.catch_warnings(record=True):
+            warnings.simplefilter("always")
+            result = war._extract_linear_2d_features(df, "psdslope")
+        for row in result["psdslope_slope"]:
+            assert np.isnan(row).all()
+        for row in result["psdslope_intercept"]:
+            assert np.isnan(row).all()
+
+
+# =========================================================================
 # 7. _extract_banded_matrix_features (lines 2733, 2751-2755, 2776, 2791,
 #    2797-2802, 2816-2822)
 # =========================================================================

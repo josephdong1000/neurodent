@@ -2958,6 +2958,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
         simple_features_in_data = [
             f for f in available_features if f in constants.LINEAR_FEATURES
         ]
+        linear_2d_features_in_data = [
+            f for f in available_features if f in constants.LINEAR_2D_FEATURES
+        ]
 
         # Process band features - extract all 5 bands
         for band_feature in band_features_in_data:
@@ -2971,6 +2974,15 @@ class WindowAnalysisResult(AnimalFeatureParser):
             if matrix_feature in df_result.columns:
                 df_result = self._extract_banded_matrix_features(
                     df_result, matrix_feature, constants.BAND_NAMES
+                )
+
+        # Process LINEAR_2D features - split each into one per-component column
+        # (e.g. psdslope -> psdslope_slope + psdslope_intercept) so they can be
+        # channel-averaged to scalars like any LINEAR feature.
+        for linear_2d_feature in linear_2d_features_in_data:
+            if linear_2d_feature in df_result.columns:
+                df_result = self._extract_linear_2d_features(
+                    df_result, linear_2d_feature
                 )
 
         # Build list of features to average
@@ -2988,12 +3000,22 @@ class WindowAnalysisResult(AnimalFeatureParser):
             for band in constants.BAND_NAMES:
                 features_to_average.append(f"{matrix_feature}_{band}")
 
+        # LINEAR_2D features: each gets one per-component expanded column.
+        for linear_2d_feature in linear_2d_features_in_data:
+            for component in constants.COMPONENT_LABELS.get(linear_2d_feature, []):
+                features_to_average.append(f"{linear_2d_feature}_{component}")
+
         # Average all features across channels
         df_result = self._average_across_channels(df_result, features_to_average)
 
-        # Drop original band/banded-matrix features (now that bands are extracted into separate columns)
-        # These are no longer needed and cannot be aggregated (contain dicts/arrays)
-        features_to_drop = band_features_in_data + banded_matrix_features_in_data
+        # Drop original band/banded-matrix/linear-2d features (now that
+        # components are extracted into separate columns).  These are no
+        # longer needed and cannot be aggregated (contain dicts/arrays).
+        features_to_drop = (
+            band_features_in_data
+            + banded_matrix_features_in_data
+            + linear_2d_features_in_data
+        )
         df_result = df_result.drop(columns=features_to_drop, errors="ignore")
 
         return df_result
@@ -3054,6 +3076,73 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
             # Store as list of arrays/values
             df[f"{feature_name}_{band_name}"] = band_values
+
+        return df
+
+    def _extract_linear_2d_features(
+        self, df: pd.DataFrame, feature_name: str
+    ) -> pd.DataFrame:
+        """Extract individual components from LINEAR_2D features.
+
+        LINEAR_2D features (e.g. ``psdslope``) are stored as 2-D arrays of
+        shape ``(n_channels, n_components)`` per row, where each channel
+        has multiple components (e.g. ``[slope, intercept]`` for psdslope).
+        This method splits each into one per-component column whose cells
+        are per-channel arrays (length ``n_channels``), shaped exactly like
+        a LINEAR feature so :meth:`_average_across_channels` can reduce it
+        to a scalar per row.
+
+        Component names come from
+        :data:`neurodent.constants.COMPONENT_LABELS` (e.g.
+        ``psdslope -> ["slope", "intercept"]``).  The new columns are
+        ``"{feature_name}_{component}"``.
+
+        Args:
+            df: DataFrame containing the LINEAR_2D feature.
+            feature_name: Name of the LINEAR_2D feature column.
+
+        Returns:
+            DataFrame with new per-component columns appended.
+            Unchanged if the feature has no entry in ``COMPONENT_LABELS``.
+        """
+        import numpy as np
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        if feature_name not in df.columns:
+            return df
+
+        component_labels = constants.COMPONENT_LABELS.get(feature_name)
+        if not component_labels:
+            # No labels configured; can't split.  Leave as-is and let
+            # downstream classification skip it.
+            logger.warning(
+                f"LINEAR_2D feature {feature_name!r} has no COMPONENT_LABELS entry; "
+                "channel-averaging will skip it."
+            )
+            return df
+
+        n_components = len(component_labels)
+        for k, component in enumerate(component_labels):
+            col_values = []
+            for i, cell in enumerate(df[feature_name]):
+                arr = np.asarray(cell)
+                if arr.ndim != 2 or arr.shape[1] != n_components:
+                    logger.warning(
+                        f"Row {i} of {feature_name} has unexpected shape "
+                        f"{arr.shape}; expected (n_channels, {n_components}). "
+                        "Using NaNs."
+                    )
+                    col_values.append(
+                        np.full(len(self.channel_names), np.nan)
+                    )
+                    continue
+                # arr[:, k] is the k-th component across all channels —
+                # same shape as a LINEAR feature's row, ready for
+                # _average_across_channels.
+                col_values.append(arr[:, k])
+            df[f"{feature_name}_{component}"] = col_values
 
         return df
 

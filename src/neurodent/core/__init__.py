@@ -92,6 +92,7 @@ from .zeitgeber import (
     run_zeitgeber_pipeline,
     get_expanded_feature_names,
     transform_time_axis,
+    expand_zt_axis,
 )
 from . import utils
 from . import discovery
@@ -112,6 +113,7 @@ __all__ = [
     "run_zeitgeber_pipeline",
     "get_expanded_feature_names",
     "transform_time_axis",
+    "expand_zt_axis",
     # Utilities
     "convert_ddfcolbin_to_ddfrowbin",
     "convert_ddfrowbin_to_si",

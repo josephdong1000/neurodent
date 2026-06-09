@@ -168,13 +168,13 @@ def main():
 
     try:
         # Group by all metadata columns present (except those that vary per row like timestamp/minute if we are binning)
-        # We want to group by: animal, genotype, sex, gene, total_minutes
+        # We want to group by: animal, genotype, sex, gene, zt_minutes
         # And potentially other static metadata.
-        # However, 'total_minutes' is the binning key.
-        
+        # However, 'zt_minutes' is the binning key.
+
         # Define grouping columns based on what's available and what should be grouped
         # We want to keep animal-level metadata and the time bin.
-        potential_group_cols = ["animal", "genotype", "sex", "gene", "total_minutes"]
+        potential_group_cols = ["animal", "genotype", "sex", "gene", "zt_minutes", "daynight"]
         group_cols = [c for c in potential_group_cols if c in df.columns]
         
         df = df.groupby(group_cols).agg(agg_dict).reset_index()
