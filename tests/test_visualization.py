@@ -1287,6 +1287,93 @@ class TestWindowAnalysisResultRemapChannels:
         assert arr.shape == (3,)
 
 
+class TestWindowAnalysisResultSelectChannels:
+    """Test WindowAnalysisResult.select_channels() — strict shim over
+    reorder_and_pad_channels: subset/reorder existing channels, raise on
+    missing names (no NaN padding)."""
+
+    @pytest.fixture
+    def select_war(self):
+        """4-channel WAR for subset-selection testing."""
+        n_rows = 3
+        n_chan = 4
+        ch_names = ["LMot", "RMot", "LBar", "RBar"]
+        rng = np.random.default_rng(7)
+        data = {
+            "animal": ["A1"] * n_rows,
+            "animalday": ["A1_day1"] * n_rows,
+            "genotype": ["WT"] * n_rows,
+            "duration": [4.0] * n_rows,
+            "rms": [rng.random(n_chan).tolist() for _ in range(n_rows)],
+            "psdband": [
+                {b: rng.random(n_chan).tolist() for b in constants.BAND_NAMES}
+                for _ in range(n_rows)
+            ],
+        }
+        return WindowAnalysisResult(
+            result=pd.DataFrame(data),
+            animal_id="A1",
+            genotype="WT",
+            channel_names=ch_names,
+        )
+
+    def test_select_channels_strict_subset(self, select_war):
+        """Requesting a 2-channel subset of a 4-channel WAR returns
+        exactly 2 channels — no NaN padding."""
+        result = select_war.select_channels(
+            ["LMot", "RMot"], use_abbrevs=False, inplace=False
+        )
+        for row in result["rms"]:
+            arr = np.array(row)
+            assert arr.shape == (2,)
+            assert not np.isnan(arr).any(), "subset of existing channels should be NaN-free"
+
+    def test_select_channels_reorders(self, select_war):
+        """Same channel set in a different order is reordered, not padded."""
+        # Note the swap: RMot before LMot.
+        result = select_war.select_channels(
+            ["RMot", "LMot", "RBar", "LBar"], use_abbrevs=False, inplace=False
+        )
+        original_first_row = np.array(select_war.result["rms"].iloc[0])
+        new_first_row = np.array(result["rms"].iloc[0])
+        # New[0] should equal original[1] (RMot's old position).
+        assert new_first_row[0] == original_first_row[1]
+        assert new_first_row[1] == original_first_row[0]
+        assert not np.isnan(new_first_row).any()
+
+    def test_select_channels_missing_raises(self, select_war):
+        """Requesting a non-existent channel raises ValueError listing
+        the offender."""
+        with pytest.raises(ValueError, match="LFake") as exc_info:
+            select_war.select_channels(
+                ["LMot", "LFake"], use_abbrevs=False, inplace=False
+            )
+        # Error message should mention the wrapped method as the
+        # NaN-padding escape hatch.
+        assert "reorder_and_pad_channels" in str(exc_info.value)
+
+    def test_select_channels_inplace_default(self, select_war):
+        """Default inplace=True updates channel_names and channel_abbrevs."""
+        select_war.select_channels(["LMot", "RMot"], use_abbrevs=False)
+        assert select_war.channel_names == ["LMot", "RMot"]
+        # And the result df is correspondingly subset.
+        arr = np.array(select_war.result["rms"].iloc[0])
+        assert arr.shape == (2,)
+
+    def test_select_channels_inplace_false_preserves_state(self, select_war):
+        """inplace=False returns a new DataFrame; WAR's own state untouched."""
+        original_channels = list(select_war.channel_names)
+        original_first_row = list(select_war.result["rms"].iloc[0])
+        result = select_war.select_channels(
+            ["LMot", "RMot"], use_abbrevs=False, inplace=False
+        )
+        # WAR state untouched.
+        assert select_war.channel_names == original_channels
+        assert list(select_war.result["rms"].iloc[0]) == original_first_row
+        # But returned df reflects the selection.
+        assert np.array(result["rms"].iloc[0]).shape == (2,)
+
+
 class TestApplyFilter:
     """Test WindowAnalysisResult._apply_filter() FeatureType dispatch."""
 

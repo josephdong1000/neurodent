@@ -2608,6 +2608,35 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
         return result
 
+    def select_channels(
+        self,
+        channels: list[str],
+        use_abbrevs: bool = True,
+        inplace: bool = True,
+    ) -> pd.DataFrame:
+        """Subset and reorder the WAR's channels to *channels*.
+
+        Every name in *channels* must be present in the WAR's current
+        channel list; missing names raise.  Source channels not in
+        *channels* are dropped.  Args mirror
+        :meth:`reorder_and_pad_channels` — use that one if you want
+        NaN-padding for missing target channels.
+
+        Raises:
+            ValueError: if any name in *channels* is not present.
+        """
+        available = self.channel_abbrevs if use_abbrevs else self.channel_names
+        missing = [c for c in channels if c not in available]
+        if missing:
+            raise ValueError(
+                f"Requested channels not present in WAR (use "
+                f"reorder_and_pad_channels for NaN-padding behaviour): "
+                f"{missing}. Available: {list(available)}"
+            )
+        return self.reorder_and_pad_channels(
+            channels, use_abbrevs=use_abbrevs, inplace=inplace
+        )
+
     def read_sars_spikes(
         self,
         sars: list["FrequencyDomainSpikeAnalysisResult"],
