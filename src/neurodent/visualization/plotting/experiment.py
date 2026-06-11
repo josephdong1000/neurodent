@@ -144,6 +144,26 @@ class ExperimentPlotter:
             plot_order if plot_order is not None else constants.DF_SORT_ORDER.copy()
         )
 
+    @staticmethod
+    def band_scale(plot_lib=None):
+        """Return ``plot_lib.Nominal(order=BAND_NAMES)`` — the canonical band
+        order for any seaborn-objects categorical scale (x / color / row / col).
+
+        Use this in ``.scale(x=..., color=..., ...)`` for any plot that maps
+        the ``band`` column to an axis or colour.  ``pd.Categorical(ordered=True)``
+        on the column upstream is necessary but not sufficient: some seaborn
+        stat/move transforms (``Dodge``, ``Jitter``, ``Est``) silently lose the
+        order, so the explicit ``Nominal`` is the rendering-layer source of truth.
+
+        Args:
+            plot_lib: Optional reference to ``seaborn.objects``. If ``None``,
+                it is imported lazily so this module doesn't require
+                seaborn-objects at import time.
+        """
+        if plot_lib is None:
+            import seaborn.objects as plot_lib
+        return plot_lib.Nominal(order=list(constants.BAND_NAMES))
+
     def validate_plot_order(self, df: pd.DataFrame, raise_errors: bool = False) -> dict:
         """
         Validate that the current plot_order contains all necessary categories for the data.

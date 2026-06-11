@@ -32,6 +32,40 @@ from ..core import FragmentAnalyzer, get_temp_directory
 from ..core.frequency_domain_spike_detection import FrequencyDomainSpikeDetector
 from ..core.utils import abbreviate_channel_names, filepath_to_index, parse_chname_to_abbrev, slugify
 from .feature_utils import extract_linear_array, extract_band_dict, repack_band_dict, extract_hist_data
+from .feature_handlers import FEATURE_HANDLERS, handler_for
+from .filters import (
+    FILTER_REGISTRY,
+    ChannelInfo,
+    FilterScope,
+    compute_filter_mask,
+    update_bad_channels_dict_from_config,
+)
+
+
+_WRAPPER_METHOD_NAMES: dict[str, str] = {
+    "logrms_range": "get_filter_logrms_range",
+    "high_rms": "get_filter_high_rms",
+    "low_rms": "get_filter_low_rms",
+    "high_beta": "get_filter_high_beta",
+    "reject_channels": "get_filter_reject_channels",
+    "reject_channels_by_session": "get_filter_reject_channels_by_recording_session",
+    "morphological_smoothing": "get_filter_morphological_smoothing",
+}
+
+
+def _column_needs_encoding(col_name: str) -> bool:
+    """Return True iff *col_name* is a WAR feature column whose cells hold
+    nested values (list, dict, tuple, ndarray).
+
+    Every feature column qualifies — LINEAR cells are stored as a list of C
+    scalars per row, BAND cells as a dict-of-lists, HIST cells as a tuple of
+    arrays, etc.  Non-feature columns (animal, animalday, timestamp, duration,
+    endfile, …) are scalar per row and skip the nested-encoding path.
+
+    Uses :data:`constants.FEATURE_TYPES` as the schema source of truth, so new
+    ``FeatureType`` additions are picked up without changing this code.
+    """
+    return col_name in constants.FEATURE_TYPES
 
 try:
     import spikeinterface.preprocessing as spre
@@ -454,7 +488,19 @@ class AnimalOrganizer(AnimalFeatureParser):
         animalday_to_items: dict,
         base_lro_kwargs: dict,
         original_manual_datetimes=None,
-    ) -> dict:
+    ) -> tuple[dict, datetime]:
+        """Compute per-item timestamps anchored at *base_datetime*.
+
+        Returns a tuple of ``(timeline, end_dt)`` where:
+
+        - ``timeline`` maps each item's key to its computed start datetime.
+        - ``end_dt`` is the end datetime of the last file in the chain
+          (equals ``base_datetime + sum(durations)`` when datetimes are
+          start times, or ``base_datetime`` when datetimes are end times).
+          ``end_dt`` is what dict-with-null forward cumulation in
+          :meth:`_process_manual_datetimes` uses to chain successive
+          sessions.
+        """
         total_items = sum(len(items) for items in animalday_to_items.values())
         total_animaldays = len(animalday_to_items)
 
@@ -555,8 +601,6 @@ class AnimalOrganizer(AnimalFeatureParser):
 
             for item, timestamp in item_timestamps:
                 _lro_kwargs = base_lro_kwargs.copy()
-                if self._is_item_file(item) and _lro_kwargs.get("mode") == "mne":
-                    _lro_kwargs["input_type"] = "file"
                 _lro_kwargs["manual_datetimes"] = timestamp
 
                 try:
@@ -578,8 +622,6 @@ class AnimalOrganizer(AnimalFeatureParser):
         else:
             for item in ordered_items:
                 _lro_kwargs = base_lro_kwargs.copy()
-                if self._is_item_file(item) and _lro_kwargs.get("mode") == "mne":
-                    _lro_kwargs["input_type"] = "file"
 
                 try:
                     temp_lro = core.LongRecordingOrganizer(item, **_lro_kwargs)
@@ -626,6 +668,9 @@ class AnimalOrganizer(AnimalFeatureParser):
                 current_start_time = current_start_time + timedelta(
                     seconds=item_durations[item]
                 )
+            # End of last file (exclusive) — used by dict-with-null forward cumulation
+            # in _process_manual_datetimes to chain successive sessions.
+            end_dt = current_start_time
         else:
             current_end_time = base_datetime
             for item in reversed(ordered_items):
@@ -634,6 +679,8 @@ class AnimalOrganizer(AnimalFeatureParser):
                 start_time = current_end_time - timedelta(seconds=duration)
                 result[item_key] = start_time
                 current_end_time = start_time
+            # base_datetime IS the end of the last file when datetimes are end times.
+            end_dt = base_datetime
 
         # Validate monotonicity of computed timestamps in item order
         for i in range(1, len(ordered_items)):
@@ -649,7 +696,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         logging.info(
             f"Timeline computed: {len(result)} items, total duration {total_duration:.1f}s"
         )
-        return result
+        return result, end_dt
 
     def _process_manual_datetimes(
         self, manual_datetimes, animalday_to_items: dict, base_lro_kwargs: dict
@@ -695,29 +742,129 @@ class AnimalOrganizer(AnimalFeatureParser):
                     f"manual_datetimes keys match sessions for {self.animal_id}. "
                     "Computing per-session timelines."
                 )
-                out = {}
+                # Dict-form session ordering uses *dict insertion order*
+                # (Python 3.7+ contract), NOT _natural_sort_key on
+                # animalday_to_items.  Dict keys are the single canonical
+                # chronological source — see plan: "Allow null in
+                # manual_datetime dict (cumulate forward from prior anchor)".
                 missing_sessions = [
                     k for k in animalday_to_items
                     if k not in manual_datetimes
                 ]
                 if missing_sessions:
                     raise ValueError(
-                        f"Missing entries in manual_datetimes for sessions: {missing_sessions}."
+                        f"Missing entries in manual_datetimes for sessions: "
+                        f"{missing_sessions}. Every discovered session must "
+                        f"be in the manual_datetime dict (use null to cumulate "
+                        f"forward from the previous anchor)."
                     )
-                for sess_key, sess_items in animalday_to_items.items():
+                extra_keys = [
+                    k for k in manual_datetimes
+                    if k not in animalday_to_items
+                ]
+                if extra_keys:
+                    raise ValueError(
+                        f"manual_datetime has keys not in discovered sessions "
+                        f"for '{self.animal_id}': {extra_keys}. Discovered "
+                        f"sessions: {list(animalday_to_items.keys())}."
+                    )
+                # Reject null in non-start-time mode: forward cumulation only
+                # makes sense when timestamps are interpreted as starts.
+                datetimes_are_start = base_lro_kwargs.get(
+                    "datetimes_are_start", True
+                )
+                if not datetimes_are_start and any(
+                    v is None for v in manual_datetimes.values()
+                ):
+                    raise ValueError(
+                        f"manual_datetime contains null values for "
+                        f"'{self.animal_id}', but datetimes_are_start is "
+                        f"False. Null (cumulate forward) is only supported "
+                        f"when timestamps are interpreted as start times."
+                    )
+
+                # Find the first explicit anchor — used to backfill any
+                # null sessions BEFORE it (working backward, assuming
+                # contiguous recording).  Sessions at and after the first
+                # explicit anchor use forward cumulation (current behaviour);
+                # subsequent explicit anchors still act as resets.
+                ordered_keys = list(manual_datetimes.keys())
+                first_explicit_idx = next(
+                    (i for i, v in enumerate(manual_datetimes.values())
+                     if v is not None),
+                    None,
+                )
+                if first_explicit_idx is None:
+                    raise ValueError(
+                        f"manual_datetime for '{self.animal_id}' has no "
+                        f"explicit anchor — every session is null. At least "
+                        f"one session must have a known datetime."
+                    )
+
+                out = {}
+
+                # Backfill prefix nulls (sessions before first_explicit_idx).
+                # Walk backward from the first explicit anchor's start time.
+                if first_explicit_idx > 0:
+                    anchor_key = ordered_keys[first_explicit_idx]
+                    anchor_items = animalday_to_items[anchor_key]
+                    anchor_context = self._get_context_path(anchor_items[0])
+                    next_session_start = self._resolve_timestamp_input(
+                        manual_datetimes[anchor_key], anchor_context
+                    )
+                    # Iterate prefix sessions in REVERSE so each session's
+                    # end_dt equals the next (later) session's start_dt —
+                    # this is the contiguous-recording assumption made
+                    # explicit.
+                    backward_kwargs = dict(base_lro_kwargs)
+                    backward_kwargs["datetimes_are_start"] = False
+                    for prefix_idx in range(first_explicit_idx - 1, -1, -1):
+                        prefix_key = ordered_keys[prefix_idx]
+                        prefix_items = animalday_to_items[prefix_key]
+                        sess_item_dict = {
+                            self._get_item_key(f): [f] for f in prefix_items
+                        }
+                        # next_session_start is treated as the END of this
+                        # prefix session's last file (contiguous).
+                        sess_timeline, _ = self._compute_global_timeline(
+                            next_session_start,
+                            sess_item_dict,
+                            backward_kwargs,
+                            original_manual_datetimes=next_session_start,
+                        )
+                        out.update(sess_timeline)
+                        # This session's start = min of computed file starts.
+                        next_session_start = min(sess_timeline.values())
+
+                # Forward cumulation from the first explicit anchor onward.
+                # Subsequent explicit anchors reset the running chain (no
+                # silent reconciliation — user's explicit values are
+                # authoritative).
+                anchor_end_dt = None
+                for idx in range(first_explicit_idx, len(ordered_keys)):
+                    sess_key = ordered_keys[idx]
                     sess_ts = manual_datetimes[sess_key]
-                    context_path = self._get_context_path(sess_items[0])
-                    resolved_dt = self._resolve_timestamp_input(
-                        sess_ts, context_path
-                    )
+                    sess_items = animalday_to_items[sess_key]
+                    if sess_ts is None:
+                        # anchor_end_dt is guaranteed non-None here because
+                        # idx >= first_explicit_idx and the very first
+                        # iteration sets it.
+                        resolved_dt = anchor_end_dt
+                        sess_input = anchor_end_dt
+                    else:
+                        context_path = self._get_context_path(sess_items[0])
+                        resolved_dt = self._resolve_timestamp_input(
+                            sess_ts, context_path
+                        )
+                        sess_input = sess_ts
                     sess_item_dict = {
                         self._get_item_key(f): [f] for f in sess_items
                     }
-                    sess_timeline = self._compute_global_timeline(
+                    sess_timeline, anchor_end_dt = self._compute_global_timeline(
                         resolved_dt,
                         sess_item_dict,
                         base_lro_kwargs,
-                        original_manual_datetimes=sess_ts,
+                        original_manual_datetimes=sess_input,
                     )
                     out.update(sess_timeline)
                 self._validate_timestamp_ordering(out)
@@ -747,12 +894,13 @@ class AnimalOrganizer(AnimalFeatureParser):
                 logging.info(
                     f"Processing global manual datetimes starting at {start_dt}"
                 )
-                return self._compute_global_timeline(
+                timeline, _end_dt = self._compute_global_timeline(
                     start_dt,
                     animalday_to_items,
                     base_lro_kwargs,
                     original_manual_datetimes=manual_datetimes,
                 )
+                return timeline
             warnings.warn(
                 "String timestamp resolved to non-scalar. Falling back to default processing."
             )
@@ -2442,85 +2590,10 @@ class WindowAnalysisResult(AnimalFeatureParser):
             )
 
         for feature in self._feature_columns:
-            ftype = constants.classify_feature(feature)
-
-            if ftype in (constants.FeatureType.LINEAR, constants.FeatureType.LINEAR_2D, constants.FeatureType.BAND):
-                if ftype is constants.FeatureType.BAND:
-                    vals, keys = extract_band_dict(result[feature])
-                    # vals is canonical (W, C, B) — no transpose needed
-                else:
-                    vals = extract_linear_array(result[feature])
-
-                # vals has shape (n_rows, n_channels, *extra_dims). We allocate an array
-                # with the same leading and trailing dimensions but with the channel axis
-                # sized to len(target_channels). Missing channels are padded with NaN and
-                # existing channels are copied in via channel_map below.
-                new_vals = np.full(
-                    (vals.shape[0], len(target_channels), *vals.shape[2:]), np.nan
-                )
-
-                for i, ch in enumerate(channel_names):
-                    if ch in channel_map:
-                        new_vals[:, channel_map[ch]] = vals[:, i]
-
-                if ftype is constants.FeatureType.BAND:
-                    # new_vals is (W, n_target, B) — canonical, pass directly to repack
-                    result[feature] = repack_band_dict(new_vals, keys)
-                    del vals, keys, new_vals
-                else:
-                    result[feature] = [list(x) for x in new_vals]
-                    del vals, new_vals
-
-            elif ftype.is_matrix:
-                if ftype is constants.FeatureType.BANDED_MATRIX:
-                    vals, keys = extract_band_dict(result[feature])
-                    # vals is canonical (W, C, C, B)
-                    logging.debug(f"vals.shape: {vals.shape}")
-                    n_bands = vals.shape[ftype.semantic_axes["bands"]]
-                    new_shape = [vals.shape[0], len(target_channels), len(target_channels), n_bands]
-                    new_vals = np.full(new_shape, np.nan)
-                    for i, ch1 in enumerate(channel_names):
-                        if ch1 in channel_map:
-                            for j, ch2 in enumerate(channel_names):
-                                if ch2 in channel_map:
-                                    new_vals[:, channel_map[ch1], channel_map[ch2], :] = vals[:, i, j, :]
-                    result[feature] = repack_band_dict(new_vals, keys)
-                    del vals, keys, new_vals
-                else:
-                    vals = extract_linear_array(result[feature])
-                    # vals is canonical (W, C, C) for SIMPLE_MATRIX
-                    logging.debug(f"vals.shape: {vals.shape}")
-                    new_shape = [vals.shape[0], len(target_channels), len(target_channels)]
-                    new_vals = np.full(new_shape, np.nan)
-                    for i, ch1 in enumerate(channel_names):
-                        if ch1 in channel_map:
-                            for j, ch2 in enumerate(channel_names):
-                                if ch2 in channel_map:
-                                    new_vals[:, channel_map[ch1], channel_map[ch2]] = vals[:, i, j]
-                    result[feature] = [list(x) for x in new_vals]
-                    del vals, new_vals
-
-            elif ftype is constants.FeatureType.HIST:
-                coords, vals = extract_hist_data(result[feature])
-                # vals is canonical (W, C, F)
-                new_vals = np.full(
-                    (vals.shape[0], len(target_channels), vals.shape[ftype.semantic_axes["freq_bins"]]), np.nan
-                )
-
-                for i, ch in enumerate(channel_names):
-                    if ch in channel_map:
-                        new_vals[:, channel_map[ch], :] = vals[:, i, :]
-
-                # Repack as (F, C) per cell to preserve per-cell storage format
-                result[feature] = [
-                    (coords[i], new_vals[i].T) for i in range(len(coords))
-                ]
-                del coords, vals, new_vals
-
-            else:
-                raise ValueError(
-                    f"Unsupported FeatureType {ftype} for channel remapping: {feature}"
-                )
+            handler = handler_for(feature)
+            result[feature] = handler.reorder_pad(
+                result[feature], channel_map, list(channel_names), target_channels
+            )
 
         if inplace:
             self.result = result
@@ -2534,6 +2607,35 @@ class WindowAnalysisResult(AnimalFeatureParser):
             logging.debug(f"New channel abbreviations: {self.channel_abbrevs}")
 
         return result
+
+    def select_channels(
+        self,
+        channels: list[str],
+        use_abbrevs: bool = True,
+        inplace: bool = True,
+    ) -> pd.DataFrame:
+        """Subset and reorder the WAR's channels to *channels*.
+
+        Every name in *channels* must be present in the WAR's current
+        channel list; missing names raise.  Source channels not in
+        *channels* are dropped.  Args mirror
+        :meth:`reorder_and_pad_channels` — use that one if you want
+        NaN-padding for missing target channels.
+
+        Raises:
+            ValueError: if any name in *channels* is not present.
+        """
+        available = self.channel_abbrevs if use_abbrevs else self.channel_names
+        missing = [c for c in channels if c not in available]
+        if missing:
+            raise ValueError(
+                f"Requested channels not present in WAR (use "
+                f"reorder_and_pad_channels for NaN-padding behaviour): "
+                f"{missing}. Available: {list(available)}"
+            )
+        return self.reorder_and_pad_channels(
+            channels, use_abbrevs=use_abbrevs, inplace=inplace
+        )
 
     def read_sars_spikes(
         self,
@@ -2885,6 +2987,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
         simple_features_in_data = [
             f for f in available_features if f in constants.LINEAR_FEATURES
         ]
+        linear_2d_features_in_data = [
+            f for f in available_features if f in constants.LINEAR_2D_FEATURES
+        ]
 
         # Process band features - extract all 5 bands
         for band_feature in band_features_in_data:
@@ -2898,6 +3003,15 @@ class WindowAnalysisResult(AnimalFeatureParser):
             if matrix_feature in df_result.columns:
                 df_result = self._extract_banded_matrix_features(
                     df_result, matrix_feature, constants.BAND_NAMES
+                )
+
+        # Process LINEAR_2D features - split each into one per-component column
+        # (e.g. psdslope -> psdslope_slope + psdslope_intercept) so they can be
+        # channel-averaged to scalars like any LINEAR feature.
+        for linear_2d_feature in linear_2d_features_in_data:
+            if linear_2d_feature in df_result.columns:
+                df_result = self._extract_linear_2d_features(
+                    df_result, linear_2d_feature
                 )
 
         # Build list of features to average
@@ -2915,12 +3029,22 @@ class WindowAnalysisResult(AnimalFeatureParser):
             for band in constants.BAND_NAMES:
                 features_to_average.append(f"{matrix_feature}_{band}")
 
+        # LINEAR_2D features: each gets one per-component expanded column.
+        for linear_2d_feature in linear_2d_features_in_data:
+            for component in constants.COMPONENT_LABELS.get(linear_2d_feature, []):
+                features_to_average.append(f"{linear_2d_feature}_{component}")
+
         # Average all features across channels
         df_result = self._average_across_channels(df_result, features_to_average)
 
-        # Drop original band/banded-matrix features (now that bands are extracted into separate columns)
-        # These are no longer needed and cannot be aggregated (contain dicts/arrays)
-        features_to_drop = band_features_in_data + banded_matrix_features_in_data
+        # Drop original band/banded-matrix/linear-2d features (now that
+        # components are extracted into separate columns).  These are no
+        # longer needed and cannot be aggregated (contain dicts/arrays).
+        features_to_drop = (
+            band_features_in_data
+            + banded_matrix_features_in_data
+            + linear_2d_features_in_data
+        )
         df_result = df_result.drop(columns=features_to_drop, errors="ignore")
 
         return df_result
@@ -2981,6 +3105,73 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
             # Store as list of arrays/values
             df[f"{feature_name}_{band_name}"] = band_values
+
+        return df
+
+    def _extract_linear_2d_features(
+        self, df: pd.DataFrame, feature_name: str
+    ) -> pd.DataFrame:
+        """Extract individual components from LINEAR_2D features.
+
+        LINEAR_2D features (e.g. ``psdslope``) are stored as 2-D arrays of
+        shape ``(n_channels, n_components)`` per row, where each channel
+        has multiple components (e.g. ``[slope, intercept]`` for psdslope).
+        This method splits each into one per-component column whose cells
+        are per-channel arrays (length ``n_channels``), shaped exactly like
+        a LINEAR feature so :meth:`_average_across_channels` can reduce it
+        to a scalar per row.
+
+        Component names come from
+        :data:`neurodent.constants.COMPONENT_LABELS` (e.g.
+        ``psdslope -> ["slope", "intercept"]``).  The new columns are
+        ``"{feature_name}_{component}"``.
+
+        Args:
+            df: DataFrame containing the LINEAR_2D feature.
+            feature_name: Name of the LINEAR_2D feature column.
+
+        Returns:
+            DataFrame with new per-component columns appended.
+            Unchanged if the feature has no entry in ``COMPONENT_LABELS``.
+        """
+        import numpy as np
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        if feature_name not in df.columns:
+            return df
+
+        component_labels = constants.COMPONENT_LABELS.get(feature_name)
+        if not component_labels:
+            # No labels configured; can't split.  Leave as-is and let
+            # downstream classification skip it.
+            logger.warning(
+                f"LINEAR_2D feature {feature_name!r} has no COMPONENT_LABELS entry; "
+                "channel-averaging will skip it."
+            )
+            return df
+
+        n_components = len(component_labels)
+        for k, component in enumerate(component_labels):
+            col_values = []
+            for i, cell in enumerate(df[feature_name]):
+                arr = np.asarray(cell)
+                if arr.ndim != 2 or arr.shape[1] != n_components:
+                    logger.warning(
+                        f"Row {i} of {feature_name} has unexpected shape "
+                        f"{arr.shape}; expected (n_channels, {n_components}). "
+                        "Using NaNs."
+                    )
+                    col_values.append(
+                        np.full(len(self.channel_names), np.nan)
+                    )
+                    continue
+                # arr[:, k] is the k-th component across all channels —
+                # same shape as a LINEAR feature's row, ready for
+                # _average_across_channels.
+                col_values.append(arr[:, k])
+            df[f"{feature_name}_{component}"] = col_values
 
         return df
 
@@ -3195,105 +3386,85 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
         return df
 
-    def get_filter_logrms_range(self, df: pd.DataFrame = None, z_range=3, **kwargs):
+    def _channel_info(self) -> ChannelInfo:
+        """Bundle channel metadata for filter functions."""
+        return ChannelInfo(
+            channel_names=list(self.channel_names),
+            channel_abbrevs=list(self.channel_abbrevs),
+            assume_from_number=self.assume_from_number,
+        )
+
+    @property
+    def path_safe_animal_id(self) -> str:
+        """Slugified :attr:`animal_id` for filesystem paths.
+
+        Use this property whenever building a ``Path`` or filename component
+        from the animal id.  ``animal_id`` itself stays in its display form
+        (which may contain ``/``, ``;``, spaces) for logs and plot labels;
+        ``slugify`` is applied here so callers don't have to remember.
+        """
+        return slugify(self.animal_id)
+
+    @property
+    def path_safe_animaldays(self) -> list[str]:
+        """Slugified :attr:`animaldays` for filesystem paths."""
+        return [slugify(ad) for ad in self.animaldays]
+
+    def get_filter_logrms_range(self, *, z_range=3, **kwargs):
         """Filter windows based on log(rms).
 
         Args:
-            df (pd.DataFrame, optional): If not None, this function will use this dataframe instead of self.result. Defaults to None.
             z_range (float, optional): The z-score range to filter by. Values outside this range will be set to NaN.
 
         Returns:
             np.ndarray: Boolean array of shape (M fragments, N channels). True = keep window, False = remove window
         """
-        result = df.copy() if df is not None else self.result.copy()
-        z_range = abs(z_range)
-        np_rms = np.array(result["rms"].tolist())
-        np_logrms = np.log(np_rms)
-        del np_rms
-        np_logrmsz = zscore(np_logrms, axis=0, nan_policy="omit")
-        np_logrms[(np_logrmsz > z_range) | (np_logrmsz < -z_range)] = np.nan
+        return FILTER_REGISTRY["logrms_range"].apply(
+            self.result, self._channel_info(), len(self.result), z_range=z_range
+        )
 
-        out = np.full(np_logrms.shape, True)
-        out[(np_logrmsz > z_range) | (np_logrmsz < -z_range)] = False
-        return out
-
-    def get_filter_high_rms(self, df: pd.DataFrame = None, max_rms=500, **kwargs):
+    def get_filter_high_rms(self, *, max_rms=500, **kwargs):
         """Filter windows based on rms.
 
         Args:
-            df (pd.DataFrame, optional): If not None, this function will use this dataframe instead of self.result. Defaults to None.
             max_rms (float, optional): The maximum rms value to filter by. Values above this will be set to NaN.
 
         Returns:
             np.ndarray: Boolean array of shape (M fragments, N channels). True = keep window, False = remove window
         """
-        result = df.copy() if df is not None else self.result.copy()
-        np_rms = np.array(result["rms"].tolist())
-        np_rmsnan = np_rms.copy()
-        # Convert to float to allow NaN assignment for integer arrays
-        if np_rmsnan.dtype.kind in ("i", "u"):  # integer types
-            np_rmsnan = np_rmsnan.astype(float)
-        np_rmsnan[np_rms > max_rms] = np.nan
-        result["rms"] = np_rmsnan.tolist()
+        return FILTER_REGISTRY["high_rms"].apply(
+            self.result, self._channel_info(), len(self.result), max_rms=max_rms
+        )
 
-        out = np.full(np_rms.shape, True)
-        out[np_rms > max_rms] = False
-        return out
-
-    def get_filter_low_rms(self, df: pd.DataFrame = None, min_rms=30, **kwargs):
+    def get_filter_low_rms(self, *, min_rms=30, **kwargs):
         """Filter windows based on rms.
 
         Args:
-            df (pd.DataFrame, optional): If not None, this function will use this dataframe instead of self.result. Defaults to None.
             min_rms (float, optional): The minimum rms value to filter by. Values below this will be set to NaN.
 
         Returns:
             np.ndarray: Boolean array of shape (M fragments, N channels). True = keep window, False = remove window
         """
-        result = df.copy() if df is not None else self.result.copy()
-        np_rms = np.array(result["rms"].tolist())
-        np_rmsnan = np_rms.copy()
-        np_rmsnan[np_rms < min_rms] = np.nan
-        result["rms"] = np_rmsnan.tolist()
+        return FILTER_REGISTRY["low_rms"].apply(
+            self.result, self._channel_info(), len(self.result), min_rms=min_rms
+        )
 
-        out = np.full(np_rms.shape, True)
-        out[np_rms < min_rms] = False
-        return out
-
-    def get_filter_high_beta(
-        self, df: pd.DataFrame = None, max_beta_prop=0.4, **kwargs
-    ):
+    def get_filter_high_beta(self, *, max_beta_prop=0.4, **kwargs):
         """Filter windows based on beta power.
 
         Args:
-            df (pd.DataFrame, optional): If not None, this function will use this dataframe instead of self.result. Defaults to None.
             max_beta_prop (float, optional): The maximum beta power to filter by. Values above this will be set to NaN. Defaults to 0.4.
 
         Returns:
             np.ndarray: Boolean array of shape (M fragments, N channels). True = keep window, False = remove window
         """
-        result = df.copy() if df is not None else self.result.copy()
-        if "psdfrac" in result.columns:
-            df_psdfrac = pd.DataFrame(result["psdfrac"].tolist())
-            np_prop = np.array(df_psdfrac["beta"].tolist())
-        elif "psdband" in result.columns and "psdtotal" in result.columns:
-            df_psdband = pd.DataFrame(result["psdband"].tolist())
-            np_beta = np.array(df_psdband["beta"].tolist())
-            np_total = np.array(result["psdtotal"].tolist())
-            np_prop = np_beta / np_total
-        else:
-            raise ValueError(
-                "psdfrac or psdband+psdtotal required for beta power filtering"
-            )
-
-        out = np.full(np_prop.shape, True)
-        out[np_prop > max_beta_prop] = False
-        out = np.broadcast_to(np.all(out, axis=-1)[:, np.newaxis], out.shape)
-        return out
+        return FILTER_REGISTRY["high_beta"].apply(
+            self.result, self._channel_info(), len(self.result), max_beta_prop=max_beta_prop
+        )
 
     def get_filter_reject_channels(
         self,
-        df: pd.DataFrame = None,
+        *,
         bad_channels: list[str] = None,
         use_abbrevs: bool = None,
         save_bad_channels: Literal["overwrite", "union", None] = "union",
@@ -3302,7 +3473,6 @@ class WindowAnalysisResult(AnimalFeatureParser):
         """Filter channels to reject.
 
         Args:
-            df (pd.DataFrame, optional): If not None, this function will use this dataframe instead of self.result. Defaults to None.
             bad_channels (list[str]): List of channels to reject. Can be either full channel names or abbreviations.
                 The method will automatically detect which format is being used. If None, no filtering is performed.
             use_abbrevs (bool, optional): Override automatic detection. If True, channels are assumed to be channel abbreviations. If False, channels are assumed to be channel names.
@@ -3317,73 +3487,32 @@ class WindowAnalysisResult(AnimalFeatureParser):
         Returns:
             np.ndarray: Boolean array of shape (M fragments, N channels). True = keep window, False = remove window
         """
-        n_samples = len(self.result)
-        n_channels = len(self.channel_names)
-        mask = np.ones((n_samples, n_channels), dtype=bool)
+        channel_info = self._channel_info()
+        mask = FILTER_REGISTRY["reject_channels"].apply(
+            self.result,
+            channel_info,
+            len(self.result),
+            bad_channels=bad_channels,
+            use_abbrevs=use_abbrevs,
+        )
 
-        if bad_channels is None:
-            return mask
-
-        channel_targets = (
-            self.channel_abbrevs
-            if use_abbrevs or use_abbrevs is None
-            else self.channel_names
-        )  # Match to appropriate target
-        if use_abbrevs is None:  # Match channels as abbreviations
-            bad_channels = [
-                core.parse_chname_to_abbrev(
-                    ch, assume_from_number=self.assume_from_number
-                )
-                for ch in bad_channels
-            ]
-
-        # Match channels to channel_targets
-        for ch in bad_channels:
-            if ch in channel_targets:
-                mask[:, channel_targets.index(ch)] = False
-            else:
-                warnings.warn(f"Channel {ch} not found in {channel_targets}")
-
-        # Save bad channels to self.bad_channels_dict if requested
-        if save_bad_channels is not None:
-            # Get all unique animal days from the result
+        if bad_channels is not None and save_bad_channels is not None:
             animaldays = self.result["animalday"].unique()
-
-            # Convert bad channels to the format used in bad_channels_dict (original channel names)
-            channels_to_save = (
-                bad_channels.copy()
-                if use_abbrevs is False
-                else [
-                    core.parse_chname_to_abbrev(
-                        ch, assume_from_number=self.assume_from_number
-                    )
-                    for ch in bad_channels
-                ]
+            self.bad_channels_dict = update_bad_channels_dict_from_config(
+                self.bad_channels_dict,
+                {"reject_channels": {
+                    "bad_channels": bad_channels,
+                    "use_abbrevs": use_abbrevs,
+                    "save_bad_channels": save_bad_channels,
+                }},
+                channel_info,
+                list(animaldays),
             )
-
-            if save_bad_channels == "overwrite":
-                # Replace entire dict with bad channels applied to all sessions
-                self.bad_channels_dict = {
-                    animalday: channels_to_save.copy() for animalday in animaldays
-                }
-            elif save_bad_channels == "union":
-                # Merge with existing bad channels for all sessions
-                updated_dict = self.bad_channels_dict.copy()
-                for animalday in animaldays:
-                    if animalday in updated_dict:
-                        # Union of existing and new channels (sorted for deterministic order)
-                        updated_dict[animalday] = sorted(
-                            set(updated_dict[animalday]) | set(channels_to_save)
-                        )
-                    else:
-                        updated_dict[animalday] = channels_to_save.copy()
-                self.bad_channels_dict = updated_dict
-
         return mask
 
     def get_filter_reject_channels_by_recording_session(
         self,
-        df: pd.DataFrame = None,
+        *,
         bad_channels_dict: dict[str, list[str]] = None,
         use_abbrevs: bool = None,
         save_bad_channels: Literal["overwrite", "union", None] = "union",
@@ -3392,7 +3521,6 @@ class WindowAnalysisResult(AnimalFeatureParser):
         """Filter channels to reject for each recording session
 
         Args:
-            df (pd.DataFrame, optional): If not None, this function will use this dataframe instead of self.result. Defaults to None.
             bad_channels_dict (dict[str, list[str]]): Dictionary of list of channels to reject for each recording session.
                 Can be either full channel names or abbreviations. The method will automatically detect which format is being used.
                 If None, the method will use the bad_channels_dict passed to the constructor.
@@ -3410,69 +3538,31 @@ class WindowAnalysisResult(AnimalFeatureParser):
         """
         if bad_channels_dict is None:
             bad_channels_dict = self.bad_channels_dict.copy()
+        channel_info = self._channel_info()
+        mask = FILTER_REGISTRY["reject_channels_by_session"].apply(
+            self.result,
+            channel_info,
+            len(self.result),
+            bad_channels_dict=bad_channels_dict,
+            use_abbrevs=use_abbrevs,
+        )
 
-        n_samples = len(self.result)
-        n_channels = len(self.channel_names)
-        mask = np.ones((n_samples, n_channels), dtype=bool)
-
-        # Group by animalday to apply filters per recording session
-        for animalday, group in self.result.groupby("animalday"):
-            if bad_channels_dict:
-                if animalday not in bad_channels_dict:
-                    raise ValueError(
-                        f"No bad channels specified for recording session {animalday}. Check that all days are present in bad_channels_dict"
-                    )
-                bad_channels = bad_channels_dict[animalday]
-            else:
-                bad_channels = []
-
-            channel_targets = (
-                self.channel_abbrevs
-                if use_abbrevs or use_abbrevs is None
-                else self.channel_names
+        if save_bad_channels is not None and bad_channels_dict:
+            animaldays = self.result["animalday"].unique()
+            self.bad_channels_dict = update_bad_channels_dict_from_config(
+                self.bad_channels_dict,
+                {"reject_channels_by_session": {
+                    "bad_channels_dict": bad_channels_dict,
+                    "use_abbrevs": use_abbrevs,
+                    "save_bad_channels": save_bad_channels,
+                }},
+                channel_info,
+                list(animaldays),
             )
-            if use_abbrevs is None:
-                bad_channels = [
-                    core.parse_chname_to_abbrev(
-                        ch, assume_from_number=self.assume_from_number
-                    )
-                    for ch in bad_channels
-                ]
-
-            # Get indices for this recording session
-            session_indices = group.index
-
-            # Apply channel filtering for this session
-            for ch in bad_channels:
-                if ch in channel_targets:
-                    ch_idx = channel_targets.index(ch)
-                    mask[session_indices, ch_idx] = False
-                else:
-                    logging.warning(
-                        f"Channel {ch} not found in {channel_targets} for session {animalday}"
-                    )
-
-        # Save bad channels to self.bad_channels_dict if requested
-        if save_bad_channels is not None and bad_channels_dict is not None:
-            if save_bad_channels == "overwrite":
-                self.bad_channels_dict = bad_channels_dict.copy()
-            elif save_bad_channels == "union":
-                # Merge with existing bad channels per session
-                updated_dict = self.bad_channels_dict.copy()
-                for animalday, channels in bad_channels_dict.items():
-                    if animalday in updated_dict:
-                        # Union of existing and new channels (sorted for deterministic order)
-                        updated_dict[animalday] = sorted(
-                            set(updated_dict[animalday]) | set(channels)
-                        )
-                    else:
-                        updated_dict[animalday] = channels.copy()
-                self.bad_channels_dict = updated_dict
-
         return mask
 
     def get_filter_morphological_smoothing(
-        self, filter_mask: np.ndarray, smoothing_seconds: float, **kwargs
+        self, filter_mask: np.ndarray, *, smoothing_seconds: float, **kwargs
     ) -> np.ndarray:
         """Apply morphological smoothing to a filter mask.
 
@@ -3483,159 +3573,73 @@ class WindowAnalysisResult(AnimalFeatureParser):
         Returns:
             np.ndarray: Smoothed boolean mask
         """
-        if "duration" not in self.result.columns:
-            raise ValueError(
-                "Cannot calculate window duration - 'duration' column missing"
-            )
-
-        window_duration = self.result["duration"].median()
-        structure_size = max(1, int(smoothing_seconds / window_duration))
-
-        if structure_size <= 1:
-            return filter_mask
-
-        smoothed_mask = filter_mask.copy()
-        for ch_idx in range(filter_mask.shape[1]):
-            channel_mask = filter_mask[:, ch_idx]
-            # Opening removes small isolated artifacts
-            channel_mask = binary_opening(
-                channel_mask, structure=np.ones(structure_size)
-            )
-            # Closing fills small gaps in valid data
-            channel_mask = binary_closing(
-                channel_mask, structure=np.ones(structure_size)
-            )
-            smoothed_mask[:, ch_idx] = channel_mask
-
-        return smoothed_mask
-
-    def filter_morphological_smoothing(
-        self, smoothing_seconds: float
-    ) -> "WindowAnalysisResult":
-        """Apply morphological smoothing to all data.
-
-        Args:
-            smoothing_seconds (float): Time window in seconds for morphological operations
-
-        Returns:
-            WindowAnalysisResult: New filtered instance
-        """
-        # Start with all-True mask and smooth it
-        base_mask = np.ones((len(self.result), len(self.channel_names)), dtype=bool)
-        smoothed_mask = self.get_filter_morphological_smoothing(
-            base_mask, smoothing_seconds
+        return FILTER_REGISTRY["morphological_smoothing"].apply(
+            filter_mask,
+            self.result,
+            self._channel_info(),
+            smoothing_seconds=smoothing_seconds,
         )
-        return self._create_filtered_copy(smoothed_mask)
 
     def filter_all(
         self,
         df: pd.DataFrame = None,
-        inplace=True,
-        # bad_channels: list[str] = None,
-        min_valid_channels=3,
-        filters: list[callable] = None,
-        morphological_smoothing_seconds: float = None,
-        # save_bad_channels: Literal["overwrite", "union", None] = "union",
+        inplace: bool = True,
+        min_valid_channels: int = 3,
+        filters: list[Callable] = None,
+        morphological_smoothing_seconds: float | None = None,
+        bad_channels: list[str] | None = None,
+        save_bad_channels: Literal["overwrite", "union", None] = "union",
         **kwargs,
-    ):
-        """Apply a list of filters to the data. Filtering should be performed before aggregation.
+    ) -> "WindowAnalysisResult":
+        """Apply the default filter suite. Thin wrapper around :meth:`apply_filters`.
 
         Args:
-            df (pd.DataFrame, optional): If not None, this function will use this dataframe instead of self.result. Defaults to None.
-            inplace (bool, optional): If True, modify the result in place. Defaults to True.
-            bad_channels (list[str], optional): List of channels to reject. Defaults to None.
-            min_valid_channels (int, optional): Minimum number of valid channels required per window. Defaults to 3.
-            filters (list[callable], optional): List of filter functions to apply. Each function should return a boolean mask.
-                If None, uses default filters: [get_filter_logrms_range, get_filter_high_rms, get_filter_low_rms, get_filter_high_beta].
-                Defaults to None.
-            morphological_smoothing_seconds (float, optional): If provided, apply morphological opening/closing to smooth the filter mask.
-                This removes isolated false positives/negatives along the time axis for each channel independently.
-                The value specifies the time window in seconds for the morphological operations. Defaults to None.
-            save_bad_channels (Literal["overwrite", "union", None], optional): How to save bad channels to self.bad_channels_dict.
-                This parameter is passed to the filtering functions. Defaults to "union".
-                Note: When using "overwrite" mode, the bad_channels parameter and bad_channels_dict parameter
-                may conflict and overwrite each other's bad channel definitions if both are provided.
-            **kwargs: Additional keyword arguments to pass to filter functions.
-
-        Returns:
-            WindowAnalysisResult: Filtered result
+            df: Deprecated; ignored (kept for signature backward compat).
+            inplace: If True, mutate ``self.result`` with the filtered output.
+            min_valid_channels: Minimum number of valid channels per window.
+            filters: Deprecated; emits a ``DeprecationWarning`` if non-None and is
+                otherwise ignored.  Use :meth:`apply_filters` with a ``filter_config``
+                dict for custom filter combinations.
+            morphological_smoothing_seconds: If provided, smooths the combined
+                mask along the time axis with this window in seconds.
+            bad_channels: If provided, adds a ``reject_channels`` filter with this list.
+            save_bad_channels: How to merge into ``self.bad_channels_dict``.
+            **kwargs: Per-filter overrides — currently consumed:
+                ``z_range`` (default 3), ``max_rms`` (500), ``min_rms`` (50),
+                ``max_beta_prop`` (0.4).  Any other keys are silently ignored.
         """
-        if filters is None:
-            # TODO refactor these into standalone functions, which take in a war as the first parameter, then pass
-            # filt_bool = filt(self, df, **kwargs) as needed
-            filters = [
-                self.get_filter_logrms_range,
-                self.get_filter_high_rms,
-                self.get_filter_low_rms,
-                self.get_filter_high_beta,
-                self.get_filter_reject_channels_by_recording_session,
-                self.get_filter_reject_channels,
-            ]
-
-        filt_bools = []
-        # Apply each filter function
-        for filter_function in filters:
-            filt_bool = filter_function(df, **kwargs)
-            filt_bools.append(filt_bool)
-            logging.info(
-                f"{filter_function.__name__}:\tfiltered {filt_bool.size - np.count_nonzero(filt_bool)}/{filt_bool.size}"
+        if filters is not None:
+            warnings.warn(
+                "Passing `filters=` to filter_all is deprecated; use apply_filters "
+                "with a filter_config dict instead.",
+                DeprecationWarning,
+                stacklevel=2,
             )
 
-        # Apply all filters
-        filt_bool_all = np.prod(np.stack(filt_bools, axis=-1), axis=-1).astype(bool)
-        logging.debug(
-            f"filt_bool_all.shape: {filt_bool_all.shape}"
-        )  # (windows, channels)
-
-        # Apply morphological smoothing if requested
+        filter_config: dict = {
+            "logrms_range": {"z_range": kwargs.pop("z_range", 3)},
+            "high_rms":     {"max_rms": kwargs.pop("max_rms", 500)},
+            "low_rms":      {"min_rms": kwargs.pop("min_rms", 50)},
+            "high_beta":    {"max_beta_prop": kwargs.pop("max_beta_prop", 0.4)},
+            "reject_channels_by_session": {"save_bad_channels": save_bad_channels},
+        }
+        if bad_channels is not None:
+            filter_config["reject_channels"] = {
+                "bad_channels": bad_channels,
+                "save_bad_channels": save_bad_channels,
+            }
         if morphological_smoothing_seconds is not None:
-            if "duration" not in self.result.columns:
-                raise ValueError(
-                    "Cannot calculate window duration - 'duration' column missing from result dataframe"
-                )
-            window_duration = self.result["duration"].median()
+            filter_config["morphological_smoothing"] = {
+                "smoothing_seconds": morphological_smoothing_seconds,
+            }
 
-            # Calculate number of windows for the smoothing
-            structure_size = max(
-                1, int(morphological_smoothing_seconds / window_duration)
-            )
-
-            if structure_size > 1:
-                logging.info(
-                    f"Applying morphological smoothing with {structure_size} windows ({morphological_smoothing_seconds}s / {window_duration}s per window)"
-                )
-                # Apply channel-wise temporal smoothing (each channel processed independently)
-                # This avoids spatial assumptions while smoothing temporal artifacts
-                for ch_idx in range(filt_bool_all.shape[1]):
-                    channel_mask = filt_bool_all[:, ch_idx]
-                    # Opening removes small isolated artifacts
-                    channel_mask = binary_opening(
-                        channel_mask, structure=np.ones(structure_size)
-                    )
-                    # Closing fills small gaps in valid data
-                    channel_mask = binary_closing(
-                        channel_mask, structure=np.ones(structure_size)
-                    )
-                    filt_bool_all[:, ch_idx] = channel_mask
-            else:
-                logging.info(
-                    "Skipping morphological smoothing - structure size would be 1 (no effect)"
-                )
-
-        # Filter windows based on number of valid channels
-        valid_channels_per_window = np.sum(filt_bool_all, axis=1)  # axis 1 = channel
-        window_mask = (
-            valid_channels_per_window >= min_valid_channels
-        )  # True if window has enough valid channels
-        filt_bool_all = (
-            filt_bool_all & window_mask[:, np.newaxis]
-        )  # Apply window mask to all channels
-
-        filtered_result = self._apply_filter(filt_bool_all)
+        filtered = self.apply_filters(
+            filter_config=filter_config, min_valid_channels=min_valid_channels
+        )
         if inplace:
-            del self.result
-            self.result = filtered_result
-        return WindowAnalysisResult._from_existing(self, filtered_result)
+            self.result = filtered.result
+            self._update_instance_vars()
+        return filtered
 
     def _create_filtered_copy(
         self, filter_mask: np.ndarray, filter_name: str = None
@@ -3811,56 +3815,56 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 "reject_channels_by_session": {},
             }
 
-        filter_methods = {
-            "logrms_range": self.get_filter_logrms_range,
-            "high_rms": self.get_filter_high_rms,
-            "low_rms": self.get_filter_low_rms,
-            "high_beta": self.get_filter_high_beta,
-            "reject_channels": self.get_filter_reject_channels,
-            "reject_channels_by_session": self.get_filter_reject_channels_by_recording_session,
-        }
+        # Translate the legacy morphological_smoothing_seconds kwarg into the registry-driven form.
+        config = dict(filter_config)
+        if morphological_smoothing_seconds is not None and "morphological_smoothing" not in config:
+            config["morphological_smoothing"] = {"smoothing_seconds": morphological_smoothing_seconds}
 
-        filt_bools = []
-        morphological_params = None
+        masks: list[np.ndarray] = []
+        mask_post: list[tuple[str, dict]] = []
 
-        for filter_name, filter_params in filter_config.items():
-            if filter_name == "morphological_smoothing":
-                morphological_params = filter_params
-                continue
-
-            if filter_name not in filter_methods:
+        for name, params in config.items():
+            spec = FILTER_REGISTRY.get(name)
+            if spec is None:
                 raise ValueError(
-                    f"Unknown filter: {filter_name}. Available: {list(filter_methods.keys()) + ['morphological_smoothing']}"
+                    f"Unknown filter: {name}. Available: {sorted(FILTER_REGISTRY)}"
                 )
+            params = params or {}
+            if spec.scope is FilterScope.MASK_POST:
+                mask_post.append((name, params))
+                continue
+            # Dispatch through the wrapper method so subclass overrides (and test mocks)
+            # are honoured. Fall back to the registry's pure function for any future
+            # filter that doesn't ship with a WindowAnalysisResult wrapper.
+            wrapper = getattr(self, _WRAPPER_METHOD_NAMES.get(name, ""), None)
+            if wrapper is not None:
+                mask = wrapper(**params)
+            else:
+                mask = spec.apply(
+                    self.result, self._channel_info(), len(self.result), **params
+                )
+            masks.append(mask)
+            logging.info(f"{name}: filtered {mask.size - np.count_nonzero(mask)}/{mask.size}")
 
-            filter_func = filter_methods[filter_name]
-            filt_bool = filter_func(**filter_params)
-            filt_bools.append(filt_bool)
-            logging.info(
-                f"{filter_name}: filtered {filt_bool.size - np.count_nonzero(filt_bool)}/{filt_bool.size}"
-            )
-
-        # Combine all filter masks
-        if filt_bools:
-            filt_bool_all = np.prod(np.stack(filt_bools, axis=-1), axis=-1).astype(bool)
+        if masks:
+            filt_bool_all = np.prod(np.stack(masks, axis=-1), axis=-1).astype(bool)
         else:
             filt_bool_all = np.ones(
                 (len(self.result), len(self.channel_names)), dtype=bool
             )
 
-        # Apply morphological smoothing if requested (either from config or parameter)
-        if morphological_params or morphological_smoothing_seconds is not None:
-            if morphological_params:
-                smoothing_seconds = morphological_params["smoothing_seconds"]
+        for name, params in mask_post:
+            spec = FILTER_REGISTRY[name]
+            wrapper_attr = _WRAPPER_METHOD_NAMES.get(name)
+            if wrapper_attr and hasattr(self, wrapper_attr):
+                filt_bool_all = getattr(self, wrapper_attr)(filt_bool_all, **params)
             else:
-                smoothing_seconds = morphological_smoothing_seconds
+                filt_bool_all = spec.apply(
+                    filt_bool_all, self.result, self._channel_info(), **params
+                )
+            logging.info(f"{name}: applied (post-mask)")
 
-            filt_bool_all = self.get_filter_morphological_smoothing(
-                filt_bool_all, smoothing_seconds
-            )
-            logging.info(f"Applied morphological smoothing: {smoothing_seconds}s")
-
-        # Filter windows based on minimum valid channels
+        # Filter windows based on minimum valid channels.
         valid_channels_per_window = np.sum(filt_bool_all, axis=1)
         window_mask = valid_channels_per_window >= min_valid_channels
         filt_bool_all = filt_bool_all & window_mask[:, np.newaxis]
@@ -3869,78 +3873,12 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
     def _apply_filter(self, filter_tfs: np.ndarray):
         result = self.result.copy()
-        filter_tfs = np.array(filter_tfs, dtype=bool)  # (M fragments, N channels)
+        filter_tfs = np.asarray(filter_tfs, dtype=bool)  # (W, C)
         for feat in constants.FEATURES:
             if feat not in result.columns:
-                logging.debug(f"Skipping {feat} because it is not in result")
                 continue
-            logging.debug(f"Filtering {feat}")
-            ftype = constants.classify_feature(feat)
-
-            if ftype is constants.FeatureType.LINEAR:
-                vals = extract_linear_array(result[feat]).astype(float, copy=False)
-                vals[~filter_tfs] = np.nan
-                result[feat] = vals.tolist()
-
-            elif ftype is constants.FeatureType.LINEAR_2D:
-                vals = extract_linear_array(result[feat]).astype(float, copy=False)
-                mask = np.broadcast_to(filter_tfs[:, :, np.newaxis], vals.shape)
-                vals[~mask] = np.nan
-                result[feat] = vals.tolist()
-
-            elif ftype is constants.FeatureType.HIST:
-                # FIXME The sampling rates have changed between computation passes so WARs have different shapes.
-                # Add a check for same sampling frequency, other war-relevant properties etc.
-                # The logging lines below should be removed at some point, but I'll keep it this way for now
-                logging.debug(
-                    f"set([np.asarray(x[0]).shape for x in result[feat].tolist()]) = {list(set([np.asarray(x[0]).shape for x in result[feat].tolist()]))}"
-                )
-                logging.debug(
-                    f"set([np.asarray(x[1]).shape for x in result[feat].tolist()]) = {list(set([np.asarray(x[1]).shape for x in result[feat].tolist()]))}"
-                )
-                coords, vals = extract_hist_data(result[feat])
-                vals = vals.astype(float, copy=False)
-                # vals is canonical (W, C, F); filter_tfs is (W, C)
-                mask = np.broadcast_to(filter_tfs[:, :, np.newaxis], vals.shape)
-                vals[~mask] = np.nan
-                # Repack as (F, C) per cell to preserve per-cell storage format
-                outs = [(c, vals[i].T) for i, c in enumerate(coords)]
-                result[feat] = outs
-
-            elif ftype is constants.FeatureType.BAND:
-                band_vals, band_keys = extract_band_dict(result[feat])
-                band_vals = band_vals.astype(float, copy=False)
-                # band_vals is canonical (W, C, B); index band on last axis
-                for bi, colname in enumerate(band_keys):
-                    v = band_vals[:, :, bi]  # (W, C)
-                    v[~filter_tfs] = np.nan
-                    band_vals[:, :, bi] = v
-                result[feat] = repack_band_dict(band_vals, band_keys)
-
-            elif ftype is constants.FeatureType.BANDED_MATRIX:
-                band_vals, band_keys = extract_band_dict(result[feat])
-                band_vals = band_vals.astype(float, copy=False)
-                # band_vals is canonical (W, C, C, B); index band on last axis
-                shape = band_vals[:, :, :, 0].shape  # (W, C, C)
-                mask = np.broadcast_to(filter_tfs[:, :, np.newaxis], shape)
-                for bi, colname in enumerate(band_keys):
-                    v = band_vals[:, :, :, bi]  # (W, C, C)
-                    v[~mask] = np.nan
-                    v[~mask.transpose(0, 2, 1)] = np.nan
-                    band_vals[:, :, :, bi] = v
-                result[feat] = repack_band_dict(band_vals, band_keys)
-
-            elif ftype is constants.FeatureType.SIMPLE_MATRIX:
-                vals = extract_linear_array(result[feat]).astype(float, copy=False)
-                mask = np.broadcast_to(filter_tfs[:, :, np.newaxis], vals.shape)
-                vals[~mask] = np.nan
-                vals[~mask.transpose(0, 2, 1)] = np.nan
-                result[feat] = vals.tolist()
-
-            else:
-                raise ValueError(
-                    f"Unsupported FeatureType {ftype} for filtering: {feat}"
-                )
+            handler = handler_for(feat)
+            result[feat] = handler.apply_mask(result[feat], filter_tfs)
         return result
 
     def save_parquet_and_json(
@@ -3976,39 +3914,17 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
         filepath = str(folder / filename)
 
-        # Write parquet as the primary stable format.
-        # Object-like columns (lists/dicts/ndarrays) are JSON-encoded per-cell.
-        # The list of encoded columns is stored in the parquet schema metadata
-        # so they can be decoded on load.
-        #
-        # Build a column dict directly (avoids df.copy() and from_pandas()
-        # which together create 2-3 redundant copies of the DataFrame).
-        columns = {}
-        encoded_cols: list[str] = []
-        for col in self.result.columns:
-            ser = self.result[col]
-            needs_encoding = False
-            if ser.dtype == object:
-                sample = ser.dropna().head(20)
-                for v in sample:
-                    if not isinstance(v, (str, int, float, bool, type(None))):
-                        needs_encoding = True
-                        break
-            if needs_encoding:
-                encoded_cols.append(col)
-                columns[col] = [
-                    json.dumps(x, cls=WindowAnalysisResult._NumpyEncoder, ensure_ascii=False)
-                    for x in ser
-                ]
-            else:
-                columns[col] = ser.to_numpy()
-        table = pa.table(columns)
-        del columns
-        neurodent_meta = json.dumps({"encoded_columns": encoded_cols}).encode()
+        table, encoded_cols = WindowAnalysisResult._df_to_arrow_table(self.result)
+        # encoding_version=2: encoded_cols are native list/struct; absence/1 = legacy JSON.
+        neurodent_meta = json.dumps(
+            {"encoded_columns": encoded_cols, "encoding_version": 2}
+        ).encode()
         existing_meta = table.schema.metadata or {}
         merged_meta = {**existing_meta, b"neurodent": neurodent_meta}
         table = table.replace_schema_metadata(merged_meta)
-        pq.write_table(table, filepath + ".parquet")
+        pq.write_table(
+            table, filepath + ".parquet", compression="zstd", compression_level=4
+        )
         del table
         logging.info(f"Saved WAR to {filepath + '.parquet'}")
 
@@ -4049,10 +3965,8 @@ class WindowAnalysisResult(AnimalFeatureParser):
         return self.save_parquet_and_json(*args, **kwargs)
 
     class _NumpyEncoder(json.JSONEncoder):
-        """JSON encoder that handles numpy types transparently.
-
-        The stdlib encoder already recurses into lists and dicts, so we only
-        need to override *default* for types it cannot handle natively.
+        """JSON encoder that handles numpy types — used by the JSON fallback
+        path for cells pyarrow can't infer a uniform schema for.
         """
 
         def default(self, o: Any) -> Any:
@@ -4066,14 +3980,90 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 return bool(o)
             return super().default(o)
 
+    _TUPLE_FIELD_PREFIX = "_t"  # tuple round-trip marker for _to/_from nested
+
+    @staticmethod
+    def _to_nested_python(v):
+        """Convert numpy/dict/tuple cells to nested Python so pyarrow can
+        infer native list/struct types.  Tuples become structs with keys
+        ``_t0``, ``_t1``, … so heterogeneous-shape elements survive the
+        round trip.
+        """
+        if isinstance(v, np.ndarray):
+            return v.tolist()
+        if isinstance(v, dict):
+            return {str(k): WindowAnalysisResult._to_nested_python(vv) for k, vv in v.items()}
+        if isinstance(v, tuple):
+            return {
+                f"{WindowAnalysisResult._TUPLE_FIELD_PREFIX}{i}": WindowAnalysisResult._to_nested_python(x)
+                for i, x in enumerate(v)
+            }
+        if isinstance(v, list):
+            return [WindowAnalysisResult._to_nested_python(x) for x in v]
+        if isinstance(v, np.integer):
+            return int(v)
+        if isinstance(v, np.floating):
+            return float(v)
+        if isinstance(v, np.bool_):
+            return bool(v)
+        return v
+
+    @staticmethod
+    def _canonicalise_band_dict(d: dict) -> dict:
+        """Reorder *d* by ``constants.BAND_NAMES`` when it has any band-name keys.
+
+        Pyarrow alphabetises struct fields on the read side of a parquet
+        round-trip (``Table.to_pandas()``), so canonical-order band dicts
+        written to disk come back as ``{"alpha", "beta", "delta", "gamma",
+        "theta"}``. Best-fit reorder: any band-name keys present are
+        promoted to the front in canonical (FREQ_BANDS insertion) order,
+        any non-band keys are appended in their original order.
+        Idempotent — an already-canonical dict round-trips to itself.
+        Dicts with zero band-name overlap are returned unchanged.
+        """
+        band_set = set(constants.BAND_NAMES)
+        if not (set(d.keys()) & band_set):
+            return d
+        band_keys = [b for b in constants.BAND_NAMES if b in d]
+        other_keys = [k for k in d if k not in band_set]
+        return {**{b: d[b] for b in band_keys}, **{k: d[k] for k in other_keys}}
+
+    @staticmethod
+    def _normalize_arrow_cell(v):
+        """Convert pyarrow's ndarray-leafed cells back to plain Python lists,
+        reconstruct ``_t0``/``_t1``/… structs as tuples, and canonicalise
+        band-keyed dicts via :meth:`_canonicalise_band_dict`.
+        """
+        if isinstance(v, np.ndarray):
+            if v.dtype == object:
+                return [WindowAnalysisResult._normalize_arrow_cell(x) for x in v]
+            return v.tolist()
+        if isinstance(v, dict):
+            prefix = WindowAnalysisResult._TUPLE_FIELD_PREFIX
+            keys = list(v.keys())
+            if keys and all(k == f"{prefix}{i}" for i, k in enumerate(sorted(keys, key=lambda k: int(k[len(prefix):]) if k.startswith(prefix) and k[len(prefix):].isdigit() else -1))):
+                ordered = sorted(keys, key=lambda k: int(k[len(prefix):]))
+                return tuple(
+                    WindowAnalysisResult._normalize_arrow_cell(v[k]) for k in ordered
+                )
+            decoded = {k: WindowAnalysisResult._normalize_arrow_cell(vv) for k, vv in v.items()}
+            return WindowAnalysisResult._canonicalise_band_dict(decoded)
+        if isinstance(v, list):
+            return [WindowAnalysisResult._normalize_arrow_cell(x) for x in v]
+        return v
+
     @staticmethod
     def _encode_df_for_parquet(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
-        """Return a copy of *df* where complex/object columns have been
-        JSON-encoded as strings so they can be written to Parquet safely.
+        """Return a copy of *df* with complex/object columns converted to
+        nested Python structures (lists / dicts / scalars).
+
+        Pyarrow can store these as native list/struct columns directly,
+        without any JSON string intermediate.  Encoded column names are
+        returned so the caller can stamp them into parquet schema metadata.
 
         Returns:
             (encoded_df, encoded_columns) — the modified DataFrame and the
-            list of column names that were encoded.
+            list of column names that were converted.
         """
         df_copy = df.copy()
         encoded_cols: list[str] = []
@@ -4089,39 +4079,120 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
             if needs_encoding:
                 encoded_cols.append(col)
-                df_copy[col] = ser.apply(
-                    lambda x: json.dumps(x, cls=WindowAnalysisResult._NumpyEncoder, ensure_ascii=False)
-                )
+                df_copy[col] = ser.apply(WindowAnalysisResult._to_nested_python)
 
         return df_copy, encoded_cols
 
     @staticmethod
-    def _decode_df_from_parquet(df: pd.DataFrame, encoded_cols: list[str]) -> pd.DataFrame:
-        """Decode JSON-encoded columns back into Python objects.
+    def _df_to_arrow_table(
+        df: pd.DataFrame, encoded_cols: list[str] | None = None
+    ):
+        """Encode a DataFrame for parquet write. Shared by eager + streaming saves.
 
-        Values are returned as plain Python types (lists, dicts, scalars) —
-        the same representation that ``json.loads`` produces.  Consuming code
-        (e.g. ``_apply_filter``) already wraps values with ``np.array()`` /
-        ``np.asarray()`` where needed, so no eager numpy conversion is done
-        here.  This avoids over-converting list-based features and keeps the
-        per-cell cost to a single ``json.loads`` call.
+        Columns whose name is in :data:`constants.FEATURE_TYPES` with a non-LINEAR
+        type are encoded as native nested pyarrow types (via ``_to_nested_python``
+        + ``pa.array``) with a per-cell JSON fallback for shapes pyarrow can't
+        infer.  tz-aware datetimes are normalised to UTC.  Pass an explicit
+        ``encoded_cols`` list to override the schema-based detection (e.g. when
+        round-tripping non-WAR DataFrames).
+
+        Returns the table (without schema metadata stamped) and the list of
+        columns that ended up encoded.
         """
-        for col in encoded_cols:
-            if col not in df.columns:
-                continue
-            # Some parquet engines may already return Python objects for nulls;
-            # only attempt json.loads on actual string values.
-            def _try_load(v):
-                if isinstance(v, str):
-                    try:
-                        return json.loads(v)
-                    except json.JSONDecodeError:
-                        return v
+        import pyarrow as pa
+
+        encoded_out: list[str] = list(encoded_cols) if encoded_cols else []
+        columns: dict[str, Any] = {}
+        for col in df.columns:
+            ser = df[col]
+            needs_encoding = col in encoded_out or _column_needs_encoding(col)
+            if needs_encoding and col not in encoded_out:
+                encoded_out.append(col)
+            if needs_encoding:
+                nested = [WindowAnalysisResult._to_nested_python(x) for x in ser]
+                try:
+                    columns[col] = pa.array(nested)
+                except (pa.lib.ArrowInvalid, pa.lib.ArrowTypeError, AttributeError, TypeError, ValueError):
+                    columns[col] = [
+                        json.dumps(x, cls=WindowAnalysisResult._NumpyEncoder, ensure_ascii=False)
+                        for x in nested
+                    ]
+                del nested
+            else:
+                if ser.dtype == object:
+                    non_null = ser.dropna()
+                    if len(non_null) > 0 and isinstance(non_null.iloc[0], pd.Timestamp):
+                        ser = pd.to_datetime(ser, errors="coerce")
+                if pd.api.types.is_datetime64_any_dtype(ser):
+                    tz = getattr(getattr(ser, "dt", None), "tz", None)
+                    if tz is not None:
+                        if ser.isna().any():
+                            ser = ser.dt.tz_convert("UTC").dt.tz_localize(None)
+                        else:
+                            ser = ser.dt.tz_convert("UTC")
+                columns[col] = ser.to_numpy()
+        return pa.table(columns), encoded_out
+
+    @staticmethod
+    def _try_load_json(v):
+        """Legacy JSON-string decoder; identity on non-strings."""
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except json.JSONDecodeError:
                 return v
+        return v
 
-            df[col] = df[col].apply(_try_load)
+    @staticmethod
+    def _decode_df_from_parquet(
+        df: pd.DataFrame,
+        encoded_cols: list[str],
+        encoding_version: int = 1,
+    ) -> pd.DataFrame:
+        """Decode complex columns to plain Python.
 
+        ``encoding_version`` is read from the parquet's ``neurodent.encoding_version``
+        schema metadata at the call site:
+
+        - 1 (or missing) → legacy JSON-string cells; decoded with :func:`json.loads`.
+        - 2              → native nested cells (pa.list/struct/binary);
+          normalised with :meth:`_normalize_arrow_cell`.
+        """
+        decoder = (
+            WindowAnalysisResult._normalize_arrow_cell
+            if encoding_version >= 2
+            else WindowAnalysisResult._try_load_json
+        )
+        for col in encoded_cols:
+            if col in df.columns:
+                df[col] = df[col].apply(decoder)
         return df
+
+    @classmethod
+    def scan_parquet_and_json(cls, folder_path: str | Path, filename: str = "war"):
+        """Open a WAR as a :class:`LazyWindowAnalysisResult` (no DataFrame materialised).
+
+        The returned object mirrors the mutator API of ``WindowAnalysisResult``
+        (``reorder_and_pad_channels``, ``add_unique_hash``, ``apply_filters``,
+        ``aggregate_time_windows``) but records each call as a ``Transform``;
+        :meth:`LazyWindowAnalysisResult.save_parquet_and_json` runs the chain
+        against batched parquet reads.
+
+        Args:
+            folder_path: directory containing ``<filename>.parquet`` and
+                ``<filename>.json``.  Matches the first positional of
+                :meth:`load_parquet_and_json`.
+            filename: stem shared by the two sidecar files.  Defaults to
+                ``"war"`` (the convention used by every NeuRodent pipeline
+                rule).
+
+        Returns:
+            LazyWindowAnalysisResult: streaming handle with the same mutator
+            API as :class:`WindowAnalysisResult`.
+        """
+        from .streaming import LazyWindowAnalysisResult
+
+        return LazyWindowAnalysisResult(folder_path, filename=filename)
 
     def get_bad_channels_by_lof_threshold(self, lof_threshold: float) -> dict:
         """Apply LOF threshold directly to stored scores to get bad channels.
@@ -4331,7 +4402,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         return y_true_list, y_pred_list
 
     @classmethod
-    def load_parquet_and_json(cls, folder_path=None, parquet_name=None, json_name=None):
+    def load_parquet_and_json(cls, folder_path=None, parquet_name=None, json_name=None, filename=None):
         """Load WindowAnalysisResult from folder.
 
         Reads ``war.parquet`` (the result DataFrame) plus ``war.json`` (the
@@ -4349,6 +4420,13 @@ class WindowAnalysisResult(AnimalFeatureParser):
             json_name (str, optional): Name of the JSON file. Can be just the filename (e.g. "war.json")
                 or a path relative to folder_path (e.g. "subdir/war.json"). If None and folder_path is provided,
                 expects exactly one .json file in folder_path. Defaults to None.
+            filename (str, optional): Shorthand stem shared by the parquet
+                and JSON sidecars (i.e. ``<filename>.parquet`` +
+                ``<filename>.json``). Matches the ``filename`` kwarg of
+                :meth:`scan_parquet_and_json` so eager and lazy entry points have the
+                same simple-case call shape. Ignored when ``parquet_name``
+                or ``json_name`` is also provided. Defaults to None
+                (auto-discovery).
 
         Raises:
             ValueError: folder_path does not exist
@@ -4358,6 +4436,11 @@ class WindowAnalysisResult(AnimalFeatureParser):
         Returns:
             result: WindowAnalysisResult object
         """
+        if filename is not None:
+            if parquet_name is None:
+                parquet_name = f"{filename}.parquet"
+            if json_name is None:
+                json_name = f"{filename}.json"
         if folder_path is not None:
             folder_path = Path(folder_path)
             if not folder_path.exists():
@@ -4430,12 +4513,14 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 import pyarrow.parquet as pq
 
                 table = pq.read_table(parquet_path)
-                # Encoded-column list is stored in schema metadata
+                # Encoded-column list + encoding_version are stored in schema metadata
                 encoded_cols: list[str] = []
+                encoding_version: int = 1
                 schema_meta = table.schema.metadata or {}
                 if b"neurodent" in schema_meta:
                     nd_meta = json.loads(schema_meta[b"neurodent"])
                     encoded_cols = nd_meta.get("encoded_columns", [])
+                    encoding_version = nd_meta.get("encoding_version", 1)
                 else:
                     # Fallback: try legacy .parquet.meta.json sidecar file
                     legacy_meta_path = parquet_path.parent / (
@@ -4446,9 +4531,11 @@ class WindowAnalysisResult(AnimalFeatureParser):
                             pq_meta = json.load(mf)
                         encoded_cols = pq_meta.get("encoded_columns", [])
 
-                data = table.to_pandas()
+                # self_destruct + split_blocks: free Arrow buffers during
+                # conversion and prevent giant BlockManager allocations.
+                data = table.to_pandas(self_destruct=True, split_blocks=True)
                 del table
-                data = cls._decode_df_from_parquet(data, encoded_cols)
+                data = cls._decode_df_from_parquet(data, encoded_cols, encoding_version=encoding_version)
             except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as e:
                 legacy_pkl = parquet_path.with_suffix(".pkl")
                 if not legacy_pkl.exists():

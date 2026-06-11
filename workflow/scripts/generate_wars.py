@@ -289,11 +289,13 @@ def main():
     fdsar_export_chunk_duration_s = fdsar_config.get("export_chunk_duration_s", 60)
 
     for fdsar in fdsar_list:
-        # Create subdirectory for this animalday
-        animalday_dir = fdsar_base_dir / f"{fdsar.animal_id}-{fdsar.genotype}-{fdsar.animal_day}"
+        # path_safe_save_stem returns slugified ``{animal_id}-{genotype}-{animal_day}``
+        # so genotypes containing "/" (e.g. ``Arx(F/y); Rosa(+/wt)``) can't break
+        # path construction.  See ``slugify`` for the convention.
+        animalday_dir = fdsar_base_dir / fdsar.path_safe_save_stem
         animalday_dir.mkdir(parents=True, exist_ok=True)
 
-        fdsar.save_fif_and_json(animalday_dir, convert_to_mne=True, slugify_filebase=False, overwrite=True, chunk_duration_s=fdsar_export_chunk_duration_s)
+        fdsar.save_fif_and_json(animalday_dir, convert_to_mne=True, overwrite=True, chunk_duration_s=fdsar_export_chunk_duration_s)
         logger.info(f"Saved FDSAR for {fdsar.animal_id} {fdsar.animal_day} to {animalday_dir}")
         fdsar.result_sas = None  # Release memmap-backed recording references
 

@@ -885,3 +885,193 @@ class TestGetDiscoveryAnimalFilter:
         animal_groups = {"OtherAnimal": "SomeGroup"}
         result = get_discovery_animal_filter("A10", is_joint=True, animal_groups=animal_groups)
         assert result == "A10"
+
+
+class TestBuildSexMarkerScale:
+    """Regression tests for ``build_sex_marker_scale``.
+
+    Why this exists: generate_ep_figures.py used to hard-code
+    ``so.Nominal(["o", "s"], order=["Female", "Male"])`` as the marker
+    scale.  seaborn-objects silently drops rows whose sex value isn't in
+    that order, so any dataset with non-canonical sex (e.g. arxrosa,
+    where every animal has sex='Unknown') rendered an *empty* plot
+    without raising — a silent regression observed on run 9000578.
+    The helper builds the scale dynamically from the DataFrame's sex
+    values.
+    """
+
+    @staticmethod
+    def _make_scale(sex_values):
+        """Build a scale from a synthetic df with the given sex values."""
+        import pandas as pd
+        from neurodent.workflow import build_sex_marker_scale
+        df = pd.DataFrame({"sex": sex_values, "y": list(range(len(sex_values)))})
+        return build_sex_marker_scale(df)
+
+    def test_canonical_female_male(self):
+        """Female + Male present → preserves circle / square in canonical order."""
+        scale = self._make_scale(["Female", "Male", "Female", "Male"])
+        assert scale.order == ["Female", "Male"]
+        assert scale.values == ["o", "s"]
+
+    def test_only_male(self):
+        """Single canonical sex → just that marker."""
+        scale = self._make_scale(["Male", "Male"])
+        assert scale.order == ["Male"]
+        assert scale.values == ["s"]
+
+    def test_unknown_only_uses_fallback_marker(self):
+        """arxrosa case: every row has sex='Unknown' → diamond fallback,
+        scale is non-empty so points actually render."""
+        scale = self._make_scale(["Unknown", "Unknown", "Unknown"])
+        assert scale.order == ["Unknown"]
+        assert scale.values == ["D"]
+
+    def test_mixed_canonical_and_unknown(self):
+        """Canonical sexes first, then any non-canonical values appended."""
+        scale = self._make_scale(["Female", "Unknown", "Male"])
+        # Canonical Female, Male come first; Unknown last.
+        assert scale.order[:2] == ["Female", "Male"]
+        assert "Unknown" in scale.order
+        # Markers track order.
+        assert scale.values[scale.order.index("Female")] == "o"
+        assert scale.values[scale.order.index("Male")] == "s"
+        assert scale.values[scale.order.index("Unknown")] == "D"
+
+    def test_drops_nan_values(self):
+        """NaN sex entries are skipped, don't introduce a NaN category."""
+        import numpy as np
+        scale = self._make_scale(["Female", np.nan, "Female"])
+        assert scale.order == ["Female"]
+        assert scale.values == ["o"]
+
+    def test_returns_seaborn_objects_nominal(self):
+        """Smoke-check the returned object's type so accidental refactors
+        that swap to a different scale class get caught."""
+        import seaborn.objects as so
+        scale = self._make_scale(["Female", "Male"])
+        assert isinstance(scale, so.Nominal)
+
+
+def _load_generate_ep_figures():
+    """Import workflow/scripts/generate_ep_figures.py as a module.
+
+    The script expects a global ``snakemake`` injected by Snakemake at
+    runtime; we stub it so the module body executes.
+    """
+    import builtins
+    import importlib.util
+
+    builtins.snakemake = None
+    spec = importlib.util.spec_from_file_location(
+        "generate_ep_figures",
+        Path(__file__).parent.parent / "workflow" / "scripts" / "generate_ep_figures.py",
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+class TestProcessFeatureDataframe:
+    """Tests for ``process_feature_dataframe`` in generate_ep_figures.py.
+
+    Why this exists: the function used to hard-code feature lists for
+    groupby dispatch.  It now delegates to ``constants.FEATURE_TYPES`` /
+    ``classify_feature`` so adding a new feature to the constants module
+    automatically routes it to the correct plot type.  These tests
+    guarantee every feature in the configured EP feature list dispatches
+    cleanly and that LINEAR_2D features raise a clear error.
+    """
+
+    @staticmethod
+    def _make_df(feature, has_band=False, has_freq=False):
+        """Build a synthetic post-pull_timeseries_dataframe input."""
+        import numpy as np
+        import pandas as pd
+
+        rows = []
+        animals = ["A1", "A2"]
+        bands = ["delta", "theta", "alpha", "beta", "gamma"] if has_band else [None]
+        freqs = np.arange(1, 11) if has_freq else [None]
+        for animal in animals:
+            for band in bands:
+                for freq in freqs:
+                    row = {
+                        "animal": animal,
+                        "genotype": "WT",
+                        "sex": "Unknown",
+                        "isday": True,
+                        "channel": "ch1",
+                        feature: 1.0,
+                    }
+                    if has_band:
+                        row["band"] = band
+                    if has_freq:
+                        row["freq"] = freq
+                    rows.append(row)
+        return pd.DataFrame(rows)
+
+    @pytest.fixture(scope="class")
+    def gef(self):
+        return _load_generate_ep_figures()
+
+    @pytest.mark.parametrize(
+        "feature",
+        ["rms", "ampvar", "psdtotal", "nspike",
+         "logrms", "logampvar", "logpsdtotal", "lognspike",
+         "pcorr", "zpcorr"],
+    )
+    def test_linear_and_simple_matrix_features_route_correctly(self, gef, feature):
+        """LINEAR and SIMPLE_MATRIX features get a no-band groupby."""
+        df = self._make_df(feature, has_band=False)
+        out, pivot = gef.process_feature_dataframe(df, feature)
+        assert "band" not in out.columns or out["band"].isna().all()
+        assert not pivot.empty
+
+    @pytest.mark.parametrize(
+        "feature",
+        ["psdband", "psdfrac", "logpsdband", "logpsdfrac",
+         "cohere", "zcohere", "imcoh", "zimcoh"],
+    )
+    def test_band_and_banded_matrix_features_route_correctly(self, gef, feature):
+        """BAND and BANDED_MATRIX features get a band-aware groupby."""
+        df = self._make_df(feature, has_band=True)
+        out, pivot = gef.process_feature_dataframe(df, feature)
+        assert "band" in out.columns
+        assert set(out["band"].unique()) == {"delta", "theta", "alpha", "beta", "gamma"}
+        assert not pivot.empty
+
+    def test_hist_psd_routes_to_no_band_groupby(self, gef):
+        """HIST features (psd) groupby has no band — freq is the semantic axis."""
+        df = self._make_df("psd", has_band=False, has_freq=True)
+        out, pivot = gef.process_feature_dataframe(df, "psd")
+        assert "band" not in out.columns or out["band"].isna().all()
+        assert "freq" in out.columns
+        assert not pivot.empty
+
+    def test_linear_2d_raises(self, gef):
+        """psdslope (LINEAR_2D) raises with a clear message."""
+        df = self._make_df("psdslope", has_band=False)
+        with pytest.raises(ValueError, match="LINEAR_2D"):
+            gef.process_feature_dataframe(df, "psdslope")
+
+    def test_unknown_feature_raises(self, gef):
+        """Unknown feature names raise via classify_feature."""
+        df = self._make_df("not_a_feature", has_band=False)
+        with pytest.raises((KeyError, ValueError)):
+            gef.process_feature_dataframe(df, "not_a_feature")
+
+    def test_feature_to_label_covers_all_configured_features(self, gef):
+        """Every feature in config.yaml ep_figures.features has a label."""
+        from neurodent import constants
+
+        configured = [
+            "rms", "ampvar", "psdtotal", "nspike",
+            "logrms", "logampvar", "logpsdtotal", "lognspike",
+            "psdband", "psdfrac", "logpsdband", "logpsdfrac",
+            "cohere", "zcohere", "imcoh", "zimcoh",
+            "pcorr", "zpcorr", "psd",
+        ]
+        labels = {**constants.FEATURE_LABELS, "normpsd": "Normalized PSD"}
+        missing = [f for f in configured if f not in labels]
+        assert not missing, f"Features without labels: {missing}"

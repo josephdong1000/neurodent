@@ -30,7 +30,6 @@ analysis:
     skip_sessions: ["*bad*"]
     lro_kwargs:
       multiprocess_mode: "dask"
-      overwrite_rowbins: false # REVIEW function of this parameter when mode is not "bin"
     compute_windowed_analysis:
       features: ["all"]             # Feature list; "all" computes every supported feature
       multiprocess_mode: "dask"     # "dask" (parallel) or "serial"
@@ -58,7 +57,7 @@ analysis:
     chunk_duration_s: 3600           # seconds per chunk for spike detection (null = load full recording at once)
 
     # .fif export parameters
-    export_chunk_duration_s: 60    # seconds per chunk when reading traces to write .fif (lower = less RAM)
+    export_chunk_duration_s: 3600    # seconds per chunk when reading traces to write .fif (lower = less RAM but more NFS round-trips)
 
     # Visualization parameters
     spike_averaged_traces:
@@ -107,12 +106,16 @@ analysis:
 
   # Zeitgeber time processing parameters
   zeitgeber:
-    features: ["logpsdband", "logpsdfrac", "logrms", "zpcorr", "zcohere", "zimcoh"]  # Features to extract for zeitgeber analysis
+    features: ["logpsdband", "logpsdfrac", "logrms", "logampvar",
+               "logpsdtotal", "lognspike", "psdslope",
+               "zpcorr", "zcohere", "zimcoh"]
     time_aggregation_minutes: 60  # Time window for aggregation (60 = hourly)
 
   # Zeitgeber temporal plots parameters
   zeitgeber_plots:
-    features: ["logpsdband", "logpsdfrac", "logrms", "zpcorr", "zcohere", "zimcoh"]  # Features to plot in temporal analysis
+    features: ["logpsdband", "logpsdfrac", "logrms", "logampvar",
+               "logpsdtotal", "lognspike", "psdslope",
+               "zpcorr", "zcohere", "zimcoh"]
     baseline_hours: 12  # Hours to use for baseline correction (first N hours)
     exclude_from_baseline: []  # Optional: features to exclude from baseline correction (e.g., ["logrms", "zcohere_delta"])
     figure_format: "png"  # Figure output format: png, tif, pdf, svg
@@ -129,8 +132,11 @@ analysis:
 
   # ExperimentPlotter statistical figures parameters
   ep_figures:
-    # features: ["pcorr", "zpcorr", "cohere", "zcohere", "logpsdfrac", "logpsdband", "psd", "normpsd", "nspike", "lognspike"]
-    features: ["nspike", "lognspike", "pcorr", "zpcorr"]
+    features: ["rms", "ampvar", "psdtotal", "nspike",
+               "logrms", "logampvar", "logpsdtotal", "lognspike",
+               "psdband", "psdfrac", "logpsdband", "logpsdfrac",
+               "cohere", "zcohere", "imcoh", "zimcoh",
+               "pcorr", "zpcorr", "psd"]
     exclude_features: null  # Features to exclude from ExperimentPlotter
     figure_format: "png"  # Figure output format: png, tif, pdf, svg
     data_format: "csv"    # Data export format: csv, pkl

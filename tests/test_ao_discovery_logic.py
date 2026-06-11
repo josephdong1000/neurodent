@@ -591,7 +591,7 @@ def test_pattern_with_irrelevant_path_data_and_index_sort(tmp_path, monkeypatch)
             ao_instance, results.AnimalOrganizer
         )
 
-        result = ao_instance._compute_global_timeline(
+        result, _end_dt = ao_instance._compute_global_timeline(
             base_datetime, animalday_to_items, base_lro_kwargs,
             original_manual_datetimes=base_datetime,
         )

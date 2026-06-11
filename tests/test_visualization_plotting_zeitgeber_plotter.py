@@ -11,7 +11,7 @@ from neurodent import constants
 def test_plot_single_feature(mock_close, mock_fig, mock_plot, tmp_path):
     """Verify plot_feature calls plotting commands correctly."""
     df = pd.DataFrame({
-        "total_minutes": [0, 60, 120, 180],
+        "zt_minutes": [0, 60, 120, 180],
         "sex": ["Male", "Male", "Female", "Female"],
         "gene": ["WT", "WT", "WT", "WT"],
         "test_feat": [1, 2, 3, 4]
@@ -30,12 +30,17 @@ def test_plot_single_feature(mock_close, mock_fig, mock_plot, tmp_path):
     output_path = tmp_path / "test_plot.png"
     
     plotter.plot_feature(feature="test_feat", output_path=output_path, figsize=[10, 10], dpi=100)
-    
-    # Verify Plot was initialized with our df
-    # so.Plot(df, ...)
+
+    # Verify Plot was initialized with the EXPANDED df (2x rows, default n_days=2)
+    # — the plotter calls expand_zt_axis(self.df, n_days=2) at render time.
     args, kwargs = mock_plot.call_args
-    pd.testing.assert_frame_equal(args[0], df)
-    assert kwargs['x'] == "total_minutes"
+    plotted_df = args[0]
+    assert len(plotted_df) == 2 * len(df), (
+        f"plot_feature should expand df via expand_zt_axis(n_days=2); "
+        f"got {len(plotted_df)} rows from {len(df)} input rows"
+    )
+    assert "daynight" in plotted_df.columns
+    assert kwargs['x'] == "zt_minutes"
     assert kwargs['y'] == "test_feat"
     
     # Verify figure creation
@@ -82,7 +87,7 @@ def test_zeitgeber_plotter_from_zars():
     mock_zar1 = MagicMock()
     mock_zar1.animal_id = "Animal1"
     mock_zar1.get_channel_averaged_result.return_value = pd.DataFrame({
-        "total_minutes": [0, 60, 120],
+        "zt_minutes": [0, 60, 120],
         "genotype": ["M_WT", "M_WT", "M_WT"],
         "feature1": [1.0, 2.0, 3.0]
     })
@@ -90,29 +95,26 @@ def test_zeitgeber_plotter_from_zars():
     mock_zar2 = MagicMock()
     mock_zar2.animal_id = "Animal2"
     mock_zar2.get_channel_averaged_result.return_value = pd.DataFrame({
-        "total_minutes": [0, 60, 120],
+        "zt_minutes": [0, 60, 120],
         "genotype": ["F_Mut", "F_Mut", "F_Mut"],
         "feature1": [4.0, 5.0, 6.0]
     })
     
-    # Mock transform_time_axis to avoid full pipeline
-    with patch.object(zeitgeber, "transform_time_axis") as mock_transform:
-        mock_transform.side_effect = lambda df, **kwargs: df  # Return df as-is
-        
-        plotter = ZeitgeberPlotter([mock_zar1, mock_zar2], features=["feature1"])
-        
-        # Verify aggregation happened
-        assert "animal" in plotter.df.columns
-        assert set(plotter.df["animal"].unique()) == {"Animal1", "Animal2"}
-        
-        # Verify transform_time_axis was called
-        mock_transform.assert_called_once()
+    plotter = ZeitgeberPlotter([mock_zar1, mock_zar2], features=["feature1"])
+
+    # Verify aggregation happened — both animals end up in the plotter's df.
+    assert "animal" in plotter.df.columns
+    assert set(plotter.df["animal"].unique()) == {"Animal1", "Animal2"}
+
+    # Post-refactor: _aggregate_zars returns a 24h df (no row duplication).
+    # Multi-day expansion is deferred to plot_feature via expand_zt_axis().
+    assert plotter.df["zt_minutes"].max() < 1440
 
 
 def test_zeitgeber_plotter_from_dataframe():
     """Test ZeitgeberPlotter initialization from DataFrame (backward compat)."""
     df = pd.DataFrame({
-        "total_minutes": [0, 60, 120],
+        "zt_minutes": [0, 60, 120],
         "sex": ["Male", "Male", "Male"],
         "gene": ["WT", "WT", "WT"],
         "feature1": [1.0, 2.0, 3.0]
@@ -141,7 +143,7 @@ def test_no_circular_import_with_transform_time_axis():
     
     # Create a simple DF and run the function to ensure it's callable
     df = pd.DataFrame({
-        "total_minutes": [0, 60, 120],
+        "zt_minutes": [0, 60, 120],
         "genotype": ["M_WT", "M_WT", "M_WT"],
         "feature": [1, 2, 3],
     })

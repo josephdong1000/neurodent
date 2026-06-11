@@ -362,7 +362,6 @@ class TestSaveFifChunkLenWiring:
         mock_fdsar.save_fif_and_json(
             animalday_dir,
             convert_to_mne=True,
-            slugify_filebase=False,
             overwrite=True,
             chunk_duration_s=fdsar_export_chunk_duration_s,
         )

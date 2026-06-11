@@ -44,7 +44,7 @@ class TestTimelineSortingCrash:
         base_lro_kwargs = {}
 
         # Execute (pass original_manual_datetimes to use manual timestamp mode)
-        result = ao._compute_global_timeline(manual_dt, animalday_to_folders, base_lro_kwargs,
+        result, _end_dt = ao._compute_global_timeline(manual_dt, animalday_to_folders, base_lro_kwargs,
                                              original_manual_datetimes=manual_dt)
         
         # Verify result contains both keys

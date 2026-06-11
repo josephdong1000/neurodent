@@ -38,7 +38,10 @@ def create_norm_from_config(norm_config):
 
 
 def generate_temporal_heatmaps_from_config(animal_plotter, config, animal_id, output_dir, version_name):
-    """Generate temporal heatmaps using AnimalPlotter and config parameters"""
+    """Generate temporal heatmaps using AnimalPlotter and config parameters.
+
+    ``animal_id`` must already be path-safe (caller passes ``war.path_safe_animal_id``).
+    """
     try:
         heatmaps_config = config["analysis"]["figures"]["temporal_heatmaps"]["features"]
 
@@ -106,7 +109,10 @@ def generate_diagnostic_figures_for_animal(war, config, animal_folder, animal_id
     logging.info(f"Processing {animal_folder} - {animal_id}")
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    save_path_base = output_dir / animal_id
+    # Use the WAR's path-safe id so we don't depend on the Snakemake ``{animal}``
+    # wildcard already being slugified upstream — defensive per the project
+    # path-safety convention.
+    save_path_base = output_dir / war.path_safe_animal_id
     ap = visualization.AnimalPlotter(war, save_fig=True, save_path=str(save_path_base))
     figure_config = config["analysis"]["figures"]
 
@@ -129,9 +135,10 @@ def generate_diagnostic_figures_for_animal(war, config, animal_folder, animal_id
             figsize=figure_config["psd_spectrogram"]["figsize"], mode=figure_config["psd_spectrogram"]["mode"]
         )
 
-        # Generate temporal heatmaps
+        # Generate temporal heatmaps — pass the path-safe id (the helper builds
+        # filenames from it).
         logging.info("Generating temporal heatmaps")
-        generate_temporal_heatmaps_from_config(ap, config, animal_id, output_dir, "")
+        generate_temporal_heatmaps_from_config(ap, config, war.path_safe_animal_id, output_dir, "")
 
     except Exception as e:
         logging.error(f"Figure generation failed: {str(e)}")

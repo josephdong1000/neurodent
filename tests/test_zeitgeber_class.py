@@ -39,7 +39,7 @@ def mock_war_data():
             "timestamp": dates,
             "genotype": ["M_WT"] * 5,
             "feature1": [1, 2, 3, 4, 5],
-            # 'total_minutes' typically not present in raw WAR output, added by ZAR
+            # 'zt_minutes' typically not present in raw WAR output, added by ZAR
         }
     )
     return MockWAR(df)
@@ -64,13 +64,13 @@ def test_zar_get_result_pipeline(mock_war_data):
 
     # Assert
     # 1. Total minutes added (via add_zeitgeber_time_columns injection)
-    assert "total_minutes" in df_res.columns
+    assert "zt_minutes" in df_res.columns
     # 2. Metadata enriched
     assert "sex" in df_res.columns
     assert df_res.iloc[0]["sex"] == "Male"
     # 3. ZT Shift (Default 6h shift: 6am -> ZT0)
     # 6:00 is minute 360. 360 - 6*60 = 0.
-    assert df_res.iloc[0]["total_minutes"] == 0
+    assert df_res.iloc[0]["zt_minutes"] == 0
 
     # 4. Baseline Correction (baseline_hours=2)
     # Baseline window: ZT 0-2 (first 2 points: 1, 2). Mean = 1.5.
@@ -96,8 +96,11 @@ def test_zar_get_channel_averaged_result(mock_war_data):
     zar = zeitgeber.ZeitgeberAnalysisResult(mock_war_data)
     df = zar.get_channel_averaged_result()
 
-    assert "total_minutes" in df.columns
+    assert "zt_minutes" in df.columns
     assert "sex" in df.columns
+    # daynight is added by shift_to_zeitgeber_reference inside the pipeline.
+    assert "daynight" in df.columns
+    assert set(df["daynight"].unique()).issubset({"Day", "Night"})
 
 
 def test_zar_missing_timestamp_fallback(mock_war_data):
@@ -110,7 +113,7 @@ def test_zar_missing_timestamp_fallback(mock_war_data):
     df_res = zar.get_result()
 
     # Should run pipeline, but add_zeitgeber_time_columns effectively skips
-    # And pipeline steps relying on total_minutes (shift, baseline) should skip or act robustly
+    # And pipeline steps relying on zt_minutes (shift, baseline) should skip or act robustly
     assert "sex" in df_res.columns  # Metadata still runs
-    assert "total_minutes" not in df_res.columns
-    assert "feature1_nobase" not in df_res.columns  # Baseline needs total_minutes
+    assert "zt_minutes" not in df_res.columns
+    assert "feature1_nobase" not in df_res.columns  # Baseline needs zt_minutes

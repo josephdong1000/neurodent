@@ -24,7 +24,13 @@ import seaborn.objects as so
 from seaborn import axes_style
 
 from neurodent import visualization, constants
-from neurodent.workflow import setup_snakemake_logging, load_wars, inject_config_aliases
+from neurodent.workflow import (
+    setup_snakemake_logging,
+    load_wars,
+    inject_config_aliases,
+    extend_plot_order_from_attr,
+    build_sex_marker_scale,
+)
 
 def infer_metadata_columns(df):
     """
@@ -49,12 +55,17 @@ def process_feature_dataframe(df, feature):
     Returns:
         tuple: (processed_df, pivoted_df)
     """
-    if feature in ["logpsdfrac", "logpsdband", "psdband", "cohere", "zcohere", "imcoh", "zimcoh"]:
-        groupby = ["animal", "isday", "band"]
-    elif feature in ["pcorr", "zpcorr", "psd", "normpsd", "nspike", "lognspike"]:
-        groupby = ["animal", "isday"]
+    if feature == "normpsd":
+        ftype = constants.FeatureType.HIST
     else:
-        raise ValueError(f"Feature {feature} not supported")
+        ftype = constants.classify_feature(feature)
+
+    if ftype.is_dict_stored:
+        groupby = ["animal", "isday", "band"]
+    elif ftype is constants.FeatureType.LINEAR_2D:
+        raise ValueError(f"LINEAR_2D features (e.g. psdslope) not yet supported for EP plots")
+    else:
+        groupby = ["animal", "isday"]
 
     if "isday" not in df.columns:
         groupby.remove("isday")
@@ -139,7 +150,12 @@ def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
             df_pivot.to_pickle(data_dir / f"{feature}-pivot.pkl")
 
         # Create plots based on feature type
-        if feature in ["pcorr", "zpcorr", "nspike", "lognspike"]:
+        if feature == "normpsd":
+            ftype = constants.FeatureType.HIST
+        else:
+            ftype = constants.classify_feature(feature)
+
+        if ftype in (constants.FeatureType.LINEAR, constants.FeatureType.SIMPLE_MATRIX):
             # Bar plot with individual points
             p = (
                 so.Plot(df, x="sex", y=feature, color="gene", marker="sex")
@@ -147,7 +163,7 @@ def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
                 .add(so.Dash(color="k"), so.Agg(), so.Dodge(empty="drop", gap=0.2))
                 .add(so.Range(color="k"), so.Est(errorbar="sd"), so.Dodge(empty="drop", gap=0.2))
                 .add(so.Dot(), so.Dodge(empty="drop", gap=0.2), so.Jitter(0.75, seed=42))
-                .scale(marker=so.Nominal(["o", "s"], order=["Female", "Male"]))
+                .scale(marker=build_sex_marker_scale(df, plot_lib=so))
                 .theme(
                     axes_style("ticks")
                     | sns.plotting_context("talk")
@@ -159,15 +175,20 @@ def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
             )
             p.save(output_dir / f"{feature}.{figure_format}", bbox_inches="tight", dpi=dpi)
 
-        elif feature in ["logpsdfrac", "logpsdband", "psdband", "cohere", "zcohere", "imcoh", "zimcoh"]:
-            # By band plot
+        elif ftype.is_dict_stored:
+            # By band plot — explicit Nominal(order=BAND_NAMES) on x because
+            # seaborn-objects' Dodge/Jitter/Est can drop pd.Categorical order.
+            # See ExperimentPlotter.band_scale docstring.
             p1 = (
                 so.Plot(df, x="band", y=feature, color="gene", marker="sex")
                 .facet(col="isday")
                 .add(so.Dash(color="k"), so.Agg(), so.Dodge())
                 .add(so.Range(color="k"), so.Est(errorbar="sd"), so.Dodge())
                 .add(so.Dot(), so.Dodge(), so.Jitter(0.75, seed=42))
-                .scale(marker=so.Nominal(["o", "s"], order=["Female", "Male"]))
+                .scale(
+                    x=visualization.ExperimentPlotter.band_scale(plot_lib=so),
+                    marker=build_sex_marker_scale(df, plot_lib=so),
+                )
                 .theme(
                     axes_style("ticks")
                     | sns.plotting_context("notebook")
@@ -179,13 +200,15 @@ def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
             )
             p1.save(output_dir / f"byband-{feature}.{figure_format}", bbox_inches="tight", dpi=dpi)
 
-            # By genotype plot
+            # By genotype plot — same Nominal(order=...) treatment for the
+            # band-as-colour mapping so the legend reads in canonical order.
             p2 = (
                 so.Plot(df, x="gene", y=feature, color="band", marker="sex")
                 .facet(col="isday")
                 .add(so.Dash(color="k"), so.Agg(), so.Dodge())
                 .add(so.Range(color="k"), so.Est(errorbar="sd"), so.Dodge())
                 .add(so.Dot(), so.Dodge(), so.Jitter(0.75, seed=42))
+                .scale(color=visualization.ExperimentPlotter.band_scale(plot_lib=so))
                 .theme(
                     axes_style("ticks")
                     | sns.plotting_context("notebook")
@@ -196,8 +219,8 @@ def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
             )
             p2.save(output_dir / f"bygeno-{feature}.{figure_format}", bbox_inches="tight", dpi=dpi)
 
-        elif feature == "psd" or feature == "normpsd":
-            ylim = (1e-4, 1) if feature == "normpsd" else (0.3, 3000)
+        elif ftype is constants.FeatureType.HIST:
+            ylim = (1e-4, 1) if feature == "normpsd" else (0.3, 1e5)
             for scale in [so.Continuous(), "log"]:
                 p = (
                     so.Plot(df, x="freq", y=feature, color="gene")
@@ -259,43 +282,25 @@ def main():
     features = ep_config["features"]
     exclude_features = ep_config.get("exclude_features", [])
 
-    # Create genotype ordering from constants, adding any observed genotypes not in the default list
-    genotype_order = list(constants.DF_SORT_ORDER.get("genotype", []))
-    
-    # Check for genotypes in loaded WARs that aren't in the default list
-    found_genotypes = set()
-    for war in wars:
-        if hasattr(war, "genotype") and war.genotype:
-            found_genotypes.add(war.genotype)
-    
-    # Add any missing genotypes to the order list
-    for gt in found_genotypes:
-        if gt not in genotype_order:
-            logging.info(f"Adding unknown genotype '{gt}' to plot order")
-            genotype_order.append(gt)
-            
+    # Extend the genotype/sex plot orders with any values observed on the
+    # loaded WARs that aren't in the default DF_SORT_ORDER.  Without this,
+    # datasets like arxrosa (every animal has sex='Unknown', genotype='UNKNOWN')
+    # fail strict plot_order validation in sort_dataframe_by_plot_order.
     plot_order = constants.DF_SORT_ORDER.copy()
-    plot_order["genotype"] = genotype_order
+    plot_order["genotype"] = extend_plot_order_from_attr(
+        wars, "genotype", constants.DF_SORT_ORDER.get("genotype", [])
+    )
+    plot_order["sex"] = extend_plot_order_from_attr(
+        wars, "sex", constants.DF_SORT_ORDER.get("sex", [])
+    )
 
     # Create ExperimentPlotter
     logger.info("Creating ExperimentPlotter")
     ep = visualization.ExperimentPlotter(wars=wars, exclude=exclude_features, plot_order=plot_order)
 
-    # Feature to label mapping
     feature_to_label = {
-        "pcorr": "PCC",
-        "cohere": "|Coherency|",
-        "imcoh": "Imaginary Coherencey",
-        "zpcorr": "z(PCC)",
-        "zcohere": "z(|Coherencey|)",
-        "zimcoh": "z(Imaginary Coherencey)",
-        "logpsdfrac": "Log Percent Power",
-        "logpsdband": "Log Band Power",
-        "psdband": r"Band Power ($\mu V^2$)",
-        "psd": r"PSD ($\mu V^2/Hz$)",
+        **constants.FEATURE_LABELS,
         "normpsd": "Normalized PSD",
-        "nspike": "n_spike / t_window",
-        "lognspike": "Log(n_spike / t_window)",
     }
 
     # Process each feature

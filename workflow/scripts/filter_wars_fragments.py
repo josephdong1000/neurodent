@@ -56,25 +56,21 @@ def main():
     logger.info(f"Animal key: {animal_key}")
 
     try:
-        # Load the standardized WAR
-        logger.info(f"Loading WAR from: {input_war_dir}")
-        war = visualization.WindowAnalysisResult.load_parquet_and_json(
-            folder_path=input_war_dir, parquet_name=war_parquet_name, json_name=war_json_name
-        )
-
-        # Apply fragment filtering only (no channel filtering)
-        logger.info("Applying fragment filtering only")
-
-        # Get fragment filter configuration from config
         fragment_filter_config = config["analysis"]["fragment_filter_config"].copy()
-
         logger.info(f"Fragment filter configuration: {fragment_filter_config}")
 
-        # Apply filters using configuration-based approach
-        war = war.apply_filters(filter_config=fragment_filter_config, min_valid_channels=3)
-
-        # Save fragment-filtered WAR as parquet and json
-        war.save_parquet_and_json(Path(output_war_parquet).parent)
+        src_filename = Path(war_parquet_name).stem
+        dst_filename = Path(output_war_parquet).stem
+        logger.info(
+            f"Stream-filtering fragments: {input_war_dir} -> {Path(output_war_parquet).parent}"
+        )
+        war = visualization.WindowAnalysisResult.scan_parquet_and_json(
+            input_war_dir, filename=src_filename
+        )
+        war.apply_filters(filter_config=fragment_filter_config, min_valid_channels=3)
+        war.save_parquet_and_json(
+            Path(output_war_parquet).parent, filename=dst_filename
+        )
 
         logger.info(f"Successfully filtered and saved {animal_name}")
 

@@ -860,7 +860,7 @@ class TestComputeGlobalTimelineNaturalSort:
             ao._get_item_name = lambda item: item
 
             base_dt = datetime(2025, 5, 10, 10, 0, 0)
-            processed = ao._compute_global_timeline(
+            processed, _end_dt = ao._compute_global_timeline(
                 base_dt,
                 animalday_to_items,
                 {},
@@ -943,7 +943,7 @@ class TestTimestampCollisionPrevention:
                 "/data/sess1/file-0.bin": ["/data/sess1/file-0.bin"],
                 "/data/sess2/file-0.bin": ["/data/sess2/file-0.bin"],
             }
-            result = ao._compute_global_timeline(
+            result, _end_dt = ao._compute_global_timeline(
                 base_dt, items, {}, original_manual_datetimes=base_dt
             )
 
@@ -1113,7 +1113,7 @@ class TestZeroDurationTimelineFilter:
             ao = _make_minimal_ao()
             base_dt = datetime(2023, 1, 1, 23, 59, 0)
             items = {k: [k] for k in durations}
-            result = ao._compute_global_timeline(
+            result, _end_dt = ao._compute_global_timeline(
                 base_dt, items, {"datetimes_are_start": False},
                 original_manual_datetimes=base_dt,
             )
@@ -1154,7 +1154,7 @@ class TestZeroDurationTimelineFilter:
             mock_cls.side_effect = self._make_mock_lro_factory(durations)
 
             ao = _make_minimal_ao()
-            result = ao._compute_global_timeline(
+            result, _end_dt = ao._compute_global_timeline(
                 datetime(2023, 1, 1, 23, 59, 0),
                 {k: [k] for k in durations},
                 {"datetimes_are_start": False},
@@ -1175,7 +1175,7 @@ class TestZeroDurationTimelineFilter:
 
             ao = _make_minimal_ao()
             base_dt = datetime(2023, 1, 1, 10, 0, 0)
-            result = ao._compute_global_timeline(
+            result, _end_dt = ao._compute_global_timeline(
                 base_dt, {k: [k] for k in durations},
                 {"datetimes_are_start": True},
                 original_manual_datetimes=base_dt,
@@ -1199,7 +1199,7 @@ class TestZeroDurationTimelineFilter:
 
             ao = _make_minimal_ao()
             end_dt = datetime(2023, 1, 1, 23, 59, 0)
-            result = ao._compute_global_timeline(
+            result, _end_dt = ao._compute_global_timeline(
                 end_dt, {k: [k] for k in durations},
                 {"datetimes_are_start": False},
                 original_manual_datetimes=end_dt,
@@ -1223,7 +1223,7 @@ class TestZeroDurationTimelineFilter:
             mock_cls.side_effect = self._make_mock_lro_factory(durations)
 
             ao = _make_minimal_ao()
-            result = ao._compute_global_timeline(
+            result, _end_dt = ao._compute_global_timeline(
                 datetime(2023, 1, 1, 23, 59, 0),
                 {k: [k] for k in durations},
                 {"datetimes_are_start": False},

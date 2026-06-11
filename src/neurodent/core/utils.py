@@ -1886,6 +1886,23 @@ def slugify(value, allow_unicode=False):
     Drop-in replacement for ``django.utils.text.slugify`` using only the
     standard library.
 
+    **Path-safety convention.**
+        This is the canonical helper for converting display-friendly identifiers
+        (animal IDs, animaldays, genotype strings) into filesystem-safe path
+        components.  Any code that constructs a ``Path`` or filename from one of
+        these strings **must** route the value through ``slugify(...)`` directly,
+        or through one of the ``path_safe_*`` accessors on
+        :class:`~neurodent.visualization.WindowAnalysisResult`,
+        :class:`~neurodent.visualization.streaming.LazyWindowAnalysisResult`, or
+        :class:`~neurodent.visualization.FrequencyDomainSpikeAnalysisResult`.
+
+        Display strings — which may contain ``/``, ``;``, parens, spaces, etc.
+        (e.g. the real arxrosa genotype ``Arx(F/y); Rosa(+/wt)``) — are correct
+        domain notation and stay unchanged on the public attributes
+        (``animal_id``, ``animaldays``, ``genotype``).  They're the source of
+        truth for what humans see in logs and plot labels.  Only the
+        ``path_safe_*`` accessors return the slugified form.
+
     Args:
         value: The string to slugify.
         allow_unicode: If ``True``, keep Unicode characters instead of

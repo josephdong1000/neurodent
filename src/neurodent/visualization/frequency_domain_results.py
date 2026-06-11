@@ -91,6 +91,29 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
         logging.info(f"Channel abbreviations: \t{self.channel_abbrevs}")
         logging.info(f"Detection parameters: \t{self.detection_params}")
 
+    @property
+    def path_safe_animal_id(self) -> str:
+        """Slugified :attr:`animal_id` for filesystem paths.
+
+        See :attr:`WindowAnalysisResult.path_safe_animal_id` for the convention.
+        """
+        return slugify(self.animal_id)
+
+    @property
+    def path_safe_animal_day(self) -> str:
+        """Slugified :attr:`animal_day` for filesystem paths."""
+        return slugify(self.animal_day)
+
+    @property
+    def path_safe_save_stem(self) -> str:
+        """Canonical filename stem ``{animal_id}-{genotype}-{animal_day}``, slugified.
+
+        Use this whenever building the directory or filename for this FDSAR's
+        on-disk artifacts; it consolidates the three identifier reads into one
+        slugified call so callers don't have to reconstruct the format string.
+        """
+        return slugify(f"{self.animal_id}-{self.genotype}-{self.animal_day}")
+
     @classmethod
     def from_detection_results(
         cls,
@@ -262,7 +285,6 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
         folder: Union[str, Path],
         convert_to_mne=True,
         make_folder=True,
-        slugify_filebase=True,
         save_abbrevs_as_chnames=False,
         overwrite=False,
         multiprocess_mode: Literal["dask", "serial"] = "serial",
@@ -272,11 +294,15 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
         Archive frequency domain spike analysis result as fif and json files.
         Mirrors the SpikeAnalysisResult.save_fif_and_json interface.
 
+        The filename stem is always :attr:`path_safe_save_stem` (slugified
+        ``{animal_id}-{genotype}-{animal_day}``). The previous ``slugify_filebase``
+        kwarg was removed — the unsafe (un-slugified) form was never the right
+        answer for any real caller.
+
         Args:
             folder: Destination folder to save results
             convert_to_mne: If True, convert to MNE if needed
             make_folder: If True, create folder if it doesn't exist
-            slugify_filebase: If True, slugify the filename base
             save_abbrevs_as_chnames: If True, save abbreviations as channel names
             overwrite: If True, overwrite existing files
             multiprocess_mode: Whether to use Dask for parallel conversion.
@@ -307,11 +333,7 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
         if make_folder:
             folder.mkdir(parents=True, exist_ok=True)
 
-        if slugify_filebase:
-            filebase = folder / slugify(f"{self.animal_id}-{self.genotype}-{self.animal_day}")
-        else:
-            filebase = folder / f"{self.animal_id}-{self.genotype}-{self.animal_day}"
-        filebase = str(filebase)
+        filebase = str(folder / self.path_safe_save_stem)
 
         if not overwrite:
             if Path(filebase + ".json").exists():
@@ -442,6 +464,12 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
             save_dir = Path(save_dir)
             save_dir.mkdir(parents=True, exist_ok=True)
 
+        # ``animal_id`` is a caller-supplied parameter (not ``self.animal_id``),
+        # so we route it through ``slugify`` directly per the project-wide
+        # path-safety convention (see ``slugify`` docstring).  For uses keyed
+        # off this FDSAR's own id, prefer ``self.path_safe_animal_id``.
+        safe_id = slugify(animal_id) if animal_id else None
+
         # Initialize event counts dictionary for all channels
         n_ch = len(raw.ch_names)
         event_counts = {ch_idx: 0 for ch_idx in range(n_ch)}
@@ -472,7 +500,7 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
 
             # Save epoch data if requested
             if save_epoch and animal_id and save_dir:
-                saveFile_MNE = f"{animal_id}_fdsar_epoch_{ch_idx}.fif"
+                saveFile_MNE = f"{safe_id}_fdsar_epoch_{ch_idx}.fif"
                 savePath_MNE = save_dir / saveFile_MNE
                 epochs.save(str(savePath_MNE), overwrite=True)
 
@@ -486,7 +514,7 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
                 if save_dir:
                     # Include animal_id in filename to prevent overwriting across days
                     if animal_id:
-                        fig_path = save_dir / f"{animal_id}_{event_name}_fd_detection.png"
+                        fig_path = save_dir / f"{safe_id}_{event_name}_fd_detection.png"
                     else:
                         fig_path = save_dir / f"{event_name}_fd_detection.png"
                     fig[0].savefig(str(fig_path), dpi=300, bbox_inches='tight')

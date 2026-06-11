@@ -122,13 +122,13 @@ def main():
     # 1. Load Data
     df = load_data(zeitgeber_file)
 
-    # 2. Process Data (48h expansion)
-    # Note: Data is already ZT-shifted and baseline-subtracted by extract_zeitgeber_features.py
-    df_processed = zeitgeber.transform_time_axis(
-        df,
-        time_range=(0, 48),
-        shift=0
-    )
+    # 2. Process Data (sort + sex/gene enrichment).
+    # Note: Data is already ZT-shifted and baseline-subtracted by
+    # extract_zeitgeber_features.py.  Multi-day expansion is no longer
+    # applied here — the persisted CSV stays 24h.  ZeitgeberPlotter
+    # materialises the 48h view internally at render time via
+    # expand_zt_axis() in core/zeitgeber.py.
+    df_processed = zeitgeber.transform_time_axis(df, shift=0)
 
     # 3. Generate Plots
     zt_config = config["analysis"]["zeitgeber_plots"]

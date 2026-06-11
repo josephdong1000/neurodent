@@ -58,14 +58,17 @@ def main():
     logger.info(f"Channel filter type: {filter_type}")
 
     try:
-        # Load the fragment-filtered WAR
-        logger.info(f"Loading fragment-filtered WAR from: {input_war_dir}")
-        war = visualization.WindowAnalysisResult.load_parquet_and_json(
-            folder_path=input_war_dir, parquet_name=war_parquet_name, json_name=war_json_name
-        )
-
         if filter_type not in ["manual", "lof"]:
             raise ValueError(f"Unknown filter_type: {filter_type}. Must be 'manual' or 'lof'")
+
+        src_filename = Path(war_parquet_name).stem
+        dst_filename = Path(output_war_parquet).stem
+        logger.info(
+            f"Stream-filtering channels ({filter_type}): {input_war_dir} -> {Path(output_war_parquet).parent}"
+        )
+        war = visualization.WindowAnalysisResult.scan_parquet_and_json(
+            input_war_dir, filename=src_filename
+        )
 
         filter_config = {}
 
@@ -76,9 +79,7 @@ def main():
         filter_config["reject_channels"] = {"bad_channels": bad_channels}
 
         if filter_type == "manual":
-            # read in bad channels by session -- manual only
             reject_channels_by_session = channel_filter_config["reject_channels_by_session"]
-
             if reject_channels_by_session:
                 samples_bad_channels = samples_config.get("bad_channels", {})
                 bad_channels_dict_manual = samples_bad_channels.get(animal_id, {})
@@ -86,14 +87,12 @@ def main():
                 if "_all" in bad_channels_dict_manual:
                     all_bad = bad_channels_dict_manual.pop("_all")
                     if bad_channels_dict_manual:
-                        # Merge _all channels into each per-session list
                         for session_key in bad_channels_dict_manual:
                             merged = list(dict.fromkeys(
                                 bad_channels_dict_manual[session_key] + all_bad
                             ))
                             bad_channels_dict_manual[session_key] = merged
                     else:
-                        # Only _all present: add to global reject_channels instead
                         existing = filter_config["reject_channels"].get("bad_channels", [])
                         filter_config["reject_channels"]["bad_channels"] = list(
                             dict.fromkeys(existing + all_bad)
@@ -105,11 +104,9 @@ def main():
             logger.info(f"{filter_type} - Minimum valid channels: {min_valid_channels}")
 
         elif filter_type == "lof":
-            # apply lof-based channel filtering -- lof only
             lof_threshold = channel_filter_config["reject_lof_threshold"]
             logger.debug(f"LOF threshold: {lof_threshold}")
             logger.debug(f"LOF scores dict: {war.lof_scores_dict}")
-
             bad_channels_dict_lof = war.get_bad_channels_by_lof_threshold(lof_threshold)
             logger.info(f"{filter_type} - Reject channels by LOF threshold: {bad_channels_dict_lof}")
             filter_config["reject_channels_by_session"] = {"bad_channels_dict": bad_channels_dict_lof}
@@ -117,15 +114,13 @@ def main():
             min_valid_channels = channel_filter_config["min_valid_channels"]
             logger.info(f"{filter_type} - Minimum valid channels: {min_valid_channels}")
 
-        # Apply filters
-        war = war.apply_filters(
+        war.apply_filters(
             filter_config=filter_config,
             min_valid_channels=min_valid_channels,
         )
-        logger.info(f"{filter_type} - Applied channel filtering")
-
-        # Save channel-filtered WAR as parquet and json
-        war.save_parquet_and_json(Path(output_war_parquet).parent)
+        war.save_parquet_and_json(
+            Path(output_war_parquet).parent, filename=dst_filename
+        )
 
         logger.info(f"Successfully channel-filtered ({filter_type}) and saved {animal_name}")
 

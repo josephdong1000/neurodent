@@ -3,12 +3,15 @@
 
 samples:
   samples_file: "config/samples_arx_rosa.json"
+  quality_filter:
+    exclude_unknown_genotypes: false  # All animals have UNKNOWN genotype (TBD)
 
 # Global defaults for all sessions
 analysis:
   war_generation:
     pattern: "{index}"  # Default pattern (overridden per animal)
+    datetimes_are_start: true  # timestamps extracted from first RHD/EDF filename per session
+    assume_from_number: false  # samples_arx_rosa.json aliases cover all channels
     lro_kwargs:
       mode: "si"  # Default: Use SpikeInterface backend
-      input_type: "files"  # Multiple files per session
 

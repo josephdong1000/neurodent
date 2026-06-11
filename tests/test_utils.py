@@ -2069,6 +2069,91 @@ class TestSortDataframeByPlotOrder:
         assert "genotype" in result.columns
         assert "channel" in result.columns
 
+    def test_unknown_sex_raises_without_extension(self):
+        """Regression: arxrosa-style 'Unknown' sex must be in plot_order or rejected.
+
+        Documents the failure mode: when WAR data contains sex='Unknown'
+        (e.g. arxrosa, where source JSON has sex='UNKNOWN' and downstream
+        defaults it to 'Unknown') and ``plot_order["sex"]`` is the default
+        ``["Male", "Female"]``, ``sort_dataframe_by_plot_order`` strict-
+        rejects with ValueError. This is the failure that broke ep_figures
+        on the arxrosa run (job 8439583).
+        """
+        df = pd.DataFrame(
+            {"sex": ["Unknown", "Unknown", "Unknown"], "value": [1, 2, 3]}
+        )
+        with pytest.raises(ValueError, match=r"sex.*not in sort order"):
+            utils.sort_dataframe_by_plot_order(df)
+
+    def test_unknown_sex_passes_with_extend_plot_order_helper(self):
+        """Regression: ``extend_plot_order_from_attr`` (the actual helper that
+        backs the script-level fix in ``generate_ep_figures.py`` and
+        ``generate_ep_heatmaps.py``) produces a plot_order that ``sort_dataframe_by_plot_order``
+        accepts for arxrosa-style data with sex='Unknown'.
+        """
+        from neurodent.workflow import extend_plot_order_from_attr
+
+        # Mock WAR objects exposing only the attributes the helper reads.
+        class _MockWAR:
+            def __init__(self, genotype, sex):
+                self.genotype = genotype
+                self.sex = sex
+
+        wars = [
+            _MockWAR("WT", "Male"),
+            _MockWAR("UNKNOWN", "Unknown"),
+            _MockWAR("UNKNOWN", "Unknown"),
+        ]
+
+        # Build plot_order using the same helper the scripts call.
+        plot_order = constants.DF_SORT_ORDER.copy()
+        plot_order["genotype"] = extend_plot_order_from_attr(
+            wars, "genotype", constants.DF_SORT_ORDER.get("genotype", [])
+        )
+        plot_order["sex"] = extend_plot_order_from_attr(
+            wars, "sex", constants.DF_SORT_ORDER.get("sex", [])
+        )
+
+        # Helper output should preserve known categories in their original
+        # order and append new ones.
+        assert plot_order["sex"][:2] == ["Male", "Female"]
+        assert "Unknown" in plot_order["sex"]
+        assert plot_order["genotype"][:2] == ["WT", "KO"]
+        assert "UNKNOWN" in plot_order["genotype"]
+
+        # And the extended order must make sort_dataframe_by_plot_order
+        # accept a DataFrame containing those same values.
+        df = pd.DataFrame(
+            {
+                "sex": ["Female", "Unknown", "Male"],
+                "genotype": ["WT", "UNKNOWN", "WT"],
+                "value": [1, 2, 3],
+            }
+        )
+        result = utils.sort_dataframe_by_plot_order(df, plot_order)
+        # Known categories sort first; novel ones (Unknown / UNKNOWN) come last.
+        assert list(result["sex"]) == ["Male", "Female", "Unknown"]
+        assert list(result["genotype"]) == ["WT", "WT", "UNKNOWN"]
+
+    def test_extend_plot_order_ignores_falsy_and_dedupes(self):
+        """``extend_plot_order_from_attr`` skips falsy attr values and
+        preserves dedup behavior."""
+        from neurodent.workflow import extend_plot_order_from_attr
+
+        class _MockWAR:
+            def __init__(self, sex):
+                self.sex = sex
+
+        wars = [
+            _MockWAR(None),       # falsy: skipped
+            _MockWAR(""),         # falsy: skipped
+            _MockWAR("Male"),     # already in base: not appended
+            _MockWAR("Unknown"),  # new: appended once
+            _MockWAR("Unknown"),  # duplicate: not appended again
+        ]
+        result = extend_plot_order_from_attr(wars, "sex", ["Male", "Female"])
+        assert result == ["Male", "Female", "Unknown"]
+
 
 class TestNanmeanSeriesOfNp:
     """Test nanmean_series_of_np function."""
