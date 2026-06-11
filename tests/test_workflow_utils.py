@@ -1072,6 +1072,6 @@ class TestProcessFeatureDataframe:
             "cohere", "zcohere", "imcoh", "zimcoh",
             "pcorr", "zpcorr", "psd",
         ]
-        labels = {**constants.FEATURE_LABELS, "psd": "PSD", "normpsd": "Normalized PSD"}
+        labels = {**constants.FEATURE_LABELS, "normpsd": "Normalized PSD"}
         missing = [f for f in configured if f not in labels]
         assert not missing, f"Features without labels: {missing}"

@@ -300,7 +300,6 @@ def main():
 
     feature_to_label = {
         **constants.FEATURE_LABELS,
-        "psd": r"PSD ($\mu V^2/Hz$)",
         "normpsd": "Normalized PSD",
     }
 
