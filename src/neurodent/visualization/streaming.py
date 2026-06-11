@@ -14,9 +14,9 @@ Usage::
     war.add_unique_hash(unique_hash_length)
     war.save_parquet_and_json(dst_folder)
 
-Peak memory is bounded by ``batch_size`` rows plus any per-transform
-cross-row state (typically a small ``(W, C)`` mask or per-group
-accumulators) — independent of total WAR size.
+Peak memory is bounded by ``batch_size`` rows for pass-through transforms.
+Some transforms (e.g. cross-row filters) may materialise full-column stats and/or
+a full ``(W, C)`` mask, so peak memory can scale with total WAR size in those cases.
 """
 
 from __future__ import annotations
