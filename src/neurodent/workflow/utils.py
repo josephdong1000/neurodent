@@ -821,15 +821,14 @@ def extend_plot_order_from_attr(wars, attr: str, base_order):
         ['Male', 'Female', 'Unknown']
     """
     order = list(base_order)
-    observed = set()
+    seen = set(order)
     for war in wars:
         v = getattr(war, attr, None)
-        if v:
-            observed.add(v)
-    for v in observed:
-        if v not in order:
-            logging.info(f"Adding unknown {attr} '{v}' to plot order")
-            order.append(v)
+        if not v or v in seen:
+            continue
+        logging.info(f"Adding unknown {attr} '{v}' to plot order")
+        order.append(v)
+        seen.add(v)
     return order
 
 
