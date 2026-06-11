@@ -71,12 +71,12 @@ def test_ao_grouping_logic(mock_overlap_structure, monkeypatch):
     # We should mock _compute_global_timeline to return dummy mapping.
     
     def mock_compute_global(self, base_dt, ad_folders, kw, original_manual_datetimes=None):
-        # Return dummy map
+        # Return dummy map + dummy end_dt (contract: (timeline_dict, end_dt))
         out = {}
         for day, folders in ad_folders.items():
             for f in folders:
                 out[Path(f).name] = base_dt # Dummy
-        return out
+        return out, base_dt
         
     monkeypatch.setattr(results.AnimalOrganizer, "_compute_global_timeline", mock_compute_global)
     

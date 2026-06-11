@@ -544,7 +544,8 @@
         },
         {
             "id": "group9_M1_Cage1",
-            "gene": "Unknown"
+            "gene": "Unknown",
+            "exclude": true
         },
         {
             "id": "group9_M2_Cage 3",
@@ -1296,6 +1297,5 @@
         "012322_cohort4_group6_3mice_FMUT___MMUT_MWT MHET_cohort4_group6",
         "012322_cohort4_group6_3mice_FMUT___MMUT_MWT MMUT_cohort4_group6",
         "013122_cohort4_group7_2mice both_FHET FHET(2)_cohort4_group7"
-    ],
-    "joint_sessions": {}
+    ]
 }

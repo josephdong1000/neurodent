@@ -223,6 +223,12 @@ describes all available parameters:
      - Per-animal keyword arguments for day/date parsing from filenames,
        overriding the global ``day_parse_kwargs``
        (e.g. ``{"date_patterns": [["\\d{6}", "%y%m%d"]]}``).
+   * - ``exclude``
+     - bool
+     - No
+     - If ``true``, the animal is skipped entirely by the pipeline.
+       The entry is retained in the config for documentation but no
+       rules are executed for it. Default: ``false``.
 
 Any additional keys (beyond those listed above) are passed through to
 ``ANIMAL_METADATA`` and are available for custom downstream processing.

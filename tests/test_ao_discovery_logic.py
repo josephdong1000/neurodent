@@ -462,3 +462,170 @@ def test_sort_lros_handles_multifile_discovered_files():
     # df1 (earlier timestamp) should come first
     assert result[0][0] is df1
     assert result[1][0] is df2
+
+
+def test_pattern_with_irrelevant_path_data_and_index_sort(tmp_path, monkeypatch):
+    """
+    Integration test: pattern with irrelevant directory data between {session} and {index}.
+
+    This tests the scenario described in the PR comment where a pattern like
+    "{animal}/{session}/*/{index}/filename.ext" has irrelevant data (the asterisk)
+    that could cause incorrect sorting if used instead of {index} metadata.
+
+    The test verifies that:
+    1. Files are discovered correctly with the wildcard pattern
+    2. Files are sorted by {index} metadata, not by the irrelevant directory names
+    3. Timeline computation uses index-based ordering
+    """
+    from neurodent.core.discovery import DiscoveredFile
+    import pandas as pd
+
+    # Create file structure with 10 files where:
+    # - Irrelevant directory names sort completely differently from indices
+    # - Filenames are intentionally out of order (not data1, data2, data3... but scrambled)
+    # This proves that ONLY sorting by {index} metadata gives correct ordering
+    #
+    # Directory structure: {animal}/{session}/{irrelevant_dir}/{index}/{filename}.bin
+    # Filenames are deliberately scrambled: zebra, monkey, aardvark, etc.
+    # If sorted by filename: aardvark < banana < cherry < ... < zebra (wrong order)
+    # If sorted by index: 001, 002, 003, ..., 010 (correct order)
+
+    session_dir = tmp_path / "A10" / "session1"
+
+    # Create 10 files with:
+    # - Indices: 001 through 010 (sequential, correct order)
+    # - Directory names: intentionally scrambled to sort differently
+    # - Filenames: alphabetically scrambled to not match index order
+
+    files_config = [
+        # (irrelevant_dir, index, filename)
+        ("run999", "001", "zebra.bin"),      # index=001, filename sorts last, dir sorts last
+        ("run001", "002", "monkey.bin"),     # index=002, filename sorts middle, dir sorts first
+        ("run700", "003", "aardvark.bin"),   # index=003, filename sorts first, dir sorts middle
+        ("run200", "004", "turtle.bin"),     # index=004
+        ("run850", "005", "banana.bin"),     # index=005
+        ("run100", "006", "xylophone.bin"),  # index=006
+        ("run950", "007", "cherry.bin"),     # index=007
+        ("run300", "008", "walrus.bin"),     # index=008
+        ("run600", "009", "elephant.bin"),   # index=009
+        ("run400", "010", "quokka.bin"),     # index=010
+    ]
+
+    for irrelevant_dir, index, filename in files_config:
+        file_dir = session_dir / irrelevant_dir / index
+        file_dir.mkdir(parents=True)
+        (file_dir / filename).touch()
+
+    # Mock _create_long_recordings to prevent actual LRO creation
+    # Instead, capture what would be passed to timeline computation
+    captured_items = []
+
+    def mock_create_long_recordings(self, lro_kwargs):
+        # Capture the discovered items for verification
+        captured_items.extend(self._animalday_folder_groups.get("session1", []))
+
+    monkeypatch.setattr(results.AnimalOrganizer, "_create_long_recordings", mock_create_long_recordings)
+
+    # Use pattern with wildcard between session and index
+    pattern = str(tmp_path) + "/{animal}/{session}/*/{index}/*.bin"
+    ao = results.AnimalOrganizer(
+        pattern=pattern,
+        animal_id="A10",
+    )
+
+    # Verify discovery
+    assert len(ao._animalday_folder_groups) == 1
+    assert "session1" in ao._animalday_folder_groups
+    assert len(ao._animalday_folder_groups["session1"]) == 10  # Now we have 10 files
+
+    # Verify all discovered items are DiscoveredFile with index metadata
+    items = ao._animalday_folder_groups["session1"]
+    for item in items:
+        assert isinstance(item, DiscoveredFile)
+        assert hasattr(item, "metadata")
+        assert "index" in item.metadata
+        assert "animal" in item.metadata
+        assert item.metadata["animal"] == "A10"
+        assert "session" in item.metadata
+        assert item.metadata["session"] == "session1"
+
+    # Verify the index values are captured correctly
+    indices = sorted([item.metadata["index"] for item in items])
+    assert indices == ["001", "002", "003", "004", "005", "006", "007", "008", "009", "010"]
+
+    # Now test that _compute_global_timeline sorts by index, not by directory name or filename
+    # Mock LongRecordingOrganizer to avoid file I/O
+    with patch("neurodent.visualization.results.core.LongRecordingOrganizer") as mock_lro_cls:
+        def side_effect(*args, **kwargs):
+            m = MagicMock()
+            m.LongRecording.get_duration.return_value = 3600.0  # 1 hour per file
+            return m
+
+        mock_lro_cls.side_effect = side_effect
+
+        animalday_to_items = {"session1": items}
+        base_datetime = pd.to_datetime("2025-01-01 10:00:00")
+        base_lro_kwargs = {"datetimes_are_start": True}
+
+        # Bind the real _compute_global_timeline method
+        ao_instance = MagicMock(spec=results.AnimalOrganizer)
+        ao_instance._compute_global_timeline = results.AnimalOrganizer._compute_global_timeline.__get__(
+            ao_instance, results.AnimalOrganizer
+        )
+        ao_instance._items_have_index = results.AnimalOrganizer._items_have_index.__get__(
+            ao_instance, results.AnimalOrganizer
+        )
+        ao_instance._session_sort_key = results.AnimalOrganizer._session_sort_key.__get__(
+            ao_instance, results.AnimalOrganizer
+        )
+        ao_instance._get_item_name = results.AnimalOrganizer._get_item_name.__get__(
+            ao_instance, results.AnimalOrganizer
+        )
+        ao_instance._sort_lros_by_median_time = results.AnimalOrganizer._sort_lros_by_median_time.__get__(
+            ao_instance, results.AnimalOrganizer
+        )
+        ao_instance._is_item_file = results.AnimalOrganizer._is_item_file.__get__(
+            ao_instance, results.AnimalOrganizer
+        )
+        ao_instance._get_item_key = results.AnimalOrganizer._get_item_key.__get__(
+            ao_instance, results.AnimalOrganizer
+        )
+
+        result, _end_dt = ao_instance._compute_global_timeline(
+            base_datetime, animalday_to_items, base_lro_kwargs,
+            original_manual_datetimes=base_datetime,
+        )
+
+        # Verify timeline is sorted by index (001-010), NOT by filename or path
+        # If sorted by filename alphabetically: aardvark, banana, cherry, elephant, monkey, quokka, turtle, walrus, xylophone, zebra
+        # If sorted by index: 001, 002, 003, 004, 005, 006, 007, 008, 009, 010 ← correct
+
+        # Expected order by index with their filenames:
+        expected_order = [
+            ("zebra.bin", "001", 0),       # index 001, hour 0
+            ("monkey.bin", "002", 1),      # index 002, hour 1
+            ("aardvark.bin", "003", 2),    # index 003, hour 2
+            ("turtle.bin", "004", 3),      # index 004, hour 3
+            ("banana.bin", "005", 4),      # index 005, hour 4
+            ("xylophone.bin", "006", 5),   # index 006, hour 5
+            ("cherry.bin", "007", 6),      # index 007, hour 6
+            ("walrus.bin", "008", 7),      # index 008, hour 7
+            ("elephant.bin", "009", 8),    # index 009, hour 8
+            ("quokka.bin", "010", 9),      # index 010, hour 9
+        ]
+
+        # _get_item_key returns full paths; build a lookup from filename to the
+        # actual key present in the result dict (avoids path-separator mismatches
+        # on Windows where DiscoveredFile.path and _get_item_key may differ).
+        filename_to_key = {}
+        for key in result:
+            fname = Path(key).name
+            filename_to_key[fname] = key
+
+        for filename, index, hour_offset in expected_order:
+            expected_time = base_datetime + pd.Timedelta(hours=hour_offset)
+            key = filename_to_key[filename]
+            assert result[key] == expected_time, (
+                f"{filename} (index {index}) should be at hour {hour_offset}, "
+                f"but got {result.get(key)}"
+            )

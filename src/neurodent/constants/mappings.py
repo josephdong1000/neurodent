@@ -100,6 +100,8 @@ FEATURE_LABELS = {
     "zimcoh": "Z-Imaginary Coherence",
     "pcorr": "Pearson Correlation",
     "zpcorr": "Z-Pearson Correlation",
+    # Histogram features (frequency-bin spectrum per channel)
+    "psd": r"PSD ($\mu V^2/Hz$)",
     # Derived/composite features
     "alphadelta": "Alpha/Delta Ratio",
 }

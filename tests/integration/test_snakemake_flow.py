@@ -39,6 +39,7 @@ def _bin_csv_extractor(discovered_file, **kwargs):
     directly to this callable.
     """
     import csv
+    import os
     import spikeinterface.core as si_core
 
     bin_path = [p for p in discovered_file.paths if p.endswith(".bin")][0]
@@ -50,7 +51,25 @@ def _bin_csv_extractor(discovered_file, **kwargs):
 
     n_channels = len(rows)
     sampling_rate = float(rows[0]["sampling_rate"])
-    data = np.fromfile(bin_path, dtype=np.float32).reshape(-1, n_channels)
+    file_size = os.path.getsize(bin_path)
+    bytes_per_frame = np.dtype(np.float32).itemsize * n_channels
+    remainder = file_size % bytes_per_frame
+    if remainder != 0:
+        raise ValueError(
+            f"Binary file size ({file_size} bytes) is not divisible by the "
+            f"expected frame size ({bytes_per_frame} bytes = "
+            f"{np.dtype(np.float32).itemsize} bytes/float32 × {n_channels} channels). "
+            f"Remainder: {remainder} bytes. "
+            f"This usually means either:\n"
+            f"  1. The number of channels in the CSV metadata ({n_channels}) "
+            f"does not match the binary — check '{csv_path}'.\n"
+            f"  2. The binary file is corrupt or was truncated during "
+            f"transfer — re-export or re-copy '{bin_path}'.\n"
+            f"  3. The binary uses a different dtype (e.g. float64 or int16) "
+            f"instead of float32."
+        )
+    n_samples = file_size // bytes_per_frame
+    data = np.memmap(bin_path, dtype=np.float32, mode="r", shape=(n_samples, n_channels), order="F")
 
     return si_core.NumpyRecording(
         traces_list=[data],
@@ -518,6 +537,155 @@ class TestPipelineContinuation:
         for fdsar in fdsars:
             assert fdsar.animal_id == ao.animal_id
             assert fdsar.genotype is not None
+
+    def test_pipeline_war_save_load_round_trip(self, war_env):
+        """Pipeline-generated WAR survives the save→load round trip losslessly.
+
+        Closes the gap that the synthetic-fixture round-trip tests in
+        tests/test_visualization.py only cover by topology — this exercises
+        the EXACT shapes produced by AnimalOrganizer.compute_windowed_analysis
+        (real LINEAR_2D / BAND / MATRIX / BANDED_MATRIX / HIST cells), through
+        the production save_parquet_and_json / load_parquet_and_json entry
+        points used by every snakemake rule.
+
+        Compares cell-by-cell via JSON normalisation (tolerates the
+        ndarray→list / tuple→list normalisations the load path performs).
+        """
+        import json
+        import tempfile
+        from pathlib import Path
+
+        import numpy as np
+        import pandas as pd
+
+        from neurodent.visualization import WindowAnalysisResult
+
+        _ao, war, _ds = war_env
+
+        def _default(obj):
+            # Unified handler: numpy types first (json's default= would
+            # override _NumpyEncoder.default), then anything else as str.
+            if isinstance(obj, np.ndarray):
+                return obj.tolist()
+            if isinstance(obj, (np.integer,)):
+                return int(obj)
+            if isinstance(obj, (np.floating,)):
+                return float(obj)
+            if isinstance(obj, np.bool_):
+                return bool(obj)
+            return str(obj)
+
+        def _norm(v) -> str:
+            if v is None:
+                return "null"
+            if isinstance(v, float) and np.isnan(v):
+                return "nan"
+            # Save path normalises tz-aware datetime columns to UTC; the
+            # absolute moment is preserved.  Convert any tz-aware Timestamp
+            # to UTC (then naive for canonical string form) so equivalence
+            # is on the moment in time, not on the tz label.
+            if isinstance(v, pd.Timestamp) and v.tz is not None:
+                v = v.tz_convert("UTC").tz_localize(None)
+            return json.dumps(v, sort_keys=True, default=_default)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            war.save_parquet_and_json(tmpdir, filename="war")
+            loaded = WindowAnalysisResult.load_parquet_and_json(folder_path=Path(tmpdir))
+
+        # Structural equivalence
+        assert len(loaded.result) == len(war.result)
+        assert set(loaded.result.columns) == set(war.result.columns)
+        assert loaded.animal_id == war.animal_id
+        assert loaded.genotype == war.genotype
+        assert loaded.channel_names == war.channel_names
+
+        # Cell-by-cell normalised equivalence (every row, every column).
+        for col in war.result.columns:
+            for i in range(len(war.result)):
+                assert _norm(war.result[col].iloc[i]) == _norm(loaded.result[col].iloc[i]), (
+                    f"col={col!r} row={i}\n  before: {war.result[col].iloc[i]!r}\n  "
+                    f"after:  {loaded.result[col].iloc[i]!r}"
+                )
+
+    def test_pipeline_war_streaming_equivalent_to_eager(self, war_env):
+        """Pipeline-generated WAR: streaming reorder_and_pad matches the eager path.
+
+        Same scope as test_pipeline_war_save_load_round_trip but exercises
+        the streaming entry point used by standardize_wars.py in production.
+        """
+        import json
+        import tempfile
+        from pathlib import Path
+
+        import numpy as np
+        import pandas as pd
+
+        from neurodent.visualization import WindowAnalysisResult
+
+        _ao, war, _ds = war_env
+
+        # WAR generation produces 8 channels (LMot..RVis); reorder is a no-op
+        # for matching channels but still exercises every code path.
+        target_channels = war.channel_abbrevs or war.channel_names
+
+        def _default(obj):
+            # Unified handler: numpy types first (json's default= would
+            # override _NumpyEncoder.default), then anything else as str.
+            if isinstance(obj, np.ndarray):
+                return obj.tolist()
+            if isinstance(obj, (np.integer,)):
+                return int(obj)
+            if isinstance(obj, (np.floating,)):
+                return float(obj)
+            if isinstance(obj, np.bool_):
+                return bool(obj)
+            return str(obj)
+
+        def _norm(v) -> str:
+            if v is None:
+                return "null"
+            if isinstance(v, float) and np.isnan(v):
+                return "nan"
+            # Save path normalises tz-aware datetime columns to UTC; the
+            # absolute moment is preserved.  Convert any tz-aware Timestamp
+            # to UTC (then naive for canonical string form) so equivalence
+            # is on the moment in time, not on the tz label.
+            if isinstance(v, pd.Timestamp) and v.tz is not None:
+                v = v.tz_convert("UTC").tz_localize(None)
+            return json.dumps(v, sort_keys=True, default=_default)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            src = tmp / "src"
+            src.mkdir()
+            war.save_parquet_and_json(src, filename="war")
+
+            # Eager: load, reorder, save.
+            eager_dst = tmp / "eager"
+            eager_dst.mkdir()
+            eager_war = WindowAnalysisResult.load_parquet_and_json(folder_path=src)
+            eager_war.reorder_and_pad_channels(target_channels, use_abbrevs=True)
+            eager_war.save_parquet_and_json(eager_dst, filename="war")
+
+            # Streaming: scan_parquet_and_json → reorder → save chain (production path).
+            stream_dst = tmp / "stream"
+            stream_war = WindowAnalysisResult.scan_parquet_and_json(src, filename="war")
+            stream_war.reorder_and_pad_channels(target_channels, use_abbrevs=True)
+            stream_war.save_parquet_and_json(stream_dst, filename="war", batch_size=4)
+
+            eager_re = WindowAnalysisResult.load_parquet_and_json(folder_path=eager_dst)
+            stream_re = WindowAnalysisResult.load_parquet_and_json(folder_path=stream_dst)
+
+        assert len(eager_re.result) == len(stream_re.result)
+        assert set(eager_re.result.columns) == set(stream_re.result.columns)
+        assert eager_re.channel_names == stream_re.channel_names
+
+        for col in eager_re.result.columns:
+            for i in range(len(eager_re.result)):
+                assert _norm(eager_re.result[col].iloc[i]) == _norm(stream_re.result[col].iloc[i]), (
+                    f"col={col!r} row={i}\n  eager:  {eager_re.result[col].iloc[i]!r}\n  "
+                    f"stream: {stream_re.result[col].iloc[i]!r}"
+                )
 
 
 # ---------------------------------------------------------------------------
@@ -988,3 +1156,129 @@ class TestMiniRealDataset:
             constants.GENOTYPE_ALIASES = orig_aliases
 
 
+@pytest.mark.integration
+class TestJointRecordingSplit:
+    """Test joint recording split functionality where animals share a recording file."""
+
+    def test_joint_recording_split(self):
+        """Test splitting A10's 10 channels into two virtual animals (A10-1 and A10-2)."""
+        from neurodent import constants
+        from neurodent.workflow import inject_config_aliases
+        from neurodent.workflow.utils import expand_animals_config
+        from neurodent.visualization import AnimalOrganizer
+
+        # Use existing A10 test data but configure it as a joint recording split
+        # A10-1 gets channels 0-4, A10-2 gets channels 5-9
+        mini_real_data = Path(__file__).resolve().parents[2] / ".tests" / "integration" / "data"
+        config_dict = {
+            "data_root": str(mini_real_data),
+            "animals": [
+                {
+                    "id": "A10-1",
+                    "sex": "M",
+                    "gene": "WT",
+                    "channels": ["0", "1", "2", "3", "4"],
+                    "group": "A10",  # Both animals share the A10 group for discovery
+                    "manual_datetime": "2025-05-10 10:00:00",
+                },
+                {
+                    "id": "A10-2",
+                    "sex": "M",
+                    "gene": "WT",
+                    "channels": ["5", "6", "7", "8", "9"],
+                    "group": "A10",  # Same group, different channels
+                    "manual_datetime": "2025-05-10 10:00:00",
+                },
+            ],
+        }
+
+        orig_metadata = constants.ANIMAL_METADATA
+        orig_aliases = constants.GENOTYPE_ALIASES
+        try:
+            # Test config expansion
+            expanded = expand_animals_config(config_dict)
+
+            # Inject the config so metadata is available
+            inject_config_aliases(expanded)
+
+            # Verify both animals are in the expanded config
+            animal_ids = {a["id"] for a in expanded["animals"]}
+            assert "A10-1" in animal_ids
+            assert "A10-2" in animal_ids
+
+            # Verify group mapping
+            assert expanded["_animal_groups"]["A10-1"] == "A10"
+            assert expanded["_animal_groups"]["A10-2"] == "A10"
+
+            # Verify channel mapping
+            assert expanded["_animal_channels"]["A10-1"] == ["0", "1", "2", "3", "4"]
+            assert expanded["_animal_channels"]["A10-2"] == ["5", "6", "7", "8", "9"]
+
+            # Test channel validation - no overlaps within group
+            channels_a10_1 = set(expanded["_animal_channels"]["A10-1"])
+            channels_a10_2 = set(expanded["_animal_channels"]["A10-2"])
+            assert len(channels_a10_1 & channels_a10_2) == 0, "Channels should not overlap within same group"
+
+            # Test AnimalOrganizer.split() functionality with real mini-real data
+            # Use the group name "A10" in the pattern to discover files for both animals
+            # The pattern matches "Cage 2 A10-0" as the {index} placeholder
+            patterns = [
+                f"{mini_real_data}/A10/{{index}}_ColMajor.bin",
+                f"{mini_real_data}/A10/{{index}}_Meta.csv",
+            ]
+
+            # Test A10-1 (first 5 channels)
+            ao1 = AnimalOrganizer(
+                patterns,
+                animal_id="A10",  # Use the group name for discovery
+                assume_from_number=True,
+                lro_kwargs={
+                    "mode": "si",
+                    "extract_func": _mini_real_extractor,
+                    "multiprocess_mode": "serial",
+                    "manual_datetimes": "2025-05-10 10:00:00",
+                },
+            )
+            assert ao1.animal_id == "A10"
+
+            # Split into two animals with different channel subsets
+            split_groups = {
+                "A10-1": ["0", "1", "2", "3", "4"],
+                "A10-2": ["5", "6", "7", "8", "9"],
+            }
+            split_aos = ao1.split(split_groups)
+
+            # Verify A10-1 split
+            assert "A10-1" in split_aos
+            ao1_split = split_aos["A10-1"]
+            assert ao1_split.animal_id == "A10-1"
+            assert len(ao1_split.long_recordings) >= 1
+            rec1 = ao1_split.long_recordings[0].LongRecording
+            assert rec1 is not None
+            assert rec1.get_num_channels() == 5  # Only 5 channels after split
+            assert rec1.get_sampling_frequency() == 1000.0
+
+            # Verify channel IDs match what we requested
+            channel_ids_1 = rec1.get_channel_ids()
+            assert len(channel_ids_1) == 5
+            expected_channels_1 = {"0", "1", "2", "3", "4"}
+            assert set(channel_ids_1) == expected_channels_1
+
+            # Verify A10-2 split
+            assert "A10-2" in split_aos
+            ao2_split = split_aos["A10-2"]
+            assert ao2_split.animal_id == "A10-2"
+            rec2 = ao2_split.long_recordings[0].LongRecording
+            assert rec2 is not None
+            assert rec2.get_num_channels() == 5
+            channel_ids_2 = rec2.get_channel_ids()
+            expected_channels_2 = {"5", "6", "7", "8", "9"}
+            assert set(channel_ids_2) == expected_channels_2
+
+        finally:
+            constants.ANIMAL_METADATA = orig_metadata
+            constants.GENOTYPE_ALIASES = orig_aliases
+
+
+
+    

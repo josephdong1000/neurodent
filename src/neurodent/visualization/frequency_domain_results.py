@@ -91,11 +91,34 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
         logging.info(f"Channel abbreviations: \t{self.channel_abbrevs}")
         logging.info(f"Detection parameters: \t{self.detection_params}")
 
+    @property
+    def path_safe_animal_id(self) -> str:
+        """Slugified :attr:`animal_id` for filesystem paths.
+
+        See :attr:`WindowAnalysisResult.path_safe_animal_id` for the convention.
+        """
+        return slugify(self.animal_id)
+
+    @property
+    def path_safe_animal_day(self) -> str:
+        """Slugified :attr:`animal_day` for filesystem paths."""
+        return slugify(self.animal_day)
+
+    @property
+    def path_safe_save_stem(self) -> str:
+        """Canonical filename stem ``{animal_id}-{genotype}-{animal_day}``, slugified.
+
+        Use this whenever building the directory or filename for this FDSAR's
+        on-disk artifacts; it consolidates the three identifier reads into one
+        slugified call so callers don't have to reconstruct the format string.
+        """
+        return slugify(f"{self.animal_id}-{self.genotype}-{self.animal_day}")
+
     @classmethod
     def from_detection_results(
         cls,
         spike_indices_per_channel: list[np.ndarray],
-        mne_raw_with_annotations: mne.io.RawArray,
+        recording: "si.BaseRecording",
         detection_params: dict,
         animal_id: str = None,
         genotype: str = None,
@@ -109,7 +132,8 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
 
         Args:
             spike_indices_per_channel: List of spike sample indices per channel
-            mne_raw_with_annotations: MNE RawArray with spike annotations
+            recording: SpikeInterface recording. Traces are read directly
+                from this object (zero-copy) to build SortingAnalyzers.
             detection_params: Parameters used for detection
             animal_id: Identifier for the animal
             genotype: Genotype of animal
@@ -127,13 +151,12 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
         # Convert to SpikeInterface format for compatibility
         result_sas = cls._convert_to_spikeinterface(
             spike_indices_per_channel,
-            mne_raw_with_annotations
+            recording,
         )
 
-        channel_names = mne_raw_with_annotations.ch_names
+        channel_names = [str(ch) for ch in recording.get_channel_ids()]
 
-        # Create instance with SAS first, then set MNE
-        instance = cls(
+        return cls(
             result_sas=result_sas,
             result_mne=None,
             spike_indices=spike_indices_per_channel,
@@ -147,15 +170,10 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
             assume_from_number=assume_from_number,
         )
 
-        # Now set the MNE object after initialization
-        instance.result_mne = mne_raw_with_annotations
-
-        return instance
-
     @staticmethod
     def _convert_to_spikeinterface(
         spike_indices_per_channel: list[np.ndarray],
-        mne_raw: mne.io.RawArray
+        recording: "si.BaseRecording",
     ) -> list[si.SortingAnalyzer]:
         """
         Convert spike detection results to SpikeInterface SortingAnalyzers.
@@ -163,9 +181,14 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
         Uses NumpySorting.from_unit_dict to create compatible objects that work
         with existing WindowAnalysisResult.read_sars_spikes() infrastructure.
 
+        No data is read from the recording here — traces are only accessed
+        later during ``.fif`` export via ``convert_sa_to_np()``, which reads
+        in small chunks.
+
         Args:
             spike_indices_per_channel: List of spike indices per channel
-            mne_raw: MNE RawArray with the original data
+            recording: SpikeInterface recording. Passed through to
+                SortingAnalyzers without reading traces.
 
         Returns:
             list[si.SortingAnalyzer]: SortingAnalyzers for each channel
@@ -173,32 +196,29 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
         if not SPIKEINTERFACE_AVAILABLE:
             raise ImportError("SpikeInterface is required for conversion")
 
-        # Create SpikeInterface recording from MNE data
-        data = mne_raw.get_data()  # Shape: (n_channels, n_times)
-        data = data.T  # SpikeInterface expects (n_times, n_channels)
-        sampling_freq = mne_raw.info['sfreq']
-        channel_ids = mne_raw.ch_names
+        sampling_freq = recording.get_sampling_frequency()
+        channel_ids = recording.get_channel_ids()
 
-        # Create base recording with channel IDs
-        recording = si.NumpyRecording(data, sampling_frequency=sampling_freq, channel_ids=channel_ids)
-
-        # Set a simple linear probe
+        # Set a probe if the recording doesn't already have one.
+        # create_sorting_analyzer requires a probe, but we avoid reading
+        # any trace data — only metadata is added.
         from probeinterface import Probe
-        probe = Probe(ndim=2)
-        probe.set_contacts(
-            positions=[(0, i) for i in range(len(channel_ids))],
-            shapes='circle',
-            shape_params={'radius': 10}
-        )
-        probe.set_device_channel_indices(list(range(len(channel_ids))))
-        recording = recording.set_probe(probe)
+        try:
+            recording.get_probegroup()
+        except ValueError:
+            probe = Probe(ndim=2)
+            probe.set_contacts(
+                positions=[(0, i) for i in range(len(channel_ids))],
+                shapes='circle',
+                shape_params={'radius': 10}
+            )
+            probe.set_device_channel_indices(list(range(len(channel_ids))))
+            recording.set_probe(probe, in_place=True)
 
         sorting_analyzers = []
 
         for ch_idx, spike_indices in enumerate(spike_indices_per_channel):
-            # Create single-channel recording using actual recording channel IDs
-            actual_channel_ids = recording.get_channel_ids()
-            channel_id = actual_channel_ids[ch_idx]
+            channel_id = channel_ids[ch_idx]
             channel_recording = recording.select_channels([channel_id])
 
             if len(spike_indices) > 0:
@@ -246,6 +266,12 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
                 result_mne = FrequencyDomainSpikeAnalysisResult.convert_sas_to_mne(
                     self.result_sas, chunk_duration_s, multiprocess_mode=multiprocess_mode,
                 )
+                from neurodent.core.frequency_domain_spike_detection import (
+                    FrequencyDomainSpikeDetector,
+                )
+                FrequencyDomainSpikeDetector._add_spike_annotations(
+                    result_mne, self.spike_indices, result_mne.info['sfreq']
+                )
                 if save_raw:
                     self.result_mne = result_mne
                 else:
@@ -259,7 +285,6 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
         folder: Union[str, Path],
         convert_to_mne=True,
         make_folder=True,
-        slugify_filebase=True,
         save_abbrevs_as_chnames=False,
         overwrite=False,
         multiprocess_mode: Literal["dask", "serial"] = "serial",
@@ -269,11 +294,15 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
         Archive frequency domain spike analysis result as fif and json files.
         Mirrors the SpikeAnalysisResult.save_fif_and_json interface.
 
+        The filename stem is always :attr:`path_safe_save_stem` (slugified
+        ``{animal_id}-{genotype}-{animal_day}``). The previous ``slugify_filebase``
+        kwarg was removed — the unsafe (un-slugified) form was never the right
+        answer for any real caller.
+
         Args:
             folder: Destination folder to save results
             convert_to_mne: If True, convert to MNE if needed
             make_folder: If True, create folder if it doesn't exist
-            slugify_filebase: If True, slugify the filename base
             save_abbrevs_as_chnames: If True, save abbreviations as channel names
             overwrite: If True, overwrite existing files
             multiprocess_mode: Whether to use Dask for parallel conversion.
@@ -304,11 +333,7 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
         if make_folder:
             folder.mkdir(parents=True, exist_ok=True)
 
-        if slugify_filebase:
-            filebase = folder / slugify(f"{self.animal_id}-{self.genotype}-{self.animal_day}")
-        else:
-            filebase = folder / f"{self.animal_id}-{self.genotype}-{self.animal_day}"
-        filebase = str(filebase)
+        filebase = str(folder / self.path_safe_save_stem)
 
         if not overwrite:
             if Path(filebase + ".json").exists():
@@ -373,7 +398,7 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
             data = json.load(f)
 
         # Load MNE data
-        result_mne = mne.io.read_raw_fif(fif_path, preload=True)
+        result_mne = mne.io.read_raw_fif(fif_path, preload=False)
 
         # Extract spike indices from MNE annotations
         spike_indices = cls._extract_spike_indices_from_mne(result_mne)
@@ -439,6 +464,12 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
             save_dir = Path(save_dir)
             save_dir.mkdir(parents=True, exist_ok=True)
 
+        # ``animal_id`` is a caller-supplied parameter (not ``self.animal_id``),
+        # so we route it through ``slugify`` directly per the project-wide
+        # path-safety convention (see ``slugify`` docstring).  For uses keyed
+        # off this FDSAR's own id, prefer ``self.path_safe_animal_id``.
+        safe_id = slugify(animal_id) if animal_id else None
+
         # Initialize event counts dictionary for all channels
         n_ch = len(raw.ch_names)
         event_counts = {ch_idx: 0 for ch_idx in range(n_ch)}
@@ -469,7 +500,7 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
 
             # Save epoch data if requested
             if save_epoch and animal_id and save_dir:
-                saveFile_MNE = f"{animal_id}_fdsar_epoch_{ch_idx}.fif"
+                saveFile_MNE = f"{safe_id}_fdsar_epoch_{ch_idx}.fif"
                 savePath_MNE = save_dir / saveFile_MNE
                 epochs.save(str(savePath_MNE), overwrite=True)
 
@@ -483,7 +514,7 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
                 if save_dir:
                     # Include animal_id in filename to prevent overwriting across days
                     if animal_id:
-                        fig_path = save_dir / f"{animal_id}_{event_name}_fd_detection.png"
+                        fig_path = save_dir / f"{safe_id}_{event_name}_fd_detection.png"
                     else:
                         fig_path = save_dir / f"{event_name}_fd_detection.png"
                     fig[0].savefig(str(fig_path), dpi=300, bbox_inches='tight')

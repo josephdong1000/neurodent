@@ -178,14 +178,15 @@ class TestAnimalOrganizerTimestampHandling:
         assert len(ao._processed_timestamps) == 3
 
         # Check that function was applied to each folder
+        # Keys are now full paths (from _get_item_key), not just folder names
         expected_times = {
-            f"WT_{self.animal_id}_2023-01-15": datetime(2023, 1, 15, 9, 0, 0),
-            f"WT_{self.animal_id}_2023-01-16": datetime(2023, 1, 16, 10, 0, 0),
-            f"WT_{self.animal_id}_2023-01-17": datetime(2023, 1, 17, 11, 0, 0),
+            str(self.folder1): datetime(2023, 1, 15, 9, 0, 0),
+            str(self.folder2): datetime(2023, 1, 16, 10, 0, 0),
+            str(self.folder3): datetime(2023, 1, 17, 11, 0, 0),
         }
 
-        for folder_name, expected_time in expected_times.items():
-            assert ao._processed_timestamps[folder_name] == expected_time
+        for folder_path, expected_time in expected_times.items():
+            assert ao._processed_timestamps[folder_path] == expected_time
 
     @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
     @patch("glob.glob")
@@ -222,13 +223,14 @@ class TestAnimalOrganizerTimestampHandling:
         # Verify processing
         assert len(ao._processed_timestamps) == 3
 
+        # Keys are now full paths (from _get_item_key), not just folder names
         # Check explicit datetime
-        assert ao._processed_timestamps[f"WT_{self.animal_id}_2023-01-15"] == datetime(
+        assert ao._processed_timestamps[str(self.folder1)] == datetime(
             2023, 1, 15, 8, 0, 0
         )
 
         # Check function result
-        assert ao._processed_timestamps[f"WT_{self.animal_id}_2023-01-16"] == datetime(
+        assert ao._processed_timestamps[str(self.folder2)] == datetime(
             2023, 1, 16, 14, 30, 0
         )
 
@@ -238,7 +240,7 @@ class TestAnimalOrganizerTimestampHandling:
             datetime(2023, 1, 17, 14, 0, 0),
         ]
         assert (
-            ao._processed_timestamps[f"WT_{self.animal_id}_2023-01-17"] == expected_list
+            ao._processed_timestamps[str(self.folder3)] == expected_list
         )
 
     @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
@@ -446,8 +448,8 @@ class TestAnimalOrganizerTimestampHandling:
         )
 
         # Verify that recursive resolution worked
-        folder_name = f"WT_{self.animal_id}_2023-01-15"
-        assert ao._processed_timestamps[folder_name] == datetime(2023, 1, 15, 12, 0, 0)
+        # Keys are now full paths (from _get_item_key)
+        assert ao._processed_timestamps[str(self.folder1)] == datetime(2023, 1, 15, 12, 0, 0)
 
     @patch("glob.glob")
     def test_continuous_timeline_single_datetime(self, mock_glob):
@@ -858,7 +860,7 @@ class TestComputeGlobalTimelineNaturalSort:
             ao._get_item_name = lambda item: item
 
             base_dt = datetime(2025, 5, 10, 10, 0, 0)
-            processed = ao._compute_global_timeline(
+            processed, _end_dt = ao._compute_global_timeline(
                 base_dt,
                 animalday_to_items,
                 {},
@@ -895,6 +897,167 @@ class TestComputeGlobalTimelineNaturalSort:
         )
 
 
+class TestTimestampCollisionPrevention:
+    """Regression tests for cross-session timestamp key collisions.
+
+    Issue: _get_item_name() returns filename-only keys (e.g. 'file-0.bin'),
+    so when two sessions contain files with the same name, the
+    _processed_timestamps dict silently overwrites earlier entries.
+    Fix: use _get_item_key() which returns the full path.
+    """
+
+    def test_get_item_key_returns_full_path_for_strings(self):
+        ao = _make_minimal_ao()
+        assert ao._get_item_key("/data/sess1/file-0.bin") == "/data/sess1/file-0.bin"
+        assert ao._get_item_key("/data/sess2/file-0.bin") == "/data/sess2/file-0.bin"
+
+    def test_get_item_key_returns_full_path_for_lists(self):
+        ao = _make_minimal_ao()
+        key = ao._get_item_key(["/data/sess1/file-0.bin", "/data/sess1/file-0.json"])
+        assert key == "/data/sess1/file-0.bin"
+
+    def test_get_item_key_distinct_for_same_filename(self):
+        """Two items with the same filename in different directories get distinct keys."""
+        ao = _make_minimal_ao()
+        key1 = ao._get_item_key("/data/session_1/Cage 3 F9 Mut-0_ColMajor.bin")
+        key2 = ao._get_item_key("/data/session_2/Cage 3 F9 Mut-0_ColMajor.bin")
+        assert key1 != key2
+
+    def test_get_item_name_would_collide(self):
+        """Verify that _get_item_name DOES produce the same key for same-named files."""
+        ao = _make_minimal_ao()
+        name1 = ao._get_item_name("/data/session_1/Cage 3 F9 Mut-0_ColMajor.bin")
+        name2 = ao._get_item_name("/data/session_2/Cage 3 F9 Mut-0_ColMajor.bin")
+        assert name1 == name2  # This is the collision we're preventing
+
+    def test_compute_global_timeline_uses_full_path_keys(self):
+        """_compute_global_timeline result keys are full paths, not just filenames."""
+        with patch("neurodent.visualization.results.core.LongRecordingOrganizer") as mock_lro_class:
+            mock_lro_class.side_effect = lambda item, **kw: _make_mock_lro(100.0)
+
+            ao = _make_minimal_ao()
+            base_dt = datetime(2023, 9, 1, 10, 0, 0)
+
+            # Two items with the same filename in different directories
+            items = {
+                "/data/sess1/file-0.bin": ["/data/sess1/file-0.bin"],
+                "/data/sess2/file-0.bin": ["/data/sess2/file-0.bin"],
+            }
+            result, _end_dt = ao._compute_global_timeline(
+                base_dt, items, {}, original_manual_datetimes=base_dt
+            )
+
+            # Keys must be full paths, not just "file-0.bin"
+            assert len(result) == 2
+            assert "/data/sess1/file-0.bin" in result
+            assert "/data/sess2/file-0.bin" in result
+
+    def test_session_keys_no_overwrite_across_sessions(self):
+        """has_session_keys branch: items from different sessions get distinct timestamps.
+
+        Regression test for the bug where out.update(sess_timeline) would
+        overwrite session-1's file-0 timestamp with session-2's file-0 timestamp.
+        """
+        with patch("neurodent.visualization.results.core.LongRecordingOrganizer") as mock_lro_class:
+            mock_lro_class.side_effect = lambda item, **kw: _make_mock_lro(100.0)
+
+            ao = _make_minimal_ao()
+
+            # Two sessions, each with one item sharing the same filename
+            animalday_to_items = {
+                "2022-09-03": ["/data/2022-09-03/Cage 3 F9 Mut-0_ColMajor.bin"],
+                "2022-09-02": ["/data/2022-09-02/Cage 3 F9 Mut-0_ColMajor.bin"],
+            }
+            manual_datetimes = {
+                "2022-09-03": datetime(2023, 9, 3, 9, 0, 0),
+                "2022-09-02": datetime(2023, 9, 2, 15, 0, 0),
+            }
+
+            result = ao._process_manual_datetimes(
+                manual_datetimes, animalday_to_items, {}
+            )
+
+            # Must have 2 distinct entries (not 1 due to collision)
+            assert len(result) == 2
+
+            # Keys must be full paths
+            keys = list(result.keys())
+            assert any("2022-09-03" in k for k in keys)
+            assert any("2022-09-02" in k for k in keys)
+
+            # Timestamps must be different
+            timestamps = list(result.values())
+            assert timestamps[0] != timestamps[1]
+
+
+class TestValidateTimestampOrdering:
+    """Tests for the _validate_timestamp_ordering static method."""
+
+    def test_passes_for_distinct_ordered_timestamps(self):
+        ts = {
+            "/data/sess1/file-0.bin": datetime(2023, 1, 1, 10, 0, 0),
+            "/data/sess2/file-0.bin": datetime(2023, 1, 2, 10, 0, 0),
+        }
+        results.AnimalOrganizer._validate_timestamp_ordering(ts)  # Should not raise
+
+    def test_raises_for_duplicate_timestamps(self):
+        """Duplicate timestamps indicate colliding index values and should raise."""
+        same_time = datetime(2023, 1, 1, 10, 0, 0)
+        ts = {
+            "/data/sess1/file.bin": same_time,
+            "/data/sess2/file.bin": same_time,
+        }
+        with pytest.raises(ValueError, match="Timestamp collision"):
+            results.AnimalOrganizer._validate_timestamp_ordering(ts)
+
+    def test_passes_for_single_item(self):
+        ts = {"/data/file.bin": datetime(2023, 1, 1, 10, 0, 0)}
+        results.AnimalOrganizer._validate_timestamp_ordering(ts)  # Should not raise
+
+    def test_passes_for_empty_dict(self):
+        results.AnimalOrganizer._validate_timestamp_ordering({})  # Should not raise
+
+    def test_skips_non_datetime_values(self):
+        """Non-datetime values (lists, functions) are not validated."""
+        ts = {
+            "/data/sess1/file.bin": [datetime(2023, 1, 1), datetime(2023, 1, 2)],
+            "/data/sess2/file.bin": [datetime(2023, 1, 1), datetime(2023, 1, 2)],
+        }
+        results.AnimalOrganizer._validate_timestamp_ordering(ts)  # Should not raise
+
+
+class TestDiagnosticDisplayOffByOne:
+    """Test that short-interval diagnostic display uses correct row indices."""
+
+    def test_first_short_interval_shows_correct_rows(self):
+        """When the first interval (row 0->1) is short, diagnostic should show rows 0 and 1, not row -1."""
+        war = results.WindowAnalysisResult.__new__(results.WindowAnalysisResult)
+        war.suppress_short_interval_error = False
+        war.animal_id = "test"
+
+        # Create a result DataFrame where the gap between row 0 and row 1 is
+        # shorter than the median duration (triggering the diagnostic).
+        war.result = pd.DataFrame({
+            "timestamp": pd.to_datetime([
+                "2023-01-01 10:00:00",
+                "2023-01-01 10:00:01",  # 1s gap (short!)
+                "2023-01-01 10:00:06",  # 5s gap (ok)
+                "2023-01-01 10:00:11",  # 5s gap (ok)
+            ]),
+            "duration": [5.0, 5.0, 5.0, 5.0],
+            "animal": ["test"] * 4,
+        })
+
+        # Should raise ValueError with diagnostic showing rows 0->1
+        with pytest.raises(ValueError, match="Found 1 intervals") as exc_info:
+            war._update_instance_vars()
+
+        # The diagnostic should reference 10:00:00 -> 10:00:01 (not the last row)
+        error_msg = str(exc_info.value)
+        assert "10:00:00" in error_msg
+        assert "10:00:01" in error_msg
+
+
 def _make_mock_lro(duration_seconds=1800.0):
     """Return a minimal mock LRO with a fixed recording duration."""
     mock_lro = Mock()
@@ -914,6 +1077,502 @@ def _make_minimal_ao():
     # Provide the minimum attributes used by _compute_global_timeline / _sort_lros_by_median_time
     ao.animal_id = "test_animal"
     return ao
+
+
+class TestZeroDurationTimelineFilter:
+    """Tests for the zero-duration item filter in _compute_global_timeline.
+
+    Regression tests for the bug where zero-byte .bin files (0 duration)
+    caused ``_validate_timestamp_ordering`` to raise ValueError because
+    ``start_time = end_time - 0`` duplicates the adjacent file's timestamp.
+
+    The fix filters zero-duration items from the timeline computation while
+    leaving them in ``_animalday_folder_groups`` for downstream
+    ``_filter_zero_sample_lros()`` to handle.
+    """
+
+    @staticmethod
+    def _make_mock_lro_factory(durations: dict):
+        """Return a factory that maps item paths to mock LROs with specified durations."""
+        def factory(item, **kwargs):
+            # item is a string path (the item key)
+            duration = durations.get(item, 1800.0)
+            return _make_mock_lro(duration)
+        return factory
+
+    def test_zero_duration_item_excluded_from_timeline(self):
+        """A zero-duration item should not appear in the returned timeline dict."""
+        durations = {
+            "/data/sess1/file-0.bin": 1800.0,
+            "/data/sess1/file-1.bin": 0.0,    # zero-byte file
+            "/data/sess1/file-2.bin": 1800.0,
+        }
+        with patch("neurodent.visualization.results.core.LongRecordingOrganizer") as mock_cls:
+            mock_cls.side_effect = self._make_mock_lro_factory(durations)
+
+            ao = _make_minimal_ao()
+            base_dt = datetime(2023, 1, 1, 23, 59, 0)
+            items = {k: [k] for k in durations}
+            result, _end_dt = ao._compute_global_timeline(
+                base_dt, items, {"datetimes_are_start": False},
+                original_manual_datetimes=base_dt,
+            )
+
+        assert len(result) == 2
+        assert "/data/sess1/file-0.bin" in result
+        assert "/data/sess1/file-1.bin" not in result  # zero-duration excluded
+        assert "/data/sess1/file-2.bin" in result
+
+    def test_zero_duration_item_logs_warning(self, caplog):
+        """Skipping a zero-duration item should log a warning."""
+        durations = {
+            "/data/sess1/file-0.bin": 1800.0,
+            "/data/sess1/file-1.bin": 0.0,
+        }
+        with patch("neurodent.visualization.results.core.LongRecordingOrganizer") as mock_cls:
+            mock_cls.side_effect = self._make_mock_lro_factory(durations)
+
+            ao = _make_minimal_ao()
+            with caplog.at_level(logging.WARNING):
+                ao._compute_global_timeline(
+                    datetime(2023, 1, 1, 23, 59, 0),
+                    {k: [k] for k in durations},
+                    {"datetimes_are_start": False},
+                    original_manual_datetimes=datetime(2023, 1, 1, 23, 59, 0),
+                )
+
+        assert any("zero-duration" in msg.lower() for msg in caplog.messages)
+        assert any("file-1.bin" in msg for msg in caplog.messages)
+
+    def test_all_zero_duration_produces_empty_timeline(self):
+        """If every item has zero duration, the result should be empty."""
+        durations = {
+            "/data/sess1/file-0.bin": 0.0,
+            "/data/sess1/file-1.bin": 0.0,
+        }
+        with patch("neurodent.visualization.results.core.LongRecordingOrganizer") as mock_cls:
+            mock_cls.side_effect = self._make_mock_lro_factory(durations)
+
+            ao = _make_minimal_ao()
+            result, _end_dt = ao._compute_global_timeline(
+                datetime(2023, 1, 1, 23, 59, 0),
+                {k: [k] for k in durations},
+                {"datetimes_are_start": False},
+                original_manual_datetimes=datetime(2023, 1, 1, 23, 59, 0),
+            )
+
+        assert len(result) == 0
+
+    def test_zero_duration_with_datetimes_are_start_true(self):
+        """Zero-duration filter works for forward (start-time) timelines too."""
+        durations = {
+            "/data/sess1/file-0.bin": 1800.0,
+            "/data/sess1/file-1.bin": 0.0,
+            "/data/sess1/file-2.bin": 1800.0,
+        }
+        with patch("neurodent.visualization.results.core.LongRecordingOrganizer") as mock_cls:
+            mock_cls.side_effect = self._make_mock_lro_factory(durations)
+
+            ao = _make_minimal_ao()
+            base_dt = datetime(2023, 1, 1, 10, 0, 0)
+            result, _end_dt = ao._compute_global_timeline(
+                base_dt, {k: [k] for k in durations},
+                {"datetimes_are_start": True},
+                original_manual_datetimes=base_dt,
+            )
+
+        assert len(result) == 2
+        assert "/data/sess1/file-1.bin" not in result
+        # file-0 starts at base_dt, file-2 starts at base_dt + 1800s
+        assert result["/data/sess1/file-0.bin"] == base_dt
+        assert result["/data/sess1/file-2.bin"] == base_dt + timedelta(seconds=1800)
+
+    def test_nonzero_items_timestamps_correct_backward(self):
+        """Remaining items get correct timestamps after zero-duration removal (backward walk)."""
+        durations = {
+            "/data/sess1/file-0.bin": 1800.0,
+            "/data/sess1/file-1.bin": 0.0,    # skipped
+            "/data/sess1/file-2.bin": 3600.0,
+        }
+        with patch("neurodent.visualization.results.core.LongRecordingOrganizer") as mock_cls:
+            mock_cls.side_effect = self._make_mock_lro_factory(durations)
+
+            ao = _make_minimal_ao()
+            end_dt = datetime(2023, 1, 1, 23, 59, 0)
+            result, _end_dt = ao._compute_global_timeline(
+                end_dt, {k: [k] for k in durations},
+                {"datetimes_are_start": False},
+                original_manual_datetimes=end_dt,
+            )
+
+        # file-2 (3600s): start = 23:59:00 - 3600s = 22:59:00
+        # file-0 (1800s): start = 22:59:00 - 1800s = 22:29:00
+        assert result["/data/sess1/file-2.bin"] == end_dt - timedelta(seconds=3600)
+        assert result["/data/sess1/file-0.bin"] == end_dt - timedelta(seconds=3600 + 1800)
+
+    def test_multiple_zero_duration_items_all_filtered(self):
+        """Multiple zero-duration items should all be filtered, not just the first."""
+        durations = {
+            "/data/sess1/file-0.bin": 1800.0,
+            "/data/sess1/file-1.bin": 0.0,
+            "/data/sess1/file-2.bin": 0.0,
+            "/data/sess1/file-3.bin": 0.0,
+            "/data/sess1/file-4.bin": 1800.0,
+        }
+        with patch("neurodent.visualization.results.core.LongRecordingOrganizer") as mock_cls:
+            mock_cls.side_effect = self._make_mock_lro_factory(durations)
+
+            ao = _make_minimal_ao()
+            result, _end_dt = ao._compute_global_timeline(
+                datetime(2023, 1, 1, 23, 59, 0),
+                {k: [k] for k in durations},
+                {"datetimes_are_start": False},
+                original_manual_datetimes=datetime(2023, 1, 1, 23, 59, 0),
+            )
+
+        assert len(result) == 2
+        assert "/data/sess1/file-0.bin" in result
+        assert "/data/sess1/file-4.bin" in result
+
+    def test_session_keyed_manual_datetimes_with_zero_duration(self):
+        """End-to-end: session-keyed manual_datetimes path handles zero-duration files.
+
+        This reproduces the exact AM5 scenario: session has files where one is
+        zero-byte, causing ``_validate_timestamp_ordering`` to raise without the fix.
+        """
+        durations = {
+            "/data/062921/AM5-0.bin": 1800.0,
+            "/data/062921/AM5-1.bin": 1800.0,
+            "/data/062921/AM5-2.bin": 1800.0,
+            "/data/062921/AM5-3.bin": 0.0,    # zero-byte file
+            "/data/062921/AM5-4.bin": 1800.0,
+        }
+        with patch("neurodent.visualization.results.core.LongRecordingOrganizer") as mock_cls:
+            mock_cls.side_effect = self._make_mock_lro_factory(durations)
+
+            ao = _make_minimal_ao()
+            animalday_to_items = {
+                "062921": list(durations.keys()),
+            }
+            manual_datetimes = {
+                "062921": datetime(2023, 6, 29, 23, 59, 25),
+            }
+            result = ao._process_manual_datetimes(
+                manual_datetimes, animalday_to_items,
+                {"datetimes_are_start": False},
+            )
+
+        assert len(result) == 4  # 5 items - 1 zero = 4
+        assert "/data/062921/AM5-3.bin" not in result
+        # Timestamps should be monotonically increasing
+        ts = sorted(result.values())
+        for i in range(1, len(ts)):
+            assert ts[i] > ts[i - 1]
+
+
+class TestSessionTimestampListLeakPrevention:
+    """Tests for the manual_datetimes list leak fix in _create_long_recordings.
+
+    Regression tests for the bug where ``_create_long_recordings`` passed a
+    session-level ``manual_datetimes`` list to individual LROs whose items were
+    missing from ``_processed_timestamps`` (e.g., zero-byte files skipped from
+    timeline), causing:
+
+        ValueError: manual_datetimes length (N) must match number of input
+        files (1) for si mode
+
+    The fix pops ``manual_datetimes`` and ``datetimes_are_start`` from
+    ``individual_kwargs`` before conditionally setting per-item values.
+    """
+
+    def test_individual_kwargs_no_manual_datetimes_when_missing_from_processed(self):
+        """Items missing from _processed_timestamps should NOT inherit session-level list."""
+        ao = _make_minimal_ao()
+        ao._animalday_folder_groups = {
+            "2022-06-18": [
+                "/data/2022-06-18/F8-0.bin",
+                "/data/2022-06-18/F8-1.bin",
+                "/data/2022-06-18/F8-2.bin",  # zero-byte, not in _processed_timestamps
+            ]
+        }
+        ao._processed_timestamps = {
+            "/data/2022-06-18/F8-0.bin": datetime(2023, 6, 18, 10, 0, 0),
+            "/data/2022-06-18/F8-1.bin": datetime(2023, 6, 18, 10, 30, 0),
+            # F8-2 intentionally missing (skipped from timeline)
+        }
+        ao.unique_animaldays = ["test_animal_2022-06-18"]
+
+        captured_kwargs = []
+        def capture_lro(item, **kwargs):
+            captured_kwargs.append((item, kwargs.copy()))
+            return _make_mock_lro(0.0 if "F8-2" in str(item) else 1800.0)
+
+        with patch("neurodent.visualization.results.core.LongRecordingOrganizer") as mock_cls:
+            mock_cls.side_effect = capture_lro
+            ao._create_long_recordings({"mode": "si"})
+
+        # F8-0 and F8-1 should get individual datetime values
+        f0_kwargs = next(kw for item, kw in captured_kwargs if "F8-0" in str(item))
+        f1_kwargs = next(kw for item, kw in captured_kwargs if "F8-1" in str(item))
+        assert f0_kwargs["manual_datetimes"] == datetime(2023, 6, 18, 10, 0, 0)
+        assert f1_kwargs["manual_datetimes"] == datetime(2023, 6, 18, 10, 30, 0)
+        assert f0_kwargs["datetimes_are_start"] is True
+        assert f1_kwargs["datetimes_are_start"] is True
+
+        # F8-2 should NOT have manual_datetimes (no session list leak)
+        f2_kwargs = next(kw for item, kw in captured_kwargs if "F8-2" in str(item))
+        assert "manual_datetimes" not in f2_kwargs
+        assert "datetimes_are_start" not in f2_kwargs
+
+    def test_single_item_session_gets_scalar_timestamp(self):
+        """Single-item sessions should get a scalar datetime, not a list."""
+        ao = _make_minimal_ao()
+        ao._animalday_folder_groups = {
+            "2022-06-18": ["/data/2022-06-18/F8-0.bin"],
+        }
+        ao._processed_timestamps = {
+            "/data/2022-06-18/F8-0.bin": datetime(2023, 6, 18, 10, 0, 0),
+        }
+        ao.unique_animaldays = ["test_animal_2022-06-18"]
+
+        captured_kwargs = []
+        def capture_lro(item, **kwargs):
+            captured_kwargs.append((item, kwargs.copy()))
+            return _make_mock_lro(1800.0)
+
+        with patch("neurodent.visualization.results.core.LongRecordingOrganizer") as mock_cls:
+            mock_cls.side_effect = capture_lro
+            ao._create_long_recordings({"mode": "si"})
+
+        assert len(captured_kwargs) == 1
+        _, kw = captured_kwargs[0]
+        # Should be a scalar datetime, not a list
+        assert isinstance(kw["manual_datetimes"], datetime)
+
+    def test_all_items_present_in_processed_timestamps_still_works(self):
+        """When no items are missing, behavior is unchanged from before the fix."""
+        ao = _make_minimal_ao()
+        ao._animalday_folder_groups = {
+            "sess1": ["/data/sess1/file-0.bin", "/data/sess1/file-1.bin"],
+        }
+        ao._processed_timestamps = {
+            "/data/sess1/file-0.bin": datetime(2023, 1, 1, 10, 0, 0),
+            "/data/sess1/file-1.bin": datetime(2023, 1, 1, 10, 30, 0),
+        }
+        ao.unique_animaldays = ["test_animal_sess1"]
+
+        captured_kwargs = []
+        def capture_lro(item, **kwargs):
+            captured_kwargs.append((item, kwargs.copy()))
+            return _make_mock_lro(1800.0)
+
+        with patch("neurodent.visualization.results.core.LongRecordingOrganizer") as mock_cls:
+            mock_cls.side_effect = capture_lro
+            ao._create_long_recordings({"mode": "si"})
+
+        for item, kw in captured_kwargs:
+            assert isinstance(kw["manual_datetimes"], datetime)
+            assert kw["datetimes_are_start"] is True
+
+    def test_no_processed_timestamps_uses_original_kwargs(self):
+        """When _processed_timestamps is None, original kwargs pass through unmodified."""
+        ao = _make_minimal_ao()
+        ao._animalday_folder_groups = {
+            "sess1": ["/data/sess1/file-0.bin"],
+        }
+        ao._processed_timestamps = None
+        ao.unique_animaldays = ["test_animal_sess1"]
+
+        manual_dt = datetime(2023, 1, 1, 10, 0, 0)
+
+        captured_kwargs = []
+        def capture_lro(item, **kwargs):
+            captured_kwargs.append((item, kwargs.copy()))
+            return _make_mock_lro(1800.0)
+
+        with patch("neurodent.visualization.results.core.LongRecordingOrganizer") as mock_cls:
+            mock_cls.side_effect = capture_lro
+            ao._create_long_recordings({
+                "mode": "si",
+                "manual_datetimes": manual_dt,
+                "datetimes_are_start": False,
+            })
+
+        _, kw = captured_kwargs[0]
+        assert kw["manual_datetimes"] == manual_dt
+        assert kw["datetimes_are_start"] is False
+
+    def test_mixed_zero_and_nonzero_items_across_sessions(self):
+        """Multiple sessions where some have zero-byte items get correct per-item timestamps."""
+        ao = _make_minimal_ao()
+        ao._animalday_folder_groups = {
+            "sess1": [
+                "/data/sess1/file-0.bin",
+                "/data/sess1/file-1.bin",
+                "/data/sess1/file-2.bin",  # zero-byte
+            ],
+            "sess2": [
+                "/data/sess2/file-0.bin",
+                "/data/sess2/file-1.bin",  # zero-byte
+            ],
+        }
+        ao._processed_timestamps = {
+            "/data/sess1/file-0.bin": datetime(2023, 1, 1, 10, 0, 0),
+            "/data/sess1/file-1.bin": datetime(2023, 1, 1, 10, 30, 0),
+            # sess1/file-2 missing (zero-byte)
+            "/data/sess2/file-0.bin": datetime(2023, 1, 2, 10, 0, 0),
+            # sess2/file-1 missing (zero-byte)
+        }
+        ao.unique_animaldays = ["test_animal_sess1", "test_animal_sess2"]
+
+        captured_kwargs = []
+        def capture_lro(item, **kwargs):
+            captured_kwargs.append((item, kwargs.copy()))
+            dur = 0.0 if ("file-2" in str(item) or ("sess2" in str(item) and "file-1" in str(item))) else 1800.0
+            return _make_mock_lro(dur)
+
+        with patch("neurodent.visualization.results.core.LongRecordingOrganizer") as mock_cls:
+            mock_cls.side_effect = capture_lro
+            ao._create_long_recordings({"mode": "si"})
+
+        # Check that zero-byte items don't have manual_datetimes
+        for item, kw in captured_kwargs:
+            if "file-2" in str(item) or ("sess2" in str(item) and "file-1" in str(item)):
+                assert "manual_datetimes" not in kw, (
+                    f"Zero-byte item {item} should not have manual_datetimes"
+                )
+            else:
+                assert isinstance(kw["manual_datetimes"], datetime), (
+                    f"Non-zero item {item} should have scalar datetime"
+                )
+
+
+class TestZeroBytePipelineEndToEnd:
+    """End-to-end tests combining both fixes: timeline filter + LRO kwargs pop.
+
+    Reproduces the exact failure scenario from the sox5_bin pipeline where
+    zero-byte .bin files caused both ValueError (timestamp collision) and
+    ValueError (manual_datetimes length mismatch).
+    """
+
+    def test_f8_scenario_session_with_zero_byte_last_file(self):
+        """Reproduces f8_group-10_cage-3: 2 sessions, last file in each is zero-byte.
+
+        Session 2022-06-18: F8-0 (1800s), F8-1 (1800s), F8-2 (0s)
+        Session 2022-06-17: F8-0 (1800s), F8-1 (1800s), F8-2 (0s)
+        """
+        durations = {
+            "/data/2022-06-18/F8-0.bin": 1800.0,
+            "/data/2022-06-18/F8-1.bin": 1800.0,
+            "/data/2022-06-18/F8-2.bin": 0.0,
+            "/data/2022-06-17/F8-0.bin": 1800.0,
+            "/data/2022-06-17/F8-1.bin": 1800.0,
+            "/data/2022-06-17/F8-2.bin": 0.0,
+        }
+        with patch("neurodent.visualization.results.core.LongRecordingOrganizer") as mock_cls:
+            def factory(item, **kwargs):
+                dur = durations.get(item, 1800.0)
+                return _make_mock_lro(dur)
+            mock_cls.side_effect = factory
+
+            ao = _make_minimal_ao()
+            animalday_to_items = {
+                "2022-06-17": [
+                    "/data/2022-06-17/F8-0.bin",
+                    "/data/2022-06-17/F8-1.bin",
+                    "/data/2022-06-17/F8-2.bin",
+                ],
+                "2022-06-18": [
+                    "/data/2022-06-18/F8-0.bin",
+                    "/data/2022-06-18/F8-1.bin",
+                    "/data/2022-06-18/F8-2.bin",
+                ],
+            }
+            manual_datetimes = {
+                "2022-06-17": datetime(2022, 6, 17, 10, 16, 54),
+                "2022-06-18": datetime(2022, 6, 18, 14, 24, 5),
+            }
+
+            # Step 1: _process_manual_datetimes should succeed (no timestamp collision)
+            result = ao._process_manual_datetimes(
+                manual_datetimes, animalday_to_items,
+                {"datetimes_are_start": False},
+            )
+
+            # 6 items - 2 zero = 4 timestamps
+            assert len(result) == 4
+            assert "/data/2022-06-17/F8-2.bin" not in result
+            assert "/data/2022-06-18/F8-2.bin" not in result
+
+            # Step 2: _create_long_recordings should not crash
+            ao._animalday_folder_groups = animalday_to_items
+            ao._processed_timestamps = result
+            ao.unique_animaldays = [f"test_{k}" for k in animalday_to_items]
+            ao._create_long_recordings({"mode": "si"})
+
+    def test_am5_scenario_middle_file_zero_byte(self):
+        """Reproduces AM5: session with 5 files, file-3 (middle) is zero-byte."""
+        durations = {
+            "/data/062921/AM5-0.bin": 1800.0,
+            "/data/062921/AM5-1.bin": 1800.0,
+            "/data/062921/AM5-2.bin": 1800.0,
+            "/data/062921/AM5-3.bin": 0.0,    # zero-byte
+            "/data/062921/AM5-4.bin": 1800.0,
+        }
+        with patch("neurodent.visualization.results.core.LongRecordingOrganizer") as mock_cls:
+            mock_cls.side_effect = lambda item, **kw: _make_mock_lro(durations.get(item, 1800.0))
+
+            ao = _make_minimal_ao()
+            items = list(durations.keys())
+            animalday_to_items = {"062921": items}
+            manual_datetimes = {"062921": datetime(2021, 6, 29, 23, 59, 25)}
+
+            result = ao._process_manual_datetimes(
+                manual_datetimes, animalday_to_items,
+                {"datetimes_are_start": False},
+            )
+
+            assert len(result) == 4
+            assert "/data/062921/AM5-3.bin" not in result
+
+            # Timestamps are strictly monotonic
+            ordered_ts = [result[k] for k in items if k in result]
+            for i in range(1, len(ordered_ts)):
+                assert ordered_ts[i] > ordered_ts[i - 1]
+
+            # LRO creation should not crash
+            ao._animalday_folder_groups = animalday_to_items
+            ao._processed_timestamps = result
+            ao.unique_animaldays = [f"test_{k}" for k in animalday_to_items]
+            ao._create_long_recordings({"mode": "si"})
+
+    def test_m4_scenario_many_zero_byte_files(self):
+        """Reproduces M4_cohort4_group1: session with 23 zero-byte files out of 24."""
+        items = {}
+        for i in range(24):
+            path = f"/data/121921/M4-{i}.bin"
+            # Only file-0 has real data
+            items[path] = 1800.0 if i == 0 else 0.0
+
+        with patch("neurodent.visualization.results.core.LongRecordingOrganizer") as mock_cls:
+            mock_cls.side_effect = lambda item, **kw: _make_mock_lro(items.get(item, 0.0))
+
+            ao = _make_minimal_ao()
+            animalday_to_items = {"121921": list(items.keys())}
+            manual_datetimes = {"121921": datetime(2021, 12, 19, 11, 7, 13)}
+
+            result = ao._process_manual_datetimes(
+                manual_datetimes, animalday_to_items,
+                {"datetimes_are_start": False},
+            )
+
+            assert len(result) == 1  # Only M4-0 has data
+            assert "/data/121921/M4-0.bin" in result
+
+            ao._animalday_folder_groups = animalday_to_items
+            ao._processed_timestamps = result
+            ao.unique_animaldays = [f"test_{k}" for k in animalday_to_items]
+            ao._create_long_recordings({"mode": "si"})
 
 
 if __name__ == "__main__":

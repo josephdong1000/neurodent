@@ -38,7 +38,10 @@ def create_norm_from_config(norm_config):
 
 
 def generate_temporal_heatmaps_from_config(animal_plotter, config, animal_id, output_dir, version_name):
-    """Generate temporal heatmaps using AnimalPlotter and config parameters"""
+    """Generate temporal heatmaps using AnimalPlotter and config parameters.
+
+    ``animal_id`` must already be path-safe (caller passes ``war.path_safe_animal_id``).
+    """
     try:
         heatmaps_config = config["analysis"]["figures"]["temporal_heatmaps"]["features"]
 
@@ -79,20 +82,24 @@ def load_war_and_config():
     animal_id = snakemake.params.animal_id
     output_dir = Path(snakemake.output.figure_dir)
 
-    logging.debug(f"snakemake.input.war_pkl: {snakemake.input.war_pkl}")
+    logging.debug(f"snakemake.input.war_parquet: {snakemake.input.war_parquet}")
     logging.debug(f"snakemake.input.war_json: {snakemake.input.war_json}")
 
     # Handle both string and list inputs
-    war_pkl_path = snakemake.input.war_pkl[0] if isinstance(snakemake.input.war_pkl, list) else snakemake.input.war_pkl
+    war_parquet_path = (
+        snakemake.input.war_parquet[0]
+        if isinstance(snakemake.input.war_parquet, list)
+        else snakemake.input.war_parquet
+    )
     war_json_path = (
         snakemake.input.war_json[0] if isinstance(snakemake.input.war_json, list) else snakemake.input.war_json
     )
 
-    war_dir = Path(war_pkl_path).parent
-    war_pkl_name = Path(war_pkl_path).name
+    war_dir = Path(war_parquet_path).parent
+    war_parquet_name = Path(war_parquet_path).name
     war_json_name = Path(war_json_path).name
-    war = visualization.WindowAnalysisResult.load_pickle_and_json(
-        folder_path=war_dir, pickle_name=war_pkl_name, json_name=war_json_name
+    war = visualization.WindowAnalysisResult.load_parquet_and_json(
+        folder_path=war_dir, parquet_name=war_parquet_name, json_name=war_json_name
     )
 
     return war, config, animal_folder, animal_id, output_dir
@@ -102,7 +109,10 @@ def generate_diagnostic_figures_for_animal(war, config, animal_folder, animal_id
     logging.info(f"Processing {animal_folder} - {animal_id}")
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    save_path_base = output_dir / animal_id
+    # Use the WAR's path-safe id so we don't depend on the Snakemake ``{animal}``
+    # wildcard already being slugified upstream — defensive per the project
+    # path-safety convention.
+    save_path_base = output_dir / war.path_safe_animal_id
     ap = visualization.AnimalPlotter(war, save_fig=True, save_path=str(save_path_base))
     figure_config = config["analysis"]["figures"]
 
@@ -125,9 +135,10 @@ def generate_diagnostic_figures_for_animal(war, config, animal_folder, animal_id
             figsize=figure_config["psd_spectrogram"]["figsize"], mode=figure_config["psd_spectrogram"]["mode"]
         )
 
-        # Generate temporal heatmaps
+        # Generate temporal heatmaps — pass the path-safe id (the helper builds
+        # filenames from it).
         logging.info("Generating temporal heatmaps")
-        generate_temporal_heatmaps_from_config(ap, config, animal_id, output_dir, "")
+        generate_temporal_heatmaps_from_config(ap, config, war.path_safe_animal_id, output_dir, "")
 
     except Exception as e:
         logging.error(f"Figure generation failed: {str(e)}")

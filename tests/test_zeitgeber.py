@@ -53,18 +53,18 @@ def sample_features_df():
 def test_add_zeitgeber_time_columns(sample_features_df):
     df = zeitgeber.add_zeitgeber_time_columns(sample_features_df)
 
-    assert "total_minutes" in df.columns
+    assert "zt_minutes" in df.columns
     assert "hour" in df.columns
     assert "minute" in df.columns
 
     # Check conversion
     # 00:00 -> 0 min
     row0 = df[df["timestamp"].dt.hour == 0].iloc[0]
-    assert row0["total_minutes"] == 0
+    assert row0["zt_minutes"] == 0
 
     # 02:00 -> 120 min
     row2 = df[df["timestamp"].dt.hour == 2].iloc[0]
-    assert row2["total_minutes"] == 120
+    assert row2["zt_minutes"] == 120
 
 
 def test_subtract_zeitgeber_baseline(sample_features_df):
@@ -72,7 +72,7 @@ def test_subtract_zeitgeber_baseline(sample_features_df):
     df = zeitgeber.add_zeitgeber_time_columns(sample_features_df)
 
     # Shift to ZT (ZT0 = 6am = 360 min)
-    df["total_minutes"] = (df["total_minutes"] - 360) % 1440
+    df["zt_minutes"] = (df["zt_minutes"] - 360) % 1440
 
     # Baseline: first 12 hours (ZT0-ZT12)
     # ZT0-12 corresponds to Clock 6:00-18:00
@@ -100,17 +100,17 @@ def test_transform_time_axis(sample_features_df):
     )
 
     row_6am = processed[processed["timestamp"].dt.hour == 6].iloc[0]
-    assert row_6am["total_minutes"] == 0
+    assert row_6am["zt_minutes"] == 0
 
     row_0am = processed[processed["timestamp"].dt.hour == 0].iloc[0]
-    assert row_0am["total_minutes"] == 1080  # 18 * 60
+    assert row_0am["zt_minutes"] == 1080  # 18 * 60
 
 
 def test_transform_time_axis_edge_cases():
     """Test edge cases for transform_time_axis."""
     # Create simple test data
     df = pd.DataFrame({
-        "total_minutes": [0, 360, 720, 1080],  # 0, 6, 12, 18 hours
+        "zt_minutes": [0, 360, 720, 1080],  # 0, 6, 12, 18 hours
         "genotype": ["M_WT", "M_WT", "F_KO", "F_KO"],
         "value": [1, 2, 3, 4],
     })
@@ -125,26 +125,28 @@ def test_transform_time_axis_edge_cases():
     # Test 2: Positive shift (moves times later)
     result = zeitgeber.transform_time_axis(df, time_range=(0, 24), shift=6)
     # 0:00 + 6h = 6:00 (360 min)
-    assert result.iloc[0]["total_minutes"] == 360
+    assert result.iloc[0]["zt_minutes"] == 360
     # 18:00 + 6h = 24:00 = 0:00 (wraps around)
-    assert result[result["value"] == 4].iloc[0]["total_minutes"] == 0
+    assert result[result["value"] == 4].iloc[0]["zt_minutes"] == 0
 
-    # Test 3: 48h expansion (default)
+    # Test 3: transform_time_axis NEVER duplicates rows after the refactor —
+    # multi-day expansion moved to expand_zt_axis().  The time_range param
+    # is a no-op kept for backward compat.
     result_48h = zeitgeber.transform_time_axis(df, time_range=(0, 48), shift=0)
-    # Should have 2x the rows (duplicated for 24-48h)
-    assert len(result_48h) == 2 * len(df)
-    # Should have values > 1440 for the duplicated portion
-    assert result_48h["total_minutes"].max() >= 1440
+    assert len(result_48h) == len(df), (
+        "transform_time_axis must not duplicate rows; use expand_zt_axis instead"
+    )
+    assert result_48h["zt_minutes"].max() < 1440
 
-    # Test 4: 72h expansion
+    # Test 4: same for any time_range — no duplication.
     result_72h = zeitgeber.transform_time_axis(df, time_range=(0, 72), shift=0)
-    assert len(result_72h) == 2 * len(df)  # Still only one duplication cycle
-    assert result_72h["total_minutes"].max() >= 1440
+    assert len(result_72h) == len(df)
+    assert result_72h["zt_minutes"].max() < 1440
 
     # Test 5: No expansion (0-24)
     result_24h = zeitgeber.transform_time_axis(df, time_range=(0, 24), shift=0)
     assert len(result_24h) == len(df)
-    assert result_24h["total_minutes"].max() < 1440
+    assert result_24h["zt_minutes"].max() < 1440
 
     # Test 6: Metadata enrichment
     assert "sex" in result_24h.columns
@@ -161,7 +163,7 @@ def test_nan_handling_legacy_issue(sample_features_df):
     df = zeitgeber.add_zeitgeber_time_columns(sample_features_df)
 
     # Check anim2 at 2am (120 min)
-    anim2_2am = df[(df["animal"] == "anim2") & (df["total_minutes"] == 120)]
+    anim2_2am = df[(df["animal"] == "anim2") & (df["zt_minutes"] == 120)]
     assert len(anim2_2am) == 1
     assert np.isnan(anim2_2am.iloc[0]["feature_const"])
 
@@ -171,14 +173,15 @@ def test_nan_handling_legacy_issue(sample_features_df):
     # The NaN should propagate or be handled gracefully
     anim2_processed_row = processed[
         (processed["animal"] == "anim2")
-        & (processed["total_minutes"] == (120 - 360) % 1440)
+        & (processed["zt_minutes"] == (120 - 360) % 1440)
     ]
-    # Note: process_zeitgeber_data does 48h expansion, so we might find 2 rows
-    # And ZT shift: 2am (120) - 6am (360) = -240 = 1200 (ZT20)
+    # ZT shift: 2am (120) - 6am (360) = -240 = 1200 (ZT20).
+    # Post-refactor the pipeline no longer duplicates rows for a 48h view,
+    # so we expect exactly the original row count per (animal, zt_minutes).
 
     # Check ZT20
     zt20_rows = processed[
-        (processed["animal"] == "anim2") & (processed["total_minutes"] == 1200)
+        (processed["animal"] == "anim2") & (processed["zt_minutes"] == 1200)
     ]
     assert len(zt20_rows) >= 1
 
@@ -198,7 +201,7 @@ def test_grouped_baseline_correction():
         # Animal 1
         rows.append(
             {
-                "total_minutes": minute,
+                "zt_minutes": minute,
                 "animal": "anim1",
                 "val": 10.0 if minute <= 720 else 15.0,  # Jump to 15 after baseline
             }
@@ -206,7 +209,7 @@ def test_grouped_baseline_correction():
         # Animal 2
         rows.append(
             {
-                "total_minutes": minute,
+                "zt_minutes": minute,
                 "animal": "anim2",
                 "val": 20.0 if minute <= 720 else 25.0,  # Jump to 25 after baseline
             }
@@ -220,23 +223,23 @@ def test_grouped_baseline_correction():
     # Check animal 1 results
     a1 = processed[processed["animal"] == "anim1"]
     # Baseline period should be 0 (10-10)
-    assert np.allclose(a1[a1["total_minutes"] <= 720]["val_nobase"], 0.0)
+    assert np.allclose(a1[a1["zt_minutes"] <= 720]["val_nobase"], 0.0)
     # Post-baseline should be 5 (15-10)
-    assert np.allclose(a1[a1["total_minutes"] > 720]["val_nobase"], 5.0)
+    assert np.allclose(a1[a1["zt_minutes"] > 720]["val_nobase"], 5.0)
 
     # Check animal 2 results
     a2 = processed[processed["animal"] == "anim2"]
     # Baseline period should be 0 (20-20)
-    assert np.allclose(a2[a2["total_minutes"] <= 720]["val_nobase"], 0.0)
+    assert np.allclose(a2[a2["zt_minutes"] <= 720]["val_nobase"], 0.0)
     # Post-baseline should be 5 (25-20)
-    assert np.allclose(a2[a2["total_minutes"] > 720]["val_nobase"], 5.0)
+    assert np.allclose(a2[a2["zt_minutes"] > 720]["val_nobase"], 5.0)
 
 
 def test_baseline_exclusions():
     # Create simple dataframe
     df = pd.DataFrame(
         {
-            "total_minutes": [0, 600, 1200],  # ZT0, ZT10, ZT20
+            "zt_minutes": [0, 600, 1200],  # ZT0, ZT10, ZT20
             "animal": ["a", "a", "a"],
             "feature_inc": [10, 10, 20],  # Should be corrected
             "feature_excl": [100, 100, 200],  # Should be excluded
@@ -265,13 +268,13 @@ def test_full_pipeline_via_run_zeitgeber_pipeline(sample_features_df):
     if "gene" in df.columns:
         del df["gene"]
 
-    # We need to ensure total_minutes exists before pipeline if we haven't stripped it
+    # We need to ensure zt_minutes exists before pipeline if we haven't stripped it
     # But sample_features_df creates a Raw DF? No, looking at lines 9-50, it makes cols:
     # timestamp, animal, genotype, feature_const, feature_wave.
-    # It DOES NOT calculate total_minutes.
+    # It DOES NOT calculate zt_minutes.
     # So we MUST call add_zeitgeber_time_columns first for the pipeline to work,
     # OR the pipeline should handle it.
-    # Our run_zeitgeber_pipeline docstring says: "Required columns: ... - 'total_minutes'"
+    # Our run_zeitgeber_pipeline docstring says: "Required columns: ... - 'zt_minutes'"
     # So we must call add_zeitgeber_time_columns first.
 
     df = zeitgeber.add_zeitgeber_time_columns(df)
@@ -285,12 +288,19 @@ def test_full_pipeline_via_run_zeitgeber_pipeline(sample_features_df):
     assert processed.iloc[0]["gene"] == "WT"
 
     # Check ZT Shift (Clock 0 -> ZT 18 (-6h) = 1080 min)
-    # mock_zt_dataframe already has total_minutes from add_zeitgeber_time_columns (0 at 00:00).
-    # Processed should have total_minutes=1080 (and 2520 due to 48h duplicate).
-    assert 1080 in processed["total_minutes"].values
+    # mock_zt_dataframe already has zt_minutes from add_zeitgeber_time_columns (0 at 00:00).
+    # Processed should have zt_minutes=1080.  Post-refactor the data layer
+    # no longer duplicates rows for a 48h view (that's the plotter's job),
+    # so the max zt_minutes stays in the 24h range.
+    assert 1080 in processed["zt_minutes"].values
+    assert processed["zt_minutes"].max() < 1440
 
     # Check Baseline Subtraction
     assert "feature_const_nobase" in processed.columns
+
+    # Check daynight label was added by shift_to_zeitgeber_reference.
+    assert "daynight" in processed.columns
+    assert set(processed["daynight"].unique()).issubset({"Day", "Night"})
 
 
 def test_variable_intervals():
@@ -303,26 +313,26 @@ def test_variable_intervals():
 
     # 1. Default (60 min)
     res_60 = zeitgeber.add_zeitgeber_time_columns(df.copy(), interval_minutes=60)
-    assert res_60.iloc[1]["total_minutes"] == 0  # 10 min
-    assert res_60.iloc[5]["total_minutes"] == 60  # 50 min
+    assert res_60.iloc[1]["zt_minutes"] == 0  # 10 min
+    assert res_60.iloc[5]["zt_minutes"] == 60  # 50 min
 
     # 2. 30 min interval
     res_30 = zeitgeber.add_zeitgeber_time_columns(df.copy(), interval_minutes=30)
-    assert res_30.iloc[1]["total_minutes"] == 0  # 10 min
-    assert res_30.iloc[2]["total_minutes"] == 30  # 20 min
+    assert res_30.iloc[1]["zt_minutes"] == 0  # 10 min
+    assert res_30.iloc[2]["zt_minutes"] == 30  # 20 min
 
     # 3. Edge Cases
     # 1 min interval (Valid)
     res_1 = zeitgeber.add_zeitgeber_time_columns(df.copy(), interval_minutes=1)
-    assert res_1.iloc[1]["total_minutes"] == 10
+    assert res_1.iloc[1]["zt_minutes"] == 10
 
     # 1440 min interval (Valid - 24h bin)
     res_1440 = zeitgeber.add_zeitgeber_time_columns(df.copy(), interval_minutes=1440)
-    assert res_1440.iloc[5]["total_minutes"] == 0  # 50 min -> 0
+    assert res_1440.iloc[5]["zt_minutes"] == 0  # 50 min -> 0
 
     # 720 min interval (Valid - 12h bin)
     res_720 = zeitgeber.add_zeitgeber_time_columns(df.copy(), interval_minutes=720)
-    assert res_720.iloc[5]["total_minutes"] == 0
+    assert res_720.iloc[5]["zt_minutes"] == 0
 
     # 4. Invalid Intervals (Primes and non-divisors)
     primes_and_oddities = [7, 11, 13, 17, 19, 23, 29, 31, 100, 500]
@@ -349,25 +359,25 @@ def test_flexible_baseline_windows():
         if h >= 18:
             val = 40.0
 
-        rows.append({"total_minutes": h * 60, "val": val, "animal": "anim1"})
+        rows.append({"zt_minutes": h * 60, "val": val, "animal": "anim1"})
     df = pd.DataFrame(rows)
 
     # 1. Custom Range (ZT6-12) => Mean=20
     res_range = zeitgeber.subtract_zeitgeber_baseline(df, baseline_window=(6, 12))
     assert np.isclose(
-        res_range[res_range["total_minutes"] == 360].iloc[0]["val_nobase"], 0.0
+        res_range[res_range["zt_minutes"] == 360].iloc[0]["val_nobase"], 0.0
     )
 
     # 2. "day" alias (ZT0-12) => Mean=15
     res_day = zeitgeber.subtract_zeitgeber_baseline(df, baseline_window="day")
     assert np.isclose(
-        res_day[res_day["total_minutes"] == 0].iloc[0]["val_nobase"], -5.0
+        res_day[res_day["zt_minutes"] == 0].iloc[0]["val_nobase"], -5.0
     )
 
     # 3. "night" alias (ZT12-24) => Mean=35
     res_night = zeitgeber.subtract_zeitgeber_baseline(df, baseline_window="night")
     assert np.isclose(
-        res_night[res_night["total_minutes"] == 720].iloc[0]["val_nobase"], -5.0
+        res_night[res_night["zt_minutes"] == 720].iloc[0]["val_nobase"], -5.0
     )
 
 
@@ -452,7 +462,7 @@ def test_add_zeitgeber_time_columns_empty_df():
 def test_subtract_baseline_no_group_cols():
     """Test baseline subtraction without grouping columns (no animal/sex/gene)."""
     df = pd.DataFrame({
-        "total_minutes": [0, 360, 720, 1080],
+        "zt_minutes": [0, 360, 720, 1080],
         "feature": [10.0, 10.0, 20.0, 20.0],
     })
     
@@ -467,7 +477,7 @@ def test_subtract_baseline_no_group_cols():
 def test_subtract_baseline_empty_window():
     """Test baseline subtraction when baseline window has no data (ungrouped)."""
     df = pd.DataFrame({
-        "total_minutes": [720, 1080, 1320],  # All after ZT12
+        "zt_minutes": [720, 1080, 1320],  # All after ZT12
         # No group columns (animal/sex/gene) - tests the ungrouped branch
         "feature": [10.0, 20.0, 30.0],
     })
@@ -482,7 +492,7 @@ def test_subtract_baseline_empty_window():
 
 def test_subtract_baseline_empty_df():
     """Test baseline subtraction with empty dataframe."""
-    empty_df = pd.DataFrame({"total_minutes": [], "feature": []})
+    empty_df = pd.DataFrame({"zt_minutes": [], "feature": []})
     result = zeitgeber.subtract_zeitgeber_baseline(empty_df)
     assert result.empty
 
@@ -490,7 +500,7 @@ def test_subtract_baseline_empty_df():
 def test_subtract_baseline_invalid_window_string():
     """Test baseline subtraction with invalid window alias."""
     df = pd.DataFrame({
-        "total_minutes": [0, 60, 120],
+        "zt_minutes": [0, 60, 120],
         "feature": [1, 2, 3],
     })
     
@@ -501,7 +511,7 @@ def test_subtract_baseline_invalid_window_string():
 def test_subtract_baseline_invalid_window_type():
     """Test baseline subtraction with invalid window type."""
     df = pd.DataFrame({
-        "total_minutes": [0, 60, 120],
+        "zt_minutes": [0, 60, 120],
         "feature": [1, 2, 3],
     })
     
@@ -555,7 +565,7 @@ def test_zar_get_grouprows_result():
     zar = zeitgeber.ZeitgeberAnalysisResult(mock_war, baseline_hours=2)
     result = zar.get_grouprows_result()
     
-    assert "total_minutes" in result.columns
+    assert "zt_minutes" in result.columns
     assert "sex" in result.columns
     mock_war.get_grouprows_result.assert_called_once()
 
@@ -574,7 +584,7 @@ def test_zar_get_groupavg_result():
     zar = zeitgeber.ZeitgeberAnalysisResult(mock_war, baseline_hours=2)
     result = zar.get_groupavg_result()
     
-    assert "total_minutes" in result.columns
+    assert "zt_minutes" in result.columns
     mock_war.get_groupavg_result.assert_called_once()
 
 
@@ -628,7 +638,7 @@ def test_baseline_grouped_empty_window(caplog):
     
     # Data where baseline window (0-360) has no data for group "b"
     df = pd.DataFrame({
-        "total_minutes": [0, 60, 720, 780],  # a has data in baseline, b does not
+        "zt_minutes": [0, 60, 720, 780],  # a has data in baseline, b does not
         "animal": ["a", "a", "b", "b"],
         "feature": [10.0, 10.0, 20.0, 20.0],
     })
@@ -673,5 +683,5 @@ def test_zar_ignores_extra_config_kwargs():
     
     # Verify pipeline was applied (has sex/gene columns from enrichment)
     assert "sex" in result.columns
-    assert "total_minutes" in result.columns
+    assert "zt_minutes" in result.columns
 

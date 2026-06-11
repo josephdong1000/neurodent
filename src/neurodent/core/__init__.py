@@ -23,7 +23,7 @@ handling everything from raw data loading to feature extraction.
 
     # 3. Access results (WindowAnalysisResult)
     df = war.result  # pandas DataFrame with all features
-    war.save_pickle_and_json('output/')
+    war.save_parquet_and_json('output/')
 
 The lower-level classes can also be used directly:
 
@@ -92,6 +92,7 @@ from .zeitgeber import (
     run_zeitgeber_pipeline,
     get_expanded_feature_names,
     transform_time_axis,
+    expand_zt_axis,
 )
 from . import utils
 from . import discovery
@@ -112,6 +113,7 @@ __all__ = [
     "run_zeitgeber_pipeline",
     "get_expanded_feature_names",
     "transform_time_axis",
+    "expand_zt_axis",
     # Utilities
     "convert_ddfcolbin_to_ddfrowbin",
     "convert_ddfrowbin_to_si",

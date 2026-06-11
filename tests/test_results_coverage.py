@@ -203,6 +203,75 @@ class TestExtractBandFeatures:
 
 
 # =========================================================================
+# 6b. _extract_linear_2d_features (new for psdslope in get_channel_averaged_result)
+# =========================================================================
+
+class TestExtractLinear2DFeatures:
+    """Cover the LINEAR_2D extraction helper used by
+    :meth:`WindowAnalysisResult.get_channel_averaged_result` for features
+    like ``psdslope`` whose raw cells are ``(n_channels, n_components)``
+    2-D arrays.
+    """
+
+    def test_splits_into_per_component_columns(self):
+        """Happy path: ``psdslope`` cells → ``psdslope_slope`` and
+        ``psdslope_intercept`` columns, each cell a per-channel array."""
+        war = make_war()
+        df = war.result.copy()
+        n_ch = len(war.channel_names)
+        # Per-row: a (n_channels, 2) array. Column 0 = slope, column 1 = intercept.
+        slopes = np.linspace(-2.0, -1.0, n_ch)
+        intercepts = np.linspace(5.0, 6.0, n_ch)
+        cell = np.column_stack([slopes, intercepts])
+        df["psdslope"] = [cell] * len(df)
+
+        result = war._extract_linear_2d_features(df, "psdslope")
+
+        assert "psdslope_slope" in result.columns
+        assert "psdslope_intercept" in result.columns
+        # Cells are per-channel arrays (length n_ch), matching LINEAR shape.
+        for row in result["psdslope_slope"]:
+            assert np.allclose(row, slopes)
+        for row in result["psdslope_intercept"]:
+            assert np.allclose(row, intercepts)
+
+    def test_missing_column_returns_df(self):
+        war = make_war()
+        df = war.result.copy()
+        result = war._extract_linear_2d_features(df, "nonexistent")
+        assert result is df
+        assert "nonexistent_slope" not in result.columns
+
+    def test_no_component_labels_returns_df_with_warning(self):
+        """Feature absent from ``COMPONENT_LABELS`` → warn and pass through."""
+        war = make_war()
+        df = war.result.copy()
+        # Use a real LINEAR_2D feature name, but temporarily empty its
+        # component labels.
+        cell = np.zeros((len(war.channel_names), 2))
+        df["psdslope"] = [cell] * len(df)
+        with patch.object(constants, "COMPONENT_LABELS", {}):
+            with warnings.catch_warnings(record=True):
+                warnings.simplefilter("always")
+                result = war._extract_linear_2d_features(df, "psdslope")
+        assert "psdslope_slope" not in result.columns
+
+    def test_wrong_shape_uses_nans(self):
+        """Cells with the wrong shape produce NaN-filled per-channel arrays."""
+        war = make_war()
+        df = war.result.copy()
+        # Wrong shape: 1-D instead of (n_channels, n_components).
+        df["psdslope"] = [np.array([1.0, 2.0])] * len(df)
+        with warnings.catch_warnings(record=True):
+            warnings.simplefilter("always")
+            result = war._extract_linear_2d_features(df, "psdslope")
+        for row in result["psdslope_slope"]:
+            assert np.isnan(row).all()
+        for row in result["psdslope_intercept"]:
+            assert np.isnan(row).all()
+
+
+# =========================================================================
 # 7. _extract_banded_matrix_features (lines 2733, 2751-2755, 2776, 2791,
 #    2797-2802, 2816-2822)
 # =========================================================================
@@ -316,25 +385,23 @@ class TestGetFilterHighBeta:
     def test_psdband_psdtotal_fallback(self):
         """Lines 3000-3004: use psdband+psdtotal when psdfrac absent."""
         war = make_war()
-        df = war.result.copy()
         n_ch = len(war.channel_names)
-        if "psdfrac" in df.columns:
-            df = df.drop(columns=["psdfrac"])
+        if "psdfrac" in war.result.columns:
+            war.result = war.result.drop(columns=["psdfrac"])
         # beta=0.3, total=1.0 -> proportion=0.3, which is below max_beta_prop=0.4
-        df["psdband"] = [{"beta": np.array([0.3] * n_ch)}] * len(df)
-        df["psdtotal"] = [np.array([1.0] * n_ch)] * len(df)
-        result = war.get_filter_high_beta(df=df)
-        assert result.shape[0] == len(df)
+        war.result["psdband"] = [{"beta": np.array([0.3] * n_ch)}] * len(war.result)
+        war.result["psdtotal"] = [np.array([1.0] * n_ch)] * len(war.result)
+        result = war.get_filter_high_beta()
+        assert result.shape[0] == len(war.result)
         # All windows should pass (0.3 < 0.4 threshold)
         assert result.all(), "All windows should pass with beta proportion 0.3 < 0.4"
 
     def test_missing_psd_features_raises(self):
         """Lines 3005-3008: missing both psdfrac and psdband raises."""
         war = make_war()
-        df = war.result.copy()
-        df = df.drop(columns=["psdfrac", "psdband", "psdtotal"], errors="ignore")
+        war.result = war.result.drop(columns=["psdfrac", "psdband", "psdtotal"], errors="ignore")
         with pytest.raises(ValueError, match="psdfrac or psdband"):
-            war.get_filter_high_beta(df=df)
+            war.get_filter_high_beta()
 
 
 # =========================================================================
@@ -384,13 +451,17 @@ class TestMorphologicalSmoothing:
 class TestFilterAll:
 
     def test_morphological_smoothing_missing_duration_raises(self):
-        """Lines 3313-3316: missing duration column raises ValueError."""
+        """Morphological smoothing requires a 'duration' column; raises if missing."""
         war = make_war(include_duration=False)
-        # Provide a trivial filter so the main filter loop works
-        trivial_filter = lambda df=None, **kw: np.ones((len(war.result), len(war.channel_names)), dtype=bool)
-        trivial_filter.__name__ = "trivial"
+        # Use apply_filters with a single MASK_POST filter so the missing-duration
+        # check fires before any per-row filter needs rms/psd data.
         with pytest.raises(ValueError, match="duration"):
-            war.filter_all(filters=[trivial_filter], morphological_smoothing_seconds=10.0)
+            war.apply_filters(
+                filter_config={
+                    "morphological_smoothing": {"smoothing_seconds": 10.0},
+                },
+                min_valid_channels=0,
+            )
 
     def test_default_all_true_when_no_filters_in_apply_filters(self):
         """Line 3568: empty filter list produces all-True mask."""
@@ -570,37 +641,37 @@ class TestEvaluateLOFThreshold:
 
 
 # =========================================================================
-# 18. load_pickle_and_json (lines 4076, 4090, 4092)
+# 18. load_parquet_and_json
 # =========================================================================
 
-class TestLoadPickleAndJson:
+class TestLoadParquetAndJson:
 
     def test_multiple_json_files_raises(self, tmp_path):
-        """Line 4076: multiple json files raises ValueError."""
-        (tmp_path / "data.pkl").write_bytes(b"")
+        """Multiple json files raises ValueError."""
+        (tmp_path / "data.parquet").write_bytes(b"")
         (tmp_path / "a.json").write_text("{}")
         (tmp_path / "b.json").write_text("{}")
         with pytest.raises(ValueError, match="Expected exactly one json"):
-            WindowAnalysisResult.load_pickle_and_json(folder_path=tmp_path)
+            WindowAnalysisResult.load_parquet_and_json(folder_path=tmp_path)
 
-    def test_missing_pickle_raises(self, tmp_path):
-        """Line 4090: missing pickle file raises FileNotFoundError."""
-        fake_pkl = tmp_path / "nonexistent.pkl"
+    def test_missing_parquet_raises(self, tmp_path):
+        """Missing parquet file raises FileNotFoundError."""
+        fake_parquet = tmp_path / "nonexistent.parquet"
         fake_json = tmp_path / "meta.json"
         fake_json.write_text("{}")
-        with pytest.raises(FileNotFoundError, match="Pickle file not found"):
-            WindowAnalysisResult.load_pickle_and_json(
-                pickle_name=str(fake_pkl), json_name=str(fake_json)
+        with pytest.raises(FileNotFoundError, match="Parquet file not found"):
+            WindowAnalysisResult.load_parquet_and_json(
+                parquet_name=str(fake_parquet), json_name=str(fake_json)
             )
 
     def test_missing_json_raises(self, tmp_path):
-        """Line 4092: missing json file raises FileNotFoundError."""
-        fake_pkl = tmp_path / "data.pkl"
-        fake_pkl.write_bytes(b"")
+        """Missing json file raises FileNotFoundError."""
+        fake_parquet = tmp_path / "data.parquet"
+        fake_parquet.write_bytes(b"")
         fake_json = tmp_path / "nonexistent.json"
         with pytest.raises(FileNotFoundError, match="JSON file not found"):
-            WindowAnalysisResult.load_pickle_and_json(
-                pickle_name=str(fake_pkl), json_name=str(fake_json)
+            WindowAnalysisResult.load_parquet_and_json(
+                parquet_name=str(fake_parquet), json_name=str(fake_json)
             )
 
 
@@ -613,11 +684,10 @@ class TestParquetLoading:
     def test_legacy_sidecar_metadata(self, tmp_path):
         """Lines 4110-4116: legacy .meta.json sidecar fallback."""
         war = make_war()
-        war.save_pickle_and_json(tmp_path, filename="test")
+        war.save_parquet_and_json(tmp_path, filename="test")
 
         parquet_path = tmp_path / "test.parquet"
-        json_path = tmp_path / "test.json"
-        assert parquet_path.exists(), "Parquet file should be created by save_pickle_and_json"
+        assert parquet_path.exists(), "Parquet file should be created by save_parquet_and_json"
 
         import pyarrow.parquet as pq
         table = pq.read_table(parquet_path)
@@ -637,22 +707,25 @@ class TestParquetLoading:
         sidecar_path.write_text(json.dumps({"encoded_columns": encoded_cols}))
 
         # Specify json_name explicitly to avoid the "found 2 json" error
-        loaded = WindowAnalysisResult.load_pickle_and_json(
+        loaded = WindowAnalysisResult.load_parquet_and_json(
             folder_path=tmp_path, json_name="test.json"
         )
         assert loaded.animal_id == "A1"
 
     def test_parquet_load_failure_falls_back_to_pickle(self, tmp_path):
-        """Lines 4120-4125: parquet load failure falls back to pickle."""
+        """Parquet load failure falls back to a legacy pickle when available."""
         war = make_war()
-        war.save_pickle_and_json(tmp_path, filename="test")
+        war.save_parquet_and_json(tmp_path, filename="test")
 
         parquet_path = tmp_path / "test.parquet"
-        assert parquet_path.exists(), "Parquet file should be created by save_pickle_and_json"
+        assert parquet_path.exists(), "Parquet file should be created by save_parquet_and_json"
 
-        # Corrupt the parquet file
+        # Simulate an old on-disk WAR: write a legacy pickle alongside the JSON,
+        # then corrupt the parquet so loading has to fall through to the pickle.
+        war.result.to_pickle(tmp_path / "test.pkl")
         parquet_path.write_bytes(b"corrupted data")
-        loaded = WindowAnalysisResult.load_pickle_and_json(folder_path=tmp_path)
+
+        loaded = WindowAnalysisResult.load_parquet_and_json(folder_path=tmp_path)
         assert loaded.animal_id == "A1"
 
 

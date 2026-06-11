@@ -18,13 +18,13 @@ rule war_generation:
     4. Saves both WAR and FDSAR results
     """
     output:
-        war_pkl="results/wars/{animal}/war.pkl",
+        war_parquet="results/wars/{animal}/war.parquet",
         war_json="results/wars/{animal}/war.json",
         fdsar_dir=directory("results/fdsars/{animal}"),
     params:
         animal_folders=get_animal_folders,
         animal_id=get_animal_id,
-        is_split_recording=lambda wc: wc.animal in JOINT_ANIMAL_TO_SESSION,
+        is_split_recording=lambda wc: get_joint_session_channels(wc) is not None,
         channel_subset=get_joint_session_channels,  # None for regular animals, list for joint sessions
         config=config,
         samples_config=samples_config,

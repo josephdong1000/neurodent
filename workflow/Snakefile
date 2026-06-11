@@ -129,31 +129,12 @@ else:
         "or 'data_folders_to_animal_ids' (legacy format)"
     )
 
-# Build mapping for animals from joint sessions
-# These animals will have their data read from split output folders
-JOINT_ANIMAL_TO_SESSION = {}  # Maps slugified animal name -> (session, original_animal_id)
-
-for session, animals_dict in samples_config.get("joint_sessions", {}).items():
-    for animal_id in animals_dict.keys():
-        slugified_name = slugify(animal_id, allow_unicode=True)
-        
-        JOINT_ANIMAL_TO_SESSION[slugified_name] = (session, animal_id)
-        
-        if slugified_name not in ANIMALS:
-            ANIMALS.append(slugified_name)
-            ANIMAL_TO_FOLDERS_MAP[slugified_name] = []
-            ANIMAL_TO_FULL_ID_MAP[slugified_name] = animal_id
-            
-        # For joint sessions, 'session' is the folder
-        ANIMAL_TO_FOLDERS_MAP[slugified_name].append((session, animal_id, session))
-
 # Optionally limit to first N animals (useful for testing)
 _truncate_animals = config.get("samples", {}).get("truncate_animals", None)
 if _truncate_animals is not None:
     ANIMALS = ANIMALS[:_truncate_animals]
     ANIMAL_TO_FOLDERS_MAP = {k: v for k, v in ANIMAL_TO_FOLDERS_MAP.items() if k in ANIMALS}
     ANIMAL_TO_FULL_ID_MAP = {k: v for k, v in ANIMAL_TO_FULL_ID_MAP.items() if k in ANIMALS}
-    JOINT_ANIMAL_TO_SESSION = {k: v for k, v in JOINT_ANIMAL_TO_SESSION.items() if k in ANIMALS}
     print(f"[info] truncate_animals={_truncate_animals}: running first {len(ANIMALS)} animal(s): {ANIMALS}")
 
 
@@ -171,15 +152,11 @@ def get_animal_folder(wildcards):
 
 def get_joint_session_channels(wildcards):
     """Get channel subset for joint session animals, or None for regular animals.
-    
-    Now looks up based on the animal ID slug. 
-    Assumes if ANY session for this animal is joint, we return the channels for that session.
-    (Merging joint + non-joint sessions for same animal is complex, assumed uniform).
+
+    Uses the new _animal_channels dict from expand_animals_config().
     """
-    if wildcards.animal in JOINT_ANIMAL_TO_SESSION:
-        session, animal_id = JOINT_ANIMAL_TO_SESSION[wildcards.animal]
-        return samples_config["joint_sessions"][session][animal_id]
-    return None
+    animal_id = ANIMAL_TO_FULL_ID_MAP[wildcards.animal]
+    return samples_config.get("_animal_channels", {}).get(animal_id)
 
 
 def get_animal_id(wildcards):
@@ -187,14 +164,14 @@ def get_animal_id(wildcards):
     return ANIMAL_TO_FULL_ID_MAP[wildcards.animal]
 
 
-def get_all_fragment_filtered_pkl(wildcards):
+def get_all_fragment_filtered_parquet(wildcards):
     out = []
     for anim in ANIMALS:
         # Only process animals that have quality-filtered output
         qual_filter_output = checkpoints.war_quality_filter.get(animal=anim).output[0]
-        qual_filenames = glob_wildcards(os.path.join(qual_filter_output, "{filename}.pkl")).filename
+        qual_filenames = glob_wildcards(os.path.join(qual_filter_output, "{filename}.parquet")).filename
         if qual_filenames:  # Only if quality filtering produced files
-            out.append(f"results/wars_fragment_filtered/{Path(qual_filter_output).name}/war.pkl")
+            out.append(f"results/wars_fragment_filtered/{Path(qual_filter_output).name}/war.parquet")
     return out
 
 
@@ -233,7 +210,7 @@ def get_wars_after_quality_filtered(wildcards, filepath_prepend, filepath_append
     for anim in ANIMALS:
         checkpoint_output = checkpoints.war_quality_filter.get(animal=anim).output[0]
         animal_name = Path(checkpoint_output).name
-        qual_filenames = glob.glob(os.path.join(checkpoint_output, "war.pkl"))
+        qual_filenames = glob.glob(os.path.join(checkpoint_output, "war.parquet"))
         if qual_filenames:
             out.append(str(Path(filepath_prepend) / animal_name / filepath_append))
     return out
@@ -243,9 +220,9 @@ def get_all_flattened_manual_wars(wildcards):
     out = []
     for anim in ANIMALS:
         checkpoint_output = checkpoints.war_quality_filter.get(animal=anim).output[0]
-        qual_filenames = glob_wildcards(os.path.join(checkpoint_output, "{filename}.pkl")).filename
+        qual_filenames = glob_wildcards(os.path.join(checkpoint_output, "{filename}.parquet")).filename
         if qual_filenames:
-            out.append(f"results/wars_flattened_manual/{Path(checkpoint_output).name}/war.pkl")
+            out.append(f"results/wars_flattened_manual/{Path(checkpoint_output).name}/war.parquet")
     return out
 
 
@@ -254,9 +231,9 @@ def get_all_flattened_lof_wars(wildcards):
     out = []
     for anim in ANIMALS:
         checkpoint_output = checkpoints.war_quality_filter.get(animal=anim).output[0]
-        qual_filenames = glob_wildcards(os.path.join(checkpoint_output, "{filename}.pkl")).filename
+        qual_filenames = glob_wildcards(os.path.join(checkpoint_output, "{filename}.parquet")).filename
         if qual_filenames:
-            out.append(f"results/wars_flattened_lof/{Path(checkpoint_output).name}/war.pkl")
+            out.append(f"results/wars_flattened_lof/{Path(checkpoint_output).name}/war.parquet")
     return out
 
 
@@ -264,7 +241,7 @@ def get_diagnostic_figures_unfiltered(wildcards):
     outputs = []
     for anim in ANIMALS:
         checkpoint_output = checkpoints.war_quality_filter.get(animal=anim).output[0]
-        hypothetical_war_path = Path(checkpoint_output) / "war.pkl"
+        hypothetical_war_path = Path(checkpoint_output) / "war.parquet"
         if os.path.exists(hypothetical_war_path):
             # print(f"thing exists: {hypothetical_war_path}")
             # outputs.extend(expand("results/diagnostic_figures/{a}/unfiltered", a=glob_wildcards()))
@@ -275,7 +252,7 @@ def get_diagnostic_figures_filtered(wildcards):
     outputs = []
     for anim in ANIMALS:
         checkpoint_output = checkpoints.war_quality_filter.get(animal=anim).output[0]
-        hypothetical_war_path = Path(checkpoint_output) / "war.pkl"
+        hypothetical_war_path = Path(checkpoint_output) / "war.parquet"
         if os.path.exists(hypothetical_war_path):
             # print(f"thing exists: {hypothetical_war_path}")
             # outputs.extend(expand("results/diagnostic_figures/{a}/unfiltered", a=glob_wildcards()))

@@ -504,6 +504,32 @@ class TestWindowAnalysisResult:
         with pytest.raises(ValueError, match=r"Found \d+ intervals.*shorter than the median duration"):
             WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"])
 
+    def test_short_intervals_error_includes_diagnostic(self):
+        """Error message includes overlapping pairs and the datetimes_are_start hint."""
+        data = {
+            "animal": ["A1"] * 4,
+            "animalday": ["A1_day1", "A1_day1", "A1_day2", "A1_day2"],
+            "genotype": ["WT"] * 4,
+            "timestamp": pd.to_datetime(
+                [
+                    "2023-01-01 10:00:00",
+                    "2023-01-01 10:00:30",  # 30s gap (short)
+                    "2023-01-01 10:01:00",  # 30s gap (short)
+                    "2023-01-01 10:04:00",
+                ]
+            ),
+            "duration": [240.0] * 4,
+            "rms": [[100.0, 110.0]] * 4,
+        }
+        df = pd.DataFrame(data)
+
+        with pytest.raises(ValueError) as exc_info:
+            WindowAnalysisResult(result=df, animal_id="A1", genotype="WT", sex="Male", channel_names=["LMot", "RMot"])
+
+        msg = str(exc_info.value)
+        assert "datetimes_are_start" in msg
+        assert "A1_day" in msg  # animalday context included
+
     def test_suppress_short_intervals_error(self):
         """Test that suppress_short_interval_error parameter suppresses the ValueError."""
         # Create DataFrame where >1% of intervals are short (same as test_short_intervals_error)
@@ -753,8 +779,8 @@ class TestWindowAnalysisResult:
             save_path = Path(tmpdir)
 
             # Save and load
-            war.save_pickle_and_json(save_path)
-            loaded_war = WindowAnalysisResult.load_pickle_and_json(save_path)
+            war.save_parquet_and_json(save_path)
+            loaded_war = WindowAnalysisResult.load_parquet_and_json(save_path)
 
             # Verify durations preserved
             assert "duration" in loaded_war.result.columns
@@ -1125,13 +1151,6 @@ class TestWindowAnalysisResultFiltering:
         with pytest.raises(ValueError, match="Cannot calculate window duration"):
             war.apply_filters(config, morphological_smoothing_seconds=8.0)
 
-    def test_filter_morphological_smoothing(self, filtering_war):
-        """Test standalone morphological smoothing filter."""
-        filtered = filtering_war.filter_morphological_smoothing(smoothing_seconds=8.0)
-
-        assert isinstance(filtered, WindowAnalysisResult)
-        assert filtered is not filtering_war
-
     def test_apply_filters_with_morphological_config(self, filtering_war):
         """Test morphological smoothing via configuration."""
         config = {"high_rms": {"max_rms": 500}, "morphological_smoothing": {"smoothing_seconds": 8.0}}
@@ -1151,7 +1170,7 @@ class TestWindowAnalysisResultFiltering:
             mock_smooth.assert_called_once()
             args, kwargs = mock_smooth.call_args
             np.testing.assert_array_equal(args[0], mask)
-            assert args[1] == 8.0
+            assert kwargs["smoothing_seconds"] == 8.0
             assert isinstance(filtered, WindowAnalysisResult)
 
 
@@ -1266,6 +1285,93 @@ class TestWindowAnalysisResultRemapChannels:
         # Verify data was updated
         arr = np.array(remap_war.result["rms"].iloc[0])
         assert arr.shape == (3,)
+
+
+class TestWindowAnalysisResultSelectChannels:
+    """Test WindowAnalysisResult.select_channels() — strict shim over
+    reorder_and_pad_channels: subset/reorder existing channels, raise on
+    missing names (no NaN padding)."""
+
+    @pytest.fixture
+    def select_war(self):
+        """4-channel WAR for subset-selection testing."""
+        n_rows = 3
+        n_chan = 4
+        ch_names = ["LMot", "RMot", "LBar", "RBar"]
+        rng = np.random.default_rng(7)
+        data = {
+            "animal": ["A1"] * n_rows,
+            "animalday": ["A1_day1"] * n_rows,
+            "genotype": ["WT"] * n_rows,
+            "duration": [4.0] * n_rows,
+            "rms": [rng.random(n_chan).tolist() for _ in range(n_rows)],
+            "psdband": [
+                {b: rng.random(n_chan).tolist() for b in constants.BAND_NAMES}
+                for _ in range(n_rows)
+            ],
+        }
+        return WindowAnalysisResult(
+            result=pd.DataFrame(data),
+            animal_id="A1",
+            genotype="WT",
+            channel_names=ch_names,
+        )
+
+    def test_select_channels_strict_subset(self, select_war):
+        """Requesting a 2-channel subset of a 4-channel WAR returns
+        exactly 2 channels — no NaN padding."""
+        result = select_war.select_channels(
+            ["LMot", "RMot"], use_abbrevs=False, inplace=False
+        )
+        for row in result["rms"]:
+            arr = np.array(row)
+            assert arr.shape == (2,)
+            assert not np.isnan(arr).any(), "subset of existing channels should be NaN-free"
+
+    def test_select_channels_reorders(self, select_war):
+        """Same channel set in a different order is reordered, not padded."""
+        # Note the swap: RMot before LMot.
+        result = select_war.select_channels(
+            ["RMot", "LMot", "RBar", "LBar"], use_abbrevs=False, inplace=False
+        )
+        original_first_row = np.array(select_war.result["rms"].iloc[0])
+        new_first_row = np.array(result["rms"].iloc[0])
+        # New[0] should equal original[1] (RMot's old position).
+        assert new_first_row[0] == original_first_row[1]
+        assert new_first_row[1] == original_first_row[0]
+        assert not np.isnan(new_first_row).any()
+
+    def test_select_channels_missing_raises(self, select_war):
+        """Requesting a non-existent channel raises ValueError listing
+        the offender."""
+        with pytest.raises(ValueError, match="LFake") as exc_info:
+            select_war.select_channels(
+                ["LMot", "LFake"], use_abbrevs=False, inplace=False
+            )
+        # Error message should mention the wrapped method as the
+        # NaN-padding escape hatch.
+        assert "reorder_and_pad_channels" in str(exc_info.value)
+
+    def test_select_channels_inplace_default(self, select_war):
+        """Default inplace=True updates channel_names and channel_abbrevs."""
+        select_war.select_channels(["LMot", "RMot"], use_abbrevs=False)
+        assert select_war.channel_names == ["LMot", "RMot"]
+        # And the result df is correspondingly subset.
+        arr = np.array(select_war.result["rms"].iloc[0])
+        assert arr.shape == (2,)
+
+    def test_select_channels_inplace_false_preserves_state(self, select_war):
+        """inplace=False returns a new DataFrame; WAR's own state untouched."""
+        original_channels = list(select_war.channel_names)
+        original_first_row = list(select_war.result["rms"].iloc[0])
+        result = select_war.select_channels(
+            ["LMot", "RMot"], use_abbrevs=False, inplace=False
+        )
+        # WAR state untouched.
+        assert select_war.channel_names == original_channels
+        assert list(select_war.result["rms"].iloc[0]) == original_first_row
+        # But returned df reflects the selection.
+        assert np.array(result["rms"].iloc[0]).shape == (2,)
 
 
 class TestApplyFilter:
@@ -1828,8 +1934,20 @@ class TestExperimentPlotterFeatureDispatch:
                 {b: rng.random(n_chan).tolist() for b in constants.BAND_NAMES}
                 for _ in range(n_rows)
             ],
+            "logpsdband": [
+                {b: rng.random(n_chan).tolist() for b in constants.BAND_NAMES}
+                for _ in range(n_rows)
+            ],
+            "psdfrac": [
+                {b: rng.random(n_chan).tolist() for b in constants.BAND_NAMES}
+                for _ in range(n_rows)
+            ],
             "pcorr": [rng.random((n_chan, n_chan)).tolist() for _ in range(n_rows)],
             "cohere": [
+                {b: rng.random((n_chan, n_chan)).tolist() for b in constants.BAND_NAMES}
+                for _ in range(n_rows)
+            ],
+            "imcoh": [
                 {b: rng.random((n_chan, n_chan)).tolist() for b in constants.BAND_NAMES}
                 for _ in range(n_rows)
             ],
@@ -1939,6 +2057,135 @@ class TestExperimentPlotterFeatureDispatch:
         assert "cohere" in df.columns
         assert "channel" in df.columns
         assert (df["channel"] == "average").all()
+
+    def test_pull_banded_matrix_shape_correctness(self, feature_plotter):
+        """Test BANDED_MATRIX shape correctness: verifies band axis is iterated correctly.
+
+        Regression test for issue where cohere/imcoh heatmaps displayed as (8,5) instead of (8,8)
+        due to incorrect iteration over the band axis in pull_timeseries_dataframe.
+        """
+        df = feature_plotter.pull_timeseries_dataframe(
+            feature="cohere", groupby=["genotype"], collapse_channels=False
+        )
+        # Each row should have a band value
+        assert "band" in df.columns
+        assert set(df["band"].unique()) == set(constants.BAND_NAMES)
+
+        # Each row's cohere value should be a matrix of shape (n_chan, n_chan)
+        n_chan = len(feature_plotter.all_channel_names)
+        for idx, row in df.iterrows():
+            cohere_matrix = np.array(row["cohere"])
+            assert cohere_matrix.shape == (n_chan, n_chan), (
+                f"Expected cohere matrix shape ({n_chan}, {n_chan}), "
+                f"got {cohere_matrix.shape} for band={row['band']}"
+            )
+
+        # Verify that different bands have different data
+        # Collect all matrices for each band
+        band_matrices = {}
+        for band_name in constants.BAND_NAMES:
+            band_data = df[df["band"] == band_name]
+            assert len(band_data) > 0, f"Band {band_name} has no data"
+            # Collect all matrices for this band
+            matrices = [np.array(row["cohere"]) for _, row in band_data.iterrows()]
+            band_matrices[band_name] = np.array(matrices)
+
+        # Verify that matrices from different bands are actually different
+        # Since the fixture uses random data with a fixed seed, different bands should have different values
+        band_names = list(band_matrices.keys())
+        for i in range(len(band_names)):
+            for j in range(i + 1, len(band_names)):
+                band1, band2 = band_names[i], band_names[j]
+                matrices1, matrices2 = band_matrices[band1], band_matrices[band2]
+                # At least some values should differ between bands
+                assert not np.allclose(matrices1, matrices2), (
+                    f"Bands {band1} and {band2} have identical data - "
+                    f"band axis may not be correctly exploded"
+                )
+
+    def test_pull_band_feature_shape_correctness(self, feature_plotter):
+        """Test BAND feature shape correctness: verifies band axis is iterated correctly.
+
+        Tests that BAND features (like psdband) also work correctly with the moveaxis fix.
+        """
+        df = feature_plotter.pull_timeseries_dataframe(
+            feature="psdband", groupby=["genotype"], collapse_channels=False
+        )
+        # Each row should have a band value
+        assert "band" in df.columns
+        assert set(df["band"].unique()) == set(constants.BAND_NAMES)
+
+        # Each row's psdband value should be a scalar (after extraction)
+        for idx, row in df.iterrows():
+            psdband_val = row["psdband"]
+            # After pull_timeseries_dataframe, BAND features should be scalar per channel per band
+            assert isinstance(psdband_val, (int, float, np.number)), (
+                f"Expected scalar psdband value, got {type(psdband_val)} for band={row['band']}"
+            )
+
+        # Verify that different bands have different data values
+        # Collect all values for each band
+        band_values = {}
+        for band_name in constants.BAND_NAMES:
+            band_data = df[df["band"] == band_name]
+            assert len(band_data) > 0, f"Band {band_name} has no data"
+            values = np.array([row["psdband"] for _, row in band_data.iterrows()])
+            band_values[band_name] = values
+
+        # Verify that values from different bands are actually different
+        band_names = list(band_values.keys())
+        for i in range(len(band_names)):
+            for j in range(i + 1, len(band_names)):
+                band1, band2 = band_names[i], band_names[j]
+                values1, values2 = band_values[band1], band_values[band2]
+                # At least some values should differ between bands
+                assert not np.allclose(values1, values2), (
+                    f"Bands {band1} and {band2} have identical data - "
+                    f"band axis may not be correctly exploded"
+                )
+
+    def test_pull_band_feature_logpsdband_shape_correctness(self, feature_plotter):
+        """Test BAND feature (logpsdband) shape correctness."""
+        df = feature_plotter.pull_timeseries_dataframe(
+            feature="logpsdband", groupby=["genotype"], collapse_channels=False
+        )
+        assert "band" in df.columns
+        assert set(df["band"].unique()) == set(constants.BAND_NAMES)
+
+        for idx, row in df.iterrows():
+            val = row["logpsdband"]
+            assert isinstance(val, (int, float, np.number)), (
+                f"Expected scalar, got {type(val)} for band={row['band']}"
+            )
+
+    def test_pull_band_feature_psdfrac_shape_correctness(self, feature_plotter):
+        """Test BAND feature (psdfrac) shape correctness."""
+        df = feature_plotter.pull_timeseries_dataframe(
+            feature="psdfrac", groupby=["genotype"], collapse_channels=False
+        )
+        assert "band" in df.columns
+        assert set(df["band"].unique()) == set(constants.BAND_NAMES)
+
+        for idx, row in df.iterrows():
+            val = row["psdfrac"]
+            assert isinstance(val, (int, float, np.number)), (
+                f"Expected scalar, got {type(val)} for band={row['band']}"
+            )
+
+    def test_pull_banded_matrix_imcoh_shape_correctness(self, feature_plotter):
+        """Test BANDED_MATRIX feature (imcoh) shape correctness."""
+        df = feature_plotter.pull_timeseries_dataframe(
+            feature="imcoh", groupby=["genotype"], collapse_channels=False
+        )
+        assert "band" in df.columns
+        assert set(df["band"].unique()) == set(constants.BAND_NAMES)
+
+        n_chan = len(feature_plotter.all_channel_names)
+        for idx, row in df.iterrows():
+            matrix = np.array(row["imcoh"])
+            assert matrix.shape == (n_chan, n_chan), (
+                f"Expected shape ({n_chan}, {n_chan}), got {matrix.shape} for band={row['band']}"
+            )
 
     def test_pull_hist_feature(self, feature_plotter):
         """Test pull_timeseries_dataframe with HIST, collapse_channels=False."""
@@ -3192,7 +3439,7 @@ class TestWindowAnalysisResultLOF:
         from pathlib import Path
 
         # Mock the save method to bypass the long_recordings dependency
-        with patch.object(war_with_lof, "save_pickle_and_json") as mock_save:
+        with patch.object(war_with_lof, "save_parquet_and_json") as mock_save:
             # Test the JSON creation part directly
             lof_scores_dict = {}
             # Simulate the LOF collection that normally happens in save
@@ -3456,8 +3703,8 @@ class TestWindowAnalysisResultLOF:
             war_with_lof.evaluate_lof_threshold_binary(ground_truth)
 
 
-class TestWindowAnalysisResultPickleJsonParameters:
-    """Test pickle_name and json_name parameters in load_pickle_and_json."""
+class TestWindowAnalysisResultParquetJsonParameters:
+    """Test parquet_name and json_name parameters in load_parquet_and_json."""
 
     @pytest.fixture
     def temp_war_files(self):
@@ -3483,26 +3730,26 @@ class TestWindowAnalysisResultPickleJsonParameters:
             tmpdir = Path(tmpdir)
 
             # Save with default names
-            war.save_pickle_and_json(tmpdir, filename="war")
+            war.save_parquet_and_json(tmpdir, filename="war")
 
             # Create subdirectory structure
             subdir = tmpdir / "subdir"
             subdir.mkdir()
-            war.save_pickle_and_json(subdir, filename="nested_war")
+            war.save_parquet_and_json(subdir, filename="nested_war")
 
             # Also save with custom names at root level
-            war.save_pickle_and_json(tmpdir, filename="custom_war")
+            war.save_parquet_and_json(tmpdir, filename="custom_war")
 
             yield {"tmpdir": tmpdir, "subdir": subdir, "war": war}
 
     def test_load_default_behavior(self, temp_war_files):
-        """Test that default behavior (no pickle_name/json_name) still works."""
+        """Test that default behavior (no parquet_name/json_name) still works."""
         tmpdir = temp_war_files["tmpdir"]
         original_war = temp_war_files["war"]
 
         # Remove other files to test single file case
         for f in tmpdir.glob("*"):
-            if f.name not in ["war.pkl", "war.json"]:
+            if f.name not in ["war.parquet", "war.json"]:
                 if f.is_file():
                     f.unlink()
                 else:
@@ -3510,7 +3757,7 @@ class TestWindowAnalysisResultPickleJsonParameters:
 
                     shutil.rmtree(f)
 
-        loaded_war = WindowAnalysisResult.load_pickle_and_json(folder_path=str(tmpdir))
+        loaded_war = WindowAnalysisResult.load_parquet_and_json(folder_path=str(tmpdir))
 
         assert loaded_war.animal_id == original_war.animal_id
         assert loaded_war.genotype == original_war.genotype
@@ -3519,12 +3766,12 @@ class TestWindowAnalysisResultPickleJsonParameters:
         pd.testing.assert_frame_equal(loaded_war.result, original_war.result)
 
     def test_load_with_exact_filenames(self, temp_war_files):
-        """Test loading with exact pickle_name and json_name."""
+        """Test loading with exact parquet_name and json_name."""
         tmpdir = temp_war_files["tmpdir"]
         original_war = temp_war_files["war"]
 
-        loaded_war = WindowAnalysisResult.load_pickle_and_json(
-            folder_path=str(tmpdir), pickle_name="custom_war.pkl", json_name="custom_war.json"
+        loaded_war = WindowAnalysisResult.load_parquet_and_json(
+            folder_path=str(tmpdir), parquet_name="custom_war.parquet", json_name="custom_war.json"
         )
 
         assert loaded_war.animal_id == original_war.animal_id
@@ -3535,8 +3782,8 @@ class TestWindowAnalysisResultPickleJsonParameters:
         tmpdir = temp_war_files["tmpdir"]
         original_war = temp_war_files["war"]
 
-        loaded_war = WindowAnalysisResult.load_pickle_and_json(
-            folder_path=str(tmpdir), pickle_name="subdir/nested_war.pkl", json_name="subdir/nested_war.json"
+        loaded_war = WindowAnalysisResult.load_parquet_and_json(
+            folder_path=str(tmpdir), parquet_name="subdir/nested_war.parquet", json_name="subdir/nested_war.json"
         )
 
         assert loaded_war.animal_id == original_war.animal_id
@@ -3547,11 +3794,11 @@ class TestWindowAnalysisResultPickleJsonParameters:
         tmpdir = temp_war_files["tmpdir"]
         original_war = temp_war_files["war"]
 
-        pickle_path = tmpdir / "custom_war.pkl"
+        parquet_path = tmpdir / "custom_war.parquet"
         json_path = tmpdir / "custom_war.json"
 
-        loaded_war = WindowAnalysisResult.load_pickle_and_json(
-            folder_path=str(tmpdir), pickle_name=str(pickle_path), json_name=str(json_path)
+        loaded_war = WindowAnalysisResult.load_parquet_and_json(
+            folder_path=str(tmpdir), parquet_name=str(parquet_path), json_name=str(json_path)
         )
 
         assert loaded_war.animal_id == original_war.animal_id
@@ -3562,21 +3809,23 @@ class TestWindowAnalysisResultPickleJsonParameters:
         tmpdir = temp_war_files["tmpdir"]
         original_war = temp_war_files["war"]
 
-        pickle_path = tmpdir / "custom_war.pkl"
+        parquet_path = tmpdir / "custom_war.parquet"
         json_path = tmpdir / "custom_war.json"
 
-        loaded_war = WindowAnalysisResult.load_pickle_and_json(pickle_name=str(pickle_path), json_name=str(json_path))
+        loaded_war = WindowAnalysisResult.load_parquet_and_json(
+            parquet_name=str(parquet_path), json_name=str(json_path)
+        )
 
         assert loaded_war.animal_id == original_war.animal_id
         pd.testing.assert_frame_equal(loaded_war.result, original_war.result)
 
-    def test_load_pickle_not_found(self, temp_war_files):
-        """Test error when pickle file not found."""
+    def test_load_parquet_not_found(self, temp_war_files):
+        """Test error when parquet file not found."""
         tmpdir = temp_war_files["tmpdir"]
 
-        with pytest.raises(FileNotFoundError, match="Pickle file not found"):
-            WindowAnalysisResult.load_pickle_and_json(
-                folder_path=str(tmpdir), pickle_name="nonexistent.pkl", json_name="war.json"
+        with pytest.raises(FileNotFoundError, match="Parquet file not found"):
+            WindowAnalysisResult.load_parquet_and_json(
+                folder_path=str(tmpdir), parquet_name="nonexistent.parquet", json_name="war.json"
             )
 
     def test_load_json_not_found(self, temp_war_files):
@@ -3584,62 +3833,62 @@ class TestWindowAnalysisResultPickleJsonParameters:
         tmpdir = temp_war_files["tmpdir"]
 
         with pytest.raises(FileNotFoundError, match="JSON file not found"):
-            WindowAnalysisResult.load_pickle_and_json(
-                folder_path=str(tmpdir), pickle_name="war.pkl", json_name="nonexistent.json"
+            WindowAnalysisResult.load_parquet_and_json(
+                folder_path=str(tmpdir), parquet_name="war.parquet", json_name="nonexistent.json"
             )
 
     def test_load_multiple_files_without_specification(self, temp_war_files):
         """Test error when multiple files exist but none specified."""
         tmpdir = temp_war_files["tmpdir"]
 
-        # There should be multiple .pkl and .json files in tmpdir
-        pkl_files = list(tmpdir.glob("*.pkl"))
+        # There should be multiple .parquet and .json files in tmpdir
+        parquet_files = list(tmpdir.glob("*.parquet"))
         json_files = list(tmpdir.glob("*.json"))
 
         # Ensure we have multiple files
-        assert len(pkl_files) > 1
+        assert len(parquet_files) > 1
         assert len(json_files) > 1
 
-        with pytest.raises(ValueError, match="Expected exactly one pickle file"):
-            WindowAnalysisResult.load_pickle_and_json(folder_path=str(tmpdir))
+        with pytest.raises(ValueError, match="Expected exactly one parquet file"):
+            WindowAnalysisResult.load_parquet_and_json(folder_path=str(tmpdir))
 
     def test_load_no_files_found(self):
         """Test error when no files are found."""
         import tempfile
 
         with tempfile.TemporaryDirectory() as empty_dir:
-            with pytest.raises(ValueError, match="Expected exactly one pickle file"):
-                WindowAnalysisResult.load_pickle_and_json(folder_path=empty_dir)
+            with pytest.raises(ValueError, match="Expected exactly one parquet file"):
+                WindowAnalysisResult.load_parquet_and_json(folder_path=empty_dir)
 
     def test_load_invalid_folder_path(self):
         """Test error with invalid folder path."""
         with pytest.raises(ValueError, match="Folder path .* does not exist"):
-            WindowAnalysisResult.load_pickle_and_json(folder_path="/nonexistent/path")
+            WindowAnalysisResult.load_parquet_and_json(folder_path="/nonexistent/path")
 
     def test_load_missing_parameters(self):
         """Test error when required parameters are missing."""
-        # Neither folder_path nor both pickle_name/json_name provided
+        # Neither folder_path nor both parquet_name/json_name provided
         with pytest.raises(ValueError, match="Either folder_path must be provided"):
-            WindowAnalysisResult.load_pickle_and_json()
+            WindowAnalysisResult.load_parquet_and_json()
 
-        # Only one of pickle_name/json_name provided without folder_path
+        # Only one of parquet_name/json_name provided without folder_path
         with pytest.raises(ValueError, match="Either folder_path must be provided"):
-            WindowAnalysisResult.load_pickle_and_json(pickle_name="/some/path.pkl")
+            WindowAnalysisResult.load_parquet_and_json(parquet_name="/some/path.parquet")
 
         with pytest.raises(ValueError, match="Either folder_path must be provided"):
-            WindowAnalysisResult.load_pickle_and_json(json_name="/some/path.json")
+            WindowAnalysisResult.load_parquet_and_json(json_name="/some/path.json")
 
     def test_load_mixed_absolute_relative_paths(self, temp_war_files):
         """Test mixing absolute and relative paths."""
         tmpdir = temp_war_files["tmpdir"]
         original_war = temp_war_files["war"]
 
-        # Absolute pickle path, relative json path
-        pickle_path = tmpdir / "custom_war.pkl"
+        # Absolute parquet path, relative json path
+        parquet_path = tmpdir / "custom_war.parquet"
 
-        loaded_war = WindowAnalysisResult.load_pickle_and_json(
+        loaded_war = WindowAnalysisResult.load_parquet_and_json(
             folder_path=str(tmpdir),
-            pickle_name=str(pickle_path),  # Absolute
+            parquet_name=str(parquet_path),  # Absolute
             json_name="custom_war.json",  # Relative
         )
 
@@ -3666,7 +3915,7 @@ class TestWindowAnalysisResultPickleJsonParameters:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir = Path(tmpdir)
 
-            # Save pickle
+            # Save legacy pickle (simulates an old WAR written before the parquet migration)
             test_df.to_pickle(tmpdir / "war.pkl")
 
             # Save JSON without sex (simulating old format)
@@ -3682,8 +3931,8 @@ class TestWindowAnalysisResultPickleJsonParameters:
             with open(tmpdir / "war.json", "w") as f:
                 json.dump(old_json, f)
 
-            # Load should succeed with sex="Unknown" (the default)
-            loaded_war = WindowAnalysisResult.load_pickle_and_json(folder_path=str(tmpdir))
+            # Load should succeed via the legacy pickle fallback, with sex="Unknown" default
+            loaded_war = WindowAnalysisResult.load_parquet_and_json(folder_path=str(tmpdir))
             assert loaded_war.animal_id == "A1"
             assert loaded_war.genotype == "WT"
             assert loaded_war.sex == "Unknown"
@@ -3725,16 +3974,17 @@ class TestParquetSaveLoad:
         """Test that save with parquet + load produces equivalent data."""
         war = war_with_complex_columns
         with tempfile.TemporaryDirectory() as tmpdir:
-            war.save_pickle_and_json(tmpdir, filename="war")
+            war.save_parquet_and_json(tmpdir, filename="war")
 
             # Verify parquet file was created
             assert (Path(tmpdir) / "war.parquet").exists()
+            # Verify pickle is NOT written any more
+            assert not (Path(tmpdir) / "war.pkl").exists()
             # No sidecar meta file — metadata is embedded in parquet
             assert not (Path(tmpdir) / "war.parquet.meta.json").exists()
 
-            # Load (should prefer parquet)
-            loaded = WindowAnalysisResult.load_pickle_and_json(
-                folder_path=tmpdir, pickle_name="war.pkl", json_name="war.json"
+            loaded = WindowAnalysisResult.load_parquet_and_json(
+                folder_path=tmpdir, parquet_name="war.parquet", json_name="war.json"
             )
             assert loaded.animal_id == war.animal_id
             assert loaded.genotype == war.genotype
@@ -3751,21 +4001,26 @@ class TestParquetSaveLoad:
         """Test that auto-discovery works when parquet files are present."""
         war = war_with_complex_columns
         with tempfile.TemporaryDirectory() as tmpdir:
-            war.save_pickle_and_json(tmpdir, filename="war")
+            war.save_parquet_and_json(tmpdir, filename="war")
 
-            loaded = WindowAnalysisResult.load_pickle_and_json(folder_path=tmpdir)
+            loaded = WindowAnalysisResult.load_parquet_and_json(folder_path=tmpdir)
             assert loaded.animal_id == war.animal_id
 
     def test_fallback_to_pickle_when_no_parquet(self, war_with_complex_columns):
-        """Test that loading falls back to pickle when parquet files are absent."""
+        """Test that loading falls back to a legacy pickle when parquet is absent.
+
+        Simulates an old on-disk WAR (written before the parquet migration) by
+        hand-writing a ``war.pkl`` alongside the JSON — no parquet.
+        """
         war = war_with_complex_columns
         with tempfile.TemporaryDirectory() as tmpdir:
-            war.save_pickle_and_json(tmpdir, filename="war")
-            # Remove parquet to force pickle fallback
+            # Save via the new API, then drop parquet and write a legacy pickle
+            war.save_parquet_and_json(tmpdir, filename="war")
             (Path(tmpdir) / "war.parquet").unlink()
+            war.result.to_pickle(Path(tmpdir) / "war.pkl")
 
-            loaded = WindowAnalysisResult.load_pickle_and_json(
-                folder_path=tmpdir, pickle_name="war.pkl", json_name="war.json"
+            loaded = WindowAnalysisResult.load_parquet_and_json(
+                folder_path=tmpdir, parquet_name="war.parquet", json_name="war.json"
             )
             assert loaded.animal_id == war.animal_id
             assert loaded.result["duration"].tolist() == war.result["duration"].tolist()
@@ -3776,7 +4031,7 @@ class TestParquetSaveLoad:
 
         war = war_with_complex_columns
         with tempfile.TemporaryDirectory() as tmpdir:
-            war.save_pickle_and_json(tmpdir, filename="war")
+            war.save_parquet_and_json(tmpdir, filename="war")
 
             table = pq.read_table(Path(tmpdir) / "war.parquet")
             schema_meta = table.schema.metadata
@@ -3787,7 +4042,13 @@ class TestParquetSaveLoad:
             assert "rms" in nd_meta["encoded_columns"]
 
     def test_encode_decode_round_trip(self):
-        """Test _encode_df_for_parquet and _decode_df_from_parquet directly."""
+        """Test _encode_df_for_parquet and _decode_df_from_parquet directly.
+
+        Updated for encoding_version=2: complex columns are converted to
+        nested Python structures (no JSON intermediate) instead of JSON
+        strings.  Decode is a no-op for cells that are already nested
+        Python (legacy string cells still get json.loads'd).
+        """
         df = pd.DataFrame(
             {
                 "scalar": [1.0, 2.0, 3.0],
@@ -3810,27 +4071,45 @@ class TestParquetSaveLoad:
         assert "dict_col" in cols
         assert "array_col" in cols
 
-        # Encoded values should be JSON strings
+        # Encoded values are nested Python (lists/dicts/scalars), NOT JSON strings.
+        # ndarrays are converted to lists via _to_nested_python.
         for col in cols:
             for val in encoded[col].dropna():
-                assert isinstance(val, str)
+                assert not isinstance(val, str), (
+                    f"{col}: expected nested Python type, got JSON string {val!r}"
+                )
+                assert isinstance(val, (list, dict, int, float, bool))
 
-        # Decode and verify round-trip
-        decoded = WindowAnalysisResult._decode_df_from_parquet(encoded, cols)
+        # Decode is a no-op for native cells (already nested Python).
+        decoded = WindowAnalysisResult._decode_df_from_parquet(
+            encoded, cols, encoding_version=2
+        )
         for i in range(len(df)):
-            # list_col stays as plain list after JSON round-trip (no numpy conversion)
             assert decoded["list_col"].iloc[i] == df["list_col"].iloc[i]
             assert decoded["dict_col"].iloc[i] == df["dict_col"].iloc[i]
-            # array_col comes back as a plain list; verify values match
+            # array_col was converted to a plain Python list at encode time.
             np.testing.assert_array_equal(
                 decoded["array_col"].iloc[i], df["array_col"].iloc[i]
             )
+
+        # Legacy backward-compat: explicit JSON strings should still decode.
+        legacy = pd.DataFrame(
+            {
+                "list_col": [json.dumps([1, 2]), json.dumps([3, 4]), json.dumps([5, 6])],
+                "dict_col": [json.dumps({"x": 1}), json.dumps({"y": 2}), json.dumps({"z": 3})],
+            }
+        )
+        legacy_decoded = WindowAnalysisResult._decode_df_from_parquet(
+            legacy, ["list_col", "dict_col"]
+        )
+        assert legacy_decoded["list_col"].iloc[0] == [1, 2]
+        assert legacy_decoded["dict_col"].iloc[0] == {"x": 1}
 
     def test_parquet_file_has_content(self, war_with_complex_columns):
         """Test that the parquet file has meaningful content matching the DataFrame."""
         war = war_with_complex_columns
         with tempfile.TemporaryDirectory() as tmpdir:
-            war.save_pickle_and_json(tmpdir, filename="war")
+            war.save_parquet_and_json(tmpdir, filename="war")
             pq_path = Path(tmpdir) / "war.parquet"
             assert pq_path.stat().st_size > 0
 
@@ -3839,11 +4118,10 @@ class TestParquetSaveLoad:
             assert set(war.result.columns).issubset(set(reloaded.columns))
 
     def test_save_load_speed(self):
-        """Test that parquet load time is comparable to pickle after warm-up.
+        """Sanity-check that parquet save + load is fast enough for realistic rows.
 
         Uses a realistically-sized DataFrame (200 rows) so that pyarrow's
-        fixed per-call overhead is amortised and the comparison reflects
-        actual I/O performance rather than interpreter start-up noise.
+        fixed per-call overhead is amortised.
         """
         import time
 
@@ -3871,36 +4149,906 @@ class TestParquetSaveLoad:
             channel_names=["LMot", "RMot"],
         )
         with tempfile.TemporaryDirectory() as tmpdir:
-            war.save_pickle_and_json(tmpdir, filename="war")
+            war.save_parquet_and_json(tmpdir, filename="war")
 
-            pkl_path = Path(tmpdir) / "war.pkl"
             pq_path = Path(tmpdir) / "war.parquet"
-            assert pkl_path.exists()
             assert pq_path.exists()
+            # Pickle should no longer be produced
+            assert not (Path(tmpdir) / "war.pkl").exists()
 
             # Warm-up: first load amortises import / JIT costs
-            pd.read_pickle(pkl_path)
             pd.read_parquet(pq_path, engine="pyarrow")
 
             n_iters = 20
-
-            start = time.perf_counter()
-            for _ in range(n_iters):
-                pd.read_pickle(pkl_path)
-            pkl_time = time.perf_counter() - start
-
             start = time.perf_counter()
             for _ in range(n_iters):
                 pd.read_parquet(pq_path, engine="pyarrow")
             pq_time = time.perf_counter() - start
 
-            # With a realistically-sized DataFrame the gap between parquet
-            # and pickle narrows substantially.  A 10x bound guards against
-            # pathological regressions while remaining stable on CI runners.
-            assert pq_time < pkl_time * 10, (
-                f"Parquet load ({pq_time:.3f}s) is unreasonably slower "
-                f"than pickle ({pkl_time:.3f}s)"
+            # 200 rows × 20 iterations should comfortably finish in < 5s on CI runners.
+            assert pq_time < 5.0, f"Parquet load time {pq_time:.3f}s is unreasonably slow"
+
+    def test_save_parquet_bypasses_encode_df_for_parquet(self):
+        """Verify save_parquet_and_json builds a column dict directly
+        instead of calling _encode_df_for_parquet (which does df.copy()).
+
+        The old path created 2-3 redundant copies of the DataFrame via
+        df.copy() + pa.Table.from_pandas(). The new path builds a column
+        dict and uses pa.table() — no DataFrame copy.
+        """
+        from unittest.mock import patch
+
+        n_rows = 50
+        rng = np.random.default_rng(99)
+        data = {
+            "animalday": [f"A1_day{i}" for i in range(n_rows)],
+            "genotype": ["WT"] * n_rows,
+            "timestamp": pd.date_range("2023-01-01", periods=n_rows, freq="5min"),
+            "duration": [240.0] * n_rows,
+            "rms": [rng.uniform(100, 200, 4).tolist() for _ in range(n_rows)],
+            "cohere": [
+                {"ch1_ch2": rng.uniform(0, 1, 8).tolist()}
+                for _ in range(n_rows)
+            ],
+        }
+        war = WindowAnalysisResult(
+            result=pd.DataFrame(data),
+            animal_id="A1",
+            genotype="WT",
+            channel_names=["LMot", "RMot", "LAud", "RAud"],
+        )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Patch _encode_df_for_parquet to verify it is NOT called
+            with patch.object(
+                WindowAnalysisResult, "_encode_df_for_parquet",
+                wraps=WindowAnalysisResult._encode_df_for_parquet,
+            ) as mock_encode:
+                war.save_parquet_and_json(tmpdir, filename="war")
+                mock_encode.assert_not_called()
+
+            # Verify the parquet file is valid and round-trips correctly
+            pq_path = Path(tmpdir) / "war.parquet"
+            assert pq_path.exists()
+
+            import pyarrow.parquet as pq
+            table = pq.read_table(pq_path)
+
+            # Check neurodent metadata with encoded columns list
+            nd_meta = json.loads(table.schema.metadata[b"neurodent"])
+            assert "rms" in nd_meta["encoded_columns"]
+            assert "cohere" in nd_meta["encoded_columns"]
+            assert "duration" not in nd_meta["encoded_columns"]
+
+            # Decode and verify values round-trip
+            reloaded = table.to_pandas()
+            encoded_cols = nd_meta["encoded_columns"]
+            encoding_version = nd_meta.get("encoding_version", 1)
+            decoded = WindowAnalysisResult._decode_df_from_parquet(
+                reloaded, encoded_cols, encoding_version=encoding_version
             )
+            assert len(decoded) == n_rows
+            for i in range(min(5, n_rows)):
+                assert decoded["rms"].iloc[i] == war.result["rms"].iloc[i]
+                assert decoded["cohere"].iloc[i] == war.result["cohere"].iloc[i]
+
+
+class TestMemoryPressure:
+    """Verify that load/save paths don't hold unnecessary copies of WAR data."""
+
+    @pytest.fixture
+    def war_for_memory_test(self):
+        """Create a WAR large enough that data dominates over fixed overhead."""
+        n_rows = 500
+        n_ch = 8
+        n_freq = 64
+        rng = np.random.default_rng(42)
+        data = {
+            "animalday": ["A1_20230101"] * n_rows,
+            "genotype": ["WT"] * n_rows,
+            "timestamp": pd.date_range("2023-01-01", periods=n_rows, freq="4min"),
+            "duration": rng.uniform(230, 250, n_rows).tolist(),
+            "rms": [rng.random(n_ch).tolist() for _ in range(n_rows)],
+            "psd": [
+                (rng.random(n_freq).tolist(), rng.random((n_ch, n_freq)).tolist())
+                for _ in range(n_rows)
+            ],
+        }
+        return WindowAnalysisResult(
+            pd.DataFrame(data), animal_id="A1", genotype="WT",
+            channel_names=["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"],
+            suppress_short_interval_error=True,
+        )
+
+    def test_load_parquet_peak_memory(self, war_for_memory_test):
+        """Peak memory during load_parquet_and_json should stay under 5x the parquet file size.
+
+        Regression guard: without ``del table`` after ``to_pandas()`` and
+        without the in-place decode (no ``df.copy()``), peak reaches ~6x+.
+        """
+        import tracemalloc
+
+        war = war_for_memory_test
+        with tempfile.TemporaryDirectory() as tmpdir:
+            war.save_parquet_and_json(tmpdir, filename="war")
+            pq_size = (Path(tmpdir) / "war.parquet").stat().st_size
+
+            tracemalloc.start()
+            loaded = WindowAnalysisResult.load_parquet_and_json(folder_path=tmpdir)
+            _, peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+
+            # Loaded data should be correct
+            assert loaded.animal_id == war.animal_id
+            assert len(loaded.result) == len(war.result)
+
+            # Peak memory should not exceed 5x the parquet file size.
+            # Before the del-table + in-place-decode fixes, this ratio was ~6x+.
+            ratio = peak / max(pq_size, 1)
+            assert ratio < 5, (
+                f"Peak memory during load is {ratio:.1f}x the parquet file size "
+                f"({peak / 1e6:.1f} MB vs {pq_size / 1e6:.1f} MB). "
+                f"Likely a missing del or unnecessary copy."
+            )
+
+    def test_save_parquet_peak_memory(self, war_for_memory_test):
+        """Peak memory during save_parquet_and_json should stay under 5x the parquet file size."""
+        import tracemalloc
+
+        war = war_for_memory_test
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tracemalloc.start()
+            war.save_parquet_and_json(tmpdir, filename="war")
+            _, peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+
+            pq_size = (Path(tmpdir) / "war.parquet").stat().st_size
+            ratio = peak / max(pq_size, 1)
+            assert ratio < 5, (
+                f"Peak memory during save is {ratio:.1f}x the parquet file size "
+                f"({peak / 1e6:.1f} MB vs {pq_size / 1e6:.1f} MB). "
+                f"Likely a missing del or unnecessary copy."
+            )
+
+
+class TestStreamReorderAndPad:
+    """Equivalence + memory tests for the lazy WAR reorder+pad chain.
+
+    The streaming path (``scan_parquet_and_json`` → ``reorder_and_pad_channels`` →
+    ``save_parquet_and_json``) must produce the same WAR data on disk as
+    the eager ``load_parquet_and_json`` → ``reorder_and_pad_channels`` →
+    ``save_parquet_and_json`` path, while using strictly less peak memory.
+    """
+
+    @pytest.fixture
+    def synthetic_war(self):
+        """Synthetic WAR with all feature types (LINEAR, LINEAR_2D, BAND,
+        SIMPLE_MATRIX, BANDED_MATRIX, HIST), 4 source channels.
+        """
+        n_rows = 60
+        C = 4
+        BANDS = ["delta", "theta", "alpha", "beta", "gamma"]
+        F = 16
+        rng = np.random.default_rng(123)
+        data = {
+            "animalday": ["A1_20230101"] * n_rows,
+            "animal": ["A1"] * n_rows,
+            "genotype": ["WT"] * n_rows,
+            "timestamp": pd.date_range("2023-01-01", periods=n_rows, freq="1min"),
+            "duration": [60.0] * n_rows,
+            # LINEAR (1D per row)
+            "rms": [rng.random(C).tolist() for _ in range(n_rows)],
+            "logrms": [rng.random(C).tolist() for _ in range(n_rows)],
+            # LINEAR_2D ([slope, intercept] per channel)
+            "psdslope": [
+                [[rng.random(), rng.random()] for _ in range(C)] for _ in range(n_rows)
+            ],
+            # BAND (band dict of 1D)
+            "psdband": [
+                {b: rng.random(C).tolist() for b in BANDS} for _ in range(n_rows)
+            ],
+            # SIMPLE_MATRIX (CxC per row)
+            "pcorr": [rng.random((C, C)).tolist() for _ in range(n_rows)],
+            # BANDED_MATRIX (band dict of CxC)
+            "cohere": [
+                {b: rng.random((C, C)).tolist() for b in BANDS} for _ in range(n_rows)
+            ],
+            # HIST (psd: per-row (coords, (C,F)))
+            "psd": [(np.arange(F).tolist(), rng.random((C, F)).tolist()) for _ in range(n_rows)],
+        }
+        return WindowAnalysisResult(
+            result=pd.DataFrame(data),
+            animal_id="A1",
+            genotype="WT",
+            channel_names=["LMot", "RMot", "LBar", "RBar"],
+            suppress_short_interval_error=True,
+        )
+
+    def test_streaming_equivalent_to_eager(self, synthetic_war):
+        """Streaming path produces the same WAR data as the eager path."""
+        target = ["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"]
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            src = tmp / "src"
+            src.mkdir()
+            synthetic_war.save_parquet_and_json(src, filename="war")
+
+            # Eager path
+            eager_dst = tmp / "eager"
+            eager_dst.mkdir()
+            war_eager = WindowAnalysisResult.load_parquet_and_json(folder_path=src)
+            war_eager.reorder_and_pad_channels(target, use_abbrevs=True)
+            war_eager.save_parquet_and_json(eager_dst, filename="war")
+
+            # Streaming path (batch_size=20 so we exercise multiple row groups)
+            stream_dst = tmp / "stream"
+            war_lazy = WindowAnalysisResult.scan_parquet_and_json(src, filename="war")
+            war_lazy.reorder_and_pad_channels(target, use_abbrevs=True)
+            war_lazy.save_parquet_and_json(stream_dst, filename="war", batch_size=20)
+
+            # Reload both, compare row-by-row.
+            re_eager = WindowAnalysisResult.load_parquet_and_json(folder_path=eager_dst)
+            re_stream = WindowAnalysisResult.load_parquet_and_json(folder_path=stream_dst)
+
+            assert list(re_eager.result.columns) == list(re_stream.result.columns)
+            assert len(re_eager.result) == len(re_stream.result)
+
+            # JSON-normalised comparison handles ndarray/tuple/list/dict
+            # equivalently (the load-side decode may return lists where the
+            # original held tuples or ndarrays — both serialise the same).
+            encoder = WindowAnalysisResult._NumpyEncoder
+            for col in re_eager.result.columns:
+                for i in range(len(re_eager.result)):
+                    a = re_eager.result[col].iloc[i]
+                    b = re_stream.result[col].iloc[i]
+                    a_norm = json.dumps(a, cls=encoder, sort_keys=True, default=str)
+                    b_norm = json.dumps(b, cls=encoder, sort_keys=True, default=str)
+                    assert a_norm == b_norm, (
+                        f"col={col}, row={i}\n  eager:  {a!r}\n  stream: {b!r}"
+                    )
+
+            # Channel-name JSON metadata should also match.
+            assert re_eager.channel_names == re_stream.channel_names
+            assert re_eager.channel_names == target
+
+    def test_streaming_peak_memory_below_eager(self, synthetic_war):
+        """Streaming peak must be substantially smaller than eager peak.
+
+        Tightened assertion (was ``stream < eager``): streaming should
+        use less than half the eager memory at ``batch_size=10`` (1/6 of
+        the 60-row fixture).  Real arxrosa-scale data observed ~40%; the
+        synthetic fixture sees ~20%; 50% is a comfortable upper bound
+        that catches regressions while tolerating pandas/pyarrow overhead
+        variance across versions.
+        """
+        import tracemalloc
+
+        target = ["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"]
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            src = tmp / "src"
+            src.mkdir()
+            synthetic_war.save_parquet_and_json(src, filename="war")
+            pq_size = (src / "war.parquet").stat().st_size
+
+            tracemalloc.start()
+            stream_dst = tmp / "stream"
+            war_lazy = WindowAnalysisResult.scan_parquet_and_json(src, filename="war")
+            war_lazy.reorder_and_pad_channels(target, use_abbrevs=True)
+            war_lazy.save_parquet_and_json(stream_dst, filename="war", batch_size=10)
+            _, stream_peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+
+            tracemalloc.start()
+            eager_dst = tmp / "eager"
+            eager_dst.mkdir()
+            war_eager = WindowAnalysisResult.load_parquet_and_json(folder_path=src)
+            war_eager.reorder_and_pad_channels(target, use_abbrevs=True)
+            war_eager.save_parquet_and_json(eager_dst, filename="war")
+            _, eager_peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+
+            ratio = stream_peak / eager_peak
+            assert ratio < 0.5, (
+                f"streaming peak {stream_peak/1e6:.2f} MB is {ratio:.0%} of "
+                f"eager peak {eager_peak/1e6:.2f} MB — expected < 50% (regression?)"
+            )
+            # Absolute ceiling: streaming should fit in ~5x the parquet size.
+            assert stream_peak < 5 * pq_size, (
+                f"streaming peak {stream_peak/1e6:.2f} MB exceeds 5x parquet "
+                f"({pq_size/1e6:.2f} MB) — peak should scale with batch_size, not WAR size"
+            )
+
+    def test_no_json_fallback_for_standard_features(self, synthetic_war):
+        """Every encoded column — including HIST (psd) — uses a native
+        pyarrow list/struct type. The per-cell JSON fallback path should
+        NOT be hit for any of the canonical FeatureTypes.
+
+        Regression guard: HIST stores ``(coords, values)`` tuples per cell.
+        Before the tuple→struct lift, those would fall back to JSON
+        strings.  After: they encode as ``struct<_t0: ..., _t1: ...>``.
+        """
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            synthetic_war.save_parquet_and_json(tmpdir, filename="war")
+            pq_path = Path(tmpdir) / "war.parquet"
+
+            schema = pq.ParquetFile(pq_path).schema_arrow
+            nd = json.loads(schema.metadata[b"neurodent"])
+            assert nd.get("encoding_version") == 2
+
+            for col in nd["encoded_columns"]:
+                ftype = schema.field(col).type
+                assert not pa.types.is_string(ftype), (
+                    f"Column {col!r} fell back to JSON encoding (string). "
+                    f"Expected a native list/struct type."
+                )
+                assert pa.types.is_nested(ftype), (
+                    f"Column {col!r} has non-nested type {ftype}; "
+                    f"expected list or struct."
+                )
+
+    def test_streaming_with_unique_hash(self, synthetic_war):
+        """Streaming with add_unique_hash matches the eager equivalent."""
+        target = ["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            src = tmp / "src"
+            src.mkdir()
+            synthetic_war.save_parquet_and_json(src, filename="war")
+
+            stream_dst = tmp / "stream"
+            war_lazy = WindowAnalysisResult.scan_parquet_and_json(src, filename="war")
+            war_lazy.reorder_and_pad_channels(target, use_abbrevs=True)
+            war_lazy.add_unique_hash(4)
+            war_lazy.save_parquet_and_json(stream_dst, filename="war", batch_size=20)
+
+            loaded = WindowAnalysisResult.load_parquet_and_json(folder_path=stream_dst)
+            # animal_id grew by a hash suffix.
+            assert loaded.animal_id.startswith("A1_")
+            assert loaded.animal_id != "A1"
+            # animal column rewritten consistently
+            assert (loaded.result["animal"] == loaded.animal_id).all()
+
+
+class TestLazyWindowAnalysisResult:
+    """Equivalence + memory tests for the LazyWindowAnalysisResult engine.
+
+    Each lazy chain (apply_filters, aggregate_time_windows, plus the
+    reorder+hash compat path) must produce the same WAR data on disk as
+    the eager mutator + save path, while keeping peak memory bounded by
+    ``batch_size``.
+    """
+
+    @pytest.fixture
+    def lazy_synthetic_war(self):
+        n_rows = 60
+        C = 4
+        BANDS = ["delta", "theta", "alpha", "beta", "gamma"]
+        F = 16
+        rng = np.random.default_rng(321)
+        # Two animaldays so we exercise the by_session filter + groupby aggregation.
+        animaldays = ["A1_20230101"] * 30 + ["A1_20230102"] * 30
+        isday = [True] * 15 + [False] * 15 + [True] * 15 + [False] * 15
+        data = {
+            "animal": ["A1"] * n_rows,
+            "animalday": animaldays,
+            "genotype": ["WT"] * n_rows,
+            "isday": isday,
+            "timestamp": pd.date_range("2023-01-01", periods=n_rows, freq="1min"),
+            "duration": [60.0] * n_rows,
+            "endfile": list(range(n_rows)),
+            "rms": [(rng.random(C) * 600).tolist() for _ in range(n_rows)],
+            "logrms": [np.log(rng.random(C) * 600 + 1).tolist() for _ in range(n_rows)],
+            "psdslope": [
+                [[rng.random(), rng.random()] for _ in range(C)] for _ in range(n_rows)
+            ],
+            "psdband": [
+                {b: rng.random(C).tolist() for b in BANDS} for _ in range(n_rows)
+            ],
+            "psdtotal": [rng.random(C).tolist() for _ in range(n_rows)],
+            "pcorr": [rng.random((C, C)).tolist() for _ in range(n_rows)],
+            "cohere": [
+                {b: rng.random((C, C)).tolist() for b in BANDS} for _ in range(n_rows)
+            ],
+            # HIST cells are (F, C) per the welch output convention.
+            "psd": [(np.arange(F).tolist(), rng.random((F, C)).tolist()) for _ in range(n_rows)],
+        }
+        return WindowAnalysisResult(
+            result=pd.DataFrame(data),
+            animal_id="A1",
+            genotype="WT",
+            channel_names=["LMot", "RMot", "LBar", "RBar"],
+            suppress_short_interval_error=True,
+        )
+
+    @staticmethod
+    def _norm_dataframe(df):
+        """Normalise a DataFrame for cell-wise comparison across eager/lazy."""
+        encoder = WindowAnalysisResult._NumpyEncoder
+        return {
+            col: [
+                json.dumps(df[col].iloc[i], cls=encoder, sort_keys=True, default=str)
+                for i in range(len(df))
+            ]
+            for col in df.columns
+        }
+
+    @staticmethod
+    def _cells_match(a, b, rtol=1e-9, atol=1e-9):
+        """Recursive numerical-tolerant equality check for WAR cell values."""
+        if isinstance(a, dict) and isinstance(b, dict):
+            if set(a.keys()) != set(b.keys()):
+                return False
+            return all(TestLazyWindowAnalysisResult._cells_match(a[k], b[k], rtol, atol) for k in a)
+        if isinstance(a, (tuple, list)) and isinstance(b, (tuple, list)):
+            if len(a) != len(b):
+                return False
+            if all(isinstance(x, (int, float, np.integer, np.floating, type(None))) for x in a + b):
+                return np.allclose(
+                    np.asarray(a, dtype=float), np.asarray(b, dtype=float),
+                    rtol=rtol, atol=atol, equal_nan=True,
+                )
+            return all(TestLazyWindowAnalysisResult._cells_match(x, y, rtol, atol) for x, y in zip(a, b))
+        if isinstance(a, np.ndarray) and isinstance(b, np.ndarray):
+            return np.allclose(a, b, rtol=rtol, atol=atol, equal_nan=True)
+        if isinstance(a, (int, float, np.integer, np.floating)) and isinstance(b, (int, float, np.integer, np.floating)):
+            return np.isclose(a, b, rtol=rtol, atol=atol, equal_nan=True)
+        return a == b
+
+    @classmethod
+    def _columns_match(cls, df_a, df_b, col, rtol=1e-9, atol=1e-9):
+        if len(df_a) != len(df_b):
+            return False
+        for i in range(len(df_a)):
+            if not cls._cells_match(df_a[col].iloc[i], df_b[col].iloc[i], rtol, atol):
+                return False
+        return True
+
+    def test_lazy_apply_filters_per_row_only(self, lazy_synthetic_war):
+        """Lazy apply_filters with per-row filters only matches eager."""
+        config = {
+            "high_rms": {"max_rms": 500},
+            "low_rms": {"min_rms": 10},
+        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            src = tmp / "src"
+            src.mkdir()
+            lazy_synthetic_war.save_parquet_and_json(src, filename="war")
+
+            eager_dst = tmp / "eager"
+            war_eager = WindowAnalysisResult.load_parquet_and_json(folder_path=src)
+            war_eager = war_eager.apply_filters(filter_config=config, min_valid_channels=2)
+            war_eager.save_parquet_and_json(eager_dst, filename="war")
+
+            lazy_dst = tmp / "lazy"
+            war_lazy = WindowAnalysisResult.scan_parquet_and_json(src, filename="war")
+            war_lazy.apply_filters(filter_config=config, min_valid_channels=2)
+            war_lazy.save_parquet_and_json(lazy_dst, filename="war", batch_size=10)
+
+            re_eager = WindowAnalysisResult.load_parquet_and_json(folder_path=eager_dst)
+            re_lazy = WindowAnalysisResult.load_parquet_and_json(folder_path=lazy_dst)
+            assert len(re_eager.result) == len(re_lazy.result)
+            for col in re_eager.result.columns:
+                assert self._columns_match(re_eager.result, re_lazy.result, col), (
+                    f"Column {col} differs between eager and lazy"
+                )
+
+    def test_lazy_apply_filters_with_logrms_range(self, lazy_synthetic_war):
+        """Cross-row logrms_range path produces equivalent output."""
+        config = {
+            "logrms_range": {"z_range": 2},
+            "high_rms": {"max_rms": 500},
+        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            src = tmp / "src"
+            src.mkdir()
+            lazy_synthetic_war.save_parquet_and_json(src, filename="war")
+
+            eager_dst = tmp / "eager"
+            war_eager = WindowAnalysisResult.load_parquet_and_json(folder_path=src)
+            war_eager = war_eager.apply_filters(filter_config=config, min_valid_channels=2)
+            war_eager.save_parquet_and_json(eager_dst, filename="war")
+
+            lazy_dst = tmp / "lazy"
+            war_lazy = WindowAnalysisResult.scan_parquet_and_json(src, filename="war")
+            war_lazy.apply_filters(filter_config=config, min_valid_channels=2)
+            war_lazy.save_parquet_and_json(lazy_dst, filename="war", batch_size=10)
+
+            re_eager = WindowAnalysisResult.load_parquet_and_json(folder_path=eager_dst)
+            re_lazy = WindowAnalysisResult.load_parquet_and_json(folder_path=lazy_dst)
+            assert len(re_eager.result) == len(re_lazy.result)
+            for col in re_eager.result.columns:
+                assert self._columns_match(re_eager.result, re_lazy.result, col), (
+                    f"Column {col} differs between eager and lazy"
+                )
+
+    def test_lazy_aggregate_time_windows_animalday_isday(self, lazy_synthetic_war):
+        """Lazy aggregate_time_windows by (animalday, isday) matches eager."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            src = tmp / "src"
+            src.mkdir()
+            lazy_synthetic_war.save_parquet_and_json(src, filename="war")
+
+            eager_dst = tmp / "eager"
+            war_eager = WindowAnalysisResult.load_parquet_and_json(folder_path=src)
+            war_eager.aggregate_time_windows(groupby=["animalday", "isday"])
+            war_eager.save_parquet_and_json(eager_dst, filename="war")
+
+            lazy_dst = tmp / "lazy"
+            war_lazy = WindowAnalysisResult.scan_parquet_and_json(src, filename="war")
+            war_lazy.aggregate_time_windows(groupby=["animalday", "isday"])
+            war_lazy.save_parquet_and_json(lazy_dst, filename="war", batch_size=10)
+
+            re_eager = WindowAnalysisResult.load_parquet_and_json(folder_path=eager_dst)
+            re_lazy = WindowAnalysisResult.load_parquet_and_json(folder_path=lazy_dst)
+            assert len(re_eager.result) == len(re_lazy.result)
+            # Sort both by groupby keys so row order doesn't matter.
+            keys = ["animalday", "isday"]
+            re_eager_df = re_eager.result.sort_values(keys).reset_index(drop=True)
+            re_lazy_df = re_lazy.result.sort_values(keys).reset_index(drop=True)
+            common = [c for c in re_eager_df.columns if c in re_lazy_df.columns]
+            for col in common:
+                assert self._columns_match(re_eager_df, re_lazy_df, col, rtol=1e-6, atol=1e-6), (
+                    f"Aggregated column {col} differs between eager and lazy"
+                )
+
+    def test_lazy_apply_filters_peak_memory_below_eager(self, lazy_synthetic_war):
+        """apply_filters streaming peak < 50% eager AND < 5× parquet."""
+        import tracemalloc
+
+        config = {
+            "logrms_range": {"z_range": 3},
+            "high_rms": {"max_rms": 500},
+            "low_rms": {"min_rms": 10},
+        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            src = tmp / "src"
+            src.mkdir()
+            lazy_synthetic_war.save_parquet_and_json(src, filename="war")
+            pq_size = (src / "war.parquet").stat().st_size
+
+            tracemalloc.start()
+            lazy_dst = tmp / "lazy"
+            war_lazy = WindowAnalysisResult.scan_parquet_and_json(src, filename="war")
+            war_lazy.apply_filters(filter_config=config, min_valid_channels=2)
+            war_lazy.save_parquet_and_json(lazy_dst, filename="war", batch_size=10)
+            _, lazy_peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+
+            tracemalloc.start()
+            eager_dst = tmp / "eager"
+            war_eager = WindowAnalysisResult.load_parquet_and_json(folder_path=src)
+            war_eager = war_eager.apply_filters(filter_config=config, min_valid_channels=2)
+            war_eager.save_parquet_and_json(eager_dst, filename="war")
+            _, eager_peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+
+            ratio = lazy_peak / eager_peak
+            assert ratio < 0.5, (
+                f"lazy apply_filters peak {lazy_peak/1e6:.2f} MB is {ratio:.0%} of "
+                f"eager peak {eager_peak/1e6:.2f} MB — expected < 50%"
+            )
+            assert lazy_peak < 5 * pq_size, (
+                f"lazy peak {lazy_peak/1e6:.2f} MB exceeds 5× parquet "
+                f"({pq_size/1e6:.2f} MB)"
+            )
+
+    def test_lazy_aggregate_raises_on_non_constant_column(self, lazy_synthetic_war):
+        """Same non-constant-column guard as eager aggregate_time_windows."""
+        # Inject a non-constant value in a normally-constant column.
+        lazy_synthetic_war.result.loc[0, "genotype"] = "MUT"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            src = tmp / "src"
+            src.mkdir()
+            lazy_synthetic_war.save_parquet_and_json(src, filename="war")
+
+            war_lazy = WindowAnalysisResult.scan_parquet_and_json(src, filename="war")
+            war_lazy.aggregate_time_windows(groupby=["animalday", "isday"])
+            with pytest.raises(ValueError, match="not constant"):
+                war_lazy.save_parquet_and_json(tmp / "lazy", filename="war", batch_size=10)
+
+    def test_scan_does_not_materialize_dataframe(self, lazy_synthetic_war):
+        """``scan_parquet_and_json`` reads JSON + parquet schema only — no DataFrame load.
+
+        Regression guard: opening a lazy WAR must NOT pull row data from
+        parquet.  Asserts the scan peak is a small fraction of the eager
+        ``load_parquet_and_json`` peak — the eager path materialises the
+        full DataFrame so any future regression that pulled rows into the
+        scan path would push the ratio toward 1.0.
+        """
+        import tracemalloc
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            src = tmp / "src"
+            src.mkdir()
+            lazy_synthetic_war.save_parquet_and_json(src, filename="war")
+
+            tracemalloc.start()
+            war_lazy = WindowAnalysisResult.scan_parquet_and_json(src, filename="war")
+            # Touch every read-only accessor to be sure none of them lazily load row data.
+            _ = war_lazy.animal_id
+            _ = war_lazy.channel_names
+            _ = war_lazy.channel_abbrevs
+            _ = war_lazy.metadata
+            _ = war_lazy.lof_scores_dict
+            _ = war_lazy.bad_channels_dict
+            _, scan_peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+
+            tracemalloc.start()
+            _ = WindowAnalysisResult.load_parquet_and_json(folder_path=src)
+            _, eager_peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+
+            ratio = scan_peak / eager_peak
+            assert ratio < 0.5, (
+                f"scan peak {scan_peak/1e6:.2f} MB is {ratio:.0%} of eager-load "
+                f"peak {eager_peak/1e6:.2f} MB — DataFrame was likely materialised"
+            )
+
+    def test_lazy_metadata_accessors_match_eager(self, lazy_synthetic_war):
+        """LazyWAR property accessors return the same values as the eager WAR's attrs."""
+        # Seed some metadata-rich state so the comparison is meaningful.
+        lazy_synthetic_war.bad_channels_dict = {
+            "A1_20230101": ["LMot"],
+            "A1_20230102": ["RMot"],
+        }
+        # Provide LOF entries for every animalday in the fixture so the eager
+        # constructor's auto-fill ("Added missing animalday to lof_scores_dict")
+        # doesn't add empty entries that aren't in the on-disk JSON.
+        lazy_synthetic_war.lof_scores_dict = {
+            "A1_20230101": {
+                "lof_scores": [1.0, 1.5, 0.9, 2.1],
+                "channel_names": ["LMot", "RMot", "LBar", "RBar"],
+            },
+            "A1_20230102": {
+                "lof_scores": [0.8, 1.7, 1.2, 1.0],
+                "channel_names": ["LMot", "RMot", "LBar", "RBar"],
+            },
+        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            src = tmp / "src"
+            src.mkdir()
+            lazy_synthetic_war.save_parquet_and_json(src, filename="war")
+
+            eager = WindowAnalysisResult.load_parquet_and_json(folder_path=src)
+            lazy = WindowAnalysisResult.scan_parquet_and_json(src, filename="war")
+
+            assert lazy.animal_id == eager.animal_id
+            assert lazy.channel_names == eager.channel_names
+            assert lazy.channel_abbrevs == eager.channel_abbrevs
+            assert lazy.bad_channels_dict == eager.bad_channels_dict
+            assert lazy.lof_scores_dict == eager.lof_scores_dict
+
+    def test_lazy_get_bad_channels_by_lof_threshold_matches_eager(self, lazy_synthetic_war):
+        """LOF threshold resolution from JSON metadata equals the eager path."""
+        lazy_synthetic_war.lof_scores_dict = {
+            "A1_20230101": {
+                "lof_scores": [1.0, 1.8, 0.9, 2.1],
+                "channel_names": ["LMot", "RMot", "LBar", "RBar"],
+            },
+            "A1_20230102": {
+                "lof_scores": [2.5, 1.0, 1.1, 0.8],
+                "channel_names": ["LMot", "RMot", "LBar", "RBar"],
+            },
+        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            src = tmp / "src"
+            src.mkdir()
+            lazy_synthetic_war.save_parquet_and_json(src, filename="war")
+
+            eager = WindowAnalysisResult.load_parquet_and_json(folder_path=src)
+            lazy = WindowAnalysisResult.scan_parquet_and_json(src, filename="war")
+
+            assert lazy.get_bad_channels_by_lof_threshold(1.5) == eager.get_bad_channels_by_lof_threshold(1.5)
+
+    def test_lazy_chain_reorder_hash_filter(self, lazy_synthetic_war):
+        """A multi-transform chain (reorder + add_unique_hash + apply_filters)
+        produces the same output as the equivalent eager pipeline.
+        """
+        target = ["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"]
+        config = {"high_rms": {"max_rms": 500}}
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            src = tmp / "src"
+            src.mkdir()
+            lazy_synthetic_war.save_parquet_and_json(src, filename="war")
+
+            # Eager: load → reorder → add_unique_hash → apply_filters → save
+            eager_dst = tmp / "eager"
+            war_eager = WindowAnalysisResult.load_parquet_and_json(folder_path=src)
+            war_eager.reorder_and_pad_channels(target, use_abbrevs=True)
+            # Force a deterministic hash so the comparison is reproducible.
+            import secrets as _sec
+            _orig_token_hex = _sec.token_hex
+            _sec.token_hex = lambda n=None: "deadbeef"
+            try:
+                war_eager.add_unique_hash(4)
+                war_eager = war_eager.apply_filters(filter_config=config, min_valid_channels=2)
+                war_eager.save_parquet_and_json(eager_dst, filename="war")
+
+                # Lazy: same chain via the streaming engine
+                lazy_dst = tmp / "lazy"
+                war_lazy = WindowAnalysisResult.scan_parquet_and_json(src, filename="war")
+                war_lazy.reorder_and_pad_channels(target, use_abbrevs=True)
+                war_lazy.add_unique_hash(4)
+                war_lazy.apply_filters(filter_config=config, min_valid_channels=2)
+                war_lazy.save_parquet_and_json(lazy_dst, filename="war", batch_size=10)
+            finally:
+                _sec.token_hex = _orig_token_hex
+
+            re_eager = WindowAnalysisResult.load_parquet_and_json(folder_path=eager_dst)
+            re_lazy = WindowAnalysisResult.load_parquet_and_json(folder_path=lazy_dst)
+            assert re_eager.animal_id == re_lazy.animal_id
+            assert re_eager.channel_names == re_lazy.channel_names
+            assert len(re_eager.result) == len(re_lazy.result)
+            for col in re_eager.result.columns:
+                assert self._columns_match(re_eager.result, re_lazy.result, col), (
+                    f"Column {col} differs between eager and lazy"
+                )
+
+    def test_lazy_save_metadata_round_trip(self, lazy_synthetic_war):
+        """JSON sidecar after lazy save preserves every metadata field a
+        downstream rule depends on (animal_id, channel_names, lof_scores_dict,
+        bad_channels_dict, assume_from_number).
+        """
+        lazy_synthetic_war.bad_channels_dict = {
+            "A1_20230101": ["LMot"],
+            "A1_20230102": ["RMot"],
+        }
+        lazy_synthetic_war.lof_scores_dict = {
+            "A1_20230101": {
+                "lof_scores": [1.0, 1.5, 0.9, 2.1],
+                "channel_names": ["LMot", "RMot", "LBar", "RBar"],
+            }
+        }
+        target = ["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            src = tmp / "src"
+            src.mkdir()
+            lazy_synthetic_war.save_parquet_and_json(src, filename="war")
+
+            war_lazy = WindowAnalysisResult.scan_parquet_and_json(src, filename="war")
+            war_lazy.reorder_and_pad_channels(target, use_abbrevs=True)
+            war_lazy.save_parquet_and_json(tmp / "out", filename="war", batch_size=10)
+
+            out_meta = json.loads((tmp / "out" / "war.json").read_text())
+            # Reorder updates channel_names; non-touched fields propagate unchanged.
+            assert out_meta["channel_names"] == target
+            assert out_meta["animal_id"] == "A1"
+            assert out_meta["lof_scores_dict"] == lazy_synthetic_war.lof_scores_dict
+            assert out_meta["bad_channels_dict"] == lazy_synthetic_war.bad_channels_dict
+            # assume_from_number must be preserved (regression guard for the LOF
+            # channel-filter chain on raw-named channels like ``D-015``).
+            assert out_meta["assume_from_number"] == lazy_synthetic_war.assume_from_number
+
+
+class TestTimestampHandling:
+    """Regression tests for the datetime/tz round-trip edge cases pyarrow
+    can't handle natively (tzlocal, tz+NaT, object-dtype Timestamp+None).
+    """
+
+    @staticmethod
+    def _war(ts_series, animal_id="A1"):
+        """Build a minimal WAR with the given timestamp series."""
+        df = pd.DataFrame({
+            "animalday": [f"{animal_id}_d{i}" for i in range(len(ts_series))],
+            "duration": [60.0] * len(ts_series),
+            "timestamp": ts_series,
+            "rms": [[1.0, 2.0]] * len(ts_series),
+        })
+        return WindowAnalysisResult(
+            result=df, animal_id=animal_id, genotype="WT",
+            channel_names=["LMot", "RMot"],
+        )
+
+    def _roundtrip(self, war):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            war.save_parquet_and_json(tmpdir, filename="war")
+            return WindowAnalysisResult.load_parquet_and_json(folder_path=Path(tmpdir))
+
+    @staticmethod
+    def _moments_equal(a: pd.Series, b: pd.Series) -> bool:
+        """Compare two datetime Series by absolute moment, tolerating
+        parquet's ns→us precision conversion."""
+        def _to_utc_us(s):
+            s = s.dt.tz_convert("UTC") if getattr(s.dt, "tz", None) is not None else s.dt.tz_localize("UTC")
+            return s.dt.floor("us")
+        return (_to_utc_us(a).reset_index(drop=True) == _to_utc_us(b).reset_index(drop=True)).all()
+
+    def test_naive_datetime_roundtrip(self):
+        ts = pd.Series(pd.to_datetime(["2023-01-01 10:00", "2023-01-01 10:05", "2023-01-01 10:10"]))
+        loaded = self._roundtrip(self._war(ts))
+        assert self._moments_equal(
+            ts.reset_index(drop=True),
+            loaded.result["timestamp"].reset_index(drop=True),
+        )
+
+    def test_tzlocal_datetime_roundtrip_to_utc(self):
+        """pyarrow can't serialise tzlocal(); save normalises to UTC."""
+        from dateutil.tz import tzlocal
+        ts = pd.Series([
+            pd.Timestamp("2023-01-01 10:00", tz=tzlocal()),
+            pd.Timestamp("2023-01-01 10:05", tz=tzlocal()),
+        ])
+        loaded = self._roundtrip(self._war(ts))
+        loaded_ts = loaded.result["timestamp"]
+        assert getattr(loaded_ts.dt, "tz", None) is not None
+        assert self._moments_equal(ts.reset_index(drop=True), loaded_ts.reset_index(drop=True))
+
+    def test_named_tz_datetime_roundtrip(self):
+        ts = pd.Series([
+            pd.Timestamp("2023-01-01 10:00", tz="America/New_York"),
+            pd.Timestamp("2023-01-01 10:05", tz="America/New_York"),
+        ])
+        loaded = self._roundtrip(self._war(ts))
+        assert self._moments_equal(
+            ts.reset_index(drop=True),
+            loaded.result["timestamp"].reset_index(drop=True),
+        )
+
+    def test_tz_aware_with_nat_strips_tz(self):
+        """tz+NaT crashes pyarrow; save strips tz (lossy on label, lossless on moment)."""
+        ts = pd.Series(pd.to_datetime(["2023-01-01 10:00", "2023-01-01 10:05", "2023-01-01 10:10"]))
+        war = self._war(ts)
+        # Edge case lives on a non-validated column.
+        war.result["end_time"] = pd.Series([
+            pd.Timestamp("2023-01-01 10:00", tz="America/New_York"),
+            pd.NaT,
+            pd.Timestamp("2023-01-01 10:05", tz="America/New_York"),
+        ])
+        loaded = self._roundtrip(war)
+        end = loaded.result["end_time"]
+        assert getattr(end.dt, "tz", None) is None  # tz stripped
+        assert pd.isna(end.iloc[1])
+        # Non-null moments preserved (compare as naive UTC).
+        expected = war.result["end_time"].dt.tz_convert("UTC").dt.tz_localize(None).dt.floor("us")
+        actual = end.dt.floor("us")
+        assert (actual.iloc[0] == expected.iloc[0]) and (actual.iloc[2] == expected.iloc[2])
+
+    def test_object_dtype_timestamp_with_none(self):
+        """Object-dtype Timestamp+None gets coerced to datetime64 before pa.table."""
+        ts = pd.Series(pd.to_datetime(["2023-01-01 10:00", "2023-01-01 10:05", "2023-01-01 10:10"]))
+        war = self._war(ts)
+        war.result["end_time"] = pd.Series([
+            pd.Timestamp("2023-01-01 10:00"),
+            None,
+            pd.Timestamp("2023-01-01 10:05"),
+        ], dtype=object)
+        assert war.result["end_time"].dtype == object
+        loaded = self._roundtrip(war)
+        end = loaded.result["end_time"]
+        assert pd.api.types.is_datetime64_any_dtype(end)
+        assert pd.isna(end.iloc[1])
+        assert end.iloc[0] == pd.Timestamp("2023-01-01 10:00")
+
+    def test_all_null_endfile_column(self):
+        """All-None object column (e.g. ``endfile`` in real WARs) round-trips
+        without crashing.  Sanity check for the integration-WAR case where
+        such columns coexist with tz-aware timestamps.
+        """
+        ts = pd.Series(pd.to_datetime(["2023-01-01", "2023-01-02"]))
+        war = self._war(ts)
+        war.result["endfile"] = [None, None]
+        # Save+load shouldn't raise; endfile reloads as either None or NaN.
+        loaded = self._roundtrip(war)
+        assert "endfile" in loaded.result.columns
+        assert loaded.result["endfile"].isna().all()
 
 
 class TestAnimalOrganizerLOF:
@@ -4074,3 +5222,120 @@ class TestAnimalOrganizerLOF:
         actual_ch0_scores = set(all_ch0_scores)
         assert actual_ch0_scores == expected_ch0_scores, \
             f"Expected Ch0 scores {expected_ch0_scores}, got {actual_ch0_scores}"
+
+
+class TestComputeGlobalTimelineKwargDiscipline:
+    """Regression tests for kwarg leaks from _compute_global_timeline into the
+    LongRecordingOrganizer (and ultimately into ``extract_func``).
+
+    Background: the arxrosa run failed every EDF animal with
+    ``read_raw_edf() got an unexpected keyword argument 'input_type'``.
+    The cause was a hardcoded ``_lro_kwargs["input_type"] = "file"`` in
+    _compute_global_timeline, intended for the long-dead
+    ``_load_and_process_mne_data`` branch but ending up forwarded all the way
+    to ``mne.io.read_raw_edf`` via ``extract_func(item, **kwargs)``.
+
+    Synthetic test extractors all accept ``**kwargs``, so the leak was invisible
+    until the first end-to-end run with the real (kwarg-strict) MNE reader.
+    """
+
+    @staticmethod
+    def _capture_lro_kwargs(monkeypatch):
+        """Patch core.LongRecordingOrganizer.__init__ to record the kwargs it
+        was called with, returning the capture list.
+
+        We patch via the same module reference that results.py uses
+        (``results.core.LongRecordingOrganizer``) so we stay correct even after
+        tests (e.g. test_imports.TestCircularImports) drop ``neurodent.core``
+        from ``sys.modules`` and force a re-import, which rebinds
+        ``neurodent.core.LongRecordingOrganizer`` to a new class object.
+        """
+        from unittest.mock import MagicMock
+        from neurodent.visualization import results as _results_mod
+
+        captured: list[dict] = []
+
+        def fake_init(self, item, **kwargs):
+            captured.append(dict(kwargs))
+            self.LongRecording = MagicMock()
+            self.LongRecording.get_duration.return_value = 100.0
+
+        monkeypatch.setattr(
+            _results_mod.core.LongRecordingOrganizer, "__init__", fake_init
+        )
+        return captured
+
+    def _make_organizer_shell(self):
+        """Build an AnimalOrganizer instance bypassing __init__'s discovery so
+        we can call _compute_global_timeline in isolation."""
+        from neurodent.visualization.results import AnimalOrganizer
+        ao = AnimalOrganizer.__new__(AnimalOrganizer)
+        ao.animal_id = "test"
+        return ao
+
+    def test_no_input_type_injection_for_mne_mode(self, tmp_path, monkeypatch):
+        """Mode='mne' must not cause input_type to leak into LRO kwargs."""
+        from datetime import datetime
+
+        captured = self._capture_lro_kwargs(monkeypatch)
+        ao = self._make_organizer_shell()
+
+        fake_edf = tmp_path / "fake_session1.edf"
+        fake_edf.write_bytes(b"")
+        base_dt = datetime(2025, 1, 1, 9, 0, 0)
+        base_lro_kwargs = {"mode": "mne", "extract_func": "read_raw_edf"}
+
+        try:
+            ao._compute_global_timeline(
+                base_datetime=base_dt,
+                animalday_to_items={"sess1": [fake_edf]},
+                base_lro_kwargs=base_lro_kwargs,
+                original_manual_datetimes=base_dt,
+            )
+        except Exception:
+            # Tolerate downstream errors after kwarg capture; the assertion below
+            # only cares about which kwargs reached LongRecordingOrganizer.
+            pass
+
+        assert captured, "expected at least one LongRecordingOrganizer instantiation"
+        leaked = [kw for kw in captured if "input_type" in kw]
+        assert not leaked, (
+            "Regression: input_type was injected into LRO kwargs by "
+            f"_compute_global_timeline. Captured: {leaked}"
+        )
+
+    def test_strict_extract_func_signature_simulation(self, tmp_path, monkeypatch):
+        """A 'strict' extract_func (mimics real mne.io.read_raw_edf) should
+        receive only the kwargs the caller actually requested — no extras
+        injected by the timeline code.
+        """
+        from datetime import datetime
+
+        captured = self._capture_lro_kwargs(monkeypatch)
+        ao = self._make_organizer_shell()
+
+        fake_edf = tmp_path / "session_a.edf"
+        fake_edf.write_bytes(b"")
+        base_dt = datetime(2025, 1, 1, 12, 0, 0)
+        # Caller-supplied kwargs only.  Anything beyond these on the way to
+        # the LRO would indicate a leak from inside _compute_global_timeline.
+        base_lro_kwargs = {"mode": "mne", "extract_func": "read_raw_edf"}
+        allowed = set(base_lro_kwargs) | {"manual_datetimes"}
+
+        try:
+            ao._compute_global_timeline(
+                base_datetime=base_dt,
+                animalday_to_items={"sess": [fake_edf]},
+                base_lro_kwargs=base_lro_kwargs,
+                original_manual_datetimes=base_dt,
+            )
+        except Exception:
+            pass
+
+        assert captured, "expected at least one LongRecordingOrganizer instantiation"
+        for kw in captured:
+            extras = set(kw) - allowed
+            assert not extras, (
+                "Regression: _compute_global_timeline injected unexpected LRO "
+                f"kwargs: {extras}.  Allowed only: {allowed}.  Full kwargs: {kw}."
+            )

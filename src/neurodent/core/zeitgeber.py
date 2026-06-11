@@ -54,7 +54,7 @@ def _load_war_for_zeitgeber(war_path_info):
 
     Args:
         war_path_info (tuple): Tuple containing:
-            - war_pkl_path (Path): Path to the WAR pickle file.
+            - war_parquet_path (Path): Path to the WAR parquet file.
             - war_json_path (Path): Path to the WAR JSON metadata file.
             - features_to_extract (list[str]): List of features to extract.
             - animal_name (str): Identifier for the animal.
@@ -64,14 +64,14 @@ def _load_war_for_zeitgeber(war_path_info):
         pd.DataFrame: DataFrame containing channel-averaged features and animal identifier.
                       The DataFrame will have columns for each extracted feature and an 'animal' column.
     """
-    war_pkl_path, war_json_path, features_to_extract, animal_name, pipeline_config = war_path_info
+    war_parquet_path, war_json_path, features_to_extract, animal_name, pipeline_config = war_path_info
 
     try:
         logger.info(f"Loading {animal_name}")
 
-        war = visualization.WindowAnalysisResult.load_pickle_and_json(
-            folder_path=war_pkl_path.parent,
-            pickle_name=war_pkl_path.name,
+        war = visualization.WindowAnalysisResult.load_parquet_and_json(
+            folder_path=war_parquet_path.parent,
+            parquet_name=war_parquet_path.name,
             json_name=war_json_path.name,
         )
         
@@ -89,6 +89,22 @@ def _load_war_for_zeitgeber(war_path_info):
         raise
 
 
+def _compute_daynight(zt_minutes):
+    """Return ``"Day"``/``"Night"`` labels for each ZT minute.
+
+    Single source of truth for the day/night phase boundary, used by
+    :func:`shift_to_zeitgeber_reference`, :func:`transform_time_axis`, and
+    :func:`expand_zt_axis` so the rule never drifts across call sites.
+
+    ``"Day"`` corresponds to ZT 0:00–11:59 (light phase, ``zt_minutes %
+    1440 < 720``); ``"Night"`` to ZT 12:00–23:59 (dark phase).  The
+    ``% 1440`` lets this work over multi-day expansions (e.g. ZT 1500 ->
+    "Day" because 1500 % 1440 = 60).
+    """
+    arr = np.asarray(zt_minutes)
+    return np.where(arr % 1440 < 720, "Day", "Night")
+
+
 def add_zeitgeber_time_columns(df, interval_minutes=60):
     """
     Convert timestamps to zeitgeber time representation with specified binning interval.
@@ -104,8 +120,12 @@ def add_zeitgeber_time_columns(df, interval_minutes=60):
         pd.DataFrame: DataFrame with added time columns:
             * 'hour' (int): Hour of the day (0-23).
             * 'minute' (int): Minute of the hour (0-59).
-            * 'total_minutes' (int): Time of day in minutes from midnight (0-1440),
-              binned to the nearest 'interval_minutes'.
+            * 'zt_minutes' (float): Minutes-of-day, binned to the nearest
+              ``interval_minutes``.  **Initially populated from raw clock
+              time** (= hour * 60 + minute); call
+              :func:`shift_to_zeitgeber_reference` afterwards to convert
+              this column to true zeitgeber-time minutes from lights-on.
+              The ``daynight`` companion column is added at that point.
 
     Raises:
         ValueError: If interval_minutes does not evenly divide 24 hours (1440 minutes).
@@ -127,7 +147,7 @@ def add_zeitgeber_time_columns(df, interval_minutes=60):
     binned_minutes = interval_minutes * (np.round(raw_minutes / interval_minutes))
 
     # Modulo 1440 to handle wraparound (e.g., 23:59 rounding up to 24:00 -> 0:00)
-    df["total_minutes"] = binned_minutes % 1440
+    df["zt_minutes"] = binned_minutes % 1440
 
     return df
 
@@ -139,10 +159,10 @@ def subtract_zeitgeber_baseline(
     Subtract baseline from numeric features in the dataframe.
 
     Baseline is calculated as the mean value within a specified window of time (ZT).
-    Requires 'total_minutes' column to be present (usually added by add_zeitgeber_time_columns).
+    Requires 'zt_minutes' column to be present (usually added by add_zeitgeber_time_columns).
 
     Args:
-        df (pd.DataFrame): DataFrame containing features and 'total_minutes'.
+        df (pd.DataFrame): DataFrame containing features and 'zt_minutes'.
         baseline_hours (int, optional): Number of hours from start of ZT0 to use as baseline.
             Defaults to 12. Ignored if baseline_window is set.
         baseline_window (tuple | str, optional): Explicit window for baseline.
@@ -186,15 +206,15 @@ def subtract_zeitgeber_baseline(
             f"Using default baseline: first {baseline_hours} hours ({start_min}-{end_min} min)"
         )
 
-    if "total_minutes" not in df.columns:
-        logger.warning("Skipping baseline subtraction: 'total_minutes' not found.")
+    if "zt_minutes" not in df.columns:
+        logger.warning("Skipping baseline subtraction: 'zt_minutes' not found.")
         return df
 
     numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
     skip_cols = [
         "hour",
         "minute",
-        "total_minutes",
+        "zt_minutes",
         "animal_idx",
         "day_idx",
         "epoch_idx",
@@ -213,7 +233,7 @@ def subtract_zeitgeber_baseline(
 
             def get_group_mean(g):
                 vals = g.loc[
-                    g["total_minutes"].between(start_min, end_min, inclusive="left"),
+                    g["zt_minutes"].between(start_min, end_min, inclusive="left"),
                     feature,
                 ]
                 return vals.mean() if not vals.empty else np.nan
@@ -231,7 +251,7 @@ def subtract_zeitgeber_baseline(
 
         else:
             baseline_data = df.loc[
-                df["total_minutes"].between(start_min, end_min, inclusive="left"),
+                df["zt_minutes"].between(start_min, end_min, inclusive="left"),
                 feature,
             ]
             if not baseline_data.empty:
@@ -246,20 +266,22 @@ def subtract_zeitgeber_baseline(
     return result_df
 
 
-def transform_time_axis(df, time_range=(0, 48), shift=0):
+def transform_time_axis(df, time_range=(0, 24), shift=0):
     """
-    Transform time axis for plotting: enrichment, sorting, and time range expansion.
+    Transform time axis for plotting: enrichment, optional time shift, and sorting.
 
     Args:
         df (pd.DataFrame): Input dataframe.
             Expected format:
             * 'genotype' (str, optional): Strain info (e.g., 'M_WT', 'F_Mut').
               Used to derive 'sex' and 'gene' if not present.
-            * 'total_minutes' (numeric): Time of day in minutes (0-1440).
-        time_range (tuple, optional): Hours to display as (start_hr, end_hr). Defaults to (0, 48).
-            Any range is valid as long as start < end. If end > 24, the function
-            duplicates data to fill the extended range (e.g., (0, 48) repeats 0-24h
-            as 24-48h, (0, 72) would repeat twice, etc.).
+            * 'zt_minutes' (numeric): Zeitgeber-time minutes (0-1440).
+        time_range (tuple, optional): No-op since the data layer no longer
+            duplicates rows for multi-day plotting.  Kept for backward
+            compatibility with callers that still pass it.  Multi-day
+            expansion is now the plotter's job — use
+            :func:`expand_zt_axis` to get a 48h/72h/... view at render
+            time.  Defaults to (0, 24).
         shift (float, optional): Hours to shift the time axis. Defaults to 0.
             - **Negative shift** moves times earlier: a data point at 6:00 with shift=-6
               becomes 0:00. Use this when your data starts at clock time 6:00 but you
@@ -267,10 +289,14 @@ def transform_time_axis(df, time_range=(0, 48), shift=0):
             - **Positive shift** moves times later: a data point at 0:00 with shift=6
               becomes 6:00.
             - Common use: shift=-6 aligns "lights on at 6am" to hour 0 (Zeitgeber Time).
+            When non-zero, also recomputes ``daynight`` so the labels stay
+            consistent with the shifted ``zt_minutes``.
 
     Returns:
         pd.DataFrame: Processed dataframe ready for plotting.
             Adds 'sex', 'gene', and temporary sorting columns if applicable.
+            Row count is unchanged — call :func:`expand_zt_axis` to
+            duplicate rows across multiple ZT cycles.
 
     Raises:
         ValueError: If time_range[0] >= time_range[1].
@@ -287,15 +313,12 @@ def transform_time_axis(df, time_range=(0, 48), shift=0):
     if "genotype" in df.columns and "gene" not in df.columns:
         df["gene"] = df["genotype"].str[2:]
 
-    # Apply time shift
-    if shift != 0 and "total_minutes" in df.columns:
-        df["total_minutes"] = (df["total_minutes"] + shift * 60) % 1440
-
-    # Duplicate for 48h view if time_range extends beyond 24h
-    if time_range[1] > 24 and "total_minutes" in df.columns:
-        df2 = df.copy()
-        df2["total_minutes"] = df2["total_minutes"] + 1440
-        df = pd.concat([df, df2], ignore_index=True)
+    # Apply time shift.  When non-zero, recompute daynight so labels stay
+    # consistent with the new zt_minutes.
+    if shift != 0 and "zt_minutes" in df.columns:
+        df["zt_minutes"] = (df["zt_minutes"] + shift * 60) % 1440
+        if "daynight" in df.columns:
+            df["daynight"] = _compute_daynight(df["zt_minutes"])
 
     sort_cols = []
     if "gene" in df.columns:
@@ -364,24 +387,70 @@ def enrich_genotype_metadata(df, genotype_pattern=None, sex_mapper=None, genotyp
 
 def shift_to_zeitgeber_reference(df, shift_hours=6):
     """
-    Shift 'total_minutes' to start at ZT0.
+    Shift ``zt_minutes`` to start at ZT0 and add the ``daynight`` label.
 
     Typically, the experimental clock starts at a certain time (e.g. 6:00 AM).
     ZT0 corresponds to "Lights On" which is often 6:00 AM.
     So Clock 6:00 -> ZT 0.
 
-    Formula: (total_minutes - shift_hours * 60) % 1440
+    Formula: ``(zt_minutes - shift_hours * 60) % 1440``
+
+    After the shift the values represent true zeitgeber-time minutes from
+    lights-on, so this is also where the ``daynight`` companion column is
+    populated (``"Day"`` for ZT 0:00–11:59, ``"Night"`` for ZT 12:00–23:59).
 
     Args:
-        df (pd.DataFrame): DataFrame with 'total_minutes'.
+        df (pd.DataFrame): DataFrame with ``zt_minutes``.
         shift_hours (int, float): Diff between Clock 0:00 and ZT0 in hours.
-                                  Defaults to 6 (so 06:00 -> Z0).
+                                  Defaults to 6 (so 06:00 -> ZT0).
     Returns:
-        pd.DataFrame: DataFrame with shifted 'total_minutes'.
+        pd.DataFrame: DataFrame with shifted ``zt_minutes`` and a fresh
+        ``daynight`` column.
     """
-    if "total_minutes" in df.columns:
-        df["total_minutes"] = (df["total_minutes"] - int(shift_hours * 60)) % 1440
+    if "zt_minutes" in df.columns:
+        df["zt_minutes"] = (df["zt_minutes"] - int(shift_hours * 60)) % 1440
+        df["daynight"] = _compute_daynight(df["zt_minutes"])
     return df
+
+
+def expand_zt_axis(df, n_days=2):
+    """Duplicate *df* across *n_days* ZT cycles for multi-day plotting.
+
+    Each copy's ``zt_minutes`` is offset by ``1440 * i``; the ``daynight``
+    column is recomputed so day/night labels stay correct in the expanded
+    range.  Used by ``ZeitgeberPlotter`` (and any other plotter that
+    wants a multi-day view) — the persisted zeitgeber CSV stays a clean
+    24 h on disk; this helper materialises the wider view only at render
+    time.
+
+    Args:
+        df (pd.DataFrame): DataFrame with ``zt_minutes``.  Should already
+            be ZT-aligned (i.e. produced after
+            :func:`shift_to_zeitgeber_reference`).
+        n_days (int): Number of ZT cycles to span.  Defaults to ``2``
+            (today's 48h plot behaviour).  Must be ``>= 1``; ``n_days=1``
+            is a no-op pass-through.
+
+    Returns:
+        pd.DataFrame: New dataframe with ``len(df) * n_days`` rows.
+
+    Raises:
+        ValueError: If ``n_days < 1``.
+    """
+    if n_days < 1:
+        raise ValueError(f"n_days must be >= 1, got {n_days}")
+    if "zt_minutes" not in df.columns:
+        return df.copy()
+    if n_days == 1:
+        return df.copy()
+    copies = []
+    for i in range(n_days):
+        c = df.copy()
+        c["zt_minutes"] = c["zt_minutes"] + 1440 * i
+        copies.append(c)
+    out = pd.concat(copies, ignore_index=True)
+    out["daynight"] = _compute_daynight(out["zt_minutes"])
+    return out
 
 
 def run_zeitgeber_pipeline(
@@ -403,25 +472,30 @@ def run_zeitgeber_pipeline(
 
     The pipeline performs the following steps:
     1. Enrich metadata (sex, gene) from ANIMAL_METADATA.
-    2. Shift to Zeitgeber Time (ZT) reference.
+    2. Shift to Zeitgeber Time (ZT) reference (also adds ``daynight``).
     3. Subtract baseline.
-    4. Prepare for plotting (48h expansion).
+    4. Sort + sex/gene enrichment for plot readiness.
 
     Args:
-        df (pd.DataFrame): Input dataframe with 'total_minutes', 'animal'.
+        df (pd.DataFrame): Input dataframe with 'zt_minutes', 'animal'.
         baseline_hours (int): Baseline duration from ZT0. Default 12.
         baseline_window (tuple | str): Explicit baseline window. Override.
         exclude_from_baseline (list): Columns to skip.
         interval_minutes (int): Binning interval.
         zeitgeber_shift_hours (int): Shift applied to align Clock Time to ZT. Default 6.
-        shift_for_48h (bool, optional): Whether to duplicate data for 48h plotting. Defaults to True.
+        shift_for_48h (bool, optional): **DEPRECATED no-op.**  Multi-day
+            expansion has moved out of the data layer to
+            :func:`expand_zt_axis`, called by plotters at render time.
+            Kept in the signature for backward compatibility; ignored.
         animal_metadata (dict, optional): Dict of animal_id -> {sex, gene} from load_animal_metadata().
         genotype_pattern (str, optional): DEPRECATED.
         sex_mapper (dict, optional): DEPRECATED.
         genotype_aliases (dict, optional): DEPRECATED. Use animal_metadata instead.
 
     Returns:
-        pd.DataFrame: Fully processed dataframe.
+        pd.DataFrame: Fully processed 24h dataframe.  Row count equals
+            input row count — plotters that want a multi-day view call
+            :func:`expand_zt_axis` on the result.
     """
     logger.info("Running zeitgeber analysis pipeline...")
 
@@ -433,13 +507,13 @@ def run_zeitgeber_pipeline(
     elif genotype_aliases is not None:
         # Legacy path
         df_processed = enrich_genotype_metadata(
-            df_processed, 
-            genotype_pattern=genotype_pattern, 
+            df_processed,
+            genotype_pattern=genotype_pattern,
             sex_mapper=sex_mapper,
             genotype_aliases=genotype_aliases
         )
 
-    # 2. Shift to ZT
+    # 2. Shift to ZT (also adds the daynight column).
     df_processed = shift_to_zeitgeber_reference(
         df_processed, shift_hours=zeitgeber_shift_hours
     )
@@ -452,12 +526,9 @@ def run_zeitgeber_pipeline(
         exclude_from_baseline=exclude_from_baseline,
     )
 
-    # 4. Transform time axis for plotting (48h expansion + sorting)
-    # Note: we already shifted to ZT, so shift=0
-    time_range = (0, 48) if shift_for_48h else (0, 24)
-    df_final = transform_time_axis(
-        df_processed, time_range=time_range, shift=0
-    )
+    # 4. Sort + sex/gene enrichment.  No multi-day expansion here — the
+    # data layer stays 24h; plotters use expand_zt_axis() at render time.
+    df_final = transform_time_axis(df_processed, shift=0)
 
     if "animal" in df_final.columns:
         logger.info(f"Processed data for {df_final['animal'].nunique()} unique animals")
@@ -490,8 +561,8 @@ class ZeitgeberAnalysisResult:
         if df.empty:
             return df
 
-        # Ensure total_minutes exists (requires 'timestamp')
-        if "total_minutes" not in df.columns:
+        # Ensure zt_minutes exists (requires 'timestamp')
+        if "zt_minutes" not in df.columns:
             # Try to add it if timestamp exists
             if "timestamp" in df.columns:
                 # Use interval from config if present, else default
@@ -517,7 +588,7 @@ class ZeitgeberAnalysisResult:
 
     def get_groupavg_result(self, *args, **kwargs):
         """Intercepts get_groupavg_result and applies ZT pipeline."""
-        # Note: If aggregation removes time information (timestamp/total_minutes),
+        # Note: If aggregation removes time information (timestamp/zt_minutes),
         # the ZT pipeline will gracefully skip time-dependent steps like shifting
         # and baseline subtraction.
         df = self.war.get_groupavg_result(*args, **kwargs)

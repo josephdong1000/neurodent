@@ -7,7 +7,7 @@ samples:
 
 analysis:
   war_generation:
-    pattern: "{index}.rhd"  # RHD files directly in session folder
+    pattern: "{data_root}/*{animal}*/{index}.rhd"  # RHD files in folders matching animal pattern
     lro_kwargs:
       extract_func: "read_intan"  # spikeinterface.extractors.read_intan
       input_type: "files"  # Multiple RHD files in folder get concatenated

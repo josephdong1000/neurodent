@@ -18,7 +18,7 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
-from neurodent.core.utils import cache_fragments_to_zarr, stream_fragments_to_zarr
+from neurodent.core.utils import cache_fragments_to_zarr, stream_fragments_to_zarr, stream_recording_to_zarr
 
 
 # ---------------------------------------------------------------------------
@@ -101,6 +101,20 @@ class TestCacheFragmentsToZarrChunkSize:
         with patch.dict(os.environ, {"TMPDIR": str(tmp_path)}):
             _, arr_none = cache_fragments_to_zarr(frags, 50, chunk_size=None)
         assert arr_none.chunks[0] == 50
+
+    def test_invalid_chunk_size_zero_raises(self, tmp_path):
+        """``chunk_size=0`` should raise ``ValueError`` before touching zarr."""
+        frags = _make_fragments(5)
+        with pytest.raises(ValueError, match="chunk_size must be >= 1"):
+            with patch.dict(os.environ, {"TMPDIR": str(tmp_path)}):
+                cache_fragments_to_zarr(frags, 5, chunk_size=0)
+
+    def test_invalid_chunk_size_negative_raises(self, tmp_path):
+        """Negative ``chunk_size`` should raise ``ValueError`` before touching zarr."""
+        frags = _make_fragments(5)
+        with pytest.raises(ValueError, match="chunk_size must be >= 1"):
+            with patch.dict(os.environ, {"TMPDIR": str(tmp_path)}):
+                cache_fragments_to_zarr(frags, 5, chunk_size=-10)
 
 
 # ---------------------------------------------------------------------------
@@ -200,6 +214,115 @@ class TestStreamFragmentsToZarr:
 
         assert len(call_counts) == 6
         assert all(c == 1 for c in call_counts.values())
+
+
+# ---------------------------------------------------------------------------
+# stream_recording_to_zarr – equivalence with per-fragment path
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.unit
+class TestStreamRecordingToZarrEquivalence:
+    """Verify that ``stream_recording_to_zarr`` produces the same output as
+    the old per-fragment ``stream_fragments_to_zarr`` path."""
+
+    def test_bulk_path_matches_per_fragment_path(self, tmp_path):
+        """stream_recording_to_zarr must produce identical fragments to
+        stream_fragments_to_zarr when given the same underlying data."""
+        import spikeinterface.core as si_core
+        import zarr
+
+        rng = np.random.default_rng(42)
+        n_channels = 4
+        fs = 1000.0
+        n_frag = 10
+        n_samples_per_frag = int(5 * fs)  # 5s windows
+        total_samples = n_frag * n_samples_per_frag
+        chunk = 3
+
+        # Each channel has a different sine frequency so transposition
+        # would produce visibly different data.
+        t = np.arange(total_samples) / fs
+        data = np.column_stack(
+            [
+                np.sin(2 * np.pi * (5 + ch * 3) * t)
+                + 0.1 * rng.standard_normal(total_samples)
+                for ch in range(n_channels)
+            ]
+        ).astype(np.float32)
+
+        rec = si_core.NumpyRecording(
+            traces_list=[data], sampling_frequency=fs,
+        )
+
+        # Old path: per-fragment getter → stream_fragments_to_zarr
+        def get_fragment(idx):
+            start = idx * n_samples_per_frag
+            end = start + n_samples_per_frag
+            return rec.get_traces(
+                start_frame=start, end_frame=end, return_scaled=True,
+            )
+
+        with patch.dict(os.environ, {"TMPDIR": str(tmp_path / "old")}):
+            os.makedirs(tmp_path / "old", exist_ok=True)
+            old_path = stream_fragments_to_zarr(
+                get_fragment,
+                n_frag,
+                (n_samples_per_frag, n_channels),
+                np.float32,
+                chunk,
+            )
+
+        # New path: bulk recording → stream_recording_to_zarr
+        with patch.dict(os.environ, {"TMPDIR": str(tmp_path / "new")}):
+            os.makedirs(tmp_path / "new", exist_ok=True)
+            new_path = stream_recording_to_zarr(
+                rec, n_frag, n_samples_per_frag, chunk,
+            )
+
+        old_arr = zarr.open(old_path, mode="r")[:]
+        new_arr = zarr.open(new_path, mode="r")[:]
+
+        assert old_arr.shape == new_arr.shape == (
+            n_frag, n_samples_per_frag, n_channels,
+        )
+        np.testing.assert_array_equal(old_arr, new_arr)
+
+    def test_channels_are_distinguishable(self, tmp_path):
+        """Each channel in the zarr output must have distinct content,
+        catching transposition bugs where all channels become identical."""
+        import spikeinterface.core as si_core
+        import zarr
+
+        n_channels = 4
+        fs = 1000.0
+        n_frag = 5
+        n_samples_per_frag = int(5 * fs)
+        total_samples = n_frag * n_samples_per_frag
+
+        # Channels with very different means so transposition is obvious
+        t = np.arange(total_samples) / fs
+        data = np.column_stack(
+            [
+                ch * 100.0 + np.sin(2 * np.pi * (2 + ch) * t)
+                for ch in range(n_channels)
+            ]
+        ).astype(np.float32)
+
+        rec = si_core.NumpyRecording(
+            traces_list=[data], sampling_frequency=fs,
+        )
+
+        with patch.dict(os.environ, {"TMPDIR": str(tmp_path)}):
+            path = stream_recording_to_zarr(rec, n_frag, n_samples_per_frag, 2)
+
+        arr = zarr.open(path, mode="r")[:]
+        # Check that channel means are distinct (0, 100, 200, 300)
+        means = [arr[:, :, ch].mean() for ch in range(n_channels)]
+        for i in range(n_channels):
+            assert abs(means[i] - i * 100.0) < 1.0, (
+                f"Channel {i} mean={means[i]:.1f}, expected ~{i * 100.0}"
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -314,7 +437,7 @@ class TestComputeWindowedAnalysisSignature:
 
     def test_stream_fragments_to_zarr_called_when_chunk_duration_s_set(self, tmp_path):
         """Calling ``compute_windowed_analysis(multiprocess_mode="dask",
-        chunk_duration_s=...)`` must invoke ``stream_fragments_to_zarr``
+        chunk_duration_s=...)`` must invoke ``stream_recording_to_zarr``
         inside the dask branch of AO."""
         import pandas as pd
         from neurodent.visualization.results import AnimalOrganizer
@@ -336,13 +459,15 @@ class TestComputeWindowedAnalysisSignature:
         mock_lan = MagicMock()
         mock_lan.n_fragments = 5
         mock_lan.f_s = 1000
-        mock_lan.get_fragment_np.return_value = np.zeros(
-            (10, 2), dtype=np.float32
-        )
+        mock_lan.apply_notch_filter = False
 
-        # _iter_valid_recordings yields one recording so the dask branch runs
+        # -- mock lrec (LongRecordingOrganizer) with a SI recording ----------
+        mock_si_rec = MagicMock()
+        mock_si_rec.get_num_channels.return_value = 2
         mock_lrec = MagicMock()
         mock_lrec.display_name = "rec0"
+        mock_lrec.LongRecording = mock_si_rec
+
         ao._iter_valid_recordings = MagicMock(
             return_value=iter([(0, mock_lrec)])
         )
@@ -353,7 +478,7 @@ class TestComputeWindowedAnalysisSignature:
                 return_value=mock_lan,
             ),
             patch(
-                "neurodent.visualization.results.core.utils.stream_fragments_to_zarr",
+                "neurodent.visualization.results.core.utils.stream_recording_to_zarr",
                 return_value=str(tmp_path / "fake.zarr"),
             ) as mock_stream,
             patch("neurodent.visualization.results.da.from_zarr"),
@@ -388,12 +513,12 @@ class TestComputeWindowedAnalysisSignature:
             )
 
             mock_stream.assert_called_once()
-            # Verify the chunk_size argument (5th positional arg) is derived
-            # from chunk_duration_s=600 / window_s=5 = 120
+            # Verify n_frag_per_chunk (4th positional arg) is derived from
+            # chunk_duration_s=600 / window_s=5 = 120
             call_args = mock_stream.call_args
-            actual_chunk_size = call_args[0][4]
-            assert actual_chunk_size == 120, (
-                f"Expected chunk_size=120 (600/5), got {actual_chunk_size}"
+            actual_n_frag_per_chunk = call_args[0][3]
+            assert actual_n_frag_per_chunk == 120, (
+                f"Expected n_frag_per_chunk=120 (600/5), got {actual_n_frag_per_chunk}"
             )
 
 
@@ -627,13 +752,13 @@ class TestFdsarChunkedDetection:
         }
 
         # Unchunked (None = full recording at once)
-        spikes_full, _ = FrequencyDomainSpikeDetector.detect_spikes_recording(
+        spikes_full = FrequencyDomainSpikeDetector.detect_spikes_recording(
             rec, detection_params=params, chunk_duration_s=None,
             multiprocess_mode="serial",
         )
 
         # Chunked: 1-second chunks → several boundary crossings
-        spikes_chunked, _ = FrequencyDomainSpikeDetector.detect_spikes_recording(
+        spikes_chunked = FrequencyDomainSpikeDetector.detect_spikes_recording(
             rec, detection_params=params, chunk_duration_s=1.0,
             multiprocess_mode="serial",
         )
@@ -688,7 +813,7 @@ class TestFdsarChunkedDetection:
             "window_s": 0.125,
         }
 
-        spikes, _ = FrequencyDomainSpikeDetector.detect_spikes_recording(
+        spikes = FrequencyDomainSpikeDetector.detect_spikes_recording(
             rec, detection_params=params, chunk_duration_s=2.0,
             multiprocess_mode="serial",
         )
@@ -780,7 +905,7 @@ class TestInputValidation:
         }
 
         # chunk_duration_s so tiny it rounds to 0 samples → clamped to 1
-        spikes, raw = FrequencyDomainSpikeDetector.detect_spikes_recording(
+        spikes = FrequencyDomainSpikeDetector.detect_spikes_recording(
             rec, detection_params=params,
             chunk_duration_s=1e-10,
             multiprocess_mode="serial",

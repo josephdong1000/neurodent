@@ -31,7 +31,7 @@ def main():
     setup_snakemake_logging(snakemake)
 
     # Get parameters from snakemake
-    input_war_pkls = snakemake.input.war_pkl
+    input_war_parquets = snakemake.input.war_parquet
     input_war_jsons = snakemake.input.war_json
     output_pkl = snakemake.output.zeitgeber_features
     config = snakemake.params.config
@@ -45,43 +45,45 @@ def main():
     features_to_extract = zeitgeber_params["features"]
     threads = snakemake.threads
 
-    logger.info(f"Processing {len(input_war_pkls)} fragment-filtered WARs")
+    logger.info(f"Processing {len(input_war_parquets)} fragment-filtered WARs")
     logger.info(f"Features to extract: {features_to_extract}")
     logger.info(f"Using {threads} threads")
 
-    # Validate that PKL and JSON inputs match
-    if len(input_war_pkls) != len(input_war_jsons):
-        raise ValueError(f"Mismatch between PKL files ({len(input_war_pkls)}) and JSON files ({len(input_war_jsons)})")
+    # Validate that parquet and JSON inputs match
+    if len(input_war_parquets) != len(input_war_jsons):
+        raise ValueError(
+            f"Mismatch between parquet files ({len(input_war_parquets)}) and JSON files ({len(input_war_jsons)})"
+        )
 
     # Create animal name to file path mappings
-    pkl_animals = {}
+    parquet_animals = {}
     json_animals = {}
 
-    for pkl_path in input_war_pkls:
-        pkl_path_obj = Path(pkl_path)
-        animal_name = pkl_path_obj.parent.name
-        pkl_animals[animal_name] = pkl_path_obj
+    for parquet_path in input_war_parquets:
+        parquet_path_obj = Path(parquet_path)
+        animal_name = parquet_path_obj.parent.name
+        parquet_animals[animal_name] = parquet_path_obj
 
     for json_path in input_war_jsons:
         json_path_obj = Path(json_path)
         animal_name = json_path_obj.parent.name
         json_animals[animal_name] = json_path_obj
 
-    # Validate that all animals have both PKL and JSON files
-    pkl_animal_set = set(pkl_animals.keys())
+    # Validate that all animals have both parquet and JSON files
+    parquet_animal_set = set(parquet_animals.keys())
     json_animal_set = set(json_animals.keys())
 
-    if pkl_animal_set != json_animal_set:
-        missing_json = pkl_animal_set - json_animal_set
-        missing_pkl = json_animal_set - pkl_animal_set
+    if parquet_animal_set != json_animal_set:
+        missing_json = parquet_animal_set - json_animal_set
+        missing_parquet = json_animal_set - parquet_animal_set
         error_msg = []
         if missing_json:
             error_msg.append(f"Animals missing JSON files: {missing_json}")
-        if missing_pkl:
-            error_msg.append(f"Animals missing PKL files: {missing_pkl}")
+        if missing_parquet:
+            error_msg.append(f"Animals missing parquet files: {missing_parquet}")
         raise ValueError("; ".join(error_msg))
 
-    logger.info(f"Validated {len(pkl_animal_set)} animals have both PKL and JSON files")
+    logger.info(f"Validated {len(parquet_animal_set)} animals have both parquet and JSON files")
 
     # Prepare war information for processing
     war_infos = []
@@ -95,10 +97,10 @@ def main():
     from neurodent import constants
     pipeline_config["animal_metadata"] = constants.ANIMAL_METADATA
     
-    for animal_name in sorted(pkl_animal_set):
-        pkl_path = pkl_animals[animal_name]
+    for animal_name in sorted(parquet_animal_set):
+        parquet_path = parquet_animals[animal_name]
         json_path = json_animals[animal_name]
-        war_infos.append((pkl_path, json_path, features_to_extract, animal_name, pipeline_config))
+        war_infos.append((parquet_path, json_path, features_to_extract, animal_name, pipeline_config))
 
     # Process WARs to extract features (parallel processing)
     dfs = []
@@ -166,13 +168,13 @@ def main():
 
     try:
         # Group by all metadata columns present (except those that vary per row like timestamp/minute if we are binning)
-        # We want to group by: animal, genotype, sex, gene, total_minutes
+        # We want to group by: animal, genotype, sex, gene, zt_minutes
         # And potentially other static metadata.
-        # However, 'total_minutes' is the binning key.
-        
+        # However, 'zt_minutes' is the binning key.
+
         # Define grouping columns based on what's available and what should be grouped
         # We want to keep animal-level metadata and the time bin.
-        potential_group_cols = ["animal", "genotype", "sex", "gene", "total_minutes"]
+        potential_group_cols = ["animal", "genotype", "sex", "gene", "zt_minutes", "daynight"]
         group_cols = [c for c in potential_group_cols if c in df.columns]
         
         df = df.groupby(group_cols).agg(agg_dict).reset_index()

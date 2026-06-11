@@ -78,6 +78,7 @@ from .analysis import (
 
     FREQ_BANDS,
     BAND_NAMES,
+    COMPONENT_LABELS,
     FREQ_BAND_TOTAL,
     FREQ_MINS,
     FREQ_MAXS,
@@ -123,6 +124,7 @@ __all__ = [
     "WAR_FEATURES",
     "FREQ_BANDS",
     "BAND_NAMES",
+    "COMPONENT_LABELS",
     "FREQ_BAND_TOTAL",
     "FREQ_MINS",
     "FREQ_MAXS",

@@ -56,39 +56,39 @@ class TestLoadWars:
         mock_war.animal_id = "test_animal"
 
         with patch("neurodent.visualization.WindowAnalysisResult") as mock_war_class:
-            mock_war_class.load_pickle_and_json.return_value = mock_war
+            mock_war_class.load_parquet_and_json.return_value = mock_war
 
-            pkl_paths = [tmp_path / "war1.pkl", tmp_path / "war2.pkl"]
+            parquet_paths = [tmp_path / "war1.parquet", tmp_path / "war2.parquet"]
             json_paths = [tmp_path / "war1.json", tmp_path / "war2.json"]
 
-            result = load_wars(pkl_paths, json_paths)
+            result = load_wars(parquet_paths, json_paths)
 
             assert len(result) == 2
-            assert mock_war_class.load_pickle_and_json.call_count == 2
+            assert mock_war_class.load_parquet_and_json.call_count == 2
 
     def test_load_wars_auto_json_paths(self, tmp_path):
         """Test loading WARs with auto-detected json paths."""
         mock_war = MagicMock()
 
         with patch("neurodent.visualization.WindowAnalysisResult") as mock_war_class:
-            mock_war_class.load_pickle_and_json.return_value = mock_war
+            mock_war_class.load_parquet_and_json.return_value = mock_war
 
-            pkl_paths = [tmp_path / "animal1" / "war.pkl"]
+            parquet_paths = [tmp_path / "animal1" / "war.parquet"]
 
-            result = load_wars(pkl_paths)
+            result = load_wars(parquet_paths)
 
             assert len(result) == 1
             # Verify it auto-derived the json path
-            call_args = mock_war_class.load_pickle_and_json.call_args
+            call_args = mock_war_class.load_parquet_and_json.call_args
             assert call_args.kwargs["json_name"] == "war.json"
 
     def test_load_wars_mismatched_lengths(self, tmp_path):
         """Test that mismatched path lengths raise ValueError."""
-        pkl_paths = [tmp_path / "war1.pkl", tmp_path / "war2.pkl"]
+        parquet_paths = [tmp_path / "war1.parquet", tmp_path / "war2.parquet"]
         json_paths = [tmp_path / "war1.json"]  # Only one json path
 
         with pytest.raises(ValueError, match="must have the same length"):
-            load_wars(pkl_paths, json_paths)
+            load_wars(parquet_paths, json_paths)
 
     def test_load_wars_empty_list(self):
         """Test that empty list raises RuntimeError."""
@@ -623,3 +623,455 @@ class TestExpandAnimalsConfig:
         expand_animals_config(cfg)
         assert cfg["animals"][0]["bad_channels"] == original_bc
         assert "bad_channels" not in cfg  # top-level not added to original
+
+    # --- Exclude field tests ---
+
+    def test_exclude_animal_omitted_from_metadata(self):
+        """Animal with exclude=true is omitted from all pipeline keys."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {
+                    "id": "BAD",
+                    "gene": "KO",
+                    "sex": "M",
+                    "exclude": True,
+                    "manual_datetime": "2025-01-01 10:00:00",
+                    "bad_channels": ["LHip"],
+                },
+            ],
+        }
+        result = expand_animals_config(cfg)
+        meta_ids = {e["id"] for e in result["ANIMAL_METADATA"]}
+        assert "BAD" not in meta_ids
+        assert "BAD" not in result.get("manual_datetimes", {})
+        assert "BAD" not in result.get("bad_channels", {})
+        assert "BAD" not in result.get("_animal_overrides", {})
+        # Excluded animal should also be removed from result["animals"]
+        result_ids = [a["id"] for a in result["animals"]]
+        assert "BAD" not in result_ids
+
+    def test_exclude_false_animal_included(self):
+        """Animal with explicit exclude=false is still included."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "OK", "gene": "WT", "sex": "F", "exclude": False},
+            ],
+        }
+        result = expand_animals_config(cfg)
+        meta_ids = {e["id"] for e in result["ANIMAL_METADATA"]}
+        assert "OK" in meta_ids
+
+    def test_exclude_mixed(self):
+        """Mix of excluded and non-excluded animals; only non-excluded appear."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "GOOD", "gene": "WT", "sex": "M"},
+                {"id": "BAD", "gene": "KO", "sex": "F", "exclude": True},
+                {"id": "ALSO_GOOD", "gene": "Het", "sex": "F"},
+            ],
+        }
+        result = expand_animals_config(cfg)
+        meta_ids = {e["id"] for e in result["ANIMAL_METADATA"]}
+        assert meta_ids == {"GOOD", "ALSO_GOOD"}
+        # Excluded animal should not appear in GENOTYPE_ALIASES
+        ko_animals = result.get("GENOTYPE_ALIASES", {}).get("KO", [])
+        assert "BAD" not in ko_animals
+        # Non-excluded genotypes should be present
+        assert "GOOD" in result["GENOTYPE_ALIASES"]["WT"]
+        assert "ALSO_GOOD" in result["GENOTYPE_ALIASES"]["Het"]
+        # result["animals"] should only contain non-excluded entries
+        result_ids = {a["id"] for a in result["animals"]}
+        assert result_ids == {"GOOD", "ALSO_GOOD"}
+
+    def test_exclude_key_not_in_metadata_entry(self):
+        """The 'exclude' key itself is stripped from ANIMAL_METADATA entries."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "A", "gene": "WT", "sex": "M", "exclude": False},
+            ],
+        }
+        result = expand_animals_config(cfg)
+        meta = result["ANIMAL_METADATA"][0]
+        assert "exclude" not in meta
+
+    def test_builds_animal_channels(self):
+        """_animal_channels dict is built from animals' channels field."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "A10", "gene": "WT", "sex": "M", "channels": ["Ch0", "Ch1", "Ch2"]},
+                {"id": "F22", "gene": "KO", "sex": "F"},
+            ],
+        }
+        result = expand_animals_config(cfg)
+        assert "_animal_channels" in result
+        assert result["_animal_channels"]["A10"] == ["Ch0", "Ch1", "Ch2"]
+        assert "F22" not in result["_animal_channels"]
+
+    def test_builds_animal_groups(self):
+        """_animal_groups dict is built from animals' group field."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "A10", "gene": "WT", "sex": "M", "channels": ["Ch0"], "group": "SharedGroup"},
+                {"id": "F22", "gene": "KO", "sex": "F"},
+            ],
+        }
+        result = expand_animals_config(cfg)
+        assert "_animal_groups" in result
+        assert result["_animal_groups"]["A10"] == "SharedGroup"
+        assert "F22" not in result["_animal_groups"]
+
+    def test_channels_and_group_not_in_metadata(self):
+        """channels and group keys are excluded from ANIMAL_METADATA."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "A10", "gene": "WT", "sex": "M", "channels": ["Ch0"], "group": "Group1"},
+            ],
+        }
+        result = expand_animals_config(cfg)
+        meta = result["ANIMAL_METADATA"][0]
+        assert "channels" not in meta
+        assert "group" not in meta
+
+    def test_backward_compat_derives_channels_from_joint_sessions(self):
+        """Legacy joint_sessions is auto-converted to _animal_channels with deprecation warning."""
+        import warnings
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "A10", "gene": "WT", "sex": "M"},
+                {"id": "F22", "gene": "KO", "sex": "F"},
+            ],
+            "joint_sessions": {
+                "Session1": {
+                    "A10": ["Ch0", "Ch1"],
+                    "F22": ["Ch2", "Ch3"],
+                }
+            },
+        }
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            result = expand_animals_config(cfg)
+            assert len(w) == 1
+            assert issubclass(w[0].category, DeprecationWarning)
+            assert "joint_sessions" in str(w[0].message)
+
+        assert "_animal_channels" in result
+        assert result["_animal_channels"]["A10"] == ["Ch0", "Ch1"]
+        assert result["_animal_channels"]["F22"] == ["Ch2", "Ch3"]
+
+    def test_backward_compat_verifies_channel_consistency(self):
+        """Legacy joint_sessions verifies channel consistency across sessions."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "A10", "gene": "WT", "sex": "M"},
+            ],
+            "joint_sessions": {
+                "Session1": {"A10": ["Ch0", "Ch1"]},
+                "Session2": {"A10": ["Ch0", "Ch2"]},  # Inconsistent!
+            },
+        }
+        with pytest.raises(ValueError, match="Inconsistent channel lists"):
+            expand_animals_config(cfg)
+
+    def test_backward_compat_new_format_takes_precedence(self):
+        """If animals have channels field, legacy joint_sessions is ignored (no warning)."""
+        import warnings
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "A10", "gene": "WT", "sex": "M", "channels": ["Ch0", "Ch1"]},
+            ],
+            "joint_sessions": {
+                "Session1": {"A10": ["Ch2", "Ch3"]},  # Should be ignored
+            },
+        }
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            result = expand_animals_config(cfg)
+            # No deprecation warning because new format is used
+            deprecation_warnings = [x for x in w if issubclass(x.category, DeprecationWarning)]
+            assert len(deprecation_warnings) == 0
+
+        # Should use the new format, not the legacy one
+        assert result["_animal_channels"]["A10"] == ["Ch0", "Ch1"]
+
+    def test_validates_no_overlapping_channels_in_group(self):
+        """Animals in the same group cannot share channels."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "A10", "gene": "WT", "sex": "M", "channels": ["Ch0", "Ch1"], "group": "Group1"},
+                {"id": "F22", "gene": "KO", "sex": "F", "channels": ["Ch1", "Ch2"], "group": "Group1"},  # Ch1 overlaps!
+            ],
+        }
+        with pytest.raises(ValueError, match="Channel 'Ch1' is assigned to both"):
+            expand_animals_config(cfg)
+
+    def test_allows_same_channels_in_different_groups(self):
+        """Same channel names can be used in different groups (different recordings)."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "A10", "gene": "WT", "sex": "M", "channels": ["Ch0", "Ch1"], "group": "Group1"},
+                {"id": "F22", "gene": "KO", "sex": "F", "channels": ["Ch0", "Ch1"], "group": "Group2"},
+            ],
+        }
+        result = expand_animals_config(cfg)
+        # Should succeed - different groups can have same channel names
+        assert result["_animal_channels"]["A10"] == ["Ch0", "Ch1"]
+        assert result["_animal_channels"]["F22"] == ["Ch0", "Ch1"]
+
+
+class TestGetDiscoveryAnimalFilter:
+    """Test the get_discovery_animal_filter function."""
+
+    def test_regular_non_joint_animal(self):
+        """Regular non-joint animals use their animal ID."""
+        from neurodent.workflow.utils import get_discovery_animal_filter
+
+        result = get_discovery_animal_filter("A10", is_joint=False, animal_groups={})
+        assert result == "A10"
+
+    def test_joint_without_group(self):
+        """Joint session without group uses animal ID (e.g., jess_rhd)."""
+        from neurodent.workflow.utils import get_discovery_animal_filter
+
+        result = get_discovery_animal_filter("AP3B2het-207-M", is_joint=True, animal_groups={})
+        assert result == "AP3B2het-207-M"
+
+    def test_joint_with_group(self):
+        """Joint session with group uses group name (e.g., arx_rosa)."""
+        from neurodent.workflow.utils import get_discovery_animal_filter
+
+        animal_groups = {
+            "ArxRosa-1017": "Arx Rosa 1017 1015",
+            "ArxRosa-1015": "Arx Rosa 1017 1015",
+        }
+        result = get_discovery_animal_filter("ArxRosa-1017", is_joint=True, animal_groups=animal_groups)
+        assert result == "Arx Rosa 1017 1015"
+
+    def test_joint_with_group_second_animal(self):
+        """Both animals in same group return same group name."""
+        from neurodent.workflow.utils import get_discovery_animal_filter
+
+        animal_groups = {
+            "ArxRosa-1017": "Arx Rosa 1017 1015",
+            "ArxRosa-1015": "Arx Rosa 1017 1015",
+        }
+        result1 = get_discovery_animal_filter("ArxRosa-1017", is_joint=True, animal_groups=animal_groups)
+        result2 = get_discovery_animal_filter("ArxRosa-1015", is_joint=True, animal_groups=animal_groups)
+        assert result1 == result2 == "Arx Rosa 1017 1015"
+
+    def test_non_joint_ignores_groups(self):
+        """Non-joint animals ignore the groups dict and use animal ID."""
+        from neurodent.workflow.utils import get_discovery_animal_filter
+
+        animal_groups = {"A10": "SomeGroup"}
+        result = get_discovery_animal_filter("A10", is_joint=False, animal_groups=animal_groups)
+        assert result == "A10"
+
+    def test_joint_animal_not_in_groups_uses_id(self):
+        """Joint animal not in groups dict falls back to animal ID."""
+        from neurodent.workflow.utils import get_discovery_animal_filter
+
+        animal_groups = {"OtherAnimal": "SomeGroup"}
+        result = get_discovery_animal_filter("A10", is_joint=True, animal_groups=animal_groups)
+        assert result == "A10"
+
+
+class TestBuildSexMarkerScale:
+    """Regression tests for ``build_sex_marker_scale``.
+
+    Why this exists: generate_ep_figures.py used to hard-code
+    ``so.Nominal(["o", "s"], order=["Female", "Male"])`` as the marker
+    scale.  seaborn-objects silently drops rows whose sex value isn't in
+    that order, so any dataset with non-canonical sex (e.g. arxrosa,
+    where every animal has sex='Unknown') rendered an *empty* plot
+    without raising — a silent regression observed on run 9000578.
+    The helper builds the scale dynamically from the DataFrame's sex
+    values.
+    """
+
+    @staticmethod
+    def _make_scale(sex_values):
+        """Build a scale from a synthetic df with the given sex values."""
+        import pandas as pd
+        from neurodent.workflow import build_sex_marker_scale
+        df = pd.DataFrame({"sex": sex_values, "y": list(range(len(sex_values)))})
+        return build_sex_marker_scale(df)
+
+    def test_canonical_female_male(self):
+        """Female + Male present → preserves circle / square in canonical order."""
+        scale = self._make_scale(["Female", "Male", "Female", "Male"])
+        assert scale.order == ["Female", "Male"]
+        assert scale.values == ["o", "s"]
+
+    def test_only_male(self):
+        """Single canonical sex → just that marker."""
+        scale = self._make_scale(["Male", "Male"])
+        assert scale.order == ["Male"]
+        assert scale.values == ["s"]
+
+    def test_unknown_only_uses_fallback_marker(self):
+        """arxrosa case: every row has sex='Unknown' → diamond fallback,
+        scale is non-empty so points actually render."""
+        scale = self._make_scale(["Unknown", "Unknown", "Unknown"])
+        assert scale.order == ["Unknown"]
+        assert scale.values == ["D"]
+
+    def test_mixed_canonical_and_unknown(self):
+        """Canonical sexes first, then any non-canonical values appended."""
+        scale = self._make_scale(["Female", "Unknown", "Male"])
+        # Canonical Female, Male come first; Unknown last.
+        assert scale.order[:2] == ["Female", "Male"]
+        assert "Unknown" in scale.order
+        # Markers track order.
+        assert scale.values[scale.order.index("Female")] == "o"
+        assert scale.values[scale.order.index("Male")] == "s"
+        assert scale.values[scale.order.index("Unknown")] == "D"
+
+    def test_drops_nan_values(self):
+        """NaN sex entries are skipped, don't introduce a NaN category."""
+        import numpy as np
+        scale = self._make_scale(["Female", np.nan, "Female"])
+        assert scale.order == ["Female"]
+        assert scale.values == ["o"]
+
+    def test_returns_seaborn_objects_nominal(self):
+        """Smoke-check the returned object's type so accidental refactors
+        that swap to a different scale class get caught."""
+        import seaborn.objects as so
+        scale = self._make_scale(["Female", "Male"])
+        assert isinstance(scale, so.Nominal)
+
+
+def _load_generate_ep_figures():
+    """Import workflow/scripts/generate_ep_figures.py as a module.
+
+    The script expects a global ``snakemake`` injected by Snakemake at
+    runtime; we stub it so the module body executes.
+    """
+    import builtins
+    import importlib.util
+
+    builtins.snakemake = None
+    spec = importlib.util.spec_from_file_location(
+        "generate_ep_figures",
+        Path(__file__).parent.parent / "workflow" / "scripts" / "generate_ep_figures.py",
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+class TestProcessFeatureDataframe:
+    """Tests for ``process_feature_dataframe`` in generate_ep_figures.py.
+
+    Why this exists: the function used to hard-code feature lists for
+    groupby dispatch.  It now delegates to ``constants.FEATURE_TYPES`` /
+    ``classify_feature`` so adding a new feature to the constants module
+    automatically routes it to the correct plot type.  These tests
+    guarantee every feature in the configured EP feature list dispatches
+    cleanly and that LINEAR_2D features raise a clear error.
+    """
+
+    @staticmethod
+    def _make_df(feature, has_band=False, has_freq=False):
+        """Build a synthetic post-pull_timeseries_dataframe input."""
+        import numpy as np
+        import pandas as pd
+
+        rows = []
+        animals = ["A1", "A2"]
+        bands = ["delta", "theta", "alpha", "beta", "gamma"] if has_band else [None]
+        freqs = np.arange(1, 11) if has_freq else [None]
+        for animal in animals:
+            for band in bands:
+                for freq in freqs:
+                    row = {
+                        "animal": animal,
+                        "genotype": "WT",
+                        "sex": "Unknown",
+                        "isday": True,
+                        "channel": "ch1",
+                        feature: 1.0,
+                    }
+                    if has_band:
+                        row["band"] = band
+                    if has_freq:
+                        row["freq"] = freq
+                    rows.append(row)
+        return pd.DataFrame(rows)
+
+    @pytest.fixture(scope="class")
+    def gef(self):
+        return _load_generate_ep_figures()
+
+    @pytest.mark.parametrize(
+        "feature",
+        ["rms", "ampvar", "psdtotal", "nspike",
+         "logrms", "logampvar", "logpsdtotal", "lognspike",
+         "pcorr", "zpcorr"],
+    )
+    def test_linear_and_simple_matrix_features_route_correctly(self, gef, feature):
+        """LINEAR and SIMPLE_MATRIX features get a no-band groupby."""
+        df = self._make_df(feature, has_band=False)
+        out, pivot = gef.process_feature_dataframe(df, feature)
+        assert "band" not in out.columns or out["band"].isna().all()
+        assert not pivot.empty
+
+    @pytest.mark.parametrize(
+        "feature",
+        ["psdband", "psdfrac", "logpsdband", "logpsdfrac",
+         "cohere", "zcohere", "imcoh", "zimcoh"],
+    )
+    def test_band_and_banded_matrix_features_route_correctly(self, gef, feature):
+        """BAND and BANDED_MATRIX features get a band-aware groupby."""
+        df = self._make_df(feature, has_band=True)
+        out, pivot = gef.process_feature_dataframe(df, feature)
+        assert "band" in out.columns
+        assert set(out["band"].unique()) == {"delta", "theta", "alpha", "beta", "gamma"}
+        assert not pivot.empty
+
+    def test_hist_psd_routes_to_no_band_groupby(self, gef):
+        """HIST features (psd) groupby has no band — freq is the semantic axis."""
+        df = self._make_df("psd", has_band=False, has_freq=True)
+        out, pivot = gef.process_feature_dataframe(df, "psd")
+        assert "band" not in out.columns or out["band"].isna().all()
+        assert "freq" in out.columns
+        assert not pivot.empty
+
+    def test_linear_2d_raises(self, gef):
+        """psdslope (LINEAR_2D) raises with a clear message."""
+        df = self._make_df("psdslope", has_band=False)
+        with pytest.raises(ValueError, match="LINEAR_2D"):
+            gef.process_feature_dataframe(df, "psdslope")
+
+    def test_unknown_feature_raises(self, gef):
+        """Unknown feature names raise via classify_feature."""
+        df = self._make_df("not_a_feature", has_band=False)
+        with pytest.raises((KeyError, ValueError)):
+            gef.process_feature_dataframe(df, "not_a_feature")
+
+    def test_feature_to_label_covers_all_configured_features(self, gef):
+        """Every feature in config.yaml ep_figures.features has a label."""
+        from neurodent import constants
+
+        configured = [
+            "rms", "ampvar", "psdtotal", "nspike",
+            "logrms", "logampvar", "logpsdtotal", "lognspike",
+            "psdband", "psdfrac", "logpsdband", "logpsdfrac",
+            "cohere", "zcohere", "imcoh", "zimcoh",
+            "pcorr", "zpcorr", "psd",
+        ]
+        labels = {**constants.FEATURE_LABELS, "normpsd": "Normalized PSD"}
+        missing = [f for f in configured if f not in labels]
+        assert not missing, f"Features without labels: {missing}"

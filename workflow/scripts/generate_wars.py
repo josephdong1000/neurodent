@@ -8,7 +8,7 @@ This script is a refactored version of the pipeline-war-* scripts,
 designed to work with the Snakemake workflow.
 
 Input: Raw EEG data files
-Output: WAR pickle and JSON files
+Output: WAR parquet and JSON files
 """
 
 import warnings
@@ -19,7 +19,7 @@ from dask.distributed import Client, LocalCluster
 
 from neurodent import constants, core, visualization
 from neurodent.workflow import setup_snakemake_logging, inject_config_aliases
-from neurodent.workflow.utils import apply_path_overrides, resolve_animal_pattern
+from neurodent.workflow.utils import apply_path_overrides, resolve_animal_pattern, get_discovery_animal_filter
 
 
 def load_samples_and_config():
@@ -57,6 +57,8 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
     try:
         with (
             LocalCluster(
+                n_workers=snakemake.threads,
+                threads_per_worker=1,
                 interface=config["cluster"]["war_generation"]["interface"],
             ) as cluster,
             Client(cluster) as client,
@@ -84,12 +86,11 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
             for folder_info in animal_folders:
                 # Unpack tuple from Snakefile
                 folder_path, source_animal_id, session_key = folder_info
-                
+
                 logger.info(f"Loading session: {folder_path} (ID in metadata: {source_animal_id})")
-                
-                # Check if this specific session is a joint session
-                # We check if the session_key exists in the joint_sessions config
-                is_joint = session_key in samples_config.get("joint_sessions", {})
+
+                # Check if this animal has channels defined (indicates joint session)
+                is_joint = source_animal_id in samples_config.get("_animal_channels", {})
 
                 # Apply session-specific overrides from dataset config
                 session_analysis_config = analysis_config.copy()
@@ -123,16 +124,23 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
                     if animal_id in all_manual_dts:
                         spec = all_manual_dts[animal_id]
                         if isinstance(spec, list):
-                            # Distribute: each AO gets one timestamp from the list
-                            # (one per session folder, matched by index order)
-                            if len(spec) != len(animal_folders):
-                                raise ValueError(
-                                    f"Length of manual_datetimes list ({len(spec)}) for {animal_id} "
-                                    f"does not match number of session folders ({len(animal_folders)})"
-                                )
-                            current_dt = spec[animal_folders.index(folder_info)]
-                            session_lro_kwargs["manual_datetimes"] = current_dt
-                            logger.info(f"  -> Using specific timestamp from list: {current_dt}")
+                            # For pattern-based discovery (unified format), pass the entire list
+                            # to AnimalOrganizer, which will distribute it to discovered sessions.
+                            # For legacy folder-based iteration, distribute per folder.
+                            if folder_path == "":
+                                # Pattern-based discovery: pass entire list
+                                session_lro_kwargs["manual_datetimes"] = spec
+                                logger.info(f"  -> Using manual_datetimes list with {len(spec)} entries for pattern discovery")
+                            else:
+                                # Legacy folder-based: distribute per folder
+                                if len(spec) != len(animal_folders):
+                                    raise ValueError(
+                                        f"Length of manual_datetimes list ({len(spec)}) for {animal_id} "
+                                        f"does not match number of session folders ({len(animal_folders)})"
+                                    )
+                                current_dt = spec[animal_folders.index(folder_info)]
+                                session_lro_kwargs["manual_datetimes"] = current_dt
+                                logger.info(f"  -> Using specific timestamp from list: {current_dt}")
                         else:
                             # Single string/scalar/dict: pass directly
                             session_lro_kwargs["manual_datetimes"] = spec
@@ -156,27 +164,34 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
                 )
                 logger.info(f"  -> Discovery pattern: {discovery_pattern}")
 
-                # For joint sessions, don't filter by animal_id during discovery
-                # since all files belong to all animals in the joint session
-                ao_animal_id = None if is_joint else source_animal_id
+                # Determine the animal filter value for discovery
+                animal_groups = samples_config.get("_animal_groups", {})
+                discovery_animal_filter = get_discovery_animal_filter(
+                    source_animal_id, is_joint, animal_groups
+                )
+                if is_joint and source_animal_id in animal_groups:
+                    logger.info(f"  -> Using group '{discovery_animal_filter}' for {{animal}} placeholder in discovery")
+                elif is_joint:
+                    logger.info(f"  -> Using animal ID '{discovery_animal_filter}' for discovery (joint session without group)")
+
 
                 # Create AO for this session using pattern-based discovery
                 session_ao = visualization.AnimalOrganizer(
                     discovery_pattern,
-                    animal_id=ao_animal_id,
+                    animal_id=discovery_animal_filter,
                     skip_sessions=session_analysis_config.get("skip_sessions", session_analysis_config.get("skip_days", [])),
                     assume_from_number=session_analysis_config["assume_from_number"],
                     lro_kwargs=session_lro_kwargs,
                 )
 
-                
+
                 if is_joint and channel_subset is not None:
                      logger.info(f"  -> Joint session detected. Filtering to channels: {channel_subset}")
                      # Split to only the channels assigned to this animal
                      # source_animal_id is the key in the splits dict
                      splits = session_ao.split(groups={source_animal_id: channel_subset})
                      session_ao = splits[source_animal_id]
-                
+
                 # Collect LROs
                 all_lros.extend(session_ao.long_recordings)
             
@@ -236,6 +251,11 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
             logger.info(f"Integrating spike features into WAR for {animal_key}")
             war = war.read_sars_spikes(fdsar_list, read_mode="sa", inplace=True)
 
+            # Release AnimalOrganizer to free memmap-backed recording references.
+            # war is self-contained (DataFrame + metadata), fdsar_list SAs still
+            # hold per-channel recording refs needed for .fif export.
+            del ao, all_lros
+
         return war, fdsar_list
     except Exception as e:
         logger.error(f"Failed to generate WAR for {animal_key}: {e}")
@@ -258,8 +278,9 @@ def main():
     war, fdsar_list = generate_war_for_animal(samples_config, config, animal_folder, animal_id, channel_subset, logger)
 
     # Save WAR (now includes nspike/lognspike features)
-    war.save_pickle_and_json(Path(snakemake.output.war_pkl).parent, filename="war", slugify_filename=False)
+    war.save_parquet_and_json(Path(snakemake.output.war_parquet).parent, filename="war", slugify_filename=False)
     logger.info(f"Successfully saved WAR for {animal_folder} {animal_id}")
+    del war  # Free WAR DataFrame before FDSAR saves
 
     # Save FDSAR results - each animalday gets its own subdirectory
     fdsar_base_dir = Path(snakemake.output.fdsar_dir)
@@ -268,26 +289,56 @@ def main():
     fdsar_export_chunk_duration_s = fdsar_config.get("export_chunk_duration_s", 60)
 
     for fdsar in fdsar_list:
-        # Create subdirectory for this animalday
-        animalday_dir = fdsar_base_dir / f"{fdsar.animal_id}-{fdsar.genotype}-{fdsar.animal_day}"
+        # path_safe_save_stem returns slugified ``{animal_id}-{genotype}-{animal_day}``
+        # so genotypes containing "/" (e.g. ``Arx(F/y); Rosa(+/wt)``) can't break
+        # path construction.  See ``slugify`` for the convention.
+        animalday_dir = fdsar_base_dir / fdsar.path_safe_save_stem
         animalday_dir.mkdir(parents=True, exist_ok=True)
 
-        fdsar.save_fif_and_json(animalday_dir, convert_to_mne=True, slugify_filebase=False, overwrite=True, chunk_duration_s=fdsar_export_chunk_duration_s)
+        fdsar.save_fif_and_json(animalday_dir, convert_to_mne=True, overwrite=True, chunk_duration_s=fdsar_export_chunk_duration_s)
         logger.info(f"Saved FDSAR for {fdsar.animal_id} {fdsar.animal_day} to {animalday_dir}")
+        fdsar.result_sas = None  # Release memmap-backed recording references
 
     logger.info(f"Successfully saved {len(fdsar_list)} FDSAR results to {fdsar_base_dir}")
 
 
 if __name__ == "__main__":
-    if os.environ.get("NEURODENT_PROFILE"):
-        import cProfile
-        profiler = cProfile.Profile()
-        profiler.enable()
-        main()
-        profiler.disable()
-        prof_path = Path(snakemake.output.war_pkl).parent / "profile.prof"
-        profiler.dump_stats(str(prof_path))
-        print(f"Profile saved to {prof_path}")
-        print("Analyze with: python -m snakeviz {prof_path}")
+
+    memray_enabled = os.environ.get("NEURODENT_MEMRAY")
+    profile_enabled = os.environ.get("NEURODENT_PROFILE")
+
+    # Optional memray memory profiling (context manager wraps main)
+    # memray is Linux-only; gracefully disable on other platforms
+    if memray_enabled:
+        import sys
+        if sys.platform == "linux":
+            import memray
+            memray_path = Path(snakemake.output.war_parquet).parent / "memray.bin"
+            tracker_ctx = memray.Tracker(
+                destination=memray.FileDestination(str(memray_path), overwrite=True)
+            )
+        else:
+            from contextlib import nullcontext
+            tracker_ctx = nullcontext()
+            print(f"Warning: NEURODENT_MEMRAY set but memray is Linux-only (current platform: {sys.platform}). Profiling disabled.")
     else:
-        main()
+        from contextlib import nullcontext
+        tracker_ctx = nullcontext()
+
+    with tracker_ctx:
+        if profile_enabled:
+            import cProfile
+            profiler = cProfile.Profile()
+            profiler.enable()
+            main()
+            profiler.disable()
+            prof_path = Path(snakemake.output.war_parquet).parent / "profile.prof"
+            profiler.dump_stats(str(prof_path))
+            print(f"Profile saved to {prof_path}")
+            print(f"Analyze with: python -m snakeviz {prof_path}")
+        else:
+            main()
+
+    if memray_enabled:
+        print(f"Memray profile saved to {memray_path}")
+        print(f"Generate flamegraph: python -m memray flamegraph {memray_path}")
