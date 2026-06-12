@@ -1,289 +1,946 @@
 {
     "data_root": "/mnt/isilon/marsh_single_unit/PythonEEG Data/Arx Parv",
-    
+    "_note_layout": "Mirror layout within each 8-position REF bank: pos 1\u21948 (Aud), 2\u21947 (Vis), 3\u21946 (Bar), 4\u21945 (Mot). L (positions 1-4) and R (positions 5-8) distinction is captured in LR_ALIASES.",
     "CHNAME_ALIASES": {
-        "Aud": ["E1-REF1", "E9-REF2", "E17-REF3", "E25-REF4"],
-        "Vis": ["E2-REF1", "E10-REF2", "E18-REF3", "E26-REF4"],
-        "Bar": ["E3-REF1", "E11-REF2", "E19-REF3", "E27-REF4"],
-        "Mot": ["E4-REF1", "E12-REF2", "E20-REF3", "E28-REF4"],
-        "Mot": ["E5-REF1", "E13-REF2", "E21-REF3", "E29-REF4"],
-        "Bar": ["E6-REF1", "E14-REF2", "E22-REF3", "E30-REF4"],
-        "Vis": ["E7-REF1", "E15-REF2", "E23-REF3", "E31-REF4"],
-        "Aud": ["E8-REF1", "E16-REF2", "E24-REF3", "E32-REF4"]
+        "Aud": [
+            "E1-REF1",
+            "E9-REF2",
+            "E17-REF3",
+            "E25-REF4",
+            "E8-REF1",
+            "E16-REF2",
+            "E24-REF3",
+            "E32-REF4"
+        ],
+        "Vis": [
+            "E2-REF1",
+            "E10-REF2",
+            "E18-REF3",
+            "E26-REF4",
+            "E7-REF1",
+            "E15-REF2",
+            "E23-REF3",
+            "E31-REF4"
+        ],
+        "Bar": [
+            "E3-REF1",
+            "E11-REF2",
+            "E19-REF3",
+            "E27-REF4",
+            "E6-REF1",
+            "E14-REF2",
+            "E22-REF3",
+            "E30-REF4"
+        ],
+        "Mot": [
+            "E4-REF1",
+            "E12-REF2",
+            "E20-REF3",
+            "E28-REF4",
+            "E5-REF1",
+            "E13-REF2",
+            "E21-REF3",
+            "E29-REF4"
+        ]
     },
-
     "LR_ALIASES": {
-        "L": ["E1-REF1", "E2-REF1", "E3-REF1", "E4-REF1", "E9-REF2", "E10-REF2", "E11-REF2", "E12-REF2", "E17-REF3", "E18-REF3", "E19-REF3", "E20-REF3", "E25-REF4", "E26-REF4", "E27-REF4", "E28-REF4"],
-        "R": ["E5-REF1", "E6-REF1", "E7-REF1", "E8-REF1", "E13-REF2", "E14-REF2", "E15-REF2", "E16-REF2", "E21-REF3", "E22-REF3", "E23-REF3", "E24-REF3", "E29-REF4", "E30-REF4", "E31-REF4", "E32-REF4"]
+        "L": [
+            "E1-REF1",
+            "E2-REF1",
+            "E3-REF1",
+            "E4-REF1",
+            "E9-REF2",
+            "E10-REF2",
+            "E11-REF2",
+            "E12-REF2",
+            "E17-REF3",
+            "E18-REF3",
+            "E19-REF3",
+            "E20-REF3",
+            "E25-REF4",
+            "E26-REF4",
+            "E27-REF4",
+            "E28-REF4"
+        ],
+        "R": [
+            "E5-REF1",
+            "E6-REF1",
+            "E7-REF1",
+            "E8-REF1",
+            "E13-REF2",
+            "E14-REF2",
+            "E15-REF2",
+            "E16-REF2",
+            "E21-REF3",
+            "E22-REF3",
+            "E23-REF3",
+            "E24-REF3",
+            "E29-REF4",
+            "E30-REF4",
+            "E31-REF4",
+            "E32-REF4"
+        ]
     },
-
     "bad_channels": {},
     "bad_folder_animalday": [],
-
     "animals": [
         {
             "id": "29",
-            "sex": "Unknown",
             "gene": "Unknown",
+            "sex": "Unknown",
             "group": "29 32 34",
-            "channels": ["E1-REF1", "E2-REF1", "E3-REF1", "E4-REF1", "E5-REF1", "E6-REF1", "E7-REF1", "E8-REF1"],
-            "manual_datetime": "2011-06-07 16:04:14"
+            "pattern": "{data_root}/{animal}/MARSH 20110606-PARV-29-32-34 2011-06-07 16H03M{session}Selection{index}.EDF",
+            "lro_kwargs": {
+                "mode": "mne",
+                "extract_func": "read_raw_edf"
+            },
+            "manual_datetime": {
+                "_0_": "2011-06-07 16:04:14",
+                "_1_": null,
+                "_2_": null
+            },
+            "channels": [
+                "E1-REF1",
+                "E2-REF1",
+                "E3-REF1",
+                "E4-REF1",
+                "E5-REF1",
+                "E6-REF1",
+                "E7-REF1",
+                "E8-REF1"
+            ]
         },
         {
             "id": "32",
-            "sex": "Unknown",
             "gene": "Unknown",
+            "sex": "Unknown",
             "group": "29 32 34",
-            "channels": ["E9-REF2", "E10-REF2", "E11-REF2", "E12-REF2", "E13-REF2", "E14-REF2", "E15-REF2", "E16-REF2"],
-            "manual_datetime": "2011-06-07 16:04:14"
+            "pattern": "{data_root}/{animal}/MARSH 20110606-PARV-29-32-34 2011-06-07 16H03M{session}Selection{index}.EDF",
+            "lro_kwargs": {
+                "mode": "mne",
+                "extract_func": "read_raw_edf"
+            },
+            "manual_datetime": {
+                "_0_": "2011-06-07 16:04:14",
+                "_1_": null,
+                "_2_": null
+            },
+            "channels": [
+                "E9-REF2",
+                "E10-REF2",
+                "E11-REF2",
+                "E12-REF2",
+                "E13-REF2",
+                "E14-REF2",
+                "E15-REF2",
+                "E16-REF2"
+            ]
         },
         {
             "id": "34",
-            "sex": "Unknown",
             "gene": "Unknown",
+            "sex": "Unknown",
             "group": "29 32 34",
-            "channels": ["E17-REF3", "E18-REF3", "E19-REF3", "E20-REF3", "E21-REF3", "E22-REF3", "E23-REF3", "E24-REF3"],
-            "manual_datetime": "2011-06-07 16:04:14"
+            "pattern": "{data_root}/{animal}/MARSH 20110606-PARV-29-32-34 2011-06-07 16H03M{session}Selection{index}.EDF",
+            "lro_kwargs": {
+                "mode": "mne",
+                "extract_func": "read_raw_edf"
+            },
+            "manual_datetime": {
+                "_0_": "2011-06-07 16:04:14",
+                "_1_": null,
+                "_2_": null
+            },
+            "channels": [
+                "E17-REF3",
+                "E18-REF3",
+                "E19-REF3",
+                "E20-REF3",
+                "E21-REF3",
+                "E22-REF3",
+                "E23-REF3",
+                "E24-REF3"
+            ]
         },
         {
             "id": "30",
-            "sex": "Unknown",
             "gene": "Unknown",
-            "group": "30 21 33",
-            "channels": ["E1-REF1", "E2-REF1", "E3-REF1", "E4-REF1", "E5-REF1", "E6-REF1", "E7-REF1", "E8-REF1"],
-            "manual_datetime": "2011-05-23 18:00:06"
+            "sex": "Unknown",
+            "group": "30 21 31",
+            "pattern": "{data_root}/{animal}/MARSH 20110523-PARV-30-21-31 2011-05-23 17H59M{session}Selection{index}.EDF",
+            "lro_kwargs": {
+                "mode": "mne",
+                "extract_func": "read_raw_edf"
+            },
+            "manual_datetime": {
+                "_0_": "2011-05-23 18:00:06",
+                "_1_": null,
+                "_2_": null
+            },
+            "channels": [
+                "E1-REF1",
+                "E2-REF1",
+                "E3-REF1",
+                "E4-REF1",
+                "E5-REF1",
+                "E6-REF1",
+                "E7-REF1",
+                "E8-REF1"
+            ]
         },
         {
             "id": "21",
-            "sex": "Unknown",
             "gene": "Unknown",
-            "group": "30 21 33",
-            "channels": ["E9-REF2", "E10-REF2", "E11-REF2", "E12-REF2", "E13-REF2", "E14-REF2", "E15-REF2", "E16-REF2"],
-            "manual_datetime": "2011-05-23 18:00:06"
+            "sex": "Unknown",
+            "group": "30 21 31",
+            "pattern": "{data_root}/{animal}/MARSH 20110523-PARV-30-21-31 2011-05-23 17H59M{session}Selection{index}.EDF",
+            "lro_kwargs": {
+                "mode": "mne",
+                "extract_func": "read_raw_edf"
+            },
+            "manual_datetime": {
+                "_0_": "2011-05-23 18:00:06",
+                "_1_": null,
+                "_2_": null
+            },
+            "channels": [
+                "E9-REF2",
+                "E10-REF2",
+                "E11-REF2",
+                "E12-REF2",
+                "E13-REF2",
+                "E14-REF2",
+                "E15-REF2",
+                "E16-REF2"
+            ]
         },
         {
             "id": "31",
-            "sex": "Unknown",
             "gene": "Unknown",
-            "group": "30 21 33",
-            "channels": ["E17-REF3", "E18-REF3", "E19-REF3", "E20-REF3", "E21-REF3", "E22-REF3", "E23-REF3", "E24-REF3"],
-            "manual_datetime": "2011-05-23 18:00:06"
+            "sex": "Unknown",
+            "group": "30 21 31",
+            "pattern": "{data_root}/{animal}/MARSH 20110523-PARV-30-21-31 2011-05-23 17H59M{session}Selection{index}.EDF",
+            "lro_kwargs": {
+                "mode": "mne",
+                "extract_func": "read_raw_edf"
+            },
+            "manual_datetime": {
+                "_0_": "2011-05-23 18:00:06",
+                "_1_": null,
+                "_2_": null
+            },
+            "channels": [
+                "E17-REF3",
+                "E18-REF3",
+                "E19-REF3",
+                "E20-REF3",
+                "E21-REF3",
+                "E22-REF3",
+                "E23-REF3",
+                "E24-REF3"
+            ]
         },
         {
             "id": "354",
-            "sex": "Male",
             "gene": "Arx(wt);Parvcre+",
+            "sex": "Male",
             "group": "354 356 357",
-            "channels": ["E1-REF1", "E2-REF1", "E3-REF1", "E4-REF1", "E5-REF1", "E6-REF1", "E7-REF1", "E8-REF1"],
-            "manual_datetime": "2012-03-01 10:57:22"
+            "pattern": "{data_root}/{animal}/MARSH 20120301 ARX PARV 354356357{session}Selection{index}.EDF",
+            "lro_kwargs": {
+                "mode": "mne",
+                "extract_func": "read_raw_edf"
+            },
+            "manual_datetime": {
+                "_0_": "2012-03-01 10:57:22",
+                "_1_": null,
+                "_2_": null
+            },
+            "channels": [
+                "E1-REF1",
+                "E2-REF1",
+                "E3-REF1",
+                "E4-REF1",
+                "E5-REF1",
+                "E6-REF1",
+                "E7-REF1",
+                "E8-REF1"
+            ]
         },
         {
             "id": "356",
-            "sex": "Male",
             "gene": "Arx(F/y);Parvcre+",
-            "group":"354 356 357",
-            "channels": ["E9-REF2", "E10-REF2", "E11-REF2", "E12-REF2", "E13-REF2", "E14-REF2", "E15-REF2", "E16-REF2"],
-            "manual_datetime": "2012-03-01 10:57:22"
+            "sex": "Male",
+            "group": "354 356 357",
+            "pattern": "{data_root}/{animal}/MARSH 20120301 ARX PARV 354356357{session}Selection{index}.EDF",
+            "lro_kwargs": {
+                "mode": "mne",
+                "extract_func": "read_raw_edf"
+            },
+            "manual_datetime": {
+                "_0_": "2012-03-01 10:57:22",
+                "_1_": null,
+                "_2_": null
+            },
+            "channels": [
+                "E9-REF2",
+                "E10-REF2",
+                "E11-REF2",
+                "E12-REF2",
+                "E13-REF2",
+                "E14-REF2",
+                "E15-REF2",
+                "E16-REF2"
+            ]
         },
         {
             "id": "357",
-            "sex": "Male",
             "gene": "Arx(F/y);Parvcre+",
+            "sex": "Male",
             "group": "354 356 357",
-            "channels": ["E17-REF3", "E18-REF3", "E19-REF3", "E20-REF3", "E21-REF3", "E22-REF3", "E23-REF3", "E24-REF3"],
-            "manual_datetime": "2012-03-01 10:57:22"
+            "pattern": "{data_root}/{animal}/MARSH 20120301 ARX PARV 354356357{session}Selection{index}.EDF",
+            "lro_kwargs": {
+                "mode": "mne",
+                "extract_func": "read_raw_edf"
+            },
+            "manual_datetime": {
+                "_0_": "2012-03-01 10:57:22",
+                "_1_": null,
+                "_2_": null
+            },
+            "channels": [
+                "E17-REF3",
+                "E18-REF3",
+                "E19-REF3",
+                "E20-REF3",
+                "E21-REF3",
+                "E22-REF3",
+                "E23-REF3",
+                "E24-REF3"
+            ]
         },
         {
             "id": "387",
-            "sex": "Male",
             "gene": "Arx(F/y);Parvcre+",
+            "sex": "Male",
             "group": "387 388 390 400",
-            "channels": ["E1-REF1", "E2-REF1", "E3-REF1", "E4-REF1", "E5-REF1", "E6-REF1", "E7-REF1", "E8-REF1"],
-            "manual_datetime": "2012-06-20 08:34:32"
+            "pattern": "{data_root}/{animal}/MARSH 20120620 ARXPARV 387388390400{session}Selection{index}.EDF",
+            "lro_kwargs": {
+                "mode": "mne",
+                "extract_func": "read_raw_edf"
+            },
+            "manual_datetime": {
+                "_0_": "2012-06-20 08:34:32",
+                "_1_": null,
+                "_2_": null
+            },
+            "channels": [
+                "E1-REF1",
+                "E2-REF1",
+                "E3-REF1",
+                "E4-REF1",
+                "E5-REF1",
+                "E6-REF1",
+                "E7-REF1",
+                "E8-REF1"
+            ]
         },
         {
             "id": "388",
-            "sex": "Female",
             "gene": "Arx(F/x);Parvcre-",
+            "sex": "Female",
             "group": "387 388 390 400",
-            "channels": ["E9-REF2", "E10-REF2", "E11-REF2", "E12-REF2", "E13-REF2", "E14-REF2", "E15-REF2", "E16-REF2"],
-            "manual_datetime": "2012-06-20 08:34:32"
+            "pattern": "{data_root}/{animal}/MARSH 20120620 ARXPARV 387388390400{session}Selection{index}.EDF",
+            "lro_kwargs": {
+                "mode": "mne",
+                "extract_func": "read_raw_edf"
+            },
+            "manual_datetime": {
+                "_0_": "2012-06-20 08:34:32",
+                "_1_": null,
+                "_2_": null
+            },
+            "channels": [
+                "E9-REF2",
+                "E10-REF2",
+                "E11-REF2",
+                "E12-REF2",
+                "E13-REF2",
+                "E14-REF2",
+                "E15-REF2",
+                "E16-REF2"
+            ]
         },
         {
             "id": "390",
-            "sex": "Female",
             "gene": "Arx(F/F);Parvcre-",
+            "sex": "Female",
             "group": "387 388 390 400",
-            "channels": ["E17-REF3", "E18-REF3", "E19-REF3", "E20-REF3", "E21-REF3", "E22-REF3", "E23-REF3", "E24-REF3"],
-            "manual_datetime": "2012-06-20 08:34:32"
+            "pattern": "{data_root}/{animal}/MARSH 20120620 ARXPARV 387388390400{session}Selection{index}.EDF",
+            "lro_kwargs": {
+                "mode": "mne",
+                "extract_func": "read_raw_edf"
+            },
+            "manual_datetime": {
+                "_0_": "2012-06-20 08:34:32",
+                "_1_": null,
+                "_2_": null
+            },
+            "channels": [
+                "E17-REF3",
+                "E18-REF3",
+                "E19-REF3",
+                "E20-REF3",
+                "E21-REF3",
+                "E22-REF3",
+                "E23-REF3",
+                "E24-REF3"
+            ]
         },
         {
             "id": "400",
-            "sex": "Female",
             "gene": "Arx(F/F);Parvcre+",
+            "sex": "Female",
             "group": "387 388 390 400",
-            "channels": ["E25-REF4", "E26-REF4", "E27-REF4", "E28-REF4", "E29-REF4", "E30-REF4", "E31-REF4", "E32-REF4"],
-            "manual_datetime": "2012-06-20 08:34:32"
+            "pattern": "{data_root}/{animal}/MARSH 20120620 ARXPARV 387388390400{session}Selection{index}.EDF",
+            "lro_kwargs": {
+                "mode": "mne",
+                "extract_func": "read_raw_edf"
+            },
+            "manual_datetime": {
+                "_0_": "2012-06-20 08:34:32",
+                "_1_": null,
+                "_2_": null
+            },
+            "channels": [
+                "E25-REF4",
+                "E26-REF4",
+                "E27-REF4",
+                "E28-REF4",
+                "E29-REF4",
+                "E30-REF4",
+                "E31-REF4",
+                "E32-REF4"
+            ]
         },
         {
             "id": "393",
-            "sex": "Male",
             "gene": "Arx(F/y);Parvcre+",
+            "sex": "Male",
             "group": "393 399 385 395",
-            "channels": ["E1-REF1", "E2-REF1", "E3-REF1", "E4-REF1", "E5-REF1", "E6-REF1", "E7-REF1", "E8-REF1"],
-            "manual_datetime": "2012-06-15 09:05:55"
+            "pattern": "{data_root}/{animal}/MARSH 20120615 ARXPARV 393399385395{session}Selection{index}.EDF",
+            "lro_kwargs": {
+                "mode": "mne",
+                "extract_func": "read_raw_edf"
+            },
+            "manual_datetime": {
+                "_0_": "2012-06-15 09:05:55",
+                "_1_": null,
+                "_2_": null
+            },
+            "channels": [
+                "E1-REF1",
+                "E2-REF1",
+                "E3-REF1",
+                "E4-REF1",
+                "E5-REF1",
+                "E6-REF1",
+                "E7-REF1",
+                "E8-REF1"
+            ]
         },
         {
             "id": "399",
-            "sex": "Male",
             "gene": "Arx(F/y);Parvcre+",
+            "sex": "Male",
             "group": "393 399 385 395",
-            "channels": ["E9-REF2", "E10-REF2", "E11-REF2", "E12-REF2", "E13-REF2", "E14-REF2", "E15-REF2", "E16-REF2"],
-            "manual_datetime": "2012-06-15 09:05:55"
+            "pattern": "{data_root}/{animal}/MARSH 20120615 ARXPARV 393399385395{session}Selection{index}.EDF",
+            "lro_kwargs": {
+                "mode": "mne",
+                "extract_func": "read_raw_edf"
+            },
+            "manual_datetime": {
+                "_0_": "2012-06-15 09:05:55",
+                "_1_": null,
+                "_2_": null
+            },
+            "channels": [
+                "E9-REF2",
+                "E10-REF2",
+                "E11-REF2",
+                "E12-REF2",
+                "E13-REF2",
+                "E14-REF2",
+                "E15-REF2",
+                "E16-REF2"
+            ]
         },
         {
             "id": "385",
-            "sex": "Female",
             "gene": "Arx(F/F);Parvcre+",
+            "sex": "Female",
             "group": "393 399 385 395",
-            "channels": ["E17-REF3", "E18-REF3", "E19-REF3", "E20-REF3", "E21-REF3", "E22-REF3", "E23-REF3", "E24-REF3"],
-            "manual_datetime": "2012-06-15 09:05:55"
+            "pattern": "{data_root}/{animal}/MARSH 20120615 ARXPARV 393399385395{session}Selection{index}.EDF",
+            "lro_kwargs": {
+                "mode": "mne",
+                "extract_func": "read_raw_edf"
+            },
+            "manual_datetime": {
+                "_0_": "2012-06-15 09:05:55",
+                "_1_": null,
+                "_2_": null
+            },
+            "channels": [
+                "E17-REF3",
+                "E18-REF3",
+                "E19-REF3",
+                "E20-REF3",
+                "E21-REF3",
+                "E22-REF3",
+                "E23-REF3",
+                "E24-REF3"
+            ]
         },
         {
             "id": "395",
-            "sex": "Male",
             "gene": "Arx(F/y);Parvcre-",
+            "sex": "Male",
             "group": "393 399 385 395",
-            "channels": ["E25-REF4", "E26-REF4", "E27-REF4", "E28-REF4", "E29-REF4", "E30-REF4", "E31-REF4", "E32-REF4"],
-            "manual_datetime": "2012-06-15 09:05:55"
+            "pattern": "{data_root}/{animal}/MARSH 20120615 ARXPARV 393399385395{session}Selection{index}.EDF",
+            "lro_kwargs": {
+                "mode": "mne",
+                "extract_func": "read_raw_edf"
+            },
+            "manual_datetime": {
+                "_0_": "2012-06-15 09:05:55",
+                "_1_": null,
+                "_2_": null
+            },
+            "channels": [
+                "E25-REF4",
+                "E26-REF4",
+                "E27-REF4",
+                "E28-REF4",
+                "E29-REF4",
+                "E30-REF4",
+                "E31-REF4",
+                "E32-REF4"
+            ]
         },
         {
             "id": "432",
-            "sex": "Male",
             "gene": "Arx(F/y);Rosa(YFP/wt);Parvcre-",
+            "sex": "Male",
             "group": "432 435 438 439",
-            "channels": ["E1-REF1", "E2-REF1", "E3-REF1", "E4-REF1", "E5-REF1", "E6-REF1", "E7-REF1", "E8-REF1"],
-            "manual_datetime": "2012-07-03 09:36:40"
+            "pattern": "{data_root}/{animal}/MARSH 20120703 ARXPARV 432435438439{session}Selection{index}.EDF",
+            "lro_kwargs": {
+                "mode": "mne",
+                "extract_func": "read_raw_edf"
+            },
+            "manual_datetime": {
+                "_0_": "2012-07-03 09:36:40",
+                "_1_": null,
+                "_2_": null
+            },
+            "channels": [
+                "E1-REF1",
+                "E2-REF1",
+                "E3-REF1",
+                "E4-REF1",
+                "E5-REF1",
+                "E6-REF1",
+                "E7-REF1",
+                "E8-REF1"
+            ]
         },
         {
             "id": "435",
-            "sex": "Male",
             "gene": "Arx(F/y);Rosa(YFP/wt);Parvcre+",
+            "sex": "Male",
             "group": "432 435 438 439",
-            "channels": ["E9-REF2", "E10-REF2", "E11-REF2", "E12-REF2", "E13-REF2", "E14-REF2", "E15-REF2", "E16-REF2"],
-            "manual_datetime": "2012-07-03 09:36:40"
+            "pattern": "{data_root}/{animal}/MARSH 20120703 ARXPARV 432435438439{session}Selection{index}.EDF",
+            "lro_kwargs": {
+                "mode": "mne",
+                "extract_func": "read_raw_edf"
+            },
+            "manual_datetime": {
+                "_0_": "2012-07-03 09:36:40",
+                "_1_": null,
+                "_2_": null
+            },
+            "channels": [
+                "E9-REF2",
+                "E10-REF2",
+                "E11-REF2",
+                "E12-REF2",
+                "E13-REF2",
+                "E14-REF2",
+                "E15-REF2",
+                "E16-REF2"
+            ]
         },
         {
             "id": "438",
-            "sex": "Female",
             "gene": "Arx(F/F);Parvcre+",
+            "sex": "Female",
             "group": "432 435 438 439",
-            "channels": ["E17-REF3", "E18-REF3", "E19-REF3", "E20-REF3", "E21-REF3", "E22-REF3", "E23-REF3", "E24-REF3"],
-            "manual_datetime": "2012-07-03 09:36:40"
+            "pattern": "{data_root}/{animal}/MARSH 20120703 ARXPARV 432435438439{session}Selection{index}.EDF",
+            "lro_kwargs": {
+                "mode": "mne",
+                "extract_func": "read_raw_edf"
+            },
+            "manual_datetime": {
+                "_0_": "2012-07-03 09:36:40",
+                "_1_": null,
+                "_2_": null
+            },
+            "channels": [
+                "E17-REF3",
+                "E18-REF3",
+                "E19-REF3",
+                "E20-REF3",
+                "E21-REF3",
+                "E22-REF3",
+                "E23-REF3",
+                "E24-REF3"
+            ]
         },
         {
             "id": "439",
-            "sex": "Female",
             "gene": "Arx(F/F);Parvcre-",
+            "sex": "Female",
             "group": "432 435 438 439",
-            "channels": ["E25-REF4", "E26-REF4", "E27-REF4", "E28-REF4", "E29-REF4", "E30-REF4", "E31-REF4", "E32-REF4"],
-            "manual_datetime": "2012-07-03 09:36:40"
+            "pattern": "{data_root}/{animal}/MARSH 20120703 ARXPARV 432435438439{session}Selection{index}.EDF",
+            "lro_kwargs": {
+                "mode": "mne",
+                "extract_func": "read_raw_edf"
+            },
+            "manual_datetime": {
+                "_0_": "2012-07-03 09:36:40",
+                "_1_": null,
+                "_2_": null
+            },
+            "channels": [
+                "E25-REF4",
+                "E26-REF4",
+                "E27-REF4",
+                "E28-REF4",
+                "E29-REF4",
+                "E30-REF4",
+                "E31-REF4",
+                "E32-REF4"
+            ]
         },
         {
             "id": "440",
-            "sex": "Female",
             "gene": "Arx(F/F);Parvcre+",
+            "sex": "Female",
             "group": "440 443 446 447",
-            "channels": ["E1-REF1", "E2-REF1", "E3-REF1", "E4-REF1", "E5-REF1", "E6-REF1", "E7-REF1", "E8-REF1"],
-            "manual_datetime": "2012-07-17 10:57:49"
+            "pattern": "{data_root}/{animal}/MARSH 20120717ARXPARV440443446447{session}Selection{index}.EDF",
+            "lro_kwargs": {
+                "mode": "mne",
+                "extract_func": "read_raw_edf"
+            },
+            "manual_datetime": {
+                "_0_": "2012-07-17 10:57:49",
+                "_1_": null,
+                "_2_": null
+            },
+            "channels": [
+                "E1-REF1",
+                "E2-REF1",
+                "E3-REF1",
+                "E4-REF1",
+                "E5-REF1",
+                "E6-REF1",
+                "E7-REF1",
+                "E8-REF1"
+            ]
         },
         {
             "id": "443",
-            "sex": "Male",
             "gene": "Arx(wt);Parvcre-",
+            "sex": "Male",
             "group": "440 443 446 447",
-            "channels": ["E9-REF2", "E10-REF2", "E11-REF2", "E12-REF2", "E13-REF2", "E14-REF2", "E15-REF2", "E16-REF2"],
-            "manual_datetime": "2012-07-17 10:57:49"
+            "pattern": "{data_root}/{animal}/MARSH 20120717ARXPARV440443446447{session}Selection{index}.EDF",
+            "lro_kwargs": {
+                "mode": "mne",
+                "extract_func": "read_raw_edf"
+            },
+            "manual_datetime": {
+                "_0_": "2012-07-17 10:57:49",
+                "_1_": null,
+                "_2_": null
+            },
+            "channels": [
+                "E9-REF2",
+                "E10-REF2",
+                "E11-REF2",
+                "E12-REF2",
+                "E13-REF2",
+                "E14-REF2",
+                "E15-REF2",
+                "E16-REF2"
+            ]
         },
         {
             "id": "446",
-            "sex": "Male",
             "gene": "Arx(F/y);Parvcre+",
+            "sex": "Male",
             "group": "440 443 446 447",
-            "channels": ["E17-REF3", "E18-REF3", "E19-REF3", "E20-REF3", "E21-REF3", "E22-REF3", "E23-REF3", "E24-REF3"],
-            "manual_datetime": "2012-07-17 10:57:49"
+            "pattern": "{data_root}/{animal}/MARSH 20120717ARXPARV440443446447{session}Selection{index}.EDF",
+            "lro_kwargs": {
+                "mode": "mne",
+                "extract_func": "read_raw_edf"
+            },
+            "manual_datetime": {
+                "_0_": "2012-07-17 10:57:49",
+                "_1_": null,
+                "_2_": null
+            },
+            "channels": [
+                "E17-REF3",
+                "E18-REF3",
+                "E19-REF3",
+                "E20-REF3",
+                "E21-REF3",
+                "E22-REF3",
+                "E23-REF3",
+                "E24-REF3"
+            ]
         },
         {
             "id": "447",
-            "sex": "Male",
             "gene": "Arx(F/y);Parvcre+",
+            "sex": "Male",
             "group": "440 443 446 447",
-            "channels": ["E25-REF4", "E26-REF4", "E27-REF4", "E28-REF4", "E29-REF4", "E30-REF4", "E31-REF4", "E32-REF4"],
-            "manual_datetime": "2012-07-17 10:57:49"
+            "pattern": "{data_root}/{animal}/MARSH 20120717ARXPARV440443446447{session}Selection{index}.EDF",
+            "lro_kwargs": {
+                "mode": "mne",
+                "extract_func": "read_raw_edf"
+            },
+            "manual_datetime": {
+                "_0_": "2012-07-17 10:57:49",
+                "_1_": null,
+                "_2_": null
+            },
+            "channels": [
+                "E25-REF4",
+                "E26-REF4",
+                "E27-REF4",
+                "E28-REF4",
+                "E29-REF4",
+                "E30-REF4",
+                "E31-REF4",
+                "E32-REF4"
+            ]
         },
         {
             "id": "700",
-            "sex": "Male",
             "gene": "Arx(F/y);Parvcre+",
+            "sex": "Male",
             "group": "700 703 704 705",
-            "channels": ["E1-REF1", "E2-REF1", "E3-REF1", "E4-REF1", "E5-REF1", "E6-REF1", "E7-REF1", "E8-REF1"],
-            "manual_datetime": "2014-01-15 11:15:54"
+            "pattern": "{data_root}/{animal}/MARSH 20140114ARXPARV700703704705{session}Selection{index}.EDF",
+            "lro_kwargs": {
+                "mode": "mne",
+                "extract_func": "read_raw_edf"
+            },
+            "manual_datetime": {
+                "_1_": "2014-01-15 11:15:54",
+                "_2_": null,
+                "_3_": null
+            },
+            "channels": [
+                "E1-REF1",
+                "E2-REF1",
+                "E3-REF1",
+                "E4-REF1",
+                "E5-REF1",
+                "E6-REF1",
+                "E7-REF1",
+                "E8-REF1"
+            ]
         },
         {
             "id": "703",
-            "sex": "Male",
             "gene": "Arx(F/y);Parvcre+",
+            "sex": "Male",
             "group": "700 703 704 705",
-            "channels": ["E9-REF2", "E10-REF2", "E11-REF2", "E12-REF2", "E13-REF2", "E14-REF2", "E15-REF2", "E16-REF2"],
-            "manual_datetime": "2014-01-15 11:15:54"
+            "pattern": "{data_root}/{animal}/MARSH 20140114ARXPARV700703704705{session}Selection{index}.EDF",
+            "lro_kwargs": {
+                "mode": "mne",
+                "extract_func": "read_raw_edf"
+            },
+            "manual_datetime": {
+                "_1_": "2014-01-15 11:15:54",
+                "_2_": null,
+                "_3_": null
+            },
+            "channels": [
+                "E9-REF2",
+                "E10-REF2",
+                "E11-REF2",
+                "E12-REF2",
+                "E13-REF2",
+                "E14-REF2",
+                "E15-REF2",
+                "E16-REF2"
+            ]
         },
         {
             "id": "704",
-            "sex": "Male",
             "gene": "Arx(F/y);Parvcre+",
+            "sex": "Male",
             "group": "700 703 704 705",
-            "channels": ["E17-REF3", "E18-REF3", "E19-REF3", "E20-REF3", "E21-REF3", "E22-REF3", "E23-REF3", "E24-REF3"],
-            "manual_datetime": "2014-01-15 11:15:54"
+            "pattern": "{data_root}/{animal}/MARSH 20140114ARXPARV700703704705{session}Selection{index}.EDF",
+            "lro_kwargs": {
+                "mode": "mne",
+                "extract_func": "read_raw_edf"
+            },
+            "manual_datetime": {
+                "_1_": "2014-01-15 11:15:54",
+                "_2_": null,
+                "_3_": null
+            },
+            "channels": [
+                "E17-REF3",
+                "E18-REF3",
+                "E19-REF3",
+                "E20-REF3",
+                "E21-REF3",
+                "E22-REF3",
+                "E23-REF3",
+                "E24-REF3"
+            ]
         },
         {
             "id": "705",
-            "sex": "Male",
             "gene": "Arx(F/y);Parvcre+",
+            "sex": "Male",
             "group": "700 703 704 705",
-            "channels": ["E25-REF4", "E26-REF4", "E27-REF4", "E28-REF4", "E29-REF4", "E30-REF4", "E31-REF4", "E32-REF4"],
-            "manual_datetime": "2014-01-15 11:15:54"
+            "pattern": "{data_root}/{animal}/MARSH 20140114ARXPARV700703704705{session}Selection{index}.EDF",
+            "lro_kwargs": {
+                "mode": "mne",
+                "extract_func": "read_raw_edf"
+            },
+            "manual_datetime": {
+                "_1_": "2014-01-15 11:15:54",
+                "_2_": null,
+                "_3_": null
+            },
+            "channels": [
+                "E25-REF4",
+                "E26-REF4",
+                "E27-REF4",
+                "E28-REF4",
+                "E29-REF4",
+                "E30-REF4",
+                "E31-REF4",
+                "E32-REF4"
+            ]
         },
         {
             "id": "708",
-            "sex": "Male",
             "gene": "Arx(F/y);Parvcre+",
+            "sex": "Male",
             "group": "708 709 710 711",
-            "channels": ["E1-REF1", "E2-REF1", "E3-REF1", "E4-REF1", "E5-REF1", "E6-REF1", "E7-REF1", "E8-REF1"],
-            "manual_datetime": "2014-02-25 12:20:27"
+            "pattern": "{data_root}/{animal}/MARSH 20140225ARX PARV708709710711{session}Selection{index}.EDF",
+            "lro_kwargs": {
+                "mode": "mne",
+                "extract_func": "read_raw_edf"
+            },
+            "manual_datetime": {
+                "_0_": "2014-02-25 12:20:27",
+                "_1_": null,
+                "_2_": null
+            },
+            "channels": [
+                "E1-REF1",
+                "E2-REF1",
+                "E3-REF1",
+                "E4-REF1",
+                "E5-REF1",
+                "E6-REF1",
+                "E7-REF1",
+                "E8-REF1"
+            ]
         },
         {
             "id": "709",
-            "sex": "Male",
             "gene": "Arx(F/y);Parvcre+",
+            "sex": "Male",
             "group": "708 709 710 711",
-            "channels": ["E9-REF2", "E10-REF2", "E11-REF2", "E12-REF2", "E13-REF2", "E14-REF2", "E15-REF2", "E16-REF2"],
-            "manual_datetime": "2014-02-25 12:20:27"
+            "pattern": "{data_root}/{animal}/MARSH 20140225ARX PARV708709710711{session}Selection{index}.EDF",
+            "lro_kwargs": {
+                "mode": "mne",
+                "extract_func": "read_raw_edf"
+            },
+            "manual_datetime": {
+                "_0_": "2014-02-25 12:20:27",
+                "_1_": null,
+                "_2_": null
+            },
+            "channels": [
+                "E9-REF2",
+                "E10-REF2",
+                "E11-REF2",
+                "E12-REF2",
+                "E13-REF2",
+                "E14-REF2",
+                "E15-REF2",
+                "E16-REF2"
+            ]
         },
         {
             "id": "710",
-            "sex": "Male",
             "gene": "Arx(F/y);Parvcre+",
+            "sex": "Male",
             "group": "708 709 710 711",
-            "channels": ["E17-REF3", "E18-REF3", "E19-REF3", "E20-REF3", "E21-REF3", "E22-REF3", "E23-REF3", "E24-REF3"],
-            "manual_datetime": "2014-02-25 12:20:27"
+            "pattern": "{data_root}/{animal}/MARSH 20140225ARX PARV708709710711{session}Selection{index}.EDF",
+            "lro_kwargs": {
+                "mode": "mne",
+                "extract_func": "read_raw_edf"
+            },
+            "manual_datetime": {
+                "_0_": "2014-02-25 12:20:27",
+                "_1_": null,
+                "_2_": null
+            },
+            "channels": [
+                "E17-REF3",
+                "E18-REF3",
+                "E19-REF3",
+                "E20-REF3",
+                "E21-REF3",
+                "E22-REF3",
+                "E23-REF3",
+                "E24-REF3"
+            ]
         },
         {
             "id": "711",
-            "sex": "Male",
             "gene": "Arx(F/y);Parvcre+",
+            "sex": "Male",
             "group": "708 709 710 711",
-            "channels": ["E25-REF4", "E26-REF4", "E27-REF4", "E28-REF4", "E29-REF4", "E30-REF4", "E31-REF4", "E32-REF4"],
-            "manual_datetime": "2014-02-25 12:20:27"
+            "pattern": "{data_root}/{animal}/MARSH 20140225ARX PARV708709710711{session}Selection{index}.EDF",
+            "lro_kwargs": {
+                "mode": "mne",
+                "extract_func": "read_raw_edf"
+            },
+            "manual_datetime": {
+                "_0_": "2014-02-25 12:20:27",
+                "_1_": null,
+                "_2_": null
+            },
+            "channels": [
+                "E25-REF4",
+                "E26-REF4",
+                "E27-REF4",
+                "E28-REF4",
+                "E29-REF4",
+                "E30-REF4",
+                "E31-REF4",
+                "E32-REF4"
+            ]
         }
     ]
 }
