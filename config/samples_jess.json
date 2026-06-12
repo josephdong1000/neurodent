@@ -1,5 +1,5 @@
 {
-    "data_parent_folder": "/mnt/isilon/marsh_single_unit/PythonEEG Data/AP3B2/Intan recordings/",
+    "data_root": "/mnt/isilon/marsh_single_unit/PythonEEG Data/AP3B2/Intan recordings/",
     "GENOTYPE_ALIASES": {
         "HOMO": [
             "AP3B2homo-240-M"
