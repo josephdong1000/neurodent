@@ -10,7 +10,7 @@ analysis:
   war_generation:
     pattern:
       - "{data_root}/{animal}/{index}.EDF"
-    assume_from_number: true
+    assume_from_number: false
     datetimes_are_start: true
     lro_kwargs:
       mode: "mne"
