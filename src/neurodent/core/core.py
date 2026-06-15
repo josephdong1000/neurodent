@@ -51,6 +51,9 @@ from .utils import (
     get_cache_status_message,
     convert_intan_chname_mne,
     abbreviate_channel_names,
+    atomic_output_path,
+    atomic_write_json,
+    safe_unlink,
 )
 
 
@@ -201,9 +204,12 @@ class RecordingMetadata:
         )
 
     def to_json(self, file_path: Path) -> None:
-        """Save RecordingMetadata to a JSON file."""
-        with open(file_path, "w") as f:
-            json.dump(self.to_dict(), f, indent=2)
+        """Save RecordingMetadata to a JSON file.
+
+        The file is written atomically (temp file + rename) so an interrupted
+        write never leaves a partial/corrupt metadata sidecar.
+        """
+        atomic_write_json(file_path, self.to_dict(), indent=2)
 
     @classmethod
     def from_json(cls, file_path: Path) -> "RecordingMetadata":
@@ -1073,30 +1079,49 @@ class LongRecordingOrganizer:
                         use_cache = False
 
         if use_cache:
-            # Load cached data file
-            if intermediate == "edf":
-                logging.info("Reading cached edf file")
-                rec = se.read_edf(fname)
-                return rec, None, metadata  # No raw object when using cache
+            # Load cached data file. The cache is validated only by existence +
+            # mtime, not integrity, so a truncated/corrupt file (e.g. from a write
+            # interrupted by a killed job) can still reach here. Guard the read and
+            # self-heal under non-'always' policies by deleting the bad cache and
+            # falling through to regeneration.
+            try:
+                if intermediate == "edf":
+                    logging.info("Reading cached edf file")
+                    rec = se.read_edf(fname)
+                    return rec, None, metadata  # No raw object when using cache
 
-            elif intermediate == "bin":
-                # Use metadata to reconstruct SpikeInterface parameters
-                params = {
-                    "sampling_frequency": metadata.f_s,
-                    "num_channels": metadata.n_channels,
-                    "dtype": "float64",  # We standardize on float64 for cached binary files
-                    "gain_to_uV": 1,
-                    "offset_to_uV": 0,
-                    "time_axis": 0,
-                    "is_filtered": False,
-                    "channel_ids": metadata.channel_names,
-                }
+                elif intermediate == "bin":
+                    # Use metadata to reconstruct SpikeInterface parameters
+                    params = {
+                        "sampling_frequency": metadata.f_s,
+                        "num_channels": metadata.n_channels,
+                        "dtype": "float64",  # We standardize on float64 for cached binary files
+                        "gain_to_uV": 1,
+                        "offset_to_uV": 0,
+                        "time_axis": 0,
+                        "is_filtered": False,
+                        "channel_ids": metadata.channel_names,
+                    }
 
-                logging.info(f"Reading from cached binary file {fname}")
-                rec = se.read_binary(fname, **params)
-                return rec, None, metadata  # No raw object when using cache
+                    logging.info(f"Reading from cached binary file {fname}")
+                    rec = se.read_binary(fname, **params)
+                    return rec, None, metadata  # No raw object when using cache
+            except Exception as e:
+                if cache_policy == "always":
+                    logging.error(
+                        f"Cache policy 'always' requires a readable cached file, "
+                        f"but {fname} could not be read: {e}"
+                    )
+                    raise
+                logging.warning(
+                    f"Cached intermediate file {fname} could not be read ({e}); "
+                    f"deleting and regenerating"
+                )
+                safe_unlink(fname)
+                safe_unlink(meta_fname)
+                use_cache = False
 
-        else:
+        if not use_cache:
             # Generate new intermediate files
             logging.info(get_cache_status_message(fname, False))
 
@@ -1147,44 +1172,47 @@ class LongRecordingOrganizer:
             # Create the intermediate file
             if intermediate == "edf":
                 logging.info(f"Exporting raw to {fname}")
-                try:
-                    mne.export.export_raw(fname, raw=raw, fmt="edf", overwrite=True)
-                except ValueError as e:
-                    # REVIEW JD to me this appears hardcoded -- will check with EDF files as well
-                    if "exceeds maximum field length" in str(e):
-                        logging.warning(
-                            f"EDF export failed due to signal range: {e}. Retrying with robust physical range."
-                        )
-                        # Calculate robust range (0.01 - 99.99 percentile) to exclude artifacts
-                        data = raw.get_data()
-                        # Use data percentiles to define physical range, excluding extreme outliers
-                        p_min, p_max = np.percentile(data, [0.01, 99.99])
+                # Export to a temp sibling and atomically rename, so an interrupted
+                # write never leaves a partial EDF at the canonical cache path.
+                with atomic_output_path(fname) as tmp:
+                    try:
+                        mne.export.export_raw(tmp, raw=raw, fmt="edf", overwrite=True)
+                    except ValueError as e:
+                        # REVIEW JD to me this appears hardcoded -- will check with EDF files as well
+                        if "exceeds maximum field length" in str(e):
+                            logging.warning(
+                                f"EDF export failed due to signal range: {e}. Retrying with robust physical range."
+                            )
+                            # Calculate robust range (0.01 - 99.99 percentile) to exclude artifacts
+                            data = raw.get_data()
+                            # Use data percentiles to define physical range, excluding extreme outliers
+                            p_min, p_max = np.percentile(data, [0.01, 99.99])
 
-                        # Helper to ensure float fits in 8 chars (EDF limit)
-                        def to_valid_edf_float(val):
-                            # Try formatting with decreasing precision
-                            for fmt in [".6g", ".5g", ".4g", ".3g", ".2g"]:
-                                s = f"{val:{fmt}}"
-                                if len(s) <= 8:
-                                    return float(s)
-                            # Fallback
-                            return float(f"{val:.2e}")
+                            # Helper to ensure float fits in 8 chars (EDF limit)
+                            def to_valid_edf_float(val):
+                                # Try formatting with decreasing precision
+                                for fmt in [".6g", ".5g", ".4g", ".3g", ".2g"]:
+                                    s = f"{val:{fmt}}"
+                                    if len(s) <= 8:
+                                        return float(s)
+                                # Fallback
+                                return float(f"{val:.2e}")
 
-                        safe_min = to_valid_edf_float(p_min)
-                        safe_max = to_valid_edf_float(p_max)
+                            safe_min = to_valid_edf_float(p_min)
+                            safe_max = to_valid_edf_float(p_max)
 
-                        logging.info(
-                            f"Using robust physical range: ({safe_min}, {safe_max})"
-                        )
-                        mne.export.export_raw(
-                            fname,
-                            raw=raw,
-                            fmt="edf",
-                            overwrite=True,
-                            physical_range=(safe_min, safe_max),
-                        )
-                    else:
-                        raise
+                            logging.info(
+                                f"Using robust physical range: ({safe_min}, {safe_max})"
+                            )
+                            mne.export.export_raw(
+                                tmp,
+                                raw=raw,
+                                fmt="edf",
+                                overwrite=True,
+                                physical_range=(safe_min, safe_max),
+                            )
+                        else:
+                            raise
 
                 logging.info("Reading edf file")
                 rec = se.read_edf(fname)
@@ -1207,7 +1235,10 @@ class LongRecordingOrganizer:
                 data = data.T  # (n samples, n channels)
                 params["dtype"] = data.dtype
                 logging.info(f"Writing to {fname}")
-                data.tofile(fname)
+                # Write to a temp sibling and atomically rename, so an interrupted
+                # write never leaves a partial binary file at the cache path.
+                with atomic_output_path(fname) as tmp:
+                    data.tofile(tmp)
 
                 logging.info(f"Reading from {fname}")
                 rec = se.read_binary(fname, **params)

@@ -729,6 +729,35 @@ class TestParquetLoading:
         assert loaded.animal_id == "A1"
 
 
+class TestAtomicWarSave:
+    """save_parquet_and_json writes atomically (no partial files on failure)."""
+
+    def test_save_produces_both_files_without_temp(self, tmp_path):
+        war = make_war()
+        war.save_parquet_and_json(tmp_path, filename="test")
+        assert (tmp_path / "test.parquet").exists()
+        assert (tmp_path / "test.json").exists()
+        # No leftover temp siblings from the atomic write.
+        assert list(tmp_path.glob("*.tmp")) == []
+
+    def test_failed_parquet_write_leaves_no_partial(self, tmp_path):
+        """If the parquet write fails, no partial .parquet is left at the path."""
+        war = make_war()
+        with patch("pyarrow.parquet.write_table", side_effect=RuntimeError("disk full")):
+            with pytest.raises(RuntimeError, match="disk full"):
+                war.save_parquet_and_json(tmp_path, filename="test")
+        assert not (tmp_path / "test.parquet").exists()
+        assert list(tmp_path.glob("*.tmp")) == []
+
+    def test_corrupt_json_sidecar_raises_clear_error(self, tmp_path):
+        """A corrupt JSON half of the pair fails with an actionable error on load."""
+        war = make_war()
+        war.save_parquet_and_json(tmp_path, filename="test")
+        (tmp_path / "test.json").write_text("{ this is not valid json")
+        with pytest.raises(ValueError, match="JSON sidecar .* missing or corrupt"):
+            WindowAnalysisResult.load_parquet_and_json(folder_path=tmp_path)
+
+
 # =========================================================================
 # 20. aggregate_time_windows (lines 4147, 4149, 4153, 4164, 4178-4179, 4188)
 # =========================================================================

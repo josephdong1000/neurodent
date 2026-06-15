@@ -65,7 +65,12 @@ class TestTimestampFixes:
 
                     # Mock the MNE export and SpikeInterface read functions
                     with (
-                        patch("neurodent.core.core.mne.export.export_raw") as mock_export,
+                        # Intermediate is written atomically (temp + rename), so the
+                        # mocked exporter must create the file at the path it is given.
+                        patch(
+                            "neurodent.core.core.mne.export.export_raw",
+                            side_effect=lambda path, *a, **k: open(path, "wb").close(),
+                        ) as mock_export,
                         patch("neurodent.core.core.se.read_edf") as mock_read_edf,
                     ):
                         # Mock the SpikeInterface recording

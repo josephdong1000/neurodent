@@ -10,7 +10,7 @@ import tempfile
 import time
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock, mock_open
+from unittest.mock import Mock, patch, MagicMock
 import numpy as np
 
 from neurodent import core
@@ -22,6 +22,16 @@ try:
     SPIKEINTERFACE_AVAILABLE = True
 except ImportError:
     SPIKEINTERFACE_AVAILABLE = False
+
+
+def _export_creates_file(path, *args, **kwargs):
+    """Side effect for a mocked ``mne.export.export_raw``.
+
+    The intermediate file is written via ``atomic_output_path`` (temp sibling +
+    rename), so a mocked exporter must create the file at the path it is given
+    for the atomic rename to succeed.
+    """
+    Path(path).write_bytes(b"")
 
 
 class TestUnifiedCachingSystem:
@@ -388,7 +398,7 @@ class TestMNECachingOptimization:
 
             # Mock MNE export and SpikeInterface read to avoid actual file operations
             with (
-                patch("neurodent.core.core.mne.export.export_raw") as mock_export,
+                patch("neurodent.core.core.mne.export.export_raw", side_effect=_export_creates_file) as mock_export,
                 patch("neurodent.core.core.se.read_edf") as mock_read_edf,
             ):
                 # Mock the SpikeInterface read_edf to return something reasonable
@@ -468,7 +478,7 @@ class TestMNECachingOptimization:
 
             # Mock MNE export and SpikeInterface read to avoid actual file operations
             with (
-                patch("neurodent.core.core.mne.export.export_raw") as mock_export,
+                patch("neurodent.core.core.mne.export.export_raw", side_effect=_export_creates_file) as mock_export,
                 patch("neurodent.core.core.se.read_edf") as mock_read_edf,
             ):
                 # Mock the SpikeInterface read_edf to return something reasonable
@@ -556,7 +566,7 @@ class TestMNECachingOptimization:
 
             # Mock MNE export and SpikeInterface read to avoid actual file operations
             with (
-                patch("neurodent.core.core.mne.export.export_raw") as mock_export,
+                patch("neurodent.core.core.mne.export.export_raw", side_effect=_export_creates_file) as mock_export,
                 patch("neurodent.core.core.se.read_edf") as mock_read_edf,
                 patch("neurodent.core.core.spre.resample") as mock_resample,
             ):
@@ -650,7 +660,7 @@ class TestMNECachingOptimization:
 
                 # Mock MNE export and SpikeInterface read
                 with (
-                    patch("neurodent.core.core.mne.export.export_raw") as mock_export,
+                    patch("neurodent.core.core.mne.export.export_raw", side_effect=_export_creates_file) as mock_export,
                     patch("neurodent.core.core.se.read_edf") as mock_read_edf,
                     patch(
                         "neurodent.core.core.RecordingMetadata.from_json"
@@ -726,11 +736,12 @@ class TestMNECachingOptimization:
             # Fresh mock for the test
             mock_func = Mock(side_effect=mock_extract_func)
 
-            # Mock file operations to track behavior
+            # Mock file operations to track behavior. (open() is no longer mocked:
+            # the metadata sidecar is now written atomically via a temp file +
+            # rename, which needs real file I/O; it lands harmlessly in tmpdir.)
             with (
-                patch("neurodent.core.core.mne.export.export_raw") as mock_export,
+                patch("neurodent.core.core.mne.export.export_raw", side_effect=_export_creates_file) as mock_export,
                 patch("neurodent.core.core.se.read_edf") as mock_read_edf,
-                patch("builtins.open", mock_open()) as mock_file_open,
             ):
                 # Mock recording
                 mock_recording = Mock()
