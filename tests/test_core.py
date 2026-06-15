@@ -32,6 +32,16 @@ from neurodent import constants
 from neurodent.core.utils import abbreviate_channel_names
 
 
+def _export_creates_file(path, *args, **kwargs):
+    """Side effect for a mocked ``mne.export.export_raw``.
+
+    The intermediate file is written via ``atomic_output_path`` (temp sibling +
+    rename), so a mocked exporter must create the file at the path it is given
+    for the atomic rename to succeed.
+    """
+    Path(path).write_bytes(b"")
+
+
 class TestDDFBinaryMetadata:
     """Test DDFBinaryMetadata class functionality."""
 
@@ -964,7 +974,7 @@ class TestLongRecordingOrganizer:
         mock_resampled.get_duration.return_value = 3600.0
 
         with (
-            patch("mne.export.export_raw") as mock_export,
+            patch("mne.export.export_raw", side_effect=_export_creates_file) as mock_export,
             patch("spikeinterface.extractors.read_edf", return_value=mock_si_rec),
             patch(
                 "spikeinterface.preprocessing.resample", return_value=mock_resampled
@@ -1289,7 +1299,7 @@ class TestMNENJobsParameter:
         mock_si_rec.get_duration.return_value = 3.6
 
         with (
-            patch("mne.export.export_raw"),
+            patch("mne.export.export_raw", side_effect=_export_creates_file),
             patch("spikeinterface.extractors.read_edf", return_value=mock_si_rec),
             patch("spikeinterface.preprocessing.resample", return_value=mock_si_rec),
         ):
@@ -1341,7 +1351,7 @@ class TestMNENJobsParameter:
         mock_si_rec.get_duration.return_value = 3.6
 
         with (
-            patch("mne.export.export_raw"),
+            patch("mne.export.export_raw", side_effect=_export_creates_file),
             patch("spikeinterface.extractors.read_edf", return_value=mock_si_rec),
             patch("spikeinterface.preprocessing.resample", return_value=mock_si_rec),
         ):
@@ -1390,7 +1400,7 @@ class TestMNENJobsParameter:
         mock_si_rec.get_duration.return_value = 1.0
 
         with (
-            patch("mne.export.export_raw"),
+            patch("mne.export.export_raw", side_effect=_export_creates_file),
             patch("spikeinterface.extractors.read_edf", return_value=mock_si_rec),
             patch("spikeinterface.preprocessing.resample", return_value=mock_si_rec),
         ):

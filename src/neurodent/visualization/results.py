@@ -30,7 +30,7 @@ from tqdm import tqdm
 from .. import constants, core
 from ..core import FragmentAnalyzer, get_temp_directory
 from ..core.frequency_domain_spike_detection import FrequencyDomainSpikeDetector
-from ..core.utils import abbreviate_channel_names, filepath_to_index, parse_chname_to_abbrev, slugify
+from ..core.utils import abbreviate_channel_names, atomic_output_path, atomic_write_json, filepath_to_index, parse_chname_to_abbrev, slugify
 from .feature_utils import extract_linear_array, extract_band_dict, repack_band_dict, extract_hist_data
 from .feature_handlers import FEATURE_HANDLERS, handler_for
 from .filters import (
@@ -3922,9 +3922,13 @@ class WindowAnalysisResult(AnimalFeatureParser):
         existing_meta = table.schema.metadata or {}
         merged_meta = {**existing_meta, b"neurodent": neurodent_meta}
         table = table.replace_schema_metadata(merged_meta)
-        pq.write_table(
-            table, filepath + ".parquet", compression="zstd", compression_level=4
-        )
+        # Write to a temp sibling and atomically rename, so an interrupted write
+        # (e.g. a killed SLURM job) never leaves a partial .parquet that a
+        # downstream rule would read as a valid output.
+        with atomic_output_path(filepath + ".parquet") as tmp_parquet:
+            pq.write_table(
+                table, str(tmp_parquet), compression="zstd", compression_level=4
+            )
         del table
         logging.info(f"Saved WAR to {filepath + '.parquet'}")
 
@@ -3943,9 +3947,8 @@ class WindowAnalysisResult(AnimalFeatureParser):
             "lof_scores_dict": self.lof_scores_dict.copy(),
         }
 
-        with open(filepath + ".json", "w") as f:
-            json.dump(json_dict, f, indent=2)
-            logging.info(f"Saved WAR to {filepath + '.json'}")
+        atomic_write_json(filepath + ".json", json_dict, indent=2)
+        logging.info(f"Saved WAR to {filepath + '.json'}")
 
     def save_pickle_and_json(self, *args, **kwargs):
         """Deprecated: use :meth:`save_parquet_and_json` instead.
@@ -4554,8 +4557,18 @@ class WindowAnalysisResult(AnimalFeatureParser):
             with open(legacy_pkl, "rb") as f:
                 data = pd.read_pickle(f)
 
-        with open(json_path, "r") as f:
-            metadata = json.load(f)
+        # Validate the JSON half of the pair explicitly: a partial/corrupt
+        # sidecar (e.g. from an interrupted write) should fail with a clear,
+        # actionable error so the WAR is regenerated, not crash with an opaque
+        # JSONDecodeError downstream.
+        try:
+            with open(json_path, "r") as f:
+                metadata = json.load(f)
+        except (OSError, json.JSONDecodeError) as e:
+            raise ValueError(
+                f"WAR JSON sidecar {json_path} is missing or corrupt ({e}); "
+                f"the parquet/JSON pair is incomplete and the WAR must be regenerated."
+            ) from e
         return cls(data, **metadata)
 
     @classmethod

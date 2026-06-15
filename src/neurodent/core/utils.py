@@ -1,5 +1,7 @@
+import contextlib
 import csv
 import itertools
+import json
 import logging
 import math
 import os
@@ -7,10 +9,11 @@ import platform
 import re
 import sys
 import unicodedata
+import uuid
 import warnings
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Callable, Literal, Optional, Union
+from typing import Any, Callable, Literal, Optional, Union
 
 import dateutil.parser
 import numpy as np
@@ -980,6 +983,70 @@ def get_temp_directory() -> Path:
         KeyError: If TMPDIR environment variable is not set.
     """
     return Path(os.environ["TMPDIR"])
+
+
+def safe_unlink(path: Union[str, Path]) -> None:
+    """Delete a file if it exists, ignoring a missing file.
+
+    Used for self-healing cache deletion: a corrupt cache file is removed so it
+    can be regenerated, and a concurrently-removed file is not an error.
+
+    Args:
+        path: Path to the file to delete.
+    """
+    try:
+        Path(path).unlink()
+    except FileNotFoundError:
+        pass
+    except (OSError, PermissionError) as e:
+        logging.warning(f"Failed to delete {path}: {e}")
+
+
+@contextlib.contextmanager
+def atomic_output_path(final_path: Union[str, Path]):
+    """Context manager yielding a temporary sibling path for an atomic write.
+
+    The caller writes to the yielded temporary path. On clean exit the temp file
+    is atomically moved into place with :func:`os.replace`; on exception the temp
+    file is removed and the original error re-raised. Because the temp file lives
+    in the same directory as ``final_path`` (same filesystem), ``os.replace`` is
+    atomic, so a crash mid-write can never leave a partial file at ``final_path``.
+
+    Args:
+        final_path: The destination path the content should end up at.
+
+    Yields:
+        Path: A temporary path in the same directory to write to.
+
+    Examples:
+        >>> with atomic_output_path("out.bin") as tmp:  # doctest: +SKIP
+        ...     data.tofile(tmp)
+    """
+    final_path = Path(final_path)
+    tmp_path = final_path.with_name(f"{final_path.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp")
+    try:
+        yield tmp_path
+    except BaseException:
+        safe_unlink(tmp_path)
+        raise
+    else:
+        os.replace(tmp_path, final_path)
+
+
+def atomic_write_json(path: Union[str, Path], obj: Any, *, indent: int = 2) -> None:
+    """Atomically write ``obj`` to ``path`` as JSON.
+
+    Serializes to a temporary sibling file and atomically renames it into place,
+    so an interrupted write never leaves a partial/corrupt JSON file at ``path``.
+
+    Args:
+        path: Destination JSON file path.
+        obj: JSON-serializable object to write.
+        indent: Indentation passed to :func:`json.dump`.
+    """
+    with atomic_output_path(path) as tmp:
+        with open(tmp, "w") as f:
+            json.dump(obj, f, indent=indent)
 
 
 def cache_fragments_to_zarr(
