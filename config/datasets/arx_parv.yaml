@@ -1,7 +1,8 @@
 # Arx Parv Project - EDF Format
 # Note: all data files that have format _0_Selection{number} were renamed; previously, just _Selection{number}
 
-temp_directory: "/scr1/users/weiy1"
+# temp_directory: "/scr1/users/weiy1"
+temp_directory: "/scr1/users/dongjp"
 
 samples:
   samples_file: "config/samples_arx_parv.json"
