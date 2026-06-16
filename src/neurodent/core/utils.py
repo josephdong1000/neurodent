@@ -7,6 +7,7 @@ import math
 import os
 import platform
 import re
+import shutil
 import sys
 import unicodedata
 import uuid
@@ -1000,6 +1001,84 @@ def safe_unlink(path: Union[str, Path]) -> None:
         pass
     except (OSError, PermissionError) as e:
         logging.warning(f"Failed to delete {path}: {e}")
+
+
+def is_si_recording_folder(path: Union[str, Path]) -> bool:
+    """Return True if ``path`` looks like a SpikeInterface recording output folder.
+
+    Recognizes the two formats written by :meth:`LongRecording.save` as well as
+    folders written by NeuRodent's own :meth:`LongRecordingOrganizer.save_recording`.
+    This is a safety gate so destructive overwrites only ever target folders we
+    actually produced — never an arbitrary user directory.
+
+    A folder qualifies when it is a directory and any of the following hold:
+
+    - **Zarr**: the folder ends in ``.zarr`` and contains zarr group metadata
+      (``.zattrs``, ``.zmetadata``, or ``zarr.json``).
+    - **Binary**: the folder contains SpikeInterface's recognition marker
+      ``si_folder.json`` (or ``binary.json``).
+    - **NeuRodent**: the folder contains our own sidecar
+      (:data:`~neurodent.constants.NEURODENT_SIDECAR_NAME`).
+
+    Args:
+        path: Path to inspect.
+
+    Returns:
+        bool: True if ``path`` is a recognized recording output folder.
+    """
+    p = Path(path)
+    if not p.is_dir():
+        return False
+
+    # NeuRodent sidecar — recognizes a folder we wrote even across SI versions.
+    if (p / constants.NEURODENT_SIDECAR_NAME).exists():
+        return True
+
+    # Zarr folder: suffix + zarr group metadata.
+    if p.suffix == ".zarr" and (
+        (p / ".zattrs").exists()
+        or (p / ".zmetadata").exists()
+        or (p / "zarr.json").exists()
+    ):
+        return True
+
+    # Binary folder: SpikeInterface's own recognition markers.
+    if (p / "si_folder.json").exists() or (p / "binary.json").exists():
+        return True
+
+    return False
+
+
+def safe_rmtree(path: Union[str, Path], *, require_marker: bool = True) -> None:
+    """Recursively delete a directory tree, refusing unrecognized targets.
+
+    A guarded counterpart to :func:`safe_unlink` for directories. By default it
+    will only delete a directory that :func:`is_si_recording_folder` recognizes,
+    so a mistyped or malicious path can never wipe an arbitrary data directory.
+
+    Args:
+        path: Directory to remove.
+        require_marker: When True (default), raise :class:`ValueError` unless the
+            target is a recognized SpikeInterface/NeuRodent recording folder.
+
+    Raises:
+        ValueError: If ``require_marker`` is True and the target is not a
+            recognized recording folder.
+    """
+    p = Path(path)
+    if not p.exists():
+        return
+    if require_marker and not is_si_recording_folder(p):
+        raise ValueError(
+            f"Refusing to delete {p}: it does not look like a SpikeInterface "
+            "recording output folder. Delete it manually if you are sure."
+        )
+    try:
+        shutil.rmtree(p)
+    except FileNotFoundError:
+        pass
+    except (OSError, PermissionError) as e:
+        logging.warning(f"Failed to remove {p}: {e}")
 
 
 @contextlib.contextmanager

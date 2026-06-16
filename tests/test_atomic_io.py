@@ -5,7 +5,14 @@ from pathlib import Path
 
 import pytest
 
-from neurodent.core.utils import atomic_output_path, atomic_write_json, safe_unlink
+from neurodent import constants
+from neurodent.core.utils import (
+    atomic_output_path,
+    atomic_write_json,
+    is_si_recording_folder,
+    safe_rmtree,
+    safe_unlink,
+)
 
 
 class TestAtomicOutputPath:
@@ -86,3 +93,83 @@ class TestSafeUnlink:
     def test_missing_file_is_noop(self, tmp_path):
         # Should not raise.
         safe_unlink(tmp_path / "does_not_exist.txt")
+
+
+def _make_zarr_folder(tmp_path, name="rec.zarr"):
+    folder = tmp_path / name
+    folder.mkdir()
+    (folder / ".zattrs").write_text("{}")
+    return folder
+
+
+def _make_binary_folder(tmp_path, name="rec_bin"):
+    folder = tmp_path / name
+    folder.mkdir()
+    (folder / "si_folder.json").write_text("{}")
+    return folder
+
+
+class TestIsSiRecordingFolder:
+    def test_zarr_folder_recognized(self, tmp_path):
+        assert is_si_recording_folder(_make_zarr_folder(tmp_path)) is True
+
+    def test_binary_folder_recognized(self, tmp_path):
+        assert is_si_recording_folder(_make_binary_folder(tmp_path)) is True
+
+    def test_neurodent_sidecar_recognized(self, tmp_path):
+        folder = tmp_path / "anything"
+        folder.mkdir()
+        (folder / constants.NEURODENT_SIDECAR_NAME).write_text("{}")
+        assert is_si_recording_folder(folder) is True
+
+    def test_zarr_suffix_without_metadata_not_recognized(self, tmp_path):
+        # .zarr suffix alone (no zarr metadata files) must not qualify.
+        folder = tmp_path / "empty.zarr"
+        folder.mkdir()
+        assert is_si_recording_folder(folder) is False
+
+    def test_foreign_dir_not_recognized(self, tmp_path):
+        folder = tmp_path / "data"
+        folder.mkdir()
+        (folder / "notes.txt").write_text("hello")
+        assert is_si_recording_folder(folder) is False
+
+    def test_empty_dir_not_recognized(self, tmp_path):
+        folder = tmp_path / "empty"
+        folder.mkdir()
+        assert is_si_recording_folder(folder) is False
+
+    def test_file_not_recognized(self, tmp_path):
+        path = tmp_path / "f.txt"
+        path.write_text("x")
+        assert is_si_recording_folder(path) is False
+
+    def test_missing_path_not_recognized(self, tmp_path):
+        assert is_si_recording_folder(tmp_path / "nope") is False
+
+
+class TestSafeRmtree:
+    def test_removes_recognized_folder(self, tmp_path):
+        folder = _make_binary_folder(tmp_path)
+        safe_rmtree(folder)
+        assert not folder.exists()
+
+    def test_refuses_foreign_folder(self, tmp_path):
+        folder = tmp_path / "data"
+        folder.mkdir()
+        sentinel = folder / "notes.txt"
+        sentinel.write_text("keep")
+        with pytest.raises(ValueError, match="Refusing to delete"):
+            safe_rmtree(folder)
+        assert sentinel.exists()
+
+    def test_removes_foreign_folder_when_marker_not_required(self, tmp_path):
+        folder = tmp_path / "data"
+        folder.mkdir()
+        (folder / "notes.txt").write_text("keep")
+        safe_rmtree(folder, require_marker=False)
+        assert not folder.exists()
+
+    def test_missing_path_is_noop(self, tmp_path):
+        # Should not raise.
+        safe_rmtree(tmp_path / "does_not_exist")

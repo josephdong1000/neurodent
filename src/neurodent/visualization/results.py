@@ -2197,8 +2197,10 @@ class AnimalOrganizer(AnimalFeatureParser):
     def split(
         self,
         groups: dict[str, list[str]],
-        persist_base: Union[str, Path] = None,
+        output_base: Union[str, Path] = None,
         format: Literal["zarr", "binary"] = "zarr",
+        overwrite: bool = False,
+        persist_base: Union[str, Path] = None,
     ) -> dict[str, "AnimalOrganizer"]:
         """
         Split this multi-animal AnimalOrganizer into per-animal AnimalOrganizers.
@@ -2206,7 +2208,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         For each group (animal), this method:
         1. Iterates over all LROs in this AnimalOrganizer
         2. Calls LRO.split() on each to extract the specified channels
-        3. Optionally persists each split LRO to disk
+        3. Optionally saves each split LRO to disk
         4. Creates a new AnimalOrganizer for each group
 
         This enables processing of joint-animal recordings where multiple animals
@@ -2217,16 +2219,22 @@ class AnimalOrganizer(AnimalFeatureParser):
                 to lists of channel names. Example:
                 {"AnimalA": ["Ch0", "Ch1", "Ch2", "Ch3"],
                  "AnimalB": ["Ch4", "Ch5", "Ch6", "Ch7"]}
-            persist_base (Union[str, Path], optional): Base directory for persisting
+            output_base (Union[str, Path], optional): Base directory for saving
                 split recordings. If None, LROs remain in-memory. Structure:
-                persist_base/
+                output_base/
                     AnimalA/
                         day1.zarr
                         day2.zarr
                     AnimalB/
                         ...
-            format (Literal["zarr", "binary"], optional): Format for persisted
+            format (Literal["zarr", "binary"], optional): Format for saved
                 recordings. Defaults to "zarr".
+            overwrite (bool, optional): Passed to
+                :meth:`LongRecordingOrganizer.save_recording`; if True, replace an
+                existing (recognized) recording folder. Defaults to False.
+            persist_base (Union[str, Path], optional): Deprecated alias for
+                ``output_base``. If provided (not None), it is used as ``output_base``
+                and emits a :class:`DeprecationWarning`.
 
         Returns:
             dict[str, AnimalOrganizer]: Dictionary mapping group names to new
@@ -2239,7 +2247,7 @@ class AnimalOrganizer(AnimalFeatureParser):
             >>> ao = AnimalOrganizer("/path/to/joint_data", "combined")
             >>> splits = ao.split(
             ...     groups={"MouseA": ["Ch0", "Ch1"], "MouseB": ["Ch2", "Ch3"]},
-            ...     persist_base="/output/split_data",
+            ...     output_base="/output/split_data",
             ... )
             >>> war_a = splits["MouseA"].compute_windowed_analysis(["all"])
             >>> war_b = splits["MouseB"].compute_windowed_analysis(["all"])
@@ -2248,8 +2256,18 @@ class AnimalOrganizer(AnimalFeatureParser):
             raise ValueError("No recordings loaded to split")
 
         if persist_base is not None:
-            persist_base = Path(persist_base)
-            persist_base.mkdir(parents=True, exist_ok=True)
+            warnings.warn(
+                "The 'persist_base' argument of AnimalOrganizer.split() is deprecated; "
+                "use 'output_base'.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            if output_base is None:
+                output_base = persist_base
+
+        if output_base is not None:
+            output_base = Path(output_base)
+            output_base.mkdir(parents=True, exist_ok=True)
 
         result = {}
 
@@ -2265,14 +2283,14 @@ class AnimalOrganizer(AnimalFeatureParser):
                 day_splits = lro.split({group_name: channels})
                 child_lro = day_splits[group_name]
 
-                # Persist if requested
-                if persist_base is not None:
+                # Save to disk if requested
+                if output_base is not None:
                     # Determine day folder name
                     day_name = lro.display_name or f"day{i}"
 
-                    output_dir = persist_base / group_name / day_name
-                    child_lro.persist(output_dir, format=format)
-                    logging.debug(f"Persisted {group_name}/{day_name} to {output_dir}")
+                    output_dir = output_base / group_name / day_name
+                    child_lro.save_recording(output_dir, format=format, overwrite=overwrite)
+                    logging.debug(f"Saved {group_name}/{day_name} to {output_dir}")
 
                 child_lros.append(child_lro)
 
