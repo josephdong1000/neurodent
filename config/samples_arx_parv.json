@@ -100,14 +100,14 @@
                 "_2_": null
             },
             "channels": [
-                "E1-REF1",
-                "E2-REF1",
-                "E3-REF1",
-                "E4-REF1",
-                "E5-REF1",
-                "E6-REF1",
-                "E7-REF1",
-                "E8-REF1"
+                "EEG E1-REF1",
+                "EEG E2-REF1",
+                "EEG E3-REF1",
+                "EEG E4-REF1",
+                "EEG E5-REF1",
+                "EEG E6-REF1",
+                "EEG E7-REF1",
+                "EEG E8-REF1"
             ]
         },
         {
@@ -126,14 +126,14 @@
                 "_2_": null
             },
             "channels": [
-                "E9-REF2",
-                "E10-REF2",
-                "E11-REF2",
-                "E12-REF2",
-                "E13-REF2",
-                "E14-REF2",
-                "E15-REF2",
-                "E16-REF2"
+                "EEG E9-REF2",
+                "EEG E10-REF2",
+                "EEG E11-REF2",
+                "EEG E12-REF2",
+                "EEG E13-REF2",
+                "EEG E14-REF2",
+                "EEG E15-REF2",
+                "EEG E16-REF2"
             ]
         },
         {
@@ -152,14 +152,14 @@
                 "_2_": null
             },
             "channels": [
-                "E17-REF3",
-                "E18-REF3",
-                "E19-REF3",
-                "E20-REF3",
-                "E21-REF3",
-                "E22-REF3",
-                "E23-REF3",
-                "E24-REF3"
+                "EEG E17-REF3",
+                "EEG E18-REF3",
+                "EEG E19-REF3",
+                "EEG E20-REF3",
+                "EEG E21-REF3",
+                "EEG E22-REF3",
+                "EEG E23-REF3",
+                "EEG E24-REF3"
             ]
         },
         {
@@ -178,14 +178,14 @@
                 "_2_": null
             },
             "channels": [
-                "E1-REF1",
-                "E2-REF1",
-                "E3-REF1",
-                "E4-REF1",
-                "E5-REF1",
-                "E6-REF1",
-                "E7-REF1",
-                "E8-REF1"
+                "EEG E1-REF1",
+                "EEG E2-REF1",
+                "EEG E3-REF1",
+                "EEG E4-REF1",
+                "EEG E5-REF1",
+                "EEG E6-REF1",
+                "EEG E7-REF1",
+                "EEG E8-REF1"
             ]
         },
         {
@@ -204,14 +204,14 @@
                 "_2_": null
             },
             "channels": [
-                "E9-REF2",
-                "E10-REF2",
-                "E11-REF2",
-                "E12-REF2",
-                "E13-REF2",
-                "E14-REF2",
-                "E15-REF2",
-                "E16-REF2"
+                "EEG E9-REF2",
+                "EEG E10-REF2",
+                "EEG E11-REF2",
+                "EEG E12-REF2",
+                "EEG E13-REF2",
+                "EEG E14-REF2",
+                "EEG E15-REF2",
+                "EEG E16-REF2"
             ]
         },
         {
@@ -230,14 +230,14 @@
                 "_2_": null
             },
             "channels": [
-                "E17-REF3",
-                "E18-REF3",
-                "E19-REF3",
-                "E20-REF3",
-                "E21-REF3",
-                "E22-REF3",
-                "E23-REF3",
-                "E24-REF3"
+                "EEG E17-REF3",
+                "EEG E18-REF3",
+                "EEG E19-REF3",
+                "EEG E20-REF3",
+                "EEG E21-REF3",
+                "EEG E22-REF3",
+                "EEG E23-REF3",
+                "EEG E24-REF3"
             ]
         },
         {
@@ -256,14 +256,14 @@
                 "_2_": null
             },
             "channels": [
-                "E1-REF1",
-                "E2-REF1",
-                "E3-REF1",
-                "E4-REF1",
-                "E5-REF1",
-                "E6-REF1",
-                "E7-REF1",
-                "E8-REF1"
+                "EEG E1-REF1",
+                "EEG E2-REF1",
+                "EEG E3-REF1",
+                "EEG E4-REF1",
+                "EEG E5-REF1",
+                "EEG E6-REF1",
+                "EEG E7-REF1",
+                "EEG E8-REF1"
             ]
         },
         {
@@ -282,14 +282,14 @@
                 "_2_": null
             },
             "channels": [
-                "E9-REF2",
-                "E10-REF2",
-                "E11-REF2",
-                "E12-REF2",
-                "E13-REF2",
-                "E14-REF2",
-                "E15-REF2",
-                "E16-REF2"
+                "EEG E9-REF2",
+                "EEG E10-REF2",
+                "EEG E11-REF2",
+                "EEG E12-REF2",
+                "EEG E13-REF2",
+                "EEG E14-REF2",
+                "EEG E15-REF2",
+                "EEG E16-REF2"
             ]
         },
         {
@@ -308,14 +308,14 @@
                 "_2_": null
             },
             "channels": [
-                "E17-REF3",
-                "E18-REF3",
-                "E19-REF3",
-                "E20-REF3",
-                "E21-REF3",
-                "E22-REF3",
-                "E23-REF3",
-                "E24-REF3"
+                "EEG E17-REF3",
+                "EEG E18-REF3",
+                "EEG E19-REF3",
+                "EEG E20-REF3",
+                "EEG E21-REF3",
+                "EEG E22-REF3",
+                "EEG E23-REF3",
+                "EEG E24-REF3"
             ]
         },
         {
@@ -334,14 +334,14 @@
                 "_2_": null
             },
             "channels": [
-                "E1-REF1",
-                "E2-REF1",
-                "E3-REF1",
-                "E4-REF1",
-                "E5-REF1",
-                "E6-REF1",
-                "E7-REF1",
-                "E8-REF1"
+                "EEG E1-REF1",
+                "EEG E2-REF1",
+                "EEG E3-REF1",
+                "EEG E4-REF1",
+                "EEG E5-REF1",
+                "EEG E6-REF1",
+                "EEG E7-REF1",
+                "EEG E8-REF1"
             ]
         },
         {
@@ -360,14 +360,14 @@
                 "_2_": null
             },
             "channels": [
-                "E9-REF2",
-                "E10-REF2",
-                "E11-REF2",
-                "E12-REF2",
-                "E13-REF2",
-                "E14-REF2",
-                "E15-REF2",
-                "E16-REF2"
+                "EEG E9-REF2",
+                "EEG E10-REF2",
+                "EEG E11-REF2",
+                "EEG E12-REF2",
+                "EEG E13-REF2",
+                "EEG E14-REF2",
+                "EEG E15-REF2",
+                "EEG E16-REF2"
             ]
         },
         {
@@ -386,14 +386,14 @@
                 "_2_": null
             },
             "channels": [
-                "E17-REF3",
-                "E18-REF3",
-                "E19-REF3",
-                "E20-REF3",
-                "E21-REF3",
-                "E22-REF3",
-                "E23-REF3",
-                "E24-REF3"
+                "EEG E17-REF3",
+                "EEG E18-REF3",
+                "EEG E19-REF3",
+                "EEG E20-REF3",
+                "EEG E21-REF3",
+                "EEG E22-REF3",
+                "EEG E23-REF3",
+                "EEG E24-REF3"
             ]
         },
         {
@@ -412,14 +412,14 @@
                 "_2_": null
             },
             "channels": [
-                "E25-REF4",
-                "E26-REF4",
-                "E27-REF4",
-                "E28-REF4",
-                "E29-REF4",
-                "E30-REF4",
-                "E31-REF4",
-                "E32-REF4"
+                "EEG E25-REF4",
+                "EEG E26-REF4",
+                "EEG E27-REF4",
+                "EEG E28-REF4",
+                "EEG E29-REF4",
+                "EEG E30-REF4",
+                "EEG E31-REF4",
+                "EEG E32-REF4"
             ]
         },
         {
@@ -438,14 +438,14 @@
                 "_2_": null
             },
             "channels": [
-                "E1-REF1",
-                "E2-REF1",
-                "E3-REF1",
-                "E4-REF1",
-                "E5-REF1",
-                "E6-REF1",
-                "E7-REF1",
-                "E8-REF1"
+                "EEG E1-REF1",
+                "EEG E2-REF1",
+                "EEG E3-REF1",
+                "EEG E4-REF1",
+                "EEG E5-REF1",
+                "EEG E6-REF1",
+                "EEG E7-REF1",
+                "EEG E8-REF1"
             ]
         },
         {
@@ -464,14 +464,14 @@
                 "_2_": null
             },
             "channels": [
-                "E9-REF2",
-                "E10-REF2",
-                "E11-REF2",
-                "E12-REF2",
-                "E13-REF2",
-                "E14-REF2",
-                "E15-REF2",
-                "E16-REF2"
+                "EEG E9-REF2",
+                "EEG E10-REF2",
+                "EEG E11-REF2",
+                "EEG E12-REF2",
+                "EEG E13-REF2",
+                "EEG E14-REF2",
+                "EEG E15-REF2",
+                "EEG E16-REF2"
             ]
         },
         {
@@ -490,14 +490,14 @@
                 "_2_": null
             },
             "channels": [
-                "E17-REF3",
-                "E18-REF3",
-                "E19-REF3",
-                "E20-REF3",
-                "E21-REF3",
-                "E22-REF3",
-                "E23-REF3",
-                "E24-REF3"
+                "EEG E17-REF3",
+                "EEG E18-REF3",
+                "EEG E19-REF3",
+                "EEG E20-REF3",
+                "EEG E21-REF3",
+                "EEG E22-REF3",
+                "EEG E23-REF3",
+                "EEG E24-REF3"
             ]
         },
         {
@@ -516,14 +516,14 @@
                 "_2_": null
             },
             "channels": [
-                "E25-REF4",
-                "E26-REF4",
-                "E27-REF4",
-                "E28-REF4",
-                "E29-REF4",
-                "E30-REF4",
-                "E31-REF4",
-                "E32-REF4"
+                "EEG E25-REF4",
+                "EEG E26-REF4",
+                "EEG E27-REF4",
+                "EEG E28-REF4",
+                "EEG E29-REF4",
+                "EEG E30-REF4",
+                "EEG E31-REF4",
+                "EEG E32-REF4"
             ]
         },
         {
@@ -542,14 +542,14 @@
                 "_2_": null
             },
             "channels": [
-                "E1-REF1",
-                "E2-REF1",
-                "E3-REF1",
-                "E4-REF1",
-                "E5-REF1",
-                "E6-REF1",
-                "E7-REF1",
-                "E8-REF1"
+                "EEG E1-REF1",
+                "EEG E2-REF1",
+                "EEG E3-REF1",
+                "EEG E4-REF1",
+                "EEG E5-REF1",
+                "EEG E6-REF1",
+                "EEG E7-REF1",
+                "EEG E8-REF1"
             ]
         },
         {
@@ -568,14 +568,14 @@
                 "_2_": null
             },
             "channels": [
-                "E9-REF2",
-                "E10-REF2",
-                "E11-REF2",
-                "E12-REF2",
-                "E13-REF2",
-                "E14-REF2",
-                "E15-REF2",
-                "E16-REF2"
+                "EEG E9-REF2",
+                "EEG E10-REF2",
+                "EEG E11-REF2",
+                "EEG E12-REF2",
+                "EEG E13-REF2",
+                "EEG E14-REF2",
+                "EEG E15-REF2",
+                "EEG E16-REF2"
             ]
         },
         {
@@ -594,14 +594,14 @@
                 "_2_": null
             },
             "channels": [
-                "E17-REF3",
-                "E18-REF3",
-                "E19-REF3",
-                "E20-REF3",
-                "E21-REF3",
-                "E22-REF3",
-                "E23-REF3",
-                "E24-REF3"
+                "EEG E17-REF3",
+                "EEG E18-REF3",
+                "EEG E19-REF3",
+                "EEG E20-REF3",
+                "EEG E21-REF3",
+                "EEG E22-REF3",
+                "EEG E23-REF3",
+                "EEG E24-REF3"
             ]
         },
         {
@@ -620,14 +620,14 @@
                 "_2_": null
             },
             "channels": [
-                "E25-REF4",
-                "E26-REF4",
-                "E27-REF4",
-                "E28-REF4",
-                "E29-REF4",
-                "E30-REF4",
-                "E31-REF4",
-                "E32-REF4"
+                "EEG E25-REF4",
+                "EEG E26-REF4",
+                "EEG E27-REF4",
+                "EEG E28-REF4",
+                "EEG E29-REF4",
+                "EEG E30-REF4",
+                "EEG E31-REF4",
+                "EEG E32-REF4"
             ]
         },
         {
@@ -646,14 +646,14 @@
                 "_2_": null
             },
             "channels": [
-                "E1-REF1",
-                "E2-REF1",
-                "E3-REF1",
-                "E4-REF1",
-                "E5-REF1",
-                "E6-REF1",
-                "E7-REF1",
-                "E8-REF1"
+                "EEG E1-REF1",
+                "EEG E2-REF1",
+                "EEG E3-REF1",
+                "EEG E4-REF1",
+                "EEG E5-REF1",
+                "EEG E6-REF1",
+                "EEG E7-REF1",
+                "EEG E8-REF1"
             ]
         },
         {
@@ -672,14 +672,14 @@
                 "_2_": null
             },
             "channels": [
-                "E9-REF2",
-                "E10-REF2",
-                "E11-REF2",
-                "E12-REF2",
-                "E13-REF2",
-                "E14-REF2",
-                "E15-REF2",
-                "E16-REF2"
+                "EEG E9-REF2",
+                "EEG E10-REF2",
+                "EEG E11-REF2",
+                "EEG E12-REF2",
+                "EEG E13-REF2",
+                "EEG E14-REF2",
+                "EEG E15-REF2",
+                "EEG E16-REF2"
             ]
         },
         {
@@ -698,14 +698,14 @@
                 "_2_": null
             },
             "channels": [
-                "E17-REF3",
-                "E18-REF3",
-                "E19-REF3",
-                "E20-REF3",
-                "E21-REF3",
-                "E22-REF3",
-                "E23-REF3",
-                "E24-REF3"
+                "EEG E17-REF3",
+                "EEG E18-REF3",
+                "EEG E19-REF3",
+                "EEG E20-REF3",
+                "EEG E21-REF3",
+                "EEG E22-REF3",
+                "EEG E23-REF3",
+                "EEG E24-REF3"
             ]
         },
         {
@@ -724,14 +724,14 @@
                 "_2_": null
             },
             "channels": [
-                "E25-REF4",
-                "E26-REF4",
-                "E27-REF4",
-                "E28-REF4",
-                "E29-REF4",
-                "E30-REF4",
-                "E31-REF4",
-                "E32-REF4"
+                "EEG E25-REF4",
+                "EEG E26-REF4",
+                "EEG E27-REF4",
+                "EEG E28-REF4",
+                "EEG E29-REF4",
+                "EEG E30-REF4",
+                "EEG E31-REF4",
+                "EEG E32-REF4"
             ]
         },
         {
@@ -750,14 +750,14 @@
                 "_3_": null
             },
             "channels": [
-                "E1-REF1",
-                "E2-REF1",
-                "E3-REF1",
-                "E4-REF1",
-                "E5-REF1",
-                "E6-REF1",
-                "E7-REF1",
-                "E8-REF1"
+                "EEG E1-REF1",
+                "EEG E2-REF1",
+                "EEG E3-REF1",
+                "EEG E4-REF1",
+                "EEG E5-REF1",
+                "EEG E6-REF1",
+                "EEG E7-REF1",
+                "EEG E8-REF1"
             ]
         },
         {
@@ -776,14 +776,14 @@
                 "_3_": null
             },
             "channels": [
-                "E9-REF2",
-                "E10-REF2",
-                "E11-REF2",
-                "E12-REF2",
-                "E13-REF2",
-                "E14-REF2",
-                "E15-REF2",
-                "E16-REF2"
+                "EEG E9-REF2",
+                "EEG E10-REF2",
+                "EEG E11-REF2",
+                "EEG E12-REF2",
+                "EEG E13-REF2",
+                "EEG E14-REF2",
+                "EEG E15-REF2",
+                "EEG E16-REF2"
             ]
         },
         {
@@ -802,14 +802,14 @@
                 "_3_": null
             },
             "channels": [
-                "E17-REF3",
-                "E18-REF3",
-                "E19-REF3",
-                "E20-REF3",
-                "E21-REF3",
-                "E22-REF3",
-                "E23-REF3",
-                "E24-REF3"
+                "EEG E17-REF3",
+                "EEG E18-REF3",
+                "EEG E19-REF3",
+                "EEG E20-REF3",
+                "EEG E21-REF3",
+                "EEG E22-REF3",
+                "EEG E23-REF3",
+                "EEG E24-REF3"
             ]
         },
         {
@@ -828,14 +828,14 @@
                 "_3_": null
             },
             "channels": [
-                "E25-REF4",
-                "E26-REF4",
-                "E27-REF4",
-                "E28-REF4",
-                "E29-REF4",
-                "E30-REF4",
-                "E31-REF4",
-                "E32-REF4"
+                "EEG E25-REF4",
+                "EEG E26-REF4",
+                "EEG E27-REF4",
+                "EEG E28-REF4",
+                "EEG E29-REF4",
+                "EEG E30-REF4",
+                "EEG E31-REF4",
+                "EEG E32-REF4"
             ]
         },
         {
@@ -854,14 +854,14 @@
                 "_2_": null
             },
             "channels": [
-                "E1-REF1",
-                "E2-REF1",
-                "E3-REF1",
-                "E4-REF1",
-                "E5-REF1",
-                "E6-REF1",
-                "E7-REF1",
-                "E8-REF1"
+                "EEG E1-REF1",
+                "EEG E2-REF1",
+                "EEG E3-REF1",
+                "EEG E4-REF1",
+                "EEG E5-REF1",
+                "EEG E6-REF1",
+                "EEG E7-REF1",
+                "EEG E8-REF1"
             ]
         },
         {
@@ -880,14 +880,14 @@
                 "_2_": null
             },
             "channels": [
-                "E9-REF2",
-                "E10-REF2",
-                "E11-REF2",
-                "E12-REF2",
-                "E13-REF2",
-                "E14-REF2",
-                "E15-REF2",
-                "E16-REF2"
+                "EEG E9-REF2",
+                "EEG E10-REF2",
+                "EEG E11-REF2",
+                "EEG E12-REF2",
+                "EEG E13-REF2",
+                "EEG E14-REF2",
+                "EEG E15-REF2",
+                "EEG E16-REF2"
             ]
         },
         {
@@ -906,14 +906,14 @@
                 "_2_": null
             },
             "channels": [
-                "E17-REF3",
-                "E18-REF3",
-                "E19-REF3",
-                "E20-REF3",
-                "E21-REF3",
-                "E22-REF3",
-                "E23-REF3",
-                "E24-REF3"
+                "EEG E17-REF3",
+                "EEG E18-REF3",
+                "EEG E19-REF3",
+                "EEG E20-REF3",
+                "EEG E21-REF3",
+                "EEG E22-REF3",
+                "EEG E23-REF3",
+                "EEG E24-REF3"
             ]
         },
         {
@@ -932,14 +932,14 @@
                 "_2_": null
             },
             "channels": [
-                "E25-REF4",
-                "E26-REF4",
-                "E27-REF4",
-                "E28-REF4",
-                "E29-REF4",
-                "E30-REF4",
-                "E31-REF4",
-                "E32-REF4"
+                "EEG E25-REF4",
+                "EEG E26-REF4",
+                "EEG E27-REF4",
+                "EEG E28-REF4",
+                "EEG E29-REF4",
+                "EEG E30-REF4",
+                "EEG E31-REF4",
+                "EEG E32-REF4"
             ]
         }
     ]
