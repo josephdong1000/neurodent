@@ -508,7 +508,7 @@ class LongRecordingOrganizer:
         extract_func (Callable | str, optional): Function to extract data.
             - If str: name of SpikeInterface or MNE extractor (e.g., 'read_intan', 'read_raw_edf')
             - If Callable: custom extraction function
-            - If None: defaults to si.load_extractor for SI mode
+            - If None: defaults to si.load for SI mode
         manual_datetimes (datetime | list[datetime], optional): Manually provided timestamps.
         datetimes_are_start (bool, optional): If True (default), manual_datetimes are start times.
         n_jobs (int, optional): Number of parallel jobs for MNE resampling. Defaults to 1.
@@ -756,7 +756,7 @@ class LongRecordingOrganizer:
                         "or a file path (e.g. 'path/to/readers.py:func_name')."
                     )
             elif extract_func is None:
-                extract_func = si.load_extractor
+                extract_func = si.load
 
             self.convert_file_with_si_to_recording(
                 extract_func=extract_func,

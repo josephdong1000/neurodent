@@ -3,6 +3,7 @@ Test split, save_recording, and load_recording functionality for LongRecordingOr
 """
 
 import tempfile
+import warnings
 from datetime import datetime
 from pathlib import Path
 
@@ -788,6 +789,31 @@ class TestDatetimeInheritance:
         dummy_long_recording.datetimes_are_start = False
         
         splits = dummy_long_recording.split({"A": ["Ch0"]})
-        
+
         assert splits["A"].datetimes_are_start is False
+
+
+# Default SI Extractor Tests
+
+class TestDefaultSiExtractor:
+    """Guard the default mode='si' load path against the deprecated si.load_extractor."""
+
+    def test_si_mode_load_does_not_use_deprecated_load_extractor(self, tmp_path):
+        """Loading with the default extract_func must not emit the load_extractor warning."""
+        traces = np.random.randn(1000, 2).astype(np.float32)
+        recording = si.NumpyRecording(traces_list=[traces], sampling_frequency=1000.0)
+        input_folder = tmp_path / "input"
+        recording.save(folder=input_folder, format="binary")
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            lro = LongRecordingOrganizer(item=input_folder, mode="si")
+
+        offending = [
+            w for w in caught
+            if issubclass(w.category, DeprecationWarning)
+            and "load_extractor" in str(w.message)
+        ]
+        assert not offending, f"Unexpected load_extractor deprecation: {[str(w.message) for w in offending]}"
+        assert lro.LongRecording.get_num_channels() == 2
 
