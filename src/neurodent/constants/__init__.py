@@ -92,6 +92,7 @@ from .config import (
     GLOBAL_SAMPLING_RATE,
     GLOBAL_DTYPE,
     LINE_FREQ,
+    NEURODENT_SIDECAR_NAME,
 )
 
 __all__ = [
@@ -135,4 +136,5 @@ __all__ = [
     "GLOBAL_SAMPLING_RATE",
     "GLOBAL_DTYPE",
     "LINE_FREQ",
+    "NEURODENT_SIDECAR_NAME",
 ]

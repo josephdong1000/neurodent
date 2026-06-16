@@ -80,7 +80,7 @@ def mock_multi_day_lros():
                     child_lro.base_folder_path = None
                     child_lro._is_in_memory = True
                     child_lro.manual_datetimes = parent_lro.manual_datetimes
-                    child_lro.persist = MagicMock(return_value=Path("/output"))
+                    child_lro.save_recording = MagicMock(return_value=Path("/output"))
                     child_lro.get_date_string.return_value = parent_lro.get_date_string.return_value
                     result[group_name] = child_lro
                 return result
@@ -507,21 +507,38 @@ class TestSplit:
         
         assert splits["AnimalA"].genotype == "HET"
 
-    def test_split_with_persist(self, mock_multi_day_lros, tmp_path):
-        """Test that persist_base triggers LRO.persist() calls."""
+    def test_split_with_output_base(self, mock_multi_day_lros, tmp_path):
+        """Test that output_base triggers LRO.save_recording() calls."""
         parent_ao = AnimalOrganizer.from_lros(
             lros=mock_multi_day_lros,
             animal_id="Combined",
         )
-        
+
         splits = parent_ao.split(
             groups={"AnimalA": ["Ch0", "Ch1"]},
-            persist_base=tmp_path,
+            output_base=tmp_path,
         )
-        
-        # Verify persist was called on each child LRO
+
+        # Verify save_recording was called on each child LRO
         for child_lro in splits["AnimalA"].long_recordings:
-            child_lro.persist.assert_called_once()
+            child_lro.save_recording.assert_called_once()
+
+    def test_split_with_persist_base_deprecated(self, mock_multi_day_lros, tmp_path):
+        """Test that the deprecated persist_base alias still triggers save_recording()."""
+        parent_ao = AnimalOrganizer.from_lros(
+            lros=mock_multi_day_lros,
+            animal_id="Combined",
+        )
+
+        with pytest.warns(DeprecationWarning, match="persist_base"):
+            splits = parent_ao.split(
+                groups={"AnimalA": ["Ch0", "Ch1"]},
+                persist_base=tmp_path,
+            )
+
+        # Verify save_recording was called on each child LRO
+        for child_lro in splits["AnimalA"].long_recordings:
+            child_lro.save_recording.assert_called_once()
 
     def test_split_no_recordings_raises_error(self):
         """Test that split raises error when no recordings loaded."""
@@ -625,23 +642,28 @@ class TestSplitIntegration:
         assert len(splits["GroupA"].long_recordings) == 2
         assert len(splits["GroupB"].long_recordings) == 2
 
-    def test_split_and_persist_real_recordings(self, dummy_multi_day_ao, tmp_path):
-        """Test splitting and persisting real recordings."""
+    def test_split_and_save_real_recordings(self, dummy_multi_day_ao, tmp_path):
+        """Test splitting and saving real recordings to disk."""
         output_base = tmp_path / "output"
-        
+
         splits = dummy_multi_day_ao.split(
             groups={"GroupA": ["Ch0", "Ch1"]},
-            persist_base=output_base,
+            output_base=output_base,
             format="zarr",
         )
-        
+
         # Verify output directories created
         group_a_dir = output_base / "GroupA"
         assert group_a_dir.exists()
-        
+
         # Verify zarr files created
         zarr_files = list(group_a_dir.glob("*.zarr"))
         assert len(zarr_files) == 2
+
+        # Each saved folder carries a NeuRodent sidecar for faithful reload
+        from neurodent import constants
+        for zf in zarr_files:
+            assert (zf / constants.NEURODENT_SIDECAR_NAME).exists()
 
     def test_split_data_integrity(self, dummy_multi_day_ao):
         """Test that split preserves data integrity."""
