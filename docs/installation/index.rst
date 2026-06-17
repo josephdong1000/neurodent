@@ -27,7 +27,8 @@ Get NeuRodent installed and ready for EEG analysis.
 Development Installation
 ------------------------
 
-If you want to contribute to NeuRodent or modify the source code, please see our :doc:`Contributing Guide <../contributing/index>`.
+If you want to contribute to NeuRodent or modify the source code, see the
+`canonical CONTRIBUTING.md guide <https://github.com/josephdong1000/neurodent/blob/main/CONTRIBUTING.md>`_.
 
 Next Steps
 ----------

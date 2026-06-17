@@ -49,7 +49,9 @@ The development extra includes everything needed to contribute to NeuRodent:
 
    pip install neurodent[dev]
 
-See the :doc:`../contributing/index` for development setup instructions.
+See the
+`canonical CONTRIBUTING.md guide <https://github.com/josephdong1000/neurodent/blob/main/CONTRIBUTING.md>`_
+for development setup instructions.
 
 ``[all]`` Extra
 ^^^^^^^^^^^^^^^
