@@ -1,9 +1,11 @@
 """Regression suite for dict-with-null ``manual_datetime`` forward cumulation.
 
-The pipeline supports three ``manual_datetime`` forms per animal:
+The pipeline supports these ``manual_datetime`` forms per animal:
 
-- **dict** with per-session explicit start times,
-- **list** of one datetime per file,
+- **dict** keyed by session, where each value is a scalar start, ``null``
+  (cumulate forward from the previous anchor), or a **list** of one explicit
+  start per file in that session (no cumulation — encodes internal gaps),
+- **list** of one datetime per file (flat, across all sessions),
 - **single value** as a global start.
 
 The single-value form silently mis-orders sessions when ``_natural_sort_key``
@@ -696,3 +698,138 @@ class TestExplicitAnchorOverridesCumulationSilently:
         assert timeline["a"] == datetime(2025, 1, 1, 10, 0, 0)
         assert timeline["b"] == datetime(2025, 1, 1, 11, 0, 0)
         assert timeline["c"] == datetime(2025, 1, 1, 23, 0, 0)
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# Per-session LIST anchors — explicit per-file starts (gap recovery)
+# ─────────────────────────────────────────────────────────────────────────
+
+
+def _make_ao_real_resolve():
+    """Like _make_ao but binds the REAL _resolve_timestamp_input / _assign_session_list
+    / _session_sort_key so list parsing and index ordering are exercised."""
+    ao, durations = _make_ao()
+    ao._resolve_timestamp_input = (
+        results.AnimalOrganizer._resolve_timestamp_input.__get__(ao)
+    )
+    ao._assign_session_list = (
+        results.AnimalOrganizer._assign_session_list.__get__(ao)
+    )
+    ao._session_sort_key = results.AnimalOrganizer._session_sort_key.__get__(ao)
+    ao._items_have_index = results.AnimalOrganizer._items_have_index.__get__(ao)
+    return ao
+
+
+class TestPerSessionList:
+    def test_list_session_assigns_per_item_starts(self):
+        """A list session assigns each file its explicit start (no cumulation)."""
+        ao = _make_ao_real_resolve()
+        animalday = _build_animalday(("_0_", ["s1", "s2", "s3"]))
+        # Deliberately irregular spacing (not equal to the 1h durations).
+        md = {
+            "_0_": [
+                "2011-06-07 16:00:00",
+                "2011-06-07 20:00:00",
+                "2011-06-08 04:00:00",  # 8h gap, not 4h
+            ]
+        }
+        with _patch_lro_durations({"s1": 3600, "s2": 3600, "s3": 3600}):
+            timeline = ao._process_manual_datetimes(md, animalday, {})
+        assert timeline["s1"] == datetime(2011, 6, 7, 16, 0, 0)
+        assert timeline["s2"] == datetime(2011, 6, 7, 20, 0, 0)
+        assert timeline["s3"] == datetime(2011, 6, 8, 4, 0, 0)
+
+    def test_list_then_null_cumulates_from_list_end(self):
+        """A null session after a list cumulates from the list's last file end."""
+        ao = _make_ao_real_resolve()
+        animalday = _build_animalday(("_0_", ["s1", "s2"]), ("_1_", ["t1"]))
+        md = {
+            "_0_": ["2011-06-07 16:00:00", "2011-06-07 22:00:00"],
+            "_1_": None,
+        }
+        # s2 duration 7200s -> last end = 22:00 + 2h = 00:00 next day.
+        with _patch_lro_durations({"s1": 3600, "s2": 7200, "t1": 3600}):
+            timeline = ao._process_manual_datetimes(md, animalday, {})
+        assert timeline["s1"] == datetime(2011, 6, 7, 16, 0, 0)
+        assert timeline["s2"] == datetime(2011, 6, 7, 22, 0, 0)
+        assert timeline["t1"] == datetime(2011, 6, 8, 0, 0, 0)  # cumulated
+
+    def test_mixed_list_scalar_null_arxparv_shape(self):
+        """The real arxparv shape: list _0_, scalar _1_ (reset), null _2_."""
+        ao = _make_ao_real_resolve()
+        animalday = _build_animalday(
+            ("_0_", ["a1", "a2", "a3", "a5", "a6"]),  # Selection4 missing
+            ("_1_", ["b1"]),
+            ("_2_", ["c1"]),
+        )
+        md = {
+            "_0_": [
+                "2011-06-07 16:04:14",
+                "2011-06-07 20:04:12",
+                "2011-06-08 00:04:12",
+                "2011-06-08 08:04:13",  # post-gap: 8h after _0_ start, not 4h
+                "2011-06-08 12:04:14",
+            ],
+            "_1_": "2011-06-08 15:59:48",
+            "_2_": None,
+        }
+        durs = {k: 4 * 3600 for k in ["a1", "a2", "a3", "a5", "a6", "b1", "c1"]}
+        with _patch_lro_durations(durs):
+            timeline = ao._process_manual_datetimes(md, animalday, {})
+        # Post-gap selection lands at its explicit (later) start, NOT 4h early.
+        assert timeline["a5"] == datetime(2011, 6, 8, 8, 4, 13)
+        assert timeline["a6"] == datetime(2011, 6, 8, 12, 4, 14)
+        # _1_ scalar resets the chain.
+        assert timeline["b1"] == datetime(2011, 6, 8, 15, 59, 48)
+        # _2_ null cumulates from _1_ end (15:59:48 + 4h).
+        assert timeline["c1"] == datetime(2011, 6, 8, 19, 59, 48)
+
+    def test_list_gap_ordering_by_index(self):
+        """List entries map to files in natural-sort order even out of order / with a gap."""
+        ao = _make_ao_real_resolve()
+        # Items built OUT OF ORDER; natural sort must restore Selection1,2,3,5,6.
+        items = ["Selection6", "Selection1", "Selection5", "Selection3", "Selection2"]
+        animalday = _build_animalday(("_0_", items))
+        md = {
+            "_0_": [
+                "2011-06-07 16:00:00",  # -> Selection1
+                "2011-06-07 20:00:00",  # -> Selection2
+                "2011-06-08 00:00:00",  # -> Selection3
+                "2011-06-08 08:00:00",  # -> Selection5 (post-gap)
+                "2011-06-08 12:00:00",  # -> Selection6
+            ]
+        }
+        with _patch_lro_durations({k: 3600 for k in items}):
+            timeline = ao._process_manual_datetimes(md, animalday, {})
+        assert timeline["Selection1"] == datetime(2011, 6, 7, 16, 0, 0)
+        assert timeline["Selection5"] == datetime(2011, 6, 8, 8, 0, 0)
+        assert timeline["Selection6"] == datetime(2011, 6, 8, 12, 0, 0)
+
+    def test_list_length_mismatch_raises(self):
+        """List length != number of files in the session -> ValueError naming the session."""
+        ao = _make_ao_real_resolve()
+        animalday = _build_animalday(("_0_", ["s1", "s2", "s3"]))
+        md = {"_0_": ["2011-06-07 16:00:00", "2011-06-07 20:00:00"]}  # 2 != 3
+        with _patch_lro_durations({"s1": 3600, "s2": 3600, "s3": 3600}):
+            with pytest.raises(ValueError, match=r"session '_0_'.*2 entries.*3 item"):
+                ao._process_manual_datetimes(md, animalday, {})
+
+    def test_list_of_iso_strings_parses(self):
+        """ISO string list elements parse to datetimes."""
+        ao = _make_ao_real_resolve()
+        animalday = _build_animalday(("_0_", ["s1", "s2"]))
+        md = {"_0_": ["2011-06-07 16:00:00", "2011-06-07 20:30:45"]}
+        with _patch_lro_durations({"s1": 3600, "s2": 3600}):
+            timeline = ao._process_manual_datetimes(md, animalday, {})
+        assert timeline["s2"] == datetime(2011, 6, 7, 20, 30, 45)
+
+    def test_list_rejected_in_end_time_mode(self):
+        """A list value with datetimes_are_start=False raises."""
+        ao = _make_ao_real_resolve()
+        animalday = _build_animalday(("_0_", ["s1", "s2"]))
+        md = {"_0_": ["2011-06-07 16:00:00", "2011-06-07 20:00:00"]}
+        with _patch_lro_durations({"s1": 3600, "s2": 3600}):
+            with pytest.raises(ValueError, match="datetimes_are_start is False"):
+                ao._process_manual_datetimes(
+                    md, animalday, {"datetimes_are_start": False}
+                )

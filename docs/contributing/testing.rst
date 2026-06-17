@@ -160,6 +160,36 @@ Run this after modifying ``src/neurodent/core/frequency_domain_spike_detection.p
 
 For full usage: ``python scripts/validate_dask_serial_spike_consistency.py --help``
 
+Zeitgeber Timestamp Propagation Validation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+To confirm that ``manual_datetime`` propagates correctly all the way to the
+zeitgeber (day/night) plot, this script builds a *synthetic* recording whose
+amplitude is a known function of Zeitgeber Time, runs the real windowed-analysis
++ zeitgeber pipeline, and checks the feature lands where it should:
+
+.. code-block:: bash
+
+   cd /mnt/isilon/marsh_single_unit/YY_PyEEG/neurodent_Joseph_devtree
+   uv run python scripts/validate_zeitgeber_timestamps.py \
+       --hours 48 --envelope both --start "2020-01-01 06:00:00" \
+       --out results/zeitgeber_validation
+
+The ``square`` envelope is high exactly during ZT night (ZT 12-24); the ``sine``
+envelope peaks at ZT 18. The rendered PNGs should show the high-amplitude band
+sitting under the night shading. Use this when you suspect timestamps are not
+reaching the plots (e.g. a recording shows no expected 24h structure).
+
+**Expected output:**
+
+- ✅ ``[square] ... night>1.5*day -> PASS`` and ``[sine] peak ... ~ZT18 -> PASS``
+- PNGs under ``--out`` with the high-RMS band under the night shading
+- Exit code 0 if all checks pass, 1 otherwise
+
+A fast, numerical version (no PNG) runs in CI as
+``tests/test_zeitgeber_timestamp_propagation.py``. 48h at 1 kHz is ~0.7 GB for
+one channel — run on the cluster or lower ``--hours`` on a small machine.
+
 
 Writing Validation Scripts
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -265,48 +265,80 @@ class TestAnimalOrganizerTimestampHandling:
     @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
     @patch("glob.glob")
     def test_invalid_list_items_error(self, mock_glob, mock_lro_class):
-        """Test that lists with non-datetime items raise errors."""
+        """Test that lists with bad items raise errors.
+
+        Per-file lists now parse ISO date strings, so a list with a non-date
+        TYPE raises TypeError, while an unparseable date STRING raises a parse
+        error (ValueError).
+        """
         # Setup
         mock_glob.return_value = [str(self.folder1)]
         mock_lro_class.return_value = self._create_mock_lro()
 
-        # Test invalid list items
-        invalid_list = [datetime(2023, 1, 15, 10, 0, 0), "not a datetime"]
-
+        # A non-date type in the list -> TypeError
         with pytest.raises(TypeError) as exc_info:
             results.AnimalOrganizer(
                 pattern=str(self.base_path) + "/WT_{animal}_{session}",
                 animal_id=self.animal_id,
-                
-                lro_kwargs={"manual_datetimes": invalid_list},
+                lro_kwargs={
+                    "manual_datetimes": [datetime(2023, 1, 15, 10, 0, 0), 12345]
+                },
             )
-
-        assert "All items in timestamp list must be datetime objects" in str(
+        assert "must be datetime objects or parseable date strings" in str(
             exc_info.value
         )
+
+        # An unparseable date string -> ValueError (dateutil ParserError)
+        with pytest.raises(ValueError):
+            results.AnimalOrganizer(
+                pattern=str(self.base_path) + "/WT_{animal}_{session}",
+                animal_id=self.animal_id,
+                lro_kwargs={
+                    "manual_datetimes": [
+                        datetime(2023, 1, 15, 10, 0, 0),
+                        "not a datetime",
+                    ]
+                },
+            )
 
     @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
     @patch("glob.glob")
     def test_invalid_list_items_error(self, mock_glob, mock_lro_class):
-        """Test that lists with non-datetime items raise errors."""
+        """Test that lists with bad items raise errors.
+
+        Per-file lists now parse ISO date strings, so a list with a non-date
+        TYPE raises TypeError, while an unparseable date STRING raises a parse
+        error (ValueError).
+        """
         # Setup
         mock_glob.return_value = [str(self.folder1)]
         mock_lro_class.return_value = self._create_mock_lro()
 
-        # Test invalid list items
-        invalid_list = [datetime(2023, 1, 15, 10, 0, 0), "not a datetime"]
-
+        # A non-date type in the list -> TypeError
         with pytest.raises(TypeError) as exc_info:
             results.AnimalOrganizer(
                 pattern=str(self.base_path) + "/WT_{animal}_{session}",
                 animal_id=self.animal_id,
-                
-                lro_kwargs={"manual_datetimes": invalid_list},
+                lro_kwargs={
+                    "manual_datetimes": [datetime(2023, 1, 15, 10, 0, 0), 12345]
+                },
             )
-
-        assert "All items in timestamp list must be datetime objects" in str(
+        assert "must be datetime objects or parseable date strings" in str(
             exc_info.value
         )
+
+        # An unparseable date string -> ValueError (dateutil ParserError)
+        with pytest.raises(ValueError):
+            results.AnimalOrganizer(
+                pattern=str(self.base_path) + "/WT_{animal}_{session}",
+                animal_id=self.animal_id,
+                lro_kwargs={
+                    "manual_datetimes": [
+                        datetime(2023, 1, 15, 10, 0, 0),
+                        "not a datetime",
+                    ]
+                },
+            )
 
     @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
     @patch("glob.glob")
@@ -680,13 +712,27 @@ class TestAnimalOrganizerTimestampHandling:
             ao._resolve_timestamp_input(12345, test_folder)
         assert "Invalid timestamp input type" in str(exc_info.value)
 
-        # Test invalid list items
-        invalid_list = [datetime(2023, 1, 15, 10, 0, 0), "not datetime"]
+        # Test list of ISO strings parses to datetimes
+        str_list = ["2023-01-15 10:00:00", "2023-01-15 14:00:00"]
+        result = ao._resolve_timestamp_input(str_list, test_folder)
+        assert result == [
+            datetime(2023, 1, 15, 10, 0, 0),
+            datetime(2023, 1, 15, 14, 0, 0),
+        ]
+
+        # Test invalid list items: non-date type -> TypeError
         with pytest.raises(TypeError) as exc_info:
-            ao._resolve_timestamp_input(invalid_list, test_folder)
-        assert "All items in timestamp list must be datetime objects" in str(
+            ao._resolve_timestamp_input(
+                [datetime(2023, 1, 15, 10, 0, 0), 12345], test_folder
+            )
+        assert "must be datetime objects or parseable date strings" in str(
             exc_info.value
         )
+        # Unparseable date string -> ValueError
+        with pytest.raises(ValueError):
+            ao._resolve_timestamp_input(
+                [datetime(2023, 1, 15, 10, 0, 0), "not datetime"], test_folder
+            )
 
     @patch("glob.glob")
     def test_datetimes_are_start_end_time_support(self, mock_glob):
