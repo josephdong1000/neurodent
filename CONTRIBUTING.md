@@ -57,6 +57,13 @@ pre-commit install
 3. Ensure tests pass and documentation builds successfully.
 4. Open a pull request with a clear description of the change.
 
+Issue templates:
+
+- Bug report:
+  https://github.com/josephdong1000/neurodent/issues/new?template=02-bug-report.md
+- Feature request:
+  https://github.com/josephdong1000/neurodent/issues/new?template=01-feature-request.md
+
 ## Running Tests
 
 ```bash
@@ -194,3 +201,14 @@ When adding scripts in `scripts/`:
 For contributor questions, open an issue:
 
 - https://github.com/josephdong1000/neurodent/issues
+
+For private or sensitive concerns, see:
+
+- Support policy: ./SUPPORT.md
+- Code of Conduct: ./CODE_OF_CONDUCT.md
+
+## Citation
+
+If your work uses NeuRodent, cite the project using:
+
+- Citation metadata: ./CITATION.cff
