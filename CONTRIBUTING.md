@@ -180,6 +180,28 @@ Expected behavior:
 - Identical spike indices at sample precision across modes
 - Exit code `0` when identical, `1` when different
 
+### Zeitgeber Timestamp Propagation
+
+Run:
+
+```bash
+uv run python scripts/validate_zeitgeber_timestamps.py \
+  --hours 48 --envelope both --start "2020-01-01 06:00:00" \
+  --out results/zeitgeber_validation
+```
+
+Builds a synthetic recording whose amplitude is a known function of Zeitgeber Time,
+runs the real windowed-analysis and zeitgeber pipeline, and checks the feature lands
+under the correct day/night shading. Use this when you suspect `manual_datetime` is
+not reaching the plots.
+
+Expected behavior:
+
+- `[square] night>1.5*day -> PASS` and `[sine] peak ~ZT18 -> PASS`
+- Exit code `0` when all checks pass, `1` otherwise
+
+A fast numerical version runs in CI as `tests/test_zeitgeber_timestamp_propagation.py`.
+
 ## Writing New Validation Scripts
 
 When adding scripts in `scripts/`:

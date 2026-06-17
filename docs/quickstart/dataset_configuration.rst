@@ -353,6 +353,47 @@ Alternatively, ``datetimes_are_start`` can be set inside the ``lro_kwargs``
 dict on the animal entry or in the global ``lro_kwargs`` of the dataset
 config YAML.
 
+Per-session anchors and ``null`` cumulation
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When a recording is split into multiple sessions (the ``{session}``
+placeholder in the ``pattern``), ``manual_datetime`` may be a **dict keyed by
+session**. Each value is either an explicit start, or ``null`` to *cumulate
+forward* — i.e. start where the previous session ended (assumes the sessions
+are contiguous). Only the first session needs a known time:
+
+.. code-block:: json
+
+   "manual_datetime": { "_0_": "2011-06-07 16:04:14", "_1_": null, "_2_": null }
+
+Dict **insertion order** is the canonical chronological order. Explicit values
+act as resets; ``null`` only works in start-time mode.
+
+Per-file explicit starts (gap recovery)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+If a session is **not** internally contiguous — e.g. one of its
+``Selection{index}`` files is missing, leaving a gap — contiguous cumulation
+would place every later file in that session too early. Give that session a
+**list** of one explicit start per file (in ``{index}`` order); the remaining
+sessions can stay scalar or ``null``:
+
+.. code-block:: json
+
+   "manual_datetime": {
+       "_0_": ["2011-06-07 16:04:14", "2011-06-07 20:04:12", "2011-06-08 00:04:12",
+               "2011-06-08 08:04:13", "2011-06-08 12:04:14"],
+       "_1_": "2011-06-08 15:59:48",
+       "_2_": null
+   }
+
+Here ``_0_`` is missing ``Selection4``, so its fourth and fifth *present* files
+(``Selection5``/``Selection6``) are anchored at their true post-gap starts
+rather than 4 h early. The list length must equal the number of files
+discovered for that session, and entries are matched to files in ``{index}``
+(natural-sort) order. A following ``null`` session cumulates from the last
+listed file's end. Lists are start-time only.
+
 Full Example
 ~~~~~~~~~~~~
 

@@ -411,12 +411,21 @@ class AnimalOrganizer(AnimalFeatureParser):
             return dt.replace(tzinfo=None)
 
         elif isinstance(input_spec, list):
-            # Validate that all items are datetime objects
-            if not all(isinstance(dt, datetime) for dt in input_spec):
-                raise TypeError(
-                    f"All items in timestamp list must be datetime objects, got: {[type(dt) for dt in input_spec]}"
-                )
-            return input_spec
+            # Resolve each element so JSON string lists (e.g. a per-session list
+            # of ISO start times) parse, while datetime objects pass through.
+            resolved = []
+            for el in input_spec:
+                if isinstance(el, datetime):
+                    resolved.append(el.replace(tzinfo=None))
+                elif isinstance(el, str):
+                    # dateutil raises ValueError on an unparseable string.
+                    resolved.append(dateutil.parser.parse(el).replace(tzinfo=None))
+                else:
+                    raise TypeError(
+                        "All items in timestamp list must be datetime objects or "
+                        f"parseable date strings, got: {[type(dt) for dt in input_spec]}"
+                    )
+            return resolved
 
         elif callable(input_spec):
             try:
@@ -698,9 +707,86 @@ class AnimalOrganizer(AnimalFeatureParser):
         )
         return result, end_dt
 
+    def _assign_session_list(
+        self, sess_key, sess_ts, sess_items, base_lro_kwargs: dict
+    ) -> tuple[dict, datetime]:
+        """Assign explicit per-file start datetimes to one session's items.
+
+        Used by :meth:`_process_manual_datetimes` when a session's value in the
+        ``manual_datetime`` dict is a list (one start per file, no cumulation) —
+        e.g. to encode an internal gap from a missing file.
+
+        Args:
+            sess_key: The session key (for error messages).
+            sess_ts: List of per-file start times (datetime or ISO string), one
+                per item in the session, in ``{index}`` / natural-sort order.
+            sess_items: The session's discovered items.
+            base_lro_kwargs: Kwargs for loading an item to estimate its duration.
+
+        Returns:
+            tuple[dict, datetime]: ``(timeline, anchor_end_dt)`` where ``timeline``
+            maps each item key to its explicit start datetime, and ``anchor_end_dt``
+            is the end of the last file (last start + its duration) — used by a
+            following ``null`` session to cumulate forward.
+
+        Raises:
+            ValueError: If the list length != number of items in the session.
+        """
+        # Order items the same way the merge/timeline does (by {index} when
+        # present). The list is positional, so this MUST match the merge order
+        # in _create_long_recordings.
+        sorted_items = sorted(sess_items, key=self._session_sort_key(sess_items))
+        if len(sess_ts) != len(sorted_items):
+            raise ValueError(
+                f"manual_datetime list for session '{sess_key}' has "
+                f"{len(sess_ts)} entries but the session has "
+                f"{len(sorted_items)} item(s): "
+                f"{[self._get_item_name(f) for f in sorted_items]}. "
+                f"Provide exactly one datetime per file, in index order."
+            )
+
+        context_path = self._get_context_path(sorted_items[0])
+        resolved = self._resolve_timestamp_input(list(sess_ts), context_path)
+
+        timeline = {}
+        for item, start_dt in zip(sorted_items, resolved):
+            timeline[self._get_item_key(item)] = start_dt
+
+        # anchor_end_dt = last file's explicit start + its duration, so a
+        # following null session cumulates from the true end of this session.
+        last_item = sorted_items[-1]
+        last_start = resolved[-1]
+        _kw = base_lro_kwargs.copy()
+        _kw["manual_datetimes"] = last_start
+        temp_lro = core.LongRecordingOrganizer(last_item, **_kw)
+        duration = (
+            temp_lro.LongRecording.get_duration()
+            if hasattr(temp_lro, "LongRecording") and temp_lro.LongRecording
+            else 0.0
+        )
+        anchor_end_dt = last_start + timedelta(seconds=duration)
+        return timeline, anchor_end_dt
+
     def _process_manual_datetimes(
         self, manual_datetimes, animalday_to_items: dict, base_lro_kwargs: dict
     ) -> dict:
+        """Resolve ``manual_datetimes`` into a per-item ``{item_key: start_datetime}`` map.
+
+        Supported forms (per animal):
+
+        - **dict keyed by session** — each value is one of:
+          a scalar start (``datetime``/ISO string) anchoring that session;
+          ``null`` to cumulate forward from the previous session's end (contiguous);
+          or a **list** of one start per file in that session (explicit, no
+          cumulation — use to encode an internal gap from a missing file).
+          Scalar/list values act as resets; nulls before the first explicit
+          anchor are backfilled by walking backward.
+        - **dict keyed by item/filename** — value per file (scalar or per-file list).
+        - **flat list** — one datetime per discovered file across all sessions.
+        - **single datetime/string** — global start for the whole animal.
+
+        Lists and nulls require ``datetimes_are_start=True``.
+        """
         if isinstance(manual_datetimes, dict):
             animal_items = []
             for items in animalday_to_items.values():
@@ -782,6 +868,19 @@ class AnimalOrganizer(AnimalFeatureParser):
                         f"False. Null (cumulate forward) is only supported "
                         f"when timestamps are interpreted as start times."
                     )
+                # Reject per-session lists (explicit per-file starts) in
+                # non-start-time mode — they only make sense as start times.
+                list_sessions = [
+                    k for k, v in manual_datetimes.items() if isinstance(v, list)
+                ]
+                if not datetimes_are_start and list_sessions:
+                    raise ValueError(
+                        f"manual_datetime contains list values for "
+                        f"'{self.animal_id}' (sessions {list_sessions}), but "
+                        f"datetimes_are_start is False. Per-file explicit start "
+                        f"lists are only supported when timestamps are "
+                        f"interpreted as start times."
+                    )
 
                 # Find the first explicit anchor — used to backfill any
                 # null sessions BEFORE it (working backward, assuming
@@ -809,8 +908,15 @@ class AnimalOrganizer(AnimalFeatureParser):
                     anchor_key = ordered_keys[first_explicit_idx]
                     anchor_items = animalday_to_items[anchor_key]
                     anchor_context = self._get_context_path(anchor_items[0])
-                    next_session_start = self._resolve_timestamp_input(
+                    anchor_resolved = self._resolve_timestamp_input(
                         manual_datetimes[anchor_key], anchor_context
+                    )
+                    # A list anchor (explicit per-file starts) resolves to a
+                    # list; the session's start is its earliest file start.
+                    next_session_start = (
+                        min(anchor_resolved)
+                        if isinstance(anchor_resolved, list)
+                        else anchor_resolved
                     )
                     # Iterate prefix sessions in REVERSE so each session's
                     # end_dt equals the next (later) session's start_dt —
@@ -845,6 +951,18 @@ class AnimalOrganizer(AnimalFeatureParser):
                     sess_key = ordered_keys[idx]
                     sess_ts = manual_datetimes[sess_key]
                     sess_items = animalday_to_items[sess_key]
+
+                    # A list value gives explicit per-file start times for this
+                    # session (no cumulation) — e.g. to encode an internal gap
+                    # from a missing file.  Handled self-contained; bypasses
+                    # _compute_global_timeline's anchor-cumulation.
+                    if isinstance(sess_ts, list):
+                        sess_timeline, anchor_end_dt = self._assign_session_list(
+                            sess_key, sess_ts, sess_items, base_lro_kwargs
+                        )
+                        out.update(sess_timeline)
+                        continue
+
                     if sess_ts is None:
                         # anchor_end_dt is guaranteed non-None here because
                         # idx >= first_explicit_idx and the very first
