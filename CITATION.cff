@@ -33,6 +33,7 @@ authors:
     email: marshe@chop.edu
 preferred-citation:
   type: article
+  status: submitted
   title: "NeuRodent: a Python Package and Pipeline for Unifying Rodent EEG Analyses"
   authors:
     - family-names: Dong
