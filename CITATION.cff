@@ -1,0 +1,55 @@
+cff-version: 1.2.0
+message: "If you use NeuRodent, please cite it using the metadata below."
+title: "NeuRodent"
+type: software
+version: 0.3.0
+license: MIT
+repository-code: "https://github.com/josephdong1000/neurodent"
+url: "https://github.com/josephdong1000/neurodent"
+keywords:
+  - neuroscience
+  - electroencephalography
+  - local field potential
+  - pipeline
+  - python
+authors:
+  - family-names: Dong
+    given-names: Joseph P.
+    orcid: "https://orcid.org/0009-0001-8636-6534"
+    email: dongjp@chop.edu
+  - family-names: Oh
+    given-names: Yongtaek
+    orcid: "https://orcid.org/0000-0002-1723-0553"
+    email: ohy2@chop.edu
+  - family-names: Singh
+    given-names: Yastika
+    orcid: "https://orcid.org/0009-0006-2319-5877"
+  - family-names: Wei
+    given-names: Yifan
+    orcid: "https://orcid.org/0009-0002-6391-0071"
+  - family-names: Marsh
+    given-names: Eric D.
+    orcid: "https://orcid.org/0000-0003-3264-0902"
+    email: marshe@chop.edu
+preferred-citation:
+  type: article
+  status: submitted
+  title: "NeuRodent: a Python Package and Pipeline for Unifying Rodent EEG Analyses"
+  authors:
+    - family-names: Dong
+      given-names: Joseph P.
+      orcid: "https://orcid.org/0009-0001-8636-6534"
+    - family-names: Oh
+      given-names: Yongtaek
+      orcid: "https://orcid.org/0000-0002-1723-0553"
+    - family-names: Singh
+      given-names: Yastika
+      orcid: "https://orcid.org/0009-0006-2319-5877"
+    - family-names: Wei
+      given-names: Yifan
+      orcid: "https://orcid.org/0009-0002-6391-0071"
+    - family-names: Marsh
+      given-names: Eric D.
+      orcid: "https://orcid.org/0000-0003-3264-0902"
+  year: 2026
+  url: "https://github.com/josephdong1000/neurodent/blob/main/paper/paper.md"

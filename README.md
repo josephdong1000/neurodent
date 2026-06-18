@@ -83,3 +83,11 @@ If you find NeuRodent useful, please cite our work!
   license   = {MIT}
 }
 ```
+
+Machine-readable citation metadata is also available in [CITATION.cff](./CITATION.cff).
+
+## Community & Governance
+
+- Contributing: [CONTRIBUTING.md](./CONTRIBUTING.md)
+- Support: [SUPPORT.md](./SUPPORT.md)
+- Code of Conduct: [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md)

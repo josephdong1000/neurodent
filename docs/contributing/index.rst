@@ -1,47 +1,22 @@
 Contributing
 ============
 
-We welcome contributions to NeuRodent! This guide will help you get started.
+Contributor documentation has been consolidated into the repository root file:
 
-.. toctree::
-   :maxdepth: 1
-   :hidden:
+- `CONTRIBUTING.md <https://github.com/josephdong1000/neurodent/blob/main/CONTRIBUTING.md>`_
 
-   setup
-   testing
+Use that page as the canonical source for development setup, testing, style, and pull request workflow.
 
-Quick Start
------------
+Related governance files:
 
-.. code-block:: bash
+- `Code of Conduct <https://github.com/josephdong1000/neurodent/blob/main/CODE_OF_CONDUCT.md>`_
+- `Support <https://github.com/josephdong1000/neurodent/blob/main/SUPPORT.md>`_
+- `Citation metadata <https://github.com/josephdong1000/neurodent/blob/main/CITATION.cff>`_
 
-   git clone https://github.com/josephdong1000/neurodent.git
-   cd neurodent
-   make setup  # Requires uv
+.. note::
 
-.. grid:: 2
+   If this docs page does not automatically move you, follow the link above.
 
-   .. grid-item-card:: :octicon:`tools` Setup Guide
-      :link: setup
-      :link-type: doc
+.. raw:: html
 
-      Environment setup, prerequisites, pre-commit hooks, and Makefile commands.
-
-   .. grid-item-card:: :octicon:`beaker` Testing & Development
-      :link: testing
-      :link-type: doc
-
-      Running tests, building documentation, and code style guidelines.
-
-Pull Request Process
---------------------
-
-1. Fork the repository and create a new branch for your feature or bug fix
-2. Make your changes and add tests if applicable
-3. Ensure all tests pass and documentation builds successfully
-4. Submit a pull request with a clear description of the changes
-
-Questions?
-----------
-
-If you have questions, please open an issue on the `GitHub repository <https://github.com/josephdong1000/neurodent>`_.
+   <meta http-equiv="refresh" content="0; url=https://github.com/josephdong1000/neurodent/blob/main/CONTRIBUTING.md">
