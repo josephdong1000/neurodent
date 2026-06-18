@@ -62,7 +62,7 @@ Instances of abusive, harassing, or otherwise unacceptable behavior may be
 reported to the community leaders at:
 
 - dongjp@chop.edu
-- marshe@chop.edu
+- ohy2@chop.edu
 
 All complaints will be reviewed and investigated promptly and fairly.
 
