@@ -22,7 +22,7 @@
   not be reported in public issues.
 - Contact maintainers directly at:
   - dongjp@chop.edu
-  - marshe@chop.edu
+  - ohy2@chop.edu
 
 ## Related governance documents
 
