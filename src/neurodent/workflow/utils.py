@@ -5,6 +5,7 @@ This module provides utilities that reduce boilerplate in Snakemake workflow scr
 """
 
 import copy
+import json
 import logging
 import os
 import sys
@@ -13,6 +14,71 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from neurodent.visualization import WindowAnalysisResult
+
+
+def load_samples_config(path: "str | Path") -> dict:
+    """Load a samples config from a ``.yaml``/``.yml`` or ``.json`` file.
+
+    The format is chosen from the file suffix, so samples configs can be
+    migrated to YAML one dataset at a time while older ``.json`` configs keep
+    working unchanged.
+
+    Args:
+        path: Path to the samples config file. Must end in ``.yaml``, ``.yml``,
+            or ``.json``.
+
+    Returns:
+        dict: The parsed samples config.
+
+    Raises:
+        ValueError: If the file suffix is not a supported config format.
+    """
+    path = Path(path)
+    suffix = path.suffix.lower()
+    if suffix in (".yaml", ".yml"):
+        import yaml
+
+        with open(path, "r") as f:
+            return yaml.safe_load(f)
+    if suffix == ".json":
+        with open(path, "r") as f:
+            return json.load(f)
+    raise ValueError(
+        f"Unsupported samples config format: '{path.suffix}' ({path}). "
+        "Expected .yaml, .yml, or .json."
+    )
+
+
+def resolve_samples_config(config: dict) -> dict:
+    """Resolve the samples config from a merged pipeline ``config``.
+
+    Supports two dataset shapes:
+
+    - **Single-file** datasets carry the samples inventory inline under a
+      top-level ``samples_data`` key (the dataset config and the samples
+      inventory live in one file).
+    - **Two-file** datasets carry a ``samples.samples_file`` path pointing at a
+      separate ``.json``/``.yaml`` samples file (loaded via
+      :func:`load_samples_config`).
+
+    Args:
+        config: The merged Snakemake pipeline config dict.
+
+    Returns:
+        dict: The (unexpanded) samples config.
+
+    Raises:
+        KeyError: If neither ``samples_data`` nor ``samples.samples_file`` is present.
+    """
+    if config.get("samples_data") is not None:
+        return config["samples_data"]
+    samples = config.get("samples", {})
+    if samples.get("samples_file"):
+        return load_samples_config(samples["samples_file"])
+    raise KeyError(
+        "Config needs a top-level 'samples_data' block (inline) or "
+        "'samples.samples_file' (path)."
+    )
 
 
 def setup_snakemake_logging(snakemake) -> logging.Logger:

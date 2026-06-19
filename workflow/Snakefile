@@ -18,7 +18,7 @@ import sys
 import glob
 
 # Import workflow utilities
-from neurodent.workflow.utils import deep_merge_dict, expand_animals_config, format_config_value, increment_memory
+from neurodent.workflow.utils import deep_merge_dict, expand_animals_config, format_config_value, increment_memory, load_samples_config, resolve_samples_config
 
 
 # Load configuration
@@ -67,8 +67,6 @@ else:
 from snakemake.utils import validate
 validate(config, schema="schemas/config.schema.yaml")
 
-samples_file = config["samples"]["samples_file"]
-
 
 # Load sample definitions
 from datetime import datetime
@@ -85,9 +83,8 @@ except ImportError:
         "  uv pip install neurodent[pipeline]\n"
     )
 
-# Load samples config
-with open(samples_file, "r") as f:
-    samples_config = json.load(f)
+# Load samples config: inline 'samples_data' block or 'samples.samples_file' (.json/.yaml)
+samples_config = resolve_samples_config(config)
 
 # Expand unified "animals" list into pipeline keys (if present)
 samples_config = expand_animals_config(samples_config)

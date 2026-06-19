@@ -14,9 +14,20 @@ properties:
   active_dataset:
     type: string
     description: Name of the active dataset configuration
+  samples_data:
+    type: object
+    description: >-
+      Inline samples inventory (data_root, channel aliases, animals) for
+      single-file datasets. Alternative to 'samples.samples_file'.
   samples:
     type: object
     properties:
+      samples_file:
+        type: string
+        description: >-
+          Path to an external samples inventory (.json/.yaml). Two-file datasets
+          use this; single-file datasets inline the inventory under top-level
+          'samples_data' instead.
       truncate_animals:
         description: Limit to first N animals (null for no limit)
         type: ["integer", "null"]
