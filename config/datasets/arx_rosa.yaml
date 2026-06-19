@@ -1,17 +1,579 @@
-# Arx Rosa Project - Unified Configuration for Mixed Formats
-# Per-animal pattern and lro_kwargs are now specified in samples_arx_rosa.json
+# Arx Rosa - single-file dataset config (pipeline settings + inline 'samples_data').
+# Channel mapping per Don Joseph email (2026-06; recorded w/ Almedia); supersedes the old
+# Becca spreadsheet + Almedia MATLAB 'NewMontage'. Hemisphere L/R and the RHD ID->region
+# map are BEST-GUESS (Don gave region only) - pending Almedia's electrode wiring map.
+#
+# EDF: 1 animal = 1 REF bank (E1-8 / E9-16 / E17-24 / E25-32), 8 live ch, odd-pos = L.
+#   Pair order: Motor, Bar(=parietal), Hippo, Visual. Data-checked: 1015 = REF4 (not REF1);
+#   some Vis/Bar channels run hot (artifact?) - leave to bad_channels/LOF.
+# RHD: ports A/B/C, IDs {10,12,14,15,16,17,19,21}, no Aud; Don Config #2 order Bar,Mot,Vis,Hip.
+#   NB the files have 16 live ch/port - the 8 selected here are provisional.
+# Excluded: 1198 only (dead per spreadsheet). 3022-3024 = TAM, montage assumed = Config #2.
+# Absent: Config #1 animals 1293/1306/1307 (would need per-cohort RHD mapping to add).
 
 samples:
-  samples_file: "config/samples_arx_rosa.json"
   quality_filter:
-    exclude_unknown_genotypes: false  # All animals have UNKNOWN genotype (TBD)
+    exclude_unknown_genotypes: false # arx_rosa genotypes are all set (Sham/Tam/control)
 
-# Global defaults for all sessions
+# Global defaults for all sessions (per-animal pattern/lro_kwargs live in samples_data.animals)
 analysis:
   war_generation:
-    pattern: "{index}"  # Default pattern (overridden per animal)
-    datetimes_are_start: true  # timestamps extracted from first RHD/EDF filename per session
-    assume_from_number: false  # samples_arx_rosa.json aliases cover all channels
+    pattern: "{index}" # default pattern (overridden per animal)
+    datetimes_are_start: true # timestamps from the first RHD/EDF filename per session
+    assume_from_number: false # samples_data aliases cover all channels
     lro_kwargs:
-      mode: "si"  # Default: Use SpikeInterface backend
+      mode: "si" # default: SpikeInterface backend
 
+# --- Data inventory (channel aliases + per-animal entries) -------------------------
+samples_data:
+  data_root: /mnt/isilon/marsh_single_unit/PythonEEG Data/Arx Rosa
+  CHNAME_ALIASES:
+    Mot:
+      - EEG E1-REF1
+      - EEG E2-REF1
+      - EEG E9-REF2
+      - EEG E10-REF2
+      - EEG E17-REF3
+      - EEG E18-REF3
+      - EEG E25-REF4
+      - EEG E26-REF4
+      - A-014
+      - A-015
+      - B-014
+      - B-015
+      - C-014
+      - C-015
+      - D-014
+      - D-015
+    Bar:
+      - EEG E3-REF1
+      - EEG E4-REF1
+      - EEG E11-REF2
+      - EEG E12-REF2
+      - EEG E19-REF3
+      - EEG E20-REF3
+      - EEG E27-REF4
+      - EEG E28-REF4
+      - A-010
+      - A-012
+      - B-010
+      - B-012
+      - C-010
+      - C-012
+      - D-010
+      - D-012
+    Vis:
+      - EEG E7-REF1
+      - EEG E8-REF1
+      - EEG E15-REF2
+      - EEG E16-REF2
+      - EEG E23-REF3
+      - EEG E24-REF3
+      - EEG E31-REF4
+      - EEG E32-REF4
+      - A-016
+      - A-017
+      - B-016
+      - B-017
+      - C-016
+      - C-017
+      - D-016
+      - D-017
+    Hip:
+      - EEG E5-REF1
+      - EEG E6-REF1
+      - EEG E13-REF2
+      - EEG E14-REF2
+      - EEG E21-REF3
+      - EEG E22-REF3
+      - EEG E29-REF4
+      - EEG E30-REF4
+      - A-019
+      - A-021
+      - B-019
+      - B-021
+      - C-019
+      - C-021
+      - D-019
+      - D-021
+  LR_ALIASES:
+    L:
+      - EEG E1-REF1
+      - EEG E3-REF1
+      - EEG E5-REF1
+      - EEG E7-REF1
+      - EEG E9-REF2
+      - EEG E11-REF2
+      - EEG E13-REF2
+      - EEG E15-REF2
+      - EEG E17-REF3
+      - EEG E19-REF3
+      - EEG E21-REF3
+      - EEG E23-REF3
+      - EEG E25-REF4
+      - EEG E27-REF4
+      - EEG E29-REF4
+      - EEG E31-REF4
+      - A-010
+      - A-014
+      - A-016
+      - A-019
+      - B-010
+      - B-014
+      - B-016
+      - B-019
+      - C-010
+      - C-014
+      - C-016
+      - C-019
+      - D-010
+      - D-014
+      - D-016
+      - D-019
+    R:
+      - EEG E2-REF1
+      - EEG E4-REF1
+      - EEG E6-REF1
+      - EEG E8-REF1
+      - EEG E10-REF2
+      - EEG E12-REF2
+      - EEG E14-REF2
+      - EEG E16-REF2
+      - EEG E18-REF3
+      - EEG E20-REF3
+      - EEG E22-REF3
+      - EEG E24-REF3
+      - EEG E26-REF4
+      - EEG E28-REF4
+      - EEG E30-REF4
+      - EEG E32-REF4
+      - A-012
+      - A-015
+      - A-017
+      - A-021
+      - B-012
+      - B-015
+      - B-017
+      - B-021
+      - C-012
+      - C-015
+      - C-017
+      - C-021
+      - D-012
+      - D-015
+      - D-017
+      - D-021
+  animals:
+    - id: ArxRosa-1017
+      gene: Arx(F/y)-Rosa(+/wt)-Sham
+      sex: Male
+      channels:
+        - EEG E25-REF4
+        - EEG E26-REF4
+        - EEG E27-REF4
+        - EEG E28-REF4
+        - EEG E29-REF4
+        - EEG E30-REF4
+        - EEG E31-REF4
+        - EEG E32-REF4
+      group: Arx Rosa 1017 1015
+      manual_datetime: # EDF header starts (verified 2026-06; was 11:11:00 anchor + nulls)
+        _: "2015-02-24 09:56:19"
+        _1_: "2015-02-25 09:52:45"
+        _2_: "2015-02-26 09:48:33"
+      pattern: "{data_root}/{animal}/MARSH 20150224ARXROSA10171015{session}Selection{index}.EDF"
+      lro_kwargs:
+        mode: mne
+        extract_func: read_raw_edf
+      bad_channels:
+        # - LMot
+        # - RMot
+        - LBar
+          # - RBar
+          # - LHip
+        - LVis
+        - RVis
+    - id: ArxRosa-1015
+      gene: Arx(F/y)-Rosa(+/wt)-Sham
+      sex: Male
+      channels:
+        - EEG E9-REF2
+        - EEG E10-REF2
+        - EEG E11-REF2
+        - EEG E12-REF2
+        - EEG E13-REF2
+        - EEG E14-REF2
+        - EEG E15-REF2
+        - EEG E16-REF2
+      group: Arx Rosa 1017 1015
+      manual_datetime: # EDF header starts (verified 2026-06; was 11:11:00 anchor + nulls)
+        _: "2015-02-24 09:56:19"
+        _1_: "2015-02-25 09:52:45"
+        _2_: "2015-02-26 09:48:33"
+      pattern: "{data_root}/{animal}/MARSH 20150224ARXROSA10171015{session}Selection{index}.EDF"
+      lro_kwargs:
+        mode: mne
+        extract_func: read_raw_edf
+      bad_channels:
+        - LBar
+        - LVis
+        - RVis
+    - id: ArxRosa-1199
+      gene: Arx(F/y)-Rosa(+/wt)-Tam
+      sex: Male
+      channels:
+        - EEG E1-REF1
+        - EEG E2-REF1
+        - EEG E3-REF1
+        - EEG E4-REF1
+        - EEG E5-REF1
+        - EEG E6-REF1
+        - EEG E7-REF1
+        - EEG E8-REF1
+      group: Arx Rosa 1199 1198 1211 1201
+      manual_datetime:
+        " ": "2016-01-19 12:15:41"  # header start of Section1
+        "-": "2016-01-19 20:15:41"  # inferred: contiguous after Section1+2 (+8h)
+        " 1 ": "2016-01-20 12:11:20"
+        " 2 ": "2016-01-21 12:06:58"
+      pattern: "{data_root}/{animal}/MARSH 20160113ARXROSA*12h15m{session}Section{index}.EDF"
+      lro_kwargs:
+        mode: mne
+        extract_func: read_raw_edf
+      bad_channels:
+        - LMot
+        - LBar
+        - RHip
+        - LVis
+        - RVis
+    - id: ArxRosa-1198
+      gene: Arx(F/y)-Rosa(+/wt)-Tam
+      sex: Male
+      channels:
+        - EEG E17-REF3
+        - EEG E18-REF3
+        - EEG E19-REF3
+        - EEG E20-REF3
+        - EEG E21-REF3
+        - EEG E22-REF3
+        - EEG E23-REF3
+        - EEG E24-REF3
+      group: Arx Rosa 1199 1198 1211 1201
+      manual_datetime:
+        " ": "2016-01-19 12:15:41"  # header start of Section1
+        "-": "2016-01-19 20:15:41"  # inferred: contiguous after Section1+2 (+8h)
+        " 1 ": "2016-01-20 12:11:20"
+        " 2 ": "2016-01-21 12:06:58"
+      pattern: "{data_root}/{animal}/MARSH 20160113ARXROSA*12h15m{session}Section{index}.EDF"
+      lro_kwargs:
+        mode: mne
+        extract_func: read_raw_edf
+      exclude: true # mouse died
+    - id: ArxRosa-1211
+      gene: Arx(F/y)-Rosa(+/wt)-Sham
+      sex: Male
+      channels:
+        - EEG E9-REF2
+        - EEG E10-REF2
+        - EEG E11-REF2
+        - EEG E12-REF2
+        - EEG E13-REF2
+        - EEG E14-REF2
+        - EEG E15-REF2
+        - EEG E16-REF2
+      group: Arx Rosa 1199 1198 1211 1201
+      manual_datetime:
+        " ": "2016-01-19 12:15:41"  # header start of Section1
+        "-": "2016-01-19 20:15:41"  # inferred: contiguous after Section1+2 (+8h)
+        " 1 ": "2016-01-20 12:11:20"
+        " 2 ": "2016-01-21 12:06:58"
+      pattern: "{data_root}/{animal}/MARSH 20160113ARXROSA*12h15m{session}Section{index}.EDF"
+      lro_kwargs:
+        mode: mne
+        extract_func: read_raw_edf
+      bad_channels:
+        - LBar
+        - RBar
+        - LHip
+        - LVis
+        - RVis
+    - id: ArxRosa-1201
+      gene: Arx(F/y)-Rosa(+/wt)-Tam
+      sex: Male
+      channels:
+        - EEG E25-REF4
+        - EEG E26-REF4
+        - EEG E27-REF4
+        - EEG E28-REF4
+        - EEG E29-REF4
+        - EEG E30-REF4
+        - EEG E31-REF4
+        - EEG E32-REF4
+      group: Arx Rosa 1199 1198 1211 1201
+      manual_datetime:
+        " ": "2016-01-19 12:15:41"  # header start of Section1
+        "-": "2016-01-19 20:15:41"  # inferred: contiguous after Section1+2 (+8h)
+        " 1 ": "2016-01-20 12:11:20"
+        " 2 ": "2016-01-21 12:06:58"
+      pattern: "{data_root}/{animal}/MARSH 20160113ARXROSA*12h15m{session}Section{index}.EDF"
+      lro_kwargs:
+        mode: mne
+        extract_func: read_raw_edf
+      bad_channels:
+        - LMot
+        - RMot
+        - LBar
+        - LHip
+        - RHip
+        - LVis
+        - RVis
+    - id: ArxRosa-967
+      gene: Arx(F/y)-Rosa(+/wt)-Tam
+      sex: Male
+      channels:
+        - EEG E1-REF1
+        - EEG E2-REF1
+        - EEG E3-REF1
+        - EEG E4-REF1
+        - EEG E5-REF1
+        - EEG E6-REF1
+        - EEG E7-REF1
+        - EEG E8-REF1
+      group: Arx Rosa  967 968 969 418
+      manual_datetime: # EDF header starts (verified 2026-06; was 09:36:00 anchor + nulls)
+        _: "2014-11-25 09:41:28"
+        _1_: "2014-11-26 09:37:10"
+        _2_: "2014-11-27 09:32:47"
+      pattern: "{data_root}/{animal}/MARSH 20141125ARXROSATAM967968969418{session}Selection{index}.EDF"
+      lro_kwargs:
+        mode: mne
+        extract_func: read_raw_edf
+      bad_channels:
+        - LBar
+        - LHip
+        - LVis
+        - RVis
+    - id: ArxRosa-968
+      gene: Arx(F/y)-Rosa(+/wt)-Tam
+      sex: Male
+      channels:
+        - EEG E9-REF2
+        - EEG E10-REF2
+        - EEG E11-REF2
+        - EEG E12-REF2
+        - EEG E13-REF2
+        - EEG E14-REF2
+        - EEG E15-REF2
+        - EEG E16-REF2
+      group: Arx Rosa  967 968 969 418
+      manual_datetime: # EDF header starts (verified 2026-06; was 09:36:00 anchor + nulls)
+        _: "2014-11-25 09:41:28"
+        _1_: "2014-11-26 09:37:10"
+        _2_: "2014-11-27 09:32:47"
+      pattern: "{data_root}/{animal}/MARSH 20141125ARXROSATAM967968969418{session}Selection{index}.EDF"
+      lro_kwargs:
+        mode: mne
+        extract_func: read_raw_edf
+      bad_channels:
+        # - LMot seems fine
+        # - LBar seems fine
+        - LVis
+        - RVis
+    - id: ArxRosa-969
+      gene: Arx(F/y)-Rosa(+/wt)-Tam
+      sex: Male
+      channels:
+        - EEG E17-REF3
+        - EEG E18-REF3
+        - EEG E19-REF3
+        - EEG E20-REF3
+        - EEG E21-REF3
+        - EEG E22-REF3
+        - EEG E23-REF3
+        - EEG E24-REF3
+      group: Arx Rosa  967 968 969 418
+      manual_datetime: # EDF header starts (verified 2026-06; was 09:36:00 anchor + nulls)
+        _: "2014-11-25 09:41:28"
+        _1_: "2014-11-26 09:37:10"
+        _2_: "2014-11-27 09:32:47"
+      pattern: "{data_root}/{animal}/MARSH 20141125ARXROSATAM967968969418{session}Selection{index}.EDF"
+      lro_kwargs:
+        mode: mne
+        extract_func: read_raw_edf
+      bad_channels:
+        - LMot
+        - RMot
+        - LBar
+        - RBar
+        - RHip
+        - LVis
+        - RVis
+      exclude: true # Very noisy
+    - id: ArxRosa-418
+      gene: Rosa(+/+)
+      sex: Male
+      channels:
+        - EEG E25-REF4
+        - EEG E26-REF4
+        - EEG E27-REF4
+        - EEG E28-REF4
+        - EEG E29-REF4
+        - EEG E30-REF4
+        - EEG E31-REF4
+        - EEG E32-REF4
+      group: Arx Rosa  967 968 969 418
+      manual_datetime: # EDF header starts (verified 2026-06; was 09:36:00 anchor + nulls)
+        _: "2014-11-25 09:41:28"
+        _1_: "2014-11-26 09:37:10"
+        _2_: "2014-11-27 09:32:47"
+      pattern: "{data_root}/{animal}/MARSH 20141125ARXROSATAM967968969418{session}Selection{index}.EDF"
+      lro_kwargs:
+        mode: mne
+        extract_func: read_raw_edf
+      bad_channels:
+        - LBar
+        - RBar
+        - LVis
+        - RVis
+    - id: ArxRosa-2059
+      gene: Arx(F/y)-Rosa(+/wt)-Tam
+      sex: Male
+      channels:
+        - A-010
+        - A-012
+        - A-014
+        - A-015
+        - A-016
+        - A-017
+        - A-019
+        - A-021
+      group: Arx Rosa 2059_2063_2064
+      manual_datetime:
+        "200804": "2020-08-04 08:48:59"
+        "200805": "2020-08-05 00:19:01"
+        "200806": "2020-08-06 00:19:02"
+        "200807": "2020-08-07 00:19:04"
+      pattern: "{data_root}/{animal}/20200804_Arx_Rosa_2059_2063_2064_{session}_{index}.rhd"
+      lro_kwargs:
+        extract_func: read_intan
+        stream_id: "0"
+        ignore_integrity_checks: true
+    - id: ArxRosa-2063
+      gene: Arx(F/y)-Rosa(+/wt)-Sham
+      sex: Male
+      channels:
+        - C-010
+        - C-012
+        - C-014
+        - C-015
+        - C-016
+        - C-017
+        - C-019
+        - C-021
+      group: Arx Rosa 2059_2063_2064
+      manual_datetime:
+        "200804": "2020-08-04 08:48:59"
+        "200805": "2020-08-05 00:19:01"
+        "200806": "2020-08-06 00:19:02"
+        "200807": "2020-08-07 00:19:04"
+      pattern: "{data_root}/{animal}/20200804_Arx_Rosa_2059_2063_2064_{session}_{index}.rhd"
+      lro_kwargs:
+        extract_func: read_intan
+        stream_id: "0"
+        ignore_integrity_checks: true
+    - id: ArxRosa-2064
+      gene: Arx(F/y)-Rosa(+/wt)-Sham
+      sex: Male
+      channels:
+        - D-010
+        - D-012
+        - D-014
+        - D-015
+        - D-016
+        - D-017
+        - D-019
+        - D-021
+      group: Arx Rosa 2059_2063_2064
+      manual_datetime:
+        "200804": "2020-08-04 08:48:59"
+        "200805": "2020-08-05 00:19:01"
+        "200806": "2020-08-06 00:19:02"
+        "200807": "2020-08-07 00:19:04"
+      pattern: "{data_root}/{animal}/20200804_Arx_Rosa_2059_2063_2064_{session}_{index}.rhd"
+      lro_kwargs:
+        extract_func: read_intan
+        stream_id: "0"
+        ignore_integrity_checks: true
+    - id: ArxRosa-3022
+      gene: Arx(F/y)-Rosa(+/wt)-Tam
+      sex: Male
+      channels:
+        - B-010
+        - B-012
+        - B-014
+        - B-015
+        - B-016
+        - B-017
+        - B-019
+        - B-021
+      group: Arx Rosa 3022 3023 3024
+      manual_datetime:
+        "201229": "2020-12-29 08:30:18"
+        "201230": "2020-12-30 00:00:18"
+        "201231": "2020-12-31 08:09:09"
+        "210101": "2021-01-01 00:09:10"
+      pattern: "{data_root}/{animal}/20201229_Arx Rosa_3022_3023_3024_{session}_{index}.rhd"
+      lro_kwargs:
+        extract_func: read_intan
+        stream_id: "0"
+        ignore_integrity_checks: true
+    - id: ArxRosa-3023
+      gene: Arx(F/y)-Rosa(+/wt)-Tam
+      sex: Male
+      channels:
+        - C-010
+        - C-012
+        - C-014
+        - C-015
+        - C-016
+        - C-017
+        - C-019
+        - C-021
+      group: Arx Rosa 3022 3023 3024
+      manual_datetime:
+        "201229": "2020-12-29 08:30:18"
+        "201230": "2020-12-30 00:00:18"
+        "201231": "2020-12-31 08:09:09"
+        "210101": "2021-01-01 00:09:10"
+      pattern: "{data_root}/{animal}/20201229_Arx Rosa_3022_3023_3024_{session}_{index}.rhd"
+      lro_kwargs:
+        extract_func: read_intan
+        stream_id: "0"
+        ignore_integrity_checks: true
+      bad_channels:
+        - RVis
+    - id: ArxRosa-3024
+      gene: Arx(F/y)-Rosa(+/wt)-Tam
+      sex: Male
+      channels:
+        - D-010
+        - D-012
+        - D-014
+        - D-015
+        - D-016
+        - D-017
+        - D-019
+        - D-021
+      group: Arx Rosa 3022 3023 3024
+      manual_datetime:
+        "201229": "2020-12-29 08:30:18"
+        "201230": "2020-12-30 00:00:18"
+        "201231": "2020-12-31 08:09:09"
+        "210101": "2021-01-01 00:09:10"
+      pattern: "{data_root}/{animal}/20201229_Arx Rosa_3022_3023_3024_{session}_{index}.rhd"
+      lro_kwargs:
+        extract_func: read_intan
+        stream_id: "0"
+        ignore_integrity_checks: true
+  data_folders_to_animal_ids: {}
+  bad_folder_animalday: []
