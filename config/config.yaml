@@ -198,12 +198,18 @@ analysis:
             vmin: 50
             vmax: 300
         psdslope:
-          figsize: [10, 3] 
+          figsize: [10, 3]
           cmap: "viridis"
-          norm_type: "fixed"
+          norm_type: "fixed"      # default norm = the slope component's scale
           norm_params:
             vmin: -3
             vmax: 0
+          component_norms:        # per-component overrides (slope uses norm_params above)
+            intercept:
+              norm_type: "fixed"
+              norm_params:
+                vmin: 2           # intercept is positive (~2.4-5.6, 1-99% across EDF+RHD animals)
+                vmax: 6
         zpcorr:
           figsize: [10, 3]
           cmap: "RdBu_r"

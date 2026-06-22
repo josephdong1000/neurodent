@@ -605,6 +605,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         cmap="viridis",
         score_type=None,
         norm=None,
+        component_norms=None,
         **kwargs,
     ):
         """
@@ -631,6 +632,12 @@ class AnimalPlotter(viz.AnimalFeatureParser):
             - matplotlib.colors.Normalize(vmin=0, vmax=1)  # Fixed range
             - matplotlib.colors.CenteredNorm(vcenter=0)  # Auto-detect range around 0
             - matplotlib.colors.LogNorm()  # Logarithmic scale
+        component_norms : dict[str, matplotlib.colors.Normalize], optional
+            Per-component color norms keyed by semantic label (e.g. "slope" /
+            "intercept" for psdslope, or band names). A component listed here
+            overrides ``norm`` for that component's heatmap; components not
+            listed fall back to ``norm``. Useful when a multi-component feature's
+            components live on different scales (e.g. psdslope slope vs intercept).
         \\**kwargs
             Additional arguments passed to matplotlib
         """
@@ -664,6 +671,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                 cmap=cmap,
                 score_type=score_type,
                 norm=norm,
+                component_norms=component_norms,
                 **kwargs,
             )
 
@@ -676,10 +684,15 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         cmap="viridis",
         score_type="z",
         norm=None,
+        component_norms=None,
         **kwargs,
     ):
         """
         Create temporal heatmap for a single feature.
+
+        ``component_norms`` (dict label->Normalize) overrides ``norm`` per
+        semantic component (e.g. {"intercept": Normalize(2, 6)} for psdslope);
+        components not listed use ``norm``.
         """
         # Group by animalday to process each recording session
         for animalday, df_day in df_rowgroup.groupby(level=0):
@@ -754,7 +767,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                         n_bins=n_bins,
                         figsize=figsize,
                         cmap=cmap,
-                        norm=norm,
+                        norm=(component_norms or {}).get(semantic_label, norm),
                         **kwargs,
                     )
                 else:
@@ -792,7 +805,7 @@ class AnimalPlotter(viz.AnimalFeatureParser):
                             n_bins=n_bins,
                             figsize=figsize,
                             cmap=cmap,
-                            norm=norm,
+                            norm=(component_norms or {}).get(label, norm),
                             **kwargs,
                         )
             else:

@@ -48,8 +48,15 @@ def generate_temporal_heatmaps_from_config(animal_plotter, config, animal_id, ou
         for feature_name, heatmap_config in heatmaps_config.items():
             logging.info(f"    - Generating {feature_name} temporal heatmap")
 
-            # Create normalization from config
+            # Create normalization from config (default, applied to all components)
             norm = create_norm_from_config(heatmap_config)
+
+            # Optional per-component norm overrides, keyed by component label
+            # (e.g. psdslope's "intercept" gets its own scale, separate from "slope").
+            component_norms = {
+                label: create_norm_from_config(comp_cfg)
+                for label, comp_cfg in heatmap_config.get("component_norms", {}).items()
+            }
 
             # Generate the heatmap using AnimalPlotter
             animal_plotter.plot_temporal_heatmap(
@@ -57,6 +64,7 @@ def generate_temporal_heatmaps_from_config(animal_plotter, config, animal_id, ou
                 figsize=tuple(heatmap_config["figsize"]),
                 cmap=heatmap_config["cmap"],
                 norm=norm,
+                component_norms=component_norms,
             )
 
             # The AnimalPlotter saves files automatically, but we need to ensure
