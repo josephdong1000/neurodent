@@ -179,6 +179,20 @@ class TestGeneNormalization:
         result = metadata.load_animal_metadata(config)
         assert result["A1"]["gene"] is None
 
+    def test_genotype_accepted_as_alias_for_gene(self):
+        """A config may write 'genotype' instead of 'gene'; it normalizes to 'gene'."""
+        config = {"ANIMAL_METADATA": [{"id": "A1", "sex": "Male", "genotype": "WT"}]}
+        result = metadata.load_animal_metadata(config)
+        assert result["A1"]["gene"] == "WT"
+        assert "genotype" not in result["A1"]  # collapsed to the internal key
+
+    def test_gene_wins_when_both_keys_present(self):
+        """If both 'gene' and 'genotype' are given, 'gene' takes precedence."""
+        config = {"ANIMAL_METADATA": [{"id": "A1", "gene": "WT", "genotype": "KO"}]}
+        result = metadata.load_animal_metadata(config)
+        assert result["A1"]["gene"] == "WT"
+        assert "genotype" not in result["A1"]
+
 
 @pytest.mark.mutates_constants
 class TestGeneNormalizationConfigured:
