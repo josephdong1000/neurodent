@@ -12,6 +12,9 @@ Safety guards - a session is FLAGGED (not auto-written) when it can't be trusted
     gives the day start, not this clip's start).
   - EDF session whose files span more than one recording day (mislabeled files,
     e.g. the arx_rosa '1199' ' ' token spanning Jan 19 + Jan 21).
+  - A session whose config value is a LIST (explicit per-file starts for a
+    missing-file gap, e.g. the arx_parv '29 32 34' '_0_' session) is shown as
+    ``LIST`` in scan and is NEVER overwritten by apply.
 
 Two steps (keep the heavy header reads on SLURM, the write local):
   1. scan  (SLURM): read headers, print report, dump proposals to JSON.
@@ -101,12 +104,20 @@ def scan(config_path: str, out_path: str) -> None:
             elif is_edf and len(days) > 1:
                 flag = f"files span {len(days)} recording days {sorted(map(str, days))}"
             proposed = None if flag else (first_start.strftime(DT_FMT) if first_start else None)
-            cur = mdt.get(sess)
-            cur = cur if isinstance(cur, str) else (None if cur is None else str(cur))
-            verdict = "FLAG " if flag else ("same " if cur == proposed else "WRITE")
-            print(f"  [{verdict}] session {sess!r:>6}: config={cur!r}  ->  {proposed!r}"
-                  + (f"   ({flag})" if flag else ""))
-            gp[sess] = {"proposed": proposed, "flag": flag, "current": cur}
+            cur_raw = mdt.get(sess)
+            is_list = isinstance(cur_raw, list)
+            cur = cur_raw if isinstance(cur_raw, str) else (None if cur_raw is None else str(cur_raw))
+            if is_list:
+                verdict = "LIST "  # gap-handling per-file starts; apply() preserves it
+            elif flag:
+                verdict = "FLAG "
+            elif cur == proposed:
+                verdict = "same "
+            else:
+                verdict = "WRITE"
+            note = f"   ({flag})" if flag else ("   (list preserved)" if is_list else "")
+            print(f"  [{verdict}] session {sess!r:>6}: config={cur!r}  ->  {proposed!r}" + note)
+            gp[sess] = {"proposed": proposed, "flag": flag, "current": cur, "is_list": is_list}
         proposals[group] = gp
 
     Path(out_path).write_text(json.dumps(proposals, indent=2))
@@ -144,10 +155,15 @@ def apply(config_path: str, in_path: str) -> None:
         if not gp or "manual_datetime" not in animal:
             continue
         for sess, info in gp.items():
-            if info["proposed"] and sess in animal["manual_datetime"]:
-                if str(animal["manual_datetime"].get(sess)) != info["proposed"]:
-                    animal["manual_datetime"][sess] = DQ(info["proposed"])
-                    n += 1
+            if sess not in animal["manual_datetime"]:
+                continue
+            # Never overwrite a list-valued session (explicit per-file starts for a
+            # missing-file gap, e.g. arx_parv '29 32 34' '_0_') with a single scalar.
+            if isinstance(animal["manual_datetime"][sess], list):
+                continue
+            if info["proposed"] and str(animal["manual_datetime"][sess]) != info["proposed"]:
+                animal["manual_datetime"][sess] = DQ(info["proposed"])
+                n += 1
     with open(target, "w") as f:
         yaml.dump(doc, f)
     flagged = {g: [s for s, i in gp.items() if i["flag"]] for g, gp in proposals.items()}

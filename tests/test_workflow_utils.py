@@ -392,8 +392,8 @@ class TestExpandAnimalsConfig:
         # Explicit lro_kwargs value should take precedence via setdefault
         assert result["_animal_overrides"]["A10"]["lro_kwargs"]["datetimes_are_start"] is True
 
-    def test_auto_generates_genotype_aliases(self):
-        """GENOTYPE_ALIASES is auto-generated from gene field."""
+    def test_no_auto_genotype_aliases(self):
+        """GENOTYPE_ALIASES is NOT auto-generated from the gene field (dead index removed)."""
         cfg = {
             "data_root": "/data",
             "animals": [
@@ -403,9 +403,7 @@ class TestExpandAnimalsConfig:
             ],
         }
         result = expand_animals_config(cfg)
-        ga = result["GENOTYPE_ALIASES"]
-        assert set(ga["WT"]) == {"A10", "B5"}
-        assert ga["KO"] == ["F22"]
+        assert "GENOTYPE_ALIASES" not in result
 
     def test_explicit_genotype_aliases_preserved(self):
         """Explicit GENOTYPE_ALIASES in config is not overwritten."""
@@ -523,11 +521,8 @@ class TestExpandAnimalsConfig:
         assert result["manual_datetimes"]["AP3B2homo-240-M"] == "2025-11-27 15:39:05"
         assert "AM3" not in result["manual_datetimes"]
 
-        # GENOTYPE_ALIASES auto-generated
-        ga = result["GENOTYPE_ALIASES"]
-        assert "AM3" in ga["WT"]
-        assert "AM5" in ga["Het"]
-        assert "AP3B2homo-240-M" in ga["HOMO"]
+        # GENOTYPE_ALIASES is no longer auto-generated from the gene field
+        assert "GENOTYPE_ALIASES" not in result
 
         # _animal_overrides built
         ov = result["_animal_overrides"]
@@ -676,12 +671,6 @@ class TestExpandAnimalsConfig:
         result = expand_animals_config(cfg)
         meta_ids = {e["id"] for e in result["ANIMAL_METADATA"]}
         assert meta_ids == {"GOOD", "ALSO_GOOD"}
-        # Excluded animal should not appear in GENOTYPE_ALIASES
-        ko_animals = result.get("GENOTYPE_ALIASES", {}).get("KO", [])
-        assert "BAD" not in ko_animals
-        # Non-excluded genotypes should be present
-        assert "GOOD" in result["GENOTYPE_ALIASES"]["WT"]
-        assert "ALSO_GOOD" in result["GENOTYPE_ALIASES"]["Het"]
         # result["animals"] should only contain non-excluded entries
         result_ids = {a["id"] for a in result["animals"]}
         assert result_ids == {"GOOD", "ALSO_GOOD"}

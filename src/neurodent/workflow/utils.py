@@ -141,8 +141,9 @@ def setup_snakemake_logging(snakemake) -> logging.Logger:
 def inject_config_aliases(samples_config: dict):
     """Inject aliases from samples_config into the global neurodent.constants.
 
-    This ensures that custom aliases for genotypes, channel names, and L/R labels
-    are available across all modules in the pipeline. This should be called at the
+    This ensures that custom aliases for genotypes, channel names, L/R labels, and the
+    ``sex``/``gene`` metadata value normalizers (``SEX_ALIASES``/``GENE_ALIASES``) are
+    available across all modules in the pipeline. This should be called at the
     beginning of every Snakemake script that loads WindowAnalysisResults or uses
     channel name parsing.
 
@@ -159,7 +160,13 @@ def inject_config_aliases(samples_config: dict):
         constants.CHNAME_ALIASES = samples_config["CHNAME_ALIASES"]
     if "LR_ALIASES" in samples_config:
         constants.LR_ALIASES = samples_config["LR_ALIASES"]
-    
+    # Value normalizers for the `sex` / `gene` metadata fields (parallel mechanisms);
+    # injected before load_animal_metadata below so the normalization picks them up.
+    if "SEX_ALIASES" in samples_config:
+        constants.SEX_ALIASES = samples_config["SEX_ALIASES"]
+    if "GENE_ALIASES" in samples_config:
+        constants.GENE_ALIASES = samples_config["GENE_ALIASES"]
+
     # New: ANIMAL_METADATA for sex/gene enrichment (required)
     if "ANIMAL_METADATA" in samples_config:
         constants.ANIMAL_METADATA = metadata_module.load_animal_metadata(samples_config)
@@ -316,8 +323,6 @@ def expand_animals_config(samples_config: dict) -> dict:
 
     * ``ANIMAL_METADATA`` – list of ``{id, gene, sex, ...}`` dicts
     * ``manual_datetimes`` – animal_id → datetime string mapping
-    * ``GENOTYPE_ALIASES`` – gene → [animal_id, …] mapping (auto-generated
-      from ``gene`` field unless already present)
     * ``bad_channels`` – animal_id → {session → [channels]} mapping
       (built from per-animal ``bad_channels`` entries)
     * ``_animal_overrides`` – animal_id → per-animal overrides dict (pattern,
@@ -458,16 +463,6 @@ def expand_animals_config(samples_config: dict) -> dict:
     for animal in animals_list:
         if "manual_datetime" in animal:
             result["manual_datetimes"][animal["id"]] = animal["manual_datetime"]
-
-    # --- Auto-generate GENOTYPE_ALIASES from gene field ---
-    if "GENOTYPE_ALIASES" not in result:
-        gene_to_animals: dict[str, list[str]] = {}
-        for animal in animals_list:
-            gene = animal.get("gene")
-            if gene:
-                gene_to_animals.setdefault(gene, []).append(animal["id"])
-        if gene_to_animals:
-            result["GENOTYPE_ALIASES"] = gene_to_animals
 
     # --- Build bad_channels ---
     if "bad_channels" not in result:

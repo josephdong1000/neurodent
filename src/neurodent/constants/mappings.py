@@ -22,6 +22,13 @@ DEFAULT_ID_TO_LR = {
 GENOTYPE_ALIASES = {"WT": ["WT", "wildtype"], "KO": ["KO", "knockout"]}
 """Canonical genotype names mapped to their aliases."""
 
+GENE_ALIASES = {}
+"""Maps a canonical short genotype label to the full ``gene`` strings that normalize
+to it (parallels :data:`SEX_ALIASES`; exact match). Empty default = passthrough (the
+raw ``gene`` value is kept, no warning). Populated per-dataset via ``GENE_ALIASES`` in
+the samples config. Distinct from :data:`GENOTYPE_ALIASES`, which is a gene->animal_id
+index used by the legacy filename parser ``parse_str_to_genotype``."""
+
 SEX_ALIASES = {
     "Male": ["Male", "male", "M", "m"],
     "Female": ["Female", "female", "F", "f"],

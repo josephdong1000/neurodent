@@ -154,6 +154,66 @@ class TestSexNormalization:
         assert result["A1"]["sex"] is None
 
 
+class TestGeneNormalization:
+    """Tests for gene normalization via GENE_ALIASES (parallels sex). Default empty
+    GENE_ALIASES = passthrough, so these need no constant mutation."""
+
+    def test_empty_aliases_passthrough_no_warning(self, caplog):
+        """Default empty GENE_ALIASES keeps the raw gene string with no warning."""
+        import logging
+        from neurodent import constants
+        assert constants.GENE_ALIASES == {}  # default
+        with caplog.at_level(logging.WARNING):
+            config = {"ANIMAL_METADATA": [{"id": "A1", "gene": "Arx(F/y);Parvcre+"}]}
+            result = metadata.load_animal_metadata(config)
+        assert result["A1"]["gene"] == "Arx(F/y);Parvcre+"
+        assert "Unrecognized" not in caplog.text
+
+    def test_none_stays_none(self):
+        config = {"ANIMAL_METADATA": [{"id": "A1", "gene": None}]}
+        result = metadata.load_animal_metadata(config)
+        assert result["A1"]["gene"] is None
+
+    def test_missing_gene_key_defaults_none(self):
+        config = {"ANIMAL_METADATA": [{"id": "A1", "sex": "M"}]}
+        result = metadata.load_animal_metadata(config)
+        assert result["A1"]["gene"] is None
+
+
+@pytest.mark.mutates_constants
+class TestGeneNormalizationConfigured:
+    """Tests for gene normalization when GENE_ALIASES is populated (mirrors sex)."""
+
+    @pytest.fixture
+    def gene_aliases(self):
+        from neurodent import constants
+        original = constants.GENE_ALIASES
+        constants.GENE_ALIASES = {
+            "KO": ["KO", "Arx(F/y);Parvcre+"],
+            "WT": ["WT", "Arx(wt);Parvcre-"],
+        }
+        yield
+        constants.GENE_ALIASES = original
+
+    def test_alias_resolves_to_canonical(self, gene_aliases):
+        config = {"ANIMAL_METADATA": [{"id": "A1", "gene": "Arx(F/y);Parvcre+"}]}
+        result = metadata.load_animal_metadata(config)
+        assert result["A1"]["gene"] == "KO"
+
+    def test_self_alias_is_idempotent(self, gene_aliases):
+        config = {"ANIMAL_METADATA": [{"id": "A1", "gene": "KO"}]}
+        result = metadata.load_animal_metadata(config)
+        assert result["A1"]["gene"] == "KO"
+
+    def test_unknown_passes_through_with_warning(self, gene_aliases, caplog):
+        import logging
+        with caplog.at_level(logging.WARNING):
+            config = {"ANIMAL_METADATA": [{"id": "A1", "gene": "Mut"}]}
+            result = metadata.load_animal_metadata(config)
+        assert result["A1"]["gene"] == "Mut"
+        assert "Unrecognized gene value" in caplog.text
+
+
 class TestLoadAnimalMetadataEdgeCases:
     """Edge case tests for load_animal_metadata."""
 
@@ -258,11 +318,32 @@ class TestInjectConfigAliases:
         
         config = {"GENOTYPE_ALIASES": {"TestGeno": ["T1", "T2"]}}
         inject_config_aliases(config)
-        
+
         assert "TestGeno" in constants.GENOTYPE_ALIASES
         assert constants.GENOTYPE_ALIASES["TestGeno"] == ["T1", "T2"]
-        
+
         # Restore
         if original is not None:
             constants.GENOTYPE_ALIASES = original
+
+    def test_injects_gene_and_sex_aliases(self):
+        """GENE_ALIASES and SEX_ALIASES are injected into constants for normalization."""
+        from neurodent import constants
+        from neurodent.workflow.utils import inject_config_aliases
+
+        original_gene = getattr(constants, "GENE_ALIASES", None)
+        original_sex = getattr(constants, "SEX_ALIASES", None)
+        try:
+            config = {
+                "GENE_ALIASES": {"KO": ["Arx(F/y);Parvcre+"]},
+                "SEX_ALIASES": {"Male": ["dude"]},
+            }
+            inject_config_aliases(config)
+            assert constants.GENE_ALIASES == {"KO": ["Arx(F/y);Parvcre+"]}
+            assert constants.SEX_ALIASES == {"Male": ["dude"]}
+        finally:
+            if original_gene is not None:
+                constants.GENE_ALIASES = original_gene
+            if original_sex is not None:
+                constants.SEX_ALIASES = original_sex
 
