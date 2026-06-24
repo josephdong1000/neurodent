@@ -80,7 +80,8 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
             
             meta = constants.ANIMAL_METADATA[animal_id]
             genotype = meta.get("gene", "Unknown")
-            logger.info(f"Resolved genotype '{genotype}' for {animal_id} from ANIMAL_METADATA")
+            sex = meta.get("sex", "Unknown")
+            logger.info(f"Resolved genotype '{genotype}' and sex '{sex}' for {animal_id} from ANIMAL_METADATA")
 
             # Load data from all source folders
             for folder_info in animal_folders:
@@ -204,6 +205,7 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
                 all_lros,
                 animal_id=animal_id,
                 genotype=genotype,
+                sex=sex,
                 assume_from_number=analysis_config.get("assume_from_number", False),
             )
 

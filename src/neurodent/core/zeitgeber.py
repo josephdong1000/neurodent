@@ -224,7 +224,7 @@ def subtract_zeitgeber_baseline(
         c for c in numeric_cols if c not in skip_cols and not c.endswith("_nobase")
     ]
 
-    group_cols = [c for c in ["animal", "sex", "gene"] if c in df.columns]
+    group_cols = [c for c in ["animal", "sex", "genotype"] if c in df.columns]
 
     result_df = df.copy()
 
@@ -273,8 +273,9 @@ def transform_time_axis(df, time_range=(0, 24), shift=0):
     Args:
         df (pd.DataFrame): Input dataframe.
             Expected format:
-            * 'genotype' (str, optional): Strain info (e.g., 'M_WT', 'F_Mut').
-              Used to derive 'sex' and 'gene' if not present.
+            * 'genotype' (str, optional): Genotype label (e.g., 'WT', 'KO').
+            * 'sex' (str, optional): 'Male'/'Female'. Both 'genotype' and 'sex'
+              are expected to already be present (added by enrich_metadata).
             * 'zt_minutes' (numeric): Zeitgeber-time minutes (0-1440).
         time_range (tuple, optional): No-op since the data layer no longer
             duplicates rows for multi-day plotting.  Kept for backward
@@ -294,7 +295,7 @@ def transform_time_axis(df, time_range=(0, 24), shift=0):
 
     Returns:
         pd.DataFrame: Processed dataframe ready for plotting.
-            Adds 'sex', 'gene', and temporary sorting columns if applicable.
+            Adds temporary sorting columns (genotype_order/sex_order) if applicable.
             Row count is unchanged — call :func:`expand_zt_axis` to
             duplicate rows across multiple ZT cycles.
 
@@ -305,14 +306,6 @@ def transform_time_axis(df, time_range=(0, 24), shift=0):
         raise ValueError(f"time_range start ({time_range[0]}) must be less than end ({time_range[1]})")
     df = df.copy()
 
-    if "genotype" in df.columns and "sex" not in df.columns:
-        df["sex"] = df["genotype"].str[0].apply(
-            lambda x: normalize_value_from_aliases(x, constants.SEX_ALIASES)
-        )
-
-    if "genotype" in df.columns and "gene" not in df.columns:
-        df["gene"] = df["genotype"].str[2:]
-
     # Apply time shift.  When non-zero, recompute daynight so labels stay
     # consistent with the new zt_minutes.
     if shift != 0 and "zt_minutes" in df.columns:
@@ -321,9 +314,9 @@ def transform_time_axis(df, time_range=(0, 24), shift=0):
             df["daynight"] = _compute_daynight(df["zt_minutes"])
 
     sort_cols = []
-    if "gene" in df.columns:
-        genotype_order = {"WT": 0, "Het": 1, "Mut": 2}
-        df["genotype_order"] = df["gene"].map(genotype_order).fillna(99)
+    if "genotype" in df.columns:
+        genotype_order = {"WT": 0, "Het": 1, "KO": 2, "Mut": 2}
+        df["genotype_order"] = df["genotype"].map(genotype_order).fillna(99)
         sort_cols.append("genotype_order")
 
     if "sex" in df.columns:

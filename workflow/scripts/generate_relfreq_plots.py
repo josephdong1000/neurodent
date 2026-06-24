@@ -207,7 +207,7 @@ def create_relfreq_plot(df, feature, feature_label, hue, hue_order, palette, log
     feature_label : str
         Label for x-axis
     hue : str
-        Column name for hue (e.g., 'gene' or 'band')
+        Column name for hue (e.g., 'genotype' or 'band')
     hue_order : list
         Order of hue categories
     palette : list
@@ -275,8 +275,8 @@ def create_relfreq_plots_from_df(df_weighted, feature, feature_label, output_dir
                 df=df_band,
                 feature=feature,
                 feature_label=f"{feature_label} ({band})",
-                hue="gene",
-                hue_order=sorted(df_weighted["gene"].unique().tolist()),  # Dynamic hue order
+                hue="genotype",
+                hue_order=sorted(df_weighted["genotype"].unique().tolist()),  # Dynamic hue order
                 palette=["blue", "blueviolet", "red"],
                 log_scale=False,
                 output_path=output_dir / f"{feature}_relfreq_{band}.{figure_format}",
@@ -307,8 +307,8 @@ def create_relfreq_plots_from_df(df_weighted, feature, feature_label, output_dir
             df=df_weighted,
             feature=feature,
             feature_label=feature_label,
-            hue="gene",
-            hue_order=sorted(df_weighted["gene"].unique().tolist()),  # Dynamic hue order
+            hue="genotype",
+            hue_order=sorted(df_weighted["genotype"].unique().tolist()),  # Dynamic hue order
             palette=["blue", "blueviolet", "red"],
             log_scale=False,
             output_path=output_dir / f"{feature}_relfreq.{figure_format}",

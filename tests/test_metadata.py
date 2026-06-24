@@ -75,7 +75,7 @@ class TestEnrichMetadata:
         result = metadata.enrich_metadata(df, animal_meta)
         
         assert list(result["sex"]) == ["Male", "Female"]
-        assert list(result["gene"]) == ["WT", "Mut"]
+        assert list(result["genotype"]) == ["WT", "Mut"]
 
     def test_missing_animal_raises(self):
         """Test error when animal not in metadata."""
@@ -93,7 +93,7 @@ class TestEnrichMetadata:
         # Should return unchanged
         result = metadata.enrich_metadata(df, animal_meta)
         assert "sex" not in result.columns
-        assert "gene" not in result.columns
+        assert "genotype" not in result.columns
 
     def test_empty_dataframe(self):
         """Test enrichment of empty DataFrame."""
@@ -102,7 +102,7 @@ class TestEnrichMetadata:
         
         result = metadata.enrich_metadata(df, animal_meta)
         assert "sex" in result.columns
-        assert "gene" in result.columns
+        assert "genotype" in result.columns
         assert len(result) == 0
 
     def test_missing_sex_field(self):
@@ -119,7 +119,7 @@ class TestEnrichMetadata:
         df = pd.DataFrame({"animal": ["M1"], "value": [1]})
         
         result = metadata.enrich_metadata(df, animal_meta)
-        assert pd.isna(result["gene"].iloc[0]) or result["gene"].iloc[0] is None
+        assert pd.isna(result["genotype"].iloc[0]) or result["genotype"].iloc[0] is None
 
 
 class TestSexNormalization:

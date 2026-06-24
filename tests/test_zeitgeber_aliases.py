@@ -27,20 +27,20 @@ def test_enrich_with_genotype_aliases():
     # 1. Check Anim1-M
     # Key="M_HOMO" -> Sex=Male, Gene=HOMO
     row1 = result[result["animal"] == "Anim1-M"].iloc[0]
-    assert row1["gene"] == "HOMO"
+    assert row1["genotype"] == "HOMO"
     assert row1["sex"] == "Male"
     
     # 2. Check Anim2
     # Key="_HET" -> Sex=None, Gene=HET
     row2 = result[result["animal"] == "Anim2"].iloc[0]
-    assert row2["gene"] == "HET"
+    assert row2["genotype"] == "HET"
     # Sex is None
     assert pd.isna(row2["sex"]) or row2["sex"] is None
     
     # 3. Check Anim3-F
     # Key="F_WT" -> Sex=Female, Gene=WT
     row3 = result[result["animal"] == "Anim3-F"].iloc[0]
-    assert row3["gene"] == "WT"
+    assert row3["genotype"] == "WT"
     assert row3["sex"] == "Female"
 
 def test_enrich_aliases_precedence():
@@ -56,6 +56,6 @@ def test_enrich_aliases_precedence():
     result = zeitgeber.enrich_genotype_metadata(df, genotype_aliases=aliases)
     
     # Should be MUTANT, not WT
-    assert result.iloc[0]["gene"] == "MUTANT"
+    assert result.iloc[0]["genotype"] == "MUTANT"
     # Sex becomes None/NaN because alias "_MUTANT" doesn't provide it
     assert pd.isna(result.iloc[0]["sex"]) or result.iloc[0]["sex"] is None

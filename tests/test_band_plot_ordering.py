@@ -170,9 +170,9 @@ class TestSoPlotBandAxisOrder:
         # The bygeno plot uses band as the colour mapping, not the x-axis;
         # the same fix has to apply there too.
         df = self._build_df()
-        df["gene"] = "WT"
+        df["genotype"] = "WT"
         p = (
-            so.Plot(df, x="gene", y="value", color="band")
+            so.Plot(df, x="genotype", y="value", color="band")
             .add(so.Dot(), so.Dodge())
             .scale(color=ExperimentPlotter.band_scale(plot_lib=so))
         )

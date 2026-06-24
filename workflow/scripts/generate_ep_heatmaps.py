@@ -104,11 +104,15 @@ def filter_wars_by_sex(wars, sex):
 
 
 def determine_baseline_key(found_genotypes, sex):
-    """Determine the baseline genotype key for difference maps."""
-    if "WT" in found_genotypes:
-        return "WT"
-    else:
-        return "WT"
+    """Determine the baseline genotype key for difference maps.
+
+    Prefer the first genotype in ``DF_SORT_ORDER["genotype"]`` that is actually
+    present (typically "WT"); fall back to the first observed genotype.
+    """
+    for g in constants.DF_SORT_ORDER.get("genotype", []):
+        if g in found_genotypes:
+            return g
+    return found_genotypes[0] if found_genotypes else None
 
 
 def generate_difference_heatmaps(wars, features, output_dir, config):
@@ -146,7 +150,8 @@ def generate_difference_heatmaps(wars, features, output_dir, config):
                 plot_order=plot_order,
             )
 
-            # Determine baseline key
+            # Determine baseline key from the genotypes actually present in this sex bucket
+            found_genotypes = sorted({war.genotype for war in sex_wars})
             baseline_key = determine_baseline_key(found_genotypes, sex)
             if baseline_key not in found_genotypes:
                  logger.warning(f"Could not find exact baseline genotype for {sex}. Using {baseline_key} (might fail). Found: {found_genotypes}")

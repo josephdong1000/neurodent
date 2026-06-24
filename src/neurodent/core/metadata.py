@@ -98,14 +98,17 @@ def resolve_metadata(animal_id: str, animal_metadata: dict) -> dict:
 
 def enrich_metadata(df: pd.DataFrame, animal_metadata: dict) -> pd.DataFrame:
     """
-    Add 'sex' and 'gene' columns to DataFrame from animal metadata.
-    
+    Add 'sex' and 'genotype' columns to DataFrame from animal metadata.
+
+    The metadata dict key remains 'gene' (the dataset-config field name); the
+    canonical DataFrame column is 'genotype'.
+
     Args:
         df: DataFrame with 'animal' column.
         animal_metadata: Dict from load_animal_metadata().
-    
+
     Returns:
-        DataFrame with 'sex' and 'gene' columns added.
+        DataFrame with 'sex' and 'genotype' columns added.
     
     Raises:
         KeyError: If any animal in df is not found in metadata.
@@ -135,7 +138,7 @@ def enrich_metadata(df: pd.DataFrame, animal_metadata: dict) -> pd.DataFrame:
         raise KeyError(f"Animals not found in ANIMAL_METADATA: {missing_animals}")
     
     df["sex"] = sexes
-    df["gene"] = genes
-    
-    logger.info(f"Enriched {len(df)} rows with sex/gene metadata")
+    df["genotype"] = genes
+
+    logger.info(f"Enriched {len(df)} rows with sex/genotype metadata")
     return df

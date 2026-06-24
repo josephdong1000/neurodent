@@ -607,6 +607,46 @@ class TestPipelineContinuation:
                     f"after:  {loaded.result[col].iloc[i]!r}"
                 )
 
+    def test_pipeline_sex_genotype_relay_via_metadata(self, war_env):
+        """Full-chain relay guard: even when a WAR is saved with STALE baked
+        sex/genotype, loading re-enriches BOTH fields from ANIMAL_METADATA into
+        the object attrs AND the per-row columns (what every renderer reads).
+        Also asserts the unified schema (canonical ``genotype``, no ``gene``).
+
+        This is the regression guard for the sex="Unknown" fragility — it follows
+        both fields (genotype is the control that already worked) end-to-end
+        through the production save/load entry points.
+        """
+        import tempfile
+        from pathlib import Path
+
+        from neurodent import constants
+        from neurodent.visualization import WindowAnalysisResult
+
+        _ao, war, _ds = war_env
+        animal_id = war.animal_id
+        meta = constants.ANIMAL_METADATA[animal_id]
+        expected_sex, expected_geno = meta["sex"], meta["gene"]
+        assert expected_sex in ("Male", "Female")  # synthetic ExWT=Male / ExKO=Female
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Reproduce the historical bug: bake STALE metadata into the saved WAR.
+            war.sex = "Unknown"
+            war.genotype = "StaleGeno"
+            war.result["sex"] = "Unknown"
+            war.result["genotype"] = "StaleGeno"
+            war.save_parquet_and_json(tmpdir, filename="war")
+            # Load with config present -> loader re-enriches BOTH fields from config.
+            loaded = WindowAnalysisResult.load_parquet_and_json(folder_path=Path(tmpdir))
+
+        # Attrs AND the load-bearing per-row columns are corrected (not the stale bake).
+        assert loaded.sex == expected_sex
+        assert loaded.genotype == expected_geno
+        assert list(loaded.result["sex"].unique()) == [expected_sex]
+        assert list(loaded.result["genotype"].unique()) == [expected_geno]
+        # Unified schema: canonical 'genotype', no redundant 'gene' column.
+        assert "gene" not in loaded.result.columns
+
     def test_pipeline_war_streaming_equivalent_to_eager(self, war_env):
         """Pipeline-generated WAR: streaming reorder_and_pad matches the eager path.
 
