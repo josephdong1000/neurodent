@@ -2516,8 +2516,45 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
         self._update_instance_vars()
 
+        # Single source of truth: re-enrich sex/genotype from the active config
+        # (constants.ANIMAL_METADATA) so every WAR construction — generation, disk
+        # load, copy — yields metadata consistent with the config.
+        self._enrich_metadata_from_constants()
+
         logging.info(f"Channel names: \t{self.channel_names}")
         logging.info(f"Channel abbreviations: \t{self.channel_abbrevs}")
+
+    def _enrich_metadata_from_constants(self) -> None:
+        """Overwrite ``sex``/``genotype`` from ``constants.ANIMAL_METADATA``.
+
+        Makes the dataset config (loaded into ``constants.ANIMAL_METADATA`` by
+        ``inject_config_aliases``) the single source of truth for per-animal
+        metadata, applied identically to ``sex`` and ``genotype`` at every WAR
+        construction. Updates BOTH the object attributes AND the per-row
+        ``result["sex"]``/``result["genotype"]`` columns (downstream renderers read
+        the columns, not the attributes).
+
+        Guarded for portability: if the animal is absent from
+        ``constants.ANIMAL_METADATA`` (e.g. a standalone load without
+        ``inject_config_aliases``), the baked values are left untouched. A metadata
+        field that is ``None`` does not overwrite a baked value.
+
+        Note: the ``ANIMAL_METADATA`` key is ``"gene"`` (the config field name); the
+        WAR's canonical attribute/column is ``"genotype"``.
+        """
+        animal_id = self.animal_id
+        if animal_id is None or animal_id not in constants.ANIMAL_METADATA:
+            return
+        meta = constants.ANIMAL_METADATA[animal_id]
+        for attr, new_val in (("genotype", meta.get("gene")), ("sex", meta.get("sex"))):
+            if new_val is None:
+                continue  # don't overwrite a baked value with None
+            old_val = getattr(self, attr, None)
+            if old_val != new_val:
+                logging.info(f"Re-enriched {animal_id}: {attr} {old_val!r} -> {new_val!r}")
+            setattr(self, attr, new_val)
+            if isinstance(self.result, pd.DataFrame):
+                self.result[attr] = new_val
 
     def __str__(self) -> str:
         return f"{self.animaldays}"

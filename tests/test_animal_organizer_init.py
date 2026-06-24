@@ -53,6 +53,22 @@ class TestAnimalOrganizerInitialization:
         expected_animalday = "Animal WT Jan-01-2022"
         assert ao.animaldays[0] == expected_animalday
 
+    def test_from_lros_sets_sex_and_genotype(self, mock_lro):
+        """from_lros must honor both genotype AND sex. Regression guard: the
+        war_generation script previously passed genotype but not sex, baking
+        sex='Unknown' into every WAR (parquet column + JSON sidecar)."""
+        ao = AnimalOrganizer.from_lros(
+            [mock_lro], animal_id="Animal", genotype="KO", sex="Female"
+        )
+        assert ao.genotype == "KO"
+        assert ao.sex == "Female"
+
+    def test_from_lros_sex_defaults_unknown(self, mock_lro):
+        """sex defaults to 'Unknown' when not provided (the default that caused
+        the bug when the caller omitted sex)."""
+        ao = AnimalOrganizer.from_lros([mock_lro], animal_id="Animal")
+        assert ao.sex == "Unknown"
+
     def test_from_lros_fails_without_metadata(self, mock_lro):
         """Test that from_lros fails hard if metadata date is missing."""
         mock_lro.get_date_string.side_effect = ValueError("No timestamps")

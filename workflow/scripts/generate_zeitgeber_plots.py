@@ -84,7 +84,7 @@ def generate_plots(df, output_dir, data_dir, zt_config):
         df.to_pickle(data_dir / "zeitgeber_processed.pkl")
     
     # Log animal counts for reference
-    animal_counts = df.groupby(['gene', 'sex'])['animal'].nunique()
+    animal_counts = df.groupby(['genotype', 'sex'])['animal'].nunique()
     logger.info(f"Animal counts by genotype and sex:\n{animal_counts}")
     
     # Generate all plots

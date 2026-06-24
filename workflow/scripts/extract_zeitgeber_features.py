@@ -174,7 +174,7 @@ def main():
 
         # Define grouping columns based on what's available and what should be grouped
         # We want to keep animal-level metadata and the time bin.
-        potential_group_cols = ["animal", "genotype", "sex", "gene", "zt_minutes", "daynight"]
+        potential_group_cols = ["animal", "genotype", "sex", "zt_minutes", "daynight"]
         group_cols = [c for c in potential_group_cols if c in df.columns]
         
         df = df.groupby(group_cols).agg(agg_dict).reset_index()

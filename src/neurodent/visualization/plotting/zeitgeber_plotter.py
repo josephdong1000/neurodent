@@ -87,7 +87,7 @@ class ZeitgeberPlotter:
         df = pd.concat(dfs, ignore_index=True)
 
         # Aggregate by time bins
-        group_cols = ["animal", "genotype", "sex", "gene", "zt_minutes"]
+        group_cols = ["animal", "genotype", "sex", "zt_minutes"]
         group_cols = [c for c in group_cols if c in df.columns]
 
         feature_cols = [c for c in df.select_dtypes(include=[np.number]).columns
@@ -123,8 +123,8 @@ class ZeitgeberPlotter:
 
         try:
             p = (
-                so.Plot(plot_df, x="zt_minutes", y=feature, color="gene")
-                .facet(col="sex", row="gene")
+                so.Plot(plot_df, x="zt_minutes", y=feature, color="genotype")
+                .facet(col="sex", row="genotype")
                 .add(so.Line(linewidth=2), so.Agg())
                 .add(so.Dot(), so.Agg())
                 .add(so.Band(), so.Est())

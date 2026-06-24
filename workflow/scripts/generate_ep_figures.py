@@ -33,15 +33,10 @@ from neurodent.workflow import (
 )
 
 def infer_metadata_columns(df):
-    """
-    Add 'gene' column from genotype. Sex is expected to already be present from WAR data.
-    """
-    df = df.copy()
-
-    # Map gene from genotype — genotype is plain (WT/Het/Mut), use directly
-    if "genotype" in df.columns:
-        df["gene"] = df["genotype"]
-    return df
+    """No-op passthrough: ``genotype`` is the canonical metadata column and is
+    already present on WAR-derived frames (``sex`` likewise). Formerly added a
+    redundant alias column."""
+    return df.copy()
 
 def process_feature_dataframe(df, feature):
     """Process feature dataframe by adding categorical columns and pivoting.
@@ -77,9 +72,7 @@ def process_feature_dataframe(df, feature):
         df["isday"] = df["isday"].map(lambda x: "Day" if x else "Night")
 
     # Create pivot table
-    pivot_index = ["animal", "gene", "sex"] if "gene" in df.columns and "sex" in df.columns else ["animal"]
-    if "genotype" in df.columns and "gene" not in df.columns:
-        pivot_index.append("genotype")
+    pivot_index = ["animal", "genotype", "sex"] if "genotype" in df.columns and "sex" in df.columns else ["animal"]
     if "freq" in df.columns:
         pivot_index.append("freq")
         
@@ -158,7 +151,7 @@ def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
         if ftype in (constants.FeatureType.LINEAR, constants.FeatureType.SIMPLE_MATRIX):
             # Bar plot with individual points
             p = (
-                so.Plot(df, x="sex", y=feature, color="gene", marker="sex")
+                so.Plot(df, x="sex", y=feature, color="genotype", marker="sex")
                 .facet(col="isday")
                 .add(so.Dash(color="k"), so.Agg(), so.Dodge(empty="drop", gap=0.2))
                 .add(so.Range(color="k"), so.Est(errorbar="sd"), so.Dodge(empty="drop", gap=0.2))
@@ -180,7 +173,7 @@ def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
             # seaborn-objects' Dodge/Jitter/Est can drop pd.Categorical order.
             # See ExperimentPlotter.band_scale docstring.
             p1 = (
-                so.Plot(df, x="band", y=feature, color="gene", marker="sex")
+                so.Plot(df, x="band", y=feature, color="genotype", marker="sex")
                 .facet(col="isday")
                 .add(so.Dash(color="k"), so.Agg(), so.Dodge())
                 .add(so.Range(color="k"), so.Est(errorbar="sd"), so.Dodge())
@@ -203,7 +196,7 @@ def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
             # By genotype plot — same Nominal(order=...) treatment for the
             # band-as-colour mapping so the legend reads in canonical order.
             p2 = (
-                so.Plot(df, x="gene", y=feature, color="band", marker="sex")
+                so.Plot(df, x="genotype", y=feature, color="band", marker="sex")
                 .facet(col="isday")
                 .add(so.Dash(color="k"), so.Agg(), so.Dodge())
                 .add(so.Range(color="k"), so.Est(errorbar="sd"), so.Dodge())
@@ -223,7 +216,7 @@ def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
             ylim = (1e-4, 1) if feature == "normpsd" else (0.3, 1e5)
             for scale in [so.Continuous(), "log"]:
                 p = (
-                    so.Plot(df, x="freq", y=feature, color="gene")
+                    so.Plot(df, x="freq", y=feature, color="genotype")
                     .facet(col="sex", row="isday")
                     .add(so.Line(), so.Agg())
                     .add(so.Band(), so.Est())
