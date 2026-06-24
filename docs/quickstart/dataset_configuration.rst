@@ -169,11 +169,13 @@ describes all available parameters:
      - Yes
      - Unique identifier for the animal (e.g. ``"M1"``, ``"AP3B2homo-240-M"``).
        Used as the primary key throughout the pipeline.
-   * - ``gene``
+   * - ``gene`` (or ``genotype``)
      - string
      - Yes
-     - Genotype label (e.g. ``"WT"``, ``"KO"``, ``"Het"``). Used to
-       auto-generate ``GENOTYPE_ALIASES`` and for downstream grouping.
+     - Genotype label (e.g. ``"WT"``, ``"KO"``, ``"Het"``). Either key name is
+       accepted (they are the same field); it surfaces as the ``genotype`` column
+       for downstream grouping. Optionally normalized to a short label via
+       ``GENE_ALIASES``.
    * - ``sex``
      - string
      - Yes

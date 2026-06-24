@@ -24,9 +24,12 @@ def load_animal_metadata(samples_config: dict) -> dict:
     so datasets without a ``GENE_ALIASES`` block keep their raw ``gene`` strings. Any
     extra fields on an entry (e.g. ``cohort``) are preserved unchanged.
 
+    The genotype field may be written as either ``gene`` or ``genotype`` in the config
+    (they are the same concept); ``genotype`` is normalized to the internal ``gene`` key.
+
     Args:
         samples_config: Dict containing "ANIMAL_METADATA" key with list of
-                        {"id": str, "sex": str, "gene": str} objects.
+                        {"id": str, "sex": str, "gene"|"genotype": str} objects.
 
     Returns:
         Dict mapping animal_id -> {"sex": str, "gene": str, ...}, with ``sex``/``gene``
@@ -49,6 +52,13 @@ def load_animal_metadata(samples_config: dict) -> dict:
         animal_id = entry["id"]
         # Copy all fields from entry (extra fields like cohort/notes pass through)
         metadata_dict[animal_id] = entry.copy()
+        # Accept 'genotype' as an alias for the canonical 'gene' input field -- they are
+        # the same concept (the value surfaces as the 'genotype' column/attr downstream).
+        # A config may write either key; normalize to the internal 'gene' here.
+        _entry = metadata_dict[animal_id]
+        if "genotype" in _entry:
+            _entry.setdefault("gene", _entry["genotype"])
+            del _entry["genotype"]
         # Normalize the `sex` and `gene` fields the same way: ensure the key exists
         # (default None), then map the raw value to its canonical label via the
         # field's alias dict (read from constants at call time so inject_config_aliases
