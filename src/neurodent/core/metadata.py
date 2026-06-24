@@ -16,14 +16,22 @@ logger = logging.getLogger(__name__)
 def load_animal_metadata(samples_config: dict) -> dict:
     """
     Load ANIMAL_METADATA from samples config into a lookup dict.
-    
+
+    The ``sex`` and ``gene`` fields are normalized identically: each raw value is
+    mapped to its canonical label via the field's alias dict (``constants.SEX_ALIASES``
+    and ``constants.GENE_ALIASES``). A value matching no alias is kept as-is with a
+    warning; an empty alias dict (``GENE_ALIASES`` by default) is a silent passthrough,
+    so datasets without a ``GENE_ALIASES`` block keep their raw ``gene`` strings. Any
+    extra fields on an entry (e.g. ``cohort``) are preserved unchanged.
+
     Args:
         samples_config: Dict containing "ANIMAL_METADATA" key with list of
                         {"id": str, "sex": str, "gene": str} objects.
-    
+
     Returns:
-        Dict mapping animal_id -> {"sex": str, "gene": str}
-    
+        Dict mapping animal_id -> {"sex": str, "gene": str, ...}, with ``sex``/``gene``
+        normalized to their canonical labels.
+
     Raises:
         KeyError: If ANIMAL_METADATA is missing.
         ValueError: If entries are malformed.
@@ -39,29 +47,30 @@ def load_animal_metadata(samples_config: dict) -> dict:
             raise ValueError(f"Missing 'id' in metadata entry: {entry}")
         
         animal_id = entry["id"]
-        # Copy all fields from entry
+        # Copy all fields from entry (extra fields like cohort/notes pass through)
         metadata_dict[animal_id] = entry.copy()
-        # Ensure sex and gene keys exist (default to None if missing)
-        # This preserves backward compatibility with code expecting these keys
-        if "sex" not in metadata_dict[animal_id]:
-            metadata_dict[animal_id]["sex"] = None
-        else:
-            # Normalize sex abbreviations to canonical form (e.g. "M" -> "Male")
-            raw_sex = metadata_dict[animal_id]["sex"]
-            if raw_sex is None:
-                pass  # Leave as None
+        # Normalize the `sex` and `gene` fields the same way: ensure the key exists
+        # (default None), then map the raw value to its canonical label via the
+        # field's alias dict (read from constants at call time so inject_config_aliases
+        # overrides apply). An empty alias dict is a passthrough that keeps the raw
+        # value with no warning -- this is GENE_ALIASES' default, so datasets without
+        # a GENE_ALIASES block keep their `gene` string verbatim (backward compatible).
+        for field, alias_dict in (("sex", constants.SEX_ALIASES), ("gene", constants.GENE_ALIASES)):
+            raw_value = metadata_dict[animal_id].get(field)
+            if raw_value is None:
+                metadata_dict[animal_id][field] = None
+                continue
+            if not alias_dict:
+                continue  # no aliases configured -> keep raw value, no warning
+            normalized = normalize_value_from_aliases(raw_value, alias_dict)
+            if normalized is None:
+                logger.warning(
+                    f"Unrecognized {field} value '{raw_value}' for animal '{animal_id}'; "
+                    f"expected one of "
+                    f"{[a for aliases in alias_dict.values() for a in aliases]}"
+                )
             else:
-                normalized = normalize_value_from_aliases(raw_sex, constants.SEX_ALIASES)
-                if normalized is None:
-                    logger.warning(
-                        f"Unrecognized sex value '{raw_sex}' for animal '{animal_id}'; "
-                        f"expected one of "
-                        f"{[a for aliases in constants.SEX_ALIASES.values() for a in aliases]}"
-                    )
-                else:
-                    metadata_dict[animal_id]["sex"] = normalized
-        if "gene" not in metadata_dict[animal_id]:
-            metadata_dict[animal_id]["gene"] = None
+                metadata_dict[animal_id][field] = normalized
     
     logger.info(f"Loaded metadata for {len(metadata_dict)} animals")
     return metadata_dict
