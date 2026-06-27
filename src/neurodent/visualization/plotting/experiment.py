@@ -88,10 +88,10 @@ class ExperimentPlotter:
         else:
             self.channel_names = [war.channel_names for war in wars]
         self.channel_to_idx = [
-            {e: i for i, e in enumerate(chnames)} for chnames in self.channel_names
+            {e: i for i, e in enumerate(ch_names)} for ch_names in self.channel_names
         ]
         self.all_channel_names = sorted(
-            list(set([name for chnames in self.channel_names for name in chnames]))
+            list(set([name for ch_names in self.channel_names for name in ch_names]))
         )
 
         # Check for inhomogeneous channel numbers/names

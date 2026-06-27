@@ -3,5 +3,15 @@
     "animals": [
         {"id": "ExWT", "sex": "M", "gene": "WT"},
         {"id": "ExKO", "sex": "F", "gene": "KO", "bad_channels": ["LHip", "RHip"]}
-    ]
+    ],
+    "channels": {
+        "LAud": ["9"],
+        "LVis": ["10"],
+        "LHip": ["12"],
+        "LBar": ["14"],
+        "RBar": ["17"],
+        "RHip": ["19"],
+        "RVis": ["21"],
+        "RAud": ["22"]
+    }
 }

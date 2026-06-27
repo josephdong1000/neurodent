@@ -18,7 +18,7 @@ from pathlib import Path
 from dask.distributed import Client, LocalCluster
 
 from neurodent import constants, core, visualization
-from neurodent.workflow import setup_snakemake_logging, inject_config_aliases
+from neurodent.workflow import setup_snakemake_logging, apply_samples_config
 from neurodent.workflow.utils import apply_path_overrides, resolve_animal_pattern, get_discovery_animal_filter
 
 
@@ -49,7 +49,7 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
     core.set_temp_directory(config["temp_directory"])
 
     # Set aliases
-    inject_config_aliases(samples_config)
+    apply_samples_config(samples_config)
     
     # Logging key
     animal_key = f"{animal_id} (across {len(animal_folders)} folders)"
@@ -91,7 +91,7 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
                 logger.info(f"Loading session: {folder_path} (ID in metadata: {source_animal_id})")
 
                 # Check if this animal has channels defined (indicates joint session)
-                is_joint = source_animal_id in samples_config.get("_animal_channels", {})
+                is_joint = source_animal_id in samples_config.get("_animal_channel_subsets", {})
 
                 # Apply session-specific overrides from dataset config
                 session_analysis_config = analysis_config.copy()
@@ -181,7 +181,6 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
                     discovery_pattern,
                     animal_id=discovery_animal_filter,
                     skip_sessions=session_analysis_config.get("skip_sessions", session_analysis_config.get("skip_days", [])),
-                    assume_from_number=session_analysis_config["assume_from_number"],
                     lro_kwargs=session_lro_kwargs,
                 )
 
@@ -206,7 +205,6 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
                 animal_id=animal_id,
                 genotype=genotype,
                 sex=sex,
-                assume_from_number=analysis_config.get("assume_from_number", False),
             )
 
             # Compute bad channels

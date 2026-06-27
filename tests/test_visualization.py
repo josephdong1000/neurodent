@@ -297,7 +297,6 @@ class TestWindowAnalysisResult:
         assert war_copy.genotype == filtering_war.genotype
         assert war_copy.sex == filtering_war.sex
         assert war_copy.channel_names == filtering_war.channel_names
-        assert war_copy.assume_from_number == filtering_war.assume_from_number
         assert war_copy.suppress_short_interval_error == filtering_war.suppress_short_interval_error
 
         # Check that DataFrames are equal but independent
@@ -1080,7 +1079,6 @@ class TestWindowAnalysisResultFiltering:
         assert filtered.genotype == filtering_war.genotype
         assert filtered.sex == filtering_war.sex
         assert filtered.channel_names == filtering_war.channel_names
-        assert filtered.assume_from_number == filtering_war.assume_from_number
         assert filtered.bad_channels_dict == filtering_war.bad_channels_dict
 
     def test_edge_case_empty_bad_channels_dict(self):
@@ -1490,7 +1488,6 @@ class TestAnimalPlotter:
         war.genotype = "WT"
         war.channel_names = ["LMot", "RMot"]
         war.channel_abbrevs = ["LM", "RM"]
-        war.assume_from_number = False
         # Only provide the 'cohere' column, not individual band columns
         band_names = constants.BAND_NAMES + ["pcorr"]
         cohere_dicts = []
@@ -1504,10 +1501,7 @@ class TestAnimalPlotter:
     @pytest.fixture
     def plotter(self, mock_war):
         """Create an AnimalPlotter instance."""
-        plotter = AnimalPlotter(mock_war)
-        # Add the missing attribute
-        plotter.CHNAME_TO_ABBREV = [("LeftMotor", "LM"), ("RightMotor", "RM")]
-        return plotter
+        return AnimalPlotter(mock_war)
 
     def test_init(self, plotter, mock_war):
         """Test AnimalPlotter initialization."""
@@ -1516,12 +1510,6 @@ class TestAnimalPlotter:
         assert plotter.channel_names == ["LMot", "RMot"]
         assert plotter.channel_abbrevs == ["LM", "RM"]
         assert plotter.n_channels == 2
-
-    def test_abbreviate_channel(self, plotter):
-        """Test channel abbreviation."""
-        # Test with a known channel name
-        result = plotter._abbreviate_channel("LeftMotor")
-        assert result == "LM"
 
     @patch("matplotlib.pyplot.subplots")
     @patch("matplotlib.pyplot.show")
@@ -3451,7 +3439,6 @@ class TestWindowAnalysisResultLOF:
                 "genotype": war_with_lof.genotype,
                 "sex": war_with_lof.sex,
                 "channel_names": war_with_lof.channel_names,
-                "assume_from_number": war_with_lof.assume_from_number,
                 "bad_channels_dict": getattr(war_with_lof, "bad_channels_dict", {}),
                 "suppress_short_interval_error": getattr(war_with_lof, "suppress_short_interval_error", False),
                 "lof_scores_dict": lof_scores_dict,
@@ -3923,7 +3910,6 @@ class TestWindowAnalysisResultParquetJsonParameters:
                 "animal_id": "A1",
                 "genotype": "WT",
                 "channel_names": ["LMot", "RMot"],
-                "assume_from_number": False,
                 "bad_channels_dict": {},
                 "suppress_short_interval_error": False,
                 "lof_scores_dict": {},
@@ -4394,7 +4380,7 @@ class TestStreamReorderAndPad:
             assert list(re_eager.result.columns) == list(re_stream.result.columns)
             assert len(re_eager.result) == len(re_stream.result)
 
-            # JSON-normalised comparison handles ndarray/tuple/list/dict
+            # JSON-normalized comparison handles ndarray/tuple/list/dict
             # equivalently (the load-side decode may return lists where the
             # original held tuples or ndarrays — both serialise the same).
             encoder = WindowAnalysisResult._NumpyEncoder
@@ -4904,7 +4890,7 @@ class TestLazyWindowAnalysisResult:
     def test_lazy_save_metadata_round_trip(self, lazy_synthetic_war):
         """JSON sidecar after lazy save preserves every metadata field a
         downstream rule depends on (animal_id, channel_names, lof_scores_dict,
-        bad_channels_dict, assume_from_number).
+        bad_channels_dict).
         """
         lazy_synthetic_war.bad_channels_dict = {
             "A1_20230101": ["LMot"],
@@ -4933,9 +4919,6 @@ class TestLazyWindowAnalysisResult:
             assert out_meta["animal_id"] == "A1"
             assert out_meta["lof_scores_dict"] == lazy_synthetic_war.lof_scores_dict
             assert out_meta["bad_channels_dict"] == lazy_synthetic_war.bad_channels_dict
-            # assume_from_number must be preserved (regression guard for the LOF
-            # channel-filter chain on raw-named channels like ``D-015``).
-            assert out_meta["assume_from_number"] == lazy_synthetic_war.assume_from_number
 
 
 class TestTimestampHandling:
@@ -4980,7 +4963,7 @@ class TestTimestampHandling:
         )
 
     def test_tzlocal_datetime_roundtrip_to_utc(self):
-        """pyarrow can't serialise tzlocal(); save normalises to UTC."""
+        """pyarrow can't serialise tzlocal(); save normalizes to UTC."""
         from dateutil.tz import tzlocal
         ts = pd.Series([
             pd.Timestamp("2023-01-01 10:00", tz=tzlocal()),
@@ -5092,7 +5075,6 @@ class TestAnimalOrganizerLOF:
         ao.genotype = "WT"
         ao.sex = "Male"
         ao.channel_names = ["LMot", "RMot"]
-        ao.assume_from_number = False
         ao.bad_channels_dict = {}
 
         # Mock long_recordings with LOF scores
@@ -5144,7 +5126,6 @@ class TestAnimalOrganizerLOF:
             ao.genotype,
             ao.sex,
             ao.channel_names,
-            ao.assume_from_number,
             ao.bad_channels_dict,
             False,  # suppress_short_interval_error
             lof_scores_dict,

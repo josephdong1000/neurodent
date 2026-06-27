@@ -8,7 +8,6 @@ analysis:
   war_generation:
     pattern:
       - "{data_root}/{animal}/{session}/{index}.EDF"
-    assume_from_number: false
     datetimes_are_start: true
     lro_kwargs:
       mode: "mne"

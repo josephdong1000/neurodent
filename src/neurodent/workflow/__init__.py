@@ -14,17 +14,17 @@ This module provides:
 from .utils import (
     setup_snakemake_logging,
     load_wars,
-    inject_config_aliases,
+    apply_samples_config,
     expand_animals_config,
     extend_plot_order_from_attr,
-    build_sex_marker_scale,
+    create_sex_marker_scale,
 )
 
 __all__ = [
     "setup_snakemake_logging",
     "load_wars",
-    "inject_config_aliases",
+    "apply_samples_config",
     "expand_animals_config",
     "extend_plot_order_from_attr",
-    "build_sex_marker_scale",
+    "create_sex_marker_scale",
 ]

@@ -616,14 +616,13 @@ class TestFrequencyDomainSpikeAnalysisResultUtils:
         fdsar.bin_folder_name = None
         fdsar.metadata = None
         fdsar.channel_names = ["ch1", "ch2"]
-        fdsar.assume_from_number = False
 
         # Mock the parse function
-        with patch("neurodent.core.parse_chname_to_abbrev") as mock_parse:
+        with patch("neurodent.core.resolve_channel") as mock_parse:
             mock_parse.return_value = "parsed"
 
             fdsar.channel_abbrevs = [
-                core.parse_chname_to_abbrev(x, assume_from_number=False) for x in fdsar.channel_names
+                core.resolve_channel(x) for x in fdsar.channel_names
             ]
 
             assert len(fdsar.channel_abbrevs) == 2

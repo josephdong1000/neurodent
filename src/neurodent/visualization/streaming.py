@@ -37,7 +37,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from .. import constants
-from ..core.utils import abbreviate_channel_names, atomic_write_json, safe_unlink, slugify
+from ..core.utils import resolve_channels, atomic_write_json, safe_unlink, slugify
 from .feature_handlers import handler_for
 from .filters import (
     FILTER_REGISTRY,
@@ -109,7 +109,9 @@ class Transform(abc.ABC):
 class ReorderAndPadChannels(Transform):
     """Reorder + pad channel axis to match ``target_channels``."""
 
-    def __init__(self, target_channels: list[str], use_abbrevs: bool = True):
+    def __init__(self, target_channels: list[str] | None = None, use_abbrevs: bool = True):
+        if target_channels is None:
+            target_channels = list(constants.CHANNEL_ABBREVS)
         duplicates = [ch for ch in target_channels if target_channels.count(ch) > 1]
         if duplicates:
             raise ValueError(
@@ -132,15 +134,10 @@ class ReorderAndPadChannels(Transform):
         # Advance ctx.channel_info so subsequent transforms see the post-reorder
         # channel set during their own bind() / pass1().  channel_names becomes
         # target_channels; channel_abbrevs is re-derived from those names.
-        from ..core.utils import abbreviate_channel_names as _abbrev
+        from ..core.utils import resolve_channels as _abbrev
         ctx.channel_info = ChannelInfo(
             channel_names=list(self.target_channels),
-            channel_abbrevs=_abbrev(
-                list(self.target_channels),
-                strict_matching=False,
-                assume_from_number=ci.assume_from_number,
-            ),
-            assume_from_number=ci.assume_from_number,
+            channel_abbrevs=_abbrev(list(self.target_channels)),
         )
 
     def apply(self, batch_df):
@@ -155,11 +152,6 @@ class ReorderAndPadChannels(Transform):
     def update_metadata(self, metadata):
         metadata = dict(metadata)
         metadata["channel_names"] = list(self.target_channels)
-        # NOTE: preserve assume_from_number from the source. The eager
-        # reorder_and_pad_channels does not touch self.assume_from_number,
-        # and downstream rules (e.g. channel_filter_lof) rely on the
-        # number-based fallback in parse_chname_to_abbrev when the source
-        # LOF dict stores raw channel labels like ``D-015``.
         return metadata
 
 
@@ -410,16 +402,10 @@ class LazyWindowAnalysisResult:
         self._metadata: dict = json.loads(self._src_json.read_text())
         # Channel info derived from JSON metadata; no DataFrame materialised yet.
         channel_names = list(self._metadata.get("channel_names") or [])
-        assume_from_number = self._metadata.get("assume_from_number", False)
-        channel_abbrevs = abbreviate_channel_names(
-            channel_names,
-            strict_matching=False,
-            assume_from_number=assume_from_number,
-        )
+        channel_abbrevs = resolve_channels(channel_names)
         self._channel_info = ChannelInfo(
             channel_names=channel_names,
             channel_abbrevs=channel_abbrevs,
-            assume_from_number=assume_from_number,
         )
         # Inspect the parquet schema for encoded-column metadata + row count.
         pf = pq.ParquetFile(self._src_parquet)
@@ -494,8 +480,12 @@ class LazyWindowAnalysisResult:
     # ---- Chained mutators (record transforms) ----
 
     def reorder_and_pad_channels(
-        self, target_channels: list[str], use_abbrevs: bool = True
+        self, target_channels: list[str] | None = None, use_abbrevs: bool = True
     ) -> "LazyWindowAnalysisResult":
+        # Mirror WindowAnalysisResult.reorder_and_pad_channels: a None target
+        # defaults to the canonical channel list (constants.CHANNEL_ABBREVS).
+        if target_channels is None:
+            target_channels = list(constants.CHANNEL_ABBREVS)
         self._pending.append(ReorderAndPadChannels(target_channels, use_abbrevs))
         return self
 

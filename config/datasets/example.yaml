@@ -12,7 +12,6 @@ samples:
 analysis:
   war_generation:
     pattern: "{animal}/{session}/{index}.nwb"   # layout: session_folder/{animal}/{session}/*.nwb
-    assume_from_number: true
     skip_sessions: []
     lro_kwargs:
       mode: "si"              # load NWB files via SpikeInterface

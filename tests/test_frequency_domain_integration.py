@@ -69,7 +69,6 @@ class TestFrequencyDomainSpikeDetectionIntegration:
                     str(TEST_DATA_BASE / animal_id) + "/{index}_Meta.csv",
                 ],
                 animal_id,
-                assume_from_number=True,
                 lro_kwargs={
                     "mode": "si",
                     "extract_func": read_bin_csv_pair,

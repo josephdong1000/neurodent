@@ -45,16 +45,13 @@ def mock_war():
     war.genotype = "WT"
     war.channel_names = ["LMot", "RMot"]
     war.channel_abbrevs = ["LM", "RM"]
-    war.assume_from_number = False
     return war
 
 
 @pytest.fixture()
 def plotter(mock_war):
     """Create an AnimalPlotter backed by the mock WAR."""
-    p = AnimalPlotter(mock_war)
-    p.CHNAME_TO_ABBREV = [("LeftMotor", "LM"), ("RightMotor", "RM")]
-    return p
+    return AnimalPlotter(mock_war)
 
 
 # ---------------------------------------------------------------------------
@@ -173,17 +170,7 @@ def _make_grouprows_matrix(n_time=10, n_chan=N_CHAN, features=None, rng=None):
 
 
 # ===================================================================
-# 1. _abbreviate_channel – fallback path (line 54)
-# ===================================================================
-
-class TestAbbreviateChannel:
-    def test_fallback_returns_original_name(self, plotter):
-        """When no alias matches, the original name is returned."""
-        assert plotter._abbreviate_channel("UnknownRegion") == "UnknownRegion"
-
-
-# ===================================================================
-# 2. _calculate_standard_data – all score_type branches (lines 320-336)
+# 1. _calculate_standard_data – all score_type branches (lines 320-336)
 # ===================================================================
 
 class TestCalculateStandardData:

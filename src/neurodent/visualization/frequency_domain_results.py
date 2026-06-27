@@ -25,7 +25,7 @@ except ImportError:  # pragma: no cover
     SPIKEINTERFACE_AVAILABLE = False
 
 from .. import core
-from ..core.utils import abbreviate_channel_names, slugify
+from ..core.utils import resolve_channels, slugify
 from .results import AnimalFeatureParser
 
 
@@ -49,7 +49,6 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
         bin_folder_name: str = None,
         metadata: core.RecordingMetadata = None,
         channel_names: list[str] = None,
-        assume_from_number=False,
     ) -> None:
         """
         Initialize FrequencyDomainSpikeAnalysisResult.
@@ -65,7 +64,6 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
             bin_folder_name (str, optional): Binary folder name
             metadata (core.RecordingMetadata, optional): Recording metadata
             channel_names (list[str], optional): List of channel names
-            assume_from_number (bool, optional): Assume channel names from numbers
         """
         # Ensure exactly one of result_sas or result_mne is provided (like SpikeAnalysisResult)
         if (result_mne is None) == (result_sas is None):
@@ -81,11 +79,8 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
         self.bin_folder_name = bin_folder_name
         self.metadata = metadata
         self.channel_names = channel_names
-        self.assume_from_number = assume_from_number
 
-        self.channel_abbrevs = abbreviate_channel_names(
-            self.channel_names, assume_from_number=assume_from_number
-        )
+        self.channel_abbrevs = resolve_channels(self.channel_names)
 
         logging.info(f"Channel names: \t{self.channel_names}")
         logging.info(f"Channel abbreviations: \t{self.channel_abbrevs}")
@@ -125,7 +120,6 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
         animal_day: str = None,
         bin_folder_name: str = None,
         metadata: core.RecordingMetadata = None,
-        assume_from_number: bool = False,
     ):
         """
         Create FrequencyDomainSpikeAnalysisResult from raw detection outputs.
@@ -140,7 +134,6 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
             animal_day: Recording day identifier
             bin_folder_name: Binary folder name
             metadata: Recording metadata
-            assume_from_number: Assume channel names from numbers
 
         Returns:
             FrequencyDomainSpikeAnalysisResult: Initialized result object
@@ -167,7 +160,6 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
             bin_folder_name=bin_folder_name,
             metadata=metadata,
             channel_names=channel_names,
-            assume_from_number=assume_from_number,
         )
 
     @staticmethod
@@ -285,7 +277,7 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
         folder: Union[str, Path],
         convert_to_mne=True,
         make_folder=True,
-        save_abbrevs_as_chnames=False,
+        save_abbrevs=False,
         overwrite=False,
         multiprocess_mode: Literal["dask", "serial"] = "serial",
         chunk_duration_s: float = 60,
@@ -303,7 +295,7 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
             folder: Destination folder to save results
             convert_to_mne: If True, convert to MNE if needed
             make_folder: If True, create folder if it doesn't exist
-            save_abbrevs_as_chnames: If True, save abbreviations as channel names
+            save_abbrevs: If True, save abbreviations as channel names
             overwrite: If True, overwrite existing files
             multiprocess_mode: Whether to use Dask for parallel conversion.
                 Defaults to "serial".
@@ -356,8 +348,7 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
             "animal_day": self.animal_day,
             "bin_folder_name": self.bin_folder_name,
             "metadata": self.metadata.metadata_path if self.metadata else None,
-            "channel_names": self.channel_abbrevs if save_abbrevs_as_chnames else self.channel_names,
-            "assume_from_number": False if save_abbrevs_as_chnames else self.assume_from_number,
+            "channel_names": self.channel_abbrevs if save_abbrevs else self.channel_names,
             "detection_params": self.detection_params,
             "spike_counts_per_channel": [len(spikes) for spikes in self.spike_indices] if self.spike_indices else [],
         }
@@ -421,7 +412,6 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
             bin_folder_name=data["bin_folder_name"],
             metadata=None,  # Would need to be reconstructed
             channel_names=data["channel_names"],
-            assume_from_number=data["assume_from_number"],
         )
 
     def plot_spike_averaged_traces(
@@ -722,4 +712,4 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
                 f"total_spikes={total_spikes})")
 
     def __repr__(self):
-        return self.__str__()
+        return self.__str__()

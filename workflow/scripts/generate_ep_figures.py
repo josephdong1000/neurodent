@@ -27,9 +27,9 @@ from neurodent import visualization, constants
 from neurodent.workflow import (
     setup_snakemake_logging,
     load_wars,
-    inject_config_aliases,
+    apply_samples_config,
     extend_plot_order_from_attr,
-    build_sex_marker_scale,
+    create_sex_marker_scale,
 )
 
 def infer_metadata_columns(df):
@@ -156,7 +156,7 @@ def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
                 .add(so.Dash(color="k"), so.Agg(), so.Dodge(empty="drop", gap=0.2))
                 .add(so.Range(color="k"), so.Est(errorbar="sd"), so.Dodge(empty="drop", gap=0.2))
                 .add(so.Dot(), so.Dodge(empty="drop", gap=0.2), so.Jitter(0.75, seed=42))
-                .scale(marker=build_sex_marker_scale(df, plot_lib=so))
+                .scale(marker=create_sex_marker_scale(df, plot_lib=so))
                 .theme(
                     axes_style("ticks")
                     | sns.plotting_context("talk")
@@ -180,7 +180,7 @@ def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
                 .add(so.Dot(), so.Dodge(), so.Jitter(0.75, seed=42))
                 .scale(
                     x=visualization.ExperimentPlotter.band_scale(plot_lib=so),
-                    marker=build_sex_marker_scale(df, plot_lib=so),
+                    marker=create_sex_marker_scale(df, plot_lib=so),
                 )
                 .theme(
                     axes_style("ticks")
@@ -253,7 +253,7 @@ def main():
     samples_config = snakemake.params.samples_config
 
     # Inject aliases
-    inject_config_aliases(samples_config)
+    apply_samples_config(samples_config)
 
     # Create output directories
     output_dir = Path(snakemake.output.figure_dir)

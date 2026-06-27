@@ -16,7 +16,6 @@ analysis:
   war_generation:
     pattern:
       - "{data_root}/{animal}/{index}.EDF"
-    assume_from_number: false
     datetimes_are_start: true
     lro_kwargs:
       mode: "mne"
@@ -26,142 +25,79 @@ analysis:
 # --- Data inventory (channel aliases + per-animal entries) -------------------------
 samples_data:
   data_root: /mnt/isilon/marsh_single_unit/PythonEEG Data/Arx Parv
-  CHNAME_ALIASES:
-    Mot:
+  channels:
+    LMot:
       - EEG E1-REF1
-      - EEG E2-REF1
       - EEG E9-REF2
-      - EEG E10-REF2
       - EEG E17-REF3
-      - EEG E18-REF3
       - EEG E25-REF4
-      - EEG E26-REF4
       - A-014
-      - A-015
       - B-014
-      - B-015
       - C-014
-      - C-015
       - D-014
-      - D-015
-    Bar:
-      - EEG E3-REF1
-      - EEG E4-REF1
-      - EEG E11-REF2
-      - EEG E12-REF2
-      - EEG E19-REF3
-      - EEG E20-REF3
-      - EEG E27-REF4
-      - EEG E28-REF4
-      - A-010
-      - A-012
-      - B-010
-      - B-012
-      - C-010
-      - C-012
-      - D-010
-      - D-012
-    Vis:
-      - EEG E7-REF1
-      - EEG E8-REF1
-      - EEG E15-REF2
-      - EEG E16-REF2
-      - EEG E23-REF3
-      - EEG E24-REF3
-      - EEG E31-REF4
-      - EEG E32-REF4
-      - A-016
-      - A-017
-      - B-016
-      - B-017
-      - C-016
-      - C-017
-      - D-016
-      - D-017
-    Hip:
-      - EEG E5-REF1
-      - EEG E6-REF1
-      - EEG E13-REF2
-      - EEG E14-REF2
-      - EEG E21-REF3
-      - EEG E22-REF3
-      - EEG E29-REF4
-      - EEG E30-REF4
-      - A-019
-      - A-021
-      - B-019
-      - B-021
-      - C-019
-      - C-021
-      - D-019
-      - D-021
-  LR_ALIASES:
-    L:
-      - EEG E1-REF1
-      - EEG E3-REF1
-      - EEG E5-REF1
-      - EEG E7-REF1
-      - EEG E9-REF2
-      - EEG E11-REF2
-      - EEG E13-REF2
-      - EEG E15-REF2
-      - EEG E17-REF3
-      - EEG E19-REF3
-      - EEG E21-REF3
-      - EEG E23-REF3
-      - EEG E25-REF4
-      - EEG E27-REF4
-      - EEG E29-REF4
-      - EEG E31-REF4
-      - A-010
-      - A-014
-      - A-016
-      - A-019
-      - B-010
-      - B-014
-      - B-016
-      - B-019
-      - C-010
-      - C-014
-      - C-016
-      - C-019
-      - D-010
-      - D-014
-      - D-016
-      - D-019
-    R:
+    RMot:
       - EEG E2-REF1
-      - EEG E4-REF1
-      - EEG E6-REF1
-      - EEG E8-REF1
       - EEG E10-REF2
-      - EEG E12-REF2
-      - EEG E14-REF2
-      - EEG E16-REF2
       - EEG E18-REF3
-      - EEG E20-REF3
-      - EEG E22-REF3
-      - EEG E24-REF3
       - EEG E26-REF4
-      - EEG E28-REF4
-      - EEG E30-REF4
-      - EEG E32-REF4
-      - A-012
       - A-015
-      - A-017
-      - A-021
-      - B-012
       - B-015
-      - B-017
-      - B-021
-      - C-012
       - C-015
-      - C-017
-      - C-021
-      - D-012
       - D-015
-      - D-017
+    LBar:
+      - EEG E3-REF1
+      - EEG E11-REF2
+      - EEG E19-REF3
+      - EEG E27-REF4
+      - A-010
+      - B-010
+      - C-010
+      - D-010
+    RBar:
+      - EEG E4-REF1
+      - EEG E12-REF2
+      - EEG E20-REF3
+      - EEG E28-REF4
+      - A-012
+      - B-012
+      - C-012
+      - D-012
+    LHip:
+      - EEG E5-REF1
+      - EEG E13-REF2
+      - EEG E21-REF3
+      - EEG E29-REF4
+      - A-019
+      - B-019
+      - C-019
+      - D-019
+    RHip:
+      - EEG E6-REF1
+      - EEG E14-REF2
+      - EEG E22-REF3
+      - EEG E30-REF4
+      - A-021
+      - B-021
+      - C-021
       - D-021
+    LVis:
+      - EEG E7-REF1
+      - EEG E15-REF2
+      - EEG E23-REF3
+      - EEG E31-REF4
+      - A-016
+      - B-016
+      - C-016
+      - D-016
+    RVis:
+      - EEG E8-REF1
+      - EEG E16-REF2
+      - EEG E24-REF3
+      - EEG E32-REF4
+      - A-017
+      - B-017
+      - C-017
+      - D-017
   # Normalize the per-animal `gene` strings -> short grouping/plot labels (exact match;
   # each label self-aliased). Arx is X-linked + PV-Cre conditional:
   #   KO = floxed Arx (F) AND Parvcre+: males F/y;Cre+ (hemizygous) and females F/F;Cre+
@@ -192,7 +128,7 @@ samples_data:
     - id: '29'
       gene: Arx(F/y); cre+
       sex: Male
-      channels:
+      channel_subset:
         - EEG E1-REF1
         - EEG E2-REF1
         - EEG E3-REF1
@@ -218,7 +154,7 @@ samples_data:
     - id: '32'
       gene: Arx(F/x); cre-
       sex: Female
-      channels:
+      channel_subset:
         - EEG E9-REF2
         - EEG E10-REF2
         - EEG E11-REF2
@@ -244,7 +180,7 @@ samples_data:
     - id: '34'
       gene: Arx(wt); Parvcre(-)
       sex: Female
-      channels:
+      channel_subset:
         - EEG E17-REF3
         - EEG E18-REF3
         - EEG E19-REF3
@@ -270,7 +206,7 @@ samples_data:
     - id: '30'
       gene: Arx(F/y); cre-
       sex: Male
-      channels:
+      channel_subset:
         - EEG E1-REF1
         - EEG E2-REF1
         - EEG E3-REF1
@@ -291,7 +227,7 @@ samples_data:
     - id: '21'
       gene: Arx(wt); cre-
       sex: Male
-      channels:
+      channel_subset:
         - EEG E9-REF2
         - EEG E10-REF2
         - EEG E11-REF2
@@ -312,7 +248,7 @@ samples_data:
     - id: '31'
       gene: Arx(F/y); cre-
       sex: Male
-      channels:
+      channel_subset:
         - EEG E17-REF3
         - EEG E18-REF3
         - EEG E19-REF3
@@ -333,7 +269,7 @@ samples_data:
     - id: '354'
       gene: Arx(wt);Parvcre+
       sex: Male
-      channels:
+      channel_subset:
         - EEG E1-REF1
         - EEG E2-REF1
         - EEG E3-REF1
@@ -354,7 +290,7 @@ samples_data:
     - id: '356'
       gene: Arx(F/y);Parvcre+
       sex: Male
-      channels:
+      channel_subset:
         - EEG E9-REF2
         - EEG E10-REF2
         - EEG E11-REF2
@@ -375,7 +311,7 @@ samples_data:
     - id: '357'
       gene: Arx(F/y);Parvcre+
       sex: Male
-      channels:
+      channel_subset:
         - EEG E17-REF3
         - EEG E18-REF3
         - EEG E19-REF3
@@ -396,7 +332,7 @@ samples_data:
     - id: '387'
       gene: Arx(F/y);Parvcre+
       sex: Male
-      channels:
+      channel_subset:
         - EEG E1-REF1
         - EEG E2-REF1
         - EEG E3-REF1
@@ -417,7 +353,7 @@ samples_data:
     - id: '388'
       gene: Arx(F/x);Parvcre-
       sex: Female
-      channels:
+      channel_subset:
         - EEG E9-REF2
         - EEG E10-REF2
         - EEG E11-REF2
@@ -438,7 +374,7 @@ samples_data:
     - id: '390'
       gene: Arx(F/F);Parvcre-
       sex: Female
-      channels:
+      channel_subset:
         - EEG E17-REF3
         - EEG E18-REF3
         - EEG E19-REF3
@@ -459,7 +395,7 @@ samples_data:
     - id: '400'
       gene: Arx(F/F);Parvcre+
       sex: Female
-      channels:
+      channel_subset:
         - EEG E25-REF4
         - EEG E26-REF4
         - EEG E27-REF4
@@ -480,7 +416,7 @@ samples_data:
     - id: '393'
       gene: Arx(F/y);Parvcre+
       sex: Male
-      channels:
+      channel_subset:
         - EEG E1-REF1
         - EEG E2-REF1
         - EEG E3-REF1
@@ -501,7 +437,7 @@ samples_data:
     - id: '399'
       gene: Arx(F/y);Parvcre+
       sex: Male
-      channels:
+      channel_subset:
         - EEG E9-REF2
         - EEG E10-REF2
         - EEG E11-REF2
@@ -522,7 +458,7 @@ samples_data:
     - id: '385'
       gene: Arx(F/F);Parvcre+
       sex: Female
-      channels:
+      channel_subset:
         - EEG E17-REF3
         - EEG E18-REF3
         - EEG E19-REF3
@@ -543,7 +479,7 @@ samples_data:
     - id: '395'
       gene: Arx(F/y);Parvcre-
       sex: Male
-      channels:
+      channel_subset:
         - EEG E25-REF4
         - EEG E26-REF4
         - EEG E27-REF4
@@ -564,7 +500,7 @@ samples_data:
     - id: '432'
       gene: Arx(F/y);Rosa(YFP/wt);Parvcre-
       sex: Male
-      channels:
+      channel_subset:
         - EEG E1-REF1
         - EEG E2-REF1
         - EEG E3-REF1
@@ -585,7 +521,7 @@ samples_data:
     - id: '435'
       gene: Arx(F/y);Rosa(YFP/wt);Parvcre+
       sex: Male
-      channels:
+      channel_subset:
         - EEG E9-REF2
         - EEG E10-REF2
         - EEG E11-REF2
@@ -606,7 +542,7 @@ samples_data:
     - id: '438'
       gene: Arx(F/F);Parvcre+
       sex: Female
-      channels:
+      channel_subset:
         - EEG E17-REF3
         - EEG E18-REF3
         - EEG E19-REF3
@@ -627,7 +563,7 @@ samples_data:
     - id: '439'
       gene: Arx(F/F);Parvcre-
       sex: Female
-      channels:
+      channel_subset:
         - EEG E25-REF4
         - EEG E26-REF4
         - EEG E27-REF4
@@ -648,7 +584,7 @@ samples_data:
     - id: '440'
       gene: Arx(F/F);Parvcre+
       sex: Female
-      channels:
+      channel_subset:
         - EEG E1-REF1
         - EEG E2-REF1
         - EEG E3-REF1
@@ -669,7 +605,7 @@ samples_data:
     - id: '443'
       gene: Arx(wt);Parvcre-
       sex: Male
-      channels:
+      channel_subset:
         - EEG E9-REF2
         - EEG E10-REF2
         - EEG E11-REF2
@@ -690,7 +626,7 @@ samples_data:
     - id: '446'
       gene: Arx(F/y);Parvcre+
       sex: Male
-      channels:
+      channel_subset:
         - EEG E17-REF3
         - EEG E18-REF3
         - EEG E19-REF3
@@ -711,7 +647,7 @@ samples_data:
     - id: '447'
       gene: Arx(F/y);Parvcre+
       sex: Male
-      channels:
+      channel_subset:
         - EEG E25-REF4
         - EEG E26-REF4
         - EEG E27-REF4
@@ -732,7 +668,7 @@ samples_data:
     - id: '700'
       gene: Arx(F/y);Parvcre+
       sex: Male
-      channels:
+      channel_subset:
         - EEG E1-REF1
         - EEG E2-REF1
         - EEG E3-REF1
@@ -753,7 +689,7 @@ samples_data:
     - id: '703'
       gene: Arx(F/y);Parvcre+
       sex: Male
-      channels:
+      channel_subset:
         - EEG E9-REF2
         - EEG E10-REF2
         - EEG E11-REF2
@@ -774,7 +710,7 @@ samples_data:
     - id: '704'
       gene: Arx(F/y);Parvcre+
       sex: Male
-      channels:
+      channel_subset:
         - EEG E17-REF3
         - EEG E18-REF3
         - EEG E19-REF3
@@ -795,7 +731,7 @@ samples_data:
     - id: '705'
       gene: Arx(F/y);Parvcre+
       sex: Male
-      channels:
+      channel_subset:
         - EEG E25-REF4
         - EEG E26-REF4
         - EEG E27-REF4
@@ -816,7 +752,7 @@ samples_data:
     - id: '708'
       gene: Arx(F/y);Parvcre+
       sex: Male
-      channels:
+      channel_subset:
         - EEG E1-REF1
         - EEG E2-REF1
         - EEG E3-REF1
@@ -837,7 +773,7 @@ samples_data:
     - id: '709'
       gene: Arx(F/y);Parvcre+
       sex: Male
-      channels:
+      channel_subset:
         - EEG E9-REF2
         - EEG E10-REF2
         - EEG E11-REF2
@@ -858,7 +794,7 @@ samples_data:
     - id: '710'
       gene: Arx(F/y);Parvcre+
       sex: Male
-      channels:
+      channel_subset:
         - EEG E17-REF3
         - EEG E18-REF3
         - EEG E19-REF3
@@ -879,7 +815,7 @@ samples_data:
     - id: '711'
       gene: Arx(F/y);Parvcre+
       sex: Male
-      channels:
+      channel_subset:
         - EEG E25-REF4
         - EEG E26-REF4
         - EEG E27-REF4

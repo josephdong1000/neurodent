@@ -248,12 +248,10 @@ In addition to ``animals``, the samples JSON supports these top-level keys:
      - Description
    * - ``data_root``
      - **Required.** Root path containing the raw data directories.
-   * - ``LR_ALIASES``
-     - Mapping of ``"L"``/``"R"`` labels to channel indices
-       (e.g. ``{"L": ["0","1","2"], "R": ["5","6","7"]}``).
-   * - ``CHNAME_ALIASES``
-     - Mapping of brain-region abbreviations to channel indices
-       (e.g. ``{"Aud": ["0","5"], "Hip": ["2","7"]}``).
+   * - ``channels``
+     - Mapping of each canonical channel abbreviation to the **exact** raw channel
+       names that appear in the data (e.g. ``{"LAud": ["0"], "RAud": ["5"], ...}``).
+       Channel resolution is an exact lookup against these names — no inference.
    * - ``GENOTYPE_ALIASES``
      - Explicit genotype → animal ID mapping. If omitted, it is
        auto-generated from each animal's ``gene`` field.
@@ -261,7 +259,9 @@ In addition to ``animals``, the samples JSON supports these top-level keys:
      - Legacy top-level bad-channel dict (see :ref:`bad-channels`).
        Prefer per-animal ``bad_channels`` in the ``animals`` list.
    * - ``joint_sessions``
-     - Sessions where multiple animals were recorded simultaneously.
+     - *Legacy.* Sessions where multiple animals were recorded simultaneously. Prefer the
+       modern per-animal form: give each animal a ``channel_subset`` (the list of raw channel
+       names belonging to it) and a shared ``group`` in the ``animals`` list.
 
 .. _bad-channels:
 
@@ -418,11 +418,9 @@ A complete samples JSON file with all available parameters:
                 "Session_Nov28": ["LMot", "RAud"]
             }}
        ],
-       "LR_ALIASES": {"L": ["0", "1", "2", "3", "4"],
-                       "R": ["5", "6", "7", "8", "9"]},
-       "CHNAME_ALIASES": {"Aud": ["0", "5"], "Vis": ["1", "6"],
-                          "Hip": ["2", "7"], "Bar": ["3", "8"],
-                          "Mot": ["4", "9"]}
+       "channels": {"LAud": ["0"], "RAud": ["5"], "LVis": ["1"], "RVis": ["6"],
+                    "LHip": ["2"], "RHip": ["7"], "LBar": ["3"], "RBar": ["8"],
+                    "LMot": ["4"], "RMot": ["9"]}
    }
 
 Step 2: Create Dataset Config

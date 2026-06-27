@@ -27,7 +27,7 @@ from neurodent.visualization import AnimalOrganizer
 
 FS = 1000
 WINDOW_S = 60  # 1-minute windows keep the window count modest
-CH_NAMES = ["L Aud", "R Aud"]  # parse to LAud/RAud via default aliases
+CH_NAMES = ["LAud", "RAud"]  # canonical abbreviations (resolve by exact lookup)
 
 
 def _stepped_recording(hours, step_h, low=1.0, high=6.0):

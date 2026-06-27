@@ -11,7 +11,6 @@ analysis:
     pattern:
       - "{data_root}/{animal}/{index}_ColMajor.bin"
       - "{data_root}/{animal}/{index}_Meta.csv"
-    assume_from_number: true
     lro_kwargs:
       mode: "si"
       extract_func: "tests/integration/readers.py:read_bin_csv_pair"

@@ -322,7 +322,6 @@ def mock_war_with_bands():
         animal_id='A001',
         genotype='WT',
         channel_names=['LMot', 'RMot', 'LBar', 'RBar', 'LAud', 'RAud', 'LVis', 'RVis'],
-        assume_from_number=True,
         bad_channels_dict={},
         suppress_short_interval_error=True,
         lof_scores_dict={}
@@ -358,7 +357,6 @@ def mock_war_with_matrices():
         animal_id='A001',
         genotype='WT',
         channel_names=['LMot', 'RMot', 'LBar', 'RBar', 'LAud', 'RAud', 'LVis', 'RVis'],
-        assume_from_number=True,
         bad_channels_dict={},
         suppress_short_interval_error=True,
         lof_scores_dict={}
@@ -386,7 +384,6 @@ def mock_war_with_linear():
         animal_id='A001',
         genotype='WT',
         channel_names=['LMot', 'RMot', 'LBar', 'RBar', 'LAud', 'RAud', 'LVis', 'RVis'],
-        assume_from_number=True,
         bad_channels_dict={},
         suppress_short_interval_error=True,
         lof_scores_dict={}
@@ -414,7 +411,6 @@ def mock_war_with_simple_matrix():
         animal_id='A001',
         genotype='WT',
         channel_names=['LMot', 'RMot', 'LBar', 'RBar', 'LAud', 'RAud', 'LVis', 'RVis'],
-        assume_from_number=True,
         bad_channels_dict={},
         suppress_short_interval_error=True,
         lof_scores_dict={}
@@ -467,7 +463,6 @@ def mock_war_full():
         animal_id='A001',
         genotype='WT',
         channel_names=['LMot', 'RMot', 'LBar', 'RBar', 'LAud', 'RAud', 'LVis', 'RVis'],
-        assume_from_number=True,
         bad_channels_dict={},
         suppress_short_interval_error=True,
         lof_scores_dict={}
@@ -496,7 +491,6 @@ def mock_war_with_linear_lists():
         animal_id='A001',
         genotype='WT',
         channel_names=['LMot', 'RMot', 'LBar', 'RBar', 'LAud', 'RAud', 'LVis', 'RVis'],
-        assume_from_number=True,
         bad_channels_dict={},
         suppress_short_interval_error=True,
         lof_scores_dict={}
@@ -525,7 +519,6 @@ def mock_war_with_matrix_lists():
         animal_id='A001',
         genotype='WT',
         channel_names=['LMot', 'RMot', 'LBar', 'RBar', 'LAud', 'RAud', 'LVis', 'RVis'],
-        assume_from_number=True,
         bad_channels_dict={},
         suppress_short_interval_error=True,
         lof_scores_dict={}
@@ -570,7 +563,6 @@ def mock_war_with_matrix_dict_lists():
         animal_id='A001',
         genotype='WT',
         channel_names=['LMot', 'RMot', 'LBar', 'RBar', 'LAud', 'RAud', 'LVis', 'RVis'],
-        assume_from_number=True,
         bad_channels_dict={},
         suppress_short_interval_error=True,
         lof_scores_dict={}
@@ -599,7 +591,6 @@ def mock_war_with_banded_matrix_as_2d_array():
         animal_id="A001",
         genotype="WT",
         channel_names=["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"],
-        assume_from_number=True,
         bad_channels_dict={},
         suppress_short_interval_error=True,
         lof_scores_dict={},
@@ -629,7 +620,6 @@ def mock_war_with_banded_matrix_as_3d_array():
         animal_id="A001",
         genotype="WT",
         channel_names=["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"],
-        assume_from_number=True,
         bad_channels_dict={},
         suppress_short_interval_error=True,
         lof_scores_dict={},

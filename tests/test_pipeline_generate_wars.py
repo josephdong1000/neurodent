@@ -31,7 +31,6 @@ class TestGenerateWarsParameterConstruction:
         """Helper to build a realistic pipeline config dict."""
         war_gen = {
             "pattern": pattern,
-            "assume_from_number": True,
             "skip_sessions": ["bad"],
             "lro_kwargs": {"multiprocess_mode": "dask"},
         }
@@ -65,7 +64,7 @@ class TestGenerateWarsParameterConstruction:
     def test_skip_sessions_backward_compat(self):
         """skip_sessions falls back to skip_days for backward compatibility."""
         # Config with only old-style skip_days
-        analysis_cfg = {"skip_days": ["bad", "test"], "assume_from_number": True}
+        analysis_cfg = {"skip_days": ["bad", "test"]}
 
         skip = analysis_cfg.get("skip_sessions", analysis_cfg.get("skip_days", []))
         assert skip == ["bad", "test"]
@@ -75,7 +74,6 @@ class TestGenerateWarsParameterConstruction:
         analysis_cfg = {
             "skip_sessions": ["bad"],
             "skip_days": ["bad", "test"],
-            "assume_from_number": True,
         }
 
         skip = analysis_cfg.get("skip_sessions", analysis_cfg.get("skip_days", []))
@@ -216,7 +214,6 @@ class TestPipelineIntegrationWithSyntheticData:
             "analysis": {
                 "war_generation": {
                     "pattern": "{index}",
-                    "assume_from_number": True,
                     "skip_sessions": [],
                     "lro_kwargs": {"mode": "si", "input_type": "files"},
                 }

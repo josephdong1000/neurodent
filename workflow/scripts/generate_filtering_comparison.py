@@ -21,7 +21,7 @@ from scipy import stats
 from sklearn.metrics import mean_squared_error
 
 from neurodent import visualization, constants
-from neurodent.workflow import setup_snakemake_logging, inject_config_aliases
+from neurodent.workflow import setup_snakemake_logging, apply_samples_config
 
 
 def load_wars_from_paths(war_paths, label):
@@ -990,7 +990,7 @@ def main():
     samples_config = snakemake.params.samples_config
     
     # Inject aliases
-    inject_config_aliases(samples_config)
+    apply_samples_config(samples_config)
 
     # Create output directories
     comparison_dir = Path(snakemake.output.comparison_dir)

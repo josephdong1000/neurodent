@@ -777,96 +777,70 @@ def _clean_str_for_date(string: str):
     return cleaned
 
 
-def parse_chname_to_abbrev(channel_name: str, assume_from_number=False, strict_matching=True) -> str:
+def resolve_channel(channel_name: str) -> str:
     """
-    Parses the channel name to get the abbreviation.
+    Resolve a raw channel name to its canonical channel abbreviation by **exact lookup**.
+
+    Resolution is explicit and never inferred: (1) the (stripped) name is already a
+    canonical abbreviation (:data:`neurodent.constants.CHANNEL_ABBREVS`); (2) it is an
+    exact key in :data:`neurodent.constants.CHANNEL_ABBREV_BY_RAW` (the per-dataset
+    ``raw name -> abbrev`` map). Anything else **raises loudly** — there is no fuzzy,
+    substring, or number-based guessing.
 
     Args:
-        channel_name (str): Name of the channel.
-        assume_from_number (bool, optional): If True, assume the abbreviation based on the last number
-            in the channel name when normal parsing fails. Defaults to False.
-        strict_matching (bool, optional): If True, ensures the input matches exactly one L/R alias and
-            one channel alias. If False, allows multiple matches and uses longest. Defaults to True.
+        channel_name (str): Raw channel name from the data.
 
     Returns:
-        str: Abbreviation of the channel name.
+        str: Canonical channel abbreviation.
 
     Raises:
-        ValueError: When channel_name cannot be parsed or contains ambiguous matches in strict mode.
-        KeyError: When assume_from_number=True but the detected number is not a valid channel ID.
+        ValueError: When the name is not in the configured channel map. Configure the exact
+            raw name under its abbreviation (``channels`` in the samples config, or
+            :func:`neurodent.set_channel_map`).
 
     Examples:
-        >>> parse_chname_to_abbrev("left Aud")
-        'LAud'
-        >>> parse_chname_to_abbrev("Right VIS")
-        'RVis'
-        >>> parse_chname_to_abbrev("channel_9", assume_from_number=True)
-        'LAud'
-        >>> parse_chname_to_abbrev("LRAud", strict_matching=False)  # Would work in non-strict mode
-        'LAud'  # Uses longest L/R match
+        >>> resolve_channel("LMot")          # already canonical
+        'LMot'
+        >>> resolve_channel("L Motor Ctx")   # configured raw name -> abbrev
+        'LMot'
     """
-    if channel_name in constants.DEFAULT_ID_TO_NAME.values():
-        logging.debug(f"{channel_name} is already an abbreviation")
-        return channel_name
-
-    try:
-        lr = _get_key_from_match_values(channel_name, constants.LR_ALIASES, strict_matching, alias_name="LR_ALIASES")
-        chname = _get_key_from_match_values(channel_name, constants.CHNAME_ALIASES, strict_matching, alias_name="CHNAME_ALIASES")
-    except ValueError as e:
-        if assume_from_number:
-            logging.debug(f"Channel '{channel_name}' does not match name aliases. Attempting to assume from number.")
-            warnings.warn(
-                "One or more channels do not match name aliases. Assuming alias from number in channel name.",
-                UserWarning,
-                stacklevel=2
-            )
-            nums = re.findall(r"\d+", channel_name)
-
-            if not nums:
-                raise ValueError(
-                    f"Expected to find a number in channel name '{channel_name}' when assume_from_number=True, but no numbers were found."
-                )
-
-            num = int(nums[-1])
-            if num not in constants.DEFAULT_ID_TO_NAME:
-                available_ids = sorted(constants.DEFAULT_ID_TO_NAME.keys())
-                raise KeyError(
-                    f"Channel number {num} found in '{channel_name}' is not a valid channel ID. Available channel IDs: {available_ids}"
-                )
-
-            return constants.DEFAULT_ID_TO_NAME[num]
-        else:
-            raise e
-
-    return lr + chname
+    raw = channel_name.strip()
+    if raw in constants.CHANNEL_ABBREVS:
+        return raw
+    if raw in constants.CHANNEL_ABBREV_BY_RAW:
+        return constants.CHANNEL_ABBREV_BY_RAW[raw]
+    raise ValueError(
+        f"Channel {raw!r} is not in the configured channel map. "
+        f"Canonical labels: {constants.CHANNEL_ABBREVS}; configured raw names: "
+        f"{sorted(constants.CHANNEL_ABBREV_BY_RAW)}. "
+        f"Add the exact raw name under its abbreviation in the samples config "
+        f"(channels) or via neurodent.set_channel_map()."
+    )
 
 
-def abbreviate_channel_names(
-    names: list[str],
-    strict_matching: bool = True,
-    assume_from_number: bool = False,
-) -> list[str]:
-    """Abbreviate a list of channel names, falling back to raw names for unparseable entries.
+def resolve_channels(names: list[str]) -> list[str]:
+    """Abbreviate a list of raw channel names via exact lookup.
+
+    Unmappable names are **warned about loudly** (and kept as-is so callers comparing
+    channel sets still get a value) rather than silently swallowed.
 
     Args:
-        names: List of channel name strings to abbreviate.
-        strict_matching: Passed to parse_chname_to_abbrev.
-        assume_from_number: Passed to parse_chname_to_abbrev.
+        names: List of raw channel name strings.
 
     Returns:
-        List of abbreviated channel names (same length as input).
+        List of canonical abbreviations (same length as input); an unmappable entry is
+        returned unchanged after a warning.
     """
     result = []
     for name in names:
         try:
-            result.append(
-                parse_chname_to_abbrev(
-                    name,
-                    assume_from_number=assume_from_number,
-                    strict_matching=strict_matching,
-                )
+            result.append(resolve_channel(name))
+        except (ValueError, KeyError, AttributeError) as e:
+            warnings.warn(
+                f"Channel name {name!r} could not be mapped to a canonical abbreviation: {e}",
+                UserWarning,
+                stacklevel=2,
             )
-        except (ValueError, KeyError, AttributeError):
             result.append(name)
     return result
 
@@ -879,7 +853,7 @@ def _get_key_from_match_values(input_string: str, alias_dict: dict, strict_match
         input_string (str): String to search in
         alias_dict (dict): Dictionary of {key: [aliases]} to match against
         strict_matching (bool): If True, ensures only one alias matches across all keys
-        alias_name (str): Name of the alias dictionary for error messages (e.g., "CHNAME_ALIASES")
+        alias_name (str): Name of the alias dictionary for error messages (e.g., "GENOTYPE_ALIASES")
 
     Returns:
         str: The key with the best matching alias
@@ -2016,9 +1990,21 @@ def should_use_cache_unified(
         raise ValueError(f"Invalid cache_policy: {cache_policy}. Must be one of: auto, always, force_regenerate")
 
 
-def convert_intan_chname_mne(mne_obj):
+def rename_mne_channels(mne_obj):
+    """Rename an MNE object's channels in place to canonical abbreviations.
+
+    Applies :func:`resolve_channel` (exact lookup) to every entry of
+    ``mne_obj.info['ch_names']``. Format-agnostic — works on any MNE object
+    whose raw channel names are declared in :data:`~neurodent.constants.CHANNEL_MAP`.
+
+    Args:
+        mne_obj: An MNE object exposing ``info['ch_names']`` (e.g. a ``RawArray``).
+
+    Returns:
+        The same ``mne_obj``, with channel names replaced by their canonical abbreviations.
+    """
     for i in range(len(mne_obj.info['ch_names'])):
-        mne_obj.info['ch_names'][i] = parse_chname_to_abbrev(channel_name = mne_obj.info['ch_names'][i], assume_from_number=True, strict_matching=False)
+        mne_obj.info['ch_names'][i] = resolve_channel(mne_obj.info['ch_names'][i])
     return mne_obj
 
 

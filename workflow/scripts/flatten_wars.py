@@ -14,7 +14,7 @@ Output: Individual aggregated WARs saved as parquet and json in wars_flattened/
 from pathlib import Path
 
 from neurodent import visualization
-from neurodent.workflow import setup_snakemake_logging, inject_config_aliases
+from neurodent.workflow import setup_snakemake_logging, apply_samples_config
 
 
 def main():
@@ -31,7 +31,7 @@ def main():
     samples_config = snakemake.params.samples_config
 
     # Inject aliases
-    inject_config_aliases(samples_config)
+    apply_samples_config(samples_config)
 
     # Get animal name from wildcards
     animal_name = snakemake.wildcards.animal

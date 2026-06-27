@@ -1,5 +1,37 @@
 {
     "data_root": "/mnt/isilon/marsh_single_unit/PythonEEG Data Bins/Sox5/Dr. Lefebvre Project",
+    "channels": {
+        "LMot": [
+            "L Motor Ctx"
+        ],
+        "RMot": [
+            "R Motor Ctx"
+        ],
+        "LBar": [
+            "L Barrel Ctx"
+        ],
+        "RBar": [
+            "R Barrel Ctx"
+        ],
+        "LHip": [
+            "L Hipp"
+        ],
+        "RHip": [
+            "R Hipp"
+        ],
+        "LAud": [
+            "L Aud Ctx"
+        ],
+        "RAud": [
+            "R Aud Ctx"
+        ],
+        "LVis": [
+            "L Vis Ctx"
+        ],
+        "RVis": [
+            "R Vis Ctx"
+        ]
+    },
     "animals": [
         {
             "id": "M3_MHET_cohort4_group2",

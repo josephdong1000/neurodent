@@ -24,7 +24,7 @@ import pandas as pd
 from scipy.ndimage import binary_closing, binary_opening
 from scipy.stats import zscore
 
-from ..core.utils import parse_chname_to_abbrev
+from ..core.utils import resolve_channel
 from .feature_utils import extract_linear_array
 
 
@@ -58,7 +58,6 @@ class ChannelInfo(NamedTuple):
 
     channel_names: list[str]
     channel_abbrevs: list[str]
-    assume_from_number: bool
 
 
 @dataclass(frozen=True)
@@ -184,8 +183,8 @@ def _resolve_channel_indices(
 ) -> tuple[list[int], list[str], list[str]]:
     """Map ``bad_channels`` → column indices.
 
-    Returns ``(indices, normalised_bad_channels, channel_targets)`` so callers
-    can both poison columns and persist the normalised list (e.g. into
+    Returns ``(indices, normalized_bad_channels, channel_targets)`` so callers
+    can both poison columns and persist the normalized list (e.g. into
     ``bad_channels_dict``).
     """
     bad_channels = [] if bad_channels is None else list(bad_channels)
@@ -196,7 +195,7 @@ def _resolve_channel_indices(
     )
     if use_abbrevs is None:
         bad_channels = [
-            parse_chname_to_abbrev(ch, assume_from_number=channel_info.assume_from_number)
+            resolve_channel(ch)
             for ch in bad_channels
         ]
     indices: list[int] = []
@@ -413,11 +412,11 @@ def compute_filter_mask(
     return combined
 
 
-def _normalise_to_abbrevs(
+def _normalize_to_abbrevs(
     channels: list[str], channel_info: ChannelInfo
 ) -> list[str]:
     return [
-        parse_chname_to_abbrev(ch, assume_from_number=channel_info.assume_from_number)
+        resolve_channel(ch)
         for ch in channels
     ]
 
@@ -433,7 +432,7 @@ def update_bad_channels_dict_from_config(
     Mirrors the legacy behaviour previously embedded in
     ``get_filter_reject_channels`` and
     ``get_filter_reject_channels_by_recording_session``: ``reject_channels``
-    normalises to abbrevs before saving (unless ``use_abbrevs is False``);
+    normalizes to abbrevs before saving (unless ``use_abbrevs is False``);
     ``reject_channels_by_session`` stores the raw per-session channel lists.
 
     Returns a new dict; ``existing_dict`` is not mutated.
@@ -456,7 +455,7 @@ def update_bad_channels_dict_from_config(
             channels_to_save = (
                 bad_channels
                 if use_abbrevs is False
-                else _normalise_to_abbrevs(bad_channels, channel_info)
+                else _normalize_to_abbrevs(bad_channels, channel_info)
             )
             if save == "overwrite":
                 updated = {ad: list(channels_to_save) for ad in animaldays}

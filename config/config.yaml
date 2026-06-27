@@ -26,7 +26,6 @@ analysis:
   # Note: mode, file_pattern, and some lro_kwargs are set by active_dataset (see datasets section above)
   # The settings below are shared across all datasets or serve as defaults
   war_generation:
-    assume_from_number: true
     skip_sessions: ["*bad*"]
     lro_kwargs:
       multiprocess_mode: "dask"
@@ -70,7 +69,9 @@ analysis:
 
   # WAR standardization parameters (channel setup applied before filtering)
   standardization:
-    channel_reorder: ["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"]
+    # Channel order/target derives from constants.CHANNEL_ABBREVS (the canonical channel
+    # list, set per-dataset via samples_data `channels`). Add
+    # `channel_reorder: [...]` here only to override that order for a dataset.
     use_abbrevs: true
     add_unique_hash: false  # Whether to add unique hash during standardization
     unique_hash_length: 4   # Length of unique hash if enabled
@@ -91,8 +92,9 @@ analysis:
   # Channel filtering configurations (spatial artifact removal)
   channel_filter_config:
     manual:
-      reject_channels_by_session: false  # Use per-session bad channels
-      reject_channels: ["LHip", "RHip"]  # List of channels to reject globally
+      # Channels rejected for ALL animals (opt-in; empty by default). Per-session
+      # bad_channels declared in the dataset config always apply on top of this.
+      reject_channels: []
       min_valid_channels: 3
     lof:
       reject_lof_threshold: 2.5  # LOF threshold above which channels are considered bad
@@ -156,8 +158,9 @@ analysis:
       min: 0.5            # Minimum LOF threshold to test
       max: 4.0            # Maximum LOF threshold to test
       step: 0.05           # Step size for threshold testing
-    # Subset of channels to evaluate (e.g., exclude hippocampal channels)
-    evaluation_channels: ["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"]
+    # Subset of channels to evaluate. Defaults to constants.CHANNEL_ABBREVS (the canonical
+    # channel list) when omitted; set `evaluation_channels: [...]` to restrict it.
+    evaluation_channels: []
     figure_format: "png"  # Figure output format: png, tif, pdf, svg
     data_format: "csv"    # Data export format: csv, pkl
     dpi: 300             # Figure resolution

@@ -45,22 +45,75 @@ To override defaults, import and modify before running analysis:
 
 # Re-export everything for backward compatibility
 from .mappings import (
-    DEFAULT_ID_TO_LR,
     GENOTYPE_ALIASES,
     GENE_ALIASES,
     SEX_ALIASES,
-    CHNAME_ALIASES,
-    LR_ALIASES,
-    DEFAULT_ID_TO_NAME,
+    CHANNEL_MAP,
+    CHANNEL_ABBREVS,
+    CHANNEL_ABBREV_BY_RAW,
     DF_SORT_ORDER,
     DATEPARSER_PATTERNS_TO_REMOVE,
     DEFAULT_DAY,
     FEATURE_LABELS,
 )
 
-# ANIMAL_METADATA is injected at runtime by inject_config_aliases()
+# ANIMAL_METADATA is injected at runtime by apply_samples_config()
 # Default is empty dict until populated
 ANIMAL_METADATA: dict = {}
+
+
+def _recompute_channel_map_derived() -> None:
+    """Rebuild channel-derived constants from :data:`CHANNEL_MAP`.
+
+    Call after assigning a new ``CHANNEL_MAP`` (e.g. via :func:`set_channel_map`
+    or ``apply_samples_config``). Updates :data:`CHANNEL_ABBREVS`,
+    :data:`CHANNEL_ABBREV_BY_RAW`, and the ``channel`` entry of :data:`DF_SORT_ORDER` so
+    every reader sees the new channel map.
+
+    Raises:
+        ValueError: if a raw channel name is mapped to more than one abbreviation (a
+            config error — surfaced loudly rather than silently resolving to one).
+    """
+    global CHANNEL_ABBREVS, CHANNEL_ABBREV_BY_RAW
+    CHANNEL_ABBREVS = list(CHANNEL_MAP)
+    DF_SORT_ORDER["channel"] = ["average", "all", *CHANNEL_ABBREVS]
+    reverse: dict = {}
+    for abbrev, raws in CHANNEL_MAP.items():
+        for raw in raws:
+            if raw in reverse and reverse[raw] != abbrev:
+                raise ValueError(
+                    f"Raw channel name {raw!r} is mapped to both {reverse[raw]!r} and "
+                    f"{abbrev!r} in CHANNEL_MAP; raw names must map to exactly one channel."
+                )
+            reverse[raw] = abbrev
+    CHANNEL_ABBREV_BY_RAW = reverse
+
+
+def set_channel_map(channels: dict) -> None:
+    """Set the canonical channel map (the single source of truth) and derive the rest.
+
+    This is the package-level front door for declaring custom channels; the Snakemake
+    pipeline reaches the same state through ``apply_samples_config``. Both update
+    :data:`CHANNEL_MAP` and then call :func:`_recompute_channel_map_derived`, so
+    :data:`CHANNEL_ABBREVS`, :data:`CHANNEL_ABBREV_BY_RAW`, the standardization target, the
+    ``channel`` sort order, and the LOF evaluation set all follow from one place.
+
+    Channel resolution is **exact** (``resolve_channel`` looks a raw name up in
+    :data:`CHANNEL_ABBREV_BY_RAW`); a label is never inferred from a name. List every raw
+    spelling a dataset's data presents under its abbreviation.
+
+    Args:
+        channels: Ordered ``{abbrev: [raw names]}`` mapping. Order defines the
+            canonical channel order. Each abbreviation (e.g. ``"LMot"``) is the atomic
+            channel identity; left/right is part of the name, not a separate axis.
+
+    Example:
+        >>> from neurodent import set_channel_map
+        >>> set_channel_map({"LMot": ["LMot", "L Motor Ctx"], "RMot": ["RMot", "R Motor Ctx"]})
+    """
+    global CHANNEL_MAP
+    CHANNEL_MAP = dict(channels)
+    _recompute_channel_map_derived()
 
 from .analysis import (
     FeatureType,
@@ -98,14 +151,14 @@ from .config import (
 
 __all__ = [
     # Mappings
-    "DEFAULT_ID_TO_LR",
     "GENOTYPE_ALIASES",
     "GENE_ALIASES",
     "SEX_ALIASES",
     "ANIMAL_METADATA",
-    "CHNAME_ALIASES",
-    "LR_ALIASES",
-    "DEFAULT_ID_TO_NAME",
+    "CHANNEL_MAP",
+    "CHANNEL_ABBREVS",
+    "CHANNEL_ABBREV_BY_RAW",
+    "set_channel_map",
     "DF_SORT_ORDER",
     "DATEPARSER_PATTERNS_TO_REMOVE",
     "DEFAULT_DAY",

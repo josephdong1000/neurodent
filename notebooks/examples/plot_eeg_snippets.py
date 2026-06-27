@@ -101,7 +101,6 @@ def load_and_sample_animal_data(animal_info: Tuple[str, str, str, Path]) -> Dict
         data_parent_folder / data_folder,
         animal_id,
         mode="nest",
-        assume_from_number=True,
         skip_days=["bad"],
         # truncate=3,
         lro_kwargs={
@@ -342,7 +341,7 @@ def plot_genotype_snippets(genotype: str, snippets: List[Dict], save_folder: Pat
                 plot_channel_abbrevs = []
 
                 for ch_name in channel_names:
-                    abbrev = core.parse_chname_to_abbrev(ch_name, assume_from_number=True, strict_matching=False)
+                    abbrev = core.resolve_channel(ch_name)
                     plot_channel_abbrevs.append(abbrev)
 
                 # Calculate y-offsets for stacked channels - start with spacing from bottom

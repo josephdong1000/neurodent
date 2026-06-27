@@ -274,12 +274,12 @@ class TestLoadAnimalMetadataEdgeCases:
 
 @pytest.mark.mutates_constants
 class TestInjectConfigAliases:
-    """Tests for inject_config_aliases function."""
+    """Tests for apply_samples_config function."""
 
     def test_injects_animal_metadata(self):
         """Test that ANIMAL_METADATA is injected into constants."""
         from neurodent import constants
-        from neurodent.workflow.utils import inject_config_aliases
+        from neurodent.workflow.utils import apply_samples_config
         
         # Save original state
         original = getattr(constants, 'ANIMAL_METADATA', None)
@@ -289,7 +289,7 @@ class TestInjectConfigAliases:
                 {"id": "TEST1", "sex": "Male", "gene": "WT"},
             ]
         }
-        inject_config_aliases(config)
+        apply_samples_config(config)
         
         assert "TEST1" in constants.ANIMAL_METADATA
         assert constants.ANIMAL_METADATA["TEST1"]["sex"] == "Male"
@@ -301,7 +301,7 @@ class TestInjectConfigAliases:
     def test_no_animal_metadata_leaves_empty(self):
         """Test that missing ANIMAL_METADATA doesn't crash."""
         from neurodent import constants
-        from neurodent.workflow.utils import inject_config_aliases
+        from neurodent.workflow.utils import apply_samples_config
         
         # Save original state
         original_meta = getattr(constants, 'ANIMAL_METADATA', None)
@@ -311,7 +311,7 @@ class TestInjectConfigAliases:
         constants.ANIMAL_METADATA = {}
         
         config = {"GENOTYPE_ALIASES": {"MWT": ["M1"]}}  # No ANIMAL_METADATA
-        inject_config_aliases(config)
+        apply_samples_config(config)
         
         # Should remain empty (no auto-convert anymore)
         assert constants.ANIMAL_METADATA == {}
@@ -325,13 +325,13 @@ class TestInjectConfigAliases:
     def test_injects_genotype_aliases(self):
         """Test that GENOTYPE_ALIASES is still injected for legacy uses."""
         from neurodent import constants
-        from neurodent.workflow.utils import inject_config_aliases
+        from neurodent.workflow.utils import apply_samples_config
         
         # Save original state
         original = getattr(constants, 'GENOTYPE_ALIASES', None)
         
         config = {"GENOTYPE_ALIASES": {"TestGeno": ["T1", "T2"]}}
-        inject_config_aliases(config)
+        apply_samples_config(config)
 
         assert "TestGeno" in constants.GENOTYPE_ALIASES
         assert constants.GENOTYPE_ALIASES["TestGeno"] == ["T1", "T2"]
@@ -343,7 +343,7 @@ class TestInjectConfigAliases:
     def test_injects_gene_and_sex_aliases(self):
         """GENE_ALIASES and SEX_ALIASES are injected into constants for normalization."""
         from neurodent import constants
-        from neurodent.workflow.utils import inject_config_aliases
+        from neurodent.workflow.utils import apply_samples_config
 
         original_gene = getattr(constants, "GENE_ALIASES", None)
         original_sex = getattr(constants, "SEX_ALIASES", None)
@@ -352,7 +352,7 @@ class TestInjectConfigAliases:
                 "GENE_ALIASES": {"KO": ["Arx(F/y);Parvcre+"]},
                 "SEX_ALIASES": {"Male": ["dude"]},
             }
-            inject_config_aliases(config)
+            apply_samples_config(config)
             assert constants.GENE_ALIASES == {"KO": ["Arx(F/y);Parvcre+"]}
             assert constants.SEX_ALIASES == {"Male": ["dude"]}
         finally:

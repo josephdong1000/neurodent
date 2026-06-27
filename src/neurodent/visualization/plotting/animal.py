@@ -46,16 +46,9 @@ class AnimalPlotter(viz.AnimalFeatureParser):
         self.genotype = war.genotype
         self.channel_names = war.channel_names
         self.n_channels = len(self.channel_names)
-        self.__assume_from_number = war.assume_from_number
         self.channel_abbrevs = war.channel_abbrevs
         self.save_fig = save_fig
         self.save_path: Path = save_path
-
-    def _abbreviate_channel(self, ch_name: str):
-        for k, v in self.CHNAME_TO_ABBREV:
-            if k in ch_name:
-                return v
-        return ch_name
 
     def plot_coherecorr_matrix(
         self, groupby="animalday", bands=None, figsize=None, cmap="viridis", **kwargs

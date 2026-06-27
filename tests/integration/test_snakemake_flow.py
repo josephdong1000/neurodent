@@ -100,7 +100,6 @@ def example_pipeline_env(tmp_path_factory):
         "analysis": {
             "war_generation": {
                 "pattern": "{animal}/{session}/{index}.nwb",
-                "assume_from_number": True,
                 "skip_sessions": [],
                 "lro_kwargs": {
                     "mode": "si",
@@ -239,9 +238,9 @@ class TestSamplesConfigIntegration:
     """Test that the generated samples_config works with neurodent utilities."""
 
     @pytest.mark.mutates_constants
-    def test_inject_config_aliases(self, example_dataset):
-        """inject_config_aliases succeeds with the synthetic config."""
-        from neurodent.workflow import inject_config_aliases
+    def test_apply_samples_config(self, example_dataset):
+        """apply_samples_config succeeds with the synthetic config."""
+        from neurodent.workflow import apply_samples_config
         from neurodent import constants
 
         # Save original state to restore after test
@@ -250,7 +249,7 @@ class TestSamplesConfigIntegration:
 
         try:
             sc = example_dataset["samples_config"]
-            inject_config_aliases(sc)
+            apply_samples_config(sc)
 
             # Verify metadata was injected
             assert "ExWT" in constants.ANIMAL_METADATA
@@ -287,7 +286,7 @@ class TestPipelineSteps:
     def test_animal_organizer_loads_data(self, example_pipeline_env):
         """AnimalOrganizer successfully loads NWB data for a single animal."""
         from neurodent import constants
-        from neurodent.workflow import inject_config_aliases
+        from neurodent.workflow import apply_samples_config
         from neurodent.visualization import AnimalOrganizer
 
         ds = example_pipeline_env
@@ -297,7 +296,7 @@ class TestPipelineSteps:
         orig_metadata = constants.ANIMAL_METADATA
         orig_aliases = constants.GENOTYPE_ALIASES
         try:
-            inject_config_aliases(ds["samples_config"])
+            apply_samples_config(ds["samples_config"])
 
             base_path = str(ds["data_root"] / ds["session_folder"])
             pattern = f"{base_path}/{cfg['pattern']}"
@@ -307,7 +306,6 @@ class TestPipelineSteps:
                 pattern,
                 animal_id=animal_id,
                 skip_sessions=cfg.get("skip_sessions", []),
-                assume_from_number=cfg["assume_from_number"],
                 lro_kwargs=cfg["lro_kwargs"],
             )
 
@@ -334,7 +332,7 @@ class TestPipelineSteps:
         from datetime import datetime
         from dateutil.tz import tzlocal
         from neurodent import constants
-        from neurodent.workflow import inject_config_aliases
+        from neurodent.workflow import apply_samples_config
         from neurodent.visualization import AnimalOrganizer
 
         ds = example_pipeline_env
@@ -343,7 +341,7 @@ class TestPipelineSteps:
         orig_metadata = constants.ANIMAL_METADATA
         orig_aliases = constants.GENOTYPE_ALIASES
         try:
-            inject_config_aliases(ds["samples_config"])
+            apply_samples_config(ds["samples_config"])
 
             base_path = str(ds["data_root"] / ds["session_folder"])
             pattern = f"{base_path}/{cfg['pattern']}"
@@ -358,7 +356,6 @@ class TestPipelineSteps:
                 pattern,
                 animal_id=animal_id,
                 skip_sessions=["day2"],  # use only 1 session
-                assume_from_number=cfg["assume_from_number"],
                 lro_kwargs=lro_kwargs,
             )
 
@@ -409,7 +406,6 @@ def _build_war(ds):
         pattern,
         animal_id=animal_id,
         skip_sessions=["day2"],
-        assume_from_number=cfg["assume_from_number"],
         lro_kwargs=lro_kwargs,
     )
 
@@ -439,19 +435,26 @@ class TestPipelineContinuation:
     @pytest.fixture(scope="class")
     def war_env(self, example_pipeline_env):
         """Return (ao, war, ds) with constants injected for the test scope."""
+        import copy
         from neurodent import constants
-        from neurodent.workflow import inject_config_aliases
+        from neurodent.workflow import apply_samples_config
 
         ds = example_pipeline_env
-        orig_metadata = constants.ANIMAL_METADATA
-        orig_aliases = constants.GENOTYPE_ALIASES
-        inject_config_aliases(ds["samples_config"])
+        # This is a class-scoped fixture, so it outlives conftest's per-function
+        # constants restore — snapshot and restore everything inject mutates
+        # (incl. the channel constants) so it does not leak into later test files.
+        _keys = [
+            "ANIMAL_METADATA", "GENOTYPE_ALIASES", "SEX_ALIASES", "GENE_ALIASES",
+            "CHANNEL_MAP", "CHANNEL_ABBREVS", "CHANNEL_ABBREV_BY_RAW", "DF_SORT_ORDER",
+        ]
+        _orig = {k: copy.deepcopy(getattr(constants, k)) for k in _keys}
+        apply_samples_config(ds["samples_config"])
 
         ao, war = _build_war(ds)
         yield ao, war, ds
 
-        constants.ANIMAL_METADATA = orig_metadata
-        constants.GENOTYPE_ALIASES = orig_aliases
+        for k, v in _orig.items():
+            setattr(constants, k, v)
 
     def test_animal_plotter_instantiation(self, war_env):
         """AnimalPlotter can be created from the generated WAR."""
@@ -479,14 +482,14 @@ class TestPipelineContinuation:
     def test_experiment_plotter_multiple_wars(self, example_pipeline_env):
         """ExperimentPlotter accepts WARs from multiple animals."""
         from neurodent import constants
-        from neurodent.workflow import inject_config_aliases
+        from neurodent.workflow import apply_samples_config
         from neurodent.visualization.plotting import ExperimentPlotter
 
         ds = example_pipeline_env
         orig_metadata = constants.ANIMAL_METADATA
         orig_aliases = constants.GENOTYPE_ALIASES
         try:
-            inject_config_aliases(ds["samples_config"])
+            apply_samples_config(ds["samples_config"])
             _ao1, war1 = _build_war(ds)
 
             # Build a second WAR for the other animal
@@ -504,7 +507,6 @@ class TestPipelineContinuation:
                 pattern,
                 animal_id=ds["animals"][1],
                 skip_sessions=["day2"],
-                assume_from_number=cfg["assume_from_number"],
                 lro_kwargs=lro_kwargs,
             )
             for lro in ao2.long_recordings:
@@ -580,7 +582,7 @@ class TestPipelineContinuation:
                 return "null"
             if isinstance(v, float) and np.isnan(v):
                 return "nan"
-            # Save path normalises tz-aware datetime columns to UTC; the
+            # Save path normalizes tz-aware datetime columns to UTC; the
             # absolute moment is preserved.  Convert any tz-aware Timestamp
             # to UTC (then naive for canonical string form) so equivalence
             # is on the moment in time, not on the tz label.
@@ -599,7 +601,7 @@ class TestPipelineContinuation:
         assert loaded.genotype == war.genotype
         assert loaded.channel_names == war.channel_names
 
-        # Cell-by-cell normalised equivalence (every row, every column).
+        # Cell-by-cell normalized equivalence (every row, every column).
         for col in war.result.columns:
             for i in range(len(war.result)):
                 assert _norm(war.result[col].iloc[i]) == _norm(loaded.result[col].iloc[i]), (
@@ -686,7 +688,7 @@ class TestPipelineContinuation:
                 return "null"
             if isinstance(v, float) and np.isnan(v):
                 return "nan"
-            # Save path normalises tz-aware datetime columns to UTC; the
+            # Save path normalizes tz-aware datetime columns to UTC; the
             # absolute moment is preserved.  Convert any tz-aware Timestamp
             # to UTC (then naive for canonical string form) so equivalence
             # is on the moment in time, not on the tz label.
@@ -795,7 +797,7 @@ class TestBinCsvMultiPatternDiscovery:
         when using a list of patterns.
         """
         from neurodent import constants
-        from neurodent.workflow import inject_config_aliases
+        from neurodent.workflow import apply_samples_config
         from neurodent.visualization import AnimalOrganizer
 
         ds = bin_csv_env
@@ -805,12 +807,11 @@ class TestBinCsvMultiPatternDiscovery:
         orig_metadata = constants.ANIMAL_METADATA
         orig_aliases = constants.GENOTYPE_ALIASES
         try:
-            inject_config_aliases(ds["samples_config"])
+            apply_samples_config(ds["samples_config"])
 
             ao = AnimalOrganizer(
                 patterns,
                 animal_id="ExWT",
-                assume_from_number=True,
                 lro_kwargs={
                     "mode": "si",
                     "extract_func": _bin_csv_extractor,
@@ -1073,7 +1074,7 @@ class TestMiniRealDataset:
     def test_mini_real_animal_organizer_loads_data(self, mini_real_config):
         """AnimalOrganizer loads mini real bin/csv data via custom extractor."""
         from neurodent import constants
-        from neurodent.workflow import inject_config_aliases
+        from neurodent.workflow import apply_samples_config
         from neurodent.workflow.utils import resolve_animal_pattern
         from neurodent.visualization import AnimalOrganizer
 
@@ -1088,12 +1089,11 @@ class TestMiniRealDataset:
         orig_metadata = constants.ANIMAL_METADATA
         orig_aliases = constants.GENOTYPE_ALIASES
         try:
-            inject_config_aliases(cfg["samples_config"])
+            apply_samples_config(cfg["samples_config"])
 
             ao = AnimalOrganizer(
                 patterns,
                 animal_id="A10",
-                assume_from_number=ds["analysis"]["war_generation"]["assume_from_number"],
                 lro_kwargs={
                     "mode": "si",
                     "extract_func": _mini_real_extractor,
@@ -1118,7 +1118,7 @@ class TestMiniRealDataset:
     def test_mini_real_both_animals_loadable(self, mini_real_config):
         """Both animals (A10, F22) can be loaded from mini real data."""
         from neurodent import constants
-        from neurodent.workflow import inject_config_aliases
+        from neurodent.workflow import apply_samples_config
         from neurodent.workflow.utils import resolve_animal_pattern
         from neurodent.visualization import AnimalOrganizer
 
@@ -1128,7 +1128,7 @@ class TestMiniRealDataset:
         orig_metadata = constants.ANIMAL_METADATA
         orig_aliases = constants.GENOTYPE_ALIASES
         try:
-            inject_config_aliases(cfg["samples_config"])
+            apply_samples_config(cfg["samples_config"])
 
             for animal_id in ["A10", "F22"]:
                 patterns = resolve_animal_pattern(
@@ -1139,7 +1139,6 @@ class TestMiniRealDataset:
                 ao = AnimalOrganizer(
                     patterns,
                     animal_id=animal_id,
-                    assume_from_number=True,
                     lro_kwargs={
                         "mode": "si",
                         "extract_func": _mini_real_extractor,
@@ -1158,7 +1157,7 @@ class TestMiniRealDataset:
     def test_mini_real_loads_via_dotted_extract_func(self, mini_real_config):
         """AnimalOrganizer resolves a dotted extract_func string from config."""
         from neurodent import constants
-        from neurodent.workflow import inject_config_aliases
+        from neurodent.workflow import apply_samples_config
         from neurodent.workflow.utils import resolve_animal_pattern
         from neurodent.visualization import AnimalOrganizer
 
@@ -1176,12 +1175,11 @@ class TestMiniRealDataset:
         orig_metadata = constants.ANIMAL_METADATA
         orig_aliases = constants.GENOTYPE_ALIASES
         try:
-            inject_config_aliases(cfg["samples_config"])
+            apply_samples_config(cfg["samples_config"])
 
             ao = AnimalOrganizer(
                 patterns,
                 animal_id="A10",
-                assume_from_number=ds["analysis"]["war_generation"]["assume_from_number"],
                 lro_kwargs=lro_kwargs,
             )
 
@@ -1203,7 +1201,7 @@ class TestJointRecordingSplit:
     def test_joint_recording_split(self):
         """Test splitting A10's 10 channels into two virtual animals (A10-1 and A10-2)."""
         from neurodent import constants
-        from neurodent.workflow import inject_config_aliases
+        from neurodent.workflow import apply_samples_config
         from neurodent.workflow.utils import expand_animals_config
         from neurodent.visualization import AnimalOrganizer
 
@@ -1217,7 +1215,7 @@ class TestJointRecordingSplit:
                     "id": "A10-1",
                     "sex": "M",
                     "gene": "WT",
-                    "channels": ["0", "1", "2", "3", "4"],
+                    "channel_subset": ["0", "1", "2", "3", "4"],
                     "group": "A10",  # Both animals share the A10 group for discovery
                     "manual_datetime": "2025-05-10 10:00:00",
                 },
@@ -1225,7 +1223,7 @@ class TestJointRecordingSplit:
                     "id": "A10-2",
                     "sex": "M",
                     "gene": "WT",
-                    "channels": ["5", "6", "7", "8", "9"],
+                    "channel_subset": ["5", "6", "7", "8", "9"],
                     "group": "A10",  # Same group, different channels
                     "manual_datetime": "2025-05-10 10:00:00",
                 },
@@ -1239,7 +1237,7 @@ class TestJointRecordingSplit:
             expanded = expand_animals_config(config_dict)
 
             # Inject the config so metadata is available
-            inject_config_aliases(expanded)
+            apply_samples_config(expanded)
 
             # Verify both animals are in the expanded config
             animal_ids = {a["id"] for a in expanded["animals"]}
@@ -1251,12 +1249,12 @@ class TestJointRecordingSplit:
             assert expanded["_animal_groups"]["A10-2"] == "A10"
 
             # Verify channel mapping
-            assert expanded["_animal_channels"]["A10-1"] == ["0", "1", "2", "3", "4"]
-            assert expanded["_animal_channels"]["A10-2"] == ["5", "6", "7", "8", "9"]
+            assert expanded["_animal_channel_subsets"]["A10-1"] == ["0", "1", "2", "3", "4"]
+            assert expanded["_animal_channel_subsets"]["A10-2"] == ["5", "6", "7", "8", "9"]
 
             # Test channel validation - no overlaps within group
-            channels_a10_1 = set(expanded["_animal_channels"]["A10-1"])
-            channels_a10_2 = set(expanded["_animal_channels"]["A10-2"])
+            channels_a10_1 = set(expanded["_animal_channel_subsets"]["A10-1"])
+            channels_a10_2 = set(expanded["_animal_channel_subsets"]["A10-2"])
             assert len(channels_a10_1 & channels_a10_2) == 0, "Channels should not overlap within same group"
 
             # Test AnimalOrganizer.split() functionality with real mini-real data
@@ -1271,7 +1269,6 @@ class TestJointRecordingSplit:
             ao1 = AnimalOrganizer(
                 patterns,
                 animal_id="A10",  # Use the group name for discovery
-                assume_from_number=True,
                 lro_kwargs={
                     "mode": "si",
                     "extract_func": _mini_real_extractor,

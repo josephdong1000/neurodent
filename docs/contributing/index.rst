@@ -9,6 +9,7 @@ We welcome contributions to NeuRodent! This guide will help you get started.
 
    setup
    testing
+   naming
 
 Quick Start
 -----------
@@ -32,6 +33,13 @@ Quick Start
       :link-type: doc
 
       Running tests, building documentation, and code style guidelines.
+
+   .. grid-item-card:: :octicon:`book` Naming Conventions
+      :link: naming
+      :link-type: doc
+
+      The verb/noun canon: which verb for which operation, and the noun rules
+      (``_MAP`` vs ``_ALIASES``, config levels, channel terminology).
 
 Pull Request Process
 --------------------

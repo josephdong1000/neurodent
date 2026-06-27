@@ -30,7 +30,7 @@ from tqdm import tqdm
 from .. import constants, core
 from ..core import FragmentAnalyzer, get_temp_directory
 from ..core.frequency_domain_spike_detection import FrequencyDomainSpikeDetector
-from ..core.utils import abbreviate_channel_names, atomic_output_path, atomic_write_json, filepath_to_index, parse_chname_to_abbrev, slugify
+from ..core.utils import resolve_channels, atomic_output_path, atomic_write_json, filepath_to_index, resolve_channel, slugify
 from .feature_utils import extract_linear_array, extract_band_dict, repack_band_dict, extract_hist_data
 from .feature_handlers import FEATURE_HANDLERS, handler_for
 from .filters import (
@@ -142,8 +142,6 @@ class AnimalOrganizer(AnimalFeatureParser):
             E.g. ``["*bad*", "corrupted_*"]``. Defaults to [].
         truncate (bool | int, optional): If True, truncate to first 10 sessions.
             If an integer, truncate to first n sessions. Defaults to False.
-        assume_from_number (bool, optional): Whether to parse channel names as numbers
-            (used for analysis, not discovery). Defaults to False.
         lro_kwargs (dict, optional): Keyword arguments passed to each LongRecordingOrganizer
             instance. Common options include 'mode', 'extract_func', 'manual_datetimes'.
             Defaults to {}.
@@ -190,13 +188,11 @@ class AnimalOrganizer(AnimalFeatureParser):
         animal_id: str | None = None,
         skip_sessions: list[str] = [],
         truncate: bool | int = False,
-        assume_from_number: bool = False,
         lro_kwargs: dict = {},
         normalize_session: Optional[Callable[[str], str]] = None,
     ) -> None:
         self.pattern = pattern
         self.animal_id = animal_id
-        self.assume_from_number = assume_from_number
         self.animal_file_match_pattern = [animal_id] if animal_id else []
         self.day_sep = None
         self.read_mode = "pattern"  # Legacy compat; new pattern-based discovery
@@ -1867,7 +1863,6 @@ class AnimalOrganizer(AnimalFeatureParser):
             self.genotype,
             self.sex,
             self.channel_names,
-            self.assume_from_number,
             self.bad_channels_dict,
             suppress_short_interval_error,
             lof_scores_dict,
@@ -1937,7 +1932,6 @@ class AnimalOrganizer(AnimalFeatureParser):
                         else None
                     ),
                     metadata=self.long_recordings[i].meta,
-                    assume_from_number=self.assume_from_number,
                 )
 
                 fdsar_list.append(fdsar)
@@ -2030,7 +2024,6 @@ class AnimalOrganizer(AnimalFeatureParser):
         animal_id: str,
         genotype: str = "Unknown",
         sex: str = "Unknown",
-        assume_from_number: bool = False,
     ) -> "AnimalOrganizer":
         """
         Create an AnimalOrganizer from an existing list of LongRecordingOrganizer objects.
@@ -2045,8 +2038,6 @@ class AnimalOrganizer(AnimalFeatureParser):
             animal_id (str): Animal identifier for this organizer.
             genotype (str, optional): Genotype string. Defaults to "Unknown".
             sex (str, optional): Sex string (e.g. "Male", "Female"). Defaults to "Unknown".
-            assume_from_number (bool, optional): Whether to assume channel aliases
-                from numbers. Defaults to False.
 
         Returns:
             AnimalOrganizer: A new AnimalOrganizer instance wrapping the provided LROs
@@ -2081,7 +2072,6 @@ class AnimalOrganizer(AnimalFeatureParser):
         ao.animal_id = animal_id
         ao.genotype = genotype
         ao.sex = sex
-        ao.assume_from_number = assume_from_number
 
         # Step 1: Group LROs by date
         date_to_lros = {}  # dict[str, list[tuple[int, LRO]]]
@@ -2224,7 +2214,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         """
         Validate that all LROs have consistent channel names.
 
-        Compares abbreviated channel names (via ``parse_chname_to_abbrev``)
+        Compares abbreviated channel names (via ``resolve_channel``)
         so that cosmetic variants like ``L Barrel`` vs ``L Barrel Ctx`` are
         treated as equivalent. If raw names differ but abbreviations match,
         the mismatched LRO's channel names are renamed to match the reference
@@ -2249,14 +2239,14 @@ class AnimalOrganizer(AnimalFeatureParser):
         if not first_names:
             return []
 
-        reference_abbrevs = abbreviate_channel_names(first_names, strict_matching=False)
+        reference_abbrevs = resolve_channels(first_names)
         reference_set = set(reference_abbrevs)
         # Map abbreviation -> canonical raw name from first LRO
         abbrev_to_raw = dict(zip(reference_abbrevs, first_names))
 
         for i, lro in enumerate(lros[1:], start=1):
             current_names = lro.channel_names if lro.channel_names else []
-            current_abbrevs = abbreviate_channel_names(current_names, strict_matching=False)
+            current_abbrevs = resolve_channels(current_names)
             current_set = set(current_abbrevs)
 
             if current_set != reference_set:
@@ -2418,7 +2408,6 @@ class AnimalOrganizer(AnimalFeatureParser):
                 animal_id=group_name,
                 genotype=self.genotype,
                 sex=self.sex,
-                assume_from_number=self.assume_from_number,
             )
 
             result[group_name] = child_ao
@@ -2477,8 +2466,8 @@ class WindowAnalysisResult(AnimalFeatureParser):
         result (pd.DataFrame): Result comes from AnimalOrganizer.compute_windowed_analysis()
         animal_id (str, optional): Identifier for the animal where result was computed from. Defaults to None.
         genotype (str, optional): Genotype of animal. Defaults to None.
-        channel_names (list[str], optional): List of channel names. Defaults to None.
-        assume_channels (bool, optional): If true, assumes channel names according to AnimalFeatureParser.DEFAULT_CHNUM_TO_NAME. Defaults to False.
+        channel_names (list[str], optional): The recording's channel labels (raw names as
+            they appear in the data). Defaults to None.
         bad_channels_dict (dict[str, list[str]], optional): Dictionary of channels to reject for each recording session. Defaults to {}.
         suppress_short_interval_error (bool, optional): If True, suppress ValueError for short intervals between timestamps. Useful for aggregated WARs with large window sizes. Defaults to False.
 
@@ -2486,8 +2475,11 @@ class WindowAnalysisResult(AnimalFeatureParser):
         result (pd.DataFrame): DataFrame containing the windowed analysis results.
         animal_id (str): Identifier for the animal.
         genotype (str): Genotype of the animal.
-        channel_names (list[str]): List of channel names.
-        channel_abbrevs (list[str]): Abbreviated channel names.
+        channel_names (list[str]): The *current working* channel labels — the raw names at
+            construction, or the canonical abbreviations after :meth:`reorder_and_pad_channels`
+            is run with ``use_abbrevs=True``.
+        channel_abbrevs (list[str]): The canonical channel abbreviations, always derived from
+            ``channel_names`` via :func:`~neurodent.core.resolve_channel` (exact lookup).
         bad_channels_dict (dict): Dictionary mapping sessions to bad channel names.
         lof_scores_dict (dict): Dictionary of LOF scores for outage detection.
     """
@@ -2499,7 +2491,6 @@ class WindowAnalysisResult(AnimalFeatureParser):
         genotype: str = None,
         sex: str = "Unknown",
         channel_names: list[str] = None,
-        assume_from_number=False,
         bad_channels_dict: dict[str, list[str]] = {},
         suppress_short_interval_error=False,
         lof_scores_dict: dict[str, dict] = {},
@@ -2509,7 +2500,6 @@ class WindowAnalysisResult(AnimalFeatureParser):
         self.genotype = genotype
         self.sex = sex
         self.channel_names = channel_names
-        self.assume_from_number = assume_from_number
         self.bad_channels_dict = bad_channels_dict.copy()
         self.suppress_short_interval_error = suppress_short_interval_error
         self.lof_scores_dict = lof_scores_dict
@@ -2528,7 +2518,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         """Overwrite ``sex``/``genotype`` from ``constants.ANIMAL_METADATA``.
 
         Makes the dataset config (loaded into ``constants.ANIMAL_METADATA`` by
-        ``inject_config_aliases``) the single source of truth for per-animal
+        ``apply_samples_config``) the single source of truth for per-animal
         metadata, applied identically to ``sex`` and ``genotype`` at every WAR
         construction. Updates BOTH the object attributes AND the per-row
         ``result["sex"]``/``result["genotype"]`` columns (downstream renderers read
@@ -2536,7 +2526,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
         Guarded for portability: if the animal is absent from
         ``constants.ANIMAL_METADATA`` (e.g. a standalone load without
-        ``inject_config_aliases``), the baked values are left untouched. A metadata
+        ``apply_samples_config``), the baked values are left untouched. A metadata
         field that is ``None`` does not overwrite a baked value.
 
         Note: the ``ANIMAL_METADATA`` key is ``"gene"`` (the config field name); the
@@ -2574,7 +2564,6 @@ class WindowAnalysisResult(AnimalFeatureParser):
             channel_names=(
                 self.channel_names.copy() if self.channel_names is not None else None
             ),
-            assume_from_number=self.assume_from_number,
             bad_channels_dict=copy.deepcopy(self.bad_channels_dict),
             suppress_short_interval_error=self.suppress_short_interval_error,
             lof_scores_dict=copy.deepcopy(self.lof_scores_dict),
@@ -2603,7 +2592,6 @@ class WindowAnalysisResult(AnimalFeatureParser):
         new_war.genotype = source.genotype
         new_war.sex = source.sex
         new_war.channel_names = source.channel_names
-        new_war.assume_from_number = source.assume_from_number
         new_war.bad_channels_dict = source.bad_channels_dict.copy()
         new_war.suppress_short_interval_error = source.suppress_short_interval_error
         new_war.lof_scores_dict = source.lof_scores_dict.copy()
@@ -2719,7 +2707,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
         try:
             self.channel_abbrevs = [
-                core.parse_chname_to_abbrev(x, assume_from_number=self.assume_from_number)
+                core.resolve_channel(x)
                 for x in self.channel_names
             ]
         except (ValueError, KeyError) as e:
@@ -2728,20 +2716,27 @@ class WindowAnalysisResult(AnimalFeatureParser):
             ) from e
 
     def reorder_and_pad_channels(
-        self, target_channels: list[str], use_abbrevs: bool = True, inplace: bool = True
+        self, target_channels: list[str] | None = None, use_abbrevs: bool = True, inplace: bool = True
     ) -> pd.DataFrame:
         """Reorder and pad channels to match a target channel list.
 
         This method ensures that the data has a consistent channel order and structure
-        by reordering existing channels and padding missing channels with NaNs.
+        by reordering existing channels and padding missing channels with NaNs. Channels
+        present in the data but **absent from** ``target_channels`` are dropped; a warning
+        names them so a montage gap can never silently discard data.
 
         Args:
-            target_channels (list[str]): List of target channel names to match
+            target_channels (list[str], optional): List of target channel names to match.
+                Defaults to :data:`neurodent.constants.CHANNEL_ABBREVS` (the canonical
+                channel list) when omitted.
             use_abbrevs (bool, optional): If True, target channel names are read as channel abbreviations instead of channel names. Defaults to True.
             inplace (bool, optional): If True, modify the result in place. Defaults to True.
         Returns:
             pd.DataFrame: DataFrame with reordered and padded channels
         """
+        if target_channels is None:
+            target_channels = list(constants.CHANNEL_ABBREVS)
+
         duplicates = [ch for ch in target_channels if target_channels.count(ch) > 1]
         if duplicates:
             raise ValueError(
@@ -2761,6 +2756,14 @@ class WindowAnalysisResult(AnimalFeatureParser):
             warnings.warn(
                 f"None of the channel names {channel_names} were found in target channels {target_channels}. Is use_abbrevs correctly set?"
             )
+        else:
+            dropped = [ch for ch in channel_names if ch not in channel_map]
+            if dropped:
+                warnings.warn(
+                    f"Standardization dropping channels not in the target montage: {dropped}. "
+                    f"Target channels: {target_channels}. Add them to the channel config "
+                    f"(CHANNEL_MAP / `channels`) if this data should be kept."
+                )
 
         for feature in self._feature_columns:
             handler = handler_for(feature)
@@ -3564,7 +3567,6 @@ class WindowAnalysisResult(AnimalFeatureParser):
         return ChannelInfo(
             channel_names=list(self.channel_names),
             channel_abbrevs=list(self.channel_abbrevs),
-            assume_from_number=self.assume_from_number,
         )
 
     @property
@@ -4060,7 +4062,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         make_folder=True,
         filename: str = None,
         slugify_filename=False,
-        save_abbrevs_as_chnames=False,
+        save_abbrevs=False,
     ):
         """Archive window analysis result into the folder specified, as a parquet and json file.
 
@@ -4073,7 +4075,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             make_folder (bool, optional): If True, create the folder if it doesn't exist. Defaults to True.
             filename (str, optional): Name of the file to save. Defaults to "war".
             slugify_filename (bool, optional): If True, slugify the filename (replace special characters). Defaults to False.
-            save_abbrevs_as_chnames (bool, optional): If True, save the channel abbreviations as the channel names in the json file. Defaults to False.
+            save_abbrevs (bool, optional): If True, save the channel abbreviations as the channel names in the json file. Defaults to False.
         """
         import pyarrow as pa
         import pyarrow.parquet as pq
@@ -4110,10 +4112,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             "genotype": self.genotype,
             "sex": self.sex,
             "channel_names": (
-                self.channel_abbrevs if save_abbrevs_as_chnames else self.channel_names
-            ),
-            "assume_from_number": (
-                False if save_abbrevs_as_chnames else self.assume_from_number
+                self.channel_abbrevs if save_abbrevs else self.channel_names
             ),
             "bad_channels_dict": self.bad_channels_dict,
             "suppress_short_interval_error": self.suppress_short_interval_error,
@@ -4268,7 +4267,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         Columns whose name is in :data:`constants.FEATURE_TYPES` with a non-LINEAR
         type are encoded as native nested pyarrow types (via ``_to_nested_python``
         + ``pa.array``) with a per-cell JSON fallback for shapes pyarrow can't
-        infer.  tz-aware datetimes are normalised to UTC.  Pass an explicit
+        infer.  tz-aware datetimes are normalized to UTC.  Pass an explicit
         ``encoded_cols`` list to override the schema-based detection (e.g. when
         round-tripping non-WAR DataFrames).
 
@@ -4332,7 +4331,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
         - 1 (or missing) → legacy JSON-string cells; decoded with :func:`json.loads`.
         - 2              → native nested cells (pa.list/struct/binary);
-          normalised with :meth:`_normalize_arrow_cell`.
+          normalized with :meth:`_normalize_arrow_cell`.
         """
         decoder = (
             WindowAnalysisResult._normalize_arrow_cell
@@ -4538,7 +4537,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             for i, channel in enumerate(channel_names):
                 if (
                     channel in evaluation_channels
-                    or parse_chname_to_abbrev(channel, strict_matching=False)
+                    or resolve_channel(channel)
                     in evaluation_channels
                 ):
                     channels_processed += 1
@@ -4546,11 +4545,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     # Ground truth: 1 if channel is marked as bad, 0 otherwise
                     is_bad_channel = (
                         channel in animalday_bad_channels
-                        or parse_chname_to_abbrev(channel, strict_matching=False)
+                        or resolve_channel(channel)
                         in animalday_bad_channels
                     )
-                    # if is_bad_channel and channel not in animalday_bad_channels:
-                    #     logging.debug(f"Mapped full channel '{channel}' -> '{parse_chname_to_abbrev(channel, strict_matching=False)}' found in bad channels")
 
                     y_true = 1 if is_bad_channel else 0
                     # Prediction: 1 if LOF score > threshold, 0 otherwise
@@ -4742,6 +4739,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
                 f"WAR JSON sidecar {json_path} is missing or corrupt ({e}); "
                 f"the parquet/JSON pair is incomplete and the WAR must be regenerated."
             ) from e
+        # Back-compat: older WAR sidecars carry "assume_from_number"; the field was
+        # removed (channel resolution is now exact-only), so drop it before construction.
+        metadata.pop("assume_from_number", None)
         return cls(data, **metadata)
 
     @classmethod

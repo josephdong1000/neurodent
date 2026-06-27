@@ -1,101 +1,65 @@
 {
     "data_parent_folder": "/mnt/isilon/marsh_single_unit/PythonEEG Data/AP3B2/Intan recordings/",
-    "CHNAME_ALIASES": {
-        "Aud": [
-            "A-009",
-            "A-022",
-            "B-009",
-            "B-022",
-            "C-009",
-            "C-022",
-            "D-009",
-            "D-022"
-        ],
-        "Vis": [
-            "A-010",
-            "A-021",
-            "B-010",
-            "B-021",
-            "C-010",
-            "C-021",
-            "D-010",
-            "D-021"
-        ],
-        "Hip": [
-            "A-012",
-            "A-019",
-            "B-012",
-            "B-019",
-            "C-012",
-            "C-019",
-            "D-012",
-            "D-019"
-        ],
-        "Bar": [
-            "A-014",
-            "A-017",
-            "B-014",
-            "B-017",
-            "C-014",
-            "C-017",
-            "D-014",
-            "D-017"
-        ],
-        "Mot": [
+    "channels": {
+        "LMot": [
             "A-015",
-            "A-016",
             "B-015",
-            "B-016",
             "C-015",
-            "C-016",
-            "D-015",
-            "D-016"
-        ]
-    },
-    "LR_ALIASES": {
-        "L": [
-            "A-009",
-            "A-010",
-            "A-012",
-            "A-014",
-            "A-015",
-            "B-009",
-            "B-010",
-            "B-012",
-            "B-014",
-            "B-015",
-            "C-009",
-            "C-010",
-            "C-012",
-            "C-014",
-            "C-015",
-            "D-009",
-            "D-010",
-            "D-012",
-            "D-014",
             "D-015"
         ],
-        "R": [
+        "RMot": [
             "A-016",
-            "A-017",
-            "A-019",
-            "A-021",
-            "A-022",
             "B-016",
-            "B-017",
-            "B-019",
-            "B-021",
-            "B-022",
             "C-016",
+            "D-016"
+        ],
+        "LBar": [
+            "A-014",
+            "B-014",
+            "C-014",
+            "D-014"
+        ],
+        "RBar": [
+            "A-017",
+            "B-017",
             "C-017",
+            "D-017"
+        ],
+        "LHip": [
+            "A-012",
+            "B-012",
+            "C-012",
+            "D-012"
+        ],
+        "RHip": [
+            "A-019",
+            "B-019",
             "C-019",
-            "C-021",
+            "D-019"
+        ],
+        "LAud": [
+            "A-009",
+            "B-009",
+            "C-009",
+            "D-009"
+        ],
+        "RAud": [
+            "A-022",
+            "B-022",
             "C-022",
-            "D-016",
-            "D-017",
-            "D-019",
-            "D-021",
             "D-022"
+        ],
+        "LVis": [
+            "A-010",
+            "B-010",
+            "C-010",
+            "D-010"
+        ],
+        "RVis": [
+            "A-021",
+            "B-021",
+            "C-021",
+            "D-021"
         ]
     },
     "animals": [
@@ -103,7 +67,7 @@
             "id": "AP3B2het-207-M",
             "gene": "HET",
             "sex": "Male",
-            "channels": [
+            "channel_subset": [
                 "A-009",
                 "A-010",
                 "A-012",
@@ -125,7 +89,7 @@
             "id": "AP3B2wt-206-M",
             "gene": "WT",
             "sex": "Male",
-            "channels": [
+            "channel_subset": [
                 "B-009",
                 "B-010",
                 "B-012",
@@ -147,7 +111,7 @@
             "id": "AP3B2homo-228-M",
             "gene": "HOMO",
             "sex": "Male",
-            "channels": [
+            "channel_subset": [
                 "A-009",
                 "A-010",
                 "A-012",
@@ -171,7 +135,7 @@
             "id": "AP3B2wt-247-F",
             "gene": "WT",
             "sex": "Female",
-            "channels": [
+            "channel_subset": [
                 "A-009",
                 "A-010",
                 "A-012",
@@ -194,7 +158,7 @@
             "id": "AP3B2homo-275-F",
             "gene": "HOMO",
             "sex": "Female",
-            "channels": [
+            "channel_subset": [
                 "B-009",
                 "B-010",
                 "B-012",
@@ -217,7 +181,7 @@
             "id": "AP3B2wt-246-F",
             "gene": "WT",
             "sex": "Female",
-            "channels": [
+            "channel_subset": [
                 "C-009",
                 "C-010",
                 "C-012",
@@ -240,7 +204,7 @@
             "id": "AP3B2homo-240-M",
             "gene": "HOMO",
             "sex": "Male",
-            "channels": [
+            "channel_subset": [
                 "A-009",
                 "A-010",
                 "A-012",
@@ -262,7 +226,7 @@
             "id": "AP3B2wt-241-M",
             "gene": "WT",
             "sex": "Male",
-            "channels": [
+            "channel_subset": [
                 "B-009",
                 "B-010",
                 "B-012",
@@ -284,7 +248,7 @@
             "id": "AP3B2het-221-M",
             "gene": "HET",
             "sex": "Male",
-            "channels": [
+            "channel_subset": [
                 "A-009",
                 "A-010",
                 "A-012",
@@ -308,7 +272,7 @@
             "id": "AP3B2het-222-M",
             "gene": "HET",
             "sex": "Male",
-            "channels": [
+            "channel_subset": [
                 "B-009",
                 "B-010",
                 "B-012",
@@ -332,7 +296,7 @@
             "id": "AP3B2-264or265-M",
             "gene": "UNKNOWN",
             "sex": "Male",
-            "channels": [
+            "channel_subset": [
                 "C-009",
                 "C-010",
                 "C-012",
@@ -356,7 +320,7 @@
             "id": "AP3B2wt-243-M",
             "gene": "WT",
             "sex": "Male",
-            "channels": [
+            "channel_subset": [
                 "D-009",
                 "D-010",
                 "D-012",
@@ -380,7 +344,7 @@
             "id": "AP3B2wt-202-F",
             "gene": "WT",
             "sex": "Female",
-            "channels": [
+            "channel_subset": [
                 "A-009",
                 "A-010",
                 "A-012",
@@ -405,7 +369,7 @@
             "id": "AP3B2homo-203-F",
             "gene": "HOMO",
             "sex": "Female",
-            "channels": [
+            "channel_subset": [
                 "B-009",
                 "B-010",
                 "B-012",
@@ -430,7 +394,7 @@
             "id": "AP3B2het-237-F",
             "gene": "HET",
             "sex": "Female",
-            "channels": [
+            "channel_subset": [
                 "C-009",
                 "C-010",
                 "C-012",
@@ -455,7 +419,7 @@
             "id": "AP3B2het-239-F",
             "gene": "HET",
             "sex": "Female",
-            "channels": [
+            "channel_subset": [
                 "D-009",
                 "D-010",
                 "D-012",
@@ -479,7 +443,7 @@
             "id": "AP3B2het-280-F",
             "gene": "HET",
             "sex": "Female",
-            "channels": [
+            "channel_subset": [
                 "A-009",
                 "A-010",
                 "A-012",
@@ -502,7 +466,7 @@
             "id": "AP3B2het-271-F",
             "gene": "HET",
             "sex": "Female",
-            "channels": [
+            "channel_subset": [
                 "B-009",
                 "B-010",
                 "B-012",
@@ -525,7 +489,7 @@
             "id": "AP3B2wt236-F",
             "gene": "WT",
             "sex": "Female",
-            "channels": [
+            "channel_subset": [
                 "C-009",
                 "C-010",
                 "C-012",
