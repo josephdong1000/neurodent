@@ -68,7 +68,6 @@ for data_folder, animal_ids in data_folders_to_animal_ids.items():
                 data_parent_folder / data_folder,
                 animal_id,
                 mode="concat",
-                assume_from_number=True,
                 skip_days=["bad"],
                 lro_kwargs={"mode": "bin", "multiprocess_mode": "dask", "overwrite_rowbins": True},
             )

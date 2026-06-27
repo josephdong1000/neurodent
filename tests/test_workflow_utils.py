@@ -205,50 +205,38 @@ class TestApplyPathOverrides:
 
 
 # ---------------------------------------------------------------------------
-# inject_config_aliases edge cases
+# apply_samples_config edge cases
 # ---------------------------------------------------------------------------
-from neurodent.workflow.utils import inject_config_aliases
+from neurodent.workflow.utils import apply_samples_config
 
 
 @pytest.mark.mutates_constants
 class TestInjectConfigAliases:
-    """Tests for inject_config_aliases covering alias injection."""
+    """Tests for apply_samples_config covering alias injection."""
 
     def test_genotype_aliases_set(self):
         from neurodent import constants
 
         orig = getattr(constants, "GENOTYPE_ALIASES", None)
         try:
-            inject_config_aliases({"GENOTYPE_ALIASES": {"wt": "WT"}})
+            apply_samples_config({"GENOTYPE_ALIASES": {"wt": "WT"}})
             assert constants.GENOTYPE_ALIASES == {"wt": "WT"}
         finally:
             if orig is not None:
                 constants.GENOTYPE_ALIASES = orig
 
-    def test_chname_aliases_set(self):
+    def test_flat_channels_set(self):
+        """The flat `channels` form sets CHANNEL_MAP and derives CHANNEL_ABBREVS."""
         from neurodent import constants
 
-        orig = getattr(constants, "CHNAME_ALIASES", None)
-        try:
-            inject_config_aliases({"CHNAME_ALIASES": {"motor": "mot"}})
-            assert constants.CHNAME_ALIASES == {"motor": "mot"}
-        finally:
-            if orig is not None:
-                constants.CHNAME_ALIASES = orig
-
-    def test_lr_aliases_set(self):
-        from neurodent import constants
-
-        orig = getattr(constants, "LR_ALIASES", None)
-        try:
-            inject_config_aliases({"LR_ALIASES": {"Left": "L"}})
-            assert constants.LR_ALIASES == {"Left": "L"}
-        finally:
-            if orig is not None:
-                constants.LR_ALIASES = orig
+        channels = {"LMot": ["LMot", "left Motor"], "RMot": ["RMot"], "LFoo": ["LFoo"]}
+        apply_samples_config({"channels": channels})
+        assert constants.CHANNEL_MAP == channels
+        assert constants.CHANNEL_ABBREVS == ["LMot", "RMot", "LFoo"]
+        assert constants.DF_SORT_ORDER["channel"] == ["average", "all", "LMot", "RMot", "LFoo"]
 
     def test_empty_config_no_error(self):
-        inject_config_aliases({})
+        apply_samples_config({})
 
 
 # ---------------------------------------------------------------------------
@@ -503,7 +491,7 @@ class TestExpandAnimalsConfig:
                     "lro_kwargs": {"mode": "si"},
                 },
             ],
-            "LR_ALIASES": {"L": ["0"], "R": ["1"]},
+            "channels": {"LMot": ["0"], "RMot": ["1"]},
         }
         result = expand_animals_config(cfg)
 
@@ -531,8 +519,8 @@ class TestExpandAnimalsConfig:
         assert ov["AP3B2homo-240-M"]["lro_kwargs"] == {"mode": "si"}
         assert "AM3" not in ov
 
-        # LR_ALIASES preserved
-        assert result["LR_ALIASES"] == {"L": ["0"], "R": ["1"]}
+        # channels preserved
+        assert result["channels"] == {"LMot": ["0"], "RMot": ["1"]}
 
     def test_legacy_data_parent_folder_without_animals(self):
         """Legacy config with data_parent_folder (no animals list) gets migrated."""
@@ -687,26 +675,26 @@ class TestExpandAnimalsConfig:
         meta = result["ANIMAL_METADATA"][0]
         assert "exclude" not in meta
 
-    def test_builds_animal_channels(self):
-        """_animal_channels dict is built from animals' channels field."""
+    def test_builds_animal_channel_subsets(self):
+        """_animal_channel_subsets dict is built from animals' channel_subset field."""
         cfg = {
             "data_root": "/data",
             "animals": [
-                {"id": "A10", "gene": "WT", "sex": "M", "channels": ["Ch0", "Ch1", "Ch2"]},
+                {"id": "A10", "gene": "WT", "sex": "M", "channel_subset": ["Ch0", "Ch1", "Ch2"]},
                 {"id": "F22", "gene": "KO", "sex": "F"},
             ],
         }
         result = expand_animals_config(cfg)
-        assert "_animal_channels" in result
-        assert result["_animal_channels"]["A10"] == ["Ch0", "Ch1", "Ch2"]
-        assert "F22" not in result["_animal_channels"]
+        assert "_animal_channel_subsets" in result
+        assert result["_animal_channel_subsets"]["A10"] == ["Ch0", "Ch1", "Ch2"]
+        assert "F22" not in result["_animal_channel_subsets"]
 
     def test_builds_animal_groups(self):
         """_animal_groups dict is built from animals' group field."""
         cfg = {
             "data_root": "/data",
             "animals": [
-                {"id": "A10", "gene": "WT", "sex": "M", "channels": ["Ch0"], "group": "SharedGroup"},
+                {"id": "A10", "gene": "WT", "sex": "M", "channel_subset": ["Ch0"], "group": "SharedGroup"},
                 {"id": "F22", "gene": "KO", "sex": "F"},
             ],
         }
@@ -720,7 +708,7 @@ class TestExpandAnimalsConfig:
         cfg = {
             "data_root": "/data",
             "animals": [
-                {"id": "A10", "gene": "WT", "sex": "M", "channels": ["Ch0"], "group": "Group1"},
+                {"id": "A10", "gene": "WT", "sex": "M", "channel_subset": ["Ch0"], "group": "Group1"},
             ],
         }
         result = expand_animals_config(cfg)
@@ -729,7 +717,7 @@ class TestExpandAnimalsConfig:
         assert "group" not in meta
 
     def test_backward_compat_derives_channels_from_joint_sessions(self):
-        """Legacy joint_sessions is auto-converted to _animal_channels with deprecation warning."""
+        """Legacy joint_sessions is auto-converted to _animal_channel_subsets with deprecation warning."""
         import warnings
         cfg = {
             "data_root": "/data",
@@ -751,9 +739,9 @@ class TestExpandAnimalsConfig:
             assert issubclass(w[0].category, DeprecationWarning)
             assert "joint_sessions" in str(w[0].message)
 
-        assert "_animal_channels" in result
-        assert result["_animal_channels"]["A10"] == ["Ch0", "Ch1"]
-        assert result["_animal_channels"]["F22"] == ["Ch2", "Ch3"]
+        assert "_animal_channel_subsets" in result
+        assert result["_animal_channel_subsets"]["A10"] == ["Ch0", "Ch1"]
+        assert result["_animal_channel_subsets"]["F22"] == ["Ch2", "Ch3"]
 
     def test_backward_compat_verifies_channel_consistency(self):
         """Legacy joint_sessions verifies channel consistency across sessions."""
@@ -771,12 +759,12 @@ class TestExpandAnimalsConfig:
             expand_animals_config(cfg)
 
     def test_backward_compat_new_format_takes_precedence(self):
-        """If animals have channels field, legacy joint_sessions is ignored (no warning)."""
+        """If animals have channel_subset field, legacy joint_sessions is ignored (no warning)."""
         import warnings
         cfg = {
             "data_root": "/data",
             "animals": [
-                {"id": "A10", "gene": "WT", "sex": "M", "channels": ["Ch0", "Ch1"]},
+                {"id": "A10", "gene": "WT", "sex": "M", "channel_subset": ["Ch0", "Ch1"]},
             ],
             "joint_sessions": {
                 "Session1": {"A10": ["Ch2", "Ch3"]},  # Should be ignored
@@ -790,15 +778,15 @@ class TestExpandAnimalsConfig:
             assert len(deprecation_warnings) == 0
 
         # Should use the new format, not the legacy one
-        assert result["_animal_channels"]["A10"] == ["Ch0", "Ch1"]
+        assert result["_animal_channel_subsets"]["A10"] == ["Ch0", "Ch1"]
 
     def test_validates_no_overlapping_channels_in_group(self):
         """Animals in the same group cannot share channels."""
         cfg = {
             "data_root": "/data",
             "animals": [
-                {"id": "A10", "gene": "WT", "sex": "M", "channels": ["Ch0", "Ch1"], "group": "Group1"},
-                {"id": "F22", "gene": "KO", "sex": "F", "channels": ["Ch1", "Ch2"], "group": "Group1"},  # Ch1 overlaps!
+                {"id": "A10", "gene": "WT", "sex": "M", "channel_subset": ["Ch0", "Ch1"], "group": "Group1"},
+                {"id": "F22", "gene": "KO", "sex": "F", "channel_subset": ["Ch1", "Ch2"], "group": "Group1"},  # Ch1 overlaps!
             ],
         }
         with pytest.raises(ValueError, match="Channel 'Ch1' is assigned to both"):
@@ -809,14 +797,14 @@ class TestExpandAnimalsConfig:
         cfg = {
             "data_root": "/data",
             "animals": [
-                {"id": "A10", "gene": "WT", "sex": "M", "channels": ["Ch0", "Ch1"], "group": "Group1"},
-                {"id": "F22", "gene": "KO", "sex": "F", "channels": ["Ch0", "Ch1"], "group": "Group2"},
+                {"id": "A10", "gene": "WT", "sex": "M", "channel_subset": ["Ch0", "Ch1"], "group": "Group1"},
+                {"id": "F22", "gene": "KO", "sex": "F", "channel_subset": ["Ch0", "Ch1"], "group": "Group2"},
             ],
         }
         result = expand_animals_config(cfg)
         # Should succeed - different groups can have same channel names
-        assert result["_animal_channels"]["A10"] == ["Ch0", "Ch1"]
-        assert result["_animal_channels"]["F22"] == ["Ch0", "Ch1"]
+        assert result["_animal_channel_subsets"]["A10"] == ["Ch0", "Ch1"]
+        assert result["_animal_channel_subsets"]["F22"] == ["Ch0", "Ch1"]
 
 
 class TestGetDiscoveryAnimalFilter:
@@ -877,7 +865,7 @@ class TestGetDiscoveryAnimalFilter:
 
 
 class TestBuildSexMarkerScale:
-    """Regression tests for ``build_sex_marker_scale``.
+    """Regression tests for ``create_sex_marker_scale``.
 
     Why this exists: generate_ep_figures.py used to hard-code
     ``so.Nominal(["o", "s"], order=["Female", "Male"])`` as the marker
@@ -893,9 +881,9 @@ class TestBuildSexMarkerScale:
     def _make_scale(sex_values):
         """Build a scale from a synthetic df with the given sex values."""
         import pandas as pd
-        from neurodent.workflow import build_sex_marker_scale
+        from neurodent.workflow import create_sex_marker_scale
         df = pd.DataFrame({"sex": sex_values, "y": list(range(len(sex_values)))})
-        return build_sex_marker_scale(df)
+        return create_sex_marker_scale(df)
 
     def test_canonical_female_male(self):
         """Female + Male present → preserves circle / square in canonical order."""

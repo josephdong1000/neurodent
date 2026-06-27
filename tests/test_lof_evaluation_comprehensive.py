@@ -21,8 +21,29 @@ from pathlib import Path
 from neurodent.visualization.results import WindowAnalysisResult
 
 
+@pytest.mark.mutates_constants
 class TestLOFEvaluationFixes:
     """Test the fixes to evaluate_lof_threshold_binary method"""
+
+    @pytest.fixture(autouse=True)
+    def _configure_intan_channels(self):
+        """Register the full Intan channel names used by these tests as explicit aliases
+        (channel resolution is exact — these raw names must be in the configured map)."""
+        from neurodent import constants
+
+        suffixes = {
+            "LMot": "L Motor Ctx", "RMot": "R Motor Ctx",
+            "LBar": "L Barrel Ctx", "RBar": "R Barrel Ctx",
+            "LAud": "L Aud Ctx", "RAud": "R Aud Ctx",
+            "LVis": "L Vis Ctx", "RVis": "R Vis Ctx",
+            "LHip": "L Hipp", "RHip": "R Hipp",
+        }
+        channels = {
+            ab: [ab] + [f"Intan Input (1)/Port{p} {sfx}" for p in ("B", "D")]
+            for ab, sfx in suffixes.items()
+        }
+        constants.set_channel_map(channels)
+        yield
 
     def test_key_filtering_with_mismatch(self):
         """Test that key mismatches raise ValueError"""
@@ -196,31 +217,31 @@ class TestLOFEvaluationFixes:
     def test_channel_abbreviation_mapping_logic(self):
         """Test the built-in channel abbreviation mapping"""
 
-        from neurodent.core.utils import parse_chname_to_abbrev
+        from neurodent.core.utils import resolve_channel
 
         # Test motor channels
-        assert parse_chname_to_abbrev("Intan Input (1)/PortB L Motor Ctx") == "LMot"
-        assert parse_chname_to_abbrev("Intan Input (1)/PortB R Motor Ctx") == "RMot"
+        assert resolve_channel("Intan Input (1)/PortB L Motor Ctx") == "LMot"
+        assert resolve_channel("Intan Input (1)/PortB R Motor Ctx") == "RMot"
 
         # Test barrel channels
-        assert parse_chname_to_abbrev("Intan Input (1)/PortB L Barrel Ctx") == "LBar"
-        assert parse_chname_to_abbrev("Intan Input (1)/PortB R Barrel Ctx") == "RBar"
+        assert resolve_channel("Intan Input (1)/PortB L Barrel Ctx") == "LBar"
+        assert resolve_channel("Intan Input (1)/PortB R Barrel Ctx") == "RBar"
 
         # Test auditory channels
-        assert parse_chname_to_abbrev("Intan Input (1)/PortB L Aud Ctx") == "LAud"
-        assert parse_chname_to_abbrev("Intan Input (1)/PortB R Aud Ctx") == "RAud"
+        assert resolve_channel("Intan Input (1)/PortB L Aud Ctx") == "LAud"
+        assert resolve_channel("Intan Input (1)/PortB R Aud Ctx") == "RAud"
 
         # Test visual channels
-        assert parse_chname_to_abbrev("Intan Input (1)/PortB L Vis Ctx") == "LVis"
-        assert parse_chname_to_abbrev("Intan Input (1)/PortB R Vis Ctx") == "RVis"
+        assert resolve_channel("Intan Input (1)/PortB L Vis Ctx") == "LVis"
+        assert resolve_channel("Intan Input (1)/PortB R Vis Ctx") == "RVis"
 
         # Test hippocampus channels
-        assert parse_chname_to_abbrev("Intan Input (1)/PortB L Hipp") == "LHip"
-        assert parse_chname_to_abbrev("Intan Input (1)/PortB R Hipp") == "RHip"
+        assert resolve_channel("Intan Input (1)/PortB L Hipp") == "LHip"
+        assert resolve_channel("Intan Input (1)/PortB R Hipp") == "RHip"
 
         # Test that abbreviations are returned as-is
-        assert parse_chname_to_abbrev("LMot") == "LMot"
-        assert parse_chname_to_abbrev("RVis") == "RVis"
+        assert resolve_channel("LMot") == "LMot"
+        assert resolve_channel("RVis") == "RVis"
 
     def test_threshold_behavior_realistic_range(self):
         """Test that different thresholds produce expected precision-recall tradeoff"""

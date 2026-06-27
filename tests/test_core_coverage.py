@@ -557,7 +557,7 @@ class TestIntanAndEdfExport:
         with patch("neurodent.core.core.should_use_cache_unified", return_value=False):
             with patch("neurodent.core.core.extract_mne_unit_info", return_value=("µV", 1.0)):
                 with patch.object(lro, "_load_mne_data_no_resample", return_value=raw):
-                    with patch("neurodent.core.core.convert_intan_chname_mne") as mock_conv:
+                    with patch("neurodent.core.core.rename_mne_channels") as mock_conv:
                         with patch("neurodent.core.core.se") as mock_se:
                             mock_se.read_edf.return_value = _make_mock_recording()
                             with patch("neurodent.core.core.mne") as mock_mne:

@@ -135,7 +135,6 @@ class TestSlashInGenotypePaths:
             bin_folder_name="",
             metadata=None,
             channel_names=["LMot", "RMot"],
-            assume_from_number=False,
         )
         stem = fdsar.path_safe_save_stem
         assert "/" not in stem

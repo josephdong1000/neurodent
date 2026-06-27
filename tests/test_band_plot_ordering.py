@@ -201,7 +201,6 @@ class TestAnimalPlotterBandKeyAssertion:
         war.genotype = "WT"
         war.channel_names = ["LMot", "RMot"]
         war.channel_abbrevs = ["LM", "RM"]
-        war.assume_from_number = False
         return AnimalPlotter(war)
 
     def _band_group_in_order(self, keys, n_time=5, n_chan=2):

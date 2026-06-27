@@ -209,7 +209,7 @@ class TestComputeGlobalTimelineIntegration:
     ):
         """Test that AnimalOrganizer works with manual_datetimes and pattern-based discovery."""
         from neurodent import constants
-        from neurodent.workflow import inject_config_aliases
+        from neurodent.workflow import apply_samples_config
         from neurodent.visualization import AnimalOrganizer
 
         ds = synthetic_nwb_dataset
@@ -221,12 +221,11 @@ class TestComputeGlobalTimelineIntegration:
         orig_metadata = constants.ANIMAL_METADATA
         orig_aliases = constants.GENOTYPE_ALIASES
         try:
-            inject_config_aliases(ds["samples_config"])
+            apply_samples_config(ds["samples_config"])
 
             ao = AnimalOrganizer(
                 pattern,
                 animal_id=animal_id,
-                assume_from_number=True,
                 lro_kwargs={
                     "mode": "si",
                     "extract_func": "read_nwb_recording",

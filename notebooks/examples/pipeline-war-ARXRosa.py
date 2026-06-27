@@ -104,16 +104,18 @@ if not save_folder.exists():
 # print(f"\n\n\tlrec: {lrec}\n\n")
 
 constants.GENOTYPE_ALIASES = {"ARX": "ARX"}
-constants.LR_ALIASES = {
-    "L": [f"E{i}-" for i in range(1, 32, 2)],  # Odd numbered electrodes (1,3,5,...,31)
-    "R": [f"E{i}-" for i in range(2, 33, 2)],  # Even numbered electrodes (2,4,6,...,32)
-}
-constants.CHNAME_ALIASES = {
-    "Vis": ["E1-", "E2-"] + ["E9-", "E10-"] + ["E17-", "E18-"] + ["E25-", "E26-"],
-    "Hip": ["E3-", "E4-"] + ["E11-", "E12-"] + ["E19-", "E20-"] + ["E27-", "E28-"],
-    "Bar": ["E5-", "E6-"] + ["E13-", "E14-"] + ["E21-", "E22-"] + ["E29-", "E30-"],
-    "Mot": ["E7-", "E8-"] + ["E15-", "E16-"] + ["E23-", "E24-"] + ["E31-", "E32-"],
-}
+# Exact channel map (matches config/datasets/arx_rosa.yaml, the corrected Pre-Intan montage:
+# Motor / Barrel / Hippo / Visual, odd electrode = Left). Channel resolution is exact.
+constants.set_channel_map({
+    "LMot": ["EEG E1-REF1", "EEG E9-REF2", "EEG E17-REF3", "EEG E25-REF4"],
+    "RMot": ["EEG E2-REF1", "EEG E10-REF2", "EEG E18-REF3", "EEG E26-REF4"],
+    "LBar": ["EEG E3-REF1", "EEG E11-REF2", "EEG E19-REF3", "EEG E27-REF4"],
+    "RBar": ["EEG E4-REF1", "EEG E12-REF2", "EEG E20-REF3", "EEG E28-REF4"],
+    "LHip": ["EEG E5-REF1", "EEG E13-REF2", "EEG E21-REF3", "EEG E29-REF4"],
+    "RHip": ["EEG E6-REF1", "EEG E14-REF2", "EEG E22-REF3", "EEG E30-REF4"],
+    "LVis": ["EEG E7-REF1", "EEG E15-REF2", "EEG E23-REF3", "EEG E31-REF4"],
+    "RVis": ["EEG E8-REF1", "EEG E16-REF2", "EEG E24-REF3", "EEG E32-REF4"],
+})
 
 for animal_id in ["1017 1015"]:
     with Client(cluster_window) as client:
@@ -121,7 +123,6 @@ for animal_id in ["1017 1015"]:
             data_folder,
             animal_id,
             mode="nest",
-            # assume_from_number=True,
             skip_days=["bad", "band data"],
             lro_kwargs={
                 "mode": "mne",

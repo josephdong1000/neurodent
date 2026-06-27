@@ -36,7 +36,7 @@ from pathlib import Path
 import psutil
 
 from neurodent import visualization
-from neurodent.workflow.utils import inject_config_aliases, load_samples_config, resolve_samples_config
+from neurodent.workflow.utils import apply_samples_config, load_samples_config, resolve_samples_config
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_WAR_ROOT = REPO_ROOT / "results" / "wars_quality_filtered"
@@ -79,10 +79,10 @@ def _convert_to_native_subprocess(animal: str, war_root: Path, output_dir: Path)
     script = f"""
 from pathlib import Path
 from neurodent import visualization
-from neurodent.workflow.utils import inject_config_aliases, load_samples_config, resolve_samples_config
+from neurodent.workflow.utils import apply_samples_config, load_samples_config, resolve_samples_config
 
 samples_config = resolve_samples_config(load_samples_config({str(SAMPLES_PATH)!r}))
-inject_config_aliases(samples_config)
+apply_samples_config(samples_config)
 
 src = Path({str(war_root)!r}) / {animal!r}
 dst = Path({str(output_dir)!r})
@@ -115,7 +115,7 @@ def main() -> None:
         "--samples",
         type=Path,
         default=SAMPLES_PATH,
-        help=f"dataset/samples config (for CHNAME/LR aliases; inline samples_data or samples_file). Default: {SAMPLES_PATH}",
+        help=f"dataset/samples config (for channel aliases; inline samples_data or samples_file). Default: {SAMPLES_PATH}",
     )
     ap.add_argument(
         "--convert-first",
@@ -142,7 +142,7 @@ def main() -> None:
         sys.exit(f"WAR folder not found: {input_war_dir}")
 
     samples_config = resolve_samples_config(load_samples_config(args.samples))
-    inject_config_aliases(samples_config)
+    apply_samples_config(samples_config)
 
     # If requested, pre-convert legacy WAR to native format in a subprocess so
     # the parent process (which memray traces) sees a fresh, low-memory start.

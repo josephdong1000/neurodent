@@ -61,7 +61,7 @@ def load_animal_metadata(samples_config: dict) -> dict:
             del _entry["genotype"]
         # Normalize the `sex` and `gene` fields the same way: ensure the key exists
         # (default None), then map the raw value to its canonical label via the
-        # field's alias dict (read from constants at call time so inject_config_aliases
+        # field's alias dict (read from constants at call time so apply_samples_config
         # overrides apply). An empty alias dict is a passthrough that keeps the raw
         # value with no warning -- this is GENE_ALIASES' default, so datasets without
         # a GENE_ALIASES block keep their `gene` string verbatim (backward compatible).

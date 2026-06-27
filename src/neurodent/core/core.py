@@ -49,8 +49,8 @@ from .utils import (
     get_file_stem,
     should_use_cache_unified,
     get_cache_status_message,
-    convert_intan_chname_mne,
-    abbreviate_channel_names,
+    rename_mne_channels,
+    resolve_channels,
     atomic_output_path,
     atomic_write_json,
     safe_unlink,
@@ -790,7 +790,7 @@ class LongRecordingOrganizer:
             raise ValueError(f"Invalid mode: {mode}")
 
     @staticmethod
-    def _make_empty_si_recording() -> "si.BaseRecording":
+    def _create_empty_si_recording() -> "si.BaseRecording":
         """Return a 0-sample SpikeInterface recording as a placeholder.
 
         Used when a file group fails to load (e.g. corrupt or empty metadata).
@@ -840,7 +840,7 @@ class LongRecordingOrganizer:
                         f"({self.item.paths}): {e}. "
                         f"Creating 0-sample placeholder; this recording will be skipped."
                     )
-                    rec = self._make_empty_si_recording()
+                    rec = self._create_empty_si_recording()
             else:
                 # Single file
                 rec: "si.BaseRecording" = extract_func(self.item.path, **kwargs)
@@ -1182,7 +1182,7 @@ class LongRecordingOrganizer:
             # Check if channel names in MNE Raw object are in Intan format and convert if necessary
             if any("intan" in ch_name.lower() for ch_name in raw.info["ch_names"]):
                 logging.info("Converting Intan channel names to MNE format")
-                convert_intan_chname_mne(
+                rename_mne_channels(
                     raw
                 )  # REVIEW check that this function is robust
 
@@ -1605,7 +1605,7 @@ class LongRecordingOrganizer:
         # Write the metadata sidecar inside the folder SI just created (written last
         # so its presence signals a complete save).
         sidecar_path = actual_output_dir / constants.NEURODENT_SIDECAR_NAME
-        atomic_write_json(sidecar_path, self._build_sidecar_payload(format))
+        atomic_write_json(sidecar_path, self._create_sidecar_payload(format))
 
         self.base_folder_path = actual_output_dir
         self._is_in_memory = False
@@ -1653,7 +1653,7 @@ class LongRecordingOrganizer:
             **kwargs,
         )
 
-    def _build_sidecar_payload(self, format: str) -> dict:
+    def _create_sidecar_payload(self, format: str) -> dict:
         """Build the JSON-serializable LRO metadata sidecar payload.
 
         Captures the LRO-level state that the raw SpikeInterface recording folder does
@@ -1687,7 +1687,7 @@ class LongRecordingOrganizer:
         """Restore LRO-level metadata from a sidecar payload onto this instance.
 
         Args:
-            data (dict): Sidecar contents produced by :meth:`_build_sidecar_payload`.
+            data (dict): Sidecar contents produced by :meth:`_create_sidecar_payload`.
         """
         self.channel_names = data["channel_names"]
         self.bad_channel_names = list(data.get("bad_channel_names", []))
@@ -2433,8 +2433,8 @@ class LongRecordingOrganizer:
         # Check channel names — compare by abbreviation to tolerate naming
         # variants (e.g. "L Barrel" vs "L Barrel Ctx" both → "LBar").
         # Unparseable names pass through as-is for exact comparison.
-        self_abbrevs = abbreviate_channel_names(self.channel_names)
-        other_abbrevs = abbreviate_channel_names(other_lro.channel_names)
+        self_abbrevs = resolve_channels(self.channel_names)
+        other_abbrevs = resolve_channels(other_lro.channel_names)
         if self_abbrevs != other_abbrevs:
             raise ValueError(
                 f"Channel names mismatch: this LRO has {self.channel_names} "

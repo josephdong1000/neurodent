@@ -451,8 +451,7 @@ class TestComputeWindowedAnalysisSignature:
         ao.animal_id = "test"
         ao.genotype = "WT"
         ao.sex = "M"
-        ao.channel_names = ["Left Aud", "Right Aud"]
-        ao.assume_from_number = False
+        ao.channel_names = ["LAud", "RAud"]
         ao.bad_channels_dict = {}
 
         # -- mock LAN returned by core.LongRecordingAnalyzer ----------------

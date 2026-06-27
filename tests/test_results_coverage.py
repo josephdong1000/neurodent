@@ -30,7 +30,7 @@ def make_war_df(
     extra_columns=None,
 ):
     """Build a minimal DataFrame accepted by WindowAnalysisResult."""
-    channels = channels or ["Left Motor", "Right Motor"]
+    channels = channels or ["LMot", "RMot"]
     n_ch = len(channels)
     rng = np.random.default_rng(42)
     rows = []
@@ -56,7 +56,7 @@ def make_war_df(
 
 def make_war(n_windows=4, channels=None, animal="A1", genotype="WT", **kwargs):
     """Shortcut: build a WAR with sensible defaults."""
-    channels = channels or ["Left Motor", "Right Motor"]
+    channels = channels or ["LMot", "RMot"]
     df = make_war_df(n_windows=n_windows, channels=channels, animal=animal, genotype=genotype, **kwargs)
     return WindowAnalysisResult(
         result=df,
@@ -126,7 +126,7 @@ class TestUpdateInstanceVars:
             warnings.simplefilter("always")
             war = WindowAnalysisResult(
                 result=df, animal_id="A1", genotype="WT",
-                channel_names=["Left Motor", "Right Motor"],
+                channel_names=["LMot", "RMot"],
                 suppress_short_interval_error=True,
             )
             assert any("index" in str(ww.message) for ww in w)
@@ -139,7 +139,7 @@ class TestUpdateInstanceVars:
             WindowAnalysisResult(
                 result=df, animal_id="WRONG",
                 genotype="WT",
-                channel_names=["Left Motor", "Right Motor"],
+                channel_names=["LMot", "RMot"],
                 suppress_short_interval_error=True,
             )
 
@@ -618,7 +618,7 @@ class TestEvaluateLOFThreshold:
         war.lof_scores_dict = {
             animalday: {
                 "lof_scores": [0.5, 2.0],
-                "channel_names": ["Left Motor", "Right Motor"],
+                "channel_names": ["LMot", "RMot"],
             }
         }
         war.bad_channels_dict = {animalday: []}  # empty → triggers line 3915
@@ -635,7 +635,7 @@ class TestEvaluateLOFThreshold:
         war.lof_scores_dict = {
             animalday: {"bad_key": []}  # missing required fields
         }
-        war.bad_channels_dict = {animalday: ["Left Motor"]}
+        war.bad_channels_dict = {animalday: ["LMot"]}
         with pytest.raises(ValueError, match="missing required fields|Invalid LOF data"):
             war.evaluate_lof_threshold_binary(threshold=1.0)
 
@@ -767,7 +767,7 @@ class TestAggregateTimeWindows:
     def test_string_groupby_converted(self):
         """Line 4147: string groupby is converted to list."""
         # Use single channel to avoid non-constant 'channel' column error
-        war = make_war(n_windows=4, channels=["Left Motor"])
+        war = make_war(n_windows=4, channels=["LMot"])
         war.aggregate_time_windows(groupby="animalday")
         assert len(war.result) >= 1
 
@@ -795,7 +795,7 @@ class TestAggregateTimeWindows:
 
     def test_duration_and_endfile_aggregation(self):
         """Line 4188: endfile takes last value, duration sums."""
-        war = make_war(n_windows=4, channels=["Left Motor"])
+        war = make_war(n_windows=4, channels=["LMot"])
         original_duration_sum = war.result["duration"].sum()
         war.aggregate_time_windows(groupby=["animalday", "isday"])
         assert war.result["duration"].sum() == pytest.approx(original_duration_sum)

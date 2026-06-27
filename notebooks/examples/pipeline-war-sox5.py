@@ -79,7 +79,6 @@ for data_folder, animal_ids in tqdm(data_folders_to_animal_ids.items(), desc="Pr
                 data_parent_folder / data_folder,
                 animal_id,
                 mode="nest",
-                assume_from_number=True,
                 skip_days=["bad"],
                 lro_kwargs={"mode": "bin", "multiprocess_mode": "dask", "overwrite_rowbins": False},
             )

@@ -10,6 +10,8 @@ __title__ = "neurodent"
 __summary__ = "Rodent EEG analysis tools"
 __uri__ = "https://github.com/josephdong1000/neurodent"
 
+from .constants import set_channel_map
+
 __all__ = [
     "__version__",
     "__author__",
@@ -18,4 +20,5 @@ __all__ = [
     "__title__",
     "__summary__",
     "__uri__",
+    "set_channel_map",
 ]

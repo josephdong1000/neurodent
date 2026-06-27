@@ -18,7 +18,7 @@ import matplotlib
 matplotlib.use("Agg")
 
 from neurodent.visualization.frequency_domain_results import FrequencyDomainSpikeAnalysisResult
-from neurodent.workflow import setup_snakemake_logging, inject_config_aliases
+from neurodent.workflow import setup_snakemake_logging, apply_samples_config
 
 
 def load_fdsar_results(fdsar_base_dir: Path):
@@ -126,7 +126,7 @@ def main():
     samples_config = snakemake.params.samples_config
 
     # Inject aliases
-    inject_config_aliases(samples_config)
+    apply_samples_config(samples_config)
 
     # Extract spike-averaged-traces parameters from config
     sat_config = (

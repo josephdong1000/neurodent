@@ -43,8 +43,30 @@ TEST_DETECTION_PARAMS = {
 @pytest.mark.skipif(not SPIKEINTERFACE_AVAILABLE, reason="SpikeInterface not available")
 @pytest.mark.skipif(len(TEST_ANIMALS) == 0, reason="Test data not available")
 @pytest.mark.integration
+@pytest.mark.mutates_constants
 class TestWARIntegration:
     """Test integration between frequency domain spike detection and WAR analysis."""
+
+    @pytest.fixture(scope="class", autouse=True)
+    def _set_channel_map(self):
+        """Register the committed bin/csv data's Intan port labels (C-0xx / D-0xx) as
+        explicit channel aliases. Class-scoped autouse so it runs before the WAR is built;
+        snapshots/restores the channel constants so it cannot leak into later test files."""
+        import copy
+        from neurodent import constants
+
+        keys = ["CHANNEL_MAP", "CHANNEL_ABBREVS", "CHANNEL_ABBREV_BY_RAW", "DF_SORT_ORDER"]
+        orig = {k: copy.deepcopy(getattr(constants, k)) for k in keys}
+        constants.set_channel_map({
+            "LMot": ["C-015", "D-015"], "RMot": ["C-016", "D-016"],
+            "LBar": ["C-014", "D-014"], "RBar": ["C-017", "D-017"],
+            "LHip": ["C-012", "D-012"], "RHip": ["C-019", "D-019"],
+            "LAud": ["C-009", "D-009"], "RAud": ["C-022", "D-022"],
+            "LVis": ["C-010", "D-010"], "RVis": ["C-021", "D-021"],
+        })
+        yield
+        for k, v in orig.items():
+            setattr(constants, k, v)
 
     @pytest.fixture(scope="class")
     def animal_organizer_with_war(self):
@@ -64,7 +86,6 @@ class TestWARIntegration:
                     str(TEST_DATA_BASE / animal_id) + "/{index}_Meta.csv",
                 ],
                 animal_id,
-                assume_from_number=True,
                 lro_kwargs={
                     "mode": "si",
                     "extract_func": read_bin_csv_pair,

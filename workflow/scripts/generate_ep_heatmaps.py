@@ -23,7 +23,7 @@ from neurodent import visualization, constants
 from neurodent.workflow import (
     setup_snakemake_logging,
     load_wars,
-    inject_config_aliases,
+    apply_samples_config,
     extend_plot_order_from_attr,
 )
 
@@ -216,7 +216,7 @@ def main():
     samples_config = snakemake.params.samples_config
 
     # Inject aliases
-    inject_config_aliases(samples_config)
+    apply_samples_config(samples_config)
 
     # Create output directories
     output_dir = Path(snakemake.output.heatmap_dir)

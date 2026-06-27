@@ -203,8 +203,8 @@ class TestCoreModuleIntegration:
         day = utils.parse_str_to_day("WT_A10_Jan01_2023")
         assert day.year == 2023
 
-        # Test channel name parsing
-        ch_name = utils.parse_chname_to_abbrev("left Auditory")
+        # Test channel name parsing (exact lookup against the canonical labels)
+        ch_name = utils.resolve_channel("LAud")
         assert ch_name == "LAud"
 
     def test_constants_and_analysis_integration(self):
