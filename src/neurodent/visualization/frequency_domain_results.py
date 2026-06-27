@@ -712,4 +712,4 @@ class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
                 f"total_spikes={total_spikes})")
 
     def __repr__(self):
-        return self.__str__()
+        return self.__str__()
