@@ -47,7 +47,7 @@ Electroencephalography (EEG) and its invasive counterpart, local field potential
 
 # State of the Field
 
-The current landscape of electrophysiology and neuroimaging software includes several mature, high-level tools such as `SpikeInterface` [@Buccino:2020] and `MNE-Python` [@Gramfort:2013] in Python, as well as `EEGLAB` [@Delorme:2004], `FieldTrip` [@Oostenveld:2011], `Brainstorm` [@Tadel:2011], and `Chronux` [@Bokil:2010] in MATLAB. These platforms provide powerful building blocks for neurophysiology analysis but are primarily oriented toward human-centric research, high-frequency spike sorting, or local single-session computation. As a result, most rodent EEG analyses remain ad-hoc and designed for local, single-session use rather than maintained and scalable applications. `NeuRodent` provides a unique scholarly contribution and addresses this gap by serving as an orchestration layer that coordinates data loading, analysis, and visualization into reproducible and rodent-specific EEG workflows.
+The current landscape of electrophysiology and neuroimaging software includes several mature, high-level tools such as `SpikeInterface` [@Buccino:2020b] and `MNE-Python` [@Gramfort:2013] in Python, as well as `EEGLAB` [@Delorme:2004], `FieldTrip` [@Oostenveld:2011], `Brainstorm` [@Tadel:2011], and `Chronux` [@Bokil:2010] in MATLAB. These platforms provide powerful building blocks for neurophysiology analysis but are primarily oriented toward human-centric research, high-frequency spike sorting, or local single-session computation. As a result, most rodent EEG analyses remain ad-hoc and designed for local, single-session use rather than maintained and scalable applications. `NeuRodent` provides a unique scholarly contribution and addresses this gap by serving as an orchestration layer that coordinates data loading, analysis, and visualization into reproducible and rodent-specific EEG workflows.
 
 # Software Design
 
@@ -77,7 +77,7 @@ Data visualization is provided through the Plotter classes. For individual anima
 
 # Research Impact Statement
 
-Originally designed for EEG analyses for the lead developer, `NeuRodent` is being developed by a team of six code contributors using data across laboratories. The package has been used in a submitted manuscript at the time of writing [@Ferrari:2026] and presented at the US Research Software Engineering conference [@Dong:2025]. `NeuRodent` and its accompanying `Snakemake` pipeline will be of great use to neuroscientists performing intracranial LFP analyses on large recorded datasets and distributing analyses across laboratories.
+Originally designed for EEG analyses for the lead developer, `NeuRodent` is being developed by a team of six code contributors using data across laboratories. The package has been used in a publication characterizing a novel developmental mouse model [@Ferrari:2026a] and presented at the US Research Software Engineering conference under the name `PyEEG` [@Dong:2025]. `NeuRodent` and its accompanying `Snakemake` pipeline will be of great use to neuroscientists performing intracranial LFP analyses on large recorded datasets and distributing analyses across laboratories.
 
 # AI Usage Disclosure
 
