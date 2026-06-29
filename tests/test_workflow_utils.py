@@ -322,17 +322,6 @@ class TestExpandAnimalsConfig:
         assert meta["id"] == "X1"
         assert meta["gene"] == "WT"
 
-    def test_no_data_folders_to_animal_ids_generated(self):
-        """Unified format does NOT produce data_folders_to_animal_ids."""
-        cfg = {
-            "data_root": "/data",
-            "animals": [
-                {"id": "A10", "gene": "WT", "sex": "M"},
-            ],
-        }
-        result = expand_animals_config(cfg)
-        assert "data_folders_to_animal_ids" not in result
-
     def test_builds_manual_datetimes(self):
         """manual_datetimes is built from animals' manual_datetime field."""
         cfg = {
@@ -501,9 +490,6 @@ class TestExpandAnimalsConfig:
         # ANIMAL_METADATA built
         meta_ids = {e["id"] for e in result["ANIMAL_METADATA"]}
         assert meta_ids == {"AM3", "AM5", "AP3B2homo-240-M"}
-
-        # No data_folders_to_animal_ids
-        assert "data_folders_to_animal_ids" not in result
 
         # manual_datetimes built
         assert result["manual_datetimes"]["AP3B2homo-240-M"] == "2025-11-27 15:39:05"
@@ -715,70 +701,6 @@ class TestExpandAnimalsConfig:
         meta = result["ANIMAL_METADATA"][0]
         assert "channels" not in meta
         assert "group" not in meta
-
-    def test_backward_compat_derives_channels_from_joint_sessions(self):
-        """Legacy joint_sessions is auto-converted to _animal_channel_subsets with deprecation warning."""
-        import warnings
-        cfg = {
-            "data_root": "/data",
-            "animals": [
-                {"id": "A10", "gene": "WT", "sex": "M"},
-                {"id": "F22", "gene": "KO", "sex": "F"},
-            ],
-            "joint_sessions": {
-                "Session1": {
-                    "A10": ["Ch0", "Ch1"],
-                    "F22": ["Ch2", "Ch3"],
-                }
-            },
-        }
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            result = expand_animals_config(cfg)
-            assert len(w) == 1
-            assert issubclass(w[0].category, DeprecationWarning)
-            assert "joint_sessions" in str(w[0].message)
-
-        assert "_animal_channel_subsets" in result
-        assert result["_animal_channel_subsets"]["A10"] == ["Ch0", "Ch1"]
-        assert result["_animal_channel_subsets"]["F22"] == ["Ch2", "Ch3"]
-
-    def test_backward_compat_verifies_channel_consistency(self):
-        """Legacy joint_sessions verifies channel consistency across sessions."""
-        cfg = {
-            "data_root": "/data",
-            "animals": [
-                {"id": "A10", "gene": "WT", "sex": "M"},
-            ],
-            "joint_sessions": {
-                "Session1": {"A10": ["Ch0", "Ch1"]},
-                "Session2": {"A10": ["Ch0", "Ch2"]},  # Inconsistent!
-            },
-        }
-        with pytest.raises(ValueError, match="Inconsistent channel lists"):
-            expand_animals_config(cfg)
-
-    def test_backward_compat_new_format_takes_precedence(self):
-        """If animals have channel_subset field, legacy joint_sessions is ignored (no warning)."""
-        import warnings
-        cfg = {
-            "data_root": "/data",
-            "animals": [
-                {"id": "A10", "gene": "WT", "sex": "M", "channel_subset": ["Ch0", "Ch1"]},
-            ],
-            "joint_sessions": {
-                "Session1": {"A10": ["Ch2", "Ch3"]},  # Should be ignored
-            },
-        }
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            result = expand_animals_config(cfg)
-            # No deprecation warning because new format is used
-            deprecation_warnings = [x for x in w if issubclass(x.category, DeprecationWarning)]
-            assert len(deprecation_warnings) == 0
-
-        # Should use the new format, not the legacy one
-        assert result["_animal_channel_subsets"]["A10"] == ["Ch0", "Ch1"]
 
     def test_validates_no_overlapping_channels_in_group(self):
         """Animals in the same group cannot share channels."""

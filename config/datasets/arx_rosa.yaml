@@ -511,5 +511,4 @@ samples_data:
         extract_func: read_intan
         stream_id: "0"
         ignore_integrity_checks: true
-  data_folders_to_animal_ids: {}
   bad_folder_animalday: []

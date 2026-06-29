@@ -89,8 +89,7 @@ samples_config = resolve_samples_config(config)
 # Expand unified "animals" list into pipeline keys (if present)
 samples_config = expand_animals_config(samples_config)
 
-# Extract sample information
-# Support both unified (animals list) and legacy (data_folders_to_animal_ids) formats
+# Extract sample information from the unified "animals" list
 ANIMALS = []
 ANIMAL_TO_FOLDERS_MAP = {}  # Maps slugified animal_id -> list of (folder, animal_id, original_session_key)
 ANIMAL_TO_FULL_ID_MAP = {} # Maps slugified animal_id -> original animal_id string
@@ -108,23 +107,8 @@ if "animals" in samples_config:
 
         # Each animal gets a single entry; pattern handles discovery
         ANIMAL_TO_FOLDERS_MAP[slugified_name].append(("", animal, ""))
-elif "data_folders_to_animal_ids" in samples_config:
-    # Legacy format: iterate from data_folders_to_animal_ids
-    for folder, animals in samples_config["data_folders_to_animal_ids"].items():
-        for animal in animals:
-            slugified_name = slugify(animal, allow_unicode=True)
-
-            if slugified_name not in ANIMALS:
-                ANIMALS.append(slugified_name)
-                ANIMAL_TO_FOLDERS_MAP[slugified_name] = []
-                ANIMAL_TO_FULL_ID_MAP[slugified_name] = animal
-
-            ANIMAL_TO_FOLDERS_MAP[slugified_name].append((folder, animal, folder))
 else:
-    raise KeyError(
-        "Samples config must contain either 'animals' (unified format) "
-        "or 'data_folders_to_animal_ids' (legacy format)"
-    )
+    raise KeyError("Samples config must contain an 'animals' list")
 
 # Optionally limit to first N animals (useful for testing)
 _truncate_animals = config.get("samples", {}).get("truncate_animals", None)

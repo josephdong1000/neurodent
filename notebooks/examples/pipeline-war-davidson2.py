@@ -51,14 +51,14 @@ logger = logging.getLogger()
 
 base_folder = Path("/mnt/isilon/marsh_single_unit/NeuRodent")
 data_parent_folder = Path("/mnt/isilon/marsh_single_unit/PythonEEG Data Bins")
-data_folders_to_animal_ids = {
+folder_to_animals = {
     "": ["A5", "A10", "F22", "G25", "G26", "N21", "N22", "N23", "N24", "N25"]
     # "" : ['A5']
 }
 constants.SORTING_PARAMS["freq_min"] = 60
 constants.SORTING_PARAMS["freq_max"] = 400
 
-for data_folder, animal_ids in data_folders_to_animal_ids.items():
+for data_folder, animal_ids in folder_to_animals.items():
     for animal_id in animal_ids:
         with Client(cluster_window) as client:
             client.run(lambda: os.system(f"pip install -e {base_folder}"))
