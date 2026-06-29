@@ -156,7 +156,6 @@ for animal_id in ["1017 1015"]:
 #     data = json.load(f)
 # data_parent_folder = Path(data["data_parent_folder"])
 # constants.GENOTYPE_ALIASES = data["GENOTYPE_ALIASES"]
-# data_folders_to_animal_ids = data["data_folders_to_animal_ids"]
 
 
 """

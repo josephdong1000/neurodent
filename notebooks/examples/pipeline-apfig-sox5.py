@@ -44,7 +44,7 @@ with open(base_folder / "notebooks" / "tests" / "sox5 combine genotypes.json", "
     data = json.load(f)
 data_parent_folder = Path(data["data_parent_folder"])
 constants.GENOTYPE_ALIASES = data["GENOTYPE_ALIASES"]
-data_folders_to_animal_ids = data["data_folders_to_animal_ids"]
+folder_to_animals = {}  # {data_folder: [animal_ids]} mapping for the dataset
 
 save_folder = Path("/home/dongjp/Downloads/5-19-25 apfig sox5").resolve()
 if not save_folder.exists():
@@ -53,7 +53,7 @@ if not save_folder.exists():
 
 # SECTION 3: Run and plot windowed analysis
 
-for data_folder, animal_ids in data_folders_to_animal_ids.items():
+for data_folder, animal_ids in folder_to_animals.items():
     for animal_id in animal_ids:
         with Client(cluster_window) as client:
             client.upload_file(str(base_folder / "neurodent.tar.gz"))

@@ -52,7 +52,7 @@ def load_genotype_mapping() -> Tuple[Dict[str, List[str]], Path]:
 
     data_parent_folder = Path(genotype_data["data_parent_folder"])
     genotype_aliases = genotype_data["GENOTYPE_ALIASES"]
-    data_folders_to_animal_ids = genotype_data["data_folders_to_animal_ids"]
+    folder_to_animals = {}  # {data_folder: [animal_ids]} mapping for the dataset
 
     # IMPORTANT: Set the constants.GENOTYPE_ALIASES so AnimalOrganizer can find genotypes
     constants.GENOTYPE_ALIASES = genotype_aliases
@@ -67,7 +67,7 @@ def load_genotype_mapping() -> Tuple[Dict[str, List[str]], Path]:
     # Build genotype to animals mapping with folder context
     genotype_to_animals = {genotype: [] for genotype in GENOTYPES}
 
-    for data_folder, animal_ids in data_folders_to_animal_ids.items():
+    for data_folder, animal_ids in folder_to_animals.items():
         for animal_id in animal_ids:
             if animal_id in animal_to_genotype:
                 genotype = animal_to_genotype[animal_id]

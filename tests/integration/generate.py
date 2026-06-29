@@ -204,12 +204,10 @@ def create_synthetic_dataset(
             "KO": ["KO", "ExKO"],
         },
         "ANIMAL_METADATA": animals,
+        "animals": animals,
         # Explicit channel map: the synthetic NWB exposes integer electrode ids
         # (CHANNEL_IDS) which resolve to the canonical abbreviations by exact lookup.
         "channels": {name: [str(cid)] for name, cid in zip(CHANNEL_NAMES, CHANNEL_IDS)},
-        "data_folders_to_animal_ids": {
-            session_folder: animal_ids,
-        },
     }
 
     return {
@@ -348,9 +346,7 @@ def create_synthetic_bin_csv_dataset(
             "KO": ["KO", "ExKO"],
         },
         "ANIMAL_METADATA": animals,
-        "data_folders_to_animal_ids": {
-            session_folder: animal_ids,
-        },
+        "animals": animals,
     }
 
     return {

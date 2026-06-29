@@ -49,12 +49,8 @@ bad_channels = data["bad_channels"]
 data_parent_folder = Path(data["data_parent_folder"])
 constants.GENOTYPE_ALIASES = data["GENOTYPE_ALIASES"]
 
-# data_folders_to_animal_ids = data["data_folders_to_animal_ids"]
-# Get only the second half of the dictionary items
-items = list(data["data_folders_to_animal_ids"].items())
-data_folders_to_animal_ids = dict(items[int(len(items) * 1 / 2) :])  # last 1/2
-# data_folders_to_animal_ids = dict(items[int(len(items) * 2 / 3) :])  # last 1/3
-# data_folders_to_animal_ids = data["data_folders_to_animal_ids"]
+# Define a {data_folder: [animal_ids]} mapping for the dataset, e.g. {"": ["A5", "A10"]}
+folder_to_animals = {}
 
 bad_folder_animalday = [
     "012322_cohort4_group6_3mice_FMUT___MMUT_MWT MHET",
@@ -66,7 +62,7 @@ bad_folder_animalday = [
 # !SECTION
 
 # SECTION 3: Run pipeline
-for data_folder, animal_ids in tqdm(data_folders_to_animal_ids.items(), desc="Processing data folders"):
+for data_folder, animal_ids in tqdm(folder_to_animals.items(), desc="Processing data folders"):
     for animal_id in tqdm(animal_ids, desc=f"Processing animals in {data_folder}", leave=False):
         if f"{data_folder} {animal_id}" in bad_folder_animalday:
             logging.warning(f"Skipping {data_folder} {animal_id} because it is in bad_folder_animalday")

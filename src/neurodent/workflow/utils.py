@@ -522,42 +522,6 @@ def expand_animals_config(samples_config: dict) -> dict:
     if animal_groups:
         result["_animal_groups"] = animal_groups
 
-    # --- Backward compatibility: derive channels from legacy joint_sessions ---
-    # Note: This only derives _animal_channel_subsets, not _animal_groups.
-    # For legacy configs where folder names don't contain animal IDs,
-    # migration to the new format with explicit 'group' fields is required.
-    if "joint_sessions" in result and result["joint_sessions"]:
-        # Check if any animals already have channels defined
-        has_new_format = any("channel_subset" in a for a in animals_list)
-
-        if not has_new_format:
-            # Auto-derive from legacy format with deprecation warning
-            import warnings
-            warnings.warn(
-                "The 'joint_sessions' configuration format is deprecated. "
-                "Please migrate to the unified 'animals' format by adding 'channel_subset' "
-                "and optionally 'group' fields to animal entries. "
-                "See the animals configuration documentation for details.",
-                DeprecationWarning,
-                stacklevel=2
-            )
-
-            # Derive channels from joint_sessions
-            if "_animal_channel_subsets" not in result:
-                result["_animal_channel_subsets"] = {}
-
-            for session_name, animals_dict in result["joint_sessions"].items():
-                for animal_id, channels in animals_dict.items():
-                    if animal_id in result["_animal_channel_subsets"]:
-                        # Verify consistency
-                        if result["_animal_channel_subsets"][animal_id] != channels:
-                            raise ValueError(
-                                f"Inconsistent channel lists for {animal_id} across joint sessions. "
-                                f"Expected {result['_animal_channel_subsets'][animal_id]}, got {channels} in {session_name}."
-                            )
-                    else:
-                        result["_animal_channel_subsets"][animal_id] = channels
-
     # --- Build _animal_overrides ---
     overrides: dict[str, dict] = {}
     for animal in animals_list:

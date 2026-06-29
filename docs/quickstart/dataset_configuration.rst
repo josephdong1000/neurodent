@@ -13,9 +13,6 @@ Quick Start
    # Run with Sox5 binary dataset
    NEURODENT_DATASET=sox5_bin uv run snakemake --profile your-profile
 
-   # Run with AP3B2 NWB dataset
-   NEURODENT_DATASET=ap3b2_nwb uv run snakemake --profile your-profile
-
    # Run with AP3B2 RHD dataset
    NEURODENT_DATASET=ap3b2_rhd uv run snakemake --profile your-profile
 
@@ -31,7 +28,6 @@ How It Works
    ├── config.local.yaml         # Local overrides (gitignored)
    ├── datasets/                 # Dataset-specific configs
    │   ├── sox5_bin.yaml        # Sox5 project, binary format
-   │   ├── ap3b2_nwb.yaml       # AP3B2 project, NWB format
    │   └── ap3b2_rhd.yaml       # AP3B2 project, RHD format
    └── samples*.json            # Sample metadata files
 
@@ -258,10 +254,6 @@ In addition to ``animals``, the samples JSON supports these top-level keys:
    * - ``bad_channels``
      - Legacy top-level bad-channel dict (see :ref:`bad-channels`).
        Prefer per-animal ``bad_channels`` in the ``animals`` list.
-   * - ``joint_sessions``
-     - *Legacy.* Sessions where multiple animals were recorded simultaneously. Prefer the
-       modern per-animal form: give each animal a ``channel_subset`` (the list of raw channel
-       names belonging to it) and a shared ``group`` in the ``animals`` list.
 
 .. _bad-channels:
 
@@ -508,7 +500,7 @@ Personal Dataset Preference
 
 .. code-block:: bash
 
-   # Edit config.local.yaml: active_dataset: "ap3b2_nwb"
+   # Edit config.local.yaml: active_dataset: "ap3b2_rhd"
    # This is gitignored - won't affect team
 
 Cluster Batch Script
@@ -532,7 +524,7 @@ Parallel Analysis
    NEURODENT_DATASET=sox5_bin uv run snakemake --profile slurm
 
    # Terminal 2
-   NEURODENT_DATASET=ap3b2_nwb uv run snakemake --profile slurm
+   NEURODENT_DATASET=ap3b2_rhd uv run snakemake --profile slurm
 
 Troubleshooting
 ---------------
