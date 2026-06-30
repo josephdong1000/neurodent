@@ -459,7 +459,7 @@ def test_add_zeitgeber_time_columns_empty_df():
 
 
 def test_subtract_baseline_no_group_cols():
-    """Test baseline subtraction without grouping columns (no animal/sex/gene)."""
+    """Test baseline subtraction without grouping columns (no animal/sex/genotype)."""
     df = pd.DataFrame({
         "zt_minutes": [0, 360, 720, 1080],
         "feature": [10.0, 10.0, 20.0, 20.0],
@@ -477,7 +477,7 @@ def test_subtract_baseline_empty_window():
     """Test baseline subtraction when baseline window has no data (ungrouped)."""
     df = pd.DataFrame({
         "zt_minutes": [720, 1080, 1320],  # All after ZT12
-        # No group columns (animal/sex/gene) - tests the ungrouped branch
+        # No group columns (animal/sex/genotype) - tests the ungrouped branch
         "feature": [10.0, 20.0, 30.0],
     })
     
@@ -523,7 +523,7 @@ def test_enrich_genotype_metadata_empty_df():
     from neurodent.core import metadata
     
     empty_df = pd.DataFrame({"animal": []})
-    animal_meta = {"M1": {"sex": "Male", "gene": "WT"}}
+    animal_meta = {"M1": {"sex": "Male", "genotype": "WT"}}
     
     # Should handle empty df gracefully
     result = metadata.enrich_metadata(empty_df, animal_meta)
@@ -539,8 +539,8 @@ def test_enrich_metadata_basic():
         "value": [10, 20],
     })
     animal_meta = {
-        "M1": {"sex": "Male", "gene": "WT"},
-        "F1": {"sex": "Female", "gene": "Mut"},
+        "M1": {"sex": "Male", "genotype": "WT"},
+        "F1": {"sex": "Female", "genotype": "Mut"},
     }
     
     result = metadata.enrich_metadata(df, animal_meta)
@@ -683,7 +683,7 @@ def test_zar_ignores_extra_config_kwargs():
     # Should not raise TypeError about unexpected keyword argument
     result = zar.get_result()
     
-    # Verify pipeline was applied (has sex/gene columns from enrichment)
+    # Verify pipeline was applied (has sex/genotype columns from enrichment)
     assert "sex" in result.columns
     assert "zt_minutes" in result.columns
 

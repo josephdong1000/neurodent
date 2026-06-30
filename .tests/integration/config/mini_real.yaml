@@ -54,9 +54,9 @@ samples_data:
   animals:
   - id: A10
     sex: M
-    gene: WT
+    genotype: WT
     manual_datetime: '2025-05-10 10:00:00'
   - id: F22
     sex: F
-    gene: KO
+    genotype: KO
     manual_datetime: '2025-05-10 10:00:00'

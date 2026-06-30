@@ -162,7 +162,7 @@ def create_synthetic_dataset(
 
     Args:
         root: Top-level directory (typically ``tmp_path``).
-        animals: List of ``{"id": str, "sex": str, "gene": str}`` dicts.
+        animals: List of ``{"id": str, "sex": str, "genotype": str}`` dicts.
             Defaults to ``ExWT`` (WT) and ``ExKO`` (KO).
         n_sessions: Number of day-sessions per animal.
         duration_s: Recording duration per session in seconds.
@@ -176,8 +176,8 @@ def create_synthetic_dataset(
     """
     if animals is None:
         animals = [
-            {"id": "ExWT", "sex": "M", "gene": "WT"},
-            {"id": "ExKO", "sex": "F", "gene": "KO"},
+            {"id": "ExWT", "sex": "M", "genotype": "WT"},
+            {"id": "ExKO", "sex": "F", "genotype": "KO"},
         ]
 
     data_root = root / "raw"
@@ -199,7 +199,7 @@ def create_synthetic_dataset(
 
     samples_config = {
         "data_root": str(data_root),
-        "GENOTYPE_ALIASES": {
+        "GENOTYPE_MAP": {
             "WT": ["WT", "ExWT"],
             "KO": ["KO", "ExKO"],
         },
@@ -305,7 +305,7 @@ def create_synthetic_bin_csv_dataset(
 
     Args:
         root: Top-level directory (typically ``tmp_path``).
-        animals: List of ``{"id": str, "sex": str, "gene": str}`` dicts.
+        animals: List of ``{"id": str, "sex": str, "genotype": str}`` dicts.
         n_sessions: Number of day-sessions per animal.
         duration_s: Duration per session in seconds.
 
@@ -315,8 +315,8 @@ def create_synthetic_bin_csv_dataset(
     """
     if animals is None:
         animals = [
-            {"id": "ExWT", "sex": "M", "gene": "WT"},
-            {"id": "ExKO", "sex": "F", "gene": "KO"},
+            {"id": "ExWT", "sex": "M", "genotype": "WT"},
+            {"id": "ExKO", "sex": "F", "genotype": "KO"},
         ]
 
     data_root = root / "raw"
@@ -341,7 +341,7 @@ def create_synthetic_bin_csv_dataset(
 
     samples_config = {
         "data_root": str(data_root),
-        "GENOTYPE_ALIASES": {
+        "GENOTYPE_MAP": {
             "WT": ["WT", "ExWT"],
             "KO": ["KO", "ExKO"],
         },

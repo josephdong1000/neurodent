@@ -182,7 +182,8 @@ def setup_test_environment(request):
     should carry the marker so the warning is suppressed.
     """
     orig = {
-        "GENOTYPE_ALIASES": copy.deepcopy(constants.GENOTYPE_ALIASES),
+        "GENOTYPE_MAP": copy.deepcopy(constants.GENOTYPE_MAP),
+        "SEX_MAP": copy.deepcopy(constants.SEX_MAP),
         "CHANNEL_MAP": copy.deepcopy(constants.CHANNEL_MAP),
         "CHANNEL_ABBREVS": copy.deepcopy(constants.CHANNEL_ABBREVS),
         "CHANNEL_ABBREV_BY_RAW": copy.deepcopy(constants.CHANNEL_ABBREV_BY_RAW),

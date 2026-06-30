@@ -4,7 +4,7 @@ This helper is the single chokepoint that re-enriches ``sex``/``genotype`` from
 ``constants.ANIMAL_METADATA`` at every WAR construction, applied identically to both
 fields and to BOTH the object attributes AND the per-row ``result`` columns (the
 columns are what downstream renderers read). It is the robust fix for the
-``sex="Unknown"`` fragility and the gene/genotype duality.
+``sex="Unknown"`` fragility.
 """
 import pandas as pd
 import pytest
@@ -41,9 +41,9 @@ def reset_metadata():
 class TestReenrichMetadataFromConstants:
     def test_populated_updates_attrs_and_columns(self, reset_metadata):
         """The load-bearing case: both attrs and per-row columns get the config value
-        (note ANIMAL_METADATA key is 'gene', WAR canonical is 'genotype')."""
+        (ANIMAL_METADATA key and WAR canonical are both 'genotype')."""
         war = _make_war(sex="Unknown", genotype="KO")
-        constants.ANIMAL_METADATA = {"X1": {"sex": "Male", "gene": "WT"}}
+        constants.ANIMAL_METADATA = {"X1": {"sex": "Male", "genotype": "WT"}}
         war._enrich_metadata_from_constants()
         assert war.sex == "Male"
         assert war.genotype == "WT"
@@ -62,7 +62,7 @@ class TestReenrichMetadataFromConstants:
     def test_partial_coverage_keeps_baked(self, reset_metadata):
         """An animal absent from ANIMAL_METADATA keeps its baked values."""
         war = _make_war(animal_id="X1", sex="Unknown", genotype="KO")
-        constants.ANIMAL_METADATA = {"OTHER": {"sex": "Male", "gene": "WT"}}
+        constants.ANIMAL_METADATA = {"OTHER": {"sex": "Male", "genotype": "WT"}}
         war._enrich_metadata_from_constants()
         assert war.sex == "Unknown"
         assert war.genotype == "KO"
@@ -70,14 +70,14 @@ class TestReenrichMetadataFromConstants:
     def test_missing_field_only_updates_present(self, reset_metadata):
         """A None/missing metadata field must not overwrite a baked value."""
         war = _make_war(sex="Unknown", genotype="KO")
-        constants.ANIMAL_METADATA = {"X1": {"gene": "WT"}}  # no sex
+        constants.ANIMAL_METADATA = {"X1": {"genotype": "WT"}}  # no sex
         war._enrich_metadata_from_constants()
         assert war.genotype == "WT"
         assert war.sex == "Unknown"  # not overwritten with None
 
     def test_idempotent(self, reset_metadata):
         war = _make_war(sex="Unknown", genotype="KO")
-        constants.ANIMAL_METADATA = {"X1": {"sex": "Female", "gene": "Het"}}
+        constants.ANIMAL_METADATA = {"X1": {"sex": "Female", "genotype": "Het"}}
         war._enrich_metadata_from_constants()
         war._enrich_metadata_from_constants()
         assert war.sex == "Female"

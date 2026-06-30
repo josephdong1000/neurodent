@@ -1,7 +1,7 @@
 """
 Animal Metadata Module
 ======================
-Functions for loading and enriching animal metadata (sex, gene) from config.
+Functions for loading and enriching animal metadata (sex, genotype) from config.
 """
 
 import logging
@@ -17,27 +17,30 @@ def load_animal_metadata(samples_config: dict) -> dict:
     """
     Load ANIMAL_METADATA from samples config into a lookup dict.
 
-    The ``sex`` and ``gene`` fields are normalized identically: each raw value is
-    mapped to its canonical label via the field's alias dict (``constants.SEX_ALIASES``
-    and ``constants.GENE_ALIASES``). A value matching no alias is kept as-is with a
-    warning; an empty alias dict (``GENE_ALIASES`` by default) is a silent passthrough,
-    so datasets without a ``GENE_ALIASES`` block keep their raw ``gene`` strings. Any
-    extra fields on an entry (e.g. ``cohort``) are preserved unchanged.
+    The ``sex`` and ``genotype`` fields are normalized identically: each raw value is
+    mapped to its canonical label via the field's map (``constants.SEX_MAP`` and
+    ``constants.GENOTYPE_MAP``, exact match). When a map is populated it is
+    **authoritative**: a value it does not cover raises ``ValueError`` (config typos
+    surface immediately). An empty map (``GENOTYPE_MAP`` by default) is a passthrough,
+    so datasets without a ``GENOTYPE_MAP`` block keep their raw ``genotype`` strings.
+    Any extra fields on an entry (e.g. ``cohort``) are preserved unchanged.
 
-    The genotype field may be written as either ``gene`` or ``genotype`` in the config
-    (they are the same concept); ``genotype`` is normalized to the internal ``gene`` key.
+    The genotype field is canonically ``genotype``; ``gene`` is still accepted as a
+    legacy input alias and normalized to the internal ``genotype`` key.
 
     Args:
         samples_config: Dict containing "ANIMAL_METADATA" key with list of
-                        {"id": str, "sex": str, "gene"|"genotype": str} objects.
+                        {"id": str, "sex": str, "genotype" (or legacy "gene"): str}
+                        objects.
 
     Returns:
-        Dict mapping animal_id -> {"sex": str, "gene": str, ...}, with ``sex``/``gene``
-        normalized to their canonical labels.
+        Dict mapping animal_id -> {"sex": str, "genotype": str, ...}, with
+        ``sex``/``genotype`` normalized to their canonical labels.
 
     Raises:
         KeyError: If ANIMAL_METADATA is missing.
-        ValueError: If entries are malformed.
+        ValueError: If entries are malformed, or a value is not covered by a populated
+            ``SEX_MAP`` / ``GENOTYPE_MAP``.
     """
     if "ANIMAL_METADATA" not in samples_config:
         raise KeyError("ANIMAL_METADATA not found in samples config")
@@ -52,35 +55,35 @@ def load_animal_metadata(samples_config: dict) -> dict:
         animal_id = entry["id"]
         # Copy all fields from entry (extra fields like cohort/notes pass through)
         metadata_dict[animal_id] = entry.copy()
-        # Accept 'genotype' as an alias for the canonical 'gene' input field -- they are
-        # the same concept (the value surfaces as the 'genotype' column/attr downstream).
-        # A config may write either key; normalize to the internal 'gene' here.
+        # 'genotype' is the canonical field; accept the legacy 'gene' spelling as an
+        # input alias and normalize it to the internal 'genotype' key.
         _entry = metadata_dict[animal_id]
-        if "genotype" in _entry:
-            _entry.setdefault("gene", _entry["genotype"])
-            del _entry["genotype"]
-        # Normalize the `sex` and `gene` fields the same way: ensure the key exists
-        # (default None), then map the raw value to its canonical label via the
-        # field's alias dict (read from constants at call time so apply_samples_config
-        # overrides apply). An empty alias dict is a passthrough that keeps the raw
-        # value with no warning -- this is GENE_ALIASES' default, so datasets without
-        # a GENE_ALIASES block keep their `gene` string verbatim (backward compatible).
-        for field, alias_dict in (("sex", constants.SEX_ALIASES), ("gene", constants.GENE_ALIASES)):
+        if "gene" in _entry:
+            _entry.setdefault("genotype", _entry["gene"])
+            del _entry["gene"]
+        # Normalize the `sex` and `genotype` fields the same way: ensure the key exists
+        # (default None), then map the raw value to its canonical label via the field's
+        # map (read from constants at call time so apply_samples_config overrides apply).
+        # An empty map is a passthrough that keeps the raw value -- this is GENOTYPE_MAP's
+        # default, so datasets without a GENOTYPE_MAP block keep their `genotype` string
+        # verbatim. A populated map is authoritative: an uncovered value raises.
+        for field, value_map in (("sex", constants.SEX_MAP), ("genotype", constants.GENOTYPE_MAP)):
             raw_value = metadata_dict[animal_id].get(field)
             if raw_value is None:
                 metadata_dict[animal_id][field] = None
                 continue
-            if not alias_dict:
-                continue  # no aliases configured -> keep raw value, no warning
-            normalized = normalize_value_from_aliases(raw_value, alias_dict)
+            if not value_map:
+                continue  # no map configured -> keep raw value
+            normalized = normalize_value_from_aliases(raw_value, value_map)
             if normalized is None:
-                logger.warning(
+                field_const = "SEX_MAP" if field == "sex" else "GENOTYPE_MAP"
+                raise ValueError(
                     f"Unrecognized {field} value '{raw_value}' for animal '{animal_id}'; "
                     f"expected one of "
-                    f"{[a for aliases in alias_dict.values() for a in aliases]}"
+                    f"{[a for aliases in value_map.values() for a in aliases]}. "
+                    f"Add it to {field_const} or fix the value."
                 )
-            else:
-                metadata_dict[animal_id][field] = normalized
+            metadata_dict[animal_id][field] = normalized
     
     logger.info(f"Loaded metadata for {len(metadata_dict)} animals")
     return metadata_dict
@@ -95,8 +98,8 @@ def resolve_metadata(animal_id: str, animal_metadata: dict) -> dict:
         animal_metadata: Dict from load_animal_metadata().
     
     Returns:
-        Dict with {"sex": str, "gene": str}.
-    
+        Dict with {"sex": str, "genotype": str}.
+
     Raises:
         KeyError: If animal_id not found in metadata.
     """
@@ -110,8 +113,8 @@ def enrich_metadata(df: pd.DataFrame, animal_metadata: dict) -> pd.DataFrame:
     """
     Add 'sex' and 'genotype' columns to DataFrame from animal metadata.
 
-    The metadata dict key remains 'gene' (the dataset-config field name); the
-    canonical DataFrame column is 'genotype'.
+    The metadata dict key and the DataFrame column are both 'genotype' (the canonical
+    name); 'gene' is accepted only as a legacy input spelling in the config.
 
     Args:
         df: DataFrame with 'animal' column.
@@ -129,26 +132,26 @@ def enrich_metadata(df: pd.DataFrame, animal_metadata: dict) -> pd.DataFrame:
     
     df = df.copy()
     
-    # Lookup sex and gene for each animal
+    # Lookup sex and genotype for each animal
     sexes = []
-    genes = []
+    genotypes = []
     missing_animals = set()
-    
+
     for animal_id in df["animal"]:
         if animal_id in animal_metadata:
             meta = animal_metadata[animal_id]
             sexes.append(meta.get("sex"))
-            genes.append(meta.get("gene"))
+            genotypes.append(meta.get("genotype"))
         else:
             missing_animals.add(animal_id)
             sexes.append(None)
-            genes.append(None)
-    
+            genotypes.append(None)
+
     if missing_animals:
         raise KeyError(f"Animals not found in ANIMAL_METADATA: {missing_animals}")
-    
+
     df["sex"] = sexes
-    df["genotype"] = genes
+    df["genotype"] = genotypes
 
     logger.info(f"Enriched {len(df)} rows with sex/genotype metadata")
     return df

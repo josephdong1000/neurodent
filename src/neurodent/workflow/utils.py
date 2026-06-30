@@ -142,8 +142,8 @@ def apply_samples_config(samples_config: dict):
     """Apply a samples config to the global ``neurodent.constants`` (pipeline front door).
 
     Installs the per-dataset globals from one samples config: the channel map
-    (:data:`CHANNEL_MAP`, via :func:`~neurodent.set_channel_map`), the genotype/sex/gene
-    variant-spelling aliases (``GENOTYPE_ALIASES``/``SEX_ALIASES``/``GENE_ALIASES``), and
+    (:data:`CHANNEL_MAP`, via :func:`~neurodent.set_channel_map`), the exact
+    ``genotype``/``sex`` value maps (``GENOTYPE_MAP``/``SEX_MAP``), and
     ``ANIMAL_METADATA``. Completes the ``load_samples_config`` → ``resolve_samples_config``
     → ``apply_samples_config`` lifecycle, and should be called at the start of every
     Snakemake script that loads WindowAnalysisResults or resolves channel names.
@@ -154,23 +154,20 @@ def apply_samples_config(samples_config: dict):
     from neurodent import constants
     from neurodent.core import metadata as metadata_module
 
-    # Legacy: GENOTYPE_ALIASES for file path parsing (parse_str_to_genotype)
-    if "GENOTYPE_ALIASES" in samples_config:
-        constants.GENOTYPE_ALIASES = samples_config["GENOTYPE_ALIASES"]
     # Channels: the flat CHANNEL_MAP is the single source of truth. set_channel_map()
     # derives CHANNEL_ABBREVS / CHANNEL_ABBREV_BY_RAW / DF_SORT_ORDER / standardization target
     # / LOF channels from it. A dataset declares its channels under `channels`.
     channels = samples_config.get("channels")
     if channels:
         constants.set_channel_map(channels)
-    # Value normalizers for the `sex` / `gene` metadata fields (parallel mechanisms);
+    # Exact value maps for the `sex` / `genotype` metadata fields (parallel mechanisms);
     # applied before load_animal_metadata below so the normalization picks them up.
-    if "SEX_ALIASES" in samples_config:
-        constants.SEX_ALIASES = samples_config["SEX_ALIASES"]
-    if "GENE_ALIASES" in samples_config:
-        constants.GENE_ALIASES = samples_config["GENE_ALIASES"]
+    if "SEX_MAP" in samples_config:
+        constants.SEX_MAP = samples_config["SEX_MAP"]
+    if "GENOTYPE_MAP" in samples_config:
+        constants.GENOTYPE_MAP = samples_config["GENOTYPE_MAP"]
 
-    # New: ANIMAL_METADATA for sex/gene enrichment (required)
+    # New: ANIMAL_METADATA for sex/genotype enrichment (required)
     if "ANIMAL_METADATA" in samples_config:
         constants.ANIMAL_METADATA = metadata_module.load_animal_metadata(samples_config)
 
@@ -324,7 +321,7 @@ def expand_animals_config(samples_config: dict) -> dict:
     When the samples config contains an ``animals`` key (a list of animal
     dicts), this function produces:
 
-    * ``ANIMAL_METADATA`` – list of ``{id, gene, sex, ...}`` dicts
+    * ``ANIMAL_METADATA`` – list of ``{id, genotype, sex, ...}`` dicts
     * ``manual_datetimes`` – animal_id → datetime string mapping
     * ``bad_channels`` – animal_id → {session → [channels]} mapping
       (built from per-animal ``bad_channels`` entries)
@@ -356,8 +353,8 @@ def expand_animals_config(samples_config: dict) -> dict:
         >>> cfg = expand_animals_config({
         ...     "data_root": "/data",
         ...     "animals": [
-        ...         {"id": "A10", "gene": "WT", "sex": "M"},
-        ...         {"id": "F22", "gene": "KO", "sex": "F"},
+        ...         {"id": "A10", "genotype": "WT", "sex": "M"},
+        ...         {"id": "F22", "genotype": "KO", "sex": "F"},
         ...     ],
         ... })
         >>> cfg["data_root"]
@@ -370,7 +367,7 @@ def expand_animals_config(samples_config: dict) -> dict:
         >>> cfg = expand_animals_config({
         ...     "data_root": "/data",
         ...     "animals": [
-        ...         {"id": "X1", "gene": "WT", "sex": "M",
+        ...         {"id": "X1", "genotype": "WT", "sex": "M",
         ...          "pattern": "{data_root}/custom/{animal}_{index}.rhd",
         ...          "lro_kwargs": {"mode": "si"},
         ...          "manual_datetime": "2025-01-01 10:00:00"},
@@ -386,7 +383,7 @@ def expand_animals_config(samples_config: dict) -> dict:
         >>> cfg = expand_animals_config({
         ...     "data_root": "/data",
         ...     "animals": [
-        ...         {"id": "A10", "gene": "WT", "sex": "M",
+        ...         {"id": "A10", "genotype": "WT", "sex": "M",
         ...          "bad_channels": ["LHip", "RHip"]},
         ...     ],
         ... })
@@ -398,7 +395,7 @@ def expand_animals_config(samples_config: dict) -> dict:
         >>> cfg = expand_animals_config({
         ...     "data_root": "/data",
         ...     "animals": [
-        ...         {"id": "A10", "gene": "WT", "sex": "M",
+        ...         {"id": "A10", "genotype": "WT", "sex": "M",
         ...          "bad_channels": {"Session1": ["LHip"], "Session2": ["RMot"]}},
         ...     ],
         ... })
@@ -410,7 +407,7 @@ def expand_animals_config(samples_config: dict) -> dict:
         >>> cfg = expand_animals_config({
         ...     "data_root": "/data",
         ...     "animals": [
-        ...         {"id": "A10", "gene": "WT", "sex": "M",
+        ...         {"id": "A10", "genotype": "WT", "sex": "M",
         ...          "channel_subset": ["Ch0", "Ch1", "Ch2", "Ch3"]},
         ...     ],
         ... })
@@ -422,7 +419,7 @@ def expand_animals_config(samples_config: dict) -> dict:
         >>> cfg = expand_animals_config({
         ...     "data_root": "/data",
         ...     "animals": [
-        ...         {"id": "A10", "gene": "WT", "sex": "M",
+        ...         {"id": "A10", "genotype": "WT", "sex": "M",
         ...          "channel_subset": ["Ch0", "Ch1"],
         ...          "group": "SharedGroup"},
         ...     ],

@@ -98,14 +98,14 @@ samples_data:
       - B-017
       - C-017
       - D-017
-  # Normalize the per-animal `gene` strings -> short grouping/plot labels (exact match;
+  # Normalize the per-animal `genotype` strings -> short grouping/plot labels (exact match;
   # each label self-aliased). Arx is X-linked + PV-Cre conditional:
   #   KO = floxed Arx (F) AND Parvcre+: males F/y;Cre+ (hemizygous) and females F/F;Cre+
   #        (homozygous) -> Arx fully deleted in PV cells.
   #   WT = everything else (controls): Cre- flox (Arx intact), Arx(wt) incl. wt;Cre+ (no
   #        floxed allele to delete), and the germline-het F/x;Cre- females (32, 388) --
   #        no Cre = no deletion, so grouped as controls (no het-KO exists in this cohort).
-  GENE_ALIASES:
+  GENOTYPE_MAP:
     KO:
       - KO
       - "Arx(F/y);Parvcre+"
@@ -126,7 +126,7 @@ samples_data:
       - "Arx(F/y);Rosa(YFP/wt);Parvcre-"
   animals:
     - id: '29'
-      gene: Arx(F/y); cre+
+      genotype: Arx(F/y); cre+
       sex: Male
       channel_subset:
         - EEG E1-REF1
@@ -152,7 +152,7 @@ samples_data:
         mode: mne
         extract_func: read_raw_edf
     - id: '32'
-      gene: Arx(F/x); cre-
+      genotype: Arx(F/x); cre-
       sex: Female
       channel_subset:
         - EEG E9-REF2
@@ -178,7 +178,7 @@ samples_data:
         mode: mne
         extract_func: read_raw_edf
     - id: '34'
-      gene: Arx(wt); Parvcre(-)
+      genotype: Arx(wt); Parvcre(-)
       sex: Female
       channel_subset:
         - EEG E17-REF3
@@ -204,7 +204,7 @@ samples_data:
         mode: mne
         extract_func: read_raw_edf
     - id: '30'
-      gene: Arx(F/y); cre-
+      genotype: Arx(F/y); cre-
       sex: Male
       channel_subset:
         - EEG E1-REF1
@@ -225,7 +225,7 @@ samples_data:
         mode: mne
         extract_func: read_raw_edf
     - id: '21'
-      gene: Arx(wt); cre-
+      genotype: Arx(wt); cre-
       sex: Male
       channel_subset:
         - EEG E9-REF2
@@ -246,7 +246,7 @@ samples_data:
         mode: mne
         extract_func: read_raw_edf
     - id: '31'
-      gene: Arx(F/y); cre-
+      genotype: Arx(F/y); cre-
       sex: Male
       channel_subset:
         - EEG E17-REF3
@@ -267,7 +267,7 @@ samples_data:
         mode: mne
         extract_func: read_raw_edf
     - id: '354'
-      gene: Arx(wt);Parvcre+
+      genotype: Arx(wt);Parvcre+
       sex: Male
       channel_subset:
         - EEG E1-REF1
@@ -288,7 +288,7 @@ samples_data:
         mode: mne
         extract_func: read_raw_edf
     - id: '356'
-      gene: Arx(F/y);Parvcre+
+      genotype: Arx(F/y);Parvcre+
       sex: Male
       channel_subset:
         - EEG E9-REF2
@@ -309,7 +309,7 @@ samples_data:
         mode: mne
         extract_func: read_raw_edf
     - id: '357'
-      gene: Arx(F/y);Parvcre+
+      genotype: Arx(F/y);Parvcre+
       sex: Male
       channel_subset:
         - EEG E17-REF3
@@ -330,7 +330,7 @@ samples_data:
         mode: mne
         extract_func: read_raw_edf
     - id: '387'
-      gene: Arx(F/y);Parvcre+
+      genotype: Arx(F/y);Parvcre+
       sex: Male
       channel_subset:
         - EEG E1-REF1
@@ -351,7 +351,7 @@ samples_data:
         mode: mne
         extract_func: read_raw_edf
     - id: '388'
-      gene: Arx(F/x);Parvcre-
+      genotype: Arx(F/x);Parvcre-
       sex: Female
       channel_subset:
         - EEG E9-REF2
@@ -372,7 +372,7 @@ samples_data:
         mode: mne
         extract_func: read_raw_edf
     - id: '390'
-      gene: Arx(F/F);Parvcre-
+      genotype: Arx(F/F);Parvcre-
       sex: Female
       channel_subset:
         - EEG E17-REF3
@@ -393,7 +393,7 @@ samples_data:
         mode: mne
         extract_func: read_raw_edf
     - id: '400'
-      gene: Arx(F/F);Parvcre+
+      genotype: Arx(F/F);Parvcre+
       sex: Female
       channel_subset:
         - EEG E25-REF4
@@ -414,7 +414,7 @@ samples_data:
         mode: mne
         extract_func: read_raw_edf
     - id: '393'
-      gene: Arx(F/y);Parvcre+
+      genotype: Arx(F/y);Parvcre+
       sex: Male
       channel_subset:
         - EEG E1-REF1
@@ -435,7 +435,7 @@ samples_data:
         mode: mne
         extract_func: read_raw_edf
     - id: '399'
-      gene: Arx(F/y);Parvcre+
+      genotype: Arx(F/y);Parvcre+
       sex: Male
       channel_subset:
         - EEG E9-REF2
@@ -456,7 +456,7 @@ samples_data:
         mode: mne
         extract_func: read_raw_edf
     - id: '385'
-      gene: Arx(F/F);Parvcre+
+      genotype: Arx(F/F);Parvcre+
       sex: Female
       channel_subset:
         - EEG E17-REF3
@@ -477,7 +477,7 @@ samples_data:
         mode: mne
         extract_func: read_raw_edf
     - id: '395'
-      gene: Arx(F/y);Parvcre-
+      genotype: Arx(F/y);Parvcre-
       sex: Male
       channel_subset:
         - EEG E25-REF4
@@ -498,7 +498,7 @@ samples_data:
         mode: mne
         extract_func: read_raw_edf
     - id: '432'
-      gene: Arx(F/y);Rosa(YFP/wt);Parvcre-
+      genotype: Arx(F/y);Rosa(YFP/wt);Parvcre-
       sex: Male
       channel_subset:
         - EEG E1-REF1
@@ -519,7 +519,7 @@ samples_data:
         mode: mne
         extract_func: read_raw_edf
     - id: '435'
-      gene: Arx(F/y);Rosa(YFP/wt);Parvcre+
+      genotype: Arx(F/y);Rosa(YFP/wt);Parvcre+
       sex: Male
       channel_subset:
         - EEG E9-REF2
@@ -540,7 +540,7 @@ samples_data:
         mode: mne
         extract_func: read_raw_edf
     - id: '438'
-      gene: Arx(F/F);Parvcre+
+      genotype: Arx(F/F);Parvcre+
       sex: Female
       channel_subset:
         - EEG E17-REF3
@@ -561,7 +561,7 @@ samples_data:
         mode: mne
         extract_func: read_raw_edf
     - id: '439'
-      gene: Arx(F/F);Parvcre-
+      genotype: Arx(F/F);Parvcre-
       sex: Female
       channel_subset:
         - EEG E25-REF4
@@ -582,7 +582,7 @@ samples_data:
         mode: mne
         extract_func: read_raw_edf
     - id: '440'
-      gene: Arx(F/F);Parvcre+
+      genotype: Arx(F/F);Parvcre+
       sex: Female
       channel_subset:
         - EEG E1-REF1
@@ -603,7 +603,7 @@ samples_data:
         mode: mne
         extract_func: read_raw_edf
     - id: '443'
-      gene: Arx(wt);Parvcre-
+      genotype: Arx(wt);Parvcre-
       sex: Male
       channel_subset:
         - EEG E9-REF2
@@ -624,7 +624,7 @@ samples_data:
         mode: mne
         extract_func: read_raw_edf
     - id: '446'
-      gene: Arx(F/y);Parvcre+
+      genotype: Arx(F/y);Parvcre+
       sex: Male
       channel_subset:
         - EEG E17-REF3
@@ -645,7 +645,7 @@ samples_data:
         mode: mne
         extract_func: read_raw_edf
     - id: '447'
-      gene: Arx(F/y);Parvcre+
+      genotype: Arx(F/y);Parvcre+
       sex: Male
       channel_subset:
         - EEG E25-REF4
@@ -666,7 +666,7 @@ samples_data:
         mode: mne
         extract_func: read_raw_edf
     - id: '700'
-      gene: Arx(F/y);Parvcre+
+      genotype: Arx(F/y);Parvcre+
       sex: Male
       channel_subset:
         - EEG E1-REF1
@@ -687,7 +687,7 @@ samples_data:
         mode: mne
         extract_func: read_raw_edf
     - id: '703'
-      gene: Arx(F/y);Parvcre+
+      genotype: Arx(F/y);Parvcre+
       sex: Male
       channel_subset:
         - EEG E9-REF2
@@ -708,7 +708,7 @@ samples_data:
         mode: mne
         extract_func: read_raw_edf
     - id: '704'
-      gene: Arx(F/y);Parvcre+
+      genotype: Arx(F/y);Parvcre+
       sex: Male
       channel_subset:
         - EEG E17-REF3
@@ -729,7 +729,7 @@ samples_data:
         mode: mne
         extract_func: read_raw_edf
     - id: '705'
-      gene: Arx(F/y);Parvcre+
+      genotype: Arx(F/y);Parvcre+
       sex: Male
       channel_subset:
         - EEG E25-REF4
@@ -750,7 +750,7 @@ samples_data:
         mode: mne
         extract_func: read_raw_edf
     - id: '708'
-      gene: Arx(F/y);Parvcre+
+      genotype: Arx(F/y);Parvcre+
       sex: Male
       channel_subset:
         - EEG E1-REF1
@@ -771,7 +771,7 @@ samples_data:
         mode: mne
         extract_func: read_raw_edf
     - id: '709'
-      gene: Arx(F/y);Parvcre+
+      genotype: Arx(F/y);Parvcre+
       sex: Male
       channel_subset:
         - EEG E9-REF2
@@ -792,7 +792,7 @@ samples_data:
         mode: mne
         extract_func: read_raw_edf
     - id: '710'
-      gene: Arx(F/y);Parvcre+
+      genotype: Arx(F/y);Parvcre+
       sex: Male
       channel_subset:
         - EEG E17-REF3
@@ -813,7 +813,7 @@ samples_data:
         mode: mne
         extract_func: read_raw_edf
     - id: '711'
-      gene: Arx(F/y);Parvcre+
+      genotype: Arx(F/y);Parvcre+
       sex: Male
       channel_subset:
         - EEG E25-REF4

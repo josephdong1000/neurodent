@@ -82,14 +82,6 @@ class TestAnalysisPipeline:
 
     def test_data_loading_and_processing_integration(self, temp_dir):
         """Test data loading and processing integration."""
-        # Use a filename with a valid genotype
-        filepath = Path("WT_A10_2023-01-01.bin")
-
-        metadata = utils.parse_path_to_animalday(filepath, animal_param=(1, "_"), )
-
-        assert metadata["genotype"] == "WT"
-        assert metadata["animal"] == "A10"
-
         # Create test file paths
         test_files = {
             "ddf_col": temp_dir / "test_ColMajor_001.bin",
@@ -115,12 +107,6 @@ class TestAnalysisPipeline:
         # Test file index extraction
         index = utils.filepath_to_index(col_path)
         assert index == 1
-
-        # Test metadata parsing
-        metadata = utils.parse_path_to_animalday(Path("WT_A10_2023-01-01.bin"), animal_param=(1, "_"), )
-        assert "animal" in metadata
-        assert "genotype" in metadata
-        assert "day" in metadata
 
 
 class TestVisualizationIntegration:
@@ -196,9 +182,6 @@ class TestCoreModuleIntegration:
         animal = utils.parse_str_to_animal("WT_A10_Jan01_2023", animal_param=(1, "_"))
         assert animal == "A10"
 
-        genotype = utils.parse_str_to_genotype("WT_A10_Jan01_2023")
-        assert genotype == "WT"
-
         # Test day parsing
         day = utils.parse_str_to_day("WT_A10_Jan01_2023")
         assert day.year == 2023
@@ -230,10 +213,6 @@ class TestErrorHandlingIntegration:
 
     def test_error_propagation_across_modules(self):
         """Test that errors propagate correctly across modules."""
-        # Test invalid data handling
-        with pytest.raises(ValueError):
-            utils.parse_str_to_genotype("INVALID_DATA")
-
         # Test invalid unit conversion
         with pytest.raises(AssertionError):
             utils.convert_units_to_multiplier("invalid", "µV")
@@ -241,10 +220,6 @@ class TestErrorHandlingIntegration:
         # Test invalid animal parameter
         with pytest.raises(ValueError):
             utils.parse_str_to_animal("test", animal_param=123)
-
-        # Test invalid mode
-        with pytest.raises(ValueError):
-            utils.parse_path_to_animalday(Path("/test"), )
 
 
 class TestPerformanceIntegration:

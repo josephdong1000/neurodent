@@ -11,21 +11,23 @@ There is no separate region/hemisphere model; left/right is part of the channel 
 
 from datetime import datetime
 
-GENOTYPE_ALIASES = {"WT": ["WT", "wildtype"], "KO": ["KO", "knockout"]}
-"""Canonical genotype names mapped to their aliases."""
+GENOTYPE_MAP = {}
+"""Exact ``{canonical_label: [accepted spellings]}`` map normalizing the per-animal
+``genotype`` value to a canonical short label (parallels :data:`CHANNEL_MAP` and
+:data:`SEX_MAP`; matched **exactly**, never fuzzily). Empty default = passthrough (the
+raw ``genotype`` value is kept as-is, for datasets that don't need normalization).
+When populated it is **authoritative**: a value it does not cover raises at load (just
+as an unknown raw channel name does), so config typos surface immediately. Populated
+per-dataset via ``GENOTYPE_MAP`` in the samples config."""
 
-GENE_ALIASES = {}
-"""Maps a canonical short genotype label to the full ``gene`` strings that normalize
-to it (parallels :data:`SEX_ALIASES`; exact match). Empty default = passthrough (the
-raw ``gene`` value is kept, no warning). Populated per-dataset via ``GENE_ALIASES`` in
-the samples config. Distinct from :data:`GENOTYPE_ALIASES`, which is a gene->animal_id
-index used by the legacy filename parser ``parse_str_to_genotype``."""
-
-SEX_ALIASES = {
+SEX_MAP = {
     "Male": ["Male", "male", "M", "m"],
     "Female": ["Female", "female", "F", "f"],
 }
-"""Canonical sex values mapped to their aliases."""
+"""Exact ``{canonical_label: [accepted spellings]}`` map normalizing the per-animal
+``sex`` value (parallels :data:`GENOTYPE_MAP`; matched **exactly**). Authoritative when
+populated — an uncovered value raises at load. Populated per-dataset via ``SEX_MAP`` in
+the samples config."""
 
 # --- Channels: the single source of truth --------------------------------------------
 CHANNEL_MAP = {
@@ -43,9 +45,9 @@ CHANNEL_MAP = {
 """Single source of truth for channels: exact ``{abbrev: [raw names]}`` map, in canonical
 order. A channel is the atomic unit (left/right is part of the identity, not a separate
 axis); the code never interprets the label — it is matched **exactly** against raw data
-channel names. This is a ``_MAP`` (exact key→values), not an ``_ALIASES`` table (the
-fuzzy, variant-spelling families like :data:`GENOTYPE_ALIASES`). Populated per-dataset via
-``channels`` in the samples config.
+channel names. This is a ``_MAP`` (exact key→values, like :data:`GENOTYPE_MAP` and
+:data:`SEX_MAP`), not a fuzzy, substring-matched ``_ALIASES`` table. Populated per-dataset
+via ``channels`` in the samples config.
 :data:`CHANNEL_ABBREVS`,
 :data:`CHANNEL_ABBREV_BY_RAW`, and the channel entry of :data:`DF_SORT_ORDER` are derived
 from this; never edit those directly."""

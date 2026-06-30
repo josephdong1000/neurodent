@@ -63,7 +63,7 @@ Each operation has a single canonical verb, matched to an established precedent.
      - Strictly format/type changes — never identifier mapping (that is ``resolve_``).
    * - String → identifier extraction
      - ``parse_``
-     - E.g. ``parse_str_to_genotype``. Not a disk-I/O verb.
+     - E.g. ``parse_str_to_animal``. Not a disk-I/O verb.
    * - Spelling
      - US ``normalize``
      - NumPy/SciPy/sklearn spelling. Never ``normalise``.
@@ -76,12 +76,14 @@ Noun canon
 
 **``_MAP`` vs ``_ALIASES``.** The suffix encodes the resolution semantics:
 
-* ``_MAP`` — an **exact** ``{key: [values]}`` lookup. :data:`~neurodent.constants.CHANNEL_MAP`
-  maps a canonical channel abbreviation to the exact raw spellings that resolve to it
-  (matched exactly by :func:`~neurodent.core.resolve_channel`).
-* ``_ALIASES`` — a **fuzzy**, variant-spelling family matched by substring. ``GENOTYPE_ALIASES``,
-  ``SEX_ALIASES``, ``GENE_ALIASES`` map a canonical label to the spellings it may appear as
-  in filenames/metadata.
+* ``_MAP`` — an **exact** ``{canonical_label: [accepted spellings]}`` lookup. The value must
+  equal one of the listed spellings (no substring/inference). :data:`~neurodent.constants.CHANNEL_MAP`
+  (matched by :func:`~neurodent.core.resolve_channel`), :data:`~neurodent.constants.GENOTYPE_MAP`,
+  and :data:`~neurodent.constants.SEX_MAP` are all exact maps; the metadata maps are
+  authoritative when populated (an uncovered value raises at load).
+* ``_ALIASES`` — a **fuzzy**, variant-spelling family matched by substring. Reserve the suffix
+  for substring-matched tables (none currently ship; the legacy filename genotype parser that
+  used one was removed).
 
 Never name an exact map ``*_ALIASES`` or a fuzzy variant-list ``*_MAP``.
 

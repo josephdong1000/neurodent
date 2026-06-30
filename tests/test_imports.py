@@ -29,14 +29,12 @@ class TestImportPatterns:
             nanaverage,
             log_transform,
             resolve_channel,
-            parse_path_to_animalday,
         )
 
         assert callable(get_temp_directory)
         assert callable(nanaverage)
         assert callable(log_transform)
         assert callable(resolve_channel)
-        assert callable(parse_path_to_animalday)
 
     def test_module_level_access(self):
         """Test accessing classes via module namespace."""
@@ -141,7 +139,6 @@ class TestIDEFunctionality:
             "nanaverage",
             "log_transform",
             "resolve_channel",
-            "parse_path_to_animalday",
         ]
 
         for item in expected_classes + expected_functions:
@@ -229,7 +226,6 @@ class TestStandardizedImports:
             "set_temp_directory",
             "nanaverage",
             "log_transform",
-            "parse_path_to_animalday",
             "validate_timestamps",
         ]
 
