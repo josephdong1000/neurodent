@@ -100,7 +100,8 @@ uses ``{animal}/{index}`` placeholders with paired ``.bin`` / ``.csv`` files:
 
 The full Snakemake run (via ``.github/workflows/snakemake-test.yml``) also
 exercises this dataset end-to-end.  See ``config/datasets/mini_real.yaml``
-and ``config/samples_mini_real.json`` for the corresponding configuration.
+for the corresponding configuration (samples inventory is inlined under
+``samples_data``).
 
 
 Building Documentation
