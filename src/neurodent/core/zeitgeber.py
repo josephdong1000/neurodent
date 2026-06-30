@@ -360,17 +360,17 @@ def enrich_genotype_metadata(df, genotype_pattern=None, sex_mapper=None, genotyp
         # Convert to new format
         animal_metadata_converted = {}
         for animal_id, genotype_key in animal_to_genotype.items():
-            # Parse genotype key to extract sex and gene
+            # Parse genotype key to extract sex and genotype
             if "_" in genotype_key:
                 parts = genotype_key.split("_", 1)
-                sex_char, gene = parts[0], parts[1]
+                sex_char, genotype = parts[0], parts[1]
             elif len(genotype_key) >= 2 and genotype_key[0].upper() in ("M", "F"):
-                sex_char, gene = genotype_key[0], genotype_key[1:]
+                sex_char, genotype = genotype_key[0], genotype_key[1:]
             else:
-                sex_char, gene = None, genotype_key
-            
-            sex = normalize_value_from_aliases(sex_char, constants.SEX_ALIASES) if sex_char else None
-            animal_metadata_converted[animal_id] = {"sex": sex, "gene": gene}
+                sex_char, genotype = None, genotype_key
+
+            sex = normalize_value_from_aliases(sex_char, constants.SEX_MAP) if sex_char else None
+            animal_metadata_converted[animal_id] = {"sex": sex, "genotype": genotype}
         
         return metadata_module.enrich_metadata(df, animal_metadata_converted)
     
@@ -464,10 +464,10 @@ def run_zeitgeber_pipeline(
     Main orchestration function for processing zeitgeber data.
 
     The pipeline performs the following steps:
-    1. Enrich metadata (sex, gene) from ANIMAL_METADATA.
+    1. Enrich metadata (sex, genotype) from ANIMAL_METADATA.
     2. Shift to Zeitgeber Time (ZT) reference (also adds ``daynight``).
     3. Subtract baseline.
-    4. Sort + sex/gene enrichment for plot readiness.
+    4. Sort + sex/genotype enrichment for plot readiness.
 
     Args:
         df (pd.DataFrame): Input dataframe with 'zt_minutes', 'animal'.
@@ -480,7 +480,7 @@ def run_zeitgeber_pipeline(
             expansion has moved out of the data layer to
             :func:`expand_zt_axis`, called by plotters at render time.
             Kept in the signature for backward compatibility; ignored.
-        animal_metadata (dict, optional): Dict of animal_id -> {sex, gene} from load_animal_metadata().
+        animal_metadata (dict, optional): Dict of animal_id -> {sex, genotype} from load_animal_metadata().
         genotype_pattern (str, optional): DEPRECATED.
         sex_mapper (dict, optional): DEPRECATED.
         genotype_aliases (dict, optional): DEPRECATED. Use animal_metadata instead.
@@ -519,7 +519,7 @@ def run_zeitgeber_pipeline(
         exclude_from_baseline=exclude_from_baseline,
     )
 
-    # 4. Sort + sex/gene enrichment.  No multi-day expansion here — the
+    # 4. Sort + sex/genotype enrichment.  No multi-day expansion here — the
     # data layer stays 24h; plotters use expand_zt_axis() at render time.
     df_final = transform_time_axis(df_processed, shift=0)
 

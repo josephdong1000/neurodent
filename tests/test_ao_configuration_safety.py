@@ -4,11 +4,6 @@ from pathlib import Path
 import neurodent.visualization.results as results
 import neurodent.constants as constants
 
-# Mock Aliases
-MOCK_ALIASES = {
-    "HOMO": ["AP3B2homo-240-M"],
-}
-
 @pytest.fixture
 def mock_valid_structure(tmp_path):
     """
@@ -23,7 +18,6 @@ def test_no_files_discovered_error(mock_valid_structure, monkeypatch):
     Test that when no files match the pattern, a clear error is raised.
     This replaces the old date parsing test - in the new system, we test pattern matching.
     """
-    monkeypatch.setattr(constants, "GENOTYPE_ALIASES", MOCK_ALIASES)
     monkeypatch.setattr(results.AnimalOrganizer, "_create_long_recordings", lambda self, kw: None)
 
     parent = mock_valid_structure
@@ -55,7 +49,6 @@ def test_pattern_matching_works(mock_valid_structure, monkeypatch):
     Test that the pattern-based discovery works correctly.
     This replaces the old strange format test.
     """
-    monkeypatch.setattr(constants, "GENOTYPE_ALIASES", MOCK_ALIASES)
     monkeypatch.setattr(results.AnimalOrganizer, "_create_long_recordings", lambda self, kw: None)
 
     parent = mock_valid_structure
@@ -83,7 +76,6 @@ def test_animal_id_filtering_works(mock_valid_structure, monkeypatch):
     """
     Verify that animal_id filtering still works correctly.
     """
-    monkeypatch.setattr(constants, "GENOTYPE_ALIASES", MOCK_ALIASES)
     monkeypatch.setattr(results.AnimalOrganizer, "_create_long_recordings", lambda self, kw: None)
 
     parent = mock_valid_structure

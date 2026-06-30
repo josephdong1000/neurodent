@@ -38,10 +38,10 @@ samples_data:
   animals:
   - id: ExWT
     sex: M
-    gene: WT
+    genotype: WT
   - id: ExKO
     sex: F
-    gene: KO
+    genotype: KO
     bad_channels:
     - LHip
     - RHip

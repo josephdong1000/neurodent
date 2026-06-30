@@ -418,104 +418,6 @@ def nanaverage(A: np.ndarray, weights: np.ndarray, axis: int = -1) -> np.ndarray
         return np.where(np.isfinite(result), result, np.nan)
 
 
-def parse_path_to_animalday(
-    filepath: str | Path,
-    animal_param: tuple[int, str] | str | list[str] = (0, None),
-    day_sep: str | None = None,
-    mode: Literal["nest", "concat", "base", "noday"] = "concat",
-    **day_parse_kwargs,
-):
-    """
-    DEPRECATED: Use FileDiscoverer with pattern-based discovery instead.
-
-    Parses the filename of a binfolder to get the animalday identifier (animal id, genotype, and day).
-
-    Args:
-        filepath (str | Path): Filepath of the binfolder.
-        animal_param (tuple[int, str] | str | list[str], optional): Parameter specifying how to parse the animal ID:
-            tuple[int, str]: (index, separator) for simple split and index
-            str: regex pattern to extract ID
-            list[str]: list of possible animal IDs to match against
-        day_sep (str, optional): Separator for day in filename. Defaults to None.
-        mode (Literal['nest', 'concat', 'base', 'noday'], optional): Mode to parse the filename. Defaults to 'concat'.
-
-            - 'nest': Extracts genotype/animal from parent directory name and date from filename.
-              Example: "/WT_A10/recording_2023-04-01.*"
-            - 'concat': Extracts all info from filename, expects genotype_animal_date format.
-              Example: "/WT_A10_2023-04-01.*"
-            - 'base': Same as concat
-            - 'noday': Extracts only genotype and animal ID, uses default date.
-              Example: "/WT_A10_recording.*"
-        **day_parse_kwargs: Additional keyword arguments to pass to parse_str_to_day function.
-                           Common options include parse_params dict for dateutil.parser.parse.
-
-    Returns:
-        dict[str, str]: Dictionary with keys "animal", "genotype", "day", and "animalday" (concatenated).
-            Example: {"animal": "A10", "genotype": "WT", "day": "Apr-01-2023", "animalday": "A10 WT Apr-01-2023"}
-
-    Raises:
-        ValueError: If mode is invalid or required components cannot be extracted
-        TypeError: If filepath is not str or Path
-    """
-    warnings.warn(
-        "parse_path_to_animalday is deprecated. Use FileDiscoverer with pattern-based discovery instead.",
-        DeprecationWarning,
-        stacklevel=2
-    )
-    filepath = Path(filepath)
-    match mode:
-        case "nest":
-            animid = parse_str_to_animal(filepath.parent.name, animal_param=animal_param)
-            geno = (constants.ANIMAL_METADATA.get(animid, {}).get("gene") or 
-                    parse_str_to_genotype(filepath.parent.name))
-            day = parse_str_to_day(filepath.name, sep=day_sep, **day_parse_kwargs).strftime("%b-%d-%Y")
-        case "concat" | "base":
-            animid = parse_str_to_animal(filepath.name, animal_param=animal_param)
-            geno = (constants.ANIMAL_METADATA.get(animid, {}).get("gene") or 
-                    parse_str_to_genotype(filepath.name))
-            day = parse_str_to_day(filepath.name, sep=day_sep, **day_parse_kwargs).strftime("%b-%d-%Y")
-        case "noday":
-            animid = parse_str_to_animal(filepath.name, animal_param=animal_param)
-            geno = (constants.ANIMAL_METADATA.get(animid, {}).get("gene") or 
-                    parse_str_to_genotype(filepath.name))
-            day = constants.DEFAULT_DAY.strftime("%b-%d-%Y")
-        case _:
-            raise ValueError(f"Invalid mode: {mode}")
-    return {
-        "animal": animid,
-        "genotype": geno,
-        "day": day,
-        "animalday": f"{animid} {geno} {day}",
-    }
-
-
-def parse_str_to_genotype(string: str, strict_matching: bool = False) -> str:
-    """
-    Parses the filename of a binfolder to get the genotype.
-
-    Args:
-        string (str): String to parse.
-        strict_matching (bool, optional): If True, ensures the input matches exactly one genotype.
-            If False, allows overlapping matches and uses longest. Defaults to False for
-            backward compatibility.
-
-    Returns:
-        str: Genotype.
-
-    Raises:
-        ValueError: When string cannot be parsed or contains ambiguous matches in strict mode.
-
-    Examples:
-        >>> parse_str_to_genotype("WT_A10_data")
-        'WT'
-        >>> parse_str_to_genotype("WT_KO_comparison", strict_matching=True)  # Would raise error
-        ValueError: Ambiguous match...
-        >>> parse_str_to_genotype("WT_KO_comparison", strict_matching=False)  # Uses longest match
-        'WT'  # or 'KO' depending on which alias is longer
-    """
-    return _get_key_from_match_values(string, constants.GENOTYPE_ALIASES, strict_matching, alias_name="GENOTYPE_ALIASES")
-
-
 def parse_str_to_animal(string: str, animal_param: tuple[int, str] | str | list[str] = (0, None)) -> str:
     """
     DEPRECATED: Use FileDiscoverer with {animal} placeholder in pattern instead.
@@ -845,72 +747,24 @@ def resolve_channels(names: list[str]) -> list[str]:
     return result
 
 
-def _get_key_from_match_values(input_string: str, alias_dict: dict, strict_matching: bool = True, alias_name: str = "alias"):
-    """
-    Find the best matching key from alias dictionary.
-
-    Args:
-        input_string (str): String to search in
-        alias_dict (dict): Dictionary of {key: [aliases]} to match against
-        strict_matching (bool): If True, ensures only one alias matches across all keys
-        alias_name (str): Name of the alias dictionary for error messages (e.g., "GENOTYPE_ALIASES")
-
-    Returns:
-        str: The key with the best matching alias
-
-    Raises:
-        ValueError: When no matches found or multiple matches in strict mode
-    """
-    matches = [
-        (key, candidate, len(candidate))
-        for key, aliases in alias_dict.items()
-        for candidate in aliases
-        if candidate in input_string
-    ]
-
-    if not matches:
-        alias_examples = {key: aliases[:2] for key, aliases in alias_dict.items()}
-        raise ValueError(
-            f"'{input_string}' does not match any {alias_name}. "
-            f"Available {alias_name} entries: {alias_examples}. "
-            f"If your data uses non-standard channel names, "
-            f"configure the appropriate aliases in your samples config file."
-        )
-
-    if strict_matching:
-        # Check if multiple different keys match
-        matching_keys = set(match[0] for match in matches)
-        if len(matching_keys) > 1:
-            matched_aliases = {key: [alias for k, alias, _ in matches if k == key] for key in matching_keys}
-            raise ValueError(
-                f"Ambiguous match in '{input_string}' for {alias_name}. "
-                f"Multiple keys matched: {matched_aliases}. "
-                f"Use strict_matching=False to allow ambiguous matches."
-            )
-
-    # Return the key with the longest matching alias
-    best_match_key, _, _ = max(matches, key=lambda x: x[2])
-    return best_match_key
-
-
 def normalize_value_from_aliases(
     value: str,
     alias_dict: dict[str, list[str]],
 ) -> str | None:
-    """Normalize a value to its canonical form using an alias dictionary.
+    """Normalize a value to its canonical form using a value map.
 
-    Unlike :func:`_get_key_from_match_values` which uses substring matching for
-    parsing values embedded in filenames, this function performs exact matching
-    for normalizing standalone configuration values.
+    Performs **exact** matching: the value must equal one of the accepted spellings
+    listed for a canonical label. Used for normalizing standalone configuration values
+    against an exact ``_MAP`` (e.g. :data:`~neurodent.constants.SEX_MAP`,
+    :data:`~neurodent.constants.GENOTYPE_MAP`).
 
     Args:
         value: The raw value to normalize (e.g., ``"M"``, ``"female"``).
-        alias_dict: Dictionary of ``{canonical_key: [aliases]}``.
+        alias_dict: Dictionary of ``{canonical_key: [accepted spellings]}``.
 
     Returns:
-        The canonical key if *value* matches any alias, or ``None`` if no match.
+        The canonical key if *value* matches any spelling, or ``None`` if no match.
     """
-    # REVIEW the function name should be unified with _get_key_from_match_values
     for canonical_key, aliases in alias_dict.items():
         if value in aliases:
             return canonical_key

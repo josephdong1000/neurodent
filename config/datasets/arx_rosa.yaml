@@ -101,7 +101,7 @@ samples_data:
       - D-017
   animals:
     - id: ArxRosa-1017
-      gene: Arx(F/y)-Rosa(+/wt)-Sham
+      genotype: Arx(F/y)-Rosa(+/wt)-Sham
       sex: Male
       channel_subset:
         - EEG E25-REF4
@@ -130,7 +130,7 @@ samples_data:
         - LVis
         - RVis
     - id: ArxRosa-1015
-      gene: Arx(F/y)-Rosa(+/wt)-Sham
+      genotype: Arx(F/y)-Rosa(+/wt)-Sham
       sex: Male
       channel_subset:
         - EEG E9-REF2
@@ -155,7 +155,7 @@ samples_data:
         - LVis
         - RVis
     - id: ArxRosa-1199
-      gene: Arx(F/y)-Rosa(+/wt)-Tam
+      genotype: Arx(F/y)-Rosa(+/wt)-Tam
       sex: Male
       channel_subset:
         - EEG E1-REF1
@@ -183,7 +183,7 @@ samples_data:
         - LVis
         - RVis
     - id: ArxRosa-1198
-      gene: Arx(F/y)-Rosa(+/wt)-Tam
+      genotype: Arx(F/y)-Rosa(+/wt)-Tam
       sex: Male
       channel_subset:
         - EEG E17-REF3
@@ -206,7 +206,7 @@ samples_data:
         extract_func: read_raw_edf
       exclude: true # mouse died
     - id: ArxRosa-1211
-      gene: Arx(F/y)-Rosa(+/wt)-Sham
+      genotype: Arx(F/y)-Rosa(+/wt)-Sham
       sex: Male
       channel_subset:
         - EEG E9-REF2
@@ -234,7 +234,7 @@ samples_data:
         - LVis
         - RVis
     - id: ArxRosa-1201
-      gene: Arx(F/y)-Rosa(+/wt)-Tam
+      genotype: Arx(F/y)-Rosa(+/wt)-Tam
       sex: Male
       channel_subset:
         - EEG E25-REF4
@@ -264,7 +264,7 @@ samples_data:
         - LVis
         - RVis
     - id: ArxRosa-967
-      gene: Arx(F/y)-Rosa(+/wt)-Tam
+      genotype: Arx(F/y)-Rosa(+/wt)-Tam
       sex: Male
       channel_subset:
         - EEG E1-REF1
@@ -290,7 +290,7 @@ samples_data:
         - LVis
         - RVis
     - id: ArxRosa-968
-      gene: Arx(F/y)-Rosa(+/wt)-Tam
+      genotype: Arx(F/y)-Rosa(+/wt)-Tam
       sex: Male
       channel_subset:
         - EEG E9-REF2
@@ -316,7 +316,7 @@ samples_data:
         - LVis
         - RVis
     - id: ArxRosa-969
-      gene: Arx(F/y)-Rosa(+/wt)-Tam
+      genotype: Arx(F/y)-Rosa(+/wt)-Tam
       sex: Male
       channel_subset:
         - EEG E17-REF3
@@ -346,7 +346,7 @@ samples_data:
         - RVis
       exclude: true # Very noisy
     - id: ArxRosa-418
-      gene: Rosa(+/+)
+      genotype: Rosa(+/+)
       sex: Male
       channel_subset:
         - EEG E25-REF4
@@ -372,7 +372,7 @@ samples_data:
         - LVis
         - RVis
     - id: ArxRosa-2059
-      gene: Arx(F/y)-Rosa(+/wt)-Tam
+      genotype: Arx(F/y)-Rosa(+/wt)-Tam
       sex: Male
       channel_subset:
         - A-010
@@ -395,7 +395,7 @@ samples_data:
         stream_id: "0"
         ignore_integrity_checks: true
     - id: ArxRosa-2063
-      gene: Arx(F/y)-Rosa(+/wt)-Sham
+      genotype: Arx(F/y)-Rosa(+/wt)-Sham
       sex: Male
       channel_subset:
         - C-010
@@ -418,7 +418,7 @@ samples_data:
         stream_id: "0"
         ignore_integrity_checks: true
     - id: ArxRosa-2064
-      gene: Arx(F/y)-Rosa(+/wt)-Sham
+      genotype: Arx(F/y)-Rosa(+/wt)-Sham
       sex: Male
       channel_subset:
         - D-010
@@ -441,7 +441,7 @@ samples_data:
         stream_id: "0"
         ignore_integrity_checks: true
     - id: ArxRosa-3022
-      gene: Arx(F/y)-Rosa(+/wt)-Tam
+      genotype: Arx(F/y)-Rosa(+/wt)-Tam
       sex: Male
       channel_subset:
         - B-010
@@ -464,7 +464,7 @@ samples_data:
         stream_id: "0"
         ignore_integrity_checks: true
     - id: ArxRosa-3023
-      gene: Arx(F/y)-Rosa(+/wt)-Tam
+      genotype: Arx(F/y)-Rosa(+/wt)-Tam
       sex: Male
       channel_subset:
         - C-010
@@ -489,7 +489,7 @@ samples_data:
       bad_channels:
         - RVis
     - id: ArxRosa-3024
-      gene: Arx(F/y)-Rosa(+/wt)-Tam
+      genotype: Arx(F/y)-Rosa(+/wt)-Tam
       sex: Male
       channel_subset:
         - D-010

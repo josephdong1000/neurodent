@@ -160,7 +160,7 @@ class TestExampleDatasetGeneration:
         assert "data_root" in sc
         assert "ANIMAL_METADATA" in sc
         assert "animals" in sc
-        assert "GENOTYPE_ALIASES" in sc
+        assert "GENOTYPE_MAP" in sc
 
 
 # ---------------------------------------------------------------------------
@@ -244,7 +244,7 @@ class TestSamplesConfigIntegration:
         from neurodent import constants
 
         # Save original state to restore after test
-        orig_genotype_aliases = constants.GENOTYPE_ALIASES
+        orig_genotype_aliases = constants.GENOTYPE_MAP
         orig_animal_metadata = constants.ANIMAL_METADATA
 
         try:
@@ -253,12 +253,12 @@ class TestSamplesConfigIntegration:
 
             # Verify metadata was injected
             assert "ExWT" in constants.ANIMAL_METADATA
-            assert constants.ANIMAL_METADATA["ExWT"]["gene"] == "WT"
+            assert constants.ANIMAL_METADATA["ExWT"]["genotype"] == "WT"
             assert "ExKO" in constants.ANIMAL_METADATA
-            assert constants.ANIMAL_METADATA["ExKO"]["gene"] == "KO"
+            assert constants.ANIMAL_METADATA["ExKO"]["genotype"] == "KO"
         finally:
             # Restore original global state to avoid leaking into other tests
-            constants.GENOTYPE_ALIASES = orig_genotype_aliases
+            constants.GENOTYPE_MAP = orig_genotype_aliases
             constants.ANIMAL_METADATA = orig_animal_metadata
 
     def test_samples_config_serializable(self, example_dataset):
@@ -294,7 +294,7 @@ class TestPipelineSteps:
 
         # Inject metadata so genotype resolution works
         orig_metadata = constants.ANIMAL_METADATA
-        orig_aliases = constants.GENOTYPE_ALIASES
+        orig_aliases = constants.GENOTYPE_MAP
         try:
             apply_samples_config(ds["samples_config"])
 
@@ -321,7 +321,7 @@ class TestPipelineSteps:
                 assert lro.LongRecording.get_num_channels() == 8
         finally:
             constants.ANIMAL_METADATA = orig_metadata
-            constants.GENOTYPE_ALIASES = orig_aliases
+            constants.GENOTYPE_MAP = orig_aliases
 
     def test_war_generation(self, example_pipeline_env):
         """compute_windowed_analysis produces a WindowAnalysisResult.
@@ -339,7 +339,7 @@ class TestPipelineSteps:
         cfg = ds["config"]["analysis"]["war_generation"]
 
         orig_metadata = constants.ANIMAL_METADATA
-        orig_aliases = constants.GENOTYPE_ALIASES
+        orig_aliases = constants.GENOTYPE_MAP
         try:
             apply_samples_config(ds["samples_config"])
 
@@ -377,7 +377,7 @@ class TestPipelineSteps:
             assert hasattr(war, "result") and war.result is not None
         finally:
             constants.ANIMAL_METADATA = orig_metadata
-            constants.GENOTYPE_ALIASES = orig_aliases
+            constants.GENOTYPE_MAP = orig_aliases
 
 
 # ---------------------------------------------------------------------------
@@ -444,7 +444,7 @@ class TestPipelineContinuation:
         # constants restore — snapshot and restore everything inject mutates
         # (incl. the channel constants) so it does not leak into later test files.
         _keys = [
-            "ANIMAL_METADATA", "GENOTYPE_ALIASES", "SEX_ALIASES", "GENE_ALIASES",
+            "ANIMAL_METADATA", "GENOTYPE_MAP", "SEX_MAP",
             "CHANNEL_MAP", "CHANNEL_ABBREVS", "CHANNEL_ABBREV_BY_RAW", "DF_SORT_ORDER",
         ]
         _orig = {k: copy.deepcopy(getattr(constants, k)) for k in _keys}
@@ -487,7 +487,7 @@ class TestPipelineContinuation:
 
         ds = example_pipeline_env
         orig_metadata = constants.ANIMAL_METADATA
-        orig_aliases = constants.GENOTYPE_ALIASES
+        orig_aliases = constants.GENOTYPE_MAP
         try:
             apply_samples_config(ds["samples_config"])
             _ao1, war1 = _build_war(ds)
@@ -525,7 +525,7 @@ class TestPipelineContinuation:
             assert not ep.concat_df_wars.empty
         finally:
             constants.ANIMAL_METADATA = orig_metadata
-            constants.GENOTYPE_ALIASES = orig_aliases
+            constants.GENOTYPE_MAP = orig_aliases
 
     def test_fdsar_generation(self, war_env):
         """Frequency-domain spike analysis runs on the same AO data."""
@@ -628,7 +628,7 @@ class TestPipelineContinuation:
         _ao, war, _ds = war_env
         animal_id = war.animal_id
         meta = constants.ANIMAL_METADATA[animal_id]
-        expected_sex, expected_geno = meta["sex"], meta["gene"]
+        expected_sex, expected_geno = meta["sex"], meta["genotype"]
         assert expected_sex in ("Male", "Female")  # synthetic ExWT=Male / ExKO=Female
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -805,7 +805,7 @@ class TestBinCsvMultiPatternDiscovery:
         patterns = [f"{base_path}/{p}" for p in ds["pattern"]]
 
         orig_metadata = constants.ANIMAL_METADATA
-        orig_aliases = constants.GENOTYPE_ALIASES
+        orig_aliases = constants.GENOTYPE_MAP
         try:
             apply_samples_config(ds["samples_config"])
 
@@ -829,7 +829,7 @@ class TestBinCsvMultiPatternDiscovery:
                 assert rec.get_num_samples() == int(3 * 1000)  # 3s @ 1kHz
         finally:
             constants.ANIMAL_METADATA = orig_metadata
-            constants.GENOTYPE_ALIASES = orig_aliases
+            constants.GENOTYPE_MAP = orig_aliases
 
 
 # ---------------------------------------------------------------------------
@@ -1083,7 +1083,7 @@ class TestMiniRealDataset:
         )
 
         orig_metadata = constants.ANIMAL_METADATA
-        orig_aliases = constants.GENOTYPE_ALIASES
+        orig_aliases = constants.GENOTYPE_MAP
         try:
             apply_samples_config(cfg["samples_config"])
 
@@ -1108,7 +1108,7 @@ class TestMiniRealDataset:
                 assert rec.get_total_duration() > 0
         finally:
             constants.ANIMAL_METADATA = orig_metadata
-            constants.GENOTYPE_ALIASES = orig_aliases
+            constants.GENOTYPE_MAP = orig_aliases
 
     @pytest.mark.mutates_constants
     def test_mini_real_both_animals_loadable(self, mini_real_config):
@@ -1122,7 +1122,7 @@ class TestMiniRealDataset:
         ds = cfg["ds_config"]
 
         orig_metadata = constants.ANIMAL_METADATA
-        orig_aliases = constants.GENOTYPE_ALIASES
+        orig_aliases = constants.GENOTYPE_MAP
         try:
             apply_samples_config(cfg["samples_config"])
 
@@ -1147,7 +1147,7 @@ class TestMiniRealDataset:
                 assert ao.long_recordings[0].LongRecording is not None
         finally:
             constants.ANIMAL_METADATA = orig_metadata
-            constants.GENOTYPE_ALIASES = orig_aliases
+            constants.GENOTYPE_MAP = orig_aliases
 
     @pytest.mark.mutates_constants
     def test_mini_real_loads_via_dotted_extract_func(self, mini_real_config):
@@ -1169,7 +1169,7 @@ class TestMiniRealDataset:
         lro_kwargs = dict(ds["analysis"]["war_generation"]["lro_kwargs"])
 
         orig_metadata = constants.ANIMAL_METADATA
-        orig_aliases = constants.GENOTYPE_ALIASES
+        orig_aliases = constants.GENOTYPE_MAP
         try:
             apply_samples_config(cfg["samples_config"])
 
@@ -1187,7 +1187,7 @@ class TestMiniRealDataset:
             assert rec.get_sampling_frequency() == 1000.0
         finally:
             constants.ANIMAL_METADATA = orig_metadata
-            constants.GENOTYPE_ALIASES = orig_aliases
+            constants.GENOTYPE_MAP = orig_aliases
 
 
 @pytest.mark.integration
@@ -1210,7 +1210,7 @@ class TestJointRecordingSplit:
                 {
                     "id": "A10-1",
                     "sex": "M",
-                    "gene": "WT",
+                    "genotype": "WT",
                     "channel_subset": ["0", "1", "2", "3", "4"],
                     "group": "A10",  # Both animals share the A10 group for discovery
                     "manual_datetime": "2025-05-10 10:00:00",
@@ -1218,7 +1218,7 @@ class TestJointRecordingSplit:
                 {
                     "id": "A10-2",
                     "sex": "M",
-                    "gene": "WT",
+                    "genotype": "WT",
                     "channel_subset": ["5", "6", "7", "8", "9"],
                     "group": "A10",  # Same group, different channels
                     "manual_datetime": "2025-05-10 10:00:00",
@@ -1227,7 +1227,7 @@ class TestJointRecordingSplit:
         }
 
         orig_metadata = constants.ANIMAL_METADATA
-        orig_aliases = constants.GENOTYPE_ALIASES
+        orig_aliases = constants.GENOTYPE_MAP
         try:
             # Test config expansion
             expanded = expand_animals_config(config_dict)
@@ -1310,7 +1310,7 @@ class TestJointRecordingSplit:
 
         finally:
             constants.ANIMAL_METADATA = orig_metadata
-            constants.GENOTYPE_ALIASES = orig_aliases
+            constants.GENOTYPE_MAP = orig_aliases
 
 
 

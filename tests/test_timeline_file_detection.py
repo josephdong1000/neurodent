@@ -219,7 +219,7 @@ class TestComputeGlobalTimelineIntegration:
 
         # Inject metadata so genotype resolution works
         orig_metadata = constants.ANIMAL_METADATA
-        orig_aliases = constants.GENOTYPE_ALIASES
+        orig_aliases = constants.GENOTYPE_MAP
         try:
             apply_samples_config(ds["samples_config"])
 
@@ -244,7 +244,7 @@ class TestComputeGlobalTimelineIntegration:
                 assert lro.LongRecording is not None
         finally:
             constants.ANIMAL_METADATA = orig_metadata
-            constants.GENOTYPE_ALIASES = orig_aliases
+            constants.GENOTYPE_MAP = orig_aliases
 
 
 if __name__ == "__main__":

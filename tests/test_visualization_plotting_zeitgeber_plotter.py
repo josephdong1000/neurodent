@@ -13,7 +13,7 @@ def test_plot_single_feature(mock_close, mock_fig, mock_plot, tmp_path):
     df = pd.DataFrame({
         "zt_minutes": [0, 60, 120, 180],
         "sex": ["Male", "Male", "Female", "Female"],
-        "gene": ["WT", "WT", "WT", "WT"],
+        "genotype": ["WT", "WT", "WT", "WT"],
         "test_feat": [1, 2, 3, 4]
     })
     
@@ -118,7 +118,7 @@ def test_zeitgeber_plotter_from_dataframe():
     df = pd.DataFrame({
         "zt_minutes": [0, 60, 120],
         "sex": ["Male", "Male", "Male"],
-        "gene": ["WT", "WT", "WT"],
+        "genotype": ["WT", "WT", "WT"],
         "feature1": [1.0, 2.0, 3.0]
     })
     

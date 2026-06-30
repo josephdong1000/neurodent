@@ -139,8 +139,8 @@ Create ``config/samples_mydata.json`` using the unified ``animals`` list format:
    {
        "data_root": "/path/to/your/data",
        "animals": [
-           {"id": "M1", "gene": "WT", "sex": "M"},
-           {"id": "F3", "gene": "KO", "sex": "F"}
+           {"id": "M1", "genotype": "WT", "sex": "M"},
+           {"id": "F3", "genotype": "KO", "sex": "F"}
        ]
    }
 
@@ -165,13 +165,14 @@ describes all available parameters:
      - Yes
      - Unique identifier for the animal (e.g. ``"M1"``, ``"AP3B2homo-240-M"``).
        Used as the primary key throughout the pipeline.
-   * - ``gene`` (or ``genotype``)
+   * - ``genotype``
      - string
      - Yes
-     - Genotype label (e.g. ``"WT"``, ``"KO"``, ``"Het"``). Either key name is
-       accepted (they are the same field); it surfaces as the ``genotype`` column
-       for downstream grouping. Optionally normalized to a short label via
-       ``GENE_ALIASES``.
+     - Genotype label (e.g. ``"WT"``, ``"KO"``, ``"Het"``); surfaces as the
+       ``genotype`` column for downstream grouping. The legacy key ``gene`` is
+       still accepted as an alias. Optionally normalized to a short label via
+       ``GENOTYPE_MAP`` (exact match; when that map is set it is authoritative —
+       an uncovered value raises at load).
    * - ``sex``
      - string
      - Yes
@@ -248,9 +249,12 @@ In addition to ``animals``, the samples JSON supports these top-level keys:
      - Mapping of each canonical channel abbreviation to the **exact** raw channel
        names that appear in the data (e.g. ``{"LAud": ["0"], "RAud": ["5"], ...}``).
        Channel resolution is an exact lookup against these names — no inference.
-   * - ``GENOTYPE_ALIASES``
-     - Explicit genotype → animal ID mapping. If omitted, it is
-       auto-generated from each animal's ``gene`` field.
+   * - ``GENOTYPE_MAP``
+     - Optional exact ``{canonical_label: [accepted spellings]}`` map normalizing
+       the per-animal ``genotype`` value (e.g. collapsing full strings to ``"KO"`` /
+       ``"WT"``). Omitted = passthrough (raw values used as-is). When set it is
+       authoritative: a value it does not cover raises at load. ``SEX_MAP`` works
+       the same way for ``sex``.
    * - ``bad_channels``
      - Legacy top-level bad-channel dict (see :ref:`bad-channels`).
        Prefer per-animal ``bad_channels`` in the ``animals`` list.
@@ -269,7 +273,7 @@ Bad channels can be specified per animal in two ways.
    {
        "animals": [
            {
-               "id": "M1", "gene": "WT", "sex": "M",
+               "id": "M1", "genotype": "WT", "sex": "M",
                "bad_channels": ["LHip", "RHip"]
            }
        ]
@@ -286,7 +290,7 @@ channel lists:
    {
        "animals": [
            {
-               "id": "M1", "gene": "WT", "sex": "M",
+               "id": "M1", "genotype": "WT", "sex": "M",
                "bad_channels": {
                    "Session1": ["LHip", "RHip"],
                    "Session2": ["LHip", "RHip", "LMot"]
@@ -313,7 +317,7 @@ each animal entry. **By default this is the recording start time.**
    {
        "animals": [
            {
-               "id": "M1", "gene": "WT", "sex": "M",
+               "id": "M1", "genotype": "WT", "sex": "M",
                "manual_datetime": "2025-05-10T10:00:00"
            }
        ]
@@ -336,7 +340,7 @@ recording **start** time.  To indicate an **end** time instead, set
    {
        "animals": [
            {
-               "id": "M1", "gene": "WT", "sex": "M",
+               "id": "M1", "genotype": "WT", "sex": "M",
                "manual_datetime": "2025-05-10T22:00:00",
                "datetimes_are_start": false
            }
@@ -398,10 +402,10 @@ A complete samples JSON file with all available parameters:
    {
        "data_root": "/mnt/data/project",
        "animals": [
-           {"id": "AM3", "gene": "WT", "sex": "Male"},
-           {"id": "AM5", "gene": "Het", "sex": "Male",
+           {"id": "AM3", "genotype": "WT", "sex": "Male"},
+           {"id": "AM5", "genotype": "Het", "sex": "Male",
             "bad_channels": ["LHip", "RHip"]},
-           {"id": "AP3B2homo-240-M", "gene": "HOMO", "sex": "Male",
+           {"id": "AP3B2homo-240-M", "genotype": "HOMO", "sex": "Male",
             "pattern": "{data_root}/PortA-*PortB-*/{animal}*_ColMajor_{index}.rhd",
             "manual_datetime": "2025-11-27T15:39:05",
             "lro_kwargs": {"mode": "si"},

@@ -74,7 +74,6 @@ from .frequency_domain_spike_detection import FrequencyDomainSpikeDetector
 from .utils import (
     get_temp_directory,
     set_temp_directory,
-    parse_path_to_animalday,
     validate_timestamps,
     nanaverage,
     resolve_channel,
@@ -119,7 +118,6 @@ __all__ = [
     "convert_ddfrowbin_to_si",
     "get_temp_directory",
     "set_temp_directory",
-    "parse_path_to_animalday",
     "validate_timestamps",
     "nanaverage",
     "resolve_channel",

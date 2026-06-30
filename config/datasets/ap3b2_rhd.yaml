@@ -67,7 +67,7 @@ samples_data:
     - D-021
   animals:
   - id: AP3B2het-207-M
-    gene: HET
+    genotype: HET
     sex: Male
     channel_subset:
     - A-009
@@ -85,7 +85,7 @@ samples_data:
     - '2025-11-04 10:15:18'
     - '2025-11-05 09:37:29'
   - id: AP3B2wt-206-M
-    gene: WT
+    genotype: WT
     sex: Male
     channel_subset:
     - B-009
@@ -103,7 +103,7 @@ samples_data:
     - '2025-11-04 10:15:18'
     - '2025-11-05 09:37:29'
   - id: AP3B2homo-228-M
-    gene: HOMO
+    genotype: HOMO
     sex: Male
     channel_subset:
     - A-009
@@ -123,7 +123,7 @@ samples_data:
     - '2025-11-09 12:26:28'
     - '2025-11-10 11:28:26'
   - id: AP3B2wt-247-F
-    gene: WT
+    genotype: WT
     sex: Female
     channel_subset:
     - A-009
@@ -142,7 +142,7 @@ samples_data:
     - '2025-11-23 11:45:27'
     - '2025-11-24 10:40:00'
   - id: AP3B2homo-275-F
-    gene: HOMO
+    genotype: HOMO
     sex: Female
     channel_subset:
     - B-009
@@ -161,7 +161,7 @@ samples_data:
     - '2025-11-23 11:45:27'
     - '2025-11-24 10:40:00'
   - id: AP3B2wt-246-F
-    gene: WT
+    genotype: WT
     sex: Female
     channel_subset:
     - C-009
@@ -180,7 +180,7 @@ samples_data:
     - '2025-11-23 11:45:27'
     - '2025-11-24 10:40:00'
   - id: AP3B2homo-240-M
-    gene: HOMO
+    genotype: HOMO
     sex: Male
     channel_subset:
     - A-009
@@ -198,7 +198,7 @@ samples_data:
     - '2025-11-27 15:39:05'
     - '2025-11-28 11:47:05'
   - id: AP3B2wt-241-M
-    gene: WT
+    genotype: WT
     sex: Male
     channel_subset:
     - B-009
@@ -216,7 +216,7 @@ samples_data:
     - '2025-11-27 15:39:05'
     - '2025-11-28 11:47:05'
   - id: AP3B2het-221-M
-    gene: HET
+    genotype: HET
     sex: Male
     channel_subset:
     - A-009
@@ -236,7 +236,7 @@ samples_data:
     - '2025-12-07 13:15:45'
     - '2025-12-08 11:08:18'
   - id: AP3B2het-222-M
-    gene: HET
+    genotype: HET
     sex: Male
     channel_subset:
     - B-009
@@ -256,7 +256,7 @@ samples_data:
     - '2025-12-07 13:15:45'
     - '2025-12-08 11:08:18'
   - id: AP3B2-264or265-M
-    gene: UNKNOWN
+    genotype: UNKNOWN
     sex: Male
     channel_subset:
     - C-009
@@ -276,7 +276,7 @@ samples_data:
     - '2025-12-07 13:15:45'
     - '2025-12-08 11:08:18'
   - id: AP3B2wt-243-M
-    gene: WT
+    genotype: WT
     sex: Male
     channel_subset:
     - D-009
@@ -296,7 +296,7 @@ samples_data:
     - '2025-12-07 13:15:45'
     - '2025-12-08 11:08:18'
   - id: AP3B2wt-202-F
-    gene: WT
+    genotype: WT
     sex: Female
     channel_subset:
     - A-009
@@ -317,7 +317,7 @@ samples_data:
     - '2025-12-15 12:22:03'
     - '2025-12-16 14:34:20'
   - id: AP3B2homo-203-F
-    gene: HOMO
+    genotype: HOMO
     sex: Female
     channel_subset:
     - B-009
@@ -338,7 +338,7 @@ samples_data:
     - '2025-12-15 12:22:03'
     - '2025-12-16 14:34:20'
   - id: AP3B2het-237-F
-    gene: HET
+    genotype: HET
     sex: Female
     channel_subset:
     - C-009
@@ -359,7 +359,7 @@ samples_data:
     - '2025-12-15 12:22:03'
     - '2025-12-16 14:34:20'
   - id: AP3B2het-239-F
-    gene: HET
+    genotype: HET
     sex: Female
     channel_subset:
     - D-009
@@ -379,7 +379,7 @@ samples_data:
     - '2025-12-13 14:08:42'
     - '2025-12-15 12:22:03'
   - id: AP3B2het-280-F
-    gene: HET
+    genotype: HET
     sex: Female
     channel_subset:
     - A-009
@@ -398,7 +398,7 @@ samples_data:
     - '2025-12-20 14:49:35'
     - '2025-12-21 12:55:11'
   - id: AP3B2het-271-F
-    gene: HET
+    genotype: HET
     sex: Female
     channel_subset:
     - B-009
@@ -417,7 +417,7 @@ samples_data:
     - '2025-12-20 14:49:35'
     - '2025-12-21 12:55:11'
   - id: AP3B2wt236-F
-    gene: WT
+    genotype: WT
     sex: Female
     channel_subset:
     - C-009

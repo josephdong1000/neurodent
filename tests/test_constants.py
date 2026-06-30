@@ -12,12 +12,11 @@ from neurodent import constants
 class TestConstants:
     """Test constants module functionality."""
 
-    def test_genotype_aliases(self):
-        """Test GENOTYPE_ALIASES mapping."""
-        assert "WT" in constants.GENOTYPE_ALIASES
-        assert "KO" in constants.GENOTYPE_ALIASES
-        assert constants.GENOTYPE_ALIASES["WT"] == ["WT", "wildtype"]
-        assert constants.GENOTYPE_ALIASES["KO"] == ["KO", "knockout"]
+    def test_genotype_map_default_empty(self):
+        """GENOTYPE_MAP defaults to empty (passthrough) and SEX_MAP covers M/F."""
+        assert constants.GENOTYPE_MAP == {}
+        assert "Male" in constants.SEX_MAP
+        assert "Female" in constants.SEX_MAP
 
     def test_channel_aliases(self):
         """Test CHANNEL_MAP: the flat channel-identity source of truth."""

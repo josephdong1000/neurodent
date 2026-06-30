@@ -264,7 +264,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         from neurodent import constants
 
         self.genotype = (
-            constants.ANIMAL_METADATA.get(self.animal_id, {}).get("gene", "Unknown")
+            constants.ANIMAL_METADATA.get(self.animal_id, {}).get("genotype", "Unknown")
             if self.animal_id
             else "Unknown"
         )
@@ -1982,7 +1982,7 @@ class AnimalOrganizer(AnimalFeatureParser):
             meta = item.metadata
             animal = meta.get("animal", animal)
             session = meta.get("session")
-            genotype = constants.ANIMAL_METADATA.get(animal, {}).get("gene", genotype)
+            genotype = constants.ANIMAL_METADATA.get(animal, {}).get("genotype", genotype)
             sex = constants.ANIMAL_METADATA.get(animal, {}).get("sex", sex)
 
         if session is None:
@@ -2529,14 +2529,14 @@ class WindowAnalysisResult(AnimalFeatureParser):
         ``apply_samples_config``), the baked values are left untouched. A metadata
         field that is ``None`` does not overwrite a baked value.
 
-        Note: the ``ANIMAL_METADATA`` key is ``"gene"`` (the config field name); the
-        WAR's canonical attribute/column is ``"genotype"``.
+        Note: the ``ANIMAL_METADATA`` key and the WAR's canonical attribute/column are
+        both ``"genotype"``.
         """
         animal_id = self.animal_id
         if animal_id is None or animal_id not in constants.ANIMAL_METADATA:
             return
         meta = constants.ANIMAL_METADATA[animal_id]
-        for attr, new_val in (("genotype", meta.get("gene")), ("sex", meta.get("sex"))):
+        for attr, new_val in (("genotype", meta.get("genotype")), ("sex", meta.get("sex"))):
             if new_val is None:
                 continue  # don't overwrite a baked value with None
             old_val = getattr(self, attr, None)

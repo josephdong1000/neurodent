@@ -39,7 +39,7 @@ def test_ao_grouping_logic(mock_overlap_structure, monkeypatch):
     """
     Test how AO groups these specific files.
     """
-    monkeypatch.setattr("neurodent.constants.GENOTYPE_ALIASES", MOCK_ALIASES)
+    monkeypatch.setattr("neurodent.constants.GENOTYPE_MAP", MOCK_ALIASES)
     # Mock LRO creation to avoid reading actual files
     monkeypatch.setattr(results.AnimalOrganizer, "_create_long_recordings", lambda self, kw: None)
 
