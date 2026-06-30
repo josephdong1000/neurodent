@@ -10,7 +10,8 @@ active_dataset: "sox5_bin"
 temp_directory: "/scr1/users/dongjp"
 
 # Sample configuration
-# Note: samples_file is set by active_dataset (see datasets section above)
+# Note: the per-dataset samples inventory is inlined under `samples_data` in each
+# config/datasets/{active_dataset}.yaml (deep-merged in by the Snakefile).
 samples:
   # Limit to first N animals (null = no limit, useful for testing)
   truncate_animals: null

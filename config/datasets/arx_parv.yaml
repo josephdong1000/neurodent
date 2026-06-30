@@ -833,4 +833,3 @@ samples_data:
       lro_kwargs:
         mode: mne
         extract_func: read_raw_edf
-  bad_folder_animalday: []
