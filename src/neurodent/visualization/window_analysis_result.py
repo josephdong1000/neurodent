@@ -1,0 +1,2550 @@
+"""Windowed feature analysis results.
+
+``WindowAnalysisResult`` wraps the windowed feature DataFrame produced by
+:meth:`neurodent.visualization.animal_organizer.AnimalOrganizer.compute_windowed_analysis`
+and provides filtering, aggregation, serialization, and LOF utilities.
+
+Split out of the former monolithic ``results.py`` (issue #134).
+"""
+
+import copy
+import glob
+import json
+import logging
+import re
+import time
+import warnings
+from pathlib import Path
+from typing import Any, Callable, Literal, TYPE_CHECKING
+
+import mne
+import numpy as np
+import pandas as pd
+
+if TYPE_CHECKING:
+    from .frequency_domain_results import FrequencyDomainSpikeAnalysisResult
+
+from .. import constants, core
+from ..core.utils import atomic_output_path, atomic_write_json, resolve_channel, slugify
+from .feature_utils import extract_linear_array, average_feature
+from .feature_handlers import handler_for
+from .filters import (
+    FILTER_REGISTRY,
+    ChannelInfo,
+    FilterScope,
+    update_bad_channels_dict_from_config,
+)
+
+
+_WRAPPER_METHOD_NAMES: dict[str, str] = {
+    "logrms_range": "get_filter_logrms_range",
+    "high_rms": "get_filter_high_rms",
+    "low_rms": "get_filter_low_rms",
+    "high_beta": "get_filter_high_beta",
+    "reject_channels": "get_filter_reject_channels",
+    "reject_channels_by_session": "get_filter_reject_channels_by_recording_session",
+    "morphological_smoothing": "get_filter_morphological_smoothing",
+}
+
+
+def _column_needs_encoding(col_name: str) -> bool:
+    """Return True iff *col_name* is a WAR feature column whose cells hold
+    nested values (list, dict, tuple, ndarray).
+
+    Every feature column qualifies — LINEAR cells are stored as a list of C
+    scalars per row, BAND cells as a dict-of-lists, HIST cells as a tuple of
+    arrays, etc.  Non-feature columns (animal, animalday, timestamp, duration,
+    endfile, …) are scalar per row and skip the nested-encoding path.
+
+    Uses :data:`constants.FEATURE_TYPES` as the schema source of truth, so new
+    ``FeatureType`` additions are picked up without changing this code.
+    """
+    return col_name in constants.FEATURE_TYPES
+
+
+def _sanitize_feature_request(
+    features: list[str] | str | None, exclude: list[str] | str = []
+):
+    """
+    Sanitizes a list of requested features for WindowAnalysisResult
+
+    Args:
+        features (list[str] | str | None): List of features to include, a single feature
+            name as a string, or None to include all features. If ``"all"``, include all
+            features in constants.FEATURES except for those in ``exclude``.
+        exclude (list[str] | str, optional): Feature or list of features to exclude.
+            Defaults to [].
+
+    Returns:
+        list[str]: Sanitized list of features.
+    """
+    if features is None:
+        features = ["all"]
+    if isinstance(features, str):
+        features = [features]
+    if isinstance(exclude, str):
+        exclude = [exclude]
+    if features == ["all"]:
+        feat = copy.deepcopy(constants.FEATURES)
+    elif not features:
+        raise ValueError("Features cannot be empty")
+    else:
+        if not all(f in constants.FEATURES for f in features):
+            raise ValueError(f"Available features are: {constants.FEATURES}")
+        feat = copy.deepcopy(features)
+    if exclude is not None:
+        for e in exclude:
+            try:
+                feat.remove(e)
+            except ValueError:
+                pass
+    return feat
+
+
+class WindowAnalysisResult:
+    """
+    Wrapper for output of windowed analysis. Has useful functions like group-wise and global averaging, filtering, and saving
+
+    Args:
+        result (pd.DataFrame): Result comes from AnimalOrganizer.compute_windowed_analysis()
+        animal_id (str, optional): Identifier for the animal where result was computed from. Defaults to None.
+        genotype (str, optional): Genotype of animal. Defaults to None.
+        channel_names (list[str], optional): The recording's channel labels (raw names as
+            they appear in the data). Defaults to None.
+        bad_channels_dict (dict[str, list[str]], optional): Dictionary of channels to reject for each recording session. Defaults to {}.
+        suppress_short_interval_error (bool, optional): If True, suppress ValueError for short intervals between timestamps. Useful for aggregated WARs with large window sizes. Defaults to False.
+
+    Attributes:
+        result (pd.DataFrame): DataFrame containing the windowed analysis results.
+        animal_id (str): Identifier for the animal.
+        genotype (str): Genotype of the animal.
+        channel_names (list[str]): The *current working* channel labels — the raw names at
+            construction, or the canonical abbreviations after :meth:`reorder_and_pad_channels`
+            is run with ``use_abbrevs=True``.
+        channel_abbrevs (list[str]): The canonical channel abbreviations, always derived from
+            ``channel_names`` via :func:`~neurodent.core.resolve_channel` (exact lookup).
+        bad_channels_dict (dict): Dictionary mapping sessions to bad channel names.
+        lof_scores_dict (dict): Dictionary of LOF scores for outage detection.
+    """
+
+    def __init__(
+        self,
+        result: pd.DataFrame,
+        animal_id: str = None,
+        genotype: str = None,
+        sex: str = "Unknown",
+        channel_names: list[str] = None,
+        bad_channels_dict: dict[str, list[str]] = {},
+        suppress_short_interval_error=False,
+        lof_scores_dict: dict[str, dict] = {},
+    ) -> None:
+        self.result = result
+        self.animal_id = animal_id
+        self.genotype = genotype
+        self.sex = sex
+        self.channel_names = channel_names
+        self.bad_channels_dict = bad_channels_dict.copy()
+        self.suppress_short_interval_error = suppress_short_interval_error
+        self.lof_scores_dict = lof_scores_dict
+
+        self._update_instance_vars()
+
+        # Single source of truth: re-enrich sex/genotype from the active config
+        # (constants.ANIMAL_METADATA) so every WAR construction — generation, disk
+        # load, copy — yields metadata consistent with the config.
+        self._enrich_metadata_from_constants()
+
+        logging.info(f"Channel names: \t{self.channel_names}")
+        logging.info(f"Channel abbreviations: \t{self.channel_abbrevs}")
+
+    def _enrich_metadata_from_constants(self) -> None:
+        """Overwrite ``sex``/``genotype`` from ``constants.ANIMAL_METADATA``.
+
+        Makes the dataset config (loaded into ``constants.ANIMAL_METADATA`` by
+        ``apply_samples_config``) the single source of truth for per-animal
+        metadata, applied identically to ``sex`` and ``genotype`` at every WAR
+        construction. Updates BOTH the object attributes AND the per-row
+        ``result["sex"]``/``result["genotype"]`` columns (downstream renderers read
+        the columns, not the attributes).
+
+        Guarded for portability: if the animal is absent from
+        ``constants.ANIMAL_METADATA`` (e.g. a standalone load without
+        ``apply_samples_config``), the baked values are left untouched. A metadata
+        field that is ``None`` does not overwrite a baked value.
+
+        Note: the ``ANIMAL_METADATA`` key and the WAR's canonical attribute/column are
+        both ``"genotype"``.
+        """
+        animal_id = self.animal_id
+        if animal_id is None or animal_id not in constants.ANIMAL_METADATA:
+            return
+        meta = constants.ANIMAL_METADATA[animal_id]
+        for attr, new_val in (("genotype", meta.get("genotype")), ("sex", meta.get("sex"))):
+            if new_val is None:
+                continue  # don't overwrite a baked value with None
+            old_val = getattr(self, attr, None)
+            if old_val != new_val:
+                logging.info(f"Re-enriched {animal_id}: {attr} {old_val!r} -> {new_val!r}")
+            setattr(self, attr, new_val)
+            if isinstance(self.result, pd.DataFrame):
+                self.result[attr] = new_val
+
+    def __str__(self) -> str:
+        return f"{self.animaldays}"
+
+    def copy(self):
+        """
+        Create a deep copy of the WindowAnalysisResult object.
+
+        Returns:
+            WindowAnalysisResult: A deep copy of the current instance with all attributes copied.
+        """
+        return WindowAnalysisResult(
+            result=self.result.copy(deep=True),
+            animal_id=self.animal_id,
+            genotype=self.genotype,
+            sex=self.sex,
+            channel_names=(
+                self.channel_names.copy() if self.channel_names is not None else None
+            ),
+            bad_channels_dict=copy.deepcopy(self.bad_channels_dict),
+            suppress_short_interval_error=self.suppress_short_interval_error,
+            lof_scores_dict=copy.deepcopy(self.lof_scores_dict),
+        )
+
+    @classmethod
+    def _from_existing(
+        cls, source: "WindowAnalysisResult", result: pd.DataFrame
+    ) -> "WindowAnalysisResult":
+        """Create a new WindowAnalysisResult by copying metadata from an existing instance.
+
+        This is a shallow copy path: it reuses the source's metadata (animal_id, genotype,
+        channel_names, etc.) with a new result DataFrame, without re-running __init__ logging.
+        Used by filtering methods to avoid redundant log output during chained operations.
+
+        Args:
+            source: The existing WindowAnalysisResult to copy metadata from.
+            result: The new result DataFrame for the new instance.
+
+        Returns:
+            A new WindowAnalysisResult with the given result and source's metadata.
+        """
+        new_war = cls.__new__(cls)
+        new_war.result = result
+        new_war.animal_id = source.animal_id
+        new_war.genotype = source.genotype
+        new_war.sex = source.sex
+        new_war.channel_names = source.channel_names
+        new_war.bad_channels_dict = source.bad_channels_dict.copy()
+        new_war.suppress_short_interval_error = source.suppress_short_interval_error
+        new_war.lof_scores_dict = source.lof_scores_dict.copy()
+        new_war._update_instance_vars()
+        return new_war
+
+    def _update_instance_vars(self):
+        """Run after updating self.result, or other init values"""
+        if "index" in self.result.columns:
+            warnings.warn("Dropping column 'index'")
+            self.result = self.result.drop(columns=["index"])
+
+        # Check if timestamps are sorted and sort if needed
+        if "timestamp" in self.result.columns:
+            if not self.result["timestamp"].is_monotonic_increasing:
+                warnings.warn(
+                    "Timestamps are not sorted. Sorting result DataFrame by timestamp."
+                )
+                self.result = self.result.sort_values("timestamp")
+
+        # Check for unusually short intervals between timestamps
+        if "timestamp" in self.result.columns and "duration" in self.result.columns:
+            median_duration = self.result["duration"].median()
+            timestamp_diffs = self.result["timestamp"].diff()
+            short_intervals = timestamp_diffs < pd.Timedelta(seconds=median_duration)
+
+            # Skip first row since diff() produces NaT
+            short_intervals = short_intervals[1:]
+
+            if short_intervals.any():
+                n_short = short_intervals.sum()
+                pct_short = (n_short / len(short_intervals)) * 100
+
+                warning_msg = (
+                    f"Found {n_short} intervals ({pct_short:.1f}%) between timestamps "
+                    f"that are shorter than the median duration of {median_duration:.1f}s"
+                )
+
+                if pct_short > 1.0 and not self.suppress_short_interval_error:
+                    # Build a diagnostic showing the first few overlapping pairs
+                    # so the user can identify which sessions have bad timestamps.
+                    short_positions = np.flatnonzero(short_intervals.to_numpy())[:5]
+                    diag_lines = []
+                    has_animalday = "animalday" in self.result.columns
+                    for pos in short_positions:
+                        # Offset by 1 to map from sliced short_intervals (which
+                        # dropped the first NaT row) back to original DataFrame
+                        # positions. Without this, pos=0 wraps to iloc[-1].
+                        actual_pos = pos + 1
+                        prev_row = self.result.iloc[actual_pos - 1]
+                        curr_row = self.result.iloc[actual_pos]
+                        gap = timestamp_diffs.iloc[actual_pos]
+                        prev_ad = f" ({prev_row['animalday']})" if has_animalday else ""
+                        curr_ad = f" ({curr_row['animalday']})" if has_animalday else ""
+                        diag_lines.append(
+                            f"  {prev_row['timestamp']}{prev_ad} -> "
+                            f"{curr_row['timestamp']}{curr_ad}: gap={gap}"
+                        )
+                    diag = "\n".join(diag_lines)
+                    raise ValueError(
+                        f"{warning_msg}\n"
+                        f"First overlapping pairs (of {n_short} total):\n{diag}\n"
+                        f"Hint: if using datetimes_are_start=False, the backward "
+                        f"computation assumes contiguous files. Large gaps between "
+                        f"files in a session will push computed start times too far "
+                        f"back, overlapping adjacent sessions. Consider providing "
+                        f"per-file timestamps or set suppress_short_interval_error=True "
+                        f"to downgrade this to a warning."
+                    )
+                elif not self.suppress_short_interval_error:
+                    warnings.warn(warning_msg)
+
+        if "animal" in self.result.columns:
+            unique_animals = self.result["animal"].unique()
+            if len(unique_animals) > 1:
+                raise ValueError(f"Multiple animals found in result: {unique_animals}")
+            if unique_animals[0] != self.animal_id:
+                raise ValueError(
+                    f"Animal ID mismatch: result has {unique_animals[0]}, but self.animal_id is {self.animal_id}"
+                )
+
+        self._feature_columns = [
+            x for x in self.result.columns if x in constants.FEATURES
+        ]
+        self._nonfeature_columns = [
+            x for x in self.result.columns if x not in constants.FEATURES
+        ]
+        self.animaldays = self.result.loc[:, "animalday"].unique()
+
+        # Ensure bad_channels_dict and lof_scores_dict have entries for all animaldays
+        # This fixes the issue where windowed analysis creates per-date animaldays
+        # but bad_channels_dict only has LRO-level (per-folder) entries
+        for animalday in self.animaldays:
+            if animalday not in self.bad_channels_dict:
+                # Add missing animalday with empty bad channels list
+                self.bad_channels_dict[animalday] = []
+                logging.info(
+                    f"Added missing animalday to bad_channels_dict: {animalday}"
+                )
+
+            if animalday not in self.lof_scores_dict:
+                # Add missing animalday with empty LOF scores
+                # NOTE: Both lof_scores AND channel_names must be empty to maintain invariant!
+                self.lof_scores_dict[animalday] = {
+                    "lof_scores": [],
+                    "channel_names": [],  # Must be empty to match empty lof_scores!
+                }
+                logging.warning(
+                    f"Added missing animalday to lof_scores_dict: {animalday}. "
+                    f"This indicates LOF scores were not computed for this session. "
+                    f"It will be excluded from LOF-based analysis."
+                )
+
+        try:
+            self.channel_abbrevs = [
+                core.resolve_channel(x)
+                for x in self.channel_names
+            ]
+        except (ValueError, KeyError) as e:
+            raise type(e)(
+                f"{e}\n\nChannel names in data: {self.channel_names}"
+            ) from e
+
+    def reorder_and_pad_channels(
+        self, target_channels: list[str] | None = None, use_abbrevs: bool = True, inplace: bool = True
+    ) -> pd.DataFrame:
+        """Reorder and pad channels to match a target channel list.
+
+        This method ensures that the data has a consistent channel order and structure
+        by reordering existing channels and padding missing channels with NaNs. Channels
+        present in the data but **absent from** ``target_channels`` are dropped; a warning
+        names them so a montage gap can never silently discard data.
+
+        Args:
+            target_channels (list[str], optional): List of target channel names to match.
+                Defaults to :data:`neurodent.constants.CHANNEL_ABBREVS` (the canonical
+                channel list) when omitted.
+            use_abbrevs (bool, optional): If True, target channel names are read as channel abbreviations instead of channel names. Defaults to True.
+            inplace (bool, optional): If True, modify the result in place. Defaults to True.
+        Returns:
+            pd.DataFrame: DataFrame with reordered and padded channels
+        """
+        if target_channels is None:
+            target_channels = list(constants.CHANNEL_ABBREVS)
+
+        duplicates = [ch for ch in target_channels if target_channels.count(ch) > 1]
+        if duplicates:
+            raise ValueError(
+                f"Target channels must be unique. Found duplicates: {duplicates}"
+            )
+
+        if inplace:
+            result = self.result
+        else:
+            result = self.result.copy()
+
+        channel_map = {ch: i for i, ch in enumerate(target_channels)}
+        channel_names = self.channel_names if not use_abbrevs else self.channel_abbrevs
+
+        valid_channels = [ch for ch in channel_names if ch in channel_map]
+        if not valid_channels:
+            warnings.warn(
+                f"None of the channel names {channel_names} were found in target channels {target_channels}. Is use_abbrevs correctly set?"
+            )
+        else:
+            dropped = [ch for ch in channel_names if ch not in channel_map]
+            if dropped:
+                warnings.warn(
+                    f"Standardization dropping channels not in the target montage: {dropped}. "
+                    f"Target channels: {target_channels}. Add them to the channel config "
+                    f"(CHANNEL_MAP / `channels`) if this data should be kept."
+                )
+
+        for feature in self._feature_columns:
+            handler = handler_for(feature)
+            result[feature] = handler.reorder_pad(
+                result[feature], channel_map, list(channel_names), target_channels
+            )
+
+        if inplace:
+            self.result = result
+
+            logging.debug(f"Old channel names: {self.channel_names}")
+            self.channel_names = target_channels
+            logging.debug(f"New channel names: {self.channel_names}")
+
+            logging.debug(f"Old channel abbreviations: {self.channel_abbrevs}")
+            self._update_instance_vars()
+            logging.debug(f"New channel abbreviations: {self.channel_abbrevs}")
+
+        return result
+
+    def select_channels(
+        self,
+        channels: list[str],
+        use_abbrevs: bool = True,
+        inplace: bool = True,
+    ) -> pd.DataFrame:
+        """Subset and reorder the WAR's channels to *channels*.
+
+        Every name in *channels* must be present in the WAR's current
+        channel list; missing names raise.  Source channels not in
+        *channels* are dropped.  Args mirror
+        :meth:`reorder_and_pad_channels` — use that one if you want
+        NaN-padding for missing target channels.
+
+        Raises:
+            ValueError: if any name in *channels* is not present.
+        """
+        available = self.channel_abbrevs if use_abbrevs else self.channel_names
+        missing = [c for c in channels if c not in available]
+        if missing:
+            raise ValueError(
+                f"Requested channels not present in WAR (use "
+                f"reorder_and_pad_channels for NaN-padding behaviour): "
+                f"{missing}. Available: {list(available)}"
+            )
+        return self.reorder_and_pad_channels(
+            channels, use_abbrevs=use_abbrevs, inplace=inplace
+        )
+
+    def read_sars_spikes(
+        self,
+        sars: list["FrequencyDomainSpikeAnalysisResult"],
+        read_mode: Literal["sa", "mne"] = "sa",
+        inplace=True,
+    ):
+        """
+        Integrate spike analysis results into WAR by adding nspike/lognspike features.
+
+        This method extracts spike timing information from spike detection results and bins
+        them according to the WAR's time windows, adding spike count features to each row.
+
+        Args:
+            sars: List of FrequencyDomainSpikeAnalysisResult objects.
+                  One result per recording session (animalday).
+            read_mode: Mode for extracting spike data:
+                - "sa": Read from SortingAnalyzer objects (result_sas attribute)
+                - "mne": Read from MNE RawArray objects (result_mne attribute)
+            inplace: If True, modifies self.result and returns self.
+                    If False, returns a new WindowAnalysisResult.
+
+        Returns:
+            WindowAnalysisResult: WAR object with added spike features (nspike, lognspike).
+                - If inplace=True: returns self with modified result DataFrame
+                - If inplace=False: returns new WAR object with enhanced result DataFrame
+
+        Notes:
+            - The number of sars must match the number of unique animaldays in self.result
+            - Spikes are binned into time windows matching the existing WAR fragments
+            - nspike: array of spike counts per channel for each time window
+            - lognspike: log-transformed spike counts using core.log_transform()
+
+        Example:
+            >>> # After computing WAR and spike detection
+            >>> enhanced_war = war.read_sars_spikes(fdsar_list, read_mode="sa", inplace=False)
+            >>> enhanced_war.result['nspike']  # Spike counts per channel per window
+        """
+        match read_mode:
+            case "sa":
+                spikes_all = []
+                for sar in sars:  # for each continuous recording session
+                    spikes_channel = []
+                    for i, sa in enumerate(sar.result_sas):  # for each channel
+                        spike_times = []
+                        for unit in sa.sorting.get_unit_ids():  # Flatten units
+                            spike_times.extend(
+                                sa.sorting.get_unit_spike_train(unit_id=unit).tolist()
+                            )
+                        spike_times = (
+                            np.array(spike_times) / sa.sorting.get_sampling_frequency()
+                        )
+                        spikes_channel.append(spike_times)
+                    spikes_all.append(spikes_channel)
+                return self._read_from_spikes_all(spikes_all, inplace=inplace)
+            case "mne":
+                raws = [sar.result_mne for sar in sars]
+                return self.read_mnes_spikes(raws, inplace=inplace)
+            case _:
+                raise ValueError(f"Invalid read_mode: {read_mode}")
+
+    def read_mnes_spikes(self, raws: list[mne.io.RawArray], inplace=True):
+        """
+        Extract spike features from MNE RawArray objects with spike annotations.
+
+        This method extracts spike timing from MNE annotations (where spikes are marked
+        with channel-specific event labels) and bins them into WAR time windows.
+
+        Args:
+            raws: List of MNE RawArray objects with spike annotations. One per recording
+                  session (animalday). Each should have annotations with channel names
+                  as event labels (e.g., 'LMot', 'RMot', etc.).
+            inplace: If True, modifies self.result and returns self.
+                    If False, returns a new WindowAnalysisResult.
+
+        Returns:
+            WindowAnalysisResult: WAR object with added spike features (nspike, lognspike).
+
+        Notes:
+            - Expects MNE annotations with channel names as event descriptions
+            - Spike times are extracted from event onsets and binned to WAR windows
+            - Channels not found in annotations will have empty spike arrays
+            - Delegates to _read_from_spikes_all() for the actual binning logic
+
+        Example:
+            >>> # From MNE spike annotations
+            >>> enhanced_war = war.read_mnes_spikes([mne_raw1, mne_raw2], inplace=False)
+        """
+        spikes_all = []
+        for raw in raws:
+            # each mne is a contiguous recording session
+            events, event_id = mne.events_from_annotations(raw)
+            event_id = {k.item(): v for k, v in event_id.items()}
+
+            spikes_channel = []
+            for channel in raw.ch_names:
+                if channel not in event_id.keys():
+                    logging.warning(f"Channel {channel} not found in event_id")
+                    spikes_channel.append([])
+                    continue
+                event_id_channel = event_id[channel]
+                spike_times = events[events[:, 2] == event_id_channel, 0]
+                spike_times = spike_times / raw.info["sfreq"]
+                spikes_channel.append(spike_times)
+            spikes_all.append(spikes_channel)
+        return self._read_from_spikes_all(spikes_all, inplace=inplace)
+
+    def _read_from_spikes_all(self, spikes_all: list[list[list[float]]], inplace=True):
+        """
+        Internal method to bin spike times into WAR time windows and add as features.
+
+        This is the common endpoint for both read_sars_spikes() and read_mnes_spikes().
+        It bins spike times according to the WAR's time windows and adds nspike/lognspike
+        features to the result DataFrame.
+
+        Args:
+            spikes_all: Nested list structure of spike times in seconds:
+                - Outer list: recording sessions (one per animalday)
+                - Middle list: channels (one per EEG channel)
+                - Inner list/array: spike times in seconds for that channel
+                Example: [[[0.5, 1.2], [0.8]], [[1.1, 2.3], []]]
+                         = 2 sessions, 2 channels each
+            inplace: If True, modifies self.result and returns self.
+                    If False, returns a new WindowAnalysisResult with enhanced data.
+
+        Returns:
+            WindowAnalysisResult: WAR object with spike features added to result DataFrame.
+
+        Notes:
+            - Groups self.result by 'animalday' and matches to spikes_all by index
+            - Uses _bin_spike_df() helper to count spikes within each time window
+            - Adds two new columns:
+                - 'nspike': array of spike counts per channel for each window
+                - 'lognspike': log-transformed spike counts via core.log_transform()
+            - Warns if spike count size doesn't match result DataFrame size
+        """
+        # Each groupby animalday is a recording session
+        grouped = self.result.groupby("animalday")
+        animaldays = grouped.groups.keys()
+        logging.debug(f"Animal days: {animaldays}")
+        spike_counts = dict(zip(animaldays, spikes_all))
+        spike_counts = grouped.apply(
+            lambda x: _bin_spike_df(x, spikes_channel=spike_counts[x.name])
+        )
+        spike_counts: pd.Series = spike_counts.explode()
+
+        if spike_counts.size != self.result.shape[0]:
+            logging.warning(
+                f"Spike counts size {spike_counts.size} does not match result size {self.result.shape[0]}"
+            )
+
+        result = self.result.copy()
+        result["nspike"] = spike_counts.tolist()
+        result["lognspike"] = list(
+            core.log_transform(np.stack(result["nspike"].tolist(), axis=0))
+        )
+        if inplace:
+            self.result = result
+            return self
+        else:
+            # Create a new WindowAnalysisResult
+            new_war = copy.deepcopy(self)
+            new_war.result = result
+            return new_war
+
+    def get_info(self):
+        """Returns a formatted string with basic information about the WindowAnalysisResult object"""
+        info = []
+        info.append(f"feature names: {', '.join(self._feature_columns)}")
+        info.append(f"animaldays: {', '.join(self.result['animalday'].unique())}")
+        info.append(
+            f"animal_id: {self.result['animal'].unique()[0] if 'animal' in self.result.columns else self.animal_id}"
+        )
+        info.append(
+            f"genotype: {self.result['genotype'].unique()[0] if 'genotype' in self.result.columns else self.genotype}"
+        )
+        info.append(f"sex: {self.sex}")
+        info.append(
+            f"channel_names: {', '.join(self.channel_names) if self.channel_names else 'None'}"
+        )
+
+        return "\n".join(info)
+
+    def get_result(
+        self,
+        features: list[str] | str | None = None,
+        exclude: list[str] | str = [],
+        allow_missing=False,
+    ):
+        """Get windowed analysis result dataframe, with helpful filters
+
+        Args:
+            features (list[str] | str | None, optional): Feature name, list of feature names,
+                or None to return all features. Defaults to None (all features).
+            exclude (list[str] | str, optional): Feature name or list of feature names to
+                exclude from result; will override the features parameter. Defaults to [].
+            allow_missing (bool, optional): If True, will return all requested features as columns regardless if they exist in result. Defaults to False.
+
+        Returns:
+            pd.DataFrame: DataFrame with features in columns and windows in rows
+        """
+        features = _sanitize_feature_request(features, exclude)
+        if not allow_missing:
+            return self.result.loc[:, self._nonfeature_columns + features]
+        else:
+            return self.result.reindex(columns=self._nonfeature_columns + features)
+
+    def get_groupavg_result(
+        self,
+        features: list[str] | str | None = None,
+        exclude: list[str] | str = [],
+        df: pd.DataFrame = None,
+        groupby="animalday",
+    ):
+        """Group result and average within groups. Preserves data structure and shape for each feature.
+
+        Args:
+            features (list[str] | str | None, optional): Feature name, list of feature names,
+                or None to return all features. Defaults to None (all features).
+            exclude (list[str] | str, optional): Feature name or list of feature names to
+                exclude from result. Will override the features parameter. Defaults to [].
+            df (pd.DataFrame, optional): If not None, this function will use this dataframe instead of self.result. Defaults to None.
+            groupby (str, optional): Feature or list of features to group by before averaging. Passed to the `by` parameter in pd.DataFrame.groupby(). Defaults to "animalday".
+
+        Returns:
+            pd.DataFrame: Result grouped by `groupby` and averaged for each group.
+        """
+        result_grouped, result_validcols = self.__get_groups(
+            features=features, exclude=exclude, df=df, groupby=groupby
+        )
+        features = _sanitize_feature_request(features, exclude)
+
+        avg_results = []
+        for f in features:
+            if f in result_validcols:
+                avg_result_col = result_grouped.apply(
+                    average_feature, f, "duration", include_groups=False
+                )
+                avg_result_col.name = f
+                avg_results.append(avg_result_col)
+            else:
+                logging.warning(f"{f} not calculated, skipping")
+
+        return pd.concat(avg_results, axis=1)
+
+    def __get_groups(
+        self,
+        features: list[str] | str | None = None,
+        exclude: list[str] | str = [],
+        df: pd.DataFrame = None,
+        groupby="animalday",
+    ):
+        features = _sanitize_feature_request(features, exclude)
+        result_win = self.result if df is None else df
+        return result_win.groupby(groupby), result_win.columns
+
+    def get_grouprows_result(
+        self,
+        features: list[str] | str | None = None,
+        exclude: list[str] | str = [],
+        df: pd.DataFrame = None,
+        multiindex=["animalday", "animal", "genotype"],
+        include=["duration", "endfile"],
+    ):
+        features = _sanitize_feature_request(features, exclude)
+        result_win = self.result if df is None else df
+        result_win = result_win.filter(features + multiindex + include)
+        return result_win.set_index(multiindex)
+
+    def get_channel_averaged_result(
+        self,
+        features: list[str] | str | None = None,
+        exclude: list[str] | str = [],
+        df: pd.DataFrame = None,
+    ) -> pd.DataFrame:
+        """Get windowed analysis result with features averaged across channels.
+
+        This method collapses the channel dimension for all requested features,
+        converting multi-channel data to scalar values per time window. It handles
+        three types of features differently:
+
+        1. **Linear features** (logrms, rms, etc.): Simple average across channels
+        2. **Band features** (logpsdband, logpsdfrac, etc.): Extracts each frequency
+           band (delta, theta, alpha, beta, gamma) and averages across channels.
+           Creates columns like: logpsdband_delta, logpsdband_theta, etc.
+        3. **Matrix features** (zcohere, zimcoh, cohere, imcoh): Extracts each
+           frequency band's connectivity matrix and averages the upper triangle
+           (excluding diagonal). Creates columns like: zcohere_delta, zcohere_theta, etc.
+
+        Args:
+            features (list[str] | str | None, optional): Feature name, list of feature names,
+                or None to return all features. Can include any combination of linear, band,
+                or matrix features. Defaults to None (all features).
+            exclude (list[str] | str, optional): Feature name or list of feature names to
+                exclude. Defaults to [].
+            df (pd.DataFrame, optional): If provided, use this dataframe instead of
+                self.result. Defaults to None.
+
+        Returns:
+            pd.DataFrame: DataFrame with all features averaged to scalars per time window.
+                - Non-feature columns (timestamp, animalday, etc.) are preserved
+                - Band features expanded to 5 columns per feature (one per frequency band)
+                - Matrix features expanded to 5 columns per feature (one per frequency band)
+                - All feature values are scalars (float)
+
+        Example:
+            >>> war = WindowAnalysisResult.load_parquet_and_json(folder_path, "war.parquet", "war_metadata.json")
+            >>> # Get channel-averaged zeitgeber features
+            >>> df = war.get_channel_averaged_result(["logpsdband", "zcohere", "logrms"])
+            >>> print(df.columns)
+            ['timestamp', 'animalday', 'genotype', 'logrms',
+             'logpsdband_delta', 'logpsdband_theta', 'logpsdband_alpha', 'logpsdband_beta', 'logpsdband_gamma',
+             'zcohere_delta', 'zcohere_theta', 'zcohere_alpha', 'zcohere_beta', 'zcohere_gamma']
+            >>> # All feature values are scalars
+            >>> df['logpsdband_delta'].iloc[0]  # Returns a single float
+
+        Note:
+            This method is designed for temporal analyses (like zeitgeber) where you want
+            to analyze feature trends over time without the channel dimension.
+            For analyses that need channel information, use get_result() instead.
+
+        See Also:
+            - get_result(): Get features with full channel information
+            - get_groupavg_result(): Average features across time windows (preserves channels)
+        """
+        from neurodent import constants
+
+        features = _sanitize_feature_request(features, exclude)
+        result_win = self.result if df is None else df
+
+        # Filter to only features that exist in the dataframe
+        available_features = [f for f in features if f in result_win.columns]
+
+        # Get the base result with requested features
+        df_result = result_win.loc[
+            :, self._nonfeature_columns + available_features
+        ].copy()
+
+        # Classify features by type
+        band_features_in_data = [
+            f for f in available_features if f in constants.BAND_FEATURES
+        ]
+        banded_matrix_features_in_data = [
+            f for f in available_features if f in constants.BANDED_MATRIX_FEATURES
+        ]
+        simple_matrix_features_in_data = [
+            f for f in available_features if f in constants.SIMPLE_MATRIX_FEATURES
+        ]
+        simple_features_in_data = [
+            f for f in available_features if f in constants.LINEAR_FEATURES
+        ]
+        linear_2d_features_in_data = [
+            f for f in available_features if f in constants.LINEAR_2D_FEATURES
+        ]
+
+        # Process band features - extract all 5 bands
+        for band_feature in band_features_in_data:
+            if band_feature in df_result.columns:
+                df_result = self._extract_band_features(
+                    df_result, band_feature, constants.BAND_NAMES
+                )
+
+        # Process banded matrix features - extract all 5 bands
+        for matrix_feature in banded_matrix_features_in_data:
+            if matrix_feature in df_result.columns:
+                df_result = self._extract_banded_matrix_features(
+                    df_result, matrix_feature, constants.BAND_NAMES
+                )
+
+        # Process LINEAR_2D features - split each into one per-component column
+        # (e.g. psdslope -> psdslope_slope + psdslope_intercept) so they can be
+        # channel-averaged to scalars like any LINEAR feature.
+        for linear_2d_feature in linear_2d_features_in_data:
+            if linear_2d_feature in df_result.columns:
+                df_result = self._extract_linear_2d_features(
+                    df_result, linear_2d_feature
+                )
+
+        # Build list of features to average
+        features_to_average = []
+        features_to_average.extend(simple_features_in_data)
+        features_to_average.extend(
+            simple_matrix_features_in_data
+        )  # pcorr, zpcorr (no bands)
+
+        for band_feature in band_features_in_data:
+            for band in constants.BAND_NAMES:
+                features_to_average.append(f"{band_feature}_{band}")
+
+        for matrix_feature in banded_matrix_features_in_data:
+            for band in constants.BAND_NAMES:
+                features_to_average.append(f"{matrix_feature}_{band}")
+
+        # LINEAR_2D features: each gets one per-component expanded column.
+        for linear_2d_feature in linear_2d_features_in_data:
+            for component in constants.COMPONENT_LABELS.get(linear_2d_feature, []):
+                features_to_average.append(f"{linear_2d_feature}_{component}")
+
+        # Average all features across channels
+        df_result = self._average_across_channels(df_result, features_to_average)
+
+        # Drop original band/banded-matrix/linear-2d features (now that
+        # components are extracted into separate columns).  These are no
+        # longer needed and cannot be aggregated (contain dicts/arrays).
+        features_to_drop = (
+            band_features_in_data
+            + banded_matrix_features_in_data
+            + linear_2d_features_in_data
+        )
+        df_result = df_result.drop(columns=features_to_drop, errors="ignore")
+
+        return df_result
+
+    def _extract_band_features(
+        self, df: pd.DataFrame, feature_name: str, band_names: list[str]
+    ) -> pd.DataFrame:
+        """Extract individual frequency bands from band features.
+
+        Band features (logpsdband, logpsdfrac, etc.) are stored as dicts with
+        band names as keys and channel arrays as values.
+
+        Args:
+            df: DataFrame containing the band feature
+            feature_name: Name of the band feature column
+            band_names: List of band names to extract
+
+        Returns:
+            DataFrame with new columns for each band (feature_name_bandname format)
+        """
+        import numpy as np
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        if feature_name not in df.columns:
+            return df
+
+        # Determine number of windows and channels from first element
+        first_element = df[feature_name].iloc[0]
+        if not isinstance(first_element, dict):
+            raise ValueError(
+                f"Band feature {feature_name} must be a dictionary of bands. "
+                f"Got {type(first_element)}. If this is a linear feature, fix constants."
+            )
+
+        # Pre-allocate columns for all expected bands to ensure consistency
+        for band_name in band_names:
+            band_values = []
+            for i, row_dict in enumerate(df[feature_name]):
+                if not isinstance(row_dict, dict):
+                    logger.warning(
+                        f"Row {i} of {feature_name} is not a dict. Using NaNs."
+                    )
+                    band_values.append(np.full(len(self.channel_names), np.nan))
+                    continue
+
+                if band_name in row_dict:
+                    val = row_dict[band_name]
+                    if isinstance(val, list):
+                        val = np.array(val)
+                    band_values.append(val)
+                else:
+                    logger.warning(
+                        f"Band {band_name} missing in {feature_name} at row {i}"
+                    )
+                    band_values.append(np.full(len(self.channel_names), np.nan))
+
+            # Store as list of arrays/values
+            df[f"{feature_name}_{band_name}"] = band_values
+
+        return df
+
+    def _extract_linear_2d_features(
+        self, df: pd.DataFrame, feature_name: str
+    ) -> pd.DataFrame:
+        """Extract individual components from LINEAR_2D features.
+
+        LINEAR_2D features (e.g. ``psdslope``) are stored as 2-D arrays of
+        shape ``(n_channels, n_components)`` per row, where each channel
+        has multiple components (e.g. ``[slope, intercept]`` for psdslope).
+        This method splits each into one per-component column whose cells
+        are per-channel arrays (length ``n_channels``), shaped exactly like
+        a LINEAR feature so :meth:`_average_across_channels` can reduce it
+        to a scalar per row.
+
+        Component names come from
+        :data:`neurodent.constants.COMPONENT_LABELS` (e.g.
+        ``psdslope -> ["slope", "intercept"]``).  The new columns are
+        ``"{feature_name}_{component}"``.
+
+        Args:
+            df: DataFrame containing the LINEAR_2D feature.
+            feature_name: Name of the LINEAR_2D feature column.
+
+        Returns:
+            DataFrame with new per-component columns appended.
+            Unchanged if the feature has no entry in ``COMPONENT_LABELS``.
+        """
+        import numpy as np
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        if feature_name not in df.columns:
+            return df
+
+        component_labels = constants.COMPONENT_LABELS.get(feature_name)
+        if not component_labels:
+            # No labels configured; can't split.  Leave as-is and let
+            # downstream classification skip it.
+            logger.warning(
+                f"LINEAR_2D feature {feature_name!r} has no COMPONENT_LABELS entry; "
+                "channel-averaging will skip it."
+            )
+            return df
+
+        n_components = len(component_labels)
+        for k, component in enumerate(component_labels):
+            col_values = []
+            for i, cell in enumerate(df[feature_name]):
+                arr = np.asarray(cell)
+                if arr.ndim != 2 or arr.shape[1] != n_components:
+                    logger.warning(
+                        f"Row {i} of {feature_name} has unexpected shape "
+                        f"{arr.shape}; expected (n_channels, {n_components}). "
+                        "Using NaNs."
+                    )
+                    col_values.append(
+                        np.full(len(self.channel_names), np.nan)
+                    )
+                    continue
+                # arr[:, k] is the k-th component across all channels —
+                # same shape as a LINEAR feature's row, ready for
+                # _average_across_channels.
+                col_values.append(arr[:, k])
+            df[f"{feature_name}_{component}"] = col_values
+
+        return df
+
+    def _extract_banded_matrix_features(
+        self, df: pd.DataFrame, feature_name: str, band_names: list[str]
+    ) -> pd.DataFrame:
+        """Extract individual frequency bands from banded matrix features.
+
+        This method handles banded matrix features (cohere, zcohere, imcoh, zimcoh)
+        which are stored as dicts with band names as keys mapping to 2D matrices.
+
+        Note: Simple matrix features (pcorr, zpcorr) should NOT be processed by this
+        method - they are single 2D matrices without frequency band structure.
+
+        Args:
+            df: DataFrame containing the banded matrix feature
+            feature_name: Name of the banded matrix feature column
+            band_names: List of band names to extract
+
+        Returns:
+            DataFrame with new columns for each band (feature_name_bandname format)
+        """
+        import numpy as np
+        import logging
+
+        logger = logging.getLogger(__name__)
+
+        if feature_name not in df.columns:
+            return df
+
+        # Check first element to determine storage format
+        first_element = df[feature_name].iloc[0]
+
+        if isinstance(first_element, dict):
+            for band_name in band_names:
+                band_matrices = []
+                for matrix_dict in df[feature_name]:
+                    if isinstance(matrix_dict, dict) and band_name in matrix_dict:
+                        matrix = matrix_dict[band_name]
+                        # Convert list to numpy array if needed (legacy format)
+                        if isinstance(matrix, list):
+                            matrix = np.array(matrix)
+
+                        if isinstance(matrix, np.ndarray) and matrix.ndim == 2:
+                            band_matrices.append(matrix)
+                        else:
+                            logger.warning(
+                                f"Expected 2D matrix for {feature_name}[{band_name}], "
+                                f"got {type(matrix)} with shape {getattr(matrix, 'shape', 'N/A')}"
+                            )
+                            band_matrices.append(
+                                np.full(
+                                    (len(self.channel_names), len(self.channel_names)),
+                                    np.nan,
+                                )
+                            )
+                    else:
+                        logger.warning(
+                            f"Missing band {band_name} in {feature_name} dictionary"
+                        )
+                        band_matrices.append(
+                            np.full(
+                                (len(self.channel_names), len(self.channel_names)),
+                                np.nan,
+                            )
+                        )
+
+                df[f"{feature_name}_{band_name}"] = band_matrices
+
+        elif isinstance(first_element, (np.ndarray, list)):
+            if isinstance(first_element, list):
+                first_element = np.array(first_element)
+
+            if first_element.ndim == 3:
+                # 3D Array format: (Bands, Ch, Ch)
+                # Verify band count matches
+                if first_element.shape[0] != len(band_names):
+                    raise ValueError(
+                        f"Matrix feature {feature_name} has {first_element.shape[0]} bands, "
+                        f"but {len(band_names)} were expected ({band_names})."
+                    )
+
+                for i, band_name in enumerate(band_names):
+                    band_matrices = []
+                    for matrix_3d in df[feature_name]:
+                        if isinstance(matrix_3d, list):
+                            matrix_3d = np.array(matrix_3d)
+
+                        if isinstance(matrix_3d, np.ndarray) and matrix_3d.ndim == 3:
+                            if matrix_3d.shape[0] == len(band_names):
+                                band_matrices.append(matrix_3d[i, :, :])
+                            else:
+                                raise ValueError(
+                                    f"Band count mismatch for {feature_name}: "
+                                    f"array has {matrix_3d.shape[0]} bands, expected {len(band_names)}."
+                                )
+                        else:
+                            raise ValueError(
+                                f"Expected 3D matrix for {feature_name}, "
+                                f"got {type(matrix_3d)} with shape {getattr(matrix_3d, 'shape', 'N/A')}"
+                            )
+
+                    df[f"{feature_name}_{band_name}"] = band_matrices
+
+            elif first_element.ndim == 2:
+                raise ValueError(
+                    f"Matrix feature {feature_name} is stored as a 2D array, but is defined as a "
+                    f"banded feature. Expected a dictionary with band keys or a 3D array (Bands, Ch, Ch). "
+                    f"If this feature should not have bands, add it to SIMPLE_MATRIX_FEATURES in constants."
+                )
+            else:
+                raise ValueError(
+                    f"Matrix feature {feature_name} has wrong dimensionality: {first_element.ndim}D. "
+                    f"Expected 3D (Bands, Ch, Ch) or dict."
+                )
+
+        else:
+            raise ValueError(
+                f"Banded matrix feature {feature_name} has unexpected format: {type(first_element)}. "
+                f"Expected dict with band keys or 3D array. If this is a simple matrix feature (pcorr, zpcorr), "
+                f"it should not be processed by this method."
+            )
+
+        return df
+
+    def _average_across_channels(
+        self, df: pd.DataFrame, features: list[str]
+    ) -> pd.DataFrame:
+        """Average features across channels to produce scalar values.
+
+        This method operates on *expanded* feature columns (e.g.
+        ``cohere_delta``, ``psdband_theta``) that have already been unpacked
+        from their dict-stored representation by
+        :meth:`_extract_band_features` / :meth:`_extract_banded_matrix_features`.
+        Because expanded names do not exist in :data:`constants.FEATURE_TYPES`,
+        dispatch is based on array dimensionality rather than
+        :func:`classify_feature`.
+
+        Handles two types of features:
+        - Vector features (1D arrays): Average across channels
+        - Matrix features (2D arrays): Average upper triangle (excluding diagonal)
+
+        Args:
+            df: DataFrame with features as columns
+            features: List of feature column names to average
+
+        Returns:
+            DataFrame with averaged features replacing original arrays
+        """
+        for feature in features:
+            if feature not in df.columns:
+                continue
+
+            first_element = df[feature].iloc[0]
+
+            if isinstance(first_element, (np.ndarray, list)):
+                if isinstance(first_element, list):
+                    first_element = np.array(first_element)
+
+                if first_element.ndim == 1:
+                    # Vector features: Mean across channels
+                    try:
+                        feature_arrays = extract_linear_array(df[feature])
+                        feature_avg = np.nanmean(feature_arrays, axis=1)
+                    except ValueError as e:
+                        raise ValueError(
+                            f"Feature {feature} has inconsistent channel counts across windows. "
+                            f"All windows must have the same number of channels. "
+                            f"This likely indicates data corruption during feature extraction. "
+                            f"Original error: {e}"
+                        ) from e
+
+                    df[feature] = feature_avg
+
+                elif first_element.ndim == 2:
+                    # Matrix features: Mean of upper triangle
+                    feature_avg = []
+                    for matrix in df[feature].values:
+                        if isinstance(matrix, list):
+                            matrix = np.array(matrix)
+
+                        # Validate matrix shape
+                        if not isinstance(matrix, np.ndarray) or matrix.ndim != 2:
+                            logging.warning(
+                                f"Expected 2D matrix for {feature}, "
+                                f"got {type(matrix)} with ndim {getattr(matrix, 'ndim', 'N/A')}"
+                            )
+                            feature_avg.append(np.nan)
+                            continue
+
+                        if matrix.shape[0] < 2 or matrix.shape[1] < 2:
+                            # Can't get upper triangle (excluding diag) from 1x1 or smaller
+                            feature_avg.append(
+                                np.nanmean(matrix) if matrix.size > 0 else np.nan
+                            )
+                            continue
+
+                        upper_tri_indices = np.triu_indices_from(matrix, k=1)
+                        upper_tri_values = matrix[upper_tri_indices]
+
+                        if len(upper_tri_values) == 0:
+                            avg_val = np.nanmean(matrix) if matrix.size > 0 else np.nan
+                        else:
+                            avg_val = np.nanmean(upper_tri_values)
+
+                        feature_avg.append(avg_val)
+
+                    df[feature] = feature_avg
+
+            elif isinstance(first_element, (int, float, np.number)):
+                pass
+
+        return df
+
+    def _channel_info(self) -> ChannelInfo:
+        """Bundle channel metadata for filter functions."""
+        return ChannelInfo(
+            channel_names=list(self.channel_names),
+            channel_abbrevs=list(self.channel_abbrevs),
+        )
+
+    @property
+    def path_safe_animal_id(self) -> str:
+        """Slugified :attr:`animal_id` for filesystem paths.
+
+        Use this property whenever building a ``Path`` or filename component
+        from the animal id.  ``animal_id`` itself stays in its display form
+        (which may contain ``/``, ``;``, spaces) for logs and plot labels;
+        ``slugify`` is applied here so callers don't have to remember.
+        """
+        return slugify(self.animal_id)
+
+    @property
+    def path_safe_animaldays(self) -> list[str]:
+        """Slugified :attr:`animaldays` for filesystem paths."""
+        return [slugify(ad) for ad in self.animaldays]
+
+    def get_filter_logrms_range(self, *, z_range=3, **kwargs):
+        """Filter windows based on log(rms).
+
+        Args:
+            z_range (float, optional): The z-score range to filter by. Values outside this range will be set to NaN.
+
+        Returns:
+            np.ndarray: Boolean array of shape (M fragments, N channels). True = keep window, False = remove window
+        """
+        return FILTER_REGISTRY["logrms_range"].apply(
+            self.result, self._channel_info(), len(self.result), z_range=z_range
+        )
+
+    def get_filter_high_rms(self, *, max_rms=500, **kwargs):
+        """Filter windows based on rms.
+
+        Args:
+            max_rms (float, optional): The maximum rms value to filter by. Values above this will be set to NaN.
+
+        Returns:
+            np.ndarray: Boolean array of shape (M fragments, N channels). True = keep window, False = remove window
+        """
+        return FILTER_REGISTRY["high_rms"].apply(
+            self.result, self._channel_info(), len(self.result), max_rms=max_rms
+        )
+
+    def get_filter_low_rms(self, *, min_rms=30, **kwargs):
+        """Filter windows based on rms.
+
+        Args:
+            min_rms (float, optional): The minimum rms value to filter by. Values below this will be set to NaN.
+
+        Returns:
+            np.ndarray: Boolean array of shape (M fragments, N channels). True = keep window, False = remove window
+        """
+        return FILTER_REGISTRY["low_rms"].apply(
+            self.result, self._channel_info(), len(self.result), min_rms=min_rms
+        )
+
+    def get_filter_high_beta(self, *, max_beta_prop=0.4, **kwargs):
+        """Filter windows based on beta power.
+
+        Args:
+            max_beta_prop (float, optional): The maximum beta power to filter by. Values above this will be set to NaN. Defaults to 0.4.
+
+        Returns:
+            np.ndarray: Boolean array of shape (M fragments, N channels). True = keep window, False = remove window
+        """
+        return FILTER_REGISTRY["high_beta"].apply(
+            self.result, self._channel_info(), len(self.result), max_beta_prop=max_beta_prop
+        )
+
+    def get_filter_reject_channels(
+        self,
+        *,
+        bad_channels: list[str] = None,
+        use_abbrevs: bool = None,
+        save_bad_channels: Literal["overwrite", "union", None] = "union",
+        **kwargs,
+    ):
+        """Filter channels to reject.
+
+        Args:
+            bad_channels (list[str]): List of channels to reject. Can be either full channel names or abbreviations.
+                The method will automatically detect which format is being used. If None, no filtering is performed.
+            use_abbrevs (bool, optional): Override automatic detection. If True, channels are assumed to be channel abbreviations. If False, channels are assumed to be channel names.
+                If None, channels are parsed to abbreviations and matched against self.channel_abbrevs.
+            save_bad_channels (Literal["overwrite", "union", None], optional): How to save bad channels to self.bad_channels_dict.
+                "overwrite": Replace self.bad_channels_dict completely with bad channels applied to all sessions.
+                "union": Merge bad channels with existing self.bad_channels_dict for all sessions.
+                None: Don't save to self.bad_channels_dict. Defaults to "union".
+                Note: When using "overwrite" mode, the bad_channels parameter and bad_channels_dict parameter
+                may conflict and overwrite each other's bad channel definitions if both are provided.
+
+        Returns:
+            np.ndarray: Boolean array of shape (M fragments, N channels). True = keep window, False = remove window
+        """
+        channel_info = self._channel_info()
+        mask = FILTER_REGISTRY["reject_channels"].apply(
+            self.result,
+            channel_info,
+            len(self.result),
+            bad_channels=bad_channels,
+            use_abbrevs=use_abbrevs,
+        )
+
+        if bad_channels is not None and save_bad_channels is not None:
+            animaldays = self.result["animalday"].unique()
+            self.bad_channels_dict = update_bad_channels_dict_from_config(
+                self.bad_channels_dict,
+                {"reject_channels": {
+                    "bad_channels": bad_channels,
+                    "use_abbrevs": use_abbrevs,
+                    "save_bad_channels": save_bad_channels,
+                }},
+                channel_info,
+                list(animaldays),
+            )
+        return mask
+
+    def get_filter_reject_channels_by_recording_session(
+        self,
+        *,
+        bad_channels_dict: dict[str, list[str]] = None,
+        use_abbrevs: bool = None,
+        save_bad_channels: Literal["overwrite", "union", None] = "union",
+        **kwargs,
+    ):
+        """Filter channels to reject for each recording session
+
+        Args:
+            bad_channels_dict (dict[str, list[str]]): Dictionary of list of channels to reject for each recording session.
+                Can be either full channel names or abbreviations. The method will automatically detect which format is being used.
+                If None, the method will use the bad_channels_dict passed to the constructor.
+            use_abbrevs (bool, optional): Override automatic detection. If True, channels are assumed to be channel abbreviations. If False, channels are assumed to be channel names.
+                If None, channels are parsed to abbreviations and matched against self.channel_abbrevs.
+            save_bad_channels (Literal["overwrite", "union", None], optional): How to save bad channels to self.bad_channels_dict.
+                "overwrite": Replace self.bad_channels_dict completely with bad_channels_dict.
+                "union": Merge bad_channels_dict with existing self.bad_channels_dict per session.
+                None: Don't save to self.bad_channels_dict. Defaults to "union".
+                Note: When using "overwrite" mode, the bad_channels parameter and bad_channels_dict parameter
+                may conflict and overwrite each other's bad channel definitions if both are provided.
+
+        Returns:
+            np.ndarray: Boolean array of shape (M fragments, N channels). True = keep window, False = remove window
+        """
+        if bad_channels_dict is None:
+            bad_channels_dict = self.bad_channels_dict.copy()
+        channel_info = self._channel_info()
+        mask = FILTER_REGISTRY["reject_channels_by_session"].apply(
+            self.result,
+            channel_info,
+            len(self.result),
+            bad_channels_dict=bad_channels_dict,
+            use_abbrevs=use_abbrevs,
+        )
+
+        if save_bad_channels is not None and bad_channels_dict:
+            animaldays = self.result["animalday"].unique()
+            self.bad_channels_dict = update_bad_channels_dict_from_config(
+                self.bad_channels_dict,
+                {"reject_channels_by_session": {
+                    "bad_channels_dict": bad_channels_dict,
+                    "use_abbrevs": use_abbrevs,
+                    "save_bad_channels": save_bad_channels,
+                }},
+                channel_info,
+                list(animaldays),
+            )
+        return mask
+
+    def get_filter_morphological_smoothing(
+        self, filter_mask: np.ndarray, *, smoothing_seconds: float, **kwargs
+    ) -> np.ndarray:
+        """Apply morphological smoothing to a filter mask.
+
+        Args:
+            filter_mask (np.ndarray): Input boolean mask of shape (n_windows, n_channels)
+            smoothing_seconds (float): Time window in seconds for morphological operations
+
+        Returns:
+            np.ndarray: Smoothed boolean mask
+        """
+        return FILTER_REGISTRY["morphological_smoothing"].apply(
+            filter_mask,
+            self.result,
+            self._channel_info(),
+            smoothing_seconds=smoothing_seconds,
+        )
+
+    def filter_all(
+        self,
+        df: pd.DataFrame = None,
+        inplace: bool = True,
+        min_valid_channels: int = 3,
+        filters: list[Callable] = None,
+        morphological_smoothing_seconds: float | None = None,
+        bad_channels: list[str] | None = None,
+        save_bad_channels: Literal["overwrite", "union", None] = "union",
+        **kwargs,
+    ) -> "WindowAnalysisResult":
+        """Apply the default filter suite. Thin wrapper around :meth:`apply_filters`.
+
+        Args:
+            df: Deprecated; ignored (kept for signature backward compat).
+            inplace: If True, mutate ``self.result`` with the filtered output.
+            min_valid_channels: Minimum number of valid channels per window.
+            filters: Deprecated; emits a ``DeprecationWarning`` if non-None and is
+                otherwise ignored.  Use :meth:`apply_filters` with a ``filter_config``
+                dict for custom filter combinations.
+            morphological_smoothing_seconds: If provided, smooths the combined
+                mask along the time axis with this window in seconds.
+            bad_channels: If provided, adds a ``reject_channels`` filter with this list.
+            save_bad_channels: How to merge into ``self.bad_channels_dict``.
+            **kwargs: Per-filter overrides — currently consumed:
+                ``z_range`` (default 3), ``max_rms`` (500), ``min_rms`` (50),
+                ``max_beta_prop`` (0.4).  Any other keys are silently ignored.
+        """
+        if filters is not None:
+            warnings.warn(
+                "Passing `filters=` to filter_all is deprecated; use apply_filters "
+                "with a filter_config dict instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
+        filter_config: dict = {
+            "logrms_range": {"z_range": kwargs.pop("z_range", 3)},
+            "high_rms":     {"max_rms": kwargs.pop("max_rms", 500)},
+            "low_rms":      {"min_rms": kwargs.pop("min_rms", 50)},
+            "high_beta":    {"max_beta_prop": kwargs.pop("max_beta_prop", 0.4)},
+            "reject_channels_by_session": {"save_bad_channels": save_bad_channels},
+        }
+        if bad_channels is not None:
+            filter_config["reject_channels"] = {
+                "bad_channels": bad_channels,
+                "save_bad_channels": save_bad_channels,
+            }
+        if morphological_smoothing_seconds is not None:
+            filter_config["morphological_smoothing"] = {
+                "smoothing_seconds": morphological_smoothing_seconds,
+            }
+
+        filtered = self.apply_filters(
+            filter_config=filter_config, min_valid_channels=min_valid_channels
+        )
+        if inplace:
+            self.result = filtered.result
+            self._update_instance_vars()
+        return filtered
+
+    def _create_filtered_copy(
+        self, filter_mask: np.ndarray, filter_name: str = None
+    ) -> "WindowAnalysisResult":
+        """Create a new WindowAnalysisResult with the filter applied.
+
+        Args:
+            filter_mask (np.ndarray): Boolean mask of shape (n_windows, n_channels)
+            filter_name (str, optional): Name of the filter for logging. Defaults to None.
+
+        Returns:
+            WindowAnalysisResult: New instance with filter applied
+        """
+        if filter_name is not None:
+            logging.info(
+                f"{filter_name}: filtered {filter_mask.size - np.count_nonzero(filter_mask)}/{filter_mask.size}"
+            )
+        filtered_result = self._apply_filter(filter_mask)
+        return WindowAnalysisResult._from_existing(self, filtered_result)
+
+    def filter_logrms_range(self, z_range: float = 3) -> "WindowAnalysisResult":
+        """Filter based on log(rms) z-score range.
+
+        Args:
+            z_range (float): Z-score range threshold. Defaults to 3.
+
+        Returns:
+            WindowAnalysisResult: New filtered instance
+        """
+        mask = self.get_filter_logrms_range(z_range=z_range)
+        return self._create_filtered_copy(mask, filter_name="logrms_range")
+
+    def filter_high_rms(self, max_rms: float = 500) -> "WindowAnalysisResult":
+        """Filter out windows with RMS above threshold.
+
+        Args:
+            max_rms (float): Maximum RMS threshold. Defaults to 500.
+
+        Returns:
+            WindowAnalysisResult: New filtered instance
+        """
+        mask = self.get_filter_high_rms(max_rms=max_rms)
+        return self._create_filtered_copy(mask, filter_name="high_rms")
+
+    def filter_low_rms(self, min_rms: float = 50) -> "WindowAnalysisResult":
+        """Filter out windows with RMS below threshold.
+
+        Args:
+            min_rms (float): Minimum RMS threshold. Defaults to 50.
+
+        Returns:
+            WindowAnalysisResult: New filtered instance
+        """
+        mask = self.get_filter_low_rms(min_rms=min_rms)
+        return self._create_filtered_copy(mask, filter_name="low_rms")
+
+    def filter_high_beta(self, max_beta_prop: float = 0.4) -> "WindowAnalysisResult":
+        """Filter out windows with high beta power.
+
+        Args:
+            max_beta_prop (float): Maximum beta power proportion. Defaults to 0.4.
+
+        Returns:
+            WindowAnalysisResult: New filtered instance
+        """
+        mask = self.get_filter_high_beta(max_beta_prop=max_beta_prop)
+        return self._create_filtered_copy(mask, filter_name="high_beta")
+
+    def filter_reject_channels(
+        self, bad_channels: list[str], use_abbrevs: bool = None
+    ) -> "WindowAnalysisResult":
+        """Filter out specified bad channels.
+
+        Args:
+            bad_channels (list[str]): List of channel names to reject
+            use_abbrevs (bool, optional): Whether to use abbreviations. Defaults to None.
+
+        Returns:
+            WindowAnalysisResult: New filtered instance
+        """
+        mask = self.get_filter_reject_channels(
+            bad_channels=bad_channels, use_abbrevs=use_abbrevs
+        )
+        return self._create_filtered_copy(mask, filter_name="reject_channels")
+
+    def filter_reject_channels_by_session(
+        self, bad_channels_dict: dict[str, list[str]] = None, use_abbrevs: bool = None
+    ) -> "WindowAnalysisResult":
+        """Filter out bad channels by recording session.
+
+        Args:
+            bad_channels_dict (dict[str, list[str]], optional): Dictionary mapping recording session
+                identifiers to lists of bad channel names to reject. Session identifiers are in the
+                format "{animal_id} {genotype} {day}" (e.g., "A10 WT Apr-01-2023"). Channel names
+                can be either full names (e.g., "Left Auditory") or abbreviations (e.g., "LAud").
+                If None, uses the bad_channels_dict from the constructor. Defaults to None.
+            use_abbrevs (bool, optional): Override automatic channel name format detection. If True,
+                channels are assumed to be abbreviations. If False, channels are assumed to be full
+                names. If None, automatically detects format and converts to abbreviations for matching.
+                Defaults to None.
+
+        Returns:
+            WindowAnalysisResult: New filtered instance with bad channels masked as NaN for their
+                respective recording sessions
+
+        Examples:
+            Filter specific channels per session using abbreviations:
+            >>> bad_channels = {
+            ...     "A10 WT Apr-01-2023": ["LAud", "RMot"],  # Session 1: reject left auditory, right motor
+            ...     "A10 WT Apr-02-2023": ["LVis"]           # Session 2: reject left visual only
+            ... }
+            >>> filtered_war = war.filter_reject_channels_by_session(bad_channels, use_abbrevs=True)
+
+            Filter using full channel names:
+            >>> bad_channels = {
+            ...     "A12 KO May-15-2023": ["Left Motor", "Right Barrel"],
+            ...     "A12 KO May-16-2023": ["Left Auditory", "Left Visual", "Right Motor"]
+            ... }
+            >>> filtered_war = war.filter_reject_channels_by_session(bad_channels, use_abbrevs=False)
+
+            Auto-detect channel format (recommended):
+            >>> bad_channels = {
+            ...     "A15 WT Jun-10-2023": ["LMot", "RBar"],  # Will auto-detect as abbreviations
+            ...     "A15 WT Jun-11-2023": ["LAud"]
+            ... }
+            >>> filtered_war = war.filter_reject_channels_by_session(bad_channels)
+
+        Note:
+            - Session identifiers must exactly match the "animalday" values in the result DataFrame
+            - Available channel abbreviations: LAud, RAud, LVis, RVis, LHip, RHip, LBar, RBar, LMot, RMot
+            - Channel names are case-insensitive and support various formats (e.g., "left aud", "Left Auditory")
+            - If a session identifier is not found in bad_channels_dict, a warning is logged but processing continues
+            - If a channel name is not recognized, a warning is logged but other channels are still processed
+        """
+        mask = self.get_filter_reject_channels_by_recording_session(
+            bad_channels_dict=bad_channels_dict, use_abbrevs=use_abbrevs
+        )
+        return self._create_filtered_copy(mask, filter_name="reject_channels_by_session")
+
+    def apply_filters(
+        self,
+        filter_config: dict = None,
+        min_valid_channels: int = 3,
+        morphological_smoothing_seconds: float = None,
+    ) -> "WindowAnalysisResult":
+        """Apply multiple filters using configuration.
+
+        Args:
+            filter_config (dict, optional): Dictionary of filter names and parameters.
+                Available filters: 'logrms_range', 'high_rms', 'low_rms', 'high_beta',
+                'reject_channels', 'reject_channels_by_session', 'morphological_smoothing'
+            min_valid_channels (int): Minimum valid channels per window. Defaults to 3.
+            morphological_smoothing_seconds (float, optional): Temporal smoothing window (deprecated, use config instead)
+
+        Returns:
+            WindowAnalysisResult: New filtered instance
+
+        Examples:
+            >>> config = {
+            ...     'logrms_range': {'z_range': 3},
+            ...     'high_rms': {'max_rms': 500},
+            ...     'reject_channels': {'bad_channels': ['LMot', 'RMot']},
+            ...     'morphological_smoothing': {'smoothing_seconds': 8.0}
+            ... }
+            >>> filtered_war = war.apply_filters(config)
+        """
+        if filter_config is None:
+            filter_config = {
+                "logrms_range": {"z_range": 3},
+                "high_rms": {"max_rms": 500},
+                "low_rms": {"min_rms": 50},
+                "high_beta": {"max_beta_prop": 0.4},
+                "reject_channels_by_session": {},
+            }
+
+        # Translate the legacy morphological_smoothing_seconds kwarg into the registry-driven form.
+        config = dict(filter_config)
+        if morphological_smoothing_seconds is not None and "morphological_smoothing" not in config:
+            config["morphological_smoothing"] = {"smoothing_seconds": morphological_smoothing_seconds}
+
+        masks: list[np.ndarray] = []
+        mask_post: list[tuple[str, dict]] = []
+
+        for name, params in config.items():
+            spec = FILTER_REGISTRY.get(name)
+            if spec is None:
+                raise ValueError(
+                    f"Unknown filter: {name}. Available: {sorted(FILTER_REGISTRY)}"
+                )
+            params = params or {}
+            if spec.scope is FilterScope.MASK_POST:
+                mask_post.append((name, params))
+                continue
+            # Dispatch through the wrapper method so subclass overrides (and test mocks)
+            # are honoured. Fall back to the registry's pure function for any future
+            # filter that doesn't ship with a WindowAnalysisResult wrapper.
+            wrapper = getattr(self, _WRAPPER_METHOD_NAMES.get(name, ""), None)
+            if wrapper is not None:
+                mask = wrapper(**params)
+            else:
+                mask = spec.apply(
+                    self.result, self._channel_info(), len(self.result), **params
+                )
+            masks.append(mask)
+            logging.info(f"{name}: filtered {mask.size - np.count_nonzero(mask)}/{mask.size}")
+
+        if masks:
+            filt_bool_all = np.prod(np.stack(masks, axis=-1), axis=-1).astype(bool)
+        else:
+            filt_bool_all = np.ones(
+                (len(self.result), len(self.channel_names)), dtype=bool
+            )
+
+        for name, params in mask_post:
+            spec = FILTER_REGISTRY[name]
+            wrapper_attr = _WRAPPER_METHOD_NAMES.get(name)
+            if wrapper_attr and hasattr(self, wrapper_attr):
+                filt_bool_all = getattr(self, wrapper_attr)(filt_bool_all, **params)
+            else:
+                filt_bool_all = spec.apply(
+                    filt_bool_all, self.result, self._channel_info(), **params
+                )
+            logging.info(f"{name}: applied (post-mask)")
+
+        # Filter windows based on minimum valid channels.
+        valid_channels_per_window = np.sum(filt_bool_all, axis=1)
+        window_mask = valid_channels_per_window >= min_valid_channels
+        filt_bool_all = filt_bool_all & window_mask[:, np.newaxis]
+
+        return self._create_filtered_copy(filt_bool_all)
+
+    def _apply_filter(self, filter_tfs: np.ndarray):
+        result = self.result.copy()
+        filter_tfs = np.asarray(filter_tfs, dtype=bool)  # (W, C)
+        for feat in constants.FEATURES:
+            if feat not in result.columns:
+                continue
+            handler = handler_for(feat)
+            result[feat] = handler.apply_mask(result[feat], filter_tfs)
+        return result
+
+    def save_parquet_and_json(
+        self,
+        folder: str | Path,
+        make_folder=True,
+        filename: str = None,
+        slugify_filename=False,
+        save_abbrevs=False,
+    ):
+        """Archive window analysis result into the folder specified, as a parquet and json file.
+
+        The result DataFrame is saved as a Parquet file (stable across pandas
+        versions).  Metadata (animal_id, channel_names, bad_channels_dict,
+        lof_scores_dict, etc.) is written alongside as a JSON sidecar.
+
+        Args:
+            folder (str | Path): Destination folder to save results to
+            make_folder (bool, optional): If True, create the folder if it doesn't exist. Defaults to True.
+            filename (str, optional): Name of the file to save. Defaults to "war".
+            slugify_filename (bool, optional): If True, slugify the filename (replace special characters). Defaults to False.
+            save_abbrevs (bool, optional): If True, save the channel abbreviations as the channel names in the json file. Defaults to False.
+        """
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+
+        folder = Path(folder)
+        if make_folder:
+            folder.mkdir(parents=True, exist_ok=True)
+
+        filename = "war" if filename is None else filename
+        filename = slugify(filename) if slugify_filename else filename
+
+        filepath = str(folder / filename)
+
+        table, encoded_cols = WindowAnalysisResult._df_to_arrow_table(self.result)
+        # encoding_version=2: encoded_cols are native list/struct; absence/1 = legacy JSON.
+        neurodent_meta = json.dumps(
+            {"encoded_columns": encoded_cols, "encoding_version": 2}
+        ).encode()
+        existing_meta = table.schema.metadata or {}
+        merged_meta = {**existing_meta, b"neurodent": neurodent_meta}
+        table = table.replace_schema_metadata(merged_meta)
+        # Write to a temp sibling and atomically rename, so an interrupted write
+        # (e.g. a killed SLURM job) never leaves a partial .parquet that a
+        # downstream rule would read as a valid output.
+        with atomic_output_path(filepath + ".parquet") as tmp_parquet:
+            pq.write_table(
+                table, str(tmp_parquet), compression="zstd", compression_level=4
+            )
+        del table
+        logging.info(f"Saved WAR to {filepath + '.parquet'}")
+
+        json_dict = {
+            "animal_id": self.animal_id,
+            "genotype": self.genotype,
+            "sex": self.sex,
+            "channel_names": (
+                self.channel_abbrevs if save_abbrevs else self.channel_names
+            ),
+            "bad_channels_dict": self.bad_channels_dict,
+            "suppress_short_interval_error": self.suppress_short_interval_error,
+            "lof_scores_dict": self.lof_scores_dict.copy(),
+        }
+
+        atomic_write_json(filepath + ".json", json_dict, indent=2)
+        logging.info(f"Saved WAR to {filepath + '.json'}")
+
+    def save_pickle_and_json(self, *args, **kwargs):
+        """Deprecated: use :meth:`save_parquet_and_json` instead.
+
+        This alias is retained so external callers don't break immediately. It
+        no longer writes a pickle file — only parquet + json. The name is
+        misleading and will be removed in a future release.
+        """
+        import warnings
+
+        warnings.warn(
+            "save_pickle_and_json is deprecated and no longer writes a pickle file; "
+            "use save_parquet_and_json instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.save_parquet_and_json(*args, **kwargs)
+
+    class _NumpyEncoder(json.JSONEncoder):
+        """JSON encoder that handles numpy types — used by the JSON fallback
+        path for cells pyarrow can't infer a uniform schema for.
+        """
+
+        def default(self, o: Any) -> Any:
+            if isinstance(o, np.ndarray):
+                return o.tolist()
+            if isinstance(o, np.integer):
+                return int(o)
+            if isinstance(o, np.floating):
+                return float(o)
+            if isinstance(o, np.bool_):
+                return bool(o)
+            return super().default(o)
+
+    _TUPLE_FIELD_PREFIX = "_t"  # tuple round-trip marker for _to/_from nested
+
+    @staticmethod
+    def _to_nested_python(v):
+        """Convert numpy/dict/tuple cells to nested Python so pyarrow can
+        infer native list/struct types.  Tuples become structs with keys
+        ``_t0``, ``_t1``, … so heterogeneous-shape elements survive the
+        round trip.
+        """
+        if isinstance(v, np.ndarray):
+            return v.tolist()
+        if isinstance(v, dict):
+            return {str(k): WindowAnalysisResult._to_nested_python(vv) for k, vv in v.items()}
+        if isinstance(v, tuple):
+            return {
+                f"{WindowAnalysisResult._TUPLE_FIELD_PREFIX}{i}": WindowAnalysisResult._to_nested_python(x)
+                for i, x in enumerate(v)
+            }
+        if isinstance(v, list):
+            return [WindowAnalysisResult._to_nested_python(x) for x in v]
+        if isinstance(v, np.integer):
+            return int(v)
+        if isinstance(v, np.floating):
+            return float(v)
+        if isinstance(v, np.bool_):
+            return bool(v)
+        return v
+
+    @staticmethod
+    def _canonicalise_band_dict(d: dict) -> dict:
+        """Reorder *d* by ``constants.BAND_NAMES`` when it has any band-name keys.
+
+        Pyarrow alphabetises struct fields on the read side of a parquet
+        round-trip (``Table.to_pandas()``), so canonical-order band dicts
+        written to disk come back as ``{"alpha", "beta", "delta", "gamma",
+        "theta"}``. Best-fit reorder: any band-name keys present are
+        promoted to the front in canonical (FREQ_BANDS insertion) order,
+        any non-band keys are appended in their original order.
+        Idempotent — an already-canonical dict round-trips to itself.
+        Dicts with zero band-name overlap are returned unchanged.
+        """
+        band_set = set(constants.BAND_NAMES)
+        if not (set(d.keys()) & band_set):
+            return d
+        band_keys = [b for b in constants.BAND_NAMES if b in d]
+        other_keys = [k for k in d if k not in band_set]
+        return {**{b: d[b] for b in band_keys}, **{k: d[k] for k in other_keys}}
+
+    @staticmethod
+    def _normalize_arrow_cell(v):
+        """Convert pyarrow's ndarray-leafed cells back to plain Python lists,
+        reconstruct ``_t0``/``_t1``/… structs as tuples, and canonicalise
+        band-keyed dicts via :meth:`_canonicalise_band_dict`.
+        """
+        if isinstance(v, np.ndarray):
+            if v.dtype == object:
+                return [WindowAnalysisResult._normalize_arrow_cell(x) for x in v]
+            return v.tolist()
+        if isinstance(v, dict):
+            prefix = WindowAnalysisResult._TUPLE_FIELD_PREFIX
+            keys = list(v.keys())
+            if keys and all(k == f"{prefix}{i}" for i, k in enumerate(sorted(keys, key=lambda k: int(k[len(prefix):]) if k.startswith(prefix) and k[len(prefix):].isdigit() else -1))):
+                ordered = sorted(keys, key=lambda k: int(k[len(prefix):]))
+                return tuple(
+                    WindowAnalysisResult._normalize_arrow_cell(v[k]) for k in ordered
+                )
+            decoded = {k: WindowAnalysisResult._normalize_arrow_cell(vv) for k, vv in v.items()}
+            return WindowAnalysisResult._canonicalise_band_dict(decoded)
+        if isinstance(v, list):
+            return [WindowAnalysisResult._normalize_arrow_cell(x) for x in v]
+        return v
+
+    @staticmethod
+    def _encode_df_for_parquet(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
+        """Return a copy of *df* with complex/object columns converted to
+        nested Python structures (lists / dicts / scalars).
+
+        Pyarrow can store these as native list/struct columns directly,
+        without any JSON string intermediate.  Encoded column names are
+        returned so the caller can stamp them into parquet schema metadata.
+
+        Returns:
+            (encoded_df, encoded_columns) — the modified DataFrame and the
+            list of column names that were converted.
+        """
+        df_copy = df.copy()
+        encoded_cols: list[str] = []
+        for col in df_copy.columns:
+            ser = df_copy[col]
+            needs_encoding = False
+            if ser.dtype == object:
+                sample = ser.dropna().head(20)
+                for v in sample:
+                    if not isinstance(v, (str, int, float, bool, type(None))):
+                        needs_encoding = True
+                        break
+
+            if needs_encoding:
+                encoded_cols.append(col)
+                df_copy[col] = ser.apply(WindowAnalysisResult._to_nested_python)
+
+        return df_copy, encoded_cols
+
+    @staticmethod
+    def _df_to_arrow_table(
+        df: pd.DataFrame, encoded_cols: list[str] | None = None
+    ):
+        """Encode a DataFrame for parquet write. Shared by eager + streaming saves.
+
+        Columns whose name is in :data:`constants.FEATURE_TYPES` with a non-LINEAR
+        type are encoded as native nested pyarrow types (via ``_to_nested_python``
+        + ``pa.array``) with a per-cell JSON fallback for shapes pyarrow can't
+        infer.  tz-aware datetimes are normalized to UTC.  Pass an explicit
+        ``encoded_cols`` list to override the schema-based detection (e.g. when
+        round-tripping non-WAR DataFrames).
+
+        Returns the table (without schema metadata stamped) and the list of
+        columns that ended up encoded.
+        """
+        import pyarrow as pa
+
+        encoded_out: list[str] = list(encoded_cols) if encoded_cols else []
+        columns: dict[str, Any] = {}
+        for col in df.columns:
+            ser = df[col]
+            needs_encoding = col in encoded_out or _column_needs_encoding(col)
+            if needs_encoding and col not in encoded_out:
+                encoded_out.append(col)
+            if needs_encoding:
+                nested = [WindowAnalysisResult._to_nested_python(x) for x in ser]
+                try:
+                    columns[col] = pa.array(nested)
+                except (pa.lib.ArrowInvalid, pa.lib.ArrowTypeError, AttributeError, TypeError, ValueError):
+                    columns[col] = [
+                        json.dumps(x, cls=WindowAnalysisResult._NumpyEncoder, ensure_ascii=False)
+                        for x in nested
+                    ]
+                del nested
+            else:
+                if ser.dtype == object:
+                    non_null = ser.dropna()
+                    if len(non_null) > 0 and isinstance(non_null.iloc[0], pd.Timestamp):
+                        ser = pd.to_datetime(ser, errors="coerce")
+                if pd.api.types.is_datetime64_any_dtype(ser):
+                    tz = getattr(getattr(ser, "dt", None), "tz", None)
+                    if tz is not None:
+                        if ser.isna().any():
+                            ser = ser.dt.tz_convert("UTC").dt.tz_localize(None)
+                        else:
+                            ser = ser.dt.tz_convert("UTC")
+                columns[col] = ser.to_numpy()
+        return pa.table(columns), encoded_out
+
+    @staticmethod
+    def _try_load_json(v):
+        """Legacy JSON-string decoder; identity on non-strings."""
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except json.JSONDecodeError:
+                return v
+        return v
+
+    @staticmethod
+    def _decode_df_from_parquet(
+        df: pd.DataFrame,
+        encoded_cols: list[str],
+        encoding_version: int = 1,
+    ) -> pd.DataFrame:
+        """Decode complex columns to plain Python.
+
+        ``encoding_version`` is read from the parquet's ``neurodent.encoding_version``
+        schema metadata at the call site:
+
+        - 1 (or missing) → legacy JSON-string cells; decoded with :func:`json.loads`.
+        - 2              → native nested cells (pa.list/struct/binary);
+          normalized with :meth:`_normalize_arrow_cell`.
+        """
+        decoder = (
+            WindowAnalysisResult._normalize_arrow_cell
+            if encoding_version >= 2
+            else WindowAnalysisResult._try_load_json
+        )
+        for col in encoded_cols:
+            if col in df.columns:
+                df[col] = df[col].apply(decoder)
+        return df
+
+    @classmethod
+    def scan_parquet_and_json(cls, folder_path: str | Path, filename: str = "war"):
+        """Open a WAR as a :class:`LazyWindowAnalysisResult` (no DataFrame materialised).
+
+        The returned object mirrors the mutator API of ``WindowAnalysisResult``
+        (``reorder_and_pad_channels``, ``add_unique_hash``, ``apply_filters``,
+        ``aggregate_time_windows``) but records each call as a ``Transform``;
+        :meth:`LazyWindowAnalysisResult.save_parquet_and_json` runs the chain
+        against batched parquet reads.
+
+        Args:
+            folder_path: directory containing ``<filename>.parquet`` and
+                ``<filename>.json``.  Matches the first positional of
+                :meth:`load_parquet_and_json`.
+            filename: stem shared by the two sidecar files.  Defaults to
+                ``"war"`` (the convention used by every NeuRodent pipeline
+                rule).
+
+        Returns:
+            LazyWindowAnalysisResult: streaming handle with the same mutator
+            API as :class:`WindowAnalysisResult`.
+        """
+        from .streaming import LazyWindowAnalysisResult
+
+        return LazyWindowAnalysisResult(folder_path, filename=filename)
+
+    def get_bad_channels_by_lof_threshold(self, lof_threshold: float) -> dict:
+        """Apply LOF threshold directly to stored scores to get bad channels.
+
+        Args:
+            lof_threshold (float): Threshold for determining bad channels.
+
+        Returns:
+            dict: Dictionary mapping animal days to lists of bad channel names.
+        """
+        if not hasattr(self, "lof_scores_dict") or not self.lof_scores_dict:
+            raise ValueError(
+                "LOF scores not available in this WAR. Compute LOF scores first."
+            )
+
+        bad_channels_dict = {}
+        for animalday, lof_data in self.lof_scores_dict.items():
+            if "lof_scores" in lof_data and "channel_names" in lof_data:
+                scores = np.array(lof_data["lof_scores"])
+                channel_names = lof_data["channel_names"]
+
+                is_inlier = scores < lof_threshold
+                bad_channels = [channel_names[i] for i in np.where(~is_inlier)[0]]
+                bad_channels_dict[animalday] = bad_channels
+            else:
+                raise ValueError(f"LOF scores not available for {animalday}")
+
+        return bad_channels_dict
+
+    def get_lof_scores(self) -> dict:
+        """Get LOF scores from this WAR.
+
+        Returns:
+            dict: Dictionary mapping animal days to LOF score dictionaries.
+        """
+        if not hasattr(self, "lof_scores_dict") or not self.lof_scores_dict:
+            raise ValueError(
+                "LOF scores not available in this WAR. Compute LOF scores first."
+            )
+
+        result = {}
+        for animalday, lof_data in self.lof_scores_dict.items():
+            if "lof_scores" in lof_data and "channel_names" in lof_data:
+                scores = lof_data["lof_scores"]
+                channel_names = lof_data["channel_names"]
+                result[animalday] = dict(zip(channel_names, scores))
+            else:
+                raise ValueError(f"LOF scores not available for {animalday}")
+
+        return result
+
+    def evaluate_lof_threshold_binary(
+        self,
+        ground_truth_bad_channels: dict = None,
+        threshold: float = None,
+        evaluation_channels: list[str] = None,
+    ) -> tuple:
+        """Evaluate single threshold against ground truth for binary classification.
+
+        Args:
+            ground_truth_bad_channels: Dict mapping animal-day to bad channel sets.
+                                     If None, uses self.bad_channels_dict as ground truth.
+            threshold: LOF threshold to test
+            evaluation_channels: Subset of channels to include in evaluation. If none, uses all channels.
+
+        Returns:
+            tuple: (y_true_list, y_pred_list) for sklearn.metrics.f1_score
+                   Each element represents one channel from one animal-day
+        """
+        if not hasattr(self, "lof_scores_dict") or not self.lof_scores_dict:
+            raise ValueError(
+                "LOF scores not available in this WAR. Run compute_bad_channels() first."
+            )
+
+        if threshold is None:
+            raise ValueError("threshold parameter is required")
+
+        # Use self.bad_channels_dict as default ground truth
+        if ground_truth_bad_channels is None:
+            if hasattr(self, "bad_channels_dict") and self.bad_channels_dict:
+                ground_truth_bad_channels = {}
+
+                # Filter bad_channels_dict to only include keys that exist in lof_scores_dict
+                lof_keys = set(self.lof_scores_dict.keys())
+                bad_channels_keys = set(self.bad_channels_dict.keys())
+
+                missing_keys = bad_channels_keys - lof_keys
+                if missing_keys:
+                    raise ValueError(
+                        f"bad_channels_dict contains keys not found in lof_scores_dict: {missing_keys}. "
+                        f"Available LOF keys: {sorted(lof_keys)}"
+                    )
+
+                # Only use bad channel keys that have corresponding LOF data
+                ground_truth_bad_channels = {
+                    key: value
+                    for key, value in self.bad_channels_dict.items()
+                    if key in lof_keys
+                }
+
+                logging.info(
+                    f"Using filtered bad_channels_dict as ground truth with {len(ground_truth_bad_channels)} animal-day sessions"
+                )
+            else:
+                raise ValueError(
+                    "No ground truth provided and self.bad_channels_dict is empty."
+                )
+
+        # Get all channels if no subset specified
+        if evaluation_channels is None:
+            evaluation_channels = self.channel_names
+
+        y_true_list = []
+        y_pred_list = []
+
+        # Debug: Log what we're working with
+        logging.debug(
+            f"evaluate_lof_threshold_binary: evaluation_channels = {evaluation_channels}"
+        )
+        logging.debug(
+            f"evaluate_lof_threshold_binary: ground_truth_bad_channels keys = {list(ground_truth_bad_channels.keys())}"
+        )
+        logging.debug(
+            f"evaluate_lof_threshold_binary: lof_scores_dict keys = {list(self.lof_scores_dict.keys())}"
+        )
+
+        # Iterate through each animal-day and evaluate channels
+        for animalday, lof_data in self.lof_scores_dict.items():
+            if "lof_scores" not in lof_data or "channel_names" not in lof_data:
+                raise ValueError(
+                    f"Invalid LOF data for {animalday}: missing required fields 'lof_scores' or 'channel_names'"
+                )
+
+            scores = np.array(lof_data["lof_scores"])
+            channel_names = lof_data["channel_names"]
+
+            # Validate data integrity before processing
+            # NOTE address this issue since this should not be happening in the first place
+            # if len(scores) == 0:
+            #     logging.warning(
+            #         f"Skipping {animalday}: No LOF scores available. "
+            #         f"This session will be excluded from LOF accuracy evaluation."
+            #     )
+            #     continue
+
+            # if len(scores) != len(channel_names):
+            #     logging.error(
+            #         f"Skipping {animalday}: LOF scores ({len(scores)}) and "
+            #         f"channels ({len(channel_names)}) length mismatch. "
+            #         f"This indicates a data integrity issue - the animalday may have been "
+            #         f"improperly mapped during LOF score collection."
+            #     )
+            #     continue
+
+            # Get ground truth bad channels for this animal-day
+            animalday_bad_channels = ground_truth_bad_channels.get(animalday, set())
+
+            # Debug: Log details for this animal-day
+            logging.debug(f"Processing {animalday}: channel_names = {channel_names}")
+            logging.debug(
+                f"Processing {animalday}: animalday_bad_channels = {animalday_bad_channels}"
+            )
+            logging.debug(f"Processing {animalday}: scores shape = {scores.shape}")
+
+            # Evaluate each channel in the evaluation subset
+            channels_processed = 0
+            for i, channel in enumerate(channel_names):
+                if (
+                    channel in evaluation_channels
+                    or resolve_channel(channel)
+                    in evaluation_channels
+                ):
+                    channels_processed += 1
+
+                    # Ground truth: 1 if channel is marked as bad, 0 otherwise
+                    is_bad_channel = (
+                        channel in animalday_bad_channels
+                        or resolve_channel(channel)
+                        in animalday_bad_channels
+                    )
+
+                    y_true = 1 if is_bad_channel else 0
+                    # Prediction: 1 if LOF score > threshold, 0 otherwise
+                    y_pred = 1 if scores[i] > threshold else 0
+
+                    y_true_list.append(y_true)
+                    y_pred_list.append(y_pred)
+
+                    logging.debug(
+                        f"Channel {channel}: y_true={y_true}, y_pred={y_pred} (score={scores[i]:.3f}, threshold={threshold})"
+                    )
+
+                    # Extra debugging for the alignment issue
+                    if y_true == 1:
+                        logging.info(
+                            f"TRUE POSITIVE CANDIDATE: {channel} mapped to bad channel in: {animalday_bad_channels}"
+                        )
+                    if y_pred == 1:
+                        logging.info(
+                            f"LOF PREDICTION: {channel} has score {scores[i]:.3f} > threshold {threshold}"
+                        )
+
+            logging.debug(f"Processed {channels_processed} channels for {animalday}")
+
+        return y_true_list, y_pred_list
+
+    @classmethod
+    def load_parquet_and_json(cls, folder_path=None, parquet_name=None, json_name=None, filename=None):
+        """Load WindowAnalysisResult from folder.
+
+        Reads ``war.parquet`` (the result DataFrame) plus ``war.json`` (the
+        WAR metadata: animal_id, channel_names, bad_channels_dict, etc.).
+
+        For backward compatibility, if the resolved parquet file does not
+        exist but a matching ``.pkl`` file does, the loader falls back to
+        reading the legacy pickle format. No pickle files are written.
+
+        Args:
+            folder_path (str, optional): Path of folder containing .parquet and .json files. Defaults to None.
+            parquet_name (str, optional): Name of the parquet file. Can be just the filename (e.g. "war.parquet")
+                or a path relative to folder_path (e.g. "subdir/war.parquet"). If None and folder_path is provided,
+                expects exactly one .parquet file in folder_path. Defaults to None.
+            json_name (str, optional): Name of the JSON file. Can be just the filename (e.g. "war.json")
+                or a path relative to folder_path (e.g. "subdir/war.json"). If None and folder_path is provided,
+                expects exactly one .json file in folder_path. Defaults to None.
+            filename (str, optional): Shorthand stem shared by the parquet
+                and JSON sidecars (i.e. ``<filename>.parquet`` +
+                ``<filename>.json``). Matches the ``filename`` kwarg of
+                :meth:`scan_parquet_and_json` so eager and lazy entry points have the
+                same simple-case call shape. Ignored when ``parquet_name``
+                or ``json_name`` is also provided. Defaults to None
+                (auto-discovery).
+
+        Raises:
+            ValueError: folder_path does not exist
+            ValueError: Expected exactly one parquet and one json file in folder_path (when parquet_name/json_name not specified)
+            FileNotFoundError: Specified parquet_name or json_name not found
+
+        Returns:
+            result: WindowAnalysisResult object
+        """
+        if filename is not None:
+            if parquet_name is None:
+                parquet_name = f"{filename}.parquet"
+            if json_name is None:
+                json_name = f"{filename}.json"
+        if folder_path is not None:
+            folder_path = Path(folder_path)
+            if not folder_path.exists():
+                raise ValueError(f"Folder path {folder_path} does not exist")
+
+            if parquet_name is not None:
+                # Handle parquet_name as either absolute path or relative to folder_path
+                p = Path(parquet_name)
+                parquet_path = p if p.is_absolute() else folder_path / parquet_name
+                if not parquet_path.exists():
+                    # Allow falling back to legacy pickle with the same stem
+                    legacy_pkl = parquet_path.with_suffix(".pkl")
+                    if not legacy_pkl.exists():
+                        raise FileNotFoundError(
+                            f"Parquet file not found: {parquet_path} (and no legacy pickle at {legacy_pkl})"
+                        )
+            else:
+                pq_files = list(folder_path.glob("*.parquet"))
+                if len(pq_files) == 1:
+                    parquet_path = pq_files[0]
+                elif len(pq_files) == 0:
+                    # Legacy layout: fall back to a single pickle file
+                    pkl_files = list(folder_path.glob("*.pkl"))
+                    if len(pkl_files) != 1:
+                        raise ValueError(
+                            f"Expected exactly one parquet file in {folder_path}, found {len(pq_files)}"
+                        )
+                    parquet_path = pkl_files[0].with_suffix(".parquet")
+                else:
+                    raise ValueError(
+                        f"Expected exactly one parquet file in {folder_path}, found {len(pq_files)}"
+                    )
+
+            if json_name is not None:
+                # Handle json_name as either absolute path or relative to folder_path
+                jp = Path(json_name)
+                json_path = jp if jp.is_absolute() else folder_path / json_name
+                if not json_path.exists():
+                    raise FileNotFoundError(f"JSON file not found: {json_path}")
+            else:
+                # Prefer the JSON file that shares the parquet stem
+                # (e.g. war.parquet → war.json).  This avoids false
+                # positives from legacy sidecar files such as
+                # *.parquet.meta.json that may coexist in the folder.
+                json_path = parquet_path.with_suffix(".json")
+                if not json_path.exists():
+                    json_files = list(folder_path.glob("*.json"))
+                    if len(json_files) != 1:
+                        raise ValueError(
+                            f"Expected exactly one json file in {folder_path}, found {len(json_files)}"
+                        )
+                    json_path = json_files[0]
+        else:
+            if parquet_name is None or json_name is None:
+                raise ValueError(
+                    "Either folder_path must be provided, or both parquet_name and json_name must be provided as absolute paths"
+                )
+
+            parquet_path = Path(parquet_name)
+            json_path = Path(json_name)
+
+            if not parquet_path.exists() and not parquet_path.with_suffix(".pkl").exists():
+                raise FileNotFoundError(f"Parquet file not found: {parquet_path}")
+            if not json_path.exists():
+                raise FileNotFoundError(f"JSON file not found: {json_path}")
+
+        data: pd.DataFrame
+        if parquet_path.exists():
+            try:
+                import pyarrow.parquet as pq
+
+                table = pq.read_table(parquet_path)
+                # Encoded-column list + encoding_version are stored in schema metadata
+                encoded_cols: list[str] = []
+                encoding_version: int = 1
+                schema_meta = table.schema.metadata or {}
+                if b"neurodent" in schema_meta:
+                    nd_meta = json.loads(schema_meta[b"neurodent"])
+                    encoded_cols = nd_meta.get("encoded_columns", [])
+                    encoding_version = nd_meta.get("encoding_version", 1)
+                else:
+                    # Fallback: try legacy .parquet.meta.json sidecar file
+                    legacy_meta_path = parquet_path.parent / (
+                        parquet_path.name + ".meta.json"
+                    )
+                    if legacy_meta_path.exists():
+                        with open(legacy_meta_path, "r") as mf:
+                            pq_meta = json.load(mf)
+                        encoded_cols = pq_meta.get("encoded_columns", [])
+
+                # self_destruct + split_blocks: free Arrow buffers during
+                # conversion and prevent giant BlockManager allocations.
+                data = table.to_pandas(self_destruct=True, split_blocks=True)
+                del table
+                data = cls._decode_df_from_parquet(data, encoded_cols, encoding_version=encoding_version)
+            except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as e:
+                legacy_pkl = parquet_path.with_suffix(".pkl")
+                if not legacy_pkl.exists():
+                    raise
+                logging.warning(
+                    f"Failed to load parquet WAR ({parquet_path}): {e}, falling back to legacy pickle"
+                )
+                with open(legacy_pkl, "rb") as f:
+                    data = pd.read_pickle(f)
+        else:
+            # Parquet missing — try the legacy pickle fallback
+            legacy_pkl = parquet_path.with_suffix(".pkl")
+            logging.warning(
+                f"Parquet WAR not found at {parquet_path}, loading legacy pickle at {legacy_pkl}"
+            )
+            with open(legacy_pkl, "rb") as f:
+                data = pd.read_pickle(f)
+
+        # Validate the JSON half of the pair explicitly: a partial/corrupt
+        # sidecar (e.g. from an interrupted write) should fail with a clear,
+        # actionable error so the WAR is regenerated, not crash with an opaque
+        # JSONDecodeError downstream.
+        try:
+            with open(json_path, "r") as f:
+                metadata = json.load(f)
+        except (OSError, json.JSONDecodeError) as e:
+            raise ValueError(
+                f"WAR JSON sidecar {json_path} is missing or corrupt ({e}); "
+                f"the parquet/JSON pair is incomplete and the WAR must be regenerated."
+            ) from e
+        # Back-compat: older WAR sidecars carry "assume_from_number"; the field was
+        # removed (channel resolution is now exact-only), so drop it before construction.
+        metadata.pop("assume_from_number", None)
+        return cls(data, **metadata)
+
+    @classmethod
+    def load_pickle_and_json(cls, folder_path=None, pickle_name=None, json_name=None):
+        """Deprecated: use :meth:`load_parquet_and_json` instead.
+
+        This alias is retained so external callers don't break immediately.
+        The loader already prefers parquet over pickle; this shim maps the
+        old ``pickle_name`` argument to ``parquet_name`` (the parquet file
+        will be resolved from the same stem).
+        """
+        import warnings
+
+        warnings.warn(
+            "load_pickle_and_json is deprecated; use load_parquet_and_json instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        parquet_name = None
+        if pickle_name is not None:
+            p = Path(pickle_name)
+            parquet_name = str(p.with_suffix(".parquet"))
+        return cls.load_parquet_and_json(
+            folder_path=folder_path,
+            parquet_name=parquet_name,
+            json_name=json_name,
+        )
+
+    def aggregate_time_windows(
+        self, groupby: list[str] | str = ["animalday", "isday"]
+    ) -> None:
+        """Aggregate time windows into a single data point per groupby by averaging features. This reduces the number of rows in the result.
+
+        Args:
+            groupby (list[str] | str, optional): Columns to group by. Defaults to ['animalday', 'isday'], which groups by animalday (recording session) and isday (day/night).
+
+        Raises:
+            ValueError: groupby must be from ['animalday', 'isday']
+            ValueError: Columns in groupby not found in result
+            ValueError: Columns in groupby are not constant in groups
+        """
+        if isinstance(groupby, str):
+            groupby = [groupby]
+        if not all(col in ["animalday", "isday"] for col in groupby):
+            raise ValueError(
+                f"groupby must be from ['animalday', 'isday']. Got {groupby}"
+            )
+        if not all(col in self.result.columns for col in groupby):
+            raise ValueError(
+                f"Columns {groupby} not found in result. Columns: {self.result.columns.tolist()}"
+            )
+
+        features = [f for f in constants.FEATURES if f in self.result.columns]
+        logging.debug(f"Aggregating {features}")
+        result_grouped = self.result.groupby(groupby)
+
+        agg_dict = {}
+
+        if "animalday" not in groupby:
+            agg_dict["animalday"] = lambda df: None
+        if "isday" not in groupby:
+            agg_dict["isday"] = lambda df: None
+
+        special_agg_cols = {"animalday", "isday", "duration", "endfile", "timestamp"}
+        constant_cols = [
+            col
+            for col in self._nonfeature_columns
+            if col not in groupby and col not in special_agg_cols
+        ]
+        for col in constant_cols:
+            if col in self.result.columns:
+                is_constant = result_grouped[col].nunique() == 1
+                if not is_constant.all():
+                    non_constant_groups = is_constant[~is_constant].index.tolist()
+                    raise ValueError(
+                        f"Column {col} is not constant in groups: {non_constant_groups}"
+                    )
+                agg_dict[col] = lambda df, col=col: df[col].iloc[0]
+
+        if "duration" in self.result.columns:
+            agg_dict["duration"] = lambda df: np.sum(df["duration"])
+
+        if "endfile" in self.result.columns:
+            agg_dict["endfile"] = lambda df: df["endfile"].iloc[-1]
+
+        if "timestamp" in self.result.columns:
+            agg_dict["timestamp"] = lambda df: df["timestamp"].iloc[0]
+
+        for feat in features:
+            agg_dict[feat] = lambda df, feat=feat: average_feature(
+                df, feat, "duration"
+            )
+
+        aggregated_df = result_grouped.apply(
+            lambda df: pd.Series(
+                {
+                    col: agg_dict[col](df)
+                    for col in self.result.columns
+                    if col not in groupby
+                }
+            )
+        )
+
+        self.result = aggregated_df.reset_index(
+            drop=False
+        )  # Keep animalday/isday as a column
+
+        self.suppress_short_interval_error = True
+        logging.info("Setting suppress_short_interval_error to True")
+        self._update_instance_vars()
+
+    def add_unique_hash(self, nbytes: int | None = None):
+        """Adds a hex hash to the animal ID to ensure uniqueness. This prevents collisions when, for example, multiple animals in ExperimentPlotter have the same animal ID.
+
+        Args:
+            nbytes (int, optional): Number of bytes to generate. This is passed directly to secrets.token_hex(). Defaults to None, which generates 16 hex characters (8 bytes).
+        """
+        import secrets
+
+        hash_suffix = secrets.token_hex(nbytes)
+        new_animal_id = f"{self.animal_id}_{hash_suffix}"
+
+        if "animal" in self.result.columns:
+            self.result["animal"] = new_animal_id
+        if "animalday" in self.result.columns:
+            self.result["animalday"] = self.result["animalday"].str.replace(
+                self.animal_id, new_animal_id
+            )
+        self.animal_id = new_animal_id
+
+        self._update_instance_vars()
+
+
+def bin_spike_times(
+    spike_times: list[float], fragment_durations: list[float]
+) -> list[int]:
+    """Bin spike times into counts based on fragment durations.
+
+    Args:
+        spike_times (list[float]): List of spike timestamps in seconds
+        fragment_durations (list[float]): List of fragment durations in seconds
+
+    Returns:
+        list[int]: List of spike counts per fragment
+    """
+    # Convert fragment durations to bin edges
+    bin_edges = np.cumsum([0] + fragment_durations)
+
+    # Use numpy's histogram function to count spikes in each bin
+    counts, _ = np.histogram(spike_times, bins=bin_edges)
+
+    return counts.tolist()
+
+
+def _bin_spike_df(df: pd.DataFrame, spikes_channel: list[list[float]]) -> np.ndarray:
+    """
+    Bins spike times into a matrix of shape (n_windows, n_channels), based on duration of each window in df
+    """
+    durations = df["duration"].tolist()
+    out = np.empty((len(durations), len(spikes_channel)))
+    for i, spike_times in enumerate(spikes_channel):
+        out[:, i] = bin_spike_times(spike_times, durations)
+    return out

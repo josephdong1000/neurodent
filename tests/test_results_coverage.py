@@ -11,8 +11,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from neurodent.visualization import WindowAnalysisResult, AnimalFeatureParser
+from neurodent.visualization import WindowAnalysisResult
 from neurodent import constants
+from neurodent.visualization.feature_utils import average_feature
 from neurodent.visualization.results import _sanitize_feature_request
 
 
@@ -85,18 +86,17 @@ class TestSanitizeFeatureRequest:
 
 
 # =========================================================================
-# 2. AnimalFeatureParser._average_feature unsupported type (line 68)
+# 2. average_feature unsupported type
 # =========================================================================
 
-class TestAnimalFeatureParserUnsupported:
+class TestAverageFeatureUnsupported:
 
     def test_unsupported_feature_type_raises(self):
-        """Line 68: unsupported FeatureType raises TypeError."""
-        parser = AnimalFeatureParser()
+        """An unsupported FeatureType raises TypeError."""
         df = pd.DataFrame({"fake_col": [1, 2, 3], "duration": [1.0, 1.0, 1.0]})
         with patch.object(constants, "classify_feature", return_value="UNKNOWN_TYPE"):
             with pytest.raises((TypeError, AttributeError)):
-                parser._average_feature(df, "fake_col", "duration")
+                average_feature(df, "fake_col", "duration")
 
 
 # =========================================================================

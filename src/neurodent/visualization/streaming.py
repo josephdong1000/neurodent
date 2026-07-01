@@ -48,7 +48,7 @@ from .filters import (
 )
 
 if TYPE_CHECKING:
-    from .results import WindowAnalysisResult
+    from .window_analysis_result import WindowAnalysisResult
 
 
 # ---------------------------------------------------------------------------
@@ -532,7 +532,7 @@ class LazyWindowAnalysisResult:
         accumulators and write the small final DataFrame via
         :meth:`WindowAnalysisResult._df_to_arrow_table` once.
         """
-        from .results import WindowAnalysisResult  # local import to avoid cycle
+        from .window_analysis_result import WindowAnalysisResult  # local import to avoid cycle
 
         dst_folder = Path(folder)
         dst_folder.mkdir(parents=True, exist_ok=True)
@@ -667,7 +667,7 @@ class LazyWindowAnalysisResult:
         replays the preceding pass-through transforms on the slice before
         accumulating into per-transform stats DataFrames.
         """
-        from .results import WindowAnalysisResult
+        from .window_analysis_result import WindowAnalysisResult
 
         if not load_cols:
             for t in pass1_ts:
