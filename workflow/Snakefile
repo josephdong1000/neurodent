@@ -18,7 +18,7 @@ import sys
 import glob
 
 # Import workflow utilities
-from neurodent.workflow.utils import deep_merge_dict, expand_animals_config, format_config_value, increment_memory
+from neurodent.workflow.utils import deep_merge_dict, expand_animals_config, format_config_value, increment_memory, load_samples_config, resolve_samples_config
 
 
 # Load configuration
@@ -67,8 +67,6 @@ else:
 from snakemake.utils import validate
 validate(config, schema="schemas/config.schema.yaml")
 
-samples_file = config["samples"]["samples_file"]
-
 
 # Load sample definitions
 from datetime import datetime
@@ -85,15 +83,13 @@ except ImportError:
         "  uv pip install neurodent[pipeline]\n"
     )
 
-# Load samples config
-with open(samples_file, "r") as f:
-    samples_config = json.load(f)
+# Load samples config: inline 'samples_data' block or 'samples.samples_file' (.json/.yaml)
+samples_config = resolve_samples_config(config)
 
 # Expand unified "animals" list into pipeline keys (if present)
 samples_config = expand_animals_config(samples_config)
 
-# Extract sample information
-# Support both unified (animals list) and legacy (data_folders_to_animal_ids) formats
+# Extract sample information from the unified "animals" list
 ANIMALS = []
 ANIMAL_TO_FOLDERS_MAP = {}  # Maps slugified animal_id -> list of (folder, animal_id, original_session_key)
 ANIMAL_TO_FULL_ID_MAP = {} # Maps slugified animal_id -> original animal_id string
@@ -111,23 +107,8 @@ if "animals" in samples_config:
 
         # Each animal gets a single entry; pattern handles discovery
         ANIMAL_TO_FOLDERS_MAP[slugified_name].append(("", animal, ""))
-elif "data_folders_to_animal_ids" in samples_config:
-    # Legacy format: iterate from data_folders_to_animal_ids
-    for folder, animals in samples_config["data_folders_to_animal_ids"].items():
-        for animal in animals:
-            slugified_name = slugify(animal, allow_unicode=True)
-
-            if slugified_name not in ANIMALS:
-                ANIMALS.append(slugified_name)
-                ANIMAL_TO_FOLDERS_MAP[slugified_name] = []
-                ANIMAL_TO_FULL_ID_MAP[slugified_name] = animal
-
-            ANIMAL_TO_FOLDERS_MAP[slugified_name].append((folder, animal, folder))
 else:
-    raise KeyError(
-        "Samples config must contain either 'animals' (unified format) "
-        "or 'data_folders_to_animal_ids' (legacy format)"
-    )
+    raise KeyError("Samples config must contain an 'animals' list")
 
 # Optionally limit to first N animals (useful for testing)
 _truncate_animals = config.get("samples", {}).get("truncate_animals", None)
@@ -153,10 +134,10 @@ def get_animal_folder(wildcards):
 def get_joint_session_channels(wildcards):
     """Get channel subset for joint session animals, or None for regular animals.
 
-    Uses the new _animal_channels dict from expand_animals_config().
+    Uses the new _animal_channel_subsets dict from expand_animals_config().
     """
     animal_id = ANIMAL_TO_FULL_ID_MAP[wildcards.animal]
-    return samples_config.get("_animal_channels", {}).get(animal_id)
+    return samples_config.get("_animal_channel_subsets", {}).get(animal_id)
 
 
 def get_animal_id(wildcards):

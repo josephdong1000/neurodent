@@ -13,11 +13,12 @@ def sample_features_df():
 
     data = []
     animals = ["anim1", "anim2"]
-    genotypes = ["M_WT", "F_KO"]
+    genotypes = ["WT", "KO"]
+    sexes = ["Male", "Female"]
 
     start_time = datetime.datetime(2023, 1, 1, 0, 0)
 
-    for i, (anim, geno) in enumerate(zip(animals, genotypes)):
+    for i, (anim, geno, sx) in enumerate(zip(animals, genotypes, sexes)):
         for hour in range(24):
             # Clock time: 0-23
             timestamp = start_time + datetime.timedelta(hours=hour)
@@ -42,6 +43,7 @@ def sample_features_df():
                     "timestamp": timestamp,
                     "animal": anim,
                     "genotype": geno,
+                    "sex": sx,
                     "feature_const": val1,
                     "feature_wave": val2,
                 }
@@ -111,7 +113,8 @@ def test_transform_time_axis_edge_cases():
     # Create simple test data
     df = pd.DataFrame({
         "zt_minutes": [0, 360, 720, 1080],  # 0, 6, 12, 18 hours
-        "genotype": ["M_WT", "M_WT", "F_KO", "F_KO"],
+        "genotype": ["WT", "WT", "KO", "KO"],
+        "sex": ["Male", "Male", "Female", "Female"],
         "value": [1, 2, 3, 4],
     })
 
@@ -148,11 +151,11 @@ def test_transform_time_axis_edge_cases():
     assert len(result_24h) == len(df)
     assert result_24h["zt_minutes"].max() < 1440
 
-    # Test 6: Metadata enrichment
+    # Test 6: Metadata carried through (sex/genotype provided in input)
     assert "sex" in result_24h.columns
-    assert "gene" in result_24h.columns
+    assert "genotype" in result_24h.columns
     assert result_24h.iloc[0]["sex"] == "Male"
-    assert result_24h.iloc[0]["gene"] == "WT"
+    assert result_24h.iloc[0]["genotype"] == "WT"
 
 
 def test_nan_handling_legacy_issue(sample_features_df):
@@ -185,9 +188,9 @@ def test_nan_handling_legacy_issue(sample_features_df):
     ]
     assert len(zt20_rows) >= 1
 
-    # Should still satisfy processing requirements (metadata added, etc)
+    # Should still satisfy processing requirements (metadata carried, etc)
     assert "sex" in processed.columns
-    assert "gene" in processed.columns
+    assert "genotype" in processed.columns
 
 
 def test_grouped_baseline_correction():
@@ -262,11 +265,7 @@ def test_baseline_exclusions():
 def test_full_pipeline_via_run_zeitgeber_pipeline(sample_features_df):
     # Rename of test_metadata_enrichment_and_sort
     df = sample_features_df.copy()
-    # Ensure no pre-existing metadata to test enrichment
-    if "sex" in df.columns:
-        del df["sex"]
-    if "gene" in df.columns:
-        del df["gene"]
+    # sample_features_df provides genotype + sex; the pipeline carries them through.
 
     # We need to ensure zt_minutes exists before pipeline if we haven't stripped it
     # But sample_features_df creates a Raw DF? No, looking at lines 9-50, it makes cols:
@@ -281,11 +280,11 @@ def test_full_pipeline_via_run_zeitgeber_pipeline(sample_features_df):
 
     processed = zeitgeber.run_zeitgeber_pipeline(df)
 
-    # 1. Check Metadata Enrichment
+    # 1. Check Metadata carried through
     assert "sex" in processed.columns
-    assert "gene" in processed.columns
+    assert "genotype" in processed.columns
     assert processed.iloc[0]["sex"] == "Male"
-    assert processed.iloc[0]["gene"] == "WT"
+    assert processed.iloc[0]["genotype"] == "WT"
 
     # Check ZT Shift (Clock 0 -> ZT 18 (-6h) = 1080 min)
     # mock_zt_dataframe already has zt_minutes from add_zeitgeber_time_columns (0 at 00:00).
@@ -460,7 +459,7 @@ def test_add_zeitgeber_time_columns_empty_df():
 
 
 def test_subtract_baseline_no_group_cols():
-    """Test baseline subtraction without grouping columns (no animal/sex/gene)."""
+    """Test baseline subtraction without grouping columns (no animal/sex/genotype)."""
     df = pd.DataFrame({
         "zt_minutes": [0, 360, 720, 1080],
         "feature": [10.0, 10.0, 20.0, 20.0],
@@ -478,7 +477,7 @@ def test_subtract_baseline_empty_window():
     """Test baseline subtraction when baseline window has no data (ungrouped)."""
     df = pd.DataFrame({
         "zt_minutes": [720, 1080, 1320],  # All after ZT12
-        # No group columns (animal/sex/gene) - tests the ungrouped branch
+        # No group columns (animal/sex/genotype) - tests the ungrouped branch
         "feature": [10.0, 20.0, 30.0],
     })
     
@@ -524,7 +523,7 @@ def test_enrich_genotype_metadata_empty_df():
     from neurodent.core import metadata
     
     empty_df = pd.DataFrame({"animal": []})
-    animal_meta = {"M1": {"sex": "Male", "gene": "WT"}}
+    animal_meta = {"M1": {"sex": "Male", "genotype": "WT"}}
     
     # Should handle empty df gracefully
     result = metadata.enrich_metadata(empty_df, animal_meta)
@@ -540,15 +539,15 @@ def test_enrich_metadata_basic():
         "value": [10, 20],
     })
     animal_meta = {
-        "M1": {"sex": "Male", "gene": "WT"},
-        "F1": {"sex": "Female", "gene": "Mut"},
+        "M1": {"sex": "Male", "genotype": "WT"},
+        "F1": {"sex": "Female", "genotype": "Mut"},
     }
     
     result = metadata.enrich_metadata(df, animal_meta)
     assert "sex" in result.columns
-    assert "gene" in result.columns
+    assert "genotype" in result.columns
     assert result.iloc[0]["sex"] == "Male"
-    assert result.iloc[1]["gene"] == "Mut"
+    assert result.iloc[1]["genotype"] == "Mut"
 
 
 def test_zar_get_grouprows_result():
@@ -558,7 +557,8 @@ def test_zar_get_grouprows_result():
     mock_war = MagicMock()
     mock_war.get_grouprows_result.return_value = pd.DataFrame({
         "timestamp": pd.date_range("2023-01-01 06:00", periods=3, freq="1h"),
-        "genotype": ["M_WT", "M_WT", "M_WT"],
+        "genotype": ["WT", "WT", "WT"],
+        "sex": ["Male", "Male", "Male"],
         "feature": [1, 2, 3],
     })
     
@@ -577,7 +577,8 @@ def test_zar_get_groupavg_result():
     mock_war = MagicMock()
     mock_war.get_groupavg_result.return_value = pd.DataFrame({
         "timestamp": pd.date_range("2023-01-01 06:00", periods=3, freq="1h"),
-        "genotype": ["M_WT", "M_WT", "M_WT"],
+        "genotype": ["WT", "WT", "WT"],
+        "sex": ["Male", "Male", "Male"],
         "feature": [1, 2, 3],
     })
     
@@ -627,9 +628,9 @@ def test_deprecated_enrich_genotype_with_aliases():
     
     # Should still work via conversion to new format
     assert "sex" in result.columns
-    assert "gene" in result.columns
+    assert "genotype" in result.columns
     assert result.iloc[0]["sex"] == "Male"
-    assert result.iloc[0]["gene"] == "WT"
+    assert result.iloc[0]["genotype"] == "WT"
 
 
 def test_baseline_grouped_empty_window(caplog):
@@ -666,10 +667,11 @@ def test_zar_ignores_extra_config_kwargs():
     mock_war = MagicMock()
     mock_war.get_result.return_value = pd.DataFrame({
         "timestamp": pd.date_range("2023-01-01 06:00", periods=3, freq="1h"),
-        "genotype": ["M_WT", "M_WT", "M_WT"],
+        "genotype": ["WT", "WT", "WT"],
+        "sex": ["Male", "Male", "Male"],
         "feature": [1, 2, 3],
     })
-    
+
     # Pass extra kwargs that are NOT valid for run_zeitgeber_pipeline
     zar = zeitgeber.ZeitgeberAnalysisResult(
         mock_war,
@@ -681,7 +683,7 @@ def test_zar_ignores_extra_config_kwargs():
     # Should not raise TypeError about unexpected keyword argument
     result = zar.get_result()
     
-    # Verify pipeline was applied (has sex/gene columns from enrichment)
+    # Verify pipeline was applied (has sex/genotype columns from enrichment)
     assert "sex" in result.columns
     assert "zt_minutes" in result.columns
 

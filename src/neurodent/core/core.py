@@ -49,8 +49,13 @@ from .utils import (
     get_file_stem,
     should_use_cache_unified,
     get_cache_status_message,
-    convert_intan_chname_mne,
-    abbreviate_channel_names,
+    rename_mne_channels,
+    resolve_channels,
+    atomic_output_path,
+    atomic_write_json,
+    safe_unlink,
+    safe_rmtree,
+    is_si_recording_folder,
 )
 
 
@@ -201,9 +206,12 @@ class RecordingMetadata:
         )
 
     def to_json(self, file_path: Path) -> None:
-        """Save RecordingMetadata to a JSON file."""
-        with open(file_path, "w") as f:
-            json.dump(self.to_dict(), f, indent=2)
+        """Save RecordingMetadata to a JSON file.
+
+        The file is written atomically (temp file + rename) so an interrupted
+        write never leaves a partial/corrupt metadata sidecar.
+        """
+        atomic_write_json(file_path, self.to_dict(), indent=2)
 
     @classmethod
     def from_json(cls, file_path: Path) -> "RecordingMetadata":
@@ -412,23 +420,30 @@ def split_recording(
     output_base: Union[str, Path] = None,
     mode: Literal["si", "mne"] = "si",
     format: Literal["zarr", "binary"] = "zarr",
-    persist: bool = True,
+    save: bool = True,
+    overwrite: bool = False,
+    persist: Union[bool, None] = None,
     **lro_kwargs,
 ) -> dict[str, "LongRecordingOrganizer"]:
     """
     Split a multi-animal recording file into separate per-animal recordings.
 
     This is a standalone convenience function that creates an LRO, splits it,
-    and optionally persists the results to disk.
+    and optionally saves the results to disk.
 
     Args:
         input_path (Union[str, Path]): Path to the input recording file/folder.
         groups (dict[str, list[str]]): Dictionary mapping group names to channel lists.
             Example: {"AnimalA": ["Ch1", "Ch2"], "AnimalB": ["Ch3", "Ch4"]}
-        output_base (Union[str, Path], optional): Base directory for output. Required if persist=True.
+        output_base (Union[str, Path], optional): Base directory for output. Required if save=True.
         mode (Literal["si", "mne"], optional): Mode for loading input. Defaults to "si".
         format (Literal["zarr", "binary"], optional): Output format. Defaults to "zarr".
-        persist (bool, optional): If True, save splits to disk. Defaults to True.
+        save (bool, optional): If True, save splits to disk via
+            :meth:`LongRecordingOrganizer.save_recording`. Defaults to True.
+        overwrite (bool, optional): Passed to ``save_recording``; if True, replace an
+            existing (recognized) recording folder. Defaults to False.
+        persist (bool, optional): Deprecated alias for ``save``. If provided (not None),
+            it overrides ``save`` and emits a :class:`DeprecationWarning`.
         **lro_kwargs: Additional arguments passed to LongRecordingOrganizer.
 
     Returns:
@@ -442,22 +457,30 @@ def split_recording(
         ...     output_base="/path/to/output",
         ... )
     """
+    if persist is not None:
+        warnings.warn(
+            "The 'persist' argument of split_recording() is deprecated; use 'save'.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        save = persist
+
     # Load the input recording
     lro = LongRecordingOrganizer(input_path, mode=mode, **lro_kwargs)
 
     # Split into in-memory LROs
     splits = lro.split(groups)
 
-    # Persist if requested
-    if persist:
+    # Save if requested
+    if save:
         if output_base is None:
-            raise ValueError("output_base is required when persist=True")
+            raise ValueError("output_base is required when save=True")
         output_base = Path(output_base)
         output_base.mkdir(parents=True, exist_ok=True)
 
         for group_name, child_lro in splits.items():
             output_dir = output_base / group_name
-            child_lro.persist(output_dir, format=format)
+            child_lro.save_recording(output_dir, format=format, overwrite=overwrite)
 
     return splits
 
@@ -485,7 +508,7 @@ class LongRecordingOrganizer:
         extract_func (Callable | str, optional): Function to extract data.
             - If str: name of SpikeInterface or MNE extractor (e.g., 'read_intan', 'read_raw_edf')
             - If Callable: custom extraction function
-            - If None: defaults to si.load_extractor for SI mode
+            - If None: defaults to si.load for SI mode
         manual_datetimes (datetime | list[datetime], optional): Manually provided timestamps.
         datetimes_are_start (bool, optional): If True (default), manual_datetimes are start times.
         n_jobs (int, optional): Number of parallel jobs for MNE resampling. Defaults to 1.
@@ -733,7 +756,7 @@ class LongRecordingOrganizer:
                         "or a file path (e.g. 'path/to/readers.py:func_name')."
                     )
             elif extract_func is None:
-                extract_func = si.load_extractor
+                extract_func = si.load
 
             self.convert_file_with_si_to_recording(
                 extract_func=extract_func,
@@ -767,7 +790,7 @@ class LongRecordingOrganizer:
             raise ValueError(f"Invalid mode: {mode}")
 
     @staticmethod
-    def _make_empty_si_recording() -> "si.BaseRecording":
+    def _create_empty_si_recording() -> "si.BaseRecording":
         """Return a 0-sample SpikeInterface recording as a placeholder.
 
         Used when a file group fails to load (e.g. corrupt or empty metadata).
@@ -817,7 +840,7 @@ class LongRecordingOrganizer:
                         f"({self.item.paths}): {e}. "
                         f"Creating 0-sample placeholder; this recording will be skipped."
                     )
-                    rec = self._make_empty_si_recording()
+                    rec = self._create_empty_si_recording()
             else:
                 # Single file
                 rec: "si.BaseRecording" = extract_func(self.item.path, **kwargs)
@@ -1073,30 +1096,49 @@ class LongRecordingOrganizer:
                         use_cache = False
 
         if use_cache:
-            # Load cached data file
-            if intermediate == "edf":
-                logging.info("Reading cached edf file")
-                rec = se.read_edf(fname)
-                return rec, None, metadata  # No raw object when using cache
+            # Load cached data file. The cache is validated only by existence +
+            # mtime, not integrity, so a truncated/corrupt file (e.g. from a write
+            # interrupted by a killed job) can still reach here. Guard the read and
+            # self-heal under non-'always' policies by deleting the bad cache and
+            # falling through to regeneration.
+            try:
+                if intermediate == "edf":
+                    logging.info("Reading cached edf file")
+                    rec = se.read_edf(fname)
+                    return rec, None, metadata  # No raw object when using cache
 
-            elif intermediate == "bin":
-                # Use metadata to reconstruct SpikeInterface parameters
-                params = {
-                    "sampling_frequency": metadata.f_s,
-                    "num_channels": metadata.n_channels,
-                    "dtype": "float64",  # We standardize on float64 for cached binary files
-                    "gain_to_uV": 1,
-                    "offset_to_uV": 0,
-                    "time_axis": 0,
-                    "is_filtered": False,
-                    "channel_ids": metadata.channel_names,
-                }
+                elif intermediate == "bin":
+                    # Use metadata to reconstruct SpikeInterface parameters
+                    params = {
+                        "sampling_frequency": metadata.f_s,
+                        "num_channels": metadata.n_channels,
+                        "dtype": "float64",  # We standardize on float64 for cached binary files
+                        "gain_to_uV": 1,
+                        "offset_to_uV": 0,
+                        "time_axis": 0,
+                        "is_filtered": False,
+                        "channel_ids": metadata.channel_names,
+                    }
 
-                logging.info(f"Reading from cached binary file {fname}")
-                rec = se.read_binary(fname, **params)
-                return rec, None, metadata  # No raw object when using cache
+                    logging.info(f"Reading from cached binary file {fname}")
+                    rec = se.read_binary(fname, **params)
+                    return rec, None, metadata  # No raw object when using cache
+            except Exception as e:
+                if cache_policy == "always":
+                    logging.error(
+                        f"Cache policy 'always' requires a readable cached file, "
+                        f"but {fname} could not be read: {e}"
+                    )
+                    raise
+                logging.warning(
+                    f"Cached intermediate file {fname} could not be read ({e}); "
+                    f"deleting and regenerating"
+                )
+                safe_unlink(fname)
+                safe_unlink(meta_fname)
+                use_cache = False
 
-        else:
+        if not use_cache:
             # Generate new intermediate files
             logging.info(get_cache_status_message(fname, False))
 
@@ -1140,51 +1182,54 @@ class LongRecordingOrganizer:
             # Check if channel names in MNE Raw object are in Intan format and convert if necessary
             if any("intan" in ch_name.lower() for ch_name in raw.info["ch_names"]):
                 logging.info("Converting Intan channel names to MNE format")
-                convert_intan_chname_mne(
+                rename_mne_channels(
                     raw
                 )  # REVIEW check that this function is robust
 
             # Create the intermediate file
             if intermediate == "edf":
                 logging.info(f"Exporting raw to {fname}")
-                try:
-                    mne.export.export_raw(fname, raw=raw, fmt="edf", overwrite=True)
-                except ValueError as e:
-                    # REVIEW JD to me this appears hardcoded -- will check with EDF files as well
-                    if "exceeds maximum field length" in str(e):
-                        logging.warning(
-                            f"EDF export failed due to signal range: {e}. Retrying with robust physical range."
-                        )
-                        # Calculate robust range (0.01 - 99.99 percentile) to exclude artifacts
-                        data = raw.get_data()
-                        # Use data percentiles to define physical range, excluding extreme outliers
-                        p_min, p_max = np.percentile(data, [0.01, 99.99])
+                # Export to a temp sibling and atomically rename, so an interrupted
+                # write never leaves a partial EDF at the canonical cache path.
+                with atomic_output_path(fname) as tmp:
+                    try:
+                        mne.export.export_raw(tmp, raw=raw, fmt="edf", overwrite=True)
+                    except ValueError as e:
+                        # REVIEW JD to me this appears hardcoded -- will check with EDF files as well
+                        if "exceeds maximum field length" in str(e):
+                            logging.warning(
+                                f"EDF export failed due to signal range: {e}. Retrying with robust physical range."
+                            )
+                            # Calculate robust range (0.01 - 99.99 percentile) to exclude artifacts
+                            data = raw.get_data()
+                            # Use data percentiles to define physical range, excluding extreme outliers
+                            p_min, p_max = np.percentile(data, [0.01, 99.99])
 
-                        # Helper to ensure float fits in 8 chars (EDF limit)
-                        def to_valid_edf_float(val):
-                            # Try formatting with decreasing precision
-                            for fmt in [".6g", ".5g", ".4g", ".3g", ".2g"]:
-                                s = f"{val:{fmt}}"
-                                if len(s) <= 8:
-                                    return float(s)
-                            # Fallback
-                            return float(f"{val:.2e}")
+                            # Helper to ensure float fits in 8 chars (EDF limit)
+                            def to_valid_edf_float(val):
+                                # Try formatting with decreasing precision
+                                for fmt in [".6g", ".5g", ".4g", ".3g", ".2g"]:
+                                    s = f"{val:{fmt}}"
+                                    if len(s) <= 8:
+                                        return float(s)
+                                # Fallback
+                                return float(f"{val:.2e}")
 
-                        safe_min = to_valid_edf_float(p_min)
-                        safe_max = to_valid_edf_float(p_max)
+                            safe_min = to_valid_edf_float(p_min)
+                            safe_max = to_valid_edf_float(p_max)
 
-                        logging.info(
-                            f"Using robust physical range: ({safe_min}, {safe_max})"
-                        )
-                        mne.export.export_raw(
-                            fname,
-                            raw=raw,
-                            fmt="edf",
-                            overwrite=True,
-                            physical_range=(safe_min, safe_max),
-                        )
-                    else:
-                        raise
+                            logging.info(
+                                f"Using robust physical range: ({safe_min}, {safe_max})"
+                            )
+                            mne.export.export_raw(
+                                tmp,
+                                raw=raw,
+                                fmt="edf",
+                                overwrite=True,
+                                physical_range=(safe_min, safe_max),
+                            )
+                        else:
+                            raise
 
                 logging.info("Reading edf file")
                 rec = se.read_edf(fname)
@@ -1207,7 +1252,10 @@ class LongRecordingOrganizer:
                 data = data.T  # (n samples, n channels)
                 params["dtype"] = data.dtype
                 logging.info(f"Writing to {fname}")
-                data.tofile(fname)
+                # Write to a temp sibling and atomically rename, so an interrupted
+                # write never leaves a partial binary file at the cache path.
+                with atomic_output_path(fname) as tmp:
+                    data.tofile(tmp)
 
                 logging.info(f"Reading from {fname}")
                 rec = se.read_binary(fname, **params)
@@ -1340,8 +1388,8 @@ class LongRecordingOrganizer:
         Split the current recording into multiple in-memory LongRecordingOrganizer objects.
 
         This creates lightweight LRO wrappers around channel-sliced views of the
-        recording. No disk I/O is performed. Use `persist()` on individual results
-        to save them to disk if needed.
+        recording. No disk I/O is performed. Use `save_recording()` on individual
+        results to save them to disk if needed.
 
         Args:
             groups (dict[str, list[str]]): Dictionary mapping group names (e.g., 'AnimalA')
@@ -1357,7 +1405,7 @@ class LongRecordingOrganizer:
         Example:
             >>> lro = LongRecordingOrganizer("/path/to/data", mode="bin")
             >>> splits = lro.split({"AnimalA": ["Ch1", "Ch2"], "AnimalB": ["Ch3", "Ch4"]})
-            >>> splits["AnimalA"].persist("/output/AnimalA", format="zarr")
+            >>> splits["AnimalA"].save_recording("/output/AnimalA", format="zarr")
         """
         if si is None:
             raise ImportError("SpikeInterface is required for split()")
@@ -1464,6 +1512,107 @@ class LongRecordingOrganizer:
 
         return lros
 
+    def save_recording(
+        self,
+        output_dir: Union[str, Path],
+        format: Literal["zarr", "binary"] = "zarr",
+        overwrite: bool = False,
+        n_jobs: int = 1,
+        chunk_duration: str = "1s",
+        progress_bar: bool = True,
+        **kwargs,
+    ) -> Path:
+        """Save this LRO's recording to disk as a self-contained folder.
+
+        Delegates the recording write to SpikeInterface's ``save()`` and additionally
+        writes a NeuRodent metadata sidecar (:data:`~neurodent.constants.NEURODENT_SIDECAR_NAME`)
+        inside the output folder so the full LRO state — timestamps, durations, units,
+        bad channels, and labels — can be restored faithfully via :meth:`load_recording`.
+
+        The sidecar is written last (and atomically), so an interrupted save leaves a
+        folder with no sidecar, which :meth:`load_recording` detects and degrades on.
+
+        Args:
+            output_dir (Union[str, Path]): Directory to save the recording to. For
+                ``format="zarr"`` a ``.zarr`` suffix is appended if not already present.
+            format (Literal["zarr", "binary"], optional): Save format. Defaults to "zarr".
+            overwrite (bool, optional): If False (default), raise :class:`FileExistsError`
+                when the target already exists. If True, the existing target is removed
+                first — but **only** when it is a recognized SpikeInterface/NeuRodent
+                recording folder; an unrecognized directory is never deleted (raises
+                :class:`ValueError`). Defaults to False.
+            n_jobs (int, optional): Number of parallel jobs. Defaults to 1.
+            chunk_duration (str, optional): Chunk duration for processing. Defaults to "1s".
+            progress_bar (bool, optional): Show progress bar. Defaults to True.
+            **kwargs: Additional arguments passed to SI's save().
+
+        Returns:
+            Path: The actual output directory where the recording was saved (with the
+            ``.zarr`` suffix applied for zarr format).
+
+        Raises:
+            ImportError: If SpikeInterface is not available.
+            ValueError: If there is no recording to save, or ``overwrite=True`` targets
+                a directory that is not a recognized recording folder.
+            FileExistsError: If the target exists and ``overwrite=False``, or the target
+                exists but is not a directory.
+        """
+        if si is None:
+            raise ImportError("SpikeInterface is required for save_recording()")
+
+        if self.LongRecording is None:
+            raise ValueError("No recording to save")
+
+        output_dir = Path(output_dir)
+
+        # Ensure parent directory exists
+        output_dir.parent.mkdir(parents=True, exist_ok=True)
+
+        # For zarr format, SI appends .zarr suffix to folder name. Validation and
+        # deletion below must operate on this resolved path so that binary format
+        # (which has no suffix) is guarded just as carefully as zarr.
+        actual_output_dir = output_dir
+        if format == "zarr" and not str(output_dir).endswith(".zarr"):
+            actual_output_dir = output_dir.parent / f"{output_dir.name}.zarr"
+
+        if actual_output_dir.exists():
+            if not actual_output_dir.is_dir():
+                raise FileExistsError(
+                    f"{actual_output_dir} exists and is not a directory; refusing to overwrite."
+                )
+            if not overwrite:
+                raise FileExistsError(
+                    f"{actual_output_dir} already exists; pass overwrite=True to replace it."
+                )
+            # overwrite=True: only delete folders we recognize as recording output.
+            if not is_si_recording_folder(actual_output_dir):
+                raise ValueError(
+                    f"Refusing to overwrite {actual_output_dir}: it does not look like a "
+                    "SpikeInterface recording output folder. Delete it manually if you are sure."
+                )
+            logging.warning(f"Overwriting existing recording folder: {actual_output_dir}")
+            safe_rmtree(actual_output_dir)
+
+        self.LongRecording.save(
+            folder=output_dir,
+            format=format,
+            n_jobs=n_jobs,
+            chunk_duration=chunk_duration,
+            progress_bar=progress_bar,
+            **kwargs,
+        )
+
+        # Write the metadata sidecar inside the folder SI just created (written last
+        # so its presence signals a complete save).
+        sidecar_path = actual_output_dir / constants.NEURODENT_SIDECAR_NAME
+        atomic_write_json(sidecar_path, self._create_sidecar_payload(format))
+
+        self.base_folder_path = actual_output_dir
+        self._is_in_memory = False
+        logging.info(f"Saved recording to {actual_output_dir} (format={format})")
+
+        return actual_output_dir
+
     def persist(
         self,
         output_dir: Union[str, Path],
@@ -1473,59 +1622,177 @@ class LongRecordingOrganizer:
         progress_bar: bool = True,
         **kwargs,
     ) -> Path:
-        """
-        Save this LRO's recording to disk.
+        """Deprecated alias for :meth:`save_recording`.
 
-        Delegates to SpikeInterface's save() function.
-
-        Args:
-            output_dir (Union[str, Path]): Directory to save the recording.
-            format (Literal["zarr", "binary"], optional): Save format. Defaults to "zarr".
-            n_jobs (int, optional): Number of parallel jobs. Defaults to 1.
-            chunk_duration (str, optional): Chunk duration for processing. Defaults to "1s".
-            progress_bar (bool, optional): Show progress bar. Defaults to True.
-            **kwargs: Additional arguments passed to SI's save().
+        Retained for backward compatibility. Delegates to :meth:`save_recording` with
+        ``overwrite=True`` to preserve the historical clobbering behavior. New code
+        should call :meth:`save_recording`, which defaults to ``overwrite=False``.
 
         Returns:
             Path: The output directory where the recording was saved.
         """
+        # Preserve the exact guard messages the historical API raised.
         if si is None:
             raise ImportError("SpikeInterface is required for persist()")
-
         if self.LongRecording is None:
             raise ValueError("No recording to persist")
 
-        output_dir = Path(output_dir)
-
-        # Ensure parent directory exists
-        output_dir.parent.mkdir(parents=True, exist_ok=True)
-
-        # For zarr format, SI appends .zarr suffix to folder name
-        actual_output_dir = output_dir
-        if format == "zarr" and not str(output_dir).endswith(".zarr"):
-            actual_output_dir = output_dir.parent / f"{output_dir.name}.zarr"
-
-        if actual_output_dir.exists():
-            logging.warning(f"Overwriting existing folder: {actual_output_dir}")
-            import shutil
-
-            shutil.rmtree(actual_output_dir)
-
-        saved_rec = self.LongRecording.save(
-            folder=output_dir,
+        warnings.warn(
+            "LongRecordingOrganizer.persist() is deprecated; use save_recording(). "
+            "Note that save_recording() defaults to overwrite=False.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.save_recording(
+            output_dir,
             format=format,
+            overwrite=True,
             n_jobs=n_jobs,
             chunk_duration=chunk_duration,
             progress_bar=progress_bar,
             **kwargs,
         )
 
-        # SI returns saved recording; update our path to actual location
-        self.base_folder_path = actual_output_dir
-        self._is_in_memory = False
-        logging.info(f"Persisted recording to {actual_output_dir} (format={format})")
+    def _create_sidecar_payload(self, format: str) -> dict:
+        """Build the JSON-serializable LRO metadata sidecar payload.
 
-        return actual_output_dir
+        Captures the LRO-level state that the raw SpikeInterface recording folder does
+        not carry, mirroring exactly what :meth:`split` propagates to child LROs.
+
+        Args:
+            format (str): The SI save format used ("zarr" or "binary").
+
+        Returns:
+            dict: JSON-serializable sidecar contents.
+        """
+        file_end_datetimes = getattr(self, "file_end_datetimes", []) or []
+        return {
+            "neurodent_sidecar_version": 1,
+            "format": format,
+            "channel_names": list(self.channel_names) if self.channel_names else [],
+            "bad_channel_names": list(self.bad_channel_names),
+            "labels": dict(self.labels),
+            "n_truncate": self.n_truncate,
+            "truncate": self.truncate,
+            "datetimes_are_start": self.datetimes_are_start,
+            "file_durations": list(self.file_durations),
+            "cumulative_file_durations": list(self.cumulative_file_durations),
+            "file_end_datetimes": [
+                dt.isoformat() if dt is not None else None for dt in file_end_datetimes
+            ],
+            "meta": self.meta.to_dict() if self.meta is not None else None,
+        }
+
+    def _overlay_sidecar(self, data: dict) -> None:
+        """Restore LRO-level metadata from a sidecar payload onto this instance.
+
+        Args:
+            data (dict): Sidecar contents produced by :meth:`_create_sidecar_payload`.
+        """
+        self.channel_names = data["channel_names"]
+        self.bad_channel_names = list(data.get("bad_channel_names", []))
+        self.labels = dict(data.get("labels", {}))
+        self.n_truncate = data.get("n_truncate", 0)
+        self.truncate = data.get("truncate", False)
+        self.datetimes_are_start = data.get("datetimes_are_start", True)
+        self.file_durations = list(data.get("file_durations", []))
+        self.cumulative_file_durations = list(data.get("cumulative_file_durations", []))
+        self.file_end_datetimes = [
+            datetime.fromisoformat(x) if x else None
+            for x in data.get("file_end_datetimes", [])
+        ]
+        if data.get("meta") is not None:
+            meta = RecordingMetadata.from_dict(data["meta"])
+            # from_dict drops these extra fields; restore them as from_json does.
+            meta.V_units = data["meta"].get("V_units")
+            meta.mult_to_uV = data["meta"].get("mult_to_uV")
+            meta.precision = data["meta"].get("precision")
+            self.meta = meta
+
+    @classmethod
+    def load_recording(
+        cls,
+        folder: Union[str, Path],
+        *,
+        strict: bool = False,
+    ) -> "LongRecordingOrganizer":
+        """Load a recording previously written by :meth:`save_recording`.
+
+        Reloads the SpikeInterface recording from ``folder`` and overlays the NeuRodent
+        metadata sidecar to restore the full LRO state (timestamps, durations, units,
+        bad channels, labels). This is the faithful round-trip counterpart to
+        :meth:`save_recording`, and gives :attr:`base_folder_path` a concrete reader.
+
+        Args:
+            folder (Union[str, Path]): Path to a saved recording folder (zarr or binary).
+            strict (bool, optional): If True, raise when the sidecar is missing or
+                invalid. If False (default), fall back to a bare reload (traces only,
+                no restored timestamps) and emit a warning. Defaults to False.
+
+        Returns:
+            LongRecordingOrganizer: The reloaded LRO.
+
+        Raises:
+            ImportError: If SpikeInterface is not available.
+            FileNotFoundError: If ``folder`` is not a directory, or (with ``strict=True``)
+                the sidecar is missing.
+            ValueError: With ``strict=True``, if the sidecar is present but invalid.
+        """
+        if si is None:
+            raise ImportError("SpikeInterface is required for load_recording()")
+
+        folder = Path(folder)
+        if not folder.is_dir():
+            raise FileNotFoundError(f"Not a directory: {folder}")
+
+        rec = si.load(folder)
+        lro = cls(item=None, mode=None, recording=rec)
+
+        sidecar_path = folder / constants.NEURODENT_SIDECAR_NAME
+        if not sidecar_path.exists():
+            msg = (
+                f"No NeuRodent sidecar ({constants.NEURODENT_SIDECAR_NAME}) in {folder}; "
+                "timestamps and labels cannot be restored."
+            )
+            if strict:
+                raise FileNotFoundError(msg)
+            logging.warning(msg)
+            lro.base_folder_path = folder
+            lro._is_in_memory = False
+            return lro
+
+        try:
+            with open(sidecar_path, "r") as f:
+                data = json.load(f)
+            lro._overlay_sidecar(data)
+        except (json.JSONDecodeError, KeyError, ValueError) as e:
+            msg = f"Invalid NeuRodent sidecar in {folder}: {e}"
+            if strict:
+                raise ValueError(msg) from e
+            logging.warning(f"{msg}. Falling back to bare reload.")
+            lro.base_folder_path = folder
+            lro._is_in_memory = False
+            return lro
+
+        # Consistency guard: channel count and total duration should agree.
+        if lro.channel_names and len(lro.channel_names) != rec.get_num_channels():
+            logging.warning(
+                f"Sidecar channel count ({len(lro.channel_names)}) != recording channels "
+                f"({rec.get_num_channels()}) for {folder}."
+            )
+        total_duration = rec.get_total_duration()
+        sidecar_total = sum(lro.file_durations) if lro.file_durations else None
+        if sidecar_total is not None and abs(sidecar_total - total_duration) > (
+            1.0 / constants.GLOBAL_SAMPLING_RATE
+        ):
+            logging.warning(
+                f"Sidecar total duration ({sidecar_total:.3f}s) differs from recording "
+                f"duration ({total_duration:.3f}s) for {folder}."
+            )
+
+        lro.base_folder_path = folder
+        lro._is_in_memory = False
+        return lro
 
     def get_num_fragments(self, fragment_len_s):
         frag_len_idx = self.__time_to_idx(fragment_len_s)
@@ -2166,8 +2433,8 @@ class LongRecordingOrganizer:
         # Check channel names — compare by abbreviation to tolerate naming
         # variants (e.g. "L Barrel" vs "L Barrel Ctx" both → "LBar").
         # Unparseable names pass through as-is for exact comparison.
-        self_abbrevs = abbreviate_channel_names(self.channel_names)
-        other_abbrevs = abbreviate_channel_names(other_lro.channel_names)
+        self_abbrevs = resolve_channels(self.channel_names)
+        other_abbrevs = resolve_channels(other_lro.channel_names)
         if self_abbrevs != other_abbrevs:
             raise ValueError(
                 f"Channel names mismatch: this LRO has {self.channel_names} "

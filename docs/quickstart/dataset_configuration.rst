@@ -13,9 +13,6 @@ Quick Start
    # Run with Sox5 binary dataset
    NEURODENT_DATASET=sox5_bin uv run snakemake --profile your-profile
 
-   # Run with AP3B2 NWB dataset
-   NEURODENT_DATASET=ap3b2_nwb uv run snakemake --profile your-profile
-
    # Run with AP3B2 RHD dataset
    NEURODENT_DATASET=ap3b2_rhd uv run snakemake --profile your-profile
 
@@ -31,7 +28,6 @@ How It Works
    ├── config.local.yaml         # Local overrides (gitignored)
    ├── datasets/                 # Dataset-specific configs
    │   ├── sox5_bin.yaml        # Sox5 project, binary format
-   │   ├── ap3b2_nwb.yaml       # AP3B2 project, NWB format
    │   └── ap3b2_rhd.yaml       # AP3B2 project, RHD format
    └── samples*.json            # Sample metadata files
 
@@ -143,8 +139,8 @@ Create ``config/samples_mydata.json`` using the unified ``animals`` list format:
    {
        "data_root": "/path/to/your/data",
        "animals": [
-           {"id": "M1", "gene": "WT", "sex": "M"},
-           {"id": "F3", "gene": "KO", "sex": "F"}
+           {"id": "M1", "genotype": "WT", "sex": "M"},
+           {"id": "F3", "genotype": "KO", "sex": "F"}
        ]
    }
 
@@ -169,11 +165,14 @@ describes all available parameters:
      - Yes
      - Unique identifier for the animal (e.g. ``"M1"``, ``"AP3B2homo-240-M"``).
        Used as the primary key throughout the pipeline.
-   * - ``gene``
+   * - ``genotype``
      - string
      - Yes
-     - Genotype label (e.g. ``"WT"``, ``"KO"``, ``"Het"``). Used to
-       auto-generate ``GENOTYPE_ALIASES`` and for downstream grouping.
+     - Genotype label (e.g. ``"WT"``, ``"KO"``, ``"Het"``); surfaces as the
+       ``genotype`` column for downstream grouping. The legacy key ``gene`` is
+       still accepted as an alias. Optionally normalized to a short label via
+       ``GENOTYPE_MAP`` (exact match; when that map is set it is authoritative —
+       an uncovered value raises at load).
    * - ``sex``
      - string
      - Yes
@@ -246,20 +245,19 @@ In addition to ``animals``, the samples JSON supports these top-level keys:
      - Description
    * - ``data_root``
      - **Required.** Root path containing the raw data directories.
-   * - ``LR_ALIASES``
-     - Mapping of ``"L"``/``"R"`` labels to channel indices
-       (e.g. ``{"L": ["0","1","2"], "R": ["5","6","7"]}``).
-   * - ``CHNAME_ALIASES``
-     - Mapping of brain-region abbreviations to channel indices
-       (e.g. ``{"Aud": ["0","5"], "Hip": ["2","7"]}``).
-   * - ``GENOTYPE_ALIASES``
-     - Explicit genotype → animal ID mapping. If omitted, it is
-       auto-generated from each animal's ``gene`` field.
+   * - ``channels``
+     - Mapping of each canonical channel abbreviation to the **exact** raw channel
+       names that appear in the data (e.g. ``{"LAud": ["0"], "RAud": ["5"], ...}``).
+       Channel resolution is an exact lookup against these names — no inference.
+   * - ``GENOTYPE_MAP``
+     - Optional exact ``{canonical_label: [accepted spellings]}`` map normalizing
+       the per-animal ``genotype`` value (e.g. collapsing full strings to ``"KO"`` /
+       ``"WT"``). Omitted = passthrough (raw values used as-is). When set it is
+       authoritative: a value it does not cover raises at load. ``SEX_MAP`` works
+       the same way for ``sex``.
    * - ``bad_channels``
      - Legacy top-level bad-channel dict (see :ref:`bad-channels`).
        Prefer per-animal ``bad_channels`` in the ``animals`` list.
-   * - ``joint_sessions``
-     - Sessions where multiple animals were recorded simultaneously.
 
 .. _bad-channels:
 
@@ -275,7 +273,7 @@ Bad channels can be specified per animal in two ways.
    {
        "animals": [
            {
-               "id": "M1", "gene": "WT", "sex": "M",
+               "id": "M1", "genotype": "WT", "sex": "M",
                "bad_channels": ["LHip", "RHip"]
            }
        ]
@@ -292,7 +290,7 @@ channel lists:
    {
        "animals": [
            {
-               "id": "M1", "gene": "WT", "sex": "M",
+               "id": "M1", "genotype": "WT", "sex": "M",
                "bad_channels": {
                    "Session1": ["LHip", "RHip"],
                    "Session2": ["LHip", "RHip", "LMot"]
@@ -319,7 +317,7 @@ each animal entry. **By default this is the recording start time.**
    {
        "animals": [
            {
-               "id": "M1", "gene": "WT", "sex": "M",
+               "id": "M1", "genotype": "WT", "sex": "M",
                "manual_datetime": "2025-05-10T10:00:00"
            }
        ]
@@ -342,7 +340,7 @@ recording **start** time.  To indicate an **end** time instead, set
    {
        "animals": [
            {
-               "id": "M1", "gene": "WT", "sex": "M",
+               "id": "M1", "genotype": "WT", "sex": "M",
                "manual_datetime": "2025-05-10T22:00:00",
                "datetimes_are_start": false
            }
@@ -352,6 +350,47 @@ recording **start** time.  To indicate an **end** time instead, set
 Alternatively, ``datetimes_are_start`` can be set inside the ``lro_kwargs``
 dict on the animal entry or in the global ``lro_kwargs`` of the dataset
 config YAML.
+
+Per-session anchors and ``null`` cumulation
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When a recording is split into multiple sessions (the ``{session}``
+placeholder in the ``pattern``), ``manual_datetime`` may be a **dict keyed by
+session**. Each value is either an explicit start, or ``null`` to *cumulate
+forward* — i.e. start where the previous session ended (assumes the sessions
+are contiguous). Only the first session needs a known time:
+
+.. code-block:: json
+
+   "manual_datetime": { "_0_": "2011-06-07 16:04:14", "_1_": null, "_2_": null }
+
+Dict **insertion order** is the canonical chronological order. Explicit values
+act as resets; ``null`` only works in start-time mode.
+
+Per-file explicit starts (gap recovery)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+If a session is **not** internally contiguous — e.g. one of its
+``Selection{index}`` files is missing, leaving a gap — contiguous cumulation
+would place every later file in that session too early. Give that session a
+**list** of one explicit start per file (in ``{index}`` order); the remaining
+sessions can stay scalar or ``null``:
+
+.. code-block:: json
+
+   "manual_datetime": {
+       "_0_": ["2011-06-07 16:04:14", "2011-06-07 20:04:12", "2011-06-08 00:04:12",
+               "2011-06-08 08:04:13", "2011-06-08 12:04:14"],
+       "_1_": "2011-06-08 15:59:48",
+       "_2_": null
+   }
+
+Here ``_0_`` is missing ``Selection4``, so its fourth and fifth *present* files
+(``Selection5``/``Selection6``) are anchored at their true post-gap starts
+rather than 4 h early. The list length must equal the number of files
+discovered for that session, and entries are matched to files in ``{index}``
+(natural-sort) order. A following ``null`` session cumulates from the last
+listed file's end. Lists are start-time only.
 
 Full Example
 ~~~~~~~~~~~~
@@ -363,10 +402,10 @@ A complete samples JSON file with all available parameters:
    {
        "data_root": "/mnt/data/project",
        "animals": [
-           {"id": "AM3", "gene": "WT", "sex": "Male"},
-           {"id": "AM5", "gene": "Het", "sex": "Male",
+           {"id": "AM3", "genotype": "WT", "sex": "Male"},
+           {"id": "AM5", "genotype": "Het", "sex": "Male",
             "bad_channels": ["LHip", "RHip"]},
-           {"id": "AP3B2homo-240-M", "gene": "HOMO", "sex": "Male",
+           {"id": "AP3B2homo-240-M", "genotype": "HOMO", "sex": "Male",
             "pattern": "{data_root}/PortA-*PortB-*/{animal}*_ColMajor_{index}.rhd",
             "manual_datetime": "2025-11-27T15:39:05",
             "lro_kwargs": {"mode": "si"},
@@ -375,11 +414,9 @@ A complete samples JSON file with all available parameters:
                 "Session_Nov28": ["LMot", "RAud"]
             }}
        ],
-       "LR_ALIASES": {"L": ["0", "1", "2", "3", "4"],
-                       "R": ["5", "6", "7", "8", "9"]},
-       "CHNAME_ALIASES": {"Aud": ["0", "5"], "Vis": ["1", "6"],
-                          "Hip": ["2", "7"], "Bar": ["3", "8"],
-                          "Mot": ["4", "9"]}
+       "channels": {"LAud": ["0"], "RAud": ["5"], "LVis": ["1"], "RVis": ["6"],
+                    "LHip": ["2"], "RHip": ["7"], "LBar": ["3"], "RBar": ["8"],
+                    "LMot": ["4"], "RMot": ["9"]}
    }
 
 Step 2: Create Dataset Config
@@ -467,7 +504,7 @@ Personal Dataset Preference
 
 .. code-block:: bash
 
-   # Edit config.local.yaml: active_dataset: "ap3b2_nwb"
+   # Edit config.local.yaml: active_dataset: "ap3b2_rhd"
    # This is gitignored - won't affect team
 
 Cluster Batch Script
@@ -491,7 +528,7 @@ Parallel Analysis
    NEURODENT_DATASET=sox5_bin uv run snakemake --profile slurm
 
    # Terminal 2
-   NEURODENT_DATASET=ap3b2_nwb uv run snakemake --profile slurm
+   NEURODENT_DATASET=ap3b2_rhd uv run snakemake --profile slurm
 
 Troubleshooting
 ---------------

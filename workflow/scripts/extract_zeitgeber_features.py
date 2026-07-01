@@ -19,7 +19,7 @@ import pandas as pd
 # Import the new zeitgeber module
 from neurodent.core import get_expanded_feature_names
 from neurodent.core.zeitgeber import _load_war_for_zeitgeber
-from neurodent.workflow import setup_snakemake_logging, inject_config_aliases
+from neurodent.workflow import setup_snakemake_logging, apply_samples_config
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ def main():
     samples_config = snakemake.params.samples_config
 
     # Inject aliases
-    inject_config_aliases(samples_config)
+    apply_samples_config(samples_config)
 
     # Get zeitgeber processing parameters from config
     zeitgeber_params = config["analysis"]["zeitgeber"]
@@ -93,7 +93,7 @@ def main():
     pipeline_config = zeitgeber_params.copy()
     pipeline_config["shift_for_48h"] = False
     
-    # Use ANIMAL_METADATA (injected by inject_config_aliases, required)
+    # Use ANIMAL_METADATA (injected by apply_samples_config, required)
     from neurodent import constants
     pipeline_config["animal_metadata"] = constants.ANIMAL_METADATA
     
@@ -174,7 +174,7 @@ def main():
 
         # Define grouping columns based on what's available and what should be grouped
         # We want to keep animal-level metadata and the time bin.
-        potential_group_cols = ["animal", "genotype", "sex", "gene", "zt_minutes", "daynight"]
+        potential_group_cols = ["animal", "genotype", "sex", "zt_minutes", "daynight"]
         group_cols = [c for c in potential_group_cols if c in df.columns]
         
         df = df.groupby(group_cols).agg(agg_dict).reset_index()

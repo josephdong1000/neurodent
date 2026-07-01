@@ -29,7 +29,17 @@ from neurodent.core.core import (
     convert_ddfrowbin_to_si,
 )
 from neurodent import constants
-from neurodent.core.utils import abbreviate_channel_names
+from neurodent.core.utils import resolve_channels
+
+
+def _export_creates_file(path, *args, **kwargs):
+    """Side effect for a mocked ``mne.export.export_raw``.
+
+    The intermediate file is written via ``atomic_output_path`` (temp sibling +
+    rename), so a mocked exporter must create the file at the path it is given
+    for the atomic rename to succeed.
+    """
+    Path(path).write_bytes(b"")
 
 
 class TestDDFBinaryMetadata:
@@ -964,7 +974,7 @@ class TestLongRecordingOrganizer:
         mock_resampled.get_duration.return_value = 3600.0
 
         with (
-            patch("mne.export.export_raw") as mock_export,
+            patch("mne.export.export_raw", side_effect=_export_creates_file) as mock_export,
             patch("spikeinterface.extractors.read_edf", return_value=mock_si_rec),
             patch(
                 "spikeinterface.preprocessing.resample", return_value=mock_resampled
@@ -1289,7 +1299,7 @@ class TestMNENJobsParameter:
         mock_si_rec.get_duration.return_value = 3.6
 
         with (
-            patch("mne.export.export_raw"),
+            patch("mne.export.export_raw", side_effect=_export_creates_file),
             patch("spikeinterface.extractors.read_edf", return_value=mock_si_rec),
             patch("spikeinterface.preprocessing.resample", return_value=mock_si_rec),
         ):
@@ -1341,7 +1351,7 @@ class TestMNENJobsParameter:
         mock_si_rec.get_duration.return_value = 3.6
 
         with (
-            patch("mne.export.export_raw"),
+            patch("mne.export.export_raw", side_effect=_export_creates_file),
             patch("spikeinterface.extractors.read_edf", return_value=mock_si_rec),
             patch("spikeinterface.preprocessing.resample", return_value=mock_si_rec),
         ):
@@ -1390,7 +1400,7 @@ class TestMNENJobsParameter:
         mock_si_rec.get_duration.return_value = 1.0
 
         with (
-            patch("mne.export.export_raw"),
+            patch("mne.export.export_raw", side_effect=_export_creates_file),
             patch("spikeinterface.extractors.read_edf", return_value=mock_si_rec),
             patch("spikeinterface.preprocessing.resample", return_value=mock_si_rec),
         ):
@@ -1847,8 +1857,15 @@ class TestMergeChannelNameAbbreviation:
 
         return lro
 
+    @pytest.mark.mutates_constants
     def test_same_abbreviation_different_raw_names_succeeds(self):
         """Merging LROs with different raw names but same abbreviations should rename and succeed."""
+        from neurodent import constants
+
+        constants.set_channel_map({
+            "LBar": ["L Barrel", "L Barrel Ctx"],
+            "LMot": ["L Motor", "L Motor Ctx"],
+        })
         base_lro = self._make_lro(5000, ["L Barrel", "L Motor"])
         other_lro = self._make_lro(3000, ["L Barrel Ctx", "L Motor Ctx"])
         original_other_rec = other_lro.LongRecording
@@ -1898,30 +1915,42 @@ class TestMergeChannelNameAbbreviation:
 
 
 class TestAbbreviateChannelNames:
-    """Tests for the abbreviate_channel_names utility."""
+    """Tests for the resolve_channels utility (exact lookup against the configured map)."""
 
-    def test_parseable_names(self):
-        """All parseable names should be abbreviated."""
-        names = ["L Barrel", "L Motor", "R Hipp"]
-        result = abbreviate_channel_names(names)
-        assert result == ["LBar", "LMot", "RHip"]
+    @pytest.mark.mutates_constants
+    def test_configured_names_are_abbreviated(self):
+        """Raw names configured under their abbreviation resolve exactly."""
+        from neurodent import constants
+
+        constants.set_channel_map({
+            "LBar": ["LBar", "L Barrel"],
+            "LMot": ["LMot", "L Motor"],
+            "RHip": ["RHip", "R Hipp"],
+        })
+        assert resolve_channels(["L Barrel", "L Motor", "R Hipp"]) == ["LBar", "LMot", "RHip"]
 
     def test_unparseable_names_pass_through(self):
-        """Unparseable names should be returned unchanged."""
+        """Unmappable names are returned unchanged (with a warning)."""
         names = ["weird_ch1", "weird_ch2"]
-        result = abbreviate_channel_names(names)
+        result = resolve_channels(names)
         assert result == ["weird_ch1", "weird_ch2"]
 
+    @pytest.mark.mutates_constants
     def test_mixed_names(self):
-        """Mix of parseable and unparseable names."""
-        names = ["L Barrel", "weird_ch", "R Motor"]
-        result = abbreviate_channel_names(names)
-        assert result == ["LBar", "weird_ch", "RMot"]
+        """Mix of configured and unmappable names."""
+        from neurodent import constants
+
+        constants.set_channel_map({"LBar": ["LBar", "L Barrel"], "RMot": ["RMot", "R Motor"]})
+        assert resolve_channels(["L Barrel", "weird_ch", "R Motor"]) == ["LBar", "weird_ch", "RMot"]
 
     def test_empty_list(self):
         """Empty list returns empty list."""
-        assert abbreviate_channel_names([]) == []
+        assert resolve_channels([]) == []
 
+    @pytest.mark.mutates_constants
     def test_variant_names_same_abbreviation(self):
-        """Different raw names that map to the same abbreviation."""
-        assert abbreviate_channel_names(["L Barrel"]) == abbreviate_channel_names(["L Barrel Ctx"])
+        """Different raw names configured under one abbreviation resolve to it."""
+        from neurodent import constants
+
+        constants.set_channel_map({"LBar": ["LBar", "L Barrel", "L Barrel Ctx"]})
+        assert resolve_channels(["L Barrel"]) == resolve_channels(["L Barrel Ctx"]) == ["LBar"]

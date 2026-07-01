@@ -5,6 +5,7 @@ This module provides utilities that reduce boilerplate in Snakemake workflow scr
 """
 
 import copy
+import json
 import logging
 import os
 import sys
@@ -13,6 +14,71 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from neurodent.visualization import WindowAnalysisResult
+
+
+def load_samples_config(path: "str | Path") -> dict:
+    """Load a samples config from a ``.yaml``/``.yml`` or ``.json`` file.
+
+    The format is chosen from the file suffix, so samples configs can be
+    migrated to YAML one dataset at a time while older ``.json`` configs keep
+    working unchanged.
+
+    Args:
+        path: Path to the samples config file. Must end in ``.yaml``, ``.yml``,
+            or ``.json``.
+
+    Returns:
+        dict: The parsed samples config.
+
+    Raises:
+        ValueError: If the file suffix is not a supported config format.
+    """
+    path = Path(path)
+    suffix = path.suffix.lower()
+    if suffix in (".yaml", ".yml"):
+        import yaml
+
+        with open(path, "r") as f:
+            return yaml.safe_load(f)
+    if suffix == ".json":
+        with open(path, "r") as f:
+            return json.load(f)
+    raise ValueError(
+        f"Unsupported samples config format: '{path.suffix}' ({path}). "
+        "Expected .yaml, .yml, or .json."
+    )
+
+
+def resolve_samples_config(config: dict) -> dict:
+    """Resolve the samples config from a merged pipeline ``config``.
+
+    Supports two dataset shapes:
+
+    - **Single-file** datasets carry the samples inventory inline under a
+      top-level ``samples_data`` key (the dataset config and the samples
+      inventory live in one file).
+    - **Two-file** datasets carry a ``samples.samples_file`` path pointing at a
+      separate ``.json``/``.yaml`` samples file (loaded via
+      :func:`load_samples_config`).
+
+    Args:
+        config: The merged Snakemake pipeline config dict.
+
+    Returns:
+        dict: The (unexpanded) samples config.
+
+    Raises:
+        KeyError: If neither ``samples_data`` nor ``samples.samples_file`` is present.
+    """
+    if config.get("samples_data") is not None:
+        return config["samples_data"]
+    samples = config.get("samples", {})
+    if samples.get("samples_file"):
+        return load_samples_config(samples["samples_file"])
+    raise KeyError(
+        "Config needs a top-level 'samples_data' block (inline) or "
+        "'samples.samples_file' (path)."
+    )
 
 
 def setup_snakemake_logging(snakemake) -> logging.Logger:
@@ -72,13 +138,23 @@ def setup_snakemake_logging(snakemake) -> logging.Logger:
     return logging.getLogger(__name__)
 
 
-def inject_config_aliases(samples_config: dict):
-    """Inject aliases from samples_config into the global neurodent.constants.
+def apply_samples_config(samples_config: dict):
+    """Apply a samples config to the global ``neurodent.constants`` (pipeline front door).
 
-    This ensures that custom aliases for genotypes, channel names, and L/R labels
-    are available across all modules in the pipeline. This should be called at the
-    beginning of every Snakemake script that loads WindowAnalysisResults or uses
-    channel name parsing.
+    Installs the per-dataset globals from one samples config: the channel map
+    (:data:`CHANNEL_MAP`, via :func:`~neurodent.set_channel_map`), the exact
+    ``genotype``/``sex`` value maps (``GENOTYPE_MAP``/``SEX_MAP``), and
+    ``ANIMAL_METADATA``. Completes the ``load_samples_config`` → ``resolve_samples_config``
+    → ``apply_samples_config`` lifecycle, and should be called at the start of every
+    Snakemake script that loads WindowAnalysisResults or resolves channel names.
+
+    The ``genotype``/``sex`` value maps are set **completely**: a dataset that omits a
+    ``GENOTYPE_MAP``/``SEX_MAP`` block resets that map to its module default
+    (:data:`~neurodent.constants.DEFAULT_GENOTYPE_MAP` / :data:`~neurodent.constants.DEFAULT_SEX_MAP`),
+    so applying config A then config B in the same process never leaks A's map into B.
+    ``CHANNEL_MAP`` and ``ANIMAL_METADATA`` remain sticky (only updated when present) —
+    every real dataset declares both, and a stale ``ANIMAL_METADATA`` surfaces loudly as a
+    ``KeyError`` rather than a silent mis-normalization.
 
     Args:
         samples_config (dict): Configuration dictionary loaded from samples.json
@@ -86,15 +162,22 @@ def inject_config_aliases(samples_config: dict):
     from neurodent import constants
     from neurodent.core import metadata as metadata_module
 
-    # Legacy: GENOTYPE_ALIASES for file path parsing (parse_str_to_genotype)
-    if "GENOTYPE_ALIASES" in samples_config:
-        constants.GENOTYPE_ALIASES = samples_config["GENOTYPE_ALIASES"]
-    if "CHNAME_ALIASES" in samples_config:
-        constants.CHNAME_ALIASES = samples_config["CHNAME_ALIASES"]
-    if "LR_ALIASES" in samples_config:
-        constants.LR_ALIASES = samples_config["LR_ALIASES"]
-    
-    # New: ANIMAL_METADATA for sex/gene enrichment (required)
+    # Channels: the flat CHANNEL_MAP is the single source of truth. set_channel_map()
+    # derives CHANNEL_ABBREVS / CHANNEL_ABBREV_BY_RAW / DF_SORT_ORDER / standardization target
+    # / LOF channels from it. A dataset declares its channels under `channels`.
+    channels = samples_config.get("channels")
+    if channels:
+        constants.set_channel_map(channels)
+    # Exact value maps for the `sex` / `genotype` metadata fields (parallel mechanisms);
+    # applied before load_animal_metadata below so the normalization picks them up.
+    # Assigned UNCONDITIONALLY (complete, not sticky): a dataset that omits a block resets
+    # that map to its module default, so applying config A then config B in one process
+    # never leaks A's map into B (which, under strict normalization, would wrongly raise).
+    # Deep-copied to avoid aliasing the config dict or the canonical default.
+    constants.SEX_MAP = copy.deepcopy(samples_config.get("SEX_MAP", constants.DEFAULT_SEX_MAP))
+    constants.GENOTYPE_MAP = copy.deepcopy(samples_config.get("GENOTYPE_MAP", constants.DEFAULT_GENOTYPE_MAP))
+
+    # New: ANIMAL_METADATA for sex/genotype enrichment (required)
     if "ANIMAL_METADATA" in samples_config:
         constants.ANIMAL_METADATA = metadata_module.load_animal_metadata(samples_config)
 
@@ -248,15 +331,13 @@ def expand_animals_config(samples_config: dict) -> dict:
     When the samples config contains an ``animals`` key (a list of animal
     dicts), this function produces:
 
-    * ``ANIMAL_METADATA`` – list of ``{id, gene, sex, ...}`` dicts
+    * ``ANIMAL_METADATA`` – list of ``{id, genotype, sex, ...}`` dicts
     * ``manual_datetimes`` – animal_id → datetime string mapping
-    * ``GENOTYPE_ALIASES`` – gene → [animal_id, …] mapping (auto-generated
-      from ``gene`` field unless already present)
     * ``bad_channels`` – animal_id → {session → [channels]} mapping
       (built from per-animal ``bad_channels`` entries)
     * ``_animal_overrides`` – animal_id → per-animal overrides dict (pattern,
       lro_kwargs, day_parse_kwargs)
-    * ``_animal_channels`` – animal_id → channel list mapping (for joint sessions)
+    * ``_animal_channel_subsets`` – animal_id → channel list mapping (for joint sessions)
     * ``_animal_groups`` – animal_id → group string mapping (for joint sessions)
 
     ``data_root`` is the canonical path key.  If the legacy key
@@ -282,8 +363,8 @@ def expand_animals_config(samples_config: dict) -> dict:
         >>> cfg = expand_animals_config({
         ...     "data_root": "/data",
         ...     "animals": [
-        ...         {"id": "A10", "gene": "WT", "sex": "M"},
-        ...         {"id": "F22", "gene": "KO", "sex": "F"},
+        ...         {"id": "A10", "genotype": "WT", "sex": "M"},
+        ...         {"id": "F22", "genotype": "KO", "sex": "F"},
         ...     ],
         ... })
         >>> cfg["data_root"]
@@ -296,7 +377,7 @@ def expand_animals_config(samples_config: dict) -> dict:
         >>> cfg = expand_animals_config({
         ...     "data_root": "/data",
         ...     "animals": [
-        ...         {"id": "X1", "gene": "WT", "sex": "M",
+        ...         {"id": "X1", "genotype": "WT", "sex": "M",
         ...          "pattern": "{data_root}/custom/{animal}_{index}.rhd",
         ...          "lro_kwargs": {"mode": "si"},
         ...          "manual_datetime": "2025-01-01 10:00:00"},
@@ -312,7 +393,7 @@ def expand_animals_config(samples_config: dict) -> dict:
         >>> cfg = expand_animals_config({
         ...     "data_root": "/data",
         ...     "animals": [
-        ...         {"id": "A10", "gene": "WT", "sex": "M",
+        ...         {"id": "A10", "genotype": "WT", "sex": "M",
         ...          "bad_channels": ["LHip", "RHip"]},
         ...     ],
         ... })
@@ -324,23 +405,23 @@ def expand_animals_config(samples_config: dict) -> dict:
         >>> cfg = expand_animals_config({
         ...     "data_root": "/data",
         ...     "animals": [
-        ...         {"id": "A10", "gene": "WT", "sex": "M",
+        ...         {"id": "A10", "genotype": "WT", "sex": "M",
         ...          "bad_channels": {"Session1": ["LHip"], "Session2": ["RMot"]}},
         ...     ],
         ... })
         >>> cfg["bad_channels"]["A10"]
         {'Session1': ['LHip'], 'Session2': ['RMot']}
 
-    Joint sessions with channels::
+    Joint sessions with a channel subset::
 
         >>> cfg = expand_animals_config({
         ...     "data_root": "/data",
         ...     "animals": [
-        ...         {"id": "A10", "gene": "WT", "sex": "M",
-        ...          "channels": ["Ch0", "Ch1", "Ch2", "Ch3"]},
+        ...         {"id": "A10", "genotype": "WT", "sex": "M",
+        ...          "channel_subset": ["Ch0", "Ch1", "Ch2", "Ch3"]},
         ...     ],
         ... })
-        >>> cfg["_animal_channels"]["A10"]
+        >>> cfg["_animal_channel_subsets"]["A10"]
         ['Ch0', 'Ch1', 'Ch2', 'Ch3']
 
     Joint sessions with group::
@@ -348,8 +429,8 @@ def expand_animals_config(samples_config: dict) -> dict:
         >>> cfg = expand_animals_config({
         ...     "data_root": "/data",
         ...     "animals": [
-        ...         {"id": "A10", "gene": "WT", "sex": "M",
-        ...          "channels": ["Ch0", "Ch1"],
+        ...         {"id": "A10", "genotype": "WT", "sex": "M",
+        ...          "channel_subset": ["Ch0", "Ch1"],
         ...          "group": "SharedGroup"},
         ...     ],
         ... })
@@ -372,7 +453,7 @@ def expand_animals_config(samples_config: dict) -> dict:
     result["animals"] = animals_list
 
     # Keys that are per-animal overrides (not core metadata)
-    _OVERRIDE_KEYS = {"pattern", "lro_kwargs", "day_parse_kwargs", "manual_datetime", "datetimes_are_start", "bad_channels", "exclude", "channels", "group"}
+    _OVERRIDE_KEYS = {"pattern", "lro_kwargs", "day_parse_kwargs", "manual_datetime", "datetimes_are_start", "bad_channels", "exclude", "channel_subset", "group"}
     _METADATA_SKIP = _OVERRIDE_KEYS  # excluded from ANIMAL_METADATA entries
 
     # --- Build ANIMAL_METADATA ---
@@ -393,16 +474,6 @@ def expand_animals_config(samples_config: dict) -> dict:
         if "manual_datetime" in animal:
             result["manual_datetimes"][animal["id"]] = animal["manual_datetime"]
 
-    # --- Auto-generate GENOTYPE_ALIASES from gene field ---
-    if "GENOTYPE_ALIASES" not in result:
-        gene_to_animals: dict[str, list[str]] = {}
-        for animal in animals_list:
-            gene = animal.get("gene")
-            if gene:
-                gene_to_animals.setdefault(gene, []).append(animal["id"])
-        if gene_to_animals:
-            result["GENOTYPE_ALIASES"] = gene_to_animals
-
     # --- Build bad_channels ---
     if "bad_channels" not in result:
         result["bad_channels"] = {}
@@ -416,18 +487,18 @@ def expand_animals_config(samples_config: dict) -> dict:
                 # Dict format: session → bad channels mapping
                 result["bad_channels"][animal["id"]] = bc
 
-    # --- Build _animal_channels and _animal_groups ---
-    animal_channels: dict[str, list[str]] = {}
+    # --- Build _animal_channel_subsets and _animal_groups ---
+    animal_channel_subsets: dict[str, list[str]] = {}
     animal_groups: dict[str, str] = {}
 
     for animal in animals_list:
-        if "channels" in animal:
-            animal_channels[animal["id"]] = animal["channels"]
+        if "channel_subset" in animal:
+            animal_channel_subsets[animal["id"]] = animal["channel_subset"]
         if "group" in animal:
             animal_groups[animal["id"]] = animal["group"]
 
     # Validate no overlapping channels within the same group
-    if animal_channels and animal_groups:
+    if animal_channel_subsets and animal_groups:
         # Group animals by their group name
         groups_to_animals: dict[str, list[str]] = {}
         for animal_id, group_name in animal_groups.items():
@@ -438,8 +509,8 @@ def expand_animals_config(samples_config: dict) -> dict:
             # Get all channels for animals in this group
             all_channels_in_group: list[tuple[str, str]] = []  # (animal_id, channel)
             for animal_id in animal_ids:
-                if animal_id in animal_channels:
-                    for channel in animal_channels[animal_id]:
+                if animal_id in animal_channel_subsets:
+                    for channel in animal_channel_subsets[animal_id]:
                         all_channels_in_group.append((animal_id, channel))
 
             # Check for duplicates
@@ -453,46 +524,10 @@ def expand_animals_config(samples_config: dict) -> dict:
                     )
                 seen_channels[channel] = animal_id
 
-    if animal_channels:
-        result["_animal_channels"] = animal_channels
+    if animal_channel_subsets:
+        result["_animal_channel_subsets"] = animal_channel_subsets
     if animal_groups:
         result["_animal_groups"] = animal_groups
-
-    # --- Backward compatibility: derive channels from legacy joint_sessions ---
-    # Note: This only derives _animal_channels, not _animal_groups.
-    # For legacy configs where folder names don't contain animal IDs,
-    # migration to the new format with explicit 'group' fields is required.
-    if "joint_sessions" in result and result["joint_sessions"]:
-        # Check if any animals already have channels defined
-        has_new_format = any("channels" in a for a in animals_list)
-
-        if not has_new_format:
-            # Auto-derive from legacy format with deprecation warning
-            import warnings
-            warnings.warn(
-                "The 'joint_sessions' configuration format is deprecated. "
-                "Please migrate to the unified 'animals' format by adding 'channels' "
-                "and optionally 'group' fields to animal entries. "
-                "See the animals configuration documentation for details.",
-                DeprecationWarning,
-                stacklevel=2
-            )
-
-            # Derive channels from joint_sessions
-            if "_animal_channels" not in result:
-                result["_animal_channels"] = {}
-
-            for session_name, animals_dict in result["joint_sessions"].items():
-                for animal_id, channels in animals_dict.items():
-                    if animal_id in result["_animal_channels"]:
-                        # Verify consistency
-                        if result["_animal_channels"][animal_id] != channels:
-                            raise ValueError(
-                                f"Inconsistent channel lists for {animal_id} across joint sessions. "
-                                f"Expected {result['_animal_channels'][animal_id]}, got {channels} in {session_name}."
-                            )
-                    else:
-                        result["_animal_channels"][animal_id] = channels
 
     # --- Build _animal_overrides ---
     overrides: dict[str, dict] = {}
@@ -832,7 +867,7 @@ def extend_plot_order_from_attr(wars, attr: str, base_order):
     return order
 
 
-def build_sex_marker_scale(df, plot_lib=None):
+def create_sex_marker_scale(df, plot_lib=None):
     """Build a seaborn-objects marker scale for the sex column of *df*.
 
     Preserves the canonical Female=circle (``"o"``), Male=square (``"s"``)
@@ -860,7 +895,7 @@ def build_sex_marker_scale(df, plot_lib=None):
 
         >>> import pandas as pd
         >>> df = pd.DataFrame({"sex": ["Female", "Male", "Female"]})
-        >>> scale = build_sex_marker_scale(df)
+        >>> scale = create_sex_marker_scale(df)
         >>> scale.order
         ['Female', 'Male']
         >>> scale.values

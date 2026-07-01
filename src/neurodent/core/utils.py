@@ -1,16 +1,20 @@
+import contextlib
 import csv
 import itertools
+import json
 import logging
 import math
 import os
 import platform
 import re
+import shutil
 import sys
 import unicodedata
+import uuid
 import warnings
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Callable, Literal, Optional, Union
+from typing import Any, Callable, Literal, Optional, Union
 
 import dateutil.parser
 import numpy as np
@@ -414,104 +418,6 @@ def nanaverage(A: np.ndarray, weights: np.ndarray, axis: int = -1) -> np.ndarray
         return np.where(np.isfinite(result), result, np.nan)
 
 
-def parse_path_to_animalday(
-    filepath: str | Path,
-    animal_param: tuple[int, str] | str | list[str] = (0, None),
-    day_sep: str | None = None,
-    mode: Literal["nest", "concat", "base", "noday"] = "concat",
-    **day_parse_kwargs,
-):
-    """
-    DEPRECATED: Use FileDiscoverer with pattern-based discovery instead.
-
-    Parses the filename of a binfolder to get the animalday identifier (animal id, genotype, and day).
-
-    Args:
-        filepath (str | Path): Filepath of the binfolder.
-        animal_param (tuple[int, str] | str | list[str], optional): Parameter specifying how to parse the animal ID:
-            tuple[int, str]: (index, separator) for simple split and index
-            str: regex pattern to extract ID
-            list[str]: list of possible animal IDs to match against
-        day_sep (str, optional): Separator for day in filename. Defaults to None.
-        mode (Literal['nest', 'concat', 'base', 'noday'], optional): Mode to parse the filename. Defaults to 'concat'.
-
-            - 'nest': Extracts genotype/animal from parent directory name and date from filename.
-              Example: "/WT_A10/recording_2023-04-01.*"
-            - 'concat': Extracts all info from filename, expects genotype_animal_date format.
-              Example: "/WT_A10_2023-04-01.*"
-            - 'base': Same as concat
-            - 'noday': Extracts only genotype and animal ID, uses default date.
-              Example: "/WT_A10_recording.*"
-        **day_parse_kwargs: Additional keyword arguments to pass to parse_str_to_day function.
-                           Common options include parse_params dict for dateutil.parser.parse.
-
-    Returns:
-        dict[str, str]: Dictionary with keys "animal", "genotype", "day", and "animalday" (concatenated).
-            Example: {"animal": "A10", "genotype": "WT", "day": "Apr-01-2023", "animalday": "A10 WT Apr-01-2023"}
-
-    Raises:
-        ValueError: If mode is invalid or required components cannot be extracted
-        TypeError: If filepath is not str or Path
-    """
-    warnings.warn(
-        "parse_path_to_animalday is deprecated. Use FileDiscoverer with pattern-based discovery instead.",
-        DeprecationWarning,
-        stacklevel=2
-    )
-    filepath = Path(filepath)
-    match mode:
-        case "nest":
-            animid = parse_str_to_animal(filepath.parent.name, animal_param=animal_param)
-            geno = (constants.ANIMAL_METADATA.get(animid, {}).get("gene") or 
-                    parse_str_to_genotype(filepath.parent.name))
-            day = parse_str_to_day(filepath.name, sep=day_sep, **day_parse_kwargs).strftime("%b-%d-%Y")
-        case "concat" | "base":
-            animid = parse_str_to_animal(filepath.name, animal_param=animal_param)
-            geno = (constants.ANIMAL_METADATA.get(animid, {}).get("gene") or 
-                    parse_str_to_genotype(filepath.name))
-            day = parse_str_to_day(filepath.name, sep=day_sep, **day_parse_kwargs).strftime("%b-%d-%Y")
-        case "noday":
-            animid = parse_str_to_animal(filepath.name, animal_param=animal_param)
-            geno = (constants.ANIMAL_METADATA.get(animid, {}).get("gene") or 
-                    parse_str_to_genotype(filepath.name))
-            day = constants.DEFAULT_DAY.strftime("%b-%d-%Y")
-        case _:
-            raise ValueError(f"Invalid mode: {mode}")
-    return {
-        "animal": animid,
-        "genotype": geno,
-        "day": day,
-        "animalday": f"{animid} {geno} {day}",
-    }
-
-
-def parse_str_to_genotype(string: str, strict_matching: bool = False) -> str:
-    """
-    Parses the filename of a binfolder to get the genotype.
-
-    Args:
-        string (str): String to parse.
-        strict_matching (bool, optional): If True, ensures the input matches exactly one genotype.
-            If False, allows overlapping matches and uses longest. Defaults to False for
-            backward compatibility.
-
-    Returns:
-        str: Genotype.
-
-    Raises:
-        ValueError: When string cannot be parsed or contains ambiguous matches in strict mode.
-
-    Examples:
-        >>> parse_str_to_genotype("WT_A10_data")
-        'WT'
-        >>> parse_str_to_genotype("WT_KO_comparison", strict_matching=True)  # Would raise error
-        ValueError: Ambiguous match...
-        >>> parse_str_to_genotype("WT_KO_comparison", strict_matching=False)  # Uses longest match
-        'WT'  # or 'KO' depending on which alias is longer
-    """
-    return _get_key_from_match_values(string, constants.GENOTYPE_ALIASES, strict_matching, alias_name="GENOTYPE_ALIASES")
-
-
 def parse_str_to_animal(string: str, animal_param: tuple[int, str] | str | list[str] = (0, None)) -> str:
     """
     DEPRECATED: Use FileDiscoverer with {animal} placeholder in pattern instead.
@@ -773,166 +679,92 @@ def _clean_str_for_date(string: str):
     return cleaned
 
 
-def parse_chname_to_abbrev(channel_name: str, assume_from_number=False, strict_matching=True) -> str:
+def resolve_channel(channel_name: str) -> str:
     """
-    Parses the channel name to get the abbreviation.
+    Resolve a raw channel name to its canonical channel abbreviation by **exact lookup**.
+
+    Resolution is explicit and never inferred: (1) the (stripped) name is already a
+    canonical abbreviation (:data:`neurodent.constants.CHANNEL_ABBREVS`); (2) it is an
+    exact key in :data:`neurodent.constants.CHANNEL_ABBREV_BY_RAW` (the per-dataset
+    ``raw name -> abbrev`` map). Anything else **raises loudly** — there is no fuzzy,
+    substring, or number-based guessing.
 
     Args:
-        channel_name (str): Name of the channel.
-        assume_from_number (bool, optional): If True, assume the abbreviation based on the last number
-            in the channel name when normal parsing fails. Defaults to False.
-        strict_matching (bool, optional): If True, ensures the input matches exactly one L/R alias and
-            one channel alias. If False, allows multiple matches and uses longest. Defaults to True.
+        channel_name (str): Raw channel name from the data.
 
     Returns:
-        str: Abbreviation of the channel name.
+        str: Canonical channel abbreviation.
 
     Raises:
-        ValueError: When channel_name cannot be parsed or contains ambiguous matches in strict mode.
-        KeyError: When assume_from_number=True but the detected number is not a valid channel ID.
+        ValueError: When the name is not in the configured channel map. Configure the exact
+            raw name under its abbreviation (``channels`` in the samples config, or
+            :func:`neurodent.set_channel_map`).
 
     Examples:
-        >>> parse_chname_to_abbrev("left Aud")
-        'LAud'
-        >>> parse_chname_to_abbrev("Right VIS")
-        'RVis'
-        >>> parse_chname_to_abbrev("channel_9", assume_from_number=True)
-        'LAud'
-        >>> parse_chname_to_abbrev("LRAud", strict_matching=False)  # Would work in non-strict mode
-        'LAud'  # Uses longest L/R match
+        >>> resolve_channel("LMot")          # already canonical
+        'LMot'
+        >>> resolve_channel("L Motor Ctx")   # configured raw name -> abbrev
+        'LMot'
     """
-    if channel_name in constants.DEFAULT_ID_TO_NAME.values():
-        logging.debug(f"{channel_name} is already an abbreviation")
-        return channel_name
-
-    try:
-        lr = _get_key_from_match_values(channel_name, constants.LR_ALIASES, strict_matching, alias_name="LR_ALIASES")
-        chname = _get_key_from_match_values(channel_name, constants.CHNAME_ALIASES, strict_matching, alias_name="CHNAME_ALIASES")
-    except ValueError as e:
-        if assume_from_number:
-            logging.debug(f"Channel '{channel_name}' does not match name aliases. Attempting to assume from number.")
-            warnings.warn(
-                "One or more channels do not match name aliases. Assuming alias from number in channel name.",
-                UserWarning,
-                stacklevel=2
-            )
-            nums = re.findall(r"\d+", channel_name)
-
-            if not nums:
-                raise ValueError(
-                    f"Expected to find a number in channel name '{channel_name}' when assume_from_number=True, but no numbers were found."
-                )
-
-            num = int(nums[-1])
-            if num not in constants.DEFAULT_ID_TO_NAME:
-                available_ids = sorted(constants.DEFAULT_ID_TO_NAME.keys())
-                raise KeyError(
-                    f"Channel number {num} found in '{channel_name}' is not a valid channel ID. Available channel IDs: {available_ids}"
-                )
-
-            return constants.DEFAULT_ID_TO_NAME[num]
-        else:
-            raise e
-
-    return lr + chname
+    raw = channel_name.strip()
+    if raw in constants.CHANNEL_ABBREVS:
+        return raw
+    if raw in constants.CHANNEL_ABBREV_BY_RAW:
+        return constants.CHANNEL_ABBREV_BY_RAW[raw]
+    raise ValueError(
+        f"Channel {raw!r} is not in the configured channel map. "
+        f"Canonical labels: {constants.CHANNEL_ABBREVS}; configured raw names: "
+        f"{sorted(constants.CHANNEL_ABBREV_BY_RAW)}. "
+        f"Add the exact raw name under its abbreviation in the samples config "
+        f"(channels) or via neurodent.set_channel_map()."
+    )
 
 
-def abbreviate_channel_names(
-    names: list[str],
-    strict_matching: bool = True,
-    assume_from_number: bool = False,
-) -> list[str]:
-    """Abbreviate a list of channel names, falling back to raw names for unparseable entries.
+def resolve_channels(names: list[str]) -> list[str]:
+    """Abbreviate a list of raw channel names via exact lookup.
+
+    Unmappable names are **warned about loudly** (and kept as-is so callers comparing
+    channel sets still get a value) rather than silently swallowed.
 
     Args:
-        names: List of channel name strings to abbreviate.
-        strict_matching: Passed to parse_chname_to_abbrev.
-        assume_from_number: Passed to parse_chname_to_abbrev.
+        names: List of raw channel name strings.
 
     Returns:
-        List of abbreviated channel names (same length as input).
+        List of canonical abbreviations (same length as input); an unmappable entry is
+        returned unchanged after a warning.
     """
     result = []
     for name in names:
         try:
-            result.append(
-                parse_chname_to_abbrev(
-                    name,
-                    assume_from_number=assume_from_number,
-                    strict_matching=strict_matching,
-                )
+            result.append(resolve_channel(name))
+        except (ValueError, KeyError, AttributeError) as e:
+            warnings.warn(
+                f"Channel name {name!r} could not be mapped to a canonical abbreviation: {e}",
+                UserWarning,
+                stacklevel=2,
             )
-        except (ValueError, KeyError, AttributeError):
             result.append(name)
     return result
-
-
-def _get_key_from_match_values(input_string: str, alias_dict: dict, strict_matching: bool = True, alias_name: str = "alias"):
-    """
-    Find the best matching key from alias dictionary.
-
-    Args:
-        input_string (str): String to search in
-        alias_dict (dict): Dictionary of {key: [aliases]} to match against
-        strict_matching (bool): If True, ensures only one alias matches across all keys
-        alias_name (str): Name of the alias dictionary for error messages (e.g., "CHNAME_ALIASES")
-
-    Returns:
-        str: The key with the best matching alias
-
-    Raises:
-        ValueError: When no matches found or multiple matches in strict mode
-    """
-    matches = [
-        (key, candidate, len(candidate))
-        for key, aliases in alias_dict.items()
-        for candidate in aliases
-        if candidate in input_string
-    ]
-
-    if not matches:
-        alias_examples = {key: aliases[:2] for key, aliases in alias_dict.items()}
-        raise ValueError(
-            f"'{input_string}' does not match any {alias_name}. "
-            f"Available {alias_name} entries: {alias_examples}. "
-            f"If your data uses non-standard channel names, "
-            f"configure the appropriate aliases in your samples config file."
-        )
-
-    if strict_matching:
-        # Check if multiple different keys match
-        matching_keys = set(match[0] for match in matches)
-        if len(matching_keys) > 1:
-            matched_aliases = {key: [alias for k, alias, _ in matches if k == key] for key in matching_keys}
-            raise ValueError(
-                f"Ambiguous match in '{input_string}' for {alias_name}. "
-                f"Multiple keys matched: {matched_aliases}. "
-                f"Use strict_matching=False to allow ambiguous matches."
-            )
-
-    # Return the key with the longest matching alias
-    best_match_key, _, _ = max(matches, key=lambda x: x[2])
-    return best_match_key
 
 
 def normalize_value_from_aliases(
     value: str,
     alias_dict: dict[str, list[str]],
 ) -> str | None:
-    """Normalize a value to its canonical form using an alias dictionary.
+    """Normalize a value to its canonical form using a value map.
 
-    Unlike :func:`_get_key_from_match_values` which uses substring matching for
-    parsing values embedded in filenames, this function performs exact matching
-    for normalizing standalone configuration values.
+    Performs **exact** matching: the value must equal one of the accepted spellings
+    listed for a canonical label. Used for normalizing standalone configuration values
+    against an exact ``_MAP`` (e.g. :data:`~neurodent.constants.SEX_MAP`,
+    :data:`~neurodent.constants.GENOTYPE_MAP`).
 
     Args:
         value: The raw value to normalize (e.g., ``"M"``, ``"female"``).
-        alias_dict: Dictionary of ``{canonical_key: [aliases]}``.
+        alias_dict: Dictionary of ``{canonical_key: [accepted spellings]}``.
 
     Returns:
-        The canonical key if *value* matches any alias, or ``None`` if no match.
+        The canonical key if *value* matches any spelling, or ``None`` if no match.
     """
-    # REVIEW the function name should be unified with _get_key_from_match_values
     for canonical_key, aliases in alias_dict.items():
         if value in aliases:
             return canonical_key
@@ -980,6 +812,148 @@ def get_temp_directory() -> Path:
         KeyError: If TMPDIR environment variable is not set.
     """
     return Path(os.environ["TMPDIR"])
+
+
+def safe_unlink(path: Union[str, Path]) -> None:
+    """Delete a file if it exists, ignoring a missing file.
+
+    Used for self-healing cache deletion: a corrupt cache file is removed so it
+    can be regenerated, and a concurrently-removed file is not an error.
+
+    Args:
+        path: Path to the file to delete.
+    """
+    try:
+        Path(path).unlink()
+    except FileNotFoundError:
+        pass
+    except (OSError, PermissionError) as e:
+        logging.warning(f"Failed to delete {path}: {e}")
+
+
+def is_si_recording_folder(path: Union[str, Path]) -> bool:
+    """Return True if ``path`` looks like a SpikeInterface recording output folder.
+
+    Recognizes the two formats written by :meth:`LongRecording.save` as well as
+    folders written by NeuRodent's own :meth:`LongRecordingOrganizer.save_recording`.
+    This is a safety gate so destructive overwrites only ever target folders we
+    actually produced — never an arbitrary user directory.
+
+    A folder qualifies when it is a directory and any of the following hold:
+
+    - **Zarr**: the folder ends in ``.zarr`` and contains zarr group metadata
+      (``.zattrs``, ``.zmetadata``, or ``zarr.json``).
+    - **Binary**: the folder contains SpikeInterface's recognition marker
+      ``si_folder.json`` (or ``binary.json``).
+    - **NeuRodent**: the folder contains our own sidecar
+      (:data:`~neurodent.constants.NEURODENT_SIDECAR_NAME`).
+
+    Args:
+        path: Path to inspect.
+
+    Returns:
+        bool: True if ``path`` is a recognized recording output folder.
+    """
+    p = Path(path)
+    if not p.is_dir():
+        return False
+
+    # NeuRodent sidecar — recognizes a folder we wrote even across SI versions.
+    if (p / constants.NEURODENT_SIDECAR_NAME).exists():
+        return True
+
+    # Zarr folder: suffix + zarr group metadata.
+    if p.suffix == ".zarr" and (
+        (p / ".zattrs").exists()
+        or (p / ".zmetadata").exists()
+        or (p / "zarr.json").exists()
+    ):
+        return True
+
+    # Binary folder: SpikeInterface's own recognition markers.
+    if (p / "si_folder.json").exists() or (p / "binary.json").exists():
+        return True
+
+    return False
+
+
+def safe_rmtree(path: Union[str, Path], *, require_marker: bool = True) -> None:
+    """Recursively delete a directory tree, refusing unrecognized targets.
+
+    A guarded counterpart to :func:`safe_unlink` for directories. By default it
+    will only delete a directory that :func:`is_si_recording_folder` recognizes,
+    so a mistyped or malicious path can never wipe an arbitrary data directory.
+
+    Args:
+        path: Directory to remove.
+        require_marker: When True (default), raise :class:`ValueError` unless the
+            target is a recognized SpikeInterface/NeuRodent recording folder.
+
+    Raises:
+        ValueError: If ``require_marker`` is True and the target is not a
+            recognized recording folder.
+    """
+    p = Path(path)
+    if not p.exists():
+        return
+    if require_marker and not is_si_recording_folder(p):
+        raise ValueError(
+            f"Refusing to delete {p}: it does not look like a SpikeInterface "
+            "recording output folder. Delete it manually if you are sure."
+        )
+    try:
+        shutil.rmtree(p)
+    except FileNotFoundError:
+        pass
+    except (OSError, PermissionError) as e:
+        logging.warning(f"Failed to remove {p}: {e}")
+
+
+@contextlib.contextmanager
+def atomic_output_path(final_path: Union[str, Path]):
+    """Context manager yielding a temporary sibling path for an atomic write.
+
+    The caller writes to the yielded temporary path. On clean exit the temp file
+    is atomically moved into place with :func:`os.replace`; on exception the temp
+    file is removed and the original error re-raised. Because the temp file lives
+    in the same directory as ``final_path`` (same filesystem), ``os.replace`` is
+    atomic, so a crash mid-write can never leave a partial file at ``final_path``.
+
+    Args:
+        final_path: The destination path the content should end up at.
+
+    Yields:
+        Path: A temporary path in the same directory to write to.
+
+    Examples:
+        >>> with atomic_output_path("out.bin") as tmp:  # doctest: +SKIP
+        ...     data.tofile(tmp)
+    """
+    final_path = Path(final_path)
+    tmp_path = final_path.with_name(f"{final_path.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp")
+    try:
+        yield tmp_path
+    except BaseException:
+        safe_unlink(tmp_path)
+        raise
+    else:
+        os.replace(tmp_path, final_path)
+
+
+def atomic_write_json(path: Union[str, Path], obj: Any, *, indent: int = 2) -> None:
+    """Atomically write ``obj`` to ``path`` as JSON.
+
+    Serializes to a temporary sibling file and atomically renames it into place,
+    so an interrupted write never leaves a partial/corrupt JSON file at ``path``.
+
+    Args:
+        path: Destination JSON file path.
+        obj: JSON-serializable object to write.
+        indent: Indentation passed to :func:`json.dump`.
+    """
+    with atomic_output_path(path) as tmp:
+        with open(tmp, "w") as f:
+            json.dump(obj, f, indent=indent)
 
 
 def cache_fragments_to_zarr(
@@ -1870,9 +1844,21 @@ def should_use_cache_unified(
         raise ValueError(f"Invalid cache_policy: {cache_policy}. Must be one of: auto, always, force_regenerate")
 
 
-def convert_intan_chname_mne(mne_obj):
+def rename_mne_channels(mne_obj):
+    """Rename an MNE object's channels in place to canonical abbreviations.
+
+    Applies :func:`resolve_channel` (exact lookup) to every entry of
+    ``mne_obj.info['ch_names']``. Format-agnostic — works on any MNE object
+    whose raw channel names are declared in :data:`~neurodent.constants.CHANNEL_MAP`.
+
+    Args:
+        mne_obj: An MNE object exposing ``info['ch_names']`` (e.g. a ``RawArray``).
+
+    Returns:
+        The same ``mne_obj``, with channel names replaced by their canonical abbreviations.
+    """
     for i in range(len(mne_obj.info['ch_names'])):
-        mne_obj.info['ch_names'][i] = parse_chname_to_abbrev(channel_name = mne_obj.info['ch_names'][i], assume_from_number=True, strict_matching=False)
+        mne_obj.info['ch_names'][i] = resolve_channel(mne_obj.info['ch_names'][i])
     return mne_obj
 
 

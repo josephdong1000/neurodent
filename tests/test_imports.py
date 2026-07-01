@@ -28,15 +28,13 @@ class TestImportPatterns:
             get_temp_directory,
             nanaverage,
             log_transform,
-            parse_chname_to_abbrev,
-            parse_path_to_animalday,
+            resolve_channel,
         )
 
         assert callable(get_temp_directory)
         assert callable(nanaverage)
         assert callable(log_transform)
-        assert callable(parse_chname_to_abbrev)
-        assert callable(parse_path_to_animalday)
+        assert callable(resolve_channel)
 
     def test_module_level_access(self):
         """Test accessing classes via module namespace."""
@@ -140,8 +138,7 @@ class TestIDEFunctionality:
             "get_temp_directory",
             "nanaverage",
             "log_transform",
-            "parse_chname_to_abbrev",
-            "parse_path_to_animalday",
+            "resolve_channel",
         ]
 
         for item in expected_classes + expected_functions:
@@ -205,13 +202,13 @@ class TestStandardizedImports:
         from neurodent import core
 
         # Test that all expected functions are accessible via core.function_name()
-        assert hasattr(core, "parse_chname_to_abbrev")
+        assert hasattr(core, "resolve_channel")
         assert hasattr(core, "LongRecordingOrganizer")
         assert hasattr(core, "LongRecordingAnalyzer")
         assert hasattr(core, "FragmentAnalyzer")
 
         # Test that functions are callable
-        assert callable(core.parse_chname_to_abbrev)
+        assert callable(core.resolve_channel)
 
         # Test that classes are instantiable (basic check)
         assert core.LongRecordingOrganizer is not None
@@ -224,12 +221,11 @@ class TestStandardizedImports:
 
         # Test public API functions (available directly on core)
         public_functions = [
-            "parse_chname_to_abbrev",
+            "resolve_channel",
             "get_temp_directory",
             "set_temp_directory",
             "nanaverage",
             "log_transform",
-            "parse_path_to_animalday",
             "validate_timestamps",
         ]
 
@@ -263,10 +259,10 @@ class TestStandardizedImports:
     def test_both_import_patterns_equivalent(self):
         """Test that both import patterns access the same functions."""
         from neurodent import core
-        from neurodent.core.utils import parse_chname_to_abbrev
+        from neurodent.core.utils import resolve_channel
 
         # Both should reference the same function
-        assert core.parse_chname_to_abbrev is parse_chname_to_abbrev
+        assert core.resolve_channel is resolve_channel
 
 
 class TestVisualizationImports:

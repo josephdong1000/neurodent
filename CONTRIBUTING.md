@@ -180,6 +180,28 @@ Expected behavior:
 - Identical spike indices at sample precision across modes
 - Exit code `0` when identical, `1` when different
 
+### Zeitgeber Timestamp Propagation
+
+Run:
+
+```bash
+uv run python scripts/validate_zeitgeber_timestamps.py \
+  --hours 48 --envelope both --start "2020-01-01 06:00:00" \
+  --out results/zeitgeber_validation
+```
+
+Builds a synthetic recording whose amplitude is a known function of Zeitgeber Time,
+runs the real windowed-analysis and zeitgeber pipeline, and checks the feature lands
+under the correct day/night shading. Use this when you suspect `manual_datetime` is
+not reaching the plots.
+
+Expected behavior:
+
+- `[square] night>1.5*day -> PASS` and `[sine] peak ~ZT18 -> PASS`
+- Exit code `0` when all checks pass, `1` otherwise
+
+A fast numerical version runs in CI as `tests/test_zeitgeber_timestamp_propagation.py`.
+
 ## Writing New Validation Scripts
 
 When adding scripts in `scripts/`:
@@ -195,6 +217,90 @@ When adding scripts in `scripts/`:
 - Follow PEP 8
 - Add type hints where appropriate
 - Use NumPy-style docstrings
+
+## Naming Conventions
+
+NeuRodent uses a small, predictable naming vocabulary so that a reader fluent in the
+scientific-Python ecosystem (MNE-Python, scikit-learn, pandas) can predict an API from its
+name. The rule of thumb: **one verb per kind of operation, one noun per concept.** When you
+add or rename a function, constant, parameter, or config key, follow the canon below.
+
+### Verb canon
+
+Each operation has a single canonical verb, matched to an established precedent.
+
+| Operation | Verb | Notes / precedent |
+|---|---|---|
+| Mutate a single global/config value | `set_` | sklearn `set_params`, MNE `set_config`/`set_montage`. E.g. `set_channel_map()`. Pairs with `get_`. |
+| Read a single global/config value | `get_` | sklearn `get_params`, MNE `get_config`. No side effects, no disk I/O. |
+| Install a whole config dict into globals | `apply_` | Distributes one config across many globals. `apply_samples_config` completes the `load_samples_config` -> `resolve_samples_config` -> `apply_samples_config` trio. |
+| Read from disk (format-named parser) | `read_` | pandas `read_parquet`, MNE `read_raw_edf`. Use when the suffix names the format. |
+| Reconstruct a known object from its files | `load_` | joblib `load`; repo `load_wars`. Use when rebuilding a known object from its own paired files. |
+| Numeric/statistical derivation (pure) | `compute_` | A real calculation (RMS, PSD, coherence, ...). |
+| Cheap accessor / lookup | `get_` | Returns a stored or trivially-derived value. |
+| Pull a sub-object out of a container | `extract_` | Reserve for "carve a piece out of a larger structure." |
+| Construct an object | `create_` | The single construct verb. Do **not** introduce `make_` or `build_`. |
+| Produce a Snakemake rule result | `generate_` | Pipeline scripts only (`workflow/scripts/generate_*.py`). This is rule/log vocabulary, not a general object factory. |
+| Canonicalize one identifier value | `resolve_` | E.g. `resolve_channel()` (raw name -> canonical abbrev). |
+| Rename labels on an object, in place | `rename_` | MNE `rename_channels`. E.g. `rename_mne_channels`. |
+| Format / dtype conversion | `convert_` | Strictly format/type changes, never identifier mapping (that is `resolve_`). |
+| String -> identifier extraction | `parse_` | E.g. `parse_str_to_animal`. Not a disk-I/O verb. |
+| Spelling | US `normalize` | NumPy/SciPy/sklearn spelling. Never `normalise`. |
+
+`get_` / `compute_` / `extract_` are already well-partitioned across the codebase; the
+boundary above is the rule to keep them that way.
+
+### Noun canon
+
+**`_MAP` vs `_ALIASES`.** The suffix encodes the resolution semantics:
+
+- `_MAP`: an **exact** `{canonical_label: [accepted spellings]}` lookup. The value must equal
+  one of the listed spellings (no substring/inference). `CHANNEL_MAP` (matched by
+  `resolve_channel()`), `GENOTYPE_MAP`, and `SEX_MAP` are all exact maps; the metadata maps
+  are authoritative when populated (an uncovered value raises at load).
+- `_ALIASES`: a **fuzzy**, variant-spelling family matched by substring. Reserve the suffix
+  for substring-matched tables (none currently ship; the legacy filename genotype parser that
+  used one was removed).
+
+Never name an exact map `*_ALIASES` or a fuzzy variant-list `*_MAP`.
+
+**Channel terminology.** Three distinct concepts:
+
+- *raw name*: the channel label as it appears in the source data (e.g. `"EEG E1-REF1"`, `"A-014"`).
+- `channel_abbrevs`: the canonical abbreviations (`"LMot"`, `"LHip"`, ...), always derived from
+  the raw names via `resolve_channel()`.
+- `channel_names`: the current working labels on a result, the raw names at construction, or the
+  abbreviations after standardization with `use_abbrevs=True`.
+
+**Config levels.** "Config" spans three nesting levels; keep them distinct in prose and variable names:
+
+- *pipeline config*: the merged Snakemake `config` object (framework-owned; not renamed).
+- *dataset config*: a `config/datasets/*.yaml` file.
+- *samples config*: the in-memory inventory dict (animals, channels, metadata) that
+  `apply_samples_config` installs. The inline YAML key for it stays `samples_data`.
+
+**The two `channels` keys.** A samples config has a top-level `channels:` map
+(`{abbrev: [raw names]}`, the montage) and, per animal in a joint recording, a `channel_subset:`
+list (the raw names belonging to that animal). They are different concepts, so do not reuse one
+key for both.
+
+### Channel API entry points
+
+Both the package and the pipeline funnel through the same single source of truth (`CHANNEL_MAP`):
+
+- **Package users** call `set_channel_map()` once with `{abbrev: [raw names]}`.
+- **Pipeline users** declare `channels:` in the samples config; each Snakemake script calls
+  `apply_samples_config` (which calls `set_channel_map` internally).
+
+Resolution is always exact (`resolve_channel()`); an unmapped raw name raises loudly rather than
+being inferred.
+
+### Migration policy
+
+Renames are **hard cuts** with no backwards-compatibility aliases. A stale caller should fail
+loudly (`ImportError`/`NameError`) rather than silently resolve to deprecated behavior. Renames
+never touch serialized on-disk data (the persisted `channel_names` JSON key is intentionally
+stable), so already-saved results keep loading.
 
 ## Questions and Support
 

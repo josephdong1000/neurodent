@@ -28,7 +28,7 @@ from seaborn import axes_style
 from neurodent.core import zeitgeber
 from neurodent.visualization.plotting import ZeitgeberPlotter
 from neurodent import constants
-from neurodent.workflow import setup_snakemake_logging, inject_config_aliases
+from neurodent.workflow import setup_snakemake_logging, apply_samples_config
 
 
 
@@ -84,7 +84,7 @@ def generate_plots(df, output_dir, data_dir, zt_config):
         df.to_pickle(data_dir / "zeitgeber_processed.pkl")
     
     # Log animal counts for reference
-    animal_counts = df.groupby(['gene', 'sex'])['animal'].nunique()
+    animal_counts = df.groupby(['genotype', 'sex'])['animal'].nunique()
     logger.info(f"Animal counts by genotype and sex:\n{animal_counts}")
     
     # Generate all plots
@@ -111,7 +111,7 @@ def main():
     samples_config = snakemake.params.samples_config
 
     # Inject aliases
-    inject_config_aliases(samples_config)
+    apply_samples_config(samples_config)
 
     # Create output directories
     output_dir = Path(snakemake.output.figure_dir)

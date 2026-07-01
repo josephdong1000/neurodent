@@ -37,7 +37,8 @@ def mock_war_data():
     df = pd.DataFrame(
         {
             "timestamp": dates,
-            "genotype": ["M_WT"] * 5,
+            "genotype": ["WT"] * 5,
+            "sex": ["Male"] * 5,
             "feature1": [1, 2, 3, 4, 5],
             # 'zt_minutes' typically not present in raw WAR output, added by ZAR
         }
@@ -106,7 +107,7 @@ def test_zar_get_channel_averaged_result(mock_war_data):
 def test_zar_missing_timestamp_fallback(mock_war_data):
     """Test behavior if timestamp is missing from raw data."""
     # Data without timestamp
-    df_no_time = pd.DataFrame({"genotype": ["M_WT"], "feature1": [1]})
+    df_no_time = pd.DataFrame({"genotype": ["WT"], "sex": ["Male"], "feature1": [1]})
     war_bad = MockWAR(df_no_time)
 
     zar = zeitgeber.ZeitgeberAnalysisResult(war_bad)

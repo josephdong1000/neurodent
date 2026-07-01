@@ -2,9 +2,6 @@
 # Dataset-specific configuration overrides
 # This file is deep-merged into the main config when active_dataset="ap3b2_rhd"
 
-samples:
-  samples_file: "config/samples_jess_rhd.json"
-
 analysis:
   war_generation:
     pattern: "{data_root}/*{animal}*/{index}.rhd"  # RHD files in folders matching animal pattern
@@ -13,3 +10,428 @@ analysis:
       input_type: "files"  # Multiple RHD files in folder get concatenated
       mode: "si"
       stream_id: "0"  # Select amplifier channels (not auxiliary)
+
+# --- Data inventory (channels + per-animal entries) ---
+samples_data:
+  data_root: /mnt/isilon/marsh_single_unit/PythonEEG Data/AP3B2/Intan recordings/
+  channels:
+    LMot:
+    - A-015
+    - B-015
+    - C-015
+    - D-015
+    RMot:
+    - A-016
+    - B-016
+    - C-016
+    - D-016
+    LBar:
+    - A-014
+    - B-014
+    - C-014
+    - D-014
+    RBar:
+    - A-017
+    - B-017
+    - C-017
+    - D-017
+    LHip:
+    - A-012
+    - B-012
+    - C-012
+    - D-012
+    RHip:
+    - A-019
+    - B-019
+    - C-019
+    - D-019
+    LAud:
+    - A-009
+    - B-009
+    - C-009
+    - D-009
+    RAud:
+    - A-022
+    - B-022
+    - C-022
+    - D-022
+    LVis:
+    - A-010
+    - B-010
+    - C-010
+    - D-010
+    RVis:
+    - A-021
+    - B-021
+    - C-021
+    - D-021
+  animals:
+  - id: AP3B2het-207-M
+    genotype: HET
+    sex: Male
+    channel_subset:
+    - A-009
+    - A-010
+    - A-012
+    - A-014
+    - A-015
+    - A-016
+    - A-017
+    - A-019
+    - A-021
+    - A-022
+    manual_datetime:
+    - '2025-10-31 11:57:09'
+    - '2025-11-04 10:15:18'
+    - '2025-11-05 09:37:29'
+  - id: AP3B2wt-206-M
+    genotype: WT
+    sex: Male
+    channel_subset:
+    - B-009
+    - B-010
+    - B-012
+    - B-014
+    - B-015
+    - B-016
+    - B-017
+    - B-019
+    - B-021
+    - B-022
+    manual_datetime:
+    - '2025-10-31 11:57:09'
+    - '2025-11-04 10:15:18'
+    - '2025-11-05 09:37:29'
+  - id: AP3B2homo-228-M
+    genotype: HOMO
+    sex: Male
+    channel_subset:
+    - A-009
+    - A-010
+    - A-012
+    - A-014
+    - A-015
+    - A-016
+    - A-017
+    - A-019
+    - A-021
+    - A-022
+    manual_datetime:
+    - '2025-11-07 11:08:07'
+    - '2025-11-07 12:31:58'
+    - '2025-11-08 11:27:19'
+    - '2025-11-09 12:26:28'
+    - '2025-11-10 11:28:26'
+  - id: AP3B2wt-247-F
+    genotype: WT
+    sex: Female
+    channel_subset:
+    - A-009
+    - A-010
+    - A-012
+    - A-014
+    - A-015
+    - A-016
+    - A-017
+    - A-019
+    - A-021
+    - A-022
+    manual_datetime:
+    - '2025-11-21 12:29:01'
+    - '2025-11-22 13:43:22'
+    - '2025-11-23 11:45:27'
+    - '2025-11-24 10:40:00'
+  - id: AP3B2homo-275-F
+    genotype: HOMO
+    sex: Female
+    channel_subset:
+    - B-009
+    - B-010
+    - B-012
+    - B-014
+    - B-015
+    - B-016
+    - B-017
+    - B-019
+    - B-021
+    - B-022
+    manual_datetime:
+    - '2025-11-21 12:29:01'
+    - '2025-11-22 13:43:22'
+    - '2025-11-23 11:45:27'
+    - '2025-11-24 10:40:00'
+  - id: AP3B2wt-246-F
+    genotype: WT
+    sex: Female
+    channel_subset:
+    - C-009
+    - C-010
+    - C-012
+    - C-014
+    - C-015
+    - C-016
+    - C-017
+    - C-019
+    - C-021
+    - C-022
+    manual_datetime:
+    - '2025-11-21 12:29:01'
+    - '2025-11-22 13:43:22'
+    - '2025-11-23 11:45:27'
+    - '2025-11-24 10:40:00'
+  - id: AP3B2homo-240-M
+    genotype: HOMO
+    sex: Male
+    channel_subset:
+    - A-009
+    - A-010
+    - A-012
+    - A-014
+    - A-015
+    - A-016
+    - A-017
+    - A-019
+    - A-021
+    - A-022
+    manual_datetime:
+    - '2025-11-26 12:23:14'
+    - '2025-11-27 15:39:05'
+    - '2025-11-28 11:47:05'
+  - id: AP3B2wt-241-M
+    genotype: WT
+    sex: Male
+    channel_subset:
+    - B-009
+    - B-010
+    - B-012
+    - B-014
+    - B-015
+    - B-016
+    - B-017
+    - B-019
+    - B-021
+    - B-022
+    manual_datetime:
+    - '2025-11-26 12:23:14'
+    - '2025-11-27 15:39:05'
+    - '2025-11-28 11:47:05'
+  - id: AP3B2het-221-M
+    genotype: HET
+    sex: Male
+    channel_subset:
+    - A-009
+    - A-010
+    - A-012
+    - A-014
+    - A-015
+    - A-016
+    - A-017
+    - A-019
+    - A-021
+    - A-022
+    manual_datetime:
+    - '2025-12-04 11:59:20'
+    - '2025-12-05 11:36:40'
+    - '2025-12-06 14:01:41'
+    - '2025-12-07 13:15:45'
+    - '2025-12-08 11:08:18'
+  - id: AP3B2het-222-M
+    genotype: HET
+    sex: Male
+    channel_subset:
+    - B-009
+    - B-010
+    - B-012
+    - B-014
+    - B-015
+    - B-016
+    - B-017
+    - B-019
+    - B-021
+    - B-022
+    manual_datetime:
+    - '2025-12-04 11:59:20'
+    - '2025-12-05 11:36:40'
+    - '2025-12-06 14:01:41'
+    - '2025-12-07 13:15:45'
+    - '2025-12-08 11:08:18'
+  - id: AP3B2-264or265-M
+    genotype: UNKNOWN
+    sex: Male
+    channel_subset:
+    - C-009
+    - C-010
+    - C-012
+    - C-014
+    - C-015
+    - C-016
+    - C-017
+    - C-019
+    - C-021
+    - C-022
+    manual_datetime:
+    - '2025-12-04 11:59:20'
+    - '2025-12-05 11:36:40'
+    - '2025-12-06 14:01:41'
+    - '2025-12-07 13:15:45'
+    - '2025-12-08 11:08:18'
+  - id: AP3B2wt-243-M
+    genotype: WT
+    sex: Male
+    channel_subset:
+    - D-009
+    - D-010
+    - D-012
+    - D-014
+    - D-015
+    - D-016
+    - D-017
+    - D-019
+    - D-021
+    - D-022
+    manual_datetime:
+    - '2025-12-04 11:59:20'
+    - '2025-12-05 11:36:40'
+    - '2025-12-06 14:01:41'
+    - '2025-12-07 13:15:45'
+    - '2025-12-08 11:08:18'
+  - id: AP3B2wt-202-F
+    genotype: WT
+    sex: Female
+    channel_subset:
+    - A-009
+    - A-010
+    - A-012
+    - A-014
+    - A-015
+    - A-016
+    - A-017
+    - A-019
+    - A-021
+    - A-022
+    manual_datetime:
+    - '2025-12-11 11:32:48'
+    - '2025-12-11 14:46:48'
+    - '2025-12-12 12:34:40'
+    - '2025-12-13 14:08:42'
+    - '2025-12-15 12:22:03'
+    - '2025-12-16 14:34:20'
+  - id: AP3B2homo-203-F
+    genotype: HOMO
+    sex: Female
+    channel_subset:
+    - B-009
+    - B-010
+    - B-012
+    - B-014
+    - B-015
+    - B-016
+    - B-017
+    - B-019
+    - B-021
+    - B-022
+    manual_datetime:
+    - '2025-12-11 11:32:48'
+    - '2025-12-11 14:46:48'
+    - '2025-12-12 12:34:40'
+    - '2025-12-13 14:08:42'
+    - '2025-12-15 12:22:03'
+    - '2025-12-16 14:34:20'
+  - id: AP3B2het-237-F
+    genotype: HET
+    sex: Female
+    channel_subset:
+    - C-009
+    - C-010
+    - C-012
+    - C-014
+    - C-015
+    - C-016
+    - C-017
+    - C-019
+    - C-021
+    - C-022
+    manual_datetime:
+    - '2025-12-11 11:32:48'
+    - '2025-12-11 14:46:48'
+    - '2025-12-12 12:34:40'
+    - '2025-12-13 14:08:42'
+    - '2025-12-15 12:22:03'
+    - '2025-12-16 14:34:20'
+  - id: AP3B2het-239-F
+    genotype: HET
+    sex: Female
+    channel_subset:
+    - D-009
+    - D-010
+    - D-012
+    - D-014
+    - D-015
+    - D-016
+    - D-017
+    - D-019
+    - D-021
+    - D-022
+    manual_datetime:
+    - '2025-12-11 11:32:48'
+    - '2025-12-11 14:46:48'
+    - '2025-12-12 12:34:40'
+    - '2025-12-13 14:08:42'
+    - '2025-12-15 12:22:03'
+  - id: AP3B2het-280-F
+    genotype: HET
+    sex: Female
+    channel_subset:
+    - A-009
+    - A-010
+    - A-012
+    - A-014
+    - A-015
+    - A-016
+    - A-017
+    - A-019
+    - A-021
+    - A-022
+    manual_datetime:
+    - '2025-12-18 15:21:36'
+    - '2025-12-19 11:23:28'
+    - '2025-12-20 14:49:35'
+    - '2025-12-21 12:55:11'
+  - id: AP3B2het-271-F
+    genotype: HET
+    sex: Female
+    channel_subset:
+    - B-009
+    - B-010
+    - B-012
+    - B-014
+    - B-015
+    - B-016
+    - B-017
+    - B-019
+    - B-021
+    - B-022
+    manual_datetime:
+    - '2025-12-18 15:21:36'
+    - '2025-12-19 11:23:28'
+    - '2025-12-20 14:49:35'
+    - '2025-12-21 12:55:11'
+  - id: AP3B2wt236-F
+    genotype: WT
+    sex: Female
+    channel_subset:
+    - C-009
+    - C-010
+    - C-012
+    - C-014
+    - C-015
+    - C-016
+    - C-017
+    - C-019
+    - C-021
+    - C-022
+    manual_datetime:
+    - '2025-12-18 15:21:36'
+    - '2025-12-19 11:23:28'
+    - '2025-12-20 14:49:35'
+    - '2025-12-21 12:55:11'

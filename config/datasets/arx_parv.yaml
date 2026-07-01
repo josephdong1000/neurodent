@@ -1,0 +1,835 @@
+# Arx Parv - single-file dataset config (pipeline settings + inline 'samples_data').
+# EDF-only cohort (Pre-Intan). Channel mapping matched to arx_rosa per Don Joseph
+# (2026-06, recorded w/ Almedia): each animal = 1 REF bank (E1-8 / E9-16 / E17-24 /
+# E25-32), 8 live ch, odd-pos = L. Pair order Motor, Bar(=parietal), Hippo, Visual.
+# Supersedes the old Aud/Vis/Bar/Mot mirror layout (no Auditory; Almedia did bilateral
+# depth hippocampus). RHD aliases (A/B/C/D) carried for parity with arx_rosa but UNUSED
+# here (no Intan animals). manual_datetime = EDF header starts (verified 2026-06).
+# Note: '_0_Selection{n}' files were renamed from '_Selection{n}'.
+# Unknown-genotype animals (29/32/34, 30/21/31) are dropped by the base config default
+# war_quality_filter.exclude_unknown_genotypes=true; add a samples.quality_filter override to keep them.
+
+temp_directory: "/scr1/users/dongjp"
+
+# Global defaults for all sessions (per-animal pattern/lro_kwargs live in samples_data.animals)
+analysis:
+  war_generation:
+    pattern:
+      - "{data_root}/{animal}/{index}.EDF"
+    datetimes_are_start: true
+    lro_kwargs:
+      mode: "mne"
+      extract_func: "read_raw_edf"
+      multiprocess_mode: "dask"
+
+# --- Data inventory (channel aliases + per-animal entries) -------------------------
+samples_data:
+  data_root: /mnt/isilon/marsh_single_unit/PythonEEG Data/Arx Parv
+  channels:
+    LMot:
+      - EEG E1-REF1
+      - EEG E9-REF2
+      - EEG E17-REF3
+      - EEG E25-REF4
+      - A-014
+      - B-014
+      - C-014
+      - D-014
+    RMot:
+      - EEG E2-REF1
+      - EEG E10-REF2
+      - EEG E18-REF3
+      - EEG E26-REF4
+      - A-015
+      - B-015
+      - C-015
+      - D-015
+    LBar:
+      - EEG E3-REF1
+      - EEG E11-REF2
+      - EEG E19-REF3
+      - EEG E27-REF4
+      - A-010
+      - B-010
+      - C-010
+      - D-010
+    RBar:
+      - EEG E4-REF1
+      - EEG E12-REF2
+      - EEG E20-REF3
+      - EEG E28-REF4
+      - A-012
+      - B-012
+      - C-012
+      - D-012
+    LHip:
+      - EEG E5-REF1
+      - EEG E13-REF2
+      - EEG E21-REF3
+      - EEG E29-REF4
+      - A-019
+      - B-019
+      - C-019
+      - D-019
+    RHip:
+      - EEG E6-REF1
+      - EEG E14-REF2
+      - EEG E22-REF3
+      - EEG E30-REF4
+      - A-021
+      - B-021
+      - C-021
+      - D-021
+    LVis:
+      - EEG E7-REF1
+      - EEG E15-REF2
+      - EEG E23-REF3
+      - EEG E31-REF4
+      - A-016
+      - B-016
+      - C-016
+      - D-016
+    RVis:
+      - EEG E8-REF1
+      - EEG E16-REF2
+      - EEG E24-REF3
+      - EEG E32-REF4
+      - A-017
+      - B-017
+      - C-017
+      - D-017
+  # Normalize the per-animal `genotype` strings -> short grouping/plot labels (exact match;
+  # each label self-aliased). Arx is X-linked + PV-Cre conditional:
+  #   KO = floxed Arx (F) AND Parvcre+: males F/y;Cre+ (hemizygous) and females F/F;Cre+
+  #        (homozygous) -> Arx fully deleted in PV cells.
+  #   WT = everything else (controls): Cre- flox (Arx intact), Arx(wt) incl. wt;Cre+ (no
+  #        floxed allele to delete), and the germline-het F/x;Cre- females (32, 388) --
+  #        no Cre = no deletion, so grouped as controls (no het-KO exists in this cohort).
+  GENOTYPE_MAP:
+    KO:
+      - KO
+      - "Arx(F/y);Parvcre+"
+      - "Arx(F/F);Parvcre+"
+      - "Arx(F/y); cre+"
+      - "Arx(F/y);Rosa(YFP/wt);Parvcre+"
+    WT:
+      - WT
+      - "Arx(wt);Parvcre+"
+      - "Arx(wt);Parvcre-"
+      - "Arx(wt); cre-"
+      - "Arx(wt); Parvcre(-)"
+      - "Arx(F/y);Parvcre-"
+      - "Arx(F/y); cre-"
+      - "Arx(F/F);Parvcre-"
+      - "Arx(F/x);Parvcre-"
+      - "Arx(F/x); cre-"
+      - "Arx(F/y);Rosa(YFP/wt);Parvcre-"
+  animals:
+    - id: '29'
+      genotype: Arx(F/y); cre+
+      sex: Male
+      channel_subset:
+        - EEG E1-REF1
+        - EEG E2-REF1
+        - EEG E3-REF1
+        - EEG E4-REF1
+        - EEG E5-REF1
+        - EEG E6-REF1
+        - EEG E7-REF1
+        - EEG E8-REF1
+      group: 29 32 34
+      manual_datetime:
+        _0_:
+          - "2011-06-07 16:04:14"
+          - "2011-06-07 20:04:12"
+          - "2011-06-08 00:04:12"
+          - "2011-06-08 08:04:13"
+          - "2011-06-08 12:04:14"
+        _1_: "2011-06-08 15:59:47"
+        _2_: "2011-06-09 15:55:20"
+      pattern: "{data_root}/{animal}/MARSH 20110606-PARV-29-32-34 2011-06-07 16H03M{session}Selection{index}.EDF"
+      lro_kwargs:
+        mode: mne
+        extract_func: read_raw_edf
+    - id: '32'
+      genotype: Arx(F/x); cre-
+      sex: Female
+      channel_subset:
+        - EEG E9-REF2
+        - EEG E10-REF2
+        - EEG E11-REF2
+        - EEG E12-REF2
+        - EEG E13-REF2
+        - EEG E14-REF2
+        - EEG E15-REF2
+        - EEG E16-REF2
+      group: 29 32 34
+      manual_datetime:
+        _0_:
+          - "2011-06-07 16:04:14"
+          - "2011-06-07 20:04:12"
+          - "2011-06-08 00:04:12"
+          - "2011-06-08 08:04:13"
+          - "2011-06-08 12:04:14"
+        _1_: "2011-06-08 15:59:47"
+        _2_: "2011-06-09 15:55:20"
+      pattern: "{data_root}/{animal}/MARSH 20110606-PARV-29-32-34 2011-06-07 16H03M{session}Selection{index}.EDF"
+      lro_kwargs:
+        mode: mne
+        extract_func: read_raw_edf
+    - id: '34'
+      genotype: Arx(wt); Parvcre(-)
+      sex: Female
+      channel_subset:
+        - EEG E17-REF3
+        - EEG E18-REF3
+        - EEG E19-REF3
+        - EEG E20-REF3
+        - EEG E21-REF3
+        - EEG E22-REF3
+        - EEG E23-REF3
+        - EEG E24-REF3
+      group: 29 32 34
+      manual_datetime:
+        _0_:
+          - "2011-06-07 16:04:14"
+          - "2011-06-07 20:04:12"
+          - "2011-06-08 00:04:12"
+          - "2011-06-08 08:04:13"
+          - "2011-06-08 12:04:14"
+        _1_: "2011-06-08 15:59:47"
+        _2_: "2011-06-09 15:55:20"
+      pattern: "{data_root}/{animal}/MARSH 20110606-PARV-29-32-34 2011-06-07 16H03M{session}Selection{index}.EDF"
+      lro_kwargs:
+        mode: mne
+        extract_func: read_raw_edf
+    - id: '30'
+      genotype: Arx(F/y); cre-
+      sex: Male
+      channel_subset:
+        - EEG E1-REF1
+        - EEG E2-REF1
+        - EEG E3-REF1
+        - EEG E4-REF1
+        - EEG E5-REF1
+        - EEG E6-REF1
+        - EEG E7-REF1
+        - EEG E8-REF1
+      group: 30 21 31
+      manual_datetime:
+        _0_: "2011-05-23 18:00:05"
+        _1_: "2011-05-24 17:55:38"
+        _2_: "2011-05-25 17:51:12"
+      pattern: "{data_root}/{animal}/MARSH 20110523-PARV-30-21-31 2011-05-23 17H59M{session}Selection{index}.EDF"
+      lro_kwargs:
+        mode: mne
+        extract_func: read_raw_edf
+    - id: '21'
+      genotype: Arx(wt); cre-
+      sex: Male
+      channel_subset:
+        - EEG E9-REF2
+        - EEG E10-REF2
+        - EEG E11-REF2
+        - EEG E12-REF2
+        - EEG E13-REF2
+        - EEG E14-REF2
+        - EEG E15-REF2
+        - EEG E16-REF2
+      group: 30 21 31
+      manual_datetime:
+        _0_: "2011-05-23 18:00:05"
+        _1_: "2011-05-24 17:55:38"
+        _2_: "2011-05-25 17:51:12"
+      pattern: "{data_root}/{animal}/MARSH 20110523-PARV-30-21-31 2011-05-23 17H59M{session}Selection{index}.EDF"
+      lro_kwargs:
+        mode: mne
+        extract_func: read_raw_edf
+    - id: '31'
+      genotype: Arx(F/y); cre-
+      sex: Male
+      channel_subset:
+        - EEG E17-REF3
+        - EEG E18-REF3
+        - EEG E19-REF3
+        - EEG E20-REF3
+        - EEG E21-REF3
+        - EEG E22-REF3
+        - EEG E23-REF3
+        - EEG E24-REF3
+      group: 30 21 31
+      manual_datetime:
+        _0_: "2011-05-23 18:00:05"
+        _1_: "2011-05-24 17:55:38"
+        _2_: "2011-05-25 17:51:12"
+      pattern: "{data_root}/{animal}/MARSH 20110523-PARV-30-21-31 2011-05-23 17H59M{session}Selection{index}.EDF"
+      lro_kwargs:
+        mode: mne
+        extract_func: read_raw_edf
+    - id: '354'
+      genotype: Arx(wt);Parvcre+
+      sex: Male
+      channel_subset:
+        - EEG E1-REF1
+        - EEG E2-REF1
+        - EEG E3-REF1
+        - EEG E4-REF1
+        - EEG E5-REF1
+        - EEG E6-REF1
+        - EEG E7-REF1
+        - EEG E8-REF1
+      group: 354 356 357
+      manual_datetime:
+        _0_: "2012-03-01 10:57:21"
+        _1_: "2012-03-02 10:53:03"
+        _2_: "2012-03-03 10:48:39"
+      pattern: "{data_root}/{animal}/MARSH 20120301 ARX PARV 354356357{session}Selection{index}.EDF"
+      lro_kwargs:
+        mode: mne
+        extract_func: read_raw_edf
+    - id: '356'
+      genotype: Arx(F/y);Parvcre+
+      sex: Male
+      channel_subset:
+        - EEG E9-REF2
+        - EEG E10-REF2
+        - EEG E11-REF2
+        - EEG E12-REF2
+        - EEG E13-REF2
+        - EEG E14-REF2
+        - EEG E15-REF2
+        - EEG E16-REF2
+      group: 354 356 357
+      manual_datetime:
+        _0_: "2012-03-01 10:57:21"
+        _1_: "2012-03-02 10:53:03"
+        _2_: "2012-03-03 10:48:39"
+      pattern: "{data_root}/{animal}/MARSH 20120301 ARX PARV 354356357{session}Selection{index}.EDF"
+      lro_kwargs:
+        mode: mne
+        extract_func: read_raw_edf
+    - id: '357'
+      genotype: Arx(F/y);Parvcre+
+      sex: Male
+      channel_subset:
+        - EEG E17-REF3
+        - EEG E18-REF3
+        - EEG E19-REF3
+        - EEG E20-REF3
+        - EEG E21-REF3
+        - EEG E22-REF3
+        - EEG E23-REF3
+        - EEG E24-REF3
+      group: 354 356 357
+      manual_datetime:
+        _0_: "2012-03-01 10:57:21"
+        _1_: "2012-03-02 10:53:03"
+        _2_: "2012-03-03 10:48:39"
+      pattern: "{data_root}/{animal}/MARSH 20120301 ARX PARV 354356357{session}Selection{index}.EDF"
+      lro_kwargs:
+        mode: mne
+        extract_func: read_raw_edf
+    - id: '387'
+      genotype: Arx(F/y);Parvcre+
+      sex: Male
+      channel_subset:
+        - EEG E1-REF1
+        - EEG E2-REF1
+        - EEG E3-REF1
+        - EEG E4-REF1
+        - EEG E5-REF1
+        - EEG E6-REF1
+        - EEG E7-REF1
+        - EEG E8-REF1
+      group: 387 388 390 400
+      manual_datetime:
+        _0_: "2012-06-20 08:34:31"
+        _1_: "2012-06-21 08:30:18"
+        _2_: "2012-06-22 08:25:53"
+      pattern: "{data_root}/{animal}/MARSH 20120620 ARXPARV 387388390400{session}Selection{index}.EDF"
+      lro_kwargs:
+        mode: mne
+        extract_func: read_raw_edf
+    - id: '388'
+      genotype: Arx(F/x);Parvcre-
+      sex: Female
+      channel_subset:
+        - EEG E9-REF2
+        - EEG E10-REF2
+        - EEG E11-REF2
+        - EEG E12-REF2
+        - EEG E13-REF2
+        - EEG E14-REF2
+        - EEG E15-REF2
+        - EEG E16-REF2
+      group: 387 388 390 400
+      manual_datetime:
+        _0_: "2012-06-20 08:34:31"
+        _1_: "2012-06-21 08:30:18"
+        _2_: "2012-06-22 08:25:53"
+      pattern: "{data_root}/{animal}/MARSH 20120620 ARXPARV 387388390400{session}Selection{index}.EDF"
+      lro_kwargs:
+        mode: mne
+        extract_func: read_raw_edf
+    - id: '390'
+      genotype: Arx(F/F);Parvcre-
+      sex: Female
+      channel_subset:
+        - EEG E17-REF3
+        - EEG E18-REF3
+        - EEG E19-REF3
+        - EEG E20-REF3
+        - EEG E21-REF3
+        - EEG E22-REF3
+        - EEG E23-REF3
+        - EEG E24-REF3
+      group: 387 388 390 400
+      manual_datetime:
+        _0_: "2012-06-20 08:34:31"
+        _1_: "2012-06-21 08:30:18"
+        _2_: "2012-06-22 08:25:53"
+      pattern: "{data_root}/{animal}/MARSH 20120620 ARXPARV 387388390400{session}Selection{index}.EDF"
+      lro_kwargs:
+        mode: mne
+        extract_func: read_raw_edf
+    - id: '400'
+      genotype: Arx(F/F);Parvcre+
+      sex: Female
+      channel_subset:
+        - EEG E25-REF4
+        - EEG E26-REF4
+        - EEG E27-REF4
+        - EEG E28-REF4
+        - EEG E29-REF4
+        - EEG E30-REF4
+        - EEG E31-REF4
+        - EEG E32-REF4
+      group: 387 388 390 400
+      manual_datetime:
+        _0_: "2012-06-20 08:34:31"
+        _1_: "2012-06-21 08:30:18"
+        _2_: "2012-06-22 08:25:53"
+      pattern: "{data_root}/{animal}/MARSH 20120620 ARXPARV 387388390400{session}Selection{index}.EDF"
+      lro_kwargs:
+        mode: mne
+        extract_func: read_raw_edf
+    - id: '393'
+      genotype: Arx(F/y);Parvcre+
+      sex: Male
+      channel_subset:
+        - EEG E1-REF1
+        - EEG E2-REF1
+        - EEG E3-REF1
+        - EEG E4-REF1
+        - EEG E5-REF1
+        - EEG E6-REF1
+        - EEG E7-REF1
+        - EEG E8-REF1
+      group: 393 399 385 395
+      manual_datetime:
+        _0_: "2012-06-15 09:05:54"
+        _1_: "2012-06-16 09:01:30"
+        _2_: "2012-06-17 08:57:05"
+      pattern: "{data_root}/{animal}/MARSH 20120615 ARXPARV 393399385395{session}Selection{index}.EDF"
+      lro_kwargs:
+        mode: mne
+        extract_func: read_raw_edf
+    - id: '399'
+      genotype: Arx(F/y);Parvcre+
+      sex: Male
+      channel_subset:
+        - EEG E9-REF2
+        - EEG E10-REF2
+        - EEG E11-REF2
+        - EEG E12-REF2
+        - EEG E13-REF2
+        - EEG E14-REF2
+        - EEG E15-REF2
+        - EEG E16-REF2
+      group: 393 399 385 395
+      manual_datetime:
+        _0_: "2012-06-15 09:05:54"
+        _1_: "2012-06-16 09:01:30"
+        _2_: "2012-06-17 08:57:05"
+      pattern: "{data_root}/{animal}/MARSH 20120615 ARXPARV 393399385395{session}Selection{index}.EDF"
+      lro_kwargs:
+        mode: mne
+        extract_func: read_raw_edf
+    - id: '385'
+      genotype: Arx(F/F);Parvcre+
+      sex: Female
+      channel_subset:
+        - EEG E17-REF3
+        - EEG E18-REF3
+        - EEG E19-REF3
+        - EEG E20-REF3
+        - EEG E21-REF3
+        - EEG E22-REF3
+        - EEG E23-REF3
+        - EEG E24-REF3
+      group: 393 399 385 395
+      manual_datetime:
+        _0_: "2012-06-15 09:05:54"
+        _1_: "2012-06-16 09:01:30"
+        _2_: "2012-06-17 08:57:05"
+      pattern: "{data_root}/{animal}/MARSH 20120615 ARXPARV 393399385395{session}Selection{index}.EDF"
+      lro_kwargs:
+        mode: mne
+        extract_func: read_raw_edf
+    - id: '395'
+      genotype: Arx(F/y);Parvcre-
+      sex: Male
+      channel_subset:
+        - EEG E25-REF4
+        - EEG E26-REF4
+        - EEG E27-REF4
+        - EEG E28-REF4
+        - EEG E29-REF4
+        - EEG E30-REF4
+        - EEG E31-REF4
+        - EEG E32-REF4
+      group: 393 399 385 395
+      manual_datetime:
+        _0_: "2012-06-15 09:05:54"
+        _1_: "2012-06-16 09:01:30"
+        _2_: "2012-06-17 08:57:05"
+      pattern: "{data_root}/{animal}/MARSH 20120615 ARXPARV 393399385395{session}Selection{index}.EDF"
+      lro_kwargs:
+        mode: mne
+        extract_func: read_raw_edf
+    - id: '432'
+      genotype: Arx(F/y);Rosa(YFP/wt);Parvcre-
+      sex: Male
+      channel_subset:
+        - EEG E1-REF1
+        - EEG E2-REF1
+        - EEG E3-REF1
+        - EEG E4-REF1
+        - EEG E5-REF1
+        - EEG E6-REF1
+        - EEG E7-REF1
+        - EEG E8-REF1
+      group: 432 435 438 439
+      manual_datetime:
+        _0_: "2012-07-03 09:36:39"
+        _1_: "2012-07-04 09:32:16"
+        _2_: "2012-07-05 09:27:54"
+      pattern: "{data_root}/{animal}/MARSH 20120703 ARXPARV 432435438439{session}Selection{index}.EDF"
+      lro_kwargs:
+        mode: mne
+        extract_func: read_raw_edf
+    - id: '435'
+      genotype: Arx(F/y);Rosa(YFP/wt);Parvcre+
+      sex: Male
+      channel_subset:
+        - EEG E9-REF2
+        - EEG E10-REF2
+        - EEG E11-REF2
+        - EEG E12-REF2
+        - EEG E13-REF2
+        - EEG E14-REF2
+        - EEG E15-REF2
+        - EEG E16-REF2
+      group: 432 435 438 439
+      manual_datetime:
+        _0_: "2012-07-03 09:36:39"
+        _1_: "2012-07-04 09:32:16"
+        _2_: "2012-07-05 09:27:54"
+      pattern: "{data_root}/{animal}/MARSH 20120703 ARXPARV 432435438439{session}Selection{index}.EDF"
+      lro_kwargs:
+        mode: mne
+        extract_func: read_raw_edf
+    - id: '438'
+      genotype: Arx(F/F);Parvcre+
+      sex: Female
+      channel_subset:
+        - EEG E17-REF3
+        - EEG E18-REF3
+        - EEG E19-REF3
+        - EEG E20-REF3
+        - EEG E21-REF3
+        - EEG E22-REF3
+        - EEG E23-REF3
+        - EEG E24-REF3
+      group: 432 435 438 439
+      manual_datetime:
+        _0_: "2012-07-03 09:36:39"
+        _1_: "2012-07-04 09:32:16"
+        _2_: "2012-07-05 09:27:54"
+      pattern: "{data_root}/{animal}/MARSH 20120703 ARXPARV 432435438439{session}Selection{index}.EDF"
+      lro_kwargs:
+        mode: mne
+        extract_func: read_raw_edf
+    - id: '439'
+      genotype: Arx(F/F);Parvcre-
+      sex: Female
+      channel_subset:
+        - EEG E25-REF4
+        - EEG E26-REF4
+        - EEG E27-REF4
+        - EEG E28-REF4
+        - EEG E29-REF4
+        - EEG E30-REF4
+        - EEG E31-REF4
+        - EEG E32-REF4
+      group: 432 435 438 439
+      manual_datetime:
+        _0_: "2012-07-03 09:36:39"
+        _1_: "2012-07-04 09:32:16"
+        _2_: "2012-07-05 09:27:54"
+      pattern: "{data_root}/{animal}/MARSH 20120703 ARXPARV 432435438439{session}Selection{index}.EDF"
+      lro_kwargs:
+        mode: mne
+        extract_func: read_raw_edf
+    - id: '440'
+      genotype: Arx(F/F);Parvcre+
+      sex: Female
+      channel_subset:
+        - EEG E1-REF1
+        - EEG E2-REF1
+        - EEG E3-REF1
+        - EEG E4-REF1
+        - EEG E5-REF1
+        - EEG E6-REF1
+        - EEG E7-REF1
+        - EEG E8-REF1
+      group: 440 443 446 447
+      manual_datetime:
+        _0_: "2012-07-17 10:57:48"
+        _1_: "2012-07-18 10:53:27"
+        _2_: "2012-07-19 10:49:04"
+      pattern: "{data_root}/{animal}/MARSH 20120717ARXPARV440443446447{session}Selection{index}.EDF"
+      lro_kwargs:
+        mode: mne
+        extract_func: read_raw_edf
+    - id: '443'
+      genotype: Arx(wt);Parvcre-
+      sex: Male
+      channel_subset:
+        - EEG E9-REF2
+        - EEG E10-REF2
+        - EEG E11-REF2
+        - EEG E12-REF2
+        - EEG E13-REF2
+        - EEG E14-REF2
+        - EEG E15-REF2
+        - EEG E16-REF2
+      group: 440 443 446 447
+      manual_datetime:
+        _0_: "2012-07-17 10:57:48"
+        _1_: "2012-07-18 10:53:27"
+        _2_: "2012-07-19 10:49:04"
+      pattern: "{data_root}/{animal}/MARSH 20120717ARXPARV440443446447{session}Selection{index}.EDF"
+      lro_kwargs:
+        mode: mne
+        extract_func: read_raw_edf
+    - id: '446'
+      genotype: Arx(F/y);Parvcre+
+      sex: Male
+      channel_subset:
+        - EEG E17-REF3
+        - EEG E18-REF3
+        - EEG E19-REF3
+        - EEG E20-REF3
+        - EEG E21-REF3
+        - EEG E22-REF3
+        - EEG E23-REF3
+        - EEG E24-REF3
+      group: 440 443 446 447
+      manual_datetime:
+        _0_: "2012-07-17 10:57:48"
+        _1_: "2012-07-18 10:53:27"
+        _2_: "2012-07-19 10:49:04"
+      pattern: "{data_root}/{animal}/MARSH 20120717ARXPARV440443446447{session}Selection{index}.EDF"
+      lro_kwargs:
+        mode: mne
+        extract_func: read_raw_edf
+    - id: '447'
+      genotype: Arx(F/y);Parvcre+
+      sex: Male
+      channel_subset:
+        - EEG E25-REF4
+        - EEG E26-REF4
+        - EEG E27-REF4
+        - EEG E28-REF4
+        - EEG E29-REF4
+        - EEG E30-REF4
+        - EEG E31-REF4
+        - EEG E32-REF4
+      group: 440 443 446 447
+      manual_datetime:
+        _0_: "2012-07-17 10:57:48"
+        _1_: "2012-07-18 10:53:27"
+        _2_: "2012-07-19 10:49:04"
+      pattern: "{data_root}/{animal}/MARSH 20120717ARXPARV440443446447{session}Selection{index}.EDF"
+      lro_kwargs:
+        mode: mne
+        extract_func: read_raw_edf
+    - id: '700'
+      genotype: Arx(F/y);Parvcre+
+      sex: Male
+      channel_subset:
+        - EEG E1-REF1
+        - EEG E2-REF1
+        - EEG E3-REF1
+        - EEG E4-REF1
+        - EEG E5-REF1
+        - EEG E6-REF1
+        - EEG E7-REF1
+        - EEG E8-REF1
+      group: 700 703 704 705
+      manual_datetime:
+        _1_: "2014-01-15 11:15:53"
+        _2_: "2014-01-16 11:11:30"
+        _3_: "2014-01-17 11:07:08"
+      pattern: "{data_root}/{animal}/MARSH 20140114ARXPARV700703704705{session}Selection{index}.EDF"
+      lro_kwargs:
+        mode: mne
+        extract_func: read_raw_edf
+    - id: '703'
+      genotype: Arx(F/y);Parvcre+
+      sex: Male
+      channel_subset:
+        - EEG E9-REF2
+        - EEG E10-REF2
+        - EEG E11-REF2
+        - EEG E12-REF2
+        - EEG E13-REF2
+        - EEG E14-REF2
+        - EEG E15-REF2
+        - EEG E16-REF2
+      group: 700 703 704 705
+      manual_datetime:
+        _1_: "2014-01-15 11:15:53"
+        _2_: "2014-01-16 11:11:30"
+        _3_: "2014-01-17 11:07:08"
+      pattern: "{data_root}/{animal}/MARSH 20140114ARXPARV700703704705{session}Selection{index}.EDF"
+      lro_kwargs:
+        mode: mne
+        extract_func: read_raw_edf
+    - id: '704'
+      genotype: Arx(F/y);Parvcre+
+      sex: Male
+      channel_subset:
+        - EEG E17-REF3
+        - EEG E18-REF3
+        - EEG E19-REF3
+        - EEG E20-REF3
+        - EEG E21-REF3
+        - EEG E22-REF3
+        - EEG E23-REF3
+        - EEG E24-REF3
+      group: 700 703 704 705
+      manual_datetime:
+        _1_: "2014-01-15 11:15:53"
+        _2_: "2014-01-16 11:11:30"
+        _3_: "2014-01-17 11:07:08"
+      pattern: "{data_root}/{animal}/MARSH 20140114ARXPARV700703704705{session}Selection{index}.EDF"
+      lro_kwargs:
+        mode: mne
+        extract_func: read_raw_edf
+    - id: '705'
+      genotype: Arx(F/y);Parvcre+
+      sex: Male
+      channel_subset:
+        - EEG E25-REF4
+        - EEG E26-REF4
+        - EEG E27-REF4
+        - EEG E28-REF4
+        - EEG E29-REF4
+        - EEG E30-REF4
+        - EEG E31-REF4
+        - EEG E32-REF4
+      group: 700 703 704 705
+      manual_datetime:
+        _1_: "2014-01-15 11:15:53"
+        _2_: "2014-01-16 11:11:30"
+        _3_: "2014-01-17 11:07:08"
+      pattern: "{data_root}/{animal}/MARSH 20140114ARXPARV700703704705{session}Selection{index}.EDF"
+      lro_kwargs:
+        mode: mne
+        extract_func: read_raw_edf
+    - id: '708'
+      genotype: Arx(F/y);Parvcre+
+      sex: Male
+      channel_subset:
+        - EEG E1-REF1
+        - EEG E2-REF1
+        - EEG E3-REF1
+        - EEG E4-REF1
+        - EEG E5-REF1
+        - EEG E6-REF1
+        - EEG E7-REF1
+        - EEG E8-REF1
+      group: 708 709 710 711
+      manual_datetime:
+        _0_: "2014-02-25 12:20:26"
+        _1_: "2014-02-26 12:16:06"
+        _2_: "2014-02-27 12:11:43"
+      pattern: "{data_root}/{animal}/MARSH 20140225ARX PARV708709710711{session}Selection{index}.EDF"
+      lro_kwargs:
+        mode: mne
+        extract_func: read_raw_edf
+    - id: '709'
+      genotype: Arx(F/y);Parvcre+
+      sex: Male
+      channel_subset:
+        - EEG E9-REF2
+        - EEG E10-REF2
+        - EEG E11-REF2
+        - EEG E12-REF2
+        - EEG E13-REF2
+        - EEG E14-REF2
+        - EEG E15-REF2
+        - EEG E16-REF2
+      group: 708 709 710 711
+      manual_datetime:
+        _0_: "2014-02-25 12:20:26"
+        _1_: "2014-02-26 12:16:06"
+        _2_: "2014-02-27 12:11:43"
+      pattern: "{data_root}/{animal}/MARSH 20140225ARX PARV708709710711{session}Selection{index}.EDF"
+      lro_kwargs:
+        mode: mne
+        extract_func: read_raw_edf
+    - id: '710'
+      genotype: Arx(F/y);Parvcre+
+      sex: Male
+      channel_subset:
+        - EEG E17-REF3
+        - EEG E18-REF3
+        - EEG E19-REF3
+        - EEG E20-REF3
+        - EEG E21-REF3
+        - EEG E22-REF3
+        - EEG E23-REF3
+        - EEG E24-REF3
+      group: 708 709 710 711
+      manual_datetime:
+        _0_: "2014-02-25 12:20:26"
+        _1_: "2014-02-26 12:16:06"
+        _2_: "2014-02-27 12:11:43"
+      pattern: "{data_root}/{animal}/MARSH 20140225ARX PARV708709710711{session}Selection{index}.EDF"
+      lro_kwargs:
+        mode: mne
+        extract_func: read_raw_edf
+    - id: '711'
+      genotype: Arx(F/y);Parvcre+
+      sex: Male
+      channel_subset:
+        - EEG E25-REF4
+        - EEG E26-REF4
+        - EEG E27-REF4
+        - EEG E28-REF4
+        - EEG E29-REF4
+        - EEG E30-REF4
+        - EEG E31-REF4
+        - EEG E32-REF4
+      group: 708 709 710 711
+      manual_datetime:
+        _0_: "2014-02-25 12:20:26"
+        _1_: "2014-02-26 12:16:06"
+        _2_: "2014-02-27 12:11:43"
+      pattern: "{data_root}/{animal}/MARSH 20140225ARX PARV708709710711{session}Selection{index}.EDF"
+      lro_kwargs:
+        mode: mne
+        extract_func: read_raw_edf

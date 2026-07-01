@@ -205,50 +205,38 @@ class TestApplyPathOverrides:
 
 
 # ---------------------------------------------------------------------------
-# inject_config_aliases edge cases
+# apply_samples_config edge cases
 # ---------------------------------------------------------------------------
-from neurodent.workflow.utils import inject_config_aliases
+from neurodent.workflow.utils import apply_samples_config
 
 
 @pytest.mark.mutates_constants
 class TestInjectConfigAliases:
-    """Tests for inject_config_aliases covering alias injection."""
+    """Tests for apply_samples_config covering map injection."""
 
-    def test_genotype_aliases_set(self):
+    def test_genotype_map_set(self):
         from neurodent import constants
 
-        orig = getattr(constants, "GENOTYPE_ALIASES", None)
+        orig = getattr(constants, "GENOTYPE_MAP", None)
         try:
-            inject_config_aliases({"GENOTYPE_ALIASES": {"wt": "WT"}})
-            assert constants.GENOTYPE_ALIASES == {"wt": "WT"}
+            apply_samples_config({"GENOTYPE_MAP": {"WT": ["wt"]}})
+            assert constants.GENOTYPE_MAP == {"WT": ["wt"]}
         finally:
             if orig is not None:
-                constants.GENOTYPE_ALIASES = orig
+                constants.GENOTYPE_MAP = orig
 
-    def test_chname_aliases_set(self):
+    def test_flat_channels_set(self):
+        """The flat `channels` form sets CHANNEL_MAP and derives CHANNEL_ABBREVS."""
         from neurodent import constants
 
-        orig = getattr(constants, "CHNAME_ALIASES", None)
-        try:
-            inject_config_aliases({"CHNAME_ALIASES": {"motor": "mot"}})
-            assert constants.CHNAME_ALIASES == {"motor": "mot"}
-        finally:
-            if orig is not None:
-                constants.CHNAME_ALIASES = orig
-
-    def test_lr_aliases_set(self):
-        from neurodent import constants
-
-        orig = getattr(constants, "LR_ALIASES", None)
-        try:
-            inject_config_aliases({"LR_ALIASES": {"Left": "L"}})
-            assert constants.LR_ALIASES == {"Left": "L"}
-        finally:
-            if orig is not None:
-                constants.LR_ALIASES = orig
+        channels = {"LMot": ["LMot", "left Motor"], "RMot": ["RMot"], "LFoo": ["LFoo"]}
+        apply_samples_config({"channels": channels})
+        assert constants.CHANNEL_MAP == channels
+        assert constants.CHANNEL_ABBREVS == ["LMot", "RMot", "LFoo"]
+        assert constants.DF_SORT_ORDER["channel"] == ["average", "all", "LMot", "RMot", "LFoo"]
 
     def test_empty_config_no_error(self):
-        inject_config_aliases({})
+        apply_samples_config({})
 
 
 # ---------------------------------------------------------------------------
@@ -269,7 +257,7 @@ class TestExpandAnimalsConfig:
 
     def test_data_root_is_canonical(self):
         """'data_root' remains as 'data_root' (canonical key)."""
-        cfg = {"data_root": "/my/root", "animals": [{"id": "A", "gene": "WT", "sex": "M"}]}
+        cfg = {"data_root": "/my/root", "animals": [{"id": "A", "genotype": "WT", "sex": "M"}]}
         result = expand_animals_config(cfg)
         assert result["data_root"] == "/my/root"
         assert "data_parent_folder" not in result
@@ -278,7 +266,7 @@ class TestExpandAnimalsConfig:
         """Legacy 'data_parent_folder' is migrated to 'data_root'."""
         cfg = {
             "data_parent_folder": "/legacy/path",
-            "animals": [{"id": "A", "gene": "WT", "sex": "M"}],
+            "animals": [{"id": "A", "genotype": "WT", "sex": "M"}],
         }
         result = expand_animals_config(cfg)
         assert result["data_root"] == "/legacy/path"
@@ -289,7 +277,7 @@ class TestExpandAnimalsConfig:
         cfg = {
             "data_root": "/new",
             "data_parent_folder": "/legacy",
-            "animals": [{"id": "A", "gene": "WT", "sex": "M"}],
+            "animals": [{"id": "A", "genotype": "WT", "sex": "M"}],
         }
         result = expand_animals_config(cfg)
         assert result["data_root"] == "/new"
@@ -299,8 +287,8 @@ class TestExpandAnimalsConfig:
         cfg = {
             "data_root": "/data",
             "animals": [
-                {"id": "A10", "gene": "WT", "sex": "M"},
-                {"id": "F22", "gene": "KO", "sex": "F"},
+                {"id": "A10", "genotype": "WT", "sex": "M"},
+                {"id": "F22", "genotype": "KO", "sex": "F"},
             ],
         }
         result = expand_animals_config(cfg)
@@ -308,7 +296,7 @@ class TestExpandAnimalsConfig:
         assert meta_ids == {"A10", "F22"}
 
         a10 = next(e for e in result["ANIMAL_METADATA"] if e["id"] == "A10")
-        assert a10["gene"] == "WT"
+        assert a10["genotype"] == "WT"
         assert a10["sex"] == "M"
 
     def test_metadata_excludes_override_keys(self):
@@ -317,7 +305,7 @@ class TestExpandAnimalsConfig:
             "data_root": "/data",
             "animals": [
                 {
-                    "id": "X1", "gene": "WT", "sex": "M",
+                    "id": "X1", "genotype": "WT", "sex": "M",
                     "pattern": "custom/{index}.nwb",
                     "lro_kwargs": {"mode": "si"},
                     "manual_datetime": "2025-01-01 10:00:00",
@@ -332,26 +320,15 @@ class TestExpandAnimalsConfig:
         assert "manual_datetime" not in meta
         assert "day_parse_kwargs" not in meta
         assert meta["id"] == "X1"
-        assert meta["gene"] == "WT"
-
-    def test_no_data_folders_to_animal_ids_generated(self):
-        """Unified format does NOT produce data_folders_to_animal_ids."""
-        cfg = {
-            "data_root": "/data",
-            "animals": [
-                {"id": "A10", "gene": "WT", "sex": "M"},
-            ],
-        }
-        result = expand_animals_config(cfg)
-        assert "data_folders_to_animal_ids" not in result
+        assert meta["genotype"] == "WT"
 
     def test_builds_manual_datetimes(self):
         """manual_datetimes is built from animals' manual_datetime field."""
         cfg = {
             "data_root": "/data",
             "animals": [
-                {"id": "A10", "gene": "WT", "sex": "M", "manual_datetime": "2025-01-01 10:00:00"},
-                {"id": "F22", "gene": "KO", "sex": "F"},
+                {"id": "A10", "genotype": "WT", "sex": "M", "manual_datetime": "2025-01-01 10:00:00"},
+                {"id": "F22", "genotype": "KO", "sex": "F"},
             ],
         }
         result = expand_animals_config(cfg)
@@ -363,11 +340,11 @@ class TestExpandAnimalsConfig:
             "data_root": "/data",
             "animals": [
                 {
-                    "id": "A10", "gene": "WT", "sex": "M",
+                    "id": "A10", "genotype": "WT", "sex": "M",
                     "manual_datetime": "2025-01-01 10:00:00",
                     "datetimes_are_start": False,
                 },
-                {"id": "F22", "gene": "KO", "sex": "F"},
+                {"id": "F22", "genotype": "KO", "sex": "F"},
             ],
         }
         result = expand_animals_config(cfg)
@@ -382,7 +359,7 @@ class TestExpandAnimalsConfig:
             "data_root": "/data",
             "animals": [
                 {
-                    "id": "A10", "gene": "WT", "sex": "M",
+                    "id": "A10", "genotype": "WT", "sex": "M",
                     "datetimes_are_start": False,
                     "lro_kwargs": {"datetimes_are_start": True},
                 },
@@ -392,32 +369,30 @@ class TestExpandAnimalsConfig:
         # Explicit lro_kwargs value should take precedence via setdefault
         assert result["_animal_overrides"]["A10"]["lro_kwargs"]["datetimes_are_start"] is True
 
-    def test_auto_generates_genotype_aliases(self):
-        """GENOTYPE_ALIASES is auto-generated from gene field."""
+    def test_no_auto_genotype_aliases(self):
+        """GENOTYPE_MAP is NOT auto-generated from the genotype field (dead index removed)."""
         cfg = {
             "data_root": "/data",
             "animals": [
-                {"id": "A10", "gene": "WT", "sex": "M"},
-                {"id": "B5", "gene": "WT", "sex": "M"},
-                {"id": "F22", "gene": "KO", "sex": "F"},
+                {"id": "A10", "genotype": "WT", "sex": "M"},
+                {"id": "B5", "genotype": "WT", "sex": "M"},
+                {"id": "F22", "genotype": "KO", "sex": "F"},
             ],
         }
         result = expand_animals_config(cfg)
-        ga = result["GENOTYPE_ALIASES"]
-        assert set(ga["WT"]) == {"A10", "B5"}
-        assert ga["KO"] == ["F22"]
+        assert "GENOTYPE_MAP" not in result
 
     def test_explicit_genotype_aliases_preserved(self):
-        """Explicit GENOTYPE_ALIASES in config is not overwritten."""
+        """Explicit GENOTYPE_MAP in config is not overwritten."""
         cfg = {
             "data_root": "/data",
             "animals": [
-                {"id": "A10", "gene": "WT", "sex": "M"},
+                {"id": "A10", "genotype": "WT", "sex": "M"},
             ],
-            "GENOTYPE_ALIASES": {"MyCustom": ["A10"]},
+            "GENOTYPE_MAP": {"MyCustom": ["A10"]},
         }
         result = expand_animals_config(cfg)
-        assert result["GENOTYPE_ALIASES"] == {"MyCustom": ["A10"]}
+        assert result["GENOTYPE_MAP"] == {"MyCustom": ["A10"]}
 
     def test_builds_animal_overrides(self):
         """_animal_overrides dict is built from per-animal override fields."""
@@ -425,12 +400,12 @@ class TestExpandAnimalsConfig:
             "data_root": "/data",
             "animals": [
                 {
-                    "id": "X1", "gene": "WT", "sex": "M",
+                    "id": "X1", "genotype": "WT", "sex": "M",
                     "pattern": "{data_root}/custom/{animal}_{index}.rhd",
                     "lro_kwargs": {"mode": "si"},
                     "day_parse_kwargs": {"date_patterns": [["\\d{6}", "%y%m%d"]]},
                 },
-                {"id": "A10", "gene": "WT", "sex": "M"},
+                {"id": "A10", "genotype": "WT", "sex": "M"},
             ],
         }
         result = expand_animals_config(cfg)
@@ -443,7 +418,7 @@ class TestExpandAnimalsConfig:
         """_animal_overrides is absent when no animals have overrides."""
         cfg = {
             "data_root": "/data",
-            "animals": [{"id": "A10", "gene": "WT", "sex": "M"}],
+            "animals": [{"id": "A10", "genotype": "WT", "sex": "M"}],
         }
         result = expand_animals_config(cfg)
         assert "_animal_overrides" not in result
@@ -453,7 +428,7 @@ class TestExpandAnimalsConfig:
         cfg = {
             "data_root": "/data",
             "animals": [
-                {"id": "A10", "gene": "WT", "sex": "M"},
+                {"id": "A10", "genotype": "WT", "sex": "M"},
             ],
         }
         original_animals = cfg["animals"][0].copy()
@@ -466,7 +441,7 @@ class TestExpandAnimalsConfig:
         cfg = {
             "data_root": "/data",
             "animals": [
-                {"id": "A10", "gene": "WT", "sex": "M", "manual_datetime": "2025-01-01"},
+                {"id": "A10", "genotype": "WT", "sex": "M", "manual_datetime": "2025-01-01"},
             ],
             "manual_datetimes": {"LegacyAnimal": "2020-01-01"},
         }
@@ -479,33 +454,33 @@ class TestExpandAnimalsConfig:
         cfg = {
             "data_root": "/data",
             "animals": [
-                {"id": "A10", "gene": "WT", "sex": "M"},
+                {"id": "A10", "genotype": "WT", "sex": "M"},
             ],
             "ANIMAL_METADATA": [
-                {"id": "A10", "gene": "KO", "sex": "F"},
+                {"id": "A10", "genotype": "KO", "sex": "F"},
             ],
         }
         result = expand_animals_config(cfg)
         # Existing entry is kept, not overwritten
         a10_entries = [e for e in result["ANIMAL_METADATA"] if e["id"] == "A10"]
         assert len(a10_entries) == 1
-        assert a10_entries[0]["gene"] == "KO"
+        assert a10_entries[0]["genotype"] == "KO"
 
     def test_full_example_config(self):
         """Test with a realistic config matching the issue's example."""
         cfg = {
             "data_root": "/mnt/data/project",
             "animals": [
-                {"id": "AM3", "gene": "WT", "sex": "Male"},
-                {"id": "AM5", "gene": "Het", "sex": "Male"},
+                {"id": "AM3", "genotype": "WT", "sex": "Male"},
+                {"id": "AM5", "genotype": "Het", "sex": "Male"},
                 {
-                    "id": "AP3B2homo-240-M", "gene": "HOMO", "sex": "Male",
+                    "id": "AP3B2homo-240-M", "genotype": "HOMO", "sex": "Male",
                     "pattern": "{data_root}/PortA-*PortB-*/{animal}*_ColMajor_{index}.rhd",
                     "manual_datetime": "2025-11-27 15:39:05",
                     "lro_kwargs": {"mode": "si"},
                 },
             ],
-            "LR_ALIASES": {"L": ["0"], "R": ["1"]},
+            "channels": {"LMot": ["0"], "RMot": ["1"]},
         }
         result = expand_animals_config(cfg)
 
@@ -516,18 +491,12 @@ class TestExpandAnimalsConfig:
         meta_ids = {e["id"] for e in result["ANIMAL_METADATA"]}
         assert meta_ids == {"AM3", "AM5", "AP3B2homo-240-M"}
 
-        # No data_folders_to_animal_ids
-        assert "data_folders_to_animal_ids" not in result
-
         # manual_datetimes built
         assert result["manual_datetimes"]["AP3B2homo-240-M"] == "2025-11-27 15:39:05"
         assert "AM3" not in result["manual_datetimes"]
 
-        # GENOTYPE_ALIASES auto-generated
-        ga = result["GENOTYPE_ALIASES"]
-        assert "AM3" in ga["WT"]
-        assert "AM5" in ga["Het"]
-        assert "AP3B2homo-240-M" in ga["HOMO"]
+        # GENOTYPE_MAP is no longer auto-generated from the genotype field
+        assert "GENOTYPE_MAP" not in result
 
         # _animal_overrides built
         ov = result["_animal_overrides"]
@@ -536,8 +505,8 @@ class TestExpandAnimalsConfig:
         assert ov["AP3B2homo-240-M"]["lro_kwargs"] == {"mode": "si"}
         assert "AM3" not in ov
 
-        # LR_ALIASES preserved
-        assert result["LR_ALIASES"] == {"L": ["0"], "R": ["1"]}
+        # channels preserved
+        assert result["channels"] == {"LMot": ["0"], "RMot": ["1"]}
 
     def test_legacy_data_parent_folder_without_animals(self):
         """Legacy config with data_parent_folder (no animals list) gets migrated."""
@@ -551,7 +520,7 @@ class TestExpandAnimalsConfig:
         cfg = {
             "data_root": "/data",
             "animals": [
-                {"id": "A10", "gene": "WT", "sex": "M", "bad_channels": ["LHip", "RHip"]},
+                {"id": "A10", "genotype": "WT", "sex": "M", "bad_channels": ["LHip", "RHip"]},
             ],
         }
         result = expand_animals_config(cfg)
@@ -563,7 +532,7 @@ class TestExpandAnimalsConfig:
             "data_root": "/data",
             "animals": [
                 {
-                    "id": "A10", "gene": "WT", "sex": "M",
+                    "id": "A10", "genotype": "WT", "sex": "M",
                     "bad_channels": {
                         "Session1": ["LHip"],
                         "Session2": ["RMot"],
@@ -582,7 +551,7 @@ class TestExpandAnimalsConfig:
         cfg = {
             "data_root": "/data",
             "animals": [
-                {"id": "A10", "gene": "WT", "sex": "M", "bad_channels": ["LHip"]},
+                {"id": "A10", "genotype": "WT", "sex": "M", "bad_channels": ["LHip"]},
             ],
         }
         result = expand_animals_config(cfg)
@@ -594,7 +563,7 @@ class TestExpandAnimalsConfig:
         cfg = {
             "data_root": "/data",
             "animals": [
-                {"id": "A10", "gene": "WT", "sex": "M", "bad_channels": ["LHip"]},
+                {"id": "A10", "genotype": "WT", "sex": "M", "bad_channels": ["LHip"]},
             ],
             "bad_channels": {"legacy_key X1": {"Session1": ["RAud"]}},
         }
@@ -606,7 +575,7 @@ class TestExpandAnimalsConfig:
         """bad_channels dict is empty when no animals have bad_channels."""
         cfg = {
             "data_root": "/data",
-            "animals": [{"id": "A10", "gene": "WT", "sex": "M"}],
+            "animals": [{"id": "A10", "genotype": "WT", "sex": "M"}],
         }
         result = expand_animals_config(cfg)
         assert result["bad_channels"] == {}
@@ -616,7 +585,7 @@ class TestExpandAnimalsConfig:
         cfg = {
             "data_root": "/data",
             "animals": [
-                {"id": "A10", "gene": "WT", "sex": "M", "bad_channels": ["LHip"]},
+                {"id": "A10", "genotype": "WT", "sex": "M", "bad_channels": ["LHip"]},
             ],
         }
         original_bc = cfg["animals"][0]["bad_channels"].copy()
@@ -633,7 +602,7 @@ class TestExpandAnimalsConfig:
             "animals": [
                 {
                     "id": "BAD",
-                    "gene": "KO",
+                    "genotype": "KO",
                     "sex": "M",
                     "exclude": True,
                     "manual_datetime": "2025-01-01 10:00:00",
@@ -656,7 +625,7 @@ class TestExpandAnimalsConfig:
         cfg = {
             "data_root": "/data",
             "animals": [
-                {"id": "OK", "gene": "WT", "sex": "F", "exclude": False},
+                {"id": "OK", "genotype": "WT", "sex": "F", "exclude": False},
             ],
         }
         result = expand_animals_config(cfg)
@@ -668,20 +637,14 @@ class TestExpandAnimalsConfig:
         cfg = {
             "data_root": "/data",
             "animals": [
-                {"id": "GOOD", "gene": "WT", "sex": "M"},
-                {"id": "BAD", "gene": "KO", "sex": "F", "exclude": True},
-                {"id": "ALSO_GOOD", "gene": "Het", "sex": "F"},
+                {"id": "GOOD", "genotype": "WT", "sex": "M"},
+                {"id": "BAD", "genotype": "KO", "sex": "F", "exclude": True},
+                {"id": "ALSO_GOOD", "genotype": "Het", "sex": "F"},
             ],
         }
         result = expand_animals_config(cfg)
         meta_ids = {e["id"] for e in result["ANIMAL_METADATA"]}
         assert meta_ids == {"GOOD", "ALSO_GOOD"}
-        # Excluded animal should not appear in GENOTYPE_ALIASES
-        ko_animals = result.get("GENOTYPE_ALIASES", {}).get("KO", [])
-        assert "BAD" not in ko_animals
-        # Non-excluded genotypes should be present
-        assert "GOOD" in result["GENOTYPE_ALIASES"]["WT"]
-        assert "ALSO_GOOD" in result["GENOTYPE_ALIASES"]["Het"]
         # result["animals"] should only contain non-excluded entries
         result_ids = {a["id"] for a in result["animals"]}
         assert result_ids == {"GOOD", "ALSO_GOOD"}
@@ -691,34 +654,34 @@ class TestExpandAnimalsConfig:
         cfg = {
             "data_root": "/data",
             "animals": [
-                {"id": "A", "gene": "WT", "sex": "M", "exclude": False},
+                {"id": "A", "genotype": "WT", "sex": "M", "exclude": False},
             ],
         }
         result = expand_animals_config(cfg)
         meta = result["ANIMAL_METADATA"][0]
         assert "exclude" not in meta
 
-    def test_builds_animal_channels(self):
-        """_animal_channels dict is built from animals' channels field."""
+    def test_builds_animal_channel_subsets(self):
+        """_animal_channel_subsets dict is built from animals' channel_subset field."""
         cfg = {
             "data_root": "/data",
             "animals": [
-                {"id": "A10", "gene": "WT", "sex": "M", "channels": ["Ch0", "Ch1", "Ch2"]},
-                {"id": "F22", "gene": "KO", "sex": "F"},
+                {"id": "A10", "genotype": "WT", "sex": "M", "channel_subset": ["Ch0", "Ch1", "Ch2"]},
+                {"id": "F22", "genotype": "KO", "sex": "F"},
             ],
         }
         result = expand_animals_config(cfg)
-        assert "_animal_channels" in result
-        assert result["_animal_channels"]["A10"] == ["Ch0", "Ch1", "Ch2"]
-        assert "F22" not in result["_animal_channels"]
+        assert "_animal_channel_subsets" in result
+        assert result["_animal_channel_subsets"]["A10"] == ["Ch0", "Ch1", "Ch2"]
+        assert "F22" not in result["_animal_channel_subsets"]
 
     def test_builds_animal_groups(self):
         """_animal_groups dict is built from animals' group field."""
         cfg = {
             "data_root": "/data",
             "animals": [
-                {"id": "A10", "gene": "WT", "sex": "M", "channels": ["Ch0"], "group": "SharedGroup"},
-                {"id": "F22", "gene": "KO", "sex": "F"},
+                {"id": "A10", "genotype": "WT", "sex": "M", "channel_subset": ["Ch0"], "group": "SharedGroup"},
+                {"id": "F22", "genotype": "KO", "sex": "F"},
             ],
         }
         result = expand_animals_config(cfg)
@@ -731,7 +694,7 @@ class TestExpandAnimalsConfig:
         cfg = {
             "data_root": "/data",
             "animals": [
-                {"id": "A10", "gene": "WT", "sex": "M", "channels": ["Ch0"], "group": "Group1"},
+                {"id": "A10", "genotype": "WT", "sex": "M", "channel_subset": ["Ch0"], "group": "Group1"},
             ],
         }
         result = expand_animals_config(cfg)
@@ -739,77 +702,13 @@ class TestExpandAnimalsConfig:
         assert "channels" not in meta
         assert "group" not in meta
 
-    def test_backward_compat_derives_channels_from_joint_sessions(self):
-        """Legacy joint_sessions is auto-converted to _animal_channels with deprecation warning."""
-        import warnings
-        cfg = {
-            "data_root": "/data",
-            "animals": [
-                {"id": "A10", "gene": "WT", "sex": "M"},
-                {"id": "F22", "gene": "KO", "sex": "F"},
-            ],
-            "joint_sessions": {
-                "Session1": {
-                    "A10": ["Ch0", "Ch1"],
-                    "F22": ["Ch2", "Ch3"],
-                }
-            },
-        }
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            result = expand_animals_config(cfg)
-            assert len(w) == 1
-            assert issubclass(w[0].category, DeprecationWarning)
-            assert "joint_sessions" in str(w[0].message)
-
-        assert "_animal_channels" in result
-        assert result["_animal_channels"]["A10"] == ["Ch0", "Ch1"]
-        assert result["_animal_channels"]["F22"] == ["Ch2", "Ch3"]
-
-    def test_backward_compat_verifies_channel_consistency(self):
-        """Legacy joint_sessions verifies channel consistency across sessions."""
-        cfg = {
-            "data_root": "/data",
-            "animals": [
-                {"id": "A10", "gene": "WT", "sex": "M"},
-            ],
-            "joint_sessions": {
-                "Session1": {"A10": ["Ch0", "Ch1"]},
-                "Session2": {"A10": ["Ch0", "Ch2"]},  # Inconsistent!
-            },
-        }
-        with pytest.raises(ValueError, match="Inconsistent channel lists"):
-            expand_animals_config(cfg)
-
-    def test_backward_compat_new_format_takes_precedence(self):
-        """If animals have channels field, legacy joint_sessions is ignored (no warning)."""
-        import warnings
-        cfg = {
-            "data_root": "/data",
-            "animals": [
-                {"id": "A10", "gene": "WT", "sex": "M", "channels": ["Ch0", "Ch1"]},
-            ],
-            "joint_sessions": {
-                "Session1": {"A10": ["Ch2", "Ch3"]},  # Should be ignored
-            },
-        }
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            result = expand_animals_config(cfg)
-            # No deprecation warning because new format is used
-            deprecation_warnings = [x for x in w if issubclass(x.category, DeprecationWarning)]
-            assert len(deprecation_warnings) == 0
-
-        # Should use the new format, not the legacy one
-        assert result["_animal_channels"]["A10"] == ["Ch0", "Ch1"]
-
     def test_validates_no_overlapping_channels_in_group(self):
         """Animals in the same group cannot share channels."""
         cfg = {
             "data_root": "/data",
             "animals": [
-                {"id": "A10", "gene": "WT", "sex": "M", "channels": ["Ch0", "Ch1"], "group": "Group1"},
-                {"id": "F22", "gene": "KO", "sex": "F", "channels": ["Ch1", "Ch2"], "group": "Group1"},  # Ch1 overlaps!
+                {"id": "A10", "genotype": "WT", "sex": "M", "channel_subset": ["Ch0", "Ch1"], "group": "Group1"},
+                {"id": "F22", "genotype": "KO", "sex": "F", "channel_subset": ["Ch1", "Ch2"], "group": "Group1"},  # Ch1 overlaps!
             ],
         }
         with pytest.raises(ValueError, match="Channel 'Ch1' is assigned to both"):
@@ -820,14 +719,14 @@ class TestExpandAnimalsConfig:
         cfg = {
             "data_root": "/data",
             "animals": [
-                {"id": "A10", "gene": "WT", "sex": "M", "channels": ["Ch0", "Ch1"], "group": "Group1"},
-                {"id": "F22", "gene": "KO", "sex": "F", "channels": ["Ch0", "Ch1"], "group": "Group2"},
+                {"id": "A10", "genotype": "WT", "sex": "M", "channel_subset": ["Ch0", "Ch1"], "group": "Group1"},
+                {"id": "F22", "genotype": "KO", "sex": "F", "channel_subset": ["Ch0", "Ch1"], "group": "Group2"},
             ],
         }
         result = expand_animals_config(cfg)
         # Should succeed - different groups can have same channel names
-        assert result["_animal_channels"]["A10"] == ["Ch0", "Ch1"]
-        assert result["_animal_channels"]["F22"] == ["Ch0", "Ch1"]
+        assert result["_animal_channel_subsets"]["A10"] == ["Ch0", "Ch1"]
+        assert result["_animal_channel_subsets"]["F22"] == ["Ch0", "Ch1"]
 
 
 class TestGetDiscoveryAnimalFilter:
@@ -888,7 +787,7 @@ class TestGetDiscoveryAnimalFilter:
 
 
 class TestBuildSexMarkerScale:
-    """Regression tests for ``build_sex_marker_scale``.
+    """Regression tests for ``create_sex_marker_scale``.
 
     Why this exists: generate_ep_figures.py used to hard-code
     ``so.Nominal(["o", "s"], order=["Female", "Male"])`` as the marker
@@ -904,9 +803,9 @@ class TestBuildSexMarkerScale:
     def _make_scale(sex_values):
         """Build a scale from a synthetic df with the given sex values."""
         import pandas as pd
-        from neurodent.workflow import build_sex_marker_scale
+        from neurodent.workflow import create_sex_marker_scale
         df = pd.DataFrame({"sex": sex_values, "y": list(range(len(sex_values)))})
-        return build_sex_marker_scale(df)
+        return create_sex_marker_scale(df)
 
     def test_canonical_female_male(self):
         """Female + Male present → preserves circle / square in canonical order."""

@@ -389,7 +389,6 @@ class TestDatetimesAreStartPropagation:
                 "{data_root}/*/*{animal}*/{session}/*-{index}_ColMajor.bin",
                 "{data_root}/*/*{animal}*/{session}/*-{index}_Meta.csv",
             ],
-            "assume_from_number": True,
             "datetimes_are_start": False,  # At war_generation level, NOT inside lro_kwargs
             "lro_kwargs": {
                 "mode": "si",

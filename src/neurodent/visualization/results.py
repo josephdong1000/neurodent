@@ -30,7 +30,7 @@ from tqdm import tqdm
 from .. import constants, core
 from ..core import FragmentAnalyzer, get_temp_directory
 from ..core.frequency_domain_spike_detection import FrequencyDomainSpikeDetector
-from ..core.utils import abbreviate_channel_names, filepath_to_index, parse_chname_to_abbrev, slugify
+from ..core.utils import resolve_channels, atomic_output_path, atomic_write_json, filepath_to_index, resolve_channel, slugify
 from .feature_utils import extract_linear_array, extract_band_dict, repack_band_dict, extract_hist_data
 from .feature_handlers import FEATURE_HANDLERS, handler_for
 from .filters import (
@@ -142,8 +142,6 @@ class AnimalOrganizer(AnimalFeatureParser):
             E.g. ``["*bad*", "corrupted_*"]``. Defaults to [].
         truncate (bool | int, optional): If True, truncate to first 10 sessions.
             If an integer, truncate to first n sessions. Defaults to False.
-        assume_from_number (bool, optional): Whether to parse channel names as numbers
-            (used for analysis, not discovery). Defaults to False.
         lro_kwargs (dict, optional): Keyword arguments passed to each LongRecordingOrganizer
             instance. Common options include 'mode', 'extract_func', 'manual_datetimes'.
             Defaults to {}.
@@ -190,13 +188,11 @@ class AnimalOrganizer(AnimalFeatureParser):
         animal_id: str | None = None,
         skip_sessions: list[str] = [],
         truncate: bool | int = False,
-        assume_from_number: bool = False,
         lro_kwargs: dict = {},
         normalize_session: Optional[Callable[[str], str]] = None,
     ) -> None:
         self.pattern = pattern
         self.animal_id = animal_id
-        self.assume_from_number = assume_from_number
         self.animal_file_match_pattern = [animal_id] if animal_id else []
         self.day_sep = None
         self.read_mode = "pattern"  # Legacy compat; new pattern-based discovery
@@ -268,7 +264,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         from neurodent import constants
 
         self.genotype = (
-            constants.ANIMAL_METADATA.get(self.animal_id, {}).get("gene", "Unknown")
+            constants.ANIMAL_METADATA.get(self.animal_id, {}).get("genotype", "Unknown")
             if self.animal_id
             else "Unknown"
         )
@@ -411,12 +407,21 @@ class AnimalOrganizer(AnimalFeatureParser):
             return dt.replace(tzinfo=None)
 
         elif isinstance(input_spec, list):
-            # Validate that all items are datetime objects
-            if not all(isinstance(dt, datetime) for dt in input_spec):
-                raise TypeError(
-                    f"All items in timestamp list must be datetime objects, got: {[type(dt) for dt in input_spec]}"
-                )
-            return input_spec
+            # Resolve each element so JSON string lists (e.g. a per-session list
+            # of ISO start times) parse, while datetime objects pass through.
+            resolved = []
+            for el in input_spec:
+                if isinstance(el, datetime):
+                    resolved.append(el.replace(tzinfo=None))
+                elif isinstance(el, str):
+                    # dateutil raises ValueError on an unparseable string.
+                    resolved.append(dateutil.parser.parse(el).replace(tzinfo=None))
+                else:
+                    raise TypeError(
+                        "All items in timestamp list must be datetime objects or "
+                        f"parseable date strings, got: {[type(dt) for dt in input_spec]}"
+                    )
+            return resolved
 
         elif callable(input_spec):
             try:
@@ -698,9 +703,86 @@ class AnimalOrganizer(AnimalFeatureParser):
         )
         return result, end_dt
 
+    def _assign_session_list(
+        self, sess_key, sess_ts, sess_items, base_lro_kwargs: dict
+    ) -> tuple[dict, datetime]:
+        """Assign explicit per-file start datetimes to one session's items.
+
+        Used by :meth:`_process_manual_datetimes` when a session's value in the
+        ``manual_datetime`` dict is a list (one start per file, no cumulation) —
+        e.g. to encode an internal gap from a missing file.
+
+        Args:
+            sess_key: The session key (for error messages).
+            sess_ts: List of per-file start times (datetime or ISO string), one
+                per item in the session, in ``{index}`` / natural-sort order.
+            sess_items: The session's discovered items.
+            base_lro_kwargs: Kwargs for loading an item to estimate its duration.
+
+        Returns:
+            tuple[dict, datetime]: ``(timeline, anchor_end_dt)`` where ``timeline``
+            maps each item key to its explicit start datetime, and ``anchor_end_dt``
+            is the end of the last file (last start + its duration) — used by a
+            following ``null`` session to cumulate forward.
+
+        Raises:
+            ValueError: If the list length != number of items in the session.
+        """
+        # Order items the same way the merge/timeline does (by {index} when
+        # present). The list is positional, so this MUST match the merge order
+        # in _create_long_recordings.
+        sorted_items = sorted(sess_items, key=self._session_sort_key(sess_items))
+        if len(sess_ts) != len(sorted_items):
+            raise ValueError(
+                f"manual_datetime list for session '{sess_key}' has "
+                f"{len(sess_ts)} entries but the session has "
+                f"{len(sorted_items)} item(s): "
+                f"{[self._get_item_name(f) for f in sorted_items]}. "
+                f"Provide exactly one datetime per file, in index order."
+            )
+
+        context_path = self._get_context_path(sorted_items[0])
+        resolved = self._resolve_timestamp_input(list(sess_ts), context_path)
+
+        timeline = {}
+        for item, start_dt in zip(sorted_items, resolved):
+            timeline[self._get_item_key(item)] = start_dt
+
+        # anchor_end_dt = last file's explicit start + its duration, so a
+        # following null session cumulates from the true end of this session.
+        last_item = sorted_items[-1]
+        last_start = resolved[-1]
+        _kw = base_lro_kwargs.copy()
+        _kw["manual_datetimes"] = last_start
+        temp_lro = core.LongRecordingOrganizer(last_item, **_kw)
+        duration = (
+            temp_lro.LongRecording.get_duration()
+            if hasattr(temp_lro, "LongRecording") and temp_lro.LongRecording
+            else 0.0
+        )
+        anchor_end_dt = last_start + timedelta(seconds=duration)
+        return timeline, anchor_end_dt
+
     def _process_manual_datetimes(
         self, manual_datetimes, animalday_to_items: dict, base_lro_kwargs: dict
     ) -> dict:
+        """Resolve ``manual_datetimes`` into a per-item ``{item_key: start_datetime}`` map.
+
+        Supported forms (per animal):
+
+        - **dict keyed by session** — each value is one of:
+          a scalar start (``datetime``/ISO string) anchoring that session;
+          ``null`` to cumulate forward from the previous session's end (contiguous);
+          or a **list** of one start per file in that session (explicit, no
+          cumulation — use to encode an internal gap from a missing file).
+          Scalar/list values act as resets; nulls before the first explicit
+          anchor are backfilled by walking backward.
+        - **dict keyed by item/filename** — value per file (scalar or per-file list).
+        - **flat list** — one datetime per discovered file across all sessions.
+        - **single datetime/string** — global start for the whole animal.
+
+        Lists and nulls require ``datetimes_are_start=True``.
+        """
         if isinstance(manual_datetimes, dict):
             animal_items = []
             for items in animalday_to_items.values():
@@ -782,6 +864,19 @@ class AnimalOrganizer(AnimalFeatureParser):
                         f"False. Null (cumulate forward) is only supported "
                         f"when timestamps are interpreted as start times."
                     )
+                # Reject per-session lists (explicit per-file starts) in
+                # non-start-time mode — they only make sense as start times.
+                list_sessions = [
+                    k for k, v in manual_datetimes.items() if isinstance(v, list)
+                ]
+                if not datetimes_are_start and list_sessions:
+                    raise ValueError(
+                        f"manual_datetime contains list values for "
+                        f"'{self.animal_id}' (sessions {list_sessions}), but "
+                        f"datetimes_are_start is False. Per-file explicit start "
+                        f"lists are only supported when timestamps are "
+                        f"interpreted as start times."
+                    )
 
                 # Find the first explicit anchor — used to backfill any
                 # null sessions BEFORE it (working backward, assuming
@@ -809,8 +904,15 @@ class AnimalOrganizer(AnimalFeatureParser):
                     anchor_key = ordered_keys[first_explicit_idx]
                     anchor_items = animalday_to_items[anchor_key]
                     anchor_context = self._get_context_path(anchor_items[0])
-                    next_session_start = self._resolve_timestamp_input(
+                    anchor_resolved = self._resolve_timestamp_input(
                         manual_datetimes[anchor_key], anchor_context
+                    )
+                    # A list anchor (explicit per-file starts) resolves to a
+                    # list; the session's start is its earliest file start.
+                    next_session_start = (
+                        min(anchor_resolved)
+                        if isinstance(anchor_resolved, list)
+                        else anchor_resolved
                     )
                     # Iterate prefix sessions in REVERSE so each session's
                     # end_dt equals the next (later) session's start_dt —
@@ -845,6 +947,18 @@ class AnimalOrganizer(AnimalFeatureParser):
                     sess_key = ordered_keys[idx]
                     sess_ts = manual_datetimes[sess_key]
                     sess_items = animalday_to_items[sess_key]
+
+                    # A list value gives explicit per-file start times for this
+                    # session (no cumulation) — e.g. to encode an internal gap
+                    # from a missing file.  Handled self-contained; bypasses
+                    # _compute_global_timeline's anchor-cumulation.
+                    if isinstance(sess_ts, list):
+                        sess_timeline, anchor_end_dt = self._assign_session_list(
+                            sess_key, sess_ts, sess_items, base_lro_kwargs
+                        )
+                        out.update(sess_timeline)
+                        continue
+
                     if sess_ts is None:
                         # anchor_end_dt is guaranteed non-None here because
                         # idx >= first_explicit_idx and the very first
@@ -1749,7 +1863,6 @@ class AnimalOrganizer(AnimalFeatureParser):
             self.genotype,
             self.sex,
             self.channel_names,
-            self.assume_from_number,
             self.bad_channels_dict,
             suppress_short_interval_error,
             lof_scores_dict,
@@ -1819,7 +1932,6 @@ class AnimalOrganizer(AnimalFeatureParser):
                         else None
                     ),
                     metadata=self.long_recordings[i].meta,
-                    assume_from_number=self.assume_from_number,
                 )
 
                 fdsar_list.append(fdsar)
@@ -1870,7 +1982,7 @@ class AnimalOrganizer(AnimalFeatureParser):
             meta = item.metadata
             animal = meta.get("animal", animal)
             session = meta.get("session")
-            genotype = constants.ANIMAL_METADATA.get(animal, {}).get("gene", genotype)
+            genotype = constants.ANIMAL_METADATA.get(animal, {}).get("genotype", genotype)
             sex = constants.ANIMAL_METADATA.get(animal, {}).get("sex", sex)
 
         if session is None:
@@ -1912,7 +2024,6 @@ class AnimalOrganizer(AnimalFeatureParser):
         animal_id: str,
         genotype: str = "Unknown",
         sex: str = "Unknown",
-        assume_from_number: bool = False,
     ) -> "AnimalOrganizer":
         """
         Create an AnimalOrganizer from an existing list of LongRecordingOrganizer objects.
@@ -1927,8 +2038,6 @@ class AnimalOrganizer(AnimalFeatureParser):
             animal_id (str): Animal identifier for this organizer.
             genotype (str, optional): Genotype string. Defaults to "Unknown".
             sex (str, optional): Sex string (e.g. "Male", "Female"). Defaults to "Unknown".
-            assume_from_number (bool, optional): Whether to assume channel aliases
-                from numbers. Defaults to False.
 
         Returns:
             AnimalOrganizer: A new AnimalOrganizer instance wrapping the provided LROs
@@ -1963,7 +2072,6 @@ class AnimalOrganizer(AnimalFeatureParser):
         ao.animal_id = animal_id
         ao.genotype = genotype
         ao.sex = sex
-        ao.assume_from_number = assume_from_number
 
         # Step 1: Group LROs by date
         date_to_lros = {}  # dict[str, list[tuple[int, LRO]]]
@@ -2106,7 +2214,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         """
         Validate that all LROs have consistent channel names.
 
-        Compares abbreviated channel names (via ``parse_chname_to_abbrev``)
+        Compares abbreviated channel names (via ``resolve_channel``)
         so that cosmetic variants like ``L Barrel`` vs ``L Barrel Ctx`` are
         treated as equivalent. If raw names differ but abbreviations match,
         the mismatched LRO's channel names are renamed to match the reference
@@ -2131,14 +2239,14 @@ class AnimalOrganizer(AnimalFeatureParser):
         if not first_names:
             return []
 
-        reference_abbrevs = abbreviate_channel_names(first_names, strict_matching=False)
+        reference_abbrevs = resolve_channels(first_names)
         reference_set = set(reference_abbrevs)
         # Map abbreviation -> canonical raw name from first LRO
         abbrev_to_raw = dict(zip(reference_abbrevs, first_names))
 
         for i, lro in enumerate(lros[1:], start=1):
             current_names = lro.channel_names if lro.channel_names else []
-            current_abbrevs = abbreviate_channel_names(current_names, strict_matching=False)
+            current_abbrevs = resolve_channels(current_names)
             current_set = set(current_abbrevs)
 
             if current_set != reference_set:
@@ -2197,8 +2305,10 @@ class AnimalOrganizer(AnimalFeatureParser):
     def split(
         self,
         groups: dict[str, list[str]],
-        persist_base: Union[str, Path] = None,
+        output_base: Union[str, Path] = None,
         format: Literal["zarr", "binary"] = "zarr",
+        overwrite: bool = False,
+        persist_base: Union[str, Path] = None,
     ) -> dict[str, "AnimalOrganizer"]:
         """
         Split this multi-animal AnimalOrganizer into per-animal AnimalOrganizers.
@@ -2206,7 +2316,7 @@ class AnimalOrganizer(AnimalFeatureParser):
         For each group (animal), this method:
         1. Iterates over all LROs in this AnimalOrganizer
         2. Calls LRO.split() on each to extract the specified channels
-        3. Optionally persists each split LRO to disk
+        3. Optionally saves each split LRO to disk
         4. Creates a new AnimalOrganizer for each group
 
         This enables processing of joint-animal recordings where multiple animals
@@ -2217,16 +2327,22 @@ class AnimalOrganizer(AnimalFeatureParser):
                 to lists of channel names. Example:
                 {"AnimalA": ["Ch0", "Ch1", "Ch2", "Ch3"],
                  "AnimalB": ["Ch4", "Ch5", "Ch6", "Ch7"]}
-            persist_base (Union[str, Path], optional): Base directory for persisting
+            output_base (Union[str, Path], optional): Base directory for saving
                 split recordings. If None, LROs remain in-memory. Structure:
-                persist_base/
+                output_base/
                     AnimalA/
                         day1.zarr
                         day2.zarr
                     AnimalB/
                         ...
-            format (Literal["zarr", "binary"], optional): Format for persisted
+            format (Literal["zarr", "binary"], optional): Format for saved
                 recordings. Defaults to "zarr".
+            overwrite (bool, optional): Passed to
+                :meth:`LongRecordingOrganizer.save_recording`; if True, replace an
+                existing (recognized) recording folder. Defaults to False.
+            persist_base (Union[str, Path], optional): Deprecated alias for
+                ``output_base``. If provided (not None), it is used as ``output_base``
+                and emits a :class:`DeprecationWarning`.
 
         Returns:
             dict[str, AnimalOrganizer]: Dictionary mapping group names to new
@@ -2239,7 +2355,7 @@ class AnimalOrganizer(AnimalFeatureParser):
             >>> ao = AnimalOrganizer("/path/to/joint_data", "combined")
             >>> splits = ao.split(
             ...     groups={"MouseA": ["Ch0", "Ch1"], "MouseB": ["Ch2", "Ch3"]},
-            ...     persist_base="/output/split_data",
+            ...     output_base="/output/split_data",
             ... )
             >>> war_a = splits["MouseA"].compute_windowed_analysis(["all"])
             >>> war_b = splits["MouseB"].compute_windowed_analysis(["all"])
@@ -2248,8 +2364,18 @@ class AnimalOrganizer(AnimalFeatureParser):
             raise ValueError("No recordings loaded to split")
 
         if persist_base is not None:
-            persist_base = Path(persist_base)
-            persist_base.mkdir(parents=True, exist_ok=True)
+            warnings.warn(
+                "The 'persist_base' argument of AnimalOrganizer.split() is deprecated; "
+                "use 'output_base'.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            if output_base is None:
+                output_base = persist_base
+
+        if output_base is not None:
+            output_base = Path(output_base)
+            output_base.mkdir(parents=True, exist_ok=True)
 
         result = {}
 
@@ -2265,14 +2391,14 @@ class AnimalOrganizer(AnimalFeatureParser):
                 day_splits = lro.split({group_name: channels})
                 child_lro = day_splits[group_name]
 
-                # Persist if requested
-                if persist_base is not None:
+                # Save to disk if requested
+                if output_base is not None:
                     # Determine day folder name
                     day_name = lro.display_name or f"day{i}"
 
-                    output_dir = persist_base / group_name / day_name
-                    child_lro.persist(output_dir, format=format)
-                    logging.debug(f"Persisted {group_name}/{day_name} to {output_dir}")
+                    output_dir = output_base / group_name / day_name
+                    child_lro.save_recording(output_dir, format=format, overwrite=overwrite)
+                    logging.debug(f"Saved {group_name}/{day_name} to {output_dir}")
 
                 child_lros.append(child_lro)
 
@@ -2282,7 +2408,6 @@ class AnimalOrganizer(AnimalFeatureParser):
                 animal_id=group_name,
                 genotype=self.genotype,
                 sex=self.sex,
-                assume_from_number=self.assume_from_number,
             )
 
             result[group_name] = child_ao
@@ -2341,8 +2466,8 @@ class WindowAnalysisResult(AnimalFeatureParser):
         result (pd.DataFrame): Result comes from AnimalOrganizer.compute_windowed_analysis()
         animal_id (str, optional): Identifier for the animal where result was computed from. Defaults to None.
         genotype (str, optional): Genotype of animal. Defaults to None.
-        channel_names (list[str], optional): List of channel names. Defaults to None.
-        assume_channels (bool, optional): If true, assumes channel names according to AnimalFeatureParser.DEFAULT_CHNUM_TO_NAME. Defaults to False.
+        channel_names (list[str], optional): The recording's channel labels (raw names as
+            they appear in the data). Defaults to None.
         bad_channels_dict (dict[str, list[str]], optional): Dictionary of channels to reject for each recording session. Defaults to {}.
         suppress_short_interval_error (bool, optional): If True, suppress ValueError for short intervals between timestamps. Useful for aggregated WARs with large window sizes. Defaults to False.
 
@@ -2350,8 +2475,11 @@ class WindowAnalysisResult(AnimalFeatureParser):
         result (pd.DataFrame): DataFrame containing the windowed analysis results.
         animal_id (str): Identifier for the animal.
         genotype (str): Genotype of the animal.
-        channel_names (list[str]): List of channel names.
-        channel_abbrevs (list[str]): Abbreviated channel names.
+        channel_names (list[str]): The *current working* channel labels — the raw names at
+            construction, or the canonical abbreviations after :meth:`reorder_and_pad_channels`
+            is run with ``use_abbrevs=True``.
+        channel_abbrevs (list[str]): The canonical channel abbreviations, always derived from
+            ``channel_names`` via :func:`~neurodent.core.resolve_channel` (exact lookup).
         bad_channels_dict (dict): Dictionary mapping sessions to bad channel names.
         lof_scores_dict (dict): Dictionary of LOF scores for outage detection.
     """
@@ -2363,7 +2491,6 @@ class WindowAnalysisResult(AnimalFeatureParser):
         genotype: str = None,
         sex: str = "Unknown",
         channel_names: list[str] = None,
-        assume_from_number=False,
         bad_channels_dict: dict[str, list[str]] = {},
         suppress_short_interval_error=False,
         lof_scores_dict: dict[str, dict] = {},
@@ -2373,15 +2500,51 @@ class WindowAnalysisResult(AnimalFeatureParser):
         self.genotype = genotype
         self.sex = sex
         self.channel_names = channel_names
-        self.assume_from_number = assume_from_number
         self.bad_channels_dict = bad_channels_dict.copy()
         self.suppress_short_interval_error = suppress_short_interval_error
         self.lof_scores_dict = lof_scores_dict
 
         self._update_instance_vars()
 
+        # Single source of truth: re-enrich sex/genotype from the active config
+        # (constants.ANIMAL_METADATA) so every WAR construction — generation, disk
+        # load, copy — yields metadata consistent with the config.
+        self._enrich_metadata_from_constants()
+
         logging.info(f"Channel names: \t{self.channel_names}")
         logging.info(f"Channel abbreviations: \t{self.channel_abbrevs}")
+
+    def _enrich_metadata_from_constants(self) -> None:
+        """Overwrite ``sex``/``genotype`` from ``constants.ANIMAL_METADATA``.
+
+        Makes the dataset config (loaded into ``constants.ANIMAL_METADATA`` by
+        ``apply_samples_config``) the single source of truth for per-animal
+        metadata, applied identically to ``sex`` and ``genotype`` at every WAR
+        construction. Updates BOTH the object attributes AND the per-row
+        ``result["sex"]``/``result["genotype"]`` columns (downstream renderers read
+        the columns, not the attributes).
+
+        Guarded for portability: if the animal is absent from
+        ``constants.ANIMAL_METADATA`` (e.g. a standalone load without
+        ``apply_samples_config``), the baked values are left untouched. A metadata
+        field that is ``None`` does not overwrite a baked value.
+
+        Note: the ``ANIMAL_METADATA`` key and the WAR's canonical attribute/column are
+        both ``"genotype"``.
+        """
+        animal_id = self.animal_id
+        if animal_id is None or animal_id not in constants.ANIMAL_METADATA:
+            return
+        meta = constants.ANIMAL_METADATA[animal_id]
+        for attr, new_val in (("genotype", meta.get("genotype")), ("sex", meta.get("sex"))):
+            if new_val is None:
+                continue  # don't overwrite a baked value with None
+            old_val = getattr(self, attr, None)
+            if old_val != new_val:
+                logging.info(f"Re-enriched {animal_id}: {attr} {old_val!r} -> {new_val!r}")
+            setattr(self, attr, new_val)
+            if isinstance(self.result, pd.DataFrame):
+                self.result[attr] = new_val
 
     def __str__(self) -> str:
         return f"{self.animaldays}"
@@ -2401,7 +2564,6 @@ class WindowAnalysisResult(AnimalFeatureParser):
             channel_names=(
                 self.channel_names.copy() if self.channel_names is not None else None
             ),
-            assume_from_number=self.assume_from_number,
             bad_channels_dict=copy.deepcopy(self.bad_channels_dict),
             suppress_short_interval_error=self.suppress_short_interval_error,
             lof_scores_dict=copy.deepcopy(self.lof_scores_dict),
@@ -2430,7 +2592,6 @@ class WindowAnalysisResult(AnimalFeatureParser):
         new_war.genotype = source.genotype
         new_war.sex = source.sex
         new_war.channel_names = source.channel_names
-        new_war.assume_from_number = source.assume_from_number
         new_war.bad_channels_dict = source.bad_channels_dict.copy()
         new_war.suppress_short_interval_error = source.suppress_short_interval_error
         new_war.lof_scores_dict = source.lof_scores_dict.copy()
@@ -2546,7 +2707,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
         try:
             self.channel_abbrevs = [
-                core.parse_chname_to_abbrev(x, assume_from_number=self.assume_from_number)
+                core.resolve_channel(x)
                 for x in self.channel_names
             ]
         except (ValueError, KeyError) as e:
@@ -2555,20 +2716,27 @@ class WindowAnalysisResult(AnimalFeatureParser):
             ) from e
 
     def reorder_and_pad_channels(
-        self, target_channels: list[str], use_abbrevs: bool = True, inplace: bool = True
+        self, target_channels: list[str] | None = None, use_abbrevs: bool = True, inplace: bool = True
     ) -> pd.DataFrame:
         """Reorder and pad channels to match a target channel list.
 
         This method ensures that the data has a consistent channel order and structure
-        by reordering existing channels and padding missing channels with NaNs.
+        by reordering existing channels and padding missing channels with NaNs. Channels
+        present in the data but **absent from** ``target_channels`` are dropped; a warning
+        names them so a montage gap can never silently discard data.
 
         Args:
-            target_channels (list[str]): List of target channel names to match
+            target_channels (list[str], optional): List of target channel names to match.
+                Defaults to :data:`neurodent.constants.CHANNEL_ABBREVS` (the canonical
+                channel list) when omitted.
             use_abbrevs (bool, optional): If True, target channel names are read as channel abbreviations instead of channel names. Defaults to True.
             inplace (bool, optional): If True, modify the result in place. Defaults to True.
         Returns:
             pd.DataFrame: DataFrame with reordered and padded channels
         """
+        if target_channels is None:
+            target_channels = list(constants.CHANNEL_ABBREVS)
+
         duplicates = [ch for ch in target_channels if target_channels.count(ch) > 1]
         if duplicates:
             raise ValueError(
@@ -2588,6 +2756,14 @@ class WindowAnalysisResult(AnimalFeatureParser):
             warnings.warn(
                 f"None of the channel names {channel_names} were found in target channels {target_channels}. Is use_abbrevs correctly set?"
             )
+        else:
+            dropped = [ch for ch in channel_names if ch not in channel_map]
+            if dropped:
+                warnings.warn(
+                    f"Standardization dropping channels not in the target montage: {dropped}. "
+                    f"Target channels: {target_channels}. Add them to the channel config "
+                    f"(CHANNEL_MAP / `channels`) if this data should be kept."
+                )
 
         for feature in self._feature_columns:
             handler = handler_for(feature)
@@ -3391,7 +3567,6 @@ class WindowAnalysisResult(AnimalFeatureParser):
         return ChannelInfo(
             channel_names=list(self.channel_names),
             channel_abbrevs=list(self.channel_abbrevs),
-            assume_from_number=self.assume_from_number,
         )
 
     @property
@@ -3887,7 +4062,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         make_folder=True,
         filename: str = None,
         slugify_filename=False,
-        save_abbrevs_as_chnames=False,
+        save_abbrevs=False,
     ):
         """Archive window analysis result into the folder specified, as a parquet and json file.
 
@@ -3900,7 +4075,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             make_folder (bool, optional): If True, create the folder if it doesn't exist. Defaults to True.
             filename (str, optional): Name of the file to save. Defaults to "war".
             slugify_filename (bool, optional): If True, slugify the filename (replace special characters). Defaults to False.
-            save_abbrevs_as_chnames (bool, optional): If True, save the channel abbreviations as the channel names in the json file. Defaults to False.
+            save_abbrevs (bool, optional): If True, save the channel abbreviations as the channel names in the json file. Defaults to False.
         """
         import pyarrow as pa
         import pyarrow.parquet as pq
@@ -3922,9 +4097,13 @@ class WindowAnalysisResult(AnimalFeatureParser):
         existing_meta = table.schema.metadata or {}
         merged_meta = {**existing_meta, b"neurodent": neurodent_meta}
         table = table.replace_schema_metadata(merged_meta)
-        pq.write_table(
-            table, filepath + ".parquet", compression="zstd", compression_level=4
-        )
+        # Write to a temp sibling and atomically rename, so an interrupted write
+        # (e.g. a killed SLURM job) never leaves a partial .parquet that a
+        # downstream rule would read as a valid output.
+        with atomic_output_path(filepath + ".parquet") as tmp_parquet:
+            pq.write_table(
+                table, str(tmp_parquet), compression="zstd", compression_level=4
+            )
         del table
         logging.info(f"Saved WAR to {filepath + '.parquet'}")
 
@@ -3933,19 +4112,15 @@ class WindowAnalysisResult(AnimalFeatureParser):
             "genotype": self.genotype,
             "sex": self.sex,
             "channel_names": (
-                self.channel_abbrevs if save_abbrevs_as_chnames else self.channel_names
-            ),
-            "assume_from_number": (
-                False if save_abbrevs_as_chnames else self.assume_from_number
+                self.channel_abbrevs if save_abbrevs else self.channel_names
             ),
             "bad_channels_dict": self.bad_channels_dict,
             "suppress_short_interval_error": self.suppress_short_interval_error,
             "lof_scores_dict": self.lof_scores_dict.copy(),
         }
 
-        with open(filepath + ".json", "w") as f:
-            json.dump(json_dict, f, indent=2)
-            logging.info(f"Saved WAR to {filepath + '.json'}")
+        atomic_write_json(filepath + ".json", json_dict, indent=2)
+        logging.info(f"Saved WAR to {filepath + '.json'}")
 
     def save_pickle_and_json(self, *args, **kwargs):
         """Deprecated: use :meth:`save_parquet_and_json` instead.
@@ -4092,7 +4267,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
         Columns whose name is in :data:`constants.FEATURE_TYPES` with a non-LINEAR
         type are encoded as native nested pyarrow types (via ``_to_nested_python``
         + ``pa.array``) with a per-cell JSON fallback for shapes pyarrow can't
-        infer.  tz-aware datetimes are normalised to UTC.  Pass an explicit
+        infer.  tz-aware datetimes are normalized to UTC.  Pass an explicit
         ``encoded_cols`` list to override the schema-based detection (e.g. when
         round-tripping non-WAR DataFrames).
 
@@ -4156,7 +4331,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
 
         - 1 (or missing) → legacy JSON-string cells; decoded with :func:`json.loads`.
         - 2              → native nested cells (pa.list/struct/binary);
-          normalised with :meth:`_normalize_arrow_cell`.
+          normalized with :meth:`_normalize_arrow_cell`.
         """
         decoder = (
             WindowAnalysisResult._normalize_arrow_cell
@@ -4362,7 +4537,7 @@ class WindowAnalysisResult(AnimalFeatureParser):
             for i, channel in enumerate(channel_names):
                 if (
                     channel in evaluation_channels
-                    or parse_chname_to_abbrev(channel, strict_matching=False)
+                    or resolve_channel(channel)
                     in evaluation_channels
                 ):
                     channels_processed += 1
@@ -4370,11 +4545,9 @@ class WindowAnalysisResult(AnimalFeatureParser):
                     # Ground truth: 1 if channel is marked as bad, 0 otherwise
                     is_bad_channel = (
                         channel in animalday_bad_channels
-                        or parse_chname_to_abbrev(channel, strict_matching=False)
+                        or resolve_channel(channel)
                         in animalday_bad_channels
                     )
-                    # if is_bad_channel and channel not in animalday_bad_channels:
-                    #     logging.debug(f"Mapped full channel '{channel}' -> '{parse_chname_to_abbrev(channel, strict_matching=False)}' found in bad channels")
 
                     y_true = 1 if is_bad_channel else 0
                     # Prediction: 1 if LOF score > threshold, 0 otherwise
@@ -4554,8 +4727,21 @@ class WindowAnalysisResult(AnimalFeatureParser):
             with open(legacy_pkl, "rb") as f:
                 data = pd.read_pickle(f)
 
-        with open(json_path, "r") as f:
-            metadata = json.load(f)
+        # Validate the JSON half of the pair explicitly: a partial/corrupt
+        # sidecar (e.g. from an interrupted write) should fail with a clear,
+        # actionable error so the WAR is regenerated, not crash with an opaque
+        # JSONDecodeError downstream.
+        try:
+            with open(json_path, "r") as f:
+                metadata = json.load(f)
+        except (OSError, json.JSONDecodeError) as e:
+            raise ValueError(
+                f"WAR JSON sidecar {json_path} is missing or corrupt ({e}); "
+                f"the parquet/JSON pair is incomplete and the WAR must be regenerated."
+            ) from e
+        # Back-compat: older WAR sidecars carry "assume_from_number"; the field was
+        # removed (channel resolution is now exact-only), so drop it before construction.
+        metadata.pop("assume_from_number", None)
         return cls(data, **metadata)
 
     @classmethod

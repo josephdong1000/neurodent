@@ -57,12 +57,8 @@ checkpoint war_quality_filter:
                         destination_file.unlink()  # Remove existing file if present
                         logging.info(f"Removed existing file: {destination_file}")
 
-                # Get bad animaldays from samples config via config parameter
-
-
-        with open(config["samples"]["samples_file"], "r") as f:
-            samples_config = json.load(f)
-        bad_folder_animalday = samples_config.get("bad_folder_animalday", [])
+                # Get bad animaldays from samples config (inline samples_data or samples_file)
+        bad_folder_animalday = resolve_samples_config(config).get("bad_folder_animalday", [])
 
         # Get quality filtering parameters from config
         exclude_bad_animaldays = config["samples"]["quality_filter"]["exclude_bad_animaldays"]

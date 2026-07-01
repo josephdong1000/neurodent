@@ -18,8 +18,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.metrics import f1_score, precision_score, recall_score
 
-from neurodent import visualization, core
-from neurodent.workflow import setup_snakemake_logging, inject_config_aliases
+from neurodent import visualization, core, constants
+from neurodent.workflow import setup_snakemake_logging, apply_samples_config
 
 
 def get_ground_truth_bad_channels(samples_config, animal_folder, animal_id):
@@ -181,7 +181,7 @@ def create_lof_accuracy_plot(results_df, output_path, config):
 
     # Add evaluation info
     total_channels = results_df["total_channels"].iloc[0] if len(results_df) > 0 else 0
-    evaluation_channels = config["analysis"]["lof_evaluation"]["evaluation_channels"]
+    evaluation_channels = config["analysis"]["lof_evaluation"].get("evaluation_channels") or constants.CHANNEL_ABBREVS
 
     plt.figtext(
         0.02,
@@ -246,8 +246,8 @@ def create_lof_channel_barplot(
                         # Try direct match first
                         if channel in evaluation_channels:
                             animal_channel_scores[channel].append(scores[i])
-                        elif core.parse_chname_to_abbrev(channel, strict_matching=False) in evaluation_channels:
-                            animal_channel_scores[core.parse_chname_to_abbrev(channel, strict_matching=False)].append(
+                        elif core.resolve_channel(channel) in evaluation_channels:
+                            animal_channel_scores[core.resolve_channel(channel)].append(
                                 scores[i]
                             )
 
@@ -348,7 +348,7 @@ def main():
     animal_folder_map = snakemake.params.animal_folder_map
 
     # Inject aliases
-    inject_config_aliases(samples_config)
+    apply_samples_config(samples_config)
     animal_id_map = snakemake.params.animal_id_map
 
     output_csv = snakemake.output.results_csv
@@ -358,7 +358,7 @@ def main():
     # Get evaluation parameters
     lof_params = config["analysis"]["lof_evaluation"]
     threshold_range = lof_params["threshold_range"]
-    evaluation_channels = lof_params["evaluation_channels"]
+    evaluation_channels = lof_params.get("evaluation_channels") or constants.CHANNEL_ABBREVS
 
     # Generate threshold array
     thresholds = np.arange(

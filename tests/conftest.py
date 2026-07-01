@@ -171,20 +171,23 @@ def setup_test_environment(request):
     """Save and restore mutable module-level constants around each test.
 
     Uses :func:`copy.deepcopy` so that *in-place* mutations of nested
-    containers (e.g. ``constants.CHNAME_ALIASES["Aud"].append(...)``) are
+    containers (e.g. ``constants.CHANNEL_MAP["LMot"].append(...)``) are
     also properly restored, not just full reassignments.
 
     If constants are mutated during a test that is **not** decorated with
     ``@pytest.mark.mutates_constants``, a :class:`ConstantsMutatedWarning`
     is emitted.  This makes accidental side-effects from production code
     visible in the test output instead of being silently masked.  Tests
-    that intentionally call :func:`~neurodent.workflow.utils.inject_config_aliases`
+    that intentionally call :func:`~neurodent.workflow.utils.apply_samples_config`
     should carry the marker so the warning is suppressed.
     """
     orig = {
-        "GENOTYPE_ALIASES": copy.deepcopy(constants.GENOTYPE_ALIASES),
-        "CHNAME_ALIASES": copy.deepcopy(constants.CHNAME_ALIASES),
-        "LR_ALIASES": copy.deepcopy(constants.LR_ALIASES),
+        "GENOTYPE_MAP": copy.deepcopy(constants.GENOTYPE_MAP),
+        "SEX_MAP": copy.deepcopy(constants.SEX_MAP),
+        "CHANNEL_MAP": copy.deepcopy(constants.CHANNEL_MAP),
+        "CHANNEL_ABBREVS": copy.deepcopy(constants.CHANNEL_ABBREVS),
+        "CHANNEL_ABBREV_BY_RAW": copy.deepcopy(constants.CHANNEL_ABBREV_BY_RAW),
+        "DF_SORT_ORDER": copy.deepcopy(constants.DF_SORT_ORDER),
         "ANIMAL_METADATA": copy.deepcopy(constants.ANIMAL_METADATA),
     }
 
@@ -324,7 +327,7 @@ def example_dataset(tmp_path_factory):
     Creates a directory tree under ``tmp_path`` with two animals
     (ExWT, ExKO), each with one 5-second NWB recording session. The returned
     dict contains the data root path and a ``samples_config`` dict ready
-    to be used with ``inject_config_aliases`` or pipeline scripts.
+    to be used with ``apply_samples_config`` or pipeline scripts.
 
     Returns:
         dict with keys ``data_root``, ``samples_config``, ``animals``,

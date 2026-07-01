@@ -12,45 +12,39 @@ from neurodent import constants
 class TestConstants:
     """Test constants module functionality."""
 
-    def test_default_id_to_lr(self):
-        """Test DEFAULT_ID_TO_LR mapping."""
-        assert constants.DEFAULT_ID_TO_LR[9] == "L"
-        assert constants.DEFAULT_ID_TO_LR[16] == "R"
-        assert len(constants.DEFAULT_ID_TO_LR) == 10
+    def test_genotype_map_default_empty(self):
+        """GENOTYPE_MAP defaults to empty (passthrough) and SEX_MAP covers M/F."""
+        assert constants.GENOTYPE_MAP == {}
+        assert "Male" in constants.SEX_MAP
+        assert "Female" in constants.SEX_MAP
 
-    def test_genotype_aliases(self):
-        """Test GENOTYPE_ALIASES mapping."""
-        assert "WT" in constants.GENOTYPE_ALIASES
-        assert "KO" in constants.GENOTYPE_ALIASES
-        assert constants.GENOTYPE_ALIASES["WT"] == ["WT", "wildtype"]
-        assert constants.GENOTYPE_ALIASES["KO"] == ["KO", "knockout"]
-
-    def test_chname_aliases(self):
-        """Test CHNAME_ALIASES mapping."""
-        expected_channels = ["Aud", "Vis", "Hip", "Bar", "Mot"]
+    def test_channel_aliases(self):
+        """Test CHANNEL_MAP: the flat channel-identity source of truth."""
+        expected_channels = ["LMot", "RMot", "LBar", "RBar", "LHip", "RHip", "LAud", "RAud", "LVis", "RVis"]
         for ch in expected_channels:
-            assert ch in constants.CHNAME_ALIASES
-            assert len(constants.CHNAME_ALIASES[ch]) == 3  # Each has lowercase, uppercase, and ALL_CAPS variants
+            assert ch in constants.CHANNEL_MAP
+            assert isinstance(constants.CHANNEL_MAP[ch], list)
 
-    def test_lr_aliases(self):
-        """Test LR_ALIASES mapping."""
-        assert "L" in constants.LR_ALIASES
-        assert "R" in constants.LR_ALIASES
-        assert "left" in constants.LR_ALIASES["L"]
-        assert "right" in constants.LR_ALIASES["R"]
+    def test_channel_abbrevs_derived_from_aliases(self):
+        """CHANNEL_ABBREVS is derived from CHANNEL_MAP keys (single source, no drift)."""
+        assert constants.CHANNEL_ABBREVS == list(constants.CHANNEL_MAP)
 
-    def test_default_id_to_name(self):
-        """Test DEFAULT_ID_TO_NAME mapping."""
-        assert constants.DEFAULT_ID_TO_NAME[9] == "LAud"
-        assert constants.DEFAULT_ID_TO_NAME[16] == "RMot"
-        assert len(constants.DEFAULT_ID_TO_NAME) == 10
+    def test_channel_abbrev_by_raw_is_inverse(self):
+        """CHANNEL_ABBREV_BY_RAW is the exact reverse of CHANNEL_MAP (the resolution table)."""
+        expected = {
+            raw: abbrev
+            for abbrev, raws in constants.CHANNEL_MAP.items()
+            for raw in raws
+        }
+        assert constants.CHANNEL_ABBREV_BY_RAW == expected
 
     def test_df_sort_order(self):
-        """Test DF_SORT_ORDER structure."""
+        """Test DF_SORT_ORDER structure and that its channel entry derives from CHANNEL_ABBREVS."""
         expected_keys = ["channel", "genotype", "sex", "isday", "band"]
         for key in expected_keys:
             assert key in constants.DF_SORT_ORDER
             assert isinstance(constants.DF_SORT_ORDER[key], list)
+        assert constants.DF_SORT_ORDER["channel"] == ["average", "all", *constants.CHANNEL_ABBREVS]
 
     def test_dateparser_patterns(self):
         """Test DATEPARSER_PATTERNS_TO_REMOVE."""

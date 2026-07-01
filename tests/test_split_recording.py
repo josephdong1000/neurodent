@@ -1,8 +1,9 @@
 """
-Test split and persist functionality for LongRecordingOrganizer.
+Test split, save_recording, and load_recording functionality for LongRecordingOrganizer.
 """
 
 import tempfile
+import warnings
 from datetime import datetime
 from pathlib import Path
 
@@ -82,41 +83,81 @@ class TestSplitInMemory:
         assert splits["GroupA"].manual_datetimes == dummy_long_recording.manual_datetimes
 
 
-# Persistence Tests
+# Save Tests
 
-class TestPersist:
-    """Test persist() functionality."""
+class TestSaveRecording:
+    """Test save_recording() functionality."""
 
-    def test_persist_creates_zarr_folder(self, dummy_long_recording, tmp_path):
-        """Test that persist() creates a zarr folder."""
+    def test_save_recording_creates_zarr_folder(self, dummy_long_recording, tmp_path):
+        """Test that save_recording() creates a zarr folder."""
         groups = {"GroupA": ["Ch0", "Ch1"]}
         splits = dummy_long_recording.split(groups)
-        
+
         output_dir = tmp_path / "output" / "GroupA"
-        actual_path = splits["GroupA"].persist(output_dir, format="zarr")
-        
+        actual_path = splits["GroupA"].save_recording(output_dir, format="zarr")
+
         # SI appends .zarr suffix
         assert actual_path.exists()
         assert str(actual_path).endswith(".zarr")
 
-    def test_persist_updates_in_memory_flag(self, dummy_long_recording, tmp_path):
-        """Test that persist() clears the in-memory flag."""
+    def test_save_recording_writes_sidecar(self, dummy_long_recording, tmp_path):
+        """Test that save_recording() writes a NeuRodent metadata sidecar."""
+        from neurodent import constants
         groups = {"GroupA": ["Ch0", "Ch1"]}
         splits = dummy_long_recording.split(groups)
-        
+
         output_dir = tmp_path / "output" / "GroupA"
-        splits["GroupA"].persist(output_dir, format="zarr")
-        
+        actual_path = splits["GroupA"].save_recording(output_dir, format="zarr")
+
+        assert (actual_path / constants.NEURODENT_SIDECAR_NAME).exists()
+
+    def test_save_recording_updates_in_memory_flag(self, dummy_long_recording, tmp_path):
+        """Test that save_recording() clears the in-memory flag."""
+        groups = {"GroupA": ["Ch0", "Ch1"]}
+        splits = dummy_long_recording.split(groups)
+
+        output_dir = tmp_path / "output" / "GroupA"
+        splits["GroupA"].save_recording(output_dir, format="zarr")
+
         assert splits["GroupA"]._is_in_memory is False
 
-    def test_persist_binary_format(self, dummy_long_recording, tmp_path):
-        """Test that persist() works with binary format."""
+    def test_save_recording_binary_format(self, dummy_long_recording, tmp_path):
+        """Test that save_recording() works with binary format."""
         groups = {"GroupA": ["Ch0", "Ch1"]}
         splits = dummy_long_recording.split(groups)
-        
+
         output_dir = tmp_path / "output" / "GroupA"
-        actual_path = splits["GroupA"].persist(output_dir, format="binary")
-        
+        actual_path = splits["GroupA"].save_recording(output_dir, format="binary")
+
+        assert actual_path.exists()
+
+
+class TestPersistDeprecated:
+    """Test the deprecated persist() alias."""
+
+    def test_persist_warns_and_delegates(self, dummy_long_recording, tmp_path):
+        """persist() emits a DeprecationWarning and still writes the folder."""
+        groups = {"GroupA": ["Ch0", "Ch1"]}
+        splits = dummy_long_recording.split(groups)
+
+        output_dir = tmp_path / "output" / "GroupA"
+        with pytest.warns(DeprecationWarning, match="persist"):
+            actual_path = splits["GroupA"].persist(output_dir, format="zarr")
+
+        assert actual_path.exists()
+        assert splits["GroupA"]._is_in_memory is False
+
+    def test_persist_overwrites_by_default(self, dummy_long_recording, tmp_path):
+        """persist() preserves historical clobbering behavior (overwrite=True)."""
+        groups = {"GroupA": ["Ch0", "Ch1"]}
+        splits = dummy_long_recording.split(groups)
+
+        output_dir = tmp_path / "output" / "GroupA"
+        with pytest.warns(DeprecationWarning):
+            splits["GroupA"].persist(output_dir, format="zarr")
+            # Second call must not raise FileExistsError (unlike save_recording default)
+            actual_path = splits["GroupA"].persist(output_dir, format="zarr")
+
         assert actual_path.exists()
 
 
@@ -150,23 +191,42 @@ class TestSplitRecordingFunction:
         assert (output_base / "AnimalA.zarr").exists()
         assert (output_base / "AnimalB.zarr").exists()
 
-    def test_split_recording_no_persist(self, tmp_path):
-        """Test split_recording() with persist=False."""
+    def test_split_recording_no_save(self, tmp_path):
+        """Test split_recording() with save=False."""
         traces = np.random.randn(2000, 4).astype(np.float32)
         recording = si.NumpyRecording(traces_list=[traces], sampling_frequency=1000.0)
         input_folder = tmp_path / "input"
         recording.save(folder=input_folder, format="binary")
-        
+
         groups = {"AnimalA": ["0", "1"]}
-        
+
         splits = split_recording(
             input_path=input_folder,
             groups=groups,
-            persist=False,
-            
+            save=False,
             manual_datetimes=datetime.now(),
         )
-        
+
+        assert "AnimalA" in splits
+        assert splits["AnimalA"]._is_in_memory is True
+
+    def test_split_recording_persist_false_deprecated(self, tmp_path):
+        """Test split_recording() still honors the deprecated persist=False alias."""
+        traces = np.random.randn(2000, 4).astype(np.float32)
+        recording = si.NumpyRecording(traces_list=[traces], sampling_frequency=1000.0)
+        input_folder = tmp_path / "input"
+        recording.save(folder=input_folder, format="binary")
+
+        groups = {"AnimalA": ["0", "1"]}
+
+        with pytest.warns(DeprecationWarning, match="persist"):
+            splits = split_recording(
+                input_path=input_folder,
+                groups=groups,
+                persist=False,
+                manual_datetimes=datetime.now(),
+            )
+
         assert "AnimalA" in splits
         assert splits["AnimalA"]._is_in_memory is True
 
@@ -200,10 +260,17 @@ class TestSplitEdgeCases:
         
         assert splits == {}
 
-    def test_persist_no_recording_raises_error(self, tmp_path):
-        """Test that persist() raises error when no recording is loaded."""
+    def test_save_recording_no_recording_raises_error(self, tmp_path):
+        """Test that save_recording() raises error when no recording is loaded."""
         lro = LongRecordingOrganizer(item=None)
-        
+
+        with pytest.raises(ValueError, match="No recording to save"):
+            lro.save_recording(tmp_path / "output")
+
+    def test_persist_no_recording_raises_error(self, tmp_path):
+        """Test that the deprecated persist() raises error when no recording is loaded."""
+        lro = LongRecordingOrganizer(item=None)
+
         with pytest.raises(ValueError, match="No recording to persist"):
             lro.persist(tmp_path / "output")
 
@@ -230,19 +297,35 @@ class TestSplitEdgeCases:
         with pytest.raises(ImportError, match="SpikeInterface is required for split"):
             lro.split({"A": ["Ch0"]})
 
-    def test_persist_si_import_error(self, monkeypatch, tmp_path):
-        """Test that persist raises ImportError when SI is not available."""
+    def test_save_recording_si_import_error(self, monkeypatch, tmp_path):
+        """Test that save_recording raises ImportError when SI is not available."""
         import sys
-        
+
         # Get the current module from sys.modules (handles test_imports.py reimporting)
         core_module = sys.modules['neurodent.core.core']
         LRO = sys.modules['neurodent.core.core'].LongRecordingOrganizer
-        
+
         lro = LRO(item='.', mode=None)
         lro.LongRecording = "dummy"
-        
+
         monkeypatch.setattr(core_module, 'si', None)
-        
+
+        with pytest.raises(ImportError, match="SpikeInterface is required for save_recording"):
+            lro.save_recording(tmp_path / "output")
+
+    def test_persist_si_import_error(self, monkeypatch, tmp_path):
+        """Test that the deprecated persist raises ImportError when SI is not available."""
+        import sys
+
+        # Get the current module from sys.modules (handles test_imports.py reimporting)
+        core_module = sys.modules['neurodent.core.core']
+        LRO = sys.modules['neurodent.core.core'].LongRecordingOrganizer
+
+        lro = LRO(item='.', mode=None)
+        lro.LongRecording = "dummy"
+
+        monkeypatch.setattr(core_module, 'si', None)
+
         with pytest.raises(ImportError, match="SpikeInterface is required for persist"):
             lro.persist(tmp_path / "output")
 
@@ -310,41 +393,71 @@ class TestInitFromRecording:
         assert abs(lro.file_durations[0] - duration_s) < 0.1
 
 
-# Persist Format Tests
+# Save Format / Overwrite Tests
 
-class TestPersistFormats:
-    """Test different persist formats."""
+class TestSaveRecordingFormats:
+    """Test save_recording formats and overwrite semantics."""
 
-    def test_persist_with_explicit_zarr_suffix(self, dummy_long_recording, tmp_path):
-        """Test persist when output_dir already ends with .zarr."""
+    def test_save_recording_with_explicit_zarr_suffix(self, dummy_long_recording, tmp_path):
+        """Test save_recording when output_dir already ends with .zarr."""
         groups = {"GroupA": ["Ch0", "Ch1"]}
         splits = dummy_long_recording.split(groups)
-        
+
         output_dir = tmp_path / "output" / "GroupA.zarr"
-        actual_path = splits["GroupA"].persist(output_dir, format="zarr")
-        
+        actual_path = splits["GroupA"].save_recording(output_dir, format="zarr")
+
         # Should not double the .zarr suffix
         assert actual_path == output_dir
         assert actual_path.exists()
 
-    def test_persist_overwrite_existing(self, dummy_long_recording, tmp_path, caplog):
-        """Test that persist overwrites existing folder with warning."""
-        import logging
-        caplog.set_level(logging.WARNING)
-        
+    def test_save_recording_refuses_overwrite_by_default(self, dummy_long_recording, tmp_path):
+        """Saving to an existing folder without overwrite=True raises FileExistsError."""
         groups = {"GroupA": ["Ch0", "Ch1"]}
         splits = dummy_long_recording.split(groups)
-        
+
         output_dir = tmp_path / "output" / "GroupA"
-        
-        # First persist
-        splits["GroupA"].persist(output_dir, format="zarr")
-        
-        # Second persist should warn
+        splits["GroupA"].save_recording(output_dir, format="zarr")
+
+        with pytest.raises(FileExistsError, match="already exists"):
+            splits["GroupA"].save_recording(output_dir, format="zarr")
+
+    def test_save_recording_overwrite_existing(self, dummy_long_recording, tmp_path, caplog):
+        """Test that save_recording(overwrite=True) replaces an existing folder with a warning."""
+        import logging
+        caplog.set_level(logging.WARNING)
+
+        groups = {"GroupA": ["Ch0", "Ch1"]}
+        splits = dummy_long_recording.split(groups)
+
+        output_dir = tmp_path / "output" / "GroupA"
+
+        # First save
+        splits["GroupA"].save_recording(output_dir, format="zarr")
+
+        # Second save with overwrite=True should warn and succeed
         caplog.clear()
-        splits["GroupA"].persist(output_dir, format="zarr")
-        
-        assert "Overwriting existing folder" in caplog.text
+        actual_path = splits["GroupA"].save_recording(output_dir, format="zarr", overwrite=True)
+
+        assert "Overwriting existing recording folder" in caplog.text
+        assert actual_path.exists()
+
+    def test_save_recording_refuses_foreign_dir(self, dummy_long_recording, tmp_path):
+        """save_recording(overwrite=True) must refuse to delete a non-recording directory."""
+        groups = {"GroupA": ["Ch0", "Ch1"]}
+        splits = dummy_long_recording.split(groups)
+
+        # A foreign directory that is not a recognized SI/NeuRodent recording folder.
+        foreign = tmp_path / "important_data"
+        foreign.mkdir(parents=True)
+        sentinel = foreign / "notes.txt"
+        sentinel.write_text("do not delete")
+
+        with pytest.raises(ValueError, match="does not look like"):
+            splits["GroupA"].save_recording(foreign, format="binary", overwrite=True)
+
+        # The foreign directory and its contents must survive untouched.
+        assert sentinel.exists()
+        assert sentinel.read_text() == "do not delete"
 
 
 # Channel Name Inheritance Tests
@@ -514,19 +627,18 @@ class TestBoundaryConditions:
 class TestSplitRecordingFunctionEdgeCases:
     """Test edge cases for the standalone split_recording() function."""
 
-    def test_split_recording_requires_output_base_when_persist(self, tmp_path):
-        """Test that output_base is required when persist=True."""
+    def test_split_recording_requires_output_base_when_save(self, tmp_path):
+        """Test that output_base is required when save=True."""
         traces = np.random.randn(1000, 2).astype(np.float32)
         recording = si.NumpyRecording(traces_list=[traces], sampling_frequency=1000.0)
         input_folder = tmp_path / "input"
         recording.save(folder=input_folder, format="binary")
-        
+
         with pytest.raises(ValueError, match="output_base is required"):
             split_recording(
                 input_path=input_folder,
                 groups={"A": ["0"]},
-                persist=True,
-                
+                save=True,
                 manual_datetimes=datetime.now(),
             )
 
@@ -555,30 +667,97 @@ class TestDataVerification:
     """Verify data integrity across split and persist operations."""
 
     def test_round_trip_data_integrity(self, dummy_long_recording, tmp_path):
-        """Test that data survives split -> persist -> reload cycle."""
+        """Test that data survives split -> save_recording -> reload cycle."""
         original_traces = dummy_long_recording.LongRecording.get_traces()
-        
+
         # Split
         splits = dummy_long_recording.split({"A": ["Ch0", "Ch1"]})
-        
-        # Persist
+
+        # Save
         output_dir = tmp_path / "output" / "A"
-        actual_path = splits["A"].persist(output_dir, format="binary")
-        
-        # Reload
-        reloaded = LongRecordingOrganizer(
-            item=actual_path,
-            
-            manual_datetimes=datetime(2023, 1, 1),
-        )
+        actual_path = splits["A"].save_recording(output_dir, format="binary")
+
+        # Reload via load_recording
+        reloaded = LongRecordingOrganizer.load_recording(actual_path)
         reloaded_traces = reloaded.LongRecording.get_traces()
-        
+
         # Verify
         np.testing.assert_array_almost_equal(
             reloaded_traces[:, 0],
             original_traces[:, 0],
             decimal=5
         )
+
+
+# Save/Load Round-Trip Tests
+
+class TestSaveLoadRoundTrip:
+    """Test the save_recording -> load_recording faithful round-trip."""
+
+    def _make_child(self, dummy_long_recording):
+        """Split a parent LRO and return a child with rich metadata set."""
+        dummy_long_recording.file_end_datetimes = [datetime(2023, 1, 1, 14, 0)]
+        dummy_long_recording.bad_channel_names = ["Ch1"]
+        dummy_long_recording.labels = {"cohort": "A"}
+        return dummy_long_recording.split({"A": ["Ch0", "Ch1"]})["A"]
+
+    @pytest.mark.parametrize("fmt", ["zarr", "binary"])
+    def test_round_trip_restores_metadata(self, dummy_long_recording, tmp_path, fmt):
+        """save_recording -> load_recording restores LRO-level metadata faithfully."""
+        child = self._make_child(dummy_long_recording)
+
+        actual_path = child.save_recording(tmp_path / "out" / "A", format=fmt)
+        back = LongRecordingOrganizer.load_recording(actual_path)
+
+        assert back.channel_names == ["Ch0", "Ch1"]
+        assert back.file_end_datetimes == child.file_end_datetimes
+        assert back.bad_channel_names == child.bad_channel_names
+        assert back.labels == {"cohort": "A"}
+        assert back.datetimes_are_start == child.datetimes_are_start
+        assert back.file_durations == child.file_durations
+        assert back.meta.f_s == child.meta.f_s
+        assert back.meta.V_units == child.meta.V_units
+        assert back._is_in_memory is False
+        assert Path(back.base_folder_path) == Path(actual_path)
+        np.testing.assert_array_almost_equal(
+            back.LongRecording.get_traces(),
+            child.LongRecording.get_traces(),
+            decimal=5,
+        )
+
+    def test_load_recording_missing_sidecar_warns(self, dummy_long_recording, tmp_path, caplog):
+        """Missing sidecar -> bare reload + warning (strict=False)."""
+        import logging
+        from neurodent import constants
+
+        child = self._make_child(dummy_long_recording)
+        actual_path = child.save_recording(tmp_path / "out" / "A", format="binary")
+        (actual_path / constants.NEURODENT_SIDECAR_NAME).unlink()
+
+        caplog.set_level(logging.WARNING)
+        back = LongRecordingOrganizer.load_recording(actual_path)
+
+        assert "sidecar" in caplog.text.lower()
+        # Bare reload still recovers the traces and folder path.
+        assert back.LongRecording.get_num_channels() == 2
+        assert Path(back.base_folder_path) == Path(actual_path)
+
+    def test_load_recording_missing_sidecar_strict_raises(self, dummy_long_recording, tmp_path):
+        """Missing sidecar with strict=True raises FileNotFoundError."""
+        from neurodent import constants
+
+        child = self._make_child(dummy_long_recording)
+        actual_path = child.save_recording(tmp_path / "out" / "A", format="binary")
+        (actual_path / constants.NEURODENT_SIDECAR_NAME).unlink()
+
+        with pytest.raises(FileNotFoundError, match="sidecar"):
+            LongRecordingOrganizer.load_recording(actual_path, strict=True)
+
+    def test_load_recording_not_a_directory_raises(self, tmp_path):
+        """load_recording on a non-directory raises FileNotFoundError."""
+        missing = tmp_path / "nope"
+        with pytest.raises(FileNotFoundError):
+            LongRecordingOrganizer.load_recording(missing)
 
     def test_metadata_consistency_after_split(self, dummy_long_recording):
         """Test that metadata is consistent after splitting."""
@@ -610,6 +789,31 @@ class TestDatetimeInheritance:
         dummy_long_recording.datetimes_are_start = False
         
         splits = dummy_long_recording.split({"A": ["Ch0"]})
-        
+
         assert splits["A"].datetimes_are_start is False
+
+
+# Default SI Extractor Tests
+
+class TestDefaultSiExtractor:
+    """Guard the default mode='si' load path against the deprecated si.load_extractor."""
+
+    def test_si_mode_load_does_not_use_deprecated_load_extractor(self, tmp_path):
+        """Loading with the default extract_func must not emit the load_extractor warning."""
+        traces = np.random.randn(1000, 2).astype(np.float32)
+        recording = si.NumpyRecording(traces_list=[traces], sampling_frequency=1000.0)
+        input_folder = tmp_path / "input"
+        recording.save(folder=input_folder, format="binary")
+
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            lro = LongRecordingOrganizer(item=input_folder, mode="si")
+
+        offending = [
+            w for w in caught
+            if issubclass(w.category, DeprecationWarning)
+            and "load_extractor" in str(w.message)
+        ]
+        assert not offending, f"Unexpected load_extractor deprecation: {[str(w.message) for w in offending]}"
+        assert lro.LongRecording.get_num_channels() == 2
 

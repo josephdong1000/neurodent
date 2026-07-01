@@ -1,60 +1,52 @@
-"""Tests for warning behavior in neurodent functions.
+"""Tests for channel-name resolution behavior (exact, loud, no inference).
 
-These tests verify that warnings from neurodent functions work correctly:
-1. Unmatched channels can produce warnings
-2. Valid channels don't produce warnings
-3. WindowAnalysisResult handles channels properly
-
-Note: Due to Python's warning registry behavior, tests cannot reliably 
-assert exact warning counts when modules are pre-imported. These tests
-verify the code paths work, not specific warning counts.
+After the move to an explicit channel map:
+1. Canonical / configured channel names resolve silently.
+2. Unconfigured channel names raise loudly (no fuzzy or number inference).
+3. resolve_channels() warns (not silently) on an unmappable name.
 """
 import warnings
 import pytest
 import pandas as pd
 
 
-class TestParseChNameBehavior:
-    """Test parse_chname_to_abbrev function behavior."""
+class TestResolveChannelBehavior:
+    """resolve_channel resolves by exact lookup only."""
 
-    def test_unmatched_channel_with_number_returns_abbreviation(self):
-        """Unmatched channel with number should return an abbreviation."""
+    def test_canonical_channel_resolves_silently(self):
         from neurodent.core import utils as core_utils
-        
-        # Should not raise an exception when assume_from_number=True
-        result = core_utils.parse_chname_to_abbrev(
-            "Intan Input C-009", assume_from_number=True
-        )
-        # Should return a valid abbreviation based on the number
-        assert result is not None
-        assert isinstance(result, str)
 
-    def test_valid_channel_no_warning(self):
-        """Valid channel names should not produce warnings."""
-        from neurodent.core import utils as core_utils
-        
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            result = core_utils.parse_chname_to_abbrev("left Auditory")
-            assert result == "LAud"
+            assert core_utils.resolve_channel("LAud") == "LAud"
+            assert core_utils.resolve_channel("RMot") == "RMot"
+        assert len(w) == 0
 
-        matching = [x for x in w if "does not match name aliases" in str(x.message)]
-        assert len(matching) == 0
-
-    def test_full_channel_names_parse_correctly(self):
-        """Full channel names should parse to abbreviations without warnings."""
+    def test_unconfigured_channel_raises(self):
         from neurodent.core import utils as core_utils
-        
-        assert core_utils.parse_chname_to_abbrev("left Auditory") == "LAud"
-        assert core_utils.parse_chname_to_abbrev("right Motor") == "RMot"
+
+        # Free-text names that used to resolve via the fuzzy fallback now raise.
+        with pytest.raises(ValueError, match="not in the configured channel map"):
+            core_utils.resolve_channel("left Auditory")
+        # Numeric / device names that used to resolve via assume_from_number now raise.
+        with pytest.raises(ValueError, match="not in the configured channel map"):
+            core_utils.resolve_channel("Intan Input C-009")
+
+    def test_abbreviate_warns_on_unmapped(self):
+        from neurodent.core import utils as core_utils
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            out = core_utils.resolve_channels(["LAud", "Intan_C009"])
+        assert out == ["LAud", "Intan_C009"]  # unmapped kept as-is
+        assert any("could not be mapped" in str(x.message) for x in w)
 
 
 class TestWindowAnalysisResultBehavior:
-    """Test WindowAnalysisResult creation behavior."""
+    """WindowAnalysisResult channel handling under exact resolution."""
 
     @pytest.fixture
     def minimal_war_df(self):
-        """Create minimal DataFrame for WAR testing."""
         return pd.DataFrame({
             "animalday": ["A10 WT Jan-01-2024"] * 3,
             "animal": ["A10"] * 3,
@@ -67,27 +59,21 @@ class TestWindowAnalysisResultBehavior:
             "rms": [[1.0, 2.0, 3.0]] * 3,
         })
 
-    def test_war_with_unmatched_channels_succeeds(self, minimal_war_df):
-        """WAR with unmatched channels should succeed with assume_from_number=True."""
+    def test_war_with_unmatched_channels_raises(self, minimal_war_df):
+        """WAR construction parses channel names; unconfigured names raise loudly."""
         from neurodent.visualization.results import WindowAnalysisResult
-        
-        unmatched_channels = ["Intan_C009", "Intan_C010", "Intan_C012"]
 
-        # Should not raise an exception
-        war = WindowAnalysisResult(
-            minimal_war_df,
-            animal_id="A10",
-            genotype="WT",
-            channel_names=unmatched_channels,
-            assume_from_number=True,
-        )
-        assert war is not None
+        with pytest.raises(ValueError, match="not in the configured channel map"):
+            WindowAnalysisResult(
+                minimal_war_df,
+                animal_id="A10",
+                genotype="WT",
+                channel_names=["Intan_C009", "Intan_C010", "Intan_C012"],
+            )
 
     def test_war_with_valid_channels_no_warning(self, minimal_war_df):
-        """WAR with valid channels produces no warnings."""
+        """WAR with canonical channel names constructs without channel warnings."""
         from neurodent.visualization.results import WindowAnalysisResult
-        
-        valid_channels = ["LMot", "RMot", "LAud"]
 
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
@@ -95,10 +81,8 @@ class TestWindowAnalysisResultBehavior:
                 minimal_war_df.copy(),
                 animal_id="A10",
                 genotype="WT",
-                channel_names=valid_channels,
-                assume_from_number=False,
+                channel_names=["LMot", "RMot", "LAud"],
             )
-
-        matching = [x for x in w if "does not match name aliases" in str(x.message)]
+        matching = [x for x in w if "could not be mapped" in str(x.message)]
         assert len(matching) == 0
         assert war is not None

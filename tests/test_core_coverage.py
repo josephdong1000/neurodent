@@ -81,6 +81,16 @@ def _make_mock_mne_raw(n_channels=4, sfreq=None, preload=True, ch_prefix="EEG"):
     return raw
 
 
+def _export_creates_file(path, *args, **kwargs):
+    """Side effect for a mocked ``mne.export.export_raw``.
+
+    The intermediate file is now written via ``atomic_output_path`` (write to a
+    temp sibling, then rename into place), so a mocked exporter must actually
+    create the file at the path it is given for the rename to succeed.
+    """
+    Path(path).write_bytes(b"")
+
+
 # ===================================================================
 # RecordingMetadata
 # ===================================================================
@@ -470,7 +480,7 @@ class TestGetOrCreateIntermediateFile:
                         with patch("neurodent.core.core.se") as mock_se:
                             mock_se.read_edf.return_value = _make_mock_recording()
                             with patch("neurodent.core.core.mne") as mock_mne:
-                                mock_mne.export = Mock()
+                                mock_mne.export.export_raw.side_effect = _export_creates_file
                                 rec, raw_obj, meta = lro._get_or_create_intermediate_file(
                                     fname=fname,
                                     source_paths=["src.edf"],
@@ -496,7 +506,7 @@ class TestGetOrCreateIntermediateFile:
                     with patch("neurodent.core.core.se") as mock_se:
                         mock_se.read_edf.return_value = _make_mock_recording()
                         with patch("neurodent.core.core.mne") as mock_mne:
-                            mock_mne.export = Mock()
+                            mock_mne.export.export_raw.side_effect = _export_creates_file
                             rec, raw_obj, meta = lro._get_or_create_intermediate_file(
                                 fname=fname,
                                 source_paths=["f1.edf", "f2.edf"],
@@ -547,11 +557,11 @@ class TestIntanAndEdfExport:
         with patch("neurodent.core.core.should_use_cache_unified", return_value=False):
             with patch("neurodent.core.core.extract_mne_unit_info", return_value=("µV", 1.0)):
                 with patch.object(lro, "_load_mne_data_no_resample", return_value=raw):
-                    with patch("neurodent.core.core.convert_intan_chname_mne") as mock_conv:
+                    with patch("neurodent.core.core.rename_mne_channels") as mock_conv:
                         with patch("neurodent.core.core.se") as mock_se:
                             mock_se.read_edf.return_value = _make_mock_recording()
                             with patch("neurodent.core.core.mne") as mock_mne:
-                                mock_mne.export = Mock()
+                                mock_mne.export.export_raw.side_effect = _export_creates_file
                                 lro._get_or_create_intermediate_file(
                                     fname=fname,
                                     source_paths=["src.edf"],
@@ -571,11 +581,13 @@ class TestIntanAndEdfExport:
 
         first_call = True
 
-        def side_effect_export(*args, **kwargs):
+        def side_effect_export(path, *args, **kwargs):
             nonlocal first_call
             if first_call:
                 first_call = False
                 raise ValueError("exceeds maximum field length")
+            # Successful retry: create the file so the atomic rename succeeds.
+            Path(path).write_bytes(b"")
 
         with patch("neurodent.core.core.should_use_cache_unified", return_value=False):
             with patch("neurodent.core.core.extract_mne_unit_info", return_value=("µV", 1.0)):
@@ -596,6 +608,129 @@ class TestIntanAndEdfExport:
                             # Verify second call used physical_range kwarg (robust retry)
                             second_call = mock_mne.export.export_raw.call_args_list[1]
                             assert "physical_range" in second_call.kwargs
+
+
+# ===================================================================
+# Self-healing read of a corrupt intermediate cache
+# ===================================================================
+
+
+def _write_valid_meta(meta_fname, channel_names=None):
+    """Write a valid RecordingMetadata sidecar so the cached-read path is reached."""
+    channel_names = channel_names or list(_DEFAULT_CH_NAMES)
+    RecordingMetadata(
+        metadata_path=None,
+        n_channels=len(channel_names),
+        f_s=constants.GLOBAL_SAMPLING_RATE,
+        dt_end=None,
+        channel_names=channel_names,
+        V_units="µV",
+        mult_to_uV=1.0,
+    ).to_json(meta_fname)
+
+
+class TestSelfHealingCorruptCache:
+    """A corrupt cached intermediate is deleted and regenerated under 'auto'."""
+
+    def test_corrupt_edf_cache_regenerates_auto(self, tmp_path):
+        lro = _make_lro(item="dummy.edf")
+        fname = tmp_path / "cached.edf"
+        meta_fname = fname.with_suffix(fname.suffix + ".meta.json")
+        fname.write_text("corrupt-not-edf")  # exists so cache validation passes
+        _write_valid_meta(meta_fname)
+
+        raw = _make_mock_mne_raw()
+        extract_func = Mock(return_value=raw)
+
+        reads = {"n": 0}
+
+        def read_edf_side_effect(path):
+            reads["n"] += 1
+            if reads["n"] == 1:
+                raise RuntimeError("the file is not EDF(+) or BDF(+) compliant (Filesize)")
+            return _make_mock_recording()
+
+        with patch("neurodent.core.core.should_use_cache_unified", return_value=True):
+            with patch("neurodent.core.core.extract_mne_unit_info", return_value=("µV", 1.0)):
+                with patch.object(lro, "_load_mne_data_no_resample", return_value=raw):
+                    with patch("neurodent.core.core.se") as mock_se:
+                        mock_se.read_edf.side_effect = read_edf_side_effect
+                        with patch("neurodent.core.core.mne") as mock_mne:
+                            mock_mne.export.export_raw.side_effect = _export_creates_file
+                            rec, raw_obj, meta = lro._get_or_create_intermediate_file(
+                                fname=fname,
+                                source_paths=["src.edf"],
+                                cache_policy="auto",
+                                intermediate="edf",
+                                extract_func=extract_func,
+                                n_jobs=1,
+                            )
+        # The corrupt cache was read once (failed), then regenerated and re-read.
+        assert reads["n"] == 2
+        assert extract_func.called
+        assert rec is not None
+        assert fname.exists()  # regenerated
+
+    def test_corrupt_bin_cache_regenerates_auto(self, tmp_path):
+        lro = _make_lro(item="dummy.bin")
+        fname = tmp_path / "cached.bin"
+        meta_fname = fname.with_suffix(fname.suffix + ".meta.json")
+        fname.write_bytes(b"corrupt")
+        _write_valid_meta(meta_fname)
+
+        raw = _make_mock_mne_raw()
+        extract_func = Mock(return_value=raw)
+
+        reads = {"n": 0}
+
+        def read_binary_side_effect(path, **kwargs):
+            reads["n"] += 1
+            if reads["n"] == 1:
+                raise ValueError("truncated binary file")
+            return _make_mock_recording()
+
+        with patch("neurodent.core.core.should_use_cache_unified", return_value=True):
+            with patch("neurodent.core.core.extract_mne_unit_info", return_value=("µV", 1.0)):
+                with patch.object(lro, "_load_mne_data_no_resample", return_value=raw):
+                    with patch("neurodent.core.core.se") as mock_se:
+                        mock_se.read_binary.side_effect = read_binary_side_effect
+                        rec, raw_obj, meta = lro._get_or_create_intermediate_file(
+                            fname=fname,
+                            source_paths=["src.bin"],
+                            cache_policy="auto",
+                            intermediate="bin",
+                            extract_func=extract_func,
+                            n_jobs=1,
+                        )
+        assert reads["n"] == 2
+        assert extract_func.called
+        assert rec is not None
+        assert fname.exists()  # regenerated (real data.tofile write)
+
+    def test_corrupt_cache_always_raises(self, tmp_path):
+        """Under cache_policy='always' a corrupt cache is not self-healed; it raises."""
+        lro = _make_lro(item="dummy.edf")
+        fname = tmp_path / "cached.edf"
+        meta_fname = fname.with_suffix(fname.suffix + ".meta.json")
+        fname.write_text("corrupt-not-edf")
+        _write_valid_meta(meta_fname)
+
+        extract_func = Mock()
+
+        with patch("neurodent.core.core.should_use_cache_unified", return_value=True):
+            with patch("neurodent.core.core.se") as mock_se:
+                mock_se.read_edf.side_effect = RuntimeError("not EDF(+) compliant")
+                with pytest.raises(RuntimeError, match="not EDF"):
+                    lro._get_or_create_intermediate_file(
+                        fname=fname,
+                        source_paths=["src.edf"],
+                        cache_policy="always",
+                        intermediate="edf",
+                        extract_func=extract_func,
+                        n_jobs=1,
+                    )
+        # No regeneration attempted under 'always'.
+        assert not extract_func.called
 
 
 # ===================================================================

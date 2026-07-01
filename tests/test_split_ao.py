@@ -80,7 +80,7 @@ def mock_multi_day_lros():
                     child_lro.base_folder_path = None
                     child_lro._is_in_memory = True
                     child_lro.manual_datetimes = parent_lro.manual_datetimes
-                    child_lro.persist = MagicMock(return_value=Path("/output"))
+                    child_lro.save_recording = MagicMock(return_value=Path("/output"))
                     child_lro.get_date_string.return_value = parent_lro.get_date_string.return_value
                     result[group_name] = child_lro
                 return result
@@ -415,47 +415,16 @@ class TestFromLros:
         actual_dates = {day.split()[-1] for day in ao.unique_animaldays}
         assert actual_dates == expected_dates
 
-    def test_from_lros_assume_from_number_propagates(self):
-        """Regression: assume_from_number=True must be passed to from_lros.
+    def test_numeric_channel_names_require_explicit_map(self):
+        """Channel resolution is exact: numeric names not in the configured map raise loudly
+        (no number inference), while an explicitly-mapped raw name resolves."""
+        from neurodent.core.utils import resolve_channel
 
-        When channel names are integers ('0', '1', ...) and assume_from_number=True
-        is set in the analysis config, generate_wars.py consolidates session AOs via
-        from_lros(). Previously, assume_from_number was not forwarded to from_lros(),
-        so the resulting AnimalOrganizer had assume_from_number=False. This caused
-        WindowAnalysisResult (created by compute_windowed_analysis) to fail when calling
-        parse_chname_to_abbrev with assume_from_number=False, producing the LR_ALIASES error.
-        """
-        lro = MagicMock(spec=LongRecordingOrganizer)
-        lro.channel_names = [str(i) for i in range(10)]
-        lro.base_folder_path = Path("/mock/path/day1")
-        lro.get_date_string.return_value = "Jan-01-2023"
-
-        # from_lros without assume_from_number must default to False
-        ao_default = AnimalOrganizer.from_lros(
-            lros=[lro],
-            animal_id="TestAnimal",
-        )
-        assert ao_default.assume_from_number is False
-
-        # from_lros with assume_from_number=True must propagate the flag
-        ao_numeric = AnimalOrganizer.from_lros(
-            lros=[lro],
-            animal_id="TestAnimal",
-            assume_from_number=True,
-        )
-        assert ao_numeric.assume_from_number is True
-
-        # Document the failure mode: calling parse_chname_to_abbrev on a numeric
-        # channel name without assume_from_number raises a LR_ALIASES ValueError
-        # (this is the exact error the user saw in the bug report).
-        from neurodent.core.utils import parse_chname_to_abbrev
-        with pytest.raises(ValueError, match="LR_ALIASES"):
-            parse_chname_to_abbrev("0", assume_from_number=False)
-
-        # With assume_from_number=True and a channel name that embeds a valid ID
-        # (e.g. "channel_9" → ID 9 → 'LAud'), parsing succeeds.
-        result = parse_chname_to_abbrev("channel_9", assume_from_number=True)
-        assert isinstance(result, str)
+        # Unconfigured numeric name -> loud raise (previously inferred via assume_from_number).
+        with pytest.raises(ValueError, match="not in the configured channel map"):
+            resolve_channel("0")
+        with pytest.raises(ValueError, match="not in the configured channel map"):
+            resolve_channel("channel_9")
 
 
 # =============================================================================
@@ -507,21 +476,38 @@ class TestSplit:
         
         assert splits["AnimalA"].genotype == "HET"
 
-    def test_split_with_persist(self, mock_multi_day_lros, tmp_path):
-        """Test that persist_base triggers LRO.persist() calls."""
+    def test_split_with_output_base(self, mock_multi_day_lros, tmp_path):
+        """Test that output_base triggers LRO.save_recording() calls."""
         parent_ao = AnimalOrganizer.from_lros(
             lros=mock_multi_day_lros,
             animal_id="Combined",
         )
-        
+
         splits = parent_ao.split(
             groups={"AnimalA": ["Ch0", "Ch1"]},
-            persist_base=tmp_path,
+            output_base=tmp_path,
         )
-        
-        # Verify persist was called on each child LRO
+
+        # Verify save_recording was called on each child LRO
         for child_lro in splits["AnimalA"].long_recordings:
-            child_lro.persist.assert_called_once()
+            child_lro.save_recording.assert_called_once()
+
+    def test_split_with_persist_base_deprecated(self, mock_multi_day_lros, tmp_path):
+        """Test that the deprecated persist_base alias still triggers save_recording()."""
+        parent_ao = AnimalOrganizer.from_lros(
+            lros=mock_multi_day_lros,
+            animal_id="Combined",
+        )
+
+        with pytest.warns(DeprecationWarning, match="persist_base"):
+            splits = parent_ao.split(
+                groups={"AnimalA": ["Ch0", "Ch1"]},
+                persist_base=tmp_path,
+            )
+
+        # Verify save_recording was called on each child LRO
+        for child_lro in splits["AnimalA"].long_recordings:
+            child_lro.save_recording.assert_called_once()
 
     def test_split_no_recordings_raises_error(self):
         """Test that split raises error when no recordings loaded."""
@@ -625,23 +611,28 @@ class TestSplitIntegration:
         assert len(splits["GroupA"].long_recordings) == 2
         assert len(splits["GroupB"].long_recordings) == 2
 
-    def test_split_and_persist_real_recordings(self, dummy_multi_day_ao, tmp_path):
-        """Test splitting and persisting real recordings."""
+    def test_split_and_save_real_recordings(self, dummy_multi_day_ao, tmp_path):
+        """Test splitting and saving real recordings to disk."""
         output_base = tmp_path / "output"
-        
+
         splits = dummy_multi_day_ao.split(
             groups={"GroupA": ["Ch0", "Ch1"]},
-            persist_base=output_base,
+            output_base=output_base,
             format="zarr",
         )
-        
+
         # Verify output directories created
         group_a_dir = output_base / "GroupA"
         assert group_a_dir.exists()
-        
+
         # Verify zarr files created
         zarr_files = list(group_a_dir.glob("*.zarr"))
         assert len(zarr_files) == 2
+
+        # Each saved folder carries a NeuRodent sidecar for faithful reload
+        from neurodent import constants
+        for zf in zarr_files:
+            assert (zf / constants.NEURODENT_SIDECAR_NAME).exists()
 
     def test_split_data_integrity(self, dummy_multi_day_ao):
         """Test that split preserves data integrity."""

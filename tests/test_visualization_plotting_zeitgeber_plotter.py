@@ -13,7 +13,7 @@ def test_plot_single_feature(mock_close, mock_fig, mock_plot, tmp_path):
     df = pd.DataFrame({
         "zt_minutes": [0, 60, 120, 180],
         "sex": ["Male", "Male", "Female", "Female"],
-        "gene": ["WT", "WT", "WT", "WT"],
+        "genotype": ["WT", "WT", "WT", "WT"],
         "test_feat": [1, 2, 3, 4]
     })
     
@@ -88,7 +88,8 @@ def test_zeitgeber_plotter_from_zars():
     mock_zar1.animal_id = "Animal1"
     mock_zar1.get_channel_averaged_result.return_value = pd.DataFrame({
         "zt_minutes": [0, 60, 120],
-        "genotype": ["M_WT", "M_WT", "M_WT"],
+        "genotype": ["WT", "WT", "WT"],
+        "sex": ["Male", "Male", "Male"],
         "feature1": [1.0, 2.0, 3.0]
     })
     
@@ -96,7 +97,8 @@ def test_zeitgeber_plotter_from_zars():
     mock_zar2.animal_id = "Animal2"
     mock_zar2.get_channel_averaged_result.return_value = pd.DataFrame({
         "zt_minutes": [0, 60, 120],
-        "genotype": ["F_Mut", "F_Mut", "F_Mut"],
+        "genotype": ["Mut", "Mut", "Mut"],
+        "sex": ["Female", "Female", "Female"],
         "feature1": [4.0, 5.0, 6.0]
     })
     
@@ -116,7 +118,7 @@ def test_zeitgeber_plotter_from_dataframe():
     df = pd.DataFrame({
         "zt_minutes": [0, 60, 120],
         "sex": ["Male", "Male", "Male"],
-        "gene": ["WT", "WT", "WT"],
+        "genotype": ["WT", "WT", "WT"],
         "feature1": [1.0, 2.0, 3.0]
     })
     
@@ -144,7 +146,8 @@ def test_no_circular_import_with_transform_time_axis():
     # Create a simple DF and run the function to ensure it's callable
     df = pd.DataFrame({
         "zt_minutes": [0, 60, 120],
-        "genotype": ["M_WT", "M_WT", "M_WT"],
+        "genotype": ["WT", "WT", "WT"],
+        "sex": ["Male", "Male", "Male"],
         "feature": [1, 2, 3],
     })
     

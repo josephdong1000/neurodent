@@ -33,13 +33,13 @@ SAMPLING_RATE = 1000          # Hz  (neurodent.constants.GLOBAL_SAMPLING_RATE)
 N_CHANNELS = 8
 DURATION_SECONDS = 5          # tiny: just enough for one analysis window
 DTYPE = np.float32            # neurodent.constants.GLOBAL_DTYPE
-# Use standard abbreviations recognised by parse_chname_to_abbrev / DEFAULT_ID_TO_NAME.
+# Use standard abbreviations recognised by resolve_channel (canonical labels).
 # IDs correspond to 8 of the 10 default channels (drop LMot/RMot for brevity).
 CHANNEL_NAMES = [
     "LAud", "LVis", "LHip", "LBar",
     "RBar", "RHip", "RVis", "RAud",
 ]
-# NWB electrode table IDs matching the pipeline's DEFAULT_ID_TO_NAME keys.
+# NWB electrode table IDs matching the example dataset channel map (config/samples_example.json).
 CHANNEL_IDS = [9, 10, 12, 14, 17, 19, 21, 22]
 
 
@@ -66,7 +66,7 @@ def _write_nwb_file(
         channel_names: Channel label list.  Defaults to standard abbreviations.
         channel_ids: Integer electrode IDs for the NWB electrode table.
             Defaults to ``CHANNEL_IDS`` so that SpikeInterface reads them
-            as IDs matching ``DEFAULT_ID_TO_NAME``.
+            as IDs matching the example dataset channel map.
         seed: NumPy RNG seed for reproducibility.
 
     Returns:
@@ -158,11 +158,11 @@ def create_synthetic_dataset(
 
     A matching ``samples_config`` dict (equivalent to ``samples_example.json``)
     is also returned so that tests can feed it directly into the Snakemake
-    pipeline or into ``inject_config_aliases``.
+    pipeline or into ``apply_samples_config``.
 
     Args:
         root: Top-level directory (typically ``tmp_path``).
-        animals: List of ``{"id": str, "sex": str, "gene": str}`` dicts.
+        animals: List of ``{"id": str, "sex": str, "genotype": str}`` dicts.
             Defaults to ``ExWT`` (WT) and ``ExKO`` (KO).
         n_sessions: Number of day-sessions per animal.
         duration_s: Recording duration per session in seconds.
@@ -170,14 +170,14 @@ def create_synthetic_dataset(
     Returns:
         Dict with keys:
         - ``"data_root"``      — Path to the raw data directory
-        - ``"samples_config"`` — dict ready for ``json.dump`` / ``inject_config_aliases``
+        - ``"samples_config"`` — dict ready for ``json.dump`` / ``apply_samples_config``
         - ``"animals"``        — list of animal ID strings
         - ``"session_folder"`` — name of the session folder (e.g. ``"example_session"``)
     """
     if animals is None:
         animals = [
-            {"id": "ExWT", "sex": "M", "gene": "WT"},
-            {"id": "ExKO", "sex": "F", "gene": "KO"},
+            {"id": "ExWT", "sex": "M", "genotype": "WT"},
+            {"id": "ExKO", "sex": "F", "genotype": "KO"},
         ]
 
     data_root = root / "raw"
@@ -199,14 +199,15 @@ def create_synthetic_dataset(
 
     samples_config = {
         "data_root": str(data_root),
-        "GENOTYPE_ALIASES": {
+        "GENOTYPE_MAP": {
             "WT": ["WT", "ExWT"],
             "KO": ["KO", "ExKO"],
         },
         "ANIMAL_METADATA": animals,
-        "data_folders_to_animal_ids": {
-            session_folder: animal_ids,
-        },
+        "animals": animals,
+        # Explicit channel map: the synthetic NWB exposes integer electrode ids
+        # (CHANNEL_IDS) which resolve to the canonical abbreviations by exact lookup.
+        "channels": {name: [str(cid)] for name, cid in zip(CHANNEL_NAMES, CHANNEL_IDS)},
     }
 
     return {
@@ -304,7 +305,7 @@ def create_synthetic_bin_csv_dataset(
 
     Args:
         root: Top-level directory (typically ``tmp_path``).
-        animals: List of ``{"id": str, "sex": str, "gene": str}`` dicts.
+        animals: List of ``{"id": str, "sex": str, "genotype": str}`` dicts.
         n_sessions: Number of day-sessions per animal.
         duration_s: Duration per session in seconds.
 
@@ -314,8 +315,8 @@ def create_synthetic_bin_csv_dataset(
     """
     if animals is None:
         animals = [
-            {"id": "ExWT", "sex": "M", "gene": "WT"},
-            {"id": "ExKO", "sex": "F", "gene": "KO"},
+            {"id": "ExWT", "sex": "M", "genotype": "WT"},
+            {"id": "ExKO", "sex": "F", "genotype": "KO"},
         ]
 
     data_root = root / "raw"
@@ -340,14 +341,12 @@ def create_synthetic_bin_csv_dataset(
 
     samples_config = {
         "data_root": str(data_root),
-        "GENOTYPE_ALIASES": {
+        "GENOTYPE_MAP": {
             "WT": ["WT", "ExWT"],
             "KO": ["KO", "ExKO"],
         },
         "ANIMAL_METADATA": animals,
-        "data_folders_to_animal_ids": {
-            session_folder: animal_ids,
-        },
+        "animals": animals,
     }
 
     return {

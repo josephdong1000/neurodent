@@ -34,8 +34,8 @@ class TestSplitRecordingFunction:
         lro.split.return_value = splits
         return lro, splits
 
-    def test_persist_true_without_output_base_raises_value_error(self):
-        """persist=True without output_base must raise ValueError."""
+    def test_save_true_without_output_base_raises_value_error(self):
+        """save=True without output_base must raise ValueError."""
         mock_lro, _ = self._make_mock_lro()
         with _patch_lro(mock_lro):
             with pytest.raises(ValueError, match="output_base is required"):
@@ -43,34 +43,53 @@ class TestSplitRecordingFunction:
                     "/fake/path",
                     groups={"A": ["ch1"], "B": ["ch2"]},
                     output_base=None,
-                    persist=True,
+                    save=True,
                 )
 
-    def test_persist_false_returns_splits_without_saving(self):
-        """persist=False should return the splits dict and not call persist()."""
+    def test_save_false_returns_splits_without_saving(self):
+        """save=False should return the splits dict and not call save_recording()."""
         mock_lro, splits = self._make_mock_lro()
         with _patch_lro(mock_lro):
             result = split_recording(
                 "/fake/path",
                 groups={"AnimalA": ["ch1"], "AnimalB": ["ch2"]},
-                persist=False,
+                save=False,
             )
         assert result is splits
         for child_lro in splits.values():
-            child_lro.persist.assert_not_called()
+            child_lro.save_recording.assert_not_called()
 
-    def test_persist_true_with_output_base_calls_persist(self, tmp_path):
-        """persist=True with output_base should call persist() on each child LRO."""
+    def test_save_true_with_output_base_calls_save_recording(self, tmp_path):
+        """save=True with output_base should call save_recording() on each child LRO."""
         mock_lro, splits = self._make_mock_lro()
         with _patch_lro(mock_lro):
             result = split_recording(
                 "/fake/path",
                 groups={"AnimalA": ["ch1"], "AnimalB": ["ch2"]},
                 output_base=tmp_path,
-                persist=True,
+                save=True,
                 format="zarr",
             )
         assert result is splits
         for group_name, child_lro in splits.items():
             expected_dir = tmp_path / group_name
-            child_lro.persist.assert_called_once_with(expected_dir, format="zarr")
+            child_lro.save_recording.assert_called_once_with(
+                expected_dir, format="zarr", overwrite=False
+            )
+
+    def test_persist_alias_is_deprecated_but_works(self, tmp_path):
+        """The deprecated persist= alias still drives save_recording() with a warning."""
+        mock_lro, splits = self._make_mock_lro()
+        with _patch_lro(mock_lro):
+            with pytest.warns(DeprecationWarning, match="persist"):
+                split_recording(
+                    "/fake/path",
+                    groups={"AnimalA": ["ch1"]},
+                    output_base=tmp_path,
+                    persist=True,
+                    format="zarr",
+                )
+        for group_name, child_lro in splits.items():
+            child_lro.save_recording.assert_called_once_with(
+                tmp_path / group_name, format="zarr", overwrite=False
+            )

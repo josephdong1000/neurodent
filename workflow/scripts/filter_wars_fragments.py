@@ -13,7 +13,7 @@ Output: Fragment-filtered WARs (ready for channel filtering)
 from pathlib import Path
 
 from neurodent import visualization
-from neurodent.workflow import setup_snakemake_logging, inject_config_aliases
+from neurodent.workflow import setup_snakemake_logging, apply_samples_config
 
 
 def main():
@@ -45,7 +45,7 @@ def main():
     animal_folder = snakemake.params.animal_folder
 
     # Inject aliases
-    inject_config_aliases(samples_config)
+    apply_samples_config(samples_config)
     animal_id = snakemake.params.animal_id
 
     # Get animal name from wildcards and construct the animal key

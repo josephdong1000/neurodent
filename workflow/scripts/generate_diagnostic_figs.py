@@ -18,7 +18,7 @@ import matplotlib
 matplotlib.use("Agg")  # Non-interactive backend
 
 from neurodent import visualization
-from neurodent.workflow import setup_snakemake_logging, inject_config_aliases
+from neurodent.workflow import setup_snakemake_logging, apply_samples_config
 
 
 def create_norm_from_config(norm_config):
@@ -48,8 +48,15 @@ def generate_temporal_heatmaps_from_config(animal_plotter, config, animal_id, ou
         for feature_name, heatmap_config in heatmaps_config.items():
             logging.info(f"    - Generating {feature_name} temporal heatmap")
 
-            # Create normalization from config
+            # Create normalization from config (default, applied to all components)
             norm = create_norm_from_config(heatmap_config)
+
+            # Optional per-component norm overrides, keyed by component label
+            # (e.g. psdslope's "intercept" gets its own scale, separate from "slope").
+            component_norms = {
+                label: create_norm_from_config(comp_cfg)
+                for label, comp_cfg in heatmap_config.get("component_norms", {}).items()
+            }
 
             # Generate the heatmap using AnimalPlotter
             animal_plotter.plot_temporal_heatmap(
@@ -57,6 +64,7 @@ def generate_temporal_heatmaps_from_config(animal_plotter, config, animal_id, ou
                 figsize=tuple(heatmap_config["figsize"]),
                 cmap=heatmap_config["cmap"],
                 norm=norm,
+                component_norms=component_norms,
             )
 
             # The AnimalPlotter saves files automatically, but we need to ensure
@@ -160,7 +168,7 @@ def main():
 
     logger.info("Diagnostic figures generation started")
     samples_config = snakemake.params.samples_config
-    inject_config_aliases(samples_config)
+    apply_samples_config(samples_config)
     war, config, animal_folder, animal_id, output_dir = load_war_and_config()
     generate_diagnostic_figures_for_animal(war, config, animal_folder, animal_id, output_dir)
     logger.info(f"Completed diagnostic figures for {animal_folder} {animal_id}")

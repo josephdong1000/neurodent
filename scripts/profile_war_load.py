@@ -27,7 +27,6 @@ from __future__ import annotations
 
 import argparse
 import gc
-import json
 import subprocess
 import sys
 import tempfile
@@ -37,11 +36,12 @@ from pathlib import Path
 import psutil
 
 from neurodent import visualization
-from neurodent.workflow.utils import inject_config_aliases
+from neurodent.workflow.utils import apply_samples_config, load_samples_config, resolve_samples_config
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_WAR_ROOT = REPO_ROOT / "results" / "wars_quality_filtered"
-SAMPLES_PATH = REPO_ROOT / "config" / "samples_arx_rosa.json"
+# arx_rosa is a single-file dataset (inline samples_data); resolve it from the dataset config.
+SAMPLES_PATH = REPO_ROOT / "config" / "datasets" / "arx_rosa.yaml"
 # Matches config/config.yaml standardization.channel_reorder (8 EEG channels).
 CHANNEL_REORDER = ["LMot", "RMot", "LBar", "RBar", "LAud", "RAud", "LVis", "RVis"]
 
@@ -77,13 +77,12 @@ def _convert_to_native_subprocess(animal: str, war_root: Path, output_dir: Path)
     profile. The parent then loads the resulting native-format WAR cleanly.
     """
     script = f"""
-import json
 from pathlib import Path
 from neurodent import visualization
-from neurodent.workflow.utils import inject_config_aliases
+from neurodent.workflow.utils import apply_samples_config, load_samples_config, resolve_samples_config
 
-samples_config = json.loads(Path({str(SAMPLES_PATH)!r}).read_text())
-inject_config_aliases(samples_config)
+samples_config = resolve_samples_config(load_samples_config({str(SAMPLES_PATH)!r}))
+apply_samples_config(samples_config)
 
 src = Path({str(war_root)!r}) / {animal!r}
 dst = Path({str(output_dir)!r})
@@ -116,7 +115,7 @@ def main() -> None:
         "--samples",
         type=Path,
         default=SAMPLES_PATH,
-        help=f"samples JSON (for CHNAME/LR aliases). Default: {SAMPLES_PATH}",
+        help=f"dataset/samples config (for channel aliases; inline samples_data or samples_file). Default: {SAMPLES_PATH}",
     )
     ap.add_argument(
         "--convert-first",
@@ -142,8 +141,8 @@ def main() -> None:
     if not input_war_dir.exists():
         sys.exit(f"WAR folder not found: {input_war_dir}")
 
-    samples_config = json.loads(args.samples.read_text())
-    inject_config_aliases(samples_config)
+    samples_config = resolve_samples_config(load_samples_config(args.samples))
+    apply_samples_config(samples_config)
 
     # If requested, pre-convert legacy WAR to native format in a subprocess so
     # the parent process (which memray traces) sees a fresh, low-memory start.

@@ -23,7 +23,8 @@ def test_verify_pipeline():
         for i, date in enumerate(dates):
             data.append({
                 "timestamp": date,
-                "genotype": "M_WT" if animal == "A1" else "F_Mut",
+                "genotype": "WT" if animal == "A1" else "Mut",
+                "sex": "Male" if animal == "A1" else "Female",
                 "feature1": np.sin(i / 24 * 2 * np.pi) + 10, # Sine wave
                 "animal": animal,
                 "animalday": f"{animal}_Day1",
@@ -64,7 +65,7 @@ def test_verify_pipeline():
     
     # 1. Metadata
     assert "sex" in df_processed.columns
-    assert "gene" in df_processed.columns
+    assert "genotype" in df_processed.columns
     logger.info("Metadata enrichment passed")
 
     # 2. Time columns
@@ -89,7 +90,7 @@ def test_verify_pipeline():
     numeric_feature_cols = df_processed[feature_cols].select_dtypes(include=[int, float]).columns.tolist()
     agg_dict = {feature: "mean" for feature in numeric_feature_cols}
     
-    group_cols = ["animal", "genotype", "sex", "gene", "zt_minutes"]
+    group_cols = ["animal", "genotype", "sex", "zt_minutes"]
     df_agg = df_processed.groupby(group_cols).agg(agg_dict).reset_index()
     logger.info("Aggregation passed")
 
