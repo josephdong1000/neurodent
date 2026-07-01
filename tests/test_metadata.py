@@ -335,3 +335,30 @@ class TestInjectConfigAliases:
                 constants.GENOTYPE_MAP = original_genotype
             if original_sex is not None:
                 constants.SEX_MAP = original_sex
+
+    def test_value_maps_do_not_leak_across_datasets(self):
+        """apply_samples_config is COMPLETE for the value maps: applying a config that
+        omits GENOTYPE_MAP/SEX_MAP resets them to their module defaults, so a prior
+        dataset's map can never leak into the next (which strict normalization would
+        otherwise turn into a spurious raise)."""
+        from neurodent import constants
+        from neurodent.workflow.utils import apply_samples_config
+
+        # Dataset A: populated maps.
+        apply_samples_config({
+            "GENOTYPE_MAP": {"KO": ["custom-ko"]},
+            "SEX_MAP": {"Male": ["dude"]},
+        })
+        assert constants.GENOTYPE_MAP == {"KO": ["custom-ko"]}
+
+        # Dataset B: omits both blocks -> maps reset to defaults (no leak from A).
+        apply_samples_config({"data_root": "/b"})
+        assert constants.GENOTYPE_MAP == constants.DEFAULT_GENOTYPE_MAP == {}
+        assert constants.SEX_MAP == constants.DEFAULT_SEX_MAP
+
+        # B's metadata (genotype not in A's map) now loads via passthrough, not a raise.
+        result = metadata.load_animal_metadata(
+            {"ANIMAL_METADATA": [{"id": "B1", "sex": "M", "genotype": "WhateverGeno"}]}
+        )
+        assert result["B1"]["genotype"] == "WhateverGeno"
+        assert result["B1"]["sex"] == "Male"  # SEX_MAP default still normalizes

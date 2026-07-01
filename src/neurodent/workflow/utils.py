@@ -148,6 +148,14 @@ def apply_samples_config(samples_config: dict):
     → ``apply_samples_config`` lifecycle, and should be called at the start of every
     Snakemake script that loads WindowAnalysisResults or resolves channel names.
 
+    The ``genotype``/``sex`` value maps are set **completely**: a dataset that omits a
+    ``GENOTYPE_MAP``/``SEX_MAP`` block resets that map to its module default
+    (:data:`~neurodent.constants.DEFAULT_GENOTYPE_MAP` / :data:`~neurodent.constants.DEFAULT_SEX_MAP`),
+    so applying config A then config B in the same process never leaks A's map into B.
+    ``CHANNEL_MAP`` and ``ANIMAL_METADATA`` remain sticky (only updated when present) —
+    every real dataset declares both, and a stale ``ANIMAL_METADATA`` surfaces loudly as a
+    ``KeyError`` rather than a silent mis-normalization.
+
     Args:
         samples_config (dict): Configuration dictionary loaded from samples.json
     """
@@ -162,10 +170,12 @@ def apply_samples_config(samples_config: dict):
         constants.set_channel_map(channels)
     # Exact value maps for the `sex` / `genotype` metadata fields (parallel mechanisms);
     # applied before load_animal_metadata below so the normalization picks them up.
-    if "SEX_MAP" in samples_config:
-        constants.SEX_MAP = samples_config["SEX_MAP"]
-    if "GENOTYPE_MAP" in samples_config:
-        constants.GENOTYPE_MAP = samples_config["GENOTYPE_MAP"]
+    # Assigned UNCONDITIONALLY (complete, not sticky): a dataset that omits a block resets
+    # that map to its module default, so applying config A then config B in one process
+    # never leaks A's map into B (which, under strict normalization, would wrongly raise).
+    # Deep-copied to avoid aliasing the config dict or the canonical default.
+    constants.SEX_MAP = copy.deepcopy(samples_config.get("SEX_MAP", constants.DEFAULT_SEX_MAP))
+    constants.GENOTYPE_MAP = copy.deepcopy(samples_config.get("GENOTYPE_MAP", constants.DEFAULT_GENOTYPE_MAP))
 
     # New: ANIMAL_METADATA for sex/genotype enrichment (required)
     if "ANIMAL_METADATA" in samples_config:

@@ -46,7 +46,9 @@ To override defaults, import and modify before running analysis:
 # Re-export everything for backward compatibility
 from .mappings import (
     GENOTYPE_MAP,
+    DEFAULT_GENOTYPE_MAP,
     SEX_MAP,
+    DEFAULT_SEX_MAP,
     CHANNEL_MAP,
     CHANNEL_ABBREVS,
     CHANNEL_ABBREV_BY_RAW,
@@ -151,7 +153,9 @@ from .config import (
 __all__ = [
     # Mappings
     "GENOTYPE_MAP",
+    "DEFAULT_GENOTYPE_MAP",
     "SEX_MAP",
+    "DEFAULT_SEX_MAP",
     "ANIMAL_METADATA",
     "CHANNEL_MAP",
     "CHANNEL_ABBREVS",
