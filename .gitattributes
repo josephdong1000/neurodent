@@ -1,0 +1,20 @@
+# Standardize line endings: all text files use LF in the working tree and repo.
+* text=auto eol=lf
+
+# Binary files: never normalize.
+*.bin   binary
+*.npy   binary
+*.npz   binary
+*.gz    binary
+*.zip   binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.pdf   binary
+*.h5    binary
+*.hdf5  binary
+*.nwb   binary
+*.parquet binary
+*.pkl   binary
+*.pickle binary
