@@ -41,7 +41,6 @@ the :mod:`neurodent.core` analysis pipeline across animals and experiments.
 
 from .results import (
     WindowAnalysisResult,
-    AnimalFeatureParser,
     AnimalOrganizer,
 )
 from .plotting import (
@@ -53,7 +52,6 @@ from .frequency_domain_results import FrequencyDomainSpikeAnalysisResult
 
 __all__ = [
     "WindowAnalysisResult",
-    "AnimalFeatureParser",
     "AnimalOrganizer",
     "FrequencyDomainSpikeAnalysisResult",
     "AnimalPlotter",

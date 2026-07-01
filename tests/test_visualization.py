@@ -16,19 +16,15 @@ from unittest.mock import Mock, patch, MagicMock
 
 from neurodent.visualization import (
     WindowAnalysisResult,
-    AnimalFeatureParser,
     AnimalPlotter,
     ExperimentPlotter,
 )
+from neurodent.visualization.feature_utils import average_feature
 from neurodent import constants
 
 
-class TestAnimalFeatureParser:
-    """Test AnimalFeatureParser class."""
-
-    @pytest.fixture
-    def parser(self):
-        return AnimalFeatureParser()
+class TestAverageFeature:
+    """Test the average_feature utility."""
 
     @pytest.fixture
     def sample_df(self):
@@ -65,9 +61,9 @@ class TestAnimalFeatureParser:
         }
         return pd.DataFrame(data)
 
-    def test_average_feature_rms(self, parser, sample_df):
+    def test_average_feature_rms(self, sample_df):
         """Test averaging RMS feature."""
-        result = parser._average_feature(sample_df, "rms", "duration")
+        result = average_feature(sample_df, "rms", "duration")
         # Calculate expected weighted average manually:
         # weights = [1.0, 2.0, 1.5], total_weight = 4.5
         # weighted_sum = 1.0*[1,2,3] + 2.0*[4,5,6] + 1.5*[7,8,9]
@@ -76,9 +72,9 @@ class TestAnimalFeatureParser:
         expected = np.array([4.33, 5.33, 6.33])
         np.testing.assert_array_almost_equal(result, expected, decimal=1)
 
-    def test_average_feature_psdband(self, parser, sample_df):
+    def test_average_feature_psdband(self, sample_df):
         """Test averaging PSD band feature."""
-        result = parser._average_feature(sample_df, "psdband", "duration")
+        result = average_feature(sample_df, "psdband", "duration")
         assert isinstance(result, dict)
         assert "alpha" in result
         assert "beta" in result
@@ -90,9 +86,9 @@ class TestAnimalFeatureParser:
         np.testing.assert_array_almost_equal(result["alpha"], expected_alpha, decimal=3)
         np.testing.assert_array_almost_equal(result["beta"], expected_beta, decimal=3)
 
-    def test_average_feature_linear_2d(self, parser, sample_df):
+    def test_average_feature_linear_2d(self, sample_df):
         """Test averaging LINEAR_2D feature (psdslope)."""
-        result = parser._average_feature(sample_df, "psdslope", "duration")
+        result = average_feature(sample_df, "psdslope", "duration")
         assert isinstance(result, np.ndarray)
         assert result.shape == (3, 2)  # (n_chan, n_components)
         w = np.array([1.0, 2.0, 1.5])
@@ -104,17 +100,17 @@ class TestAnimalFeatureParser:
         expected = np.average(raw, axis=0, weights=w)
         np.testing.assert_array_almost_equal(result, expected)
 
-    def test_average_feature_simple_matrix(self, parser, sample_df):
+    def test_average_feature_simple_matrix(self, sample_df):
         """Test averaging SIMPLE_MATRIX feature (pcorr)."""
-        result = parser._average_feature(sample_df, "pcorr", "duration")
+        result = average_feature(sample_df, "pcorr", "duration")
         assert isinstance(result, np.ndarray)
         assert result.shape == (3, 3)  # (n_chan, n_chan)
         expected = np.eye(3) * (1 * 1.0 + 2 * 2.0 + 3 * 1.5) / 4.5
         np.testing.assert_array_almost_equal(result, expected)
 
-    def test_average_feature_banded_matrix(self, parser, sample_df):
+    def test_average_feature_banded_matrix(self, sample_df):
         """Test averaging BANDED_MATRIX feature (cohere)."""
-        result = parser._average_feature(sample_df, "cohere", "duration")
+        result = average_feature(sample_df, "cohere", "duration")
         assert isinstance(result, dict)
         assert "alpha" in result
         assert "beta" in result
@@ -124,9 +120,9 @@ class TestAnimalFeatureParser:
         np.testing.assert_array_almost_equal(result["alpha"], expected_alpha)
         np.testing.assert_array_almost_equal(result["beta"], expected_beta)
 
-    def test_average_feature_hist(self, parser, sample_df):
+    def test_average_feature_hist(self, sample_df):
         """Test averaging HIST feature (psd)."""
-        result = parser._average_feature(sample_df, "psd", "duration")
+        result = average_feature(sample_df, "psd", "duration")
         assert isinstance(result, tuple)
         assert len(result) == 2
         coords, values = result
@@ -142,25 +138,25 @@ class TestAnimalFeatureParser:
         expected_values = np.average(canonical, axis=0, weights=w).T  # (F=2, C=3)
         np.testing.assert_array_almost_equal(values, expected_values)
 
-    def test_average_feature_no_weights(self, parser, sample_df):
+    def test_average_feature_no_weights(self, sample_df):
         """Test averaging with no weight column (uniform weights)."""
-        result = parser._average_feature(sample_df, "rms", weightsname=None)
+        result = average_feature(sample_df, "rms", weightsname=None)
         # Uniform weights → simple mean
         expected = np.mean([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]], axis=0)
         np.testing.assert_array_almost_equal(result, expected)
 
-    def test_average_feature_no_weights_band(self, parser, sample_df):
+    def test_average_feature_no_weights_band(self, sample_df):
         """Uniform-weight averaging for BAND feature."""
-        result = parser._average_feature(sample_df, "psdband", weightsname=None)
+        result = average_feature(sample_df, "psdband", weightsname=None)
         # Simple mean across 3 windows:
         # alpha: [[1,2], [5,6], [9,10]] -> mean = [5, 6]
         # beta:  [[3,4], [7,8], [11,12]] -> mean = [7, 8]
         np.testing.assert_array_almost_equal(result["alpha"], [5.0, 6.0])
         np.testing.assert_array_almost_equal(result["beta"], [7.0, 8.0])
 
-    def test_average_feature_no_weights_linear_2d(self, parser, sample_df):
+    def test_average_feature_no_weights_linear_2d(self, sample_df):
         """Uniform-weight averaging for LINEAR_2D feature."""
-        result = parser._average_feature(sample_df, "psdslope", weightsname=None)
+        result = average_feature(sample_df, "psdslope", weightsname=None)
         raw = np.array([
             [[0.1, 0.2], [0.3, 0.4], [0.5, 0.6]],
             [[0.7, 0.8], [0.9, 1.0], [1.1, 1.2]],
@@ -169,24 +165,24 @@ class TestAnimalFeatureParser:
         expected = np.mean(raw, axis=0)
         np.testing.assert_array_almost_equal(result, expected)
 
-    def test_average_feature_no_weights_simple_matrix(self, parser, sample_df):
+    def test_average_feature_no_weights_simple_matrix(self, sample_df):
         """Uniform-weight averaging for SIMPLE_MATRIX feature."""
-        result = parser._average_feature(sample_df, "pcorr", weightsname=None)
+        result = average_feature(sample_df, "pcorr", weightsname=None)
         # eye(3)*1, eye(3)*2, eye(3)*3 -> mean = eye(3)*2
         expected = np.eye(3) * 2.0
         np.testing.assert_array_almost_equal(result, expected)
 
-    def test_average_feature_no_weights_banded_matrix(self, parser, sample_df):
+    def test_average_feature_no_weights_banded_matrix(self, sample_df):
         """Uniform-weight averaging for BANDED_MATRIX feature."""
-        result = parser._average_feature(sample_df, "cohere", weightsname=None)
+        result = average_feature(sample_df, "cohere", weightsname=None)
         # alpha: ones*1, ones*3, ones*5 -> mean = ones*3
         # beta:  ones*2, ones*4, ones*6 -> mean = ones*4
         np.testing.assert_array_almost_equal(result["alpha"], np.ones((3, 3)) * 3.0)
         np.testing.assert_array_almost_equal(result["beta"], np.ones((3, 3)) * 4.0)
 
-    def test_average_feature_no_weights_hist(self, parser, sample_df):
+    def test_average_feature_no_weights_hist(self, sample_df):
         """Uniform-weight averaging for HIST feature."""
-        result = parser._average_feature(sample_df, "psd", weightsname=None)
+        result = average_feature(sample_df, "psd", weightsname=None)
         coords, values = result
         np.testing.assert_array_equal(coords, [1.0, 2.0, 3.0])
         # Canonical (W=3, C=3, F=2) after extract_hist_data transpose

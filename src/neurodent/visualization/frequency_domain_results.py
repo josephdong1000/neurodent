@@ -26,10 +26,9 @@ except ImportError:  # pragma: no cover
 
 from .. import core
 from ..core.utils import resolve_channels, slugify
-from .results import AnimalFeatureParser
 
 
-class FrequencyDomainSpikeAnalysisResult(AnimalFeatureParser):
+class FrequencyDomainSpikeAnalysisResult:
     """
     Wrapper for frequency-domain spike detection results.
 

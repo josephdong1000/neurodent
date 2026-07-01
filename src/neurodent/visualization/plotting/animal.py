@@ -18,7 +18,7 @@ from ..feature_utils import (
 )
 
 
-class AnimalPlotter(viz.AnimalFeatureParser):
+class AnimalPlotter:
     """Class for plotting results from an AnimalOrganizer/WindowAnalysisResult.
 
     Args:

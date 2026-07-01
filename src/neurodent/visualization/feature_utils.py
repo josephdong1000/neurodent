@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 
 from .. import constants
+from ..core import nanaverage
 
 
 def _ensure_dense(arr: np.ndarray, error_msg: str) -> np.ndarray:
@@ -475,4 +476,51 @@ def collapse_feature_channels(
         # trailing semantic axes (e.g. bands) are preserved automatically.
         tril_vals = vals[:, tril[0], tril[1]]  # (W, n_pairs[, ...semantic])
         return np.nanmean(tril_vals, axis=1)
+
+
+# ---------------------------------------------------------------------------
+# Weighted feature averaging
+# ---------------------------------------------------------------------------
+
+def average_feature(
+    df: pd.DataFrame, colname: str, weightsname: str | None = "duration"
+):
+    """Compute the weighted average of a feature column across rows.
+
+    Dispatches on :class:`constants.FeatureType`: LINEAR/LINEAR_2D/SIMPLE_MATRIX
+    are averaged as dense arrays, dict-stored (BAND/BANDED_MATRIX) features are
+    averaged per band, and HIST features are averaged over windows.
+    """
+    column = df[colname]
+    if weightsname is None or weightsname not in df.columns:
+        weights = np.ones(column.size)
+    else:
+        weights = df[weightsname]
+    weights = np.asarray(weights)
+
+    ftype = constants.classify_feature(colname)
+    if ftype in (constants.FeatureType.LINEAR, constants.FeatureType.LINEAR_2D, constants.FeatureType.SIMPLE_MATRIX):
+        col_agg = extract_linear_array(column)
+        avg = nanaverage(col_agg, axis=0, weights=weights)
+
+    elif ftype.is_dict_stored:
+        vals, keys = extract_band_dict(column)
+        avg_vals = nanaverage(vals, axis=0, weights=weights)
+        # vals is canonical (W, C, B) for BAND or (W, C, C, B) for BANDED_MATRIX.
+        # avg_vals after axis=0 is (C, B) or (C, C, B).
+        # Bands are always on the last axis — use [..., i] to slice per band.
+        avg = {keys[i]: avg_vals[..., i] for i in range(len(keys))}
+
+    elif ftype is constants.FeatureType.HIST:
+        coords, values = extract_hist_data(column)
+        # values is canonical (W, C, F); average over windows → (C, F).
+        # Transpose to (F, C) to preserve per-cell storage format.
+        avg = (coords[0], nanaverage(values, axis=0, weights=weights).T)
+
+    else:
+        raise TypeError(
+            f"Unsupported FeatureType {ftype} for averaging column {colname}"
+        )
+
+    return avg
 
