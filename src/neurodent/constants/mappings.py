@@ -11,23 +11,33 @@ There is no separate region/hemisphere model; left/right is part of the channel 
 
 from datetime import datetime
 
-GENOTYPE_MAP = {}
+DEFAULT_GENOTYPE_MAP = {}
+"""Module default for :data:`GENOTYPE_MAP` (empty = passthrough). ``apply_samples_config``
+resets the live map to this when a dataset omits a ``GENOTYPE_MAP`` block, so applying one
+dataset's config never leaks its map into the next."""
+
+GENOTYPE_MAP = dict(DEFAULT_GENOTYPE_MAP)
 """Exact ``{canonical_label: [accepted spellings]}`` map normalizing the per-animal
 ``genotype`` value to a canonical short label (parallels :data:`CHANNEL_MAP` and
 :data:`SEX_MAP`; matched **exactly**, never fuzzily). Empty default = passthrough (the
 raw ``genotype`` value is kept as-is, for datasets that don't need normalization).
 When populated it is **authoritative**: a value it does not cover raises at load (just
 as an unknown raw channel name does), so config typos surface immediately. Populated
-per-dataset via ``GENOTYPE_MAP`` in the samples config."""
+per-dataset via ``GENOTYPE_MAP`` in the samples config (reset to
+:data:`DEFAULT_GENOTYPE_MAP` when absent)."""
 
-SEX_MAP = {
+DEFAULT_SEX_MAP = {
     "Male": ["Male", "male", "M", "m"],
     "Female": ["Female", "female", "F", "f"],
 }
+"""Module default for :data:`SEX_MAP` (the standard M/F spellings). ``apply_samples_config``
+resets the live map to a copy of this when a dataset omits a ``SEX_MAP`` block."""
+
+SEX_MAP = {k: list(v) for k, v in DEFAULT_SEX_MAP.items()}
 """Exact ``{canonical_label: [accepted spellings]}`` map normalizing the per-animal
 ``sex`` value (parallels :data:`GENOTYPE_MAP`; matched **exactly**). Authoritative when
 populated — an uncovered value raises at load. Populated per-dataset via ``SEX_MAP`` in
-the samples config."""
+the samples config (reset to :data:`DEFAULT_SEX_MAP` when absent)."""
 
 # --- Channels: the single source of truth --------------------------------------------
 CHANNEL_MAP = {

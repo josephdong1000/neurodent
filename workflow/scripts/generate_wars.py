@@ -79,7 +79,7 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
                  )
             
             meta = constants.ANIMAL_METADATA[animal_id]
-            genotype = meta.get("gene", "Unknown")
+            genotype = meta.get("genotype", "Unknown")
             sex = meta.get("sex", "Unknown")
             logger.info(f"Resolved genotype '{genotype}' and sex '{sex}' for {animal_id} from ANIMAL_METADATA")
 

@@ -163,7 +163,7 @@ def render(df, name, out_dir):
     try:
         from neurodent.visualization.plotting import ZeitgeberPlotter
         pdf = df[["zt_minutes", "rms"]].copy()
-        pdf["gene"], pdf["sex"] = "WT", "M"
+        pdf["genotype"], pdf["sex"] = "WT", "M"
         ZeitgeberPlotter(pdf).plot_feature("rms", png, figsize=[12, 6], n_days=2)
     except Exception as e:  # guaranteed fallback
         print(f"  (ZeitgeberPlotter failed: {e}; fallback plot)")
