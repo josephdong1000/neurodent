@@ -39,9 +39,16 @@ For pipeline support, development setup, and other installation options, check o
 
 ## Overview
 
-NeuRodent loads multi-format EEG data (`LongRecordingAnalyzer` → `AnimalOrganizer`) and computes features over windows (`WindowAnalysisResult`) and population spiking (`FrequencyDomainSpikeAnalysisResult`). Results feed into `AnimalOrganizer` and `ExperimentPlotter` for multi-animal comparison by genotype, session, or circadian cycle.
+NeuRodent loads multi-format EEG data (`LongRecordingAnalyzer` → `AnimalOrganizer`) and computes features over windows (`WindowAnalysisResult`) and population spiking (`FrequencyDomainSpikeAnalysisResult`). Results feed into `AnimalPlotter` and `ExperimentPlotter` for multi-animal comparison by genotype, session, or circadian cycle.
 
 ```python
+from neurodent import (
+    LongRecordingOrganizer,
+    AnimalOrganizer,
+    WindowAnalysisResult,
+    ExperimentPlotter,
+)
+
 lro = LongRecordingOrganizer(data_path)
 ao = AnimalOrganizer(lro)
 war = ao.compute_windowed_analysis(features=["rms", "psdband", "cohere"])

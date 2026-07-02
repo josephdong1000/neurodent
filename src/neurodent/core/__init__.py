@@ -7,10 +7,10 @@ handling everything from raw data loading to feature extraction.
 
 .. code-block:: python
 
-    from neurodent import visualization
+    from neurodent import AnimalOrganizer
 
     # 1. Organize recordings for an animal
-    ao = visualization.AnimalOrganizer(
+    ao = AnimalOrganizer(
         data_path, animal_id, mode="nest",
     )
 
@@ -96,8 +96,12 @@ from .zeitgeber import (
 from . import utils
 from . import discovery
 
+# Loading orchestration (imported after backend + results so their names are bound)
+from .loading import AnimalOrganizer
+
 __all__ = [
     # Data loading
+    "AnimalOrganizer",
     "RecordingMetadata",
     "DDFBinaryMetadata",  # Deprecated, kept for backward compatibility
     "convert_ddfcolbin_to_ddfrowbin",

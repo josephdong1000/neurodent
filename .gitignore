@@ -55,6 +55,8 @@ coverage.xml
 site/
 logs/
 results/
+# results/ above targets snakemake output dirs; keep the source package tracked
+!src/neurodent/core/results/
 .snakemake_run_id
 CLAUDE.md
 config/config.local.yaml

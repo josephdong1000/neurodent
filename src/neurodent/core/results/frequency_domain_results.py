@@ -1,0 +1,714 @@
+"""
+Frequency Domain Spike Analysis Results
+======================================
+
+This module contains result classes for frequency-domain spike detection analysis,
+providing compatibility with the existing SpikeAnalysisResult infrastructure.
+"""
+
+import json
+import logging
+import warnings
+from pathlib import Path
+from typing import Literal, Union
+
+import dask
+import dask.delayed
+import numpy as np
+import matplotlib.pyplot as plt
+import mne
+try:
+    import spikeinterface.core as si
+    SPIKEINTERFACE_AVAILABLE = True
+except ImportError:  # pragma: no cover
+    si = None
+    SPIKEINTERFACE_AVAILABLE = False
+
+import neurodent.core as core
+from neurodent.core.utils import resolve_channels, slugify
+
+
+class FrequencyDomainSpikeAnalysisResult:
+    """
+    Wrapper for frequency-domain spike detection results.
+
+    This class mirrors the SpikeAnalysisResult interface to ensure compatibility
+    with existing WindowAnalysisResult.read_sars_spikes() infrastructure.
+    """
+
+    def __init__(
+        self,
+        result_sas: list[si.SortingAnalyzer] = None,
+        result_mne: mne.io.RawArray = None,
+        spike_indices: list[np.ndarray] = None,
+        detection_params: dict = None,
+        animal_id: str = None,
+        genotype: str = None,
+        animal_day: str = None,
+        bin_folder_name: str = None,
+        metadata: core.RecordingMetadata = None,
+        channel_names: list[str] = None,
+    ) -> None:
+        """
+        Initialize FrequencyDomainSpikeAnalysisResult.
+
+        Args:
+            result_sas (list[si.SortingAnalyzer], optional): SpikeInterface SortingAnalyzers for compatibility
+            result_mne (mne.io.RawArray, optional): MNE RawArray with spike annotations
+            spike_indices (list[np.ndarray], optional): Raw spike detection results per channel
+            detection_params (dict, optional): Parameters used for spike detection
+            animal_id (str, optional): Identifier for the animal
+            genotype (str, optional): Genotype of animal
+            animal_day (str, optional): Recording day identifier
+            bin_folder_name (str, optional): Binary folder name
+            metadata (core.RecordingMetadata, optional): Recording metadata
+            channel_names (list[str], optional): List of channel names
+        """
+        # Ensure exactly one of result_sas or result_mne is provided (like SpikeAnalysisResult)
+        if (result_mne is None) == (result_sas is None):
+            raise ValueError("Exactly one of result_sas or result_mne must be provided")
+
+        self.result_sas = result_sas
+        self.result_mne = result_mne
+        self.spike_indices = spike_indices or []
+        self.detection_params = detection_params or {}
+        self.animal_id = animal_id
+        self.genotype = genotype
+        self.animal_day = animal_day
+        self.bin_folder_name = bin_folder_name
+        self.metadata = metadata
+        self.channel_names = channel_names
+
+        self.channel_abbrevs = resolve_channels(self.channel_names)
+
+        logging.info(f"Channel names: \t{self.channel_names}")
+        logging.info(f"Channel abbreviations: \t{self.channel_abbrevs}")
+        logging.info(f"Detection parameters: \t{self.detection_params}")
+
+    @property
+    def path_safe_animal_id(self) -> str:
+        """Slugified :attr:`animal_id` for filesystem paths.
+
+        See :attr:`WindowAnalysisResult.path_safe_animal_id` for the convention.
+        """
+        return slugify(self.animal_id)
+
+    @property
+    def path_safe_animal_day(self) -> str:
+        """Slugified :attr:`animal_day` for filesystem paths."""
+        return slugify(self.animal_day)
+
+    @property
+    def path_safe_save_stem(self) -> str:
+        """Canonical filename stem ``{animal_id}-{genotype}-{animal_day}``, slugified.
+
+        Use this whenever building the directory or filename for this FDSAR's
+        on-disk artifacts; it consolidates the three identifier reads into one
+        slugified call so callers don't have to reconstruct the format string.
+        """
+        return slugify(f"{self.animal_id}-{self.genotype}-{self.animal_day}")
+
+    @classmethod
+    def from_detection_results(
+        cls,
+        spike_indices_per_channel: list[np.ndarray],
+        recording: "si.BaseRecording",
+        detection_params: dict,
+        animal_id: str = None,
+        genotype: str = None,
+        animal_day: str = None,
+        bin_folder_name: str = None,
+        metadata: core.RecordingMetadata = None,
+    ):
+        """
+        Create FrequencyDomainSpikeAnalysisResult from raw detection outputs.
+
+        Args:
+            spike_indices_per_channel: List of spike sample indices per channel
+            recording: SpikeInterface recording. Traces are read directly
+                from this object (zero-copy) to build SortingAnalyzers.
+            detection_params: Parameters used for detection
+            animal_id: Identifier for the animal
+            genotype: Genotype of animal
+            animal_day: Recording day identifier
+            bin_folder_name: Binary folder name
+            metadata: Recording metadata
+
+        Returns:
+            FrequencyDomainSpikeAnalysisResult: Initialized result object
+        """
+        if not SPIKEINTERFACE_AVAILABLE:
+            raise ImportError("SpikeInterface is required for FrequencyDomainSpikeAnalysisResult")
+
+        # Convert to SpikeInterface format for compatibility
+        result_sas = cls._convert_to_spikeinterface(
+            spike_indices_per_channel,
+            recording,
+        )
+
+        channel_names = [str(ch) for ch in recording.get_channel_ids()]
+
+        return cls(
+            result_sas=result_sas,
+            result_mne=None,
+            spike_indices=spike_indices_per_channel,
+            detection_params=detection_params,
+            animal_id=animal_id,
+            genotype=genotype,
+            animal_day=animal_day,
+            bin_folder_name=bin_folder_name,
+            metadata=metadata,
+            channel_names=channel_names,
+        )
+
+    @staticmethod
+    def _convert_to_spikeinterface(
+        spike_indices_per_channel: list[np.ndarray],
+        recording: "si.BaseRecording",
+    ) -> list[si.SortingAnalyzer]:
+        """
+        Convert spike detection results to SpikeInterface SortingAnalyzers.
+
+        Uses NumpySorting.from_unit_dict to create compatible objects that work
+        with existing WindowAnalysisResult.read_sars_spikes() infrastructure.
+
+        No data is read from the recording here — traces are only accessed
+        later during ``.fif`` export via ``convert_sa_to_np()``, which reads
+        in small chunks.
+
+        Args:
+            spike_indices_per_channel: List of spike indices per channel
+            recording: SpikeInterface recording. Passed through to
+                SortingAnalyzers without reading traces.
+
+        Returns:
+            list[si.SortingAnalyzer]: SortingAnalyzers for each channel
+        """
+        if not SPIKEINTERFACE_AVAILABLE:
+            raise ImportError("SpikeInterface is required for conversion")
+
+        sampling_freq = recording.get_sampling_frequency()
+        channel_ids = recording.get_channel_ids()
+
+        # Set a probe if the recording doesn't already have one.
+        # create_sorting_analyzer requires a probe, but we avoid reading
+        # any trace data — only metadata is added.
+        from probeinterface import Probe
+        try:
+            recording.get_probegroup()
+        except ValueError:
+            probe = Probe(ndim=2)
+            probe.set_contacts(
+                positions=[(0, i) for i in range(len(channel_ids))],
+                shapes='circle',
+                shape_params={'radius': 10}
+            )
+            probe.set_device_channel_indices(list(range(len(channel_ids))))
+            recording.set_probe(probe, in_place=True)
+
+        sorting_analyzers = []
+
+        for ch_idx, spike_indices in enumerate(spike_indices_per_channel):
+            channel_id = channel_ids[ch_idx]
+            channel_recording = recording.select_channels([channel_id])
+
+            if len(spike_indices) > 0:
+                # Create sorting with all spikes as a single unit (unit corresponding to channel index)
+                unit_dict = {str(ch_idx): spike_indices}  # Keep as numpy array
+                sorting = si.NumpySorting.from_unit_dict(
+                    unit_dict,
+                    sampling_frequency=sampling_freq
+                )
+            else:
+                # Create empty sorting if no spikes detected
+                sorting = si.NumpySorting.from_unit_dict(
+                    {},
+                    sampling_frequency=sampling_freq
+                )
+
+            # Create SortingAnalyzer for compatibility
+            sorting_analyzer = si.create_sorting_analyzer(
+                sorting, channel_recording, sparse=False
+            )
+            sorting_analyzers.append(sorting_analyzer)
+
+        return sorting_analyzers
+
+    def convert_to_mne(
+        self, chunk_duration_s: float = 60, save_raw=True,
+        multiprocess_mode: Literal["dask", "serial"] = "serial",
+    ) -> mne.io.RawArray:
+        """
+        Convert SortingAnalyzers to MNE RawArray.
+
+        Args:
+            chunk_duration_s (float, optional): Duration in seconds of each chunk
+                read during conversion. Smaller values reduce peak RAM; larger
+                values improve throughput. Defaults to 60.
+            save_raw: Whether to save the result internally
+            multiprocess_mode: Whether to use Dask for parallel per-channel conversion.
+                Defaults to "serial".
+
+        Returns:
+            mne.io.RawArray: MNE RawArray with spike annotations
+        """
+        if self.result_mne is None:
+            if self.result_sas:
+                result_mne = FrequencyDomainSpikeAnalysisResult.convert_sas_to_mne(
+                    self.result_sas, chunk_duration_s, multiprocess_mode=multiprocess_mode,
+                )
+                from neurodent.core.frequency_domain_spike_detection import (
+                    FrequencyDomainSpikeDetector,
+                )
+                FrequencyDomainSpikeDetector._add_spike_annotations(
+                    result_mne, self.spike_indices, result_mne.info['sfreq']
+                )
+                if save_raw:
+                    self.result_mne = result_mne
+                else:
+                    return result_mne
+            else:
+                raise ValueError("No data available for conversion")
+        return self.result_mne
+
+    def save_fif_and_json(
+        self,
+        folder: Union[str, Path],
+        convert_to_mne=True,
+        make_folder=True,
+        save_abbrevs=False,
+        overwrite=False,
+        multiprocess_mode: Literal["dask", "serial"] = "serial",
+        chunk_duration_s: float = 60,
+    ):
+        """
+        Archive frequency domain spike analysis result as fif and json files.
+        Mirrors the SpikeAnalysisResult.save_fif_and_json interface.
+
+        The filename stem is always :attr:`path_safe_save_stem` (slugified
+        ``{animal_id}-{genotype}-{animal_day}``). The previous ``slugify_filebase``
+        kwarg was removed — the unsafe (un-slugified) form was never the right
+        answer for any real caller.
+
+        Args:
+            folder: Destination folder to save results
+            convert_to_mne: If True, convert to MNE if needed
+            make_folder: If True, create folder if it doesn't exist
+            save_abbrevs: If True, save abbreviations as channel names
+            overwrite: If True, overwrite existing files
+            multiprocess_mode: Whether to use Dask for parallel conversion.
+                Defaults to "serial".
+            chunk_duration_s (float, optional): Duration in seconds of each chunk
+                read when converting SortingAnalyzers to a NumPy trace array.
+                Smaller values reduce peak RAM at the cost of more I/O
+                round-trips; larger values improve throughput on high-memory
+                systems. Only used when ``result_mne`` is ``None`` and
+                ``convert_to_mne`` is ``True``. Defaults to 60.
+        """
+        if self.result_mne is None:
+            if convert_to_mne and self.result_sas:
+                result_mne = self.convert_to_mne(
+                    chunk_duration_s=chunk_duration_s,
+                    save_raw=True,
+                    multiprocess_mode=multiprocess_mode,
+                )
+                if result_mne is None:
+                    warnings.warn("No data found for saving")
+                    return
+            else:
+                raise ValueError("No MNE RawArray found, and convert_to_mne is False")
+        else:
+            result_mne = self.result_mne
+
+        folder = Path(folder)
+        if make_folder:
+            folder.mkdir(parents=True, exist_ok=True)
+
+        filebase = str(folder / self.path_safe_save_stem)
+
+        if not overwrite:
+            if Path(filebase + ".json").exists():
+                raise FileExistsError(f"File {filebase}.json already exists")
+            if Path(filebase + "-raw.fif").exists():
+                raise FileExistsError(f"File {filebase}-raw.fif already exists")
+        else:
+            # Clean up existing files
+            for pattern in ["*.json", "*-raw.fif"]:
+                for f in folder.glob(pattern):
+                    f.unlink()
+
+        # Save MNE data
+        result_mne.save(filebase + "-raw.fif", overwrite=overwrite)
+
+        # Save metadata as JSON
+        json_dict = {
+            "animal_id": self.animal_id,
+            "genotype": self.genotype,
+            "animal_day": self.animal_day,
+            "bin_folder_name": self.bin_folder_name,
+            "metadata": self.metadata.metadata_path if self.metadata else None,
+            "channel_names": self.channel_abbrevs if save_abbrevs else self.channel_names,
+            "detection_params": self.detection_params,
+            "spike_counts_per_channel": [len(spikes) for spikes in self.spike_indices] if self.spike_indices else [],
+        }
+
+        with open(filebase + ".json", "w") as f:
+            json.dump(json_dict, f, indent=2)
+
+        logging.info(f"Saved FrequencyDomainSpikeAnalysisResult to {folder}")
+
+    @classmethod
+    def load_fif_and_json(cls, folder: Union[str, Path]):
+        """
+        Load FrequencyDomainSpikeAnalysisResult from fif and json files.
+        Mirrors the SpikeAnalysisResult.load_fif_and_json interface.
+
+        Args:
+            folder: Folder containing the saved files
+
+        Returns:
+            FrequencyDomainSpikeAnalysisResult: Loaded result object
+        """
+        folder = Path(folder)
+        if not folder.exists():
+            raise ValueError(f"Folder {folder} does not exist")
+
+        fif_files = list(folder.glob("*-raw.fif"))
+        json_files = list(folder.glob("*.json"))
+
+        if len(json_files) != 1:
+            raise ValueError(f"Expected exactly one json file in {folder}")
+        if len(fif_files) != 1:
+            raise ValueError(f"Expected exactly one fif file in {folder}")
+
+        fif_path = fif_files[0]
+        json_path = json_files[0]
+
+        with open(json_path, "r") as f:
+            data = json.load(f)
+
+        # Load MNE data
+        result_mne = mne.io.read_raw_fif(fif_path, preload=False)
+
+        # Extract spike indices from MNE annotations
+        spike_indices = cls._extract_spike_indices_from_mne(result_mne)
+
+        # Fix detection params: convert lists back to tuples for specific parameters
+        detection_params = data.get("detection_params", {})
+        tuple_params = ['bp', 'notch', 'freq_slices']
+        for param in tuple_params:
+            if param in detection_params and isinstance(detection_params[param], list):
+                detection_params[param] = tuple(detection_params[param])
+
+        return cls(
+            result_sas=None,  # Will be generated on demand
+            result_mne=result_mne,
+            spike_indices=spike_indices,
+            detection_params=detection_params,
+            animal_id=data["animal_id"],
+            genotype=data["genotype"],
+            animal_day=data["animal_day"],
+            bin_folder_name=data["bin_folder_name"],
+            metadata=None,  # Would need to be reconstructed
+            channel_names=data["channel_names"],
+        )
+
+    def plot_spike_averaged_traces(
+        self,
+        tmin=-0.5,
+        tmax=0.5,
+        baseline=None,
+        save_dir=None,
+        animal_id=None,
+        save_epoch=True
+    ):
+        """
+        Plot spike-triggered averages for each channel.
+
+        Based on plot_spike_evoked_by_channel from the pipeline script.
+
+        Args:
+            tmin: Start time for epochs (seconds)
+            tmax: End time for epochs (seconds)
+            baseline: Baseline correction period
+            save_dir: Directory to save plots and epoch data
+            animal_id: Animal identifier for filenames
+            save_epoch: Whether to save epoch data
+
+        Returns:
+            dict: Spike counts per channel, keyed by channel index
+        """
+        if self.result_mne is None:
+            raise ValueError("No MNE RawArray available for plotting")
+
+        raw = self.result_mne
+        events, event_id = mne.events_from_annotations(raw)
+        spike_event_id = {k: v for k, v in event_id.items() if k.startswith("Spike_Ch")}
+
+        if not spike_event_id:
+            logging.warning("No spike events with label 'Spike_Ch*' found.")
+            return {ch_idx: 0 for ch_idx in range(len(raw.ch_names))}
+
+        if save_dir:
+            save_dir = Path(save_dir)
+            save_dir.mkdir(parents=True, exist_ok=True)
+
+        # ``animal_id`` is a caller-supplied parameter (not ``self.animal_id``),
+        # so we route it through ``slugify`` directly per the project-wide
+        # path-safety convention (see ``slugify`` docstring).  For uses keyed
+        # off this FDSAR's own id, prefer ``self.path_safe_animal_id``.
+        safe_id = slugify(animal_id) if animal_id else None
+
+        # Initialize event counts dictionary for all channels
+        n_ch = len(raw.ch_names)
+        event_counts = {ch_idx: 0 for ch_idx in range(n_ch)}
+
+        for event_name, code in spike_event_id.items():
+            ch_idx = int(event_name.split("_Ch")[-1])
+
+            channel_events = events[events[:, 2] == code]
+            event_counts[ch_idx] = len(channel_events)
+            
+            if len(channel_events) == 0:
+                logging.warning(f"No events found for {event_name}")
+                continue
+
+            # Create epochs for this channel
+            epochs = mne.Epochs(
+                raw, channel_events, event_id={event_name: code},
+                tmin=tmin, tmax=tmax, baseline=baseline,
+                picks=[ch_idx], preload=True, event_repeated='merge'
+            )
+
+            if len(epochs) == 0:
+                logging.warning(
+                    f"No valid epochs for {event_name} after windowing "
+                    f"(tmin={tmin}, tmax={tmax}). Skipping plot."
+                )
+                continue
+
+            # Save epoch data if requested
+            if save_epoch and animal_id and save_dir:
+                saveFile_MNE = f"{safe_id}_fdsar_epoch_{ch_idx}.fif"
+                savePath_MNE = save_dir / saveFile_MNE
+                epochs.save(str(savePath_MNE), overwrite=True)
+
+            # Create and save plot
+            try:
+                fig = epochs.plot_image(
+                    title=f"{event_name} (FD Detection)",
+                    show=(save_dir is None),
+                    combine="mean",
+                )
+                if save_dir:
+                    # Include animal_id in filename to prevent overwriting across days
+                    if animal_id:
+                        fig_path = save_dir / f"{safe_id}_{event_name}_fd_detection.png"
+                    else:
+                        fig_path = save_dir / f"{event_name}_fd_detection.png"
+                    fig[0].savefig(str(fig_path), dpi=300, bbox_inches='tight')
+                    plt.close(fig[0])
+                    logging.info(f"Saved spike-averaged plot: {fig_path}")
+            except Exception as e:
+                logging.error(f"Failed to create plot for {event_name}: {e}")
+                raise e
+
+        return event_counts
+
+    @staticmethod
+    def _extract_spike_indices_from_mne(mne_raw: mne.io.RawArray) -> list[np.ndarray]:
+        """
+        Extract spike sample indices from MNE annotations.
+
+        Args:
+            mne_raw: MNE RawArray with spike annotations
+
+        Returns:
+            list[np.ndarray]: Spike indices per channel
+        """
+        events, event_id = mne.events_from_annotations(mne_raw)
+        spike_event_id = {k: v for k, v in event_id.items() if k.startswith("Spike_Ch")}
+
+        n_channels = len(mne_raw.ch_names)
+        spike_indices = [np.array([], dtype=int) for _ in range(n_channels)]
+
+        for event_name, code in spike_event_id.items():
+            ch_idx = int(event_name.split("_Ch")[-1])
+            if ch_idx < n_channels:
+                # Extract sample indices from events array (column 0)
+                channel_spike_samples = events[events[:, 2] == code, 0]
+                spike_indices[ch_idx] = channel_spike_samples
+
+        return spike_indices
+
+    def get_spike_counts_per_channel(self) -> list[int]:
+        """
+        Get spike counts per channel.
+
+        Returns:
+            list: Number of detected spikes per channel
+        """
+        if self.spike_indices:
+            return [len(spikes) for spikes in self.spike_indices]
+        elif self.result_mne:
+            # Extract from MNE annotations if spike_indices not available
+            spike_indices = self._extract_spike_indices_from_mne(self.result_mne)
+            return [len(spikes) for spikes in spike_indices]
+        else:
+            return []
+
+    def get_total_spike_count(self) -> int:
+        """Get total number of detected spikes across all channels."""
+        return sum(self.get_spike_counts_per_channel())
+
+    @staticmethod
+    def convert_sas_to_mne(
+        sas: list[si.SortingAnalyzer], chunk_duration_s: float = 60,
+        multiprocess_mode: Literal["dask", "serial"] = "serial",
+    ) -> mne.io.RawArray:
+        """Convert a list of SortingAnalyzers to a MNE RawArray.
+
+        Args:
+            sas (list[si.SortingAnalyzer]): The list of SortingAnalyzers to convert
+            chunk_duration_s (float, optional): Duration in seconds of each chunk
+                read during conversion. Defaults to 60.
+            multiprocess_mode (Literal["dask", "serial"], optional): Whether to use Dask for parallel
+                per-channel conversion. Defaults to "serial".
+
+        Returns:
+            mne.io.RawArray: The converted RawArray, with spikes labeled as annotations
+        """
+        if len(sas) == 0:
+            return None
+
+        # Check that all SortingAnalyzers have the same sampling frequency
+        sfreqs = [sa.recording.get_sampling_frequency() for sa in sas]
+        if not all(sf == sfreqs[0] for sf in sfreqs):
+            raise ValueError(
+                f"All SortingAnalyzers must have the same sampling frequency. Got frequencies: {sfreqs}"
+            )
+
+        # Preallocate data array
+        total_frames = int(sas[0].recording.get_duration() * sfreqs[0])
+        n_channels = len(sas)
+        data = np.empty((n_channels, total_frames))
+        logging.debug(f"Data shape: {data.shape}")
+
+        # Fill data array one channel at a time
+        match multiprocess_mode:
+            case "dask":
+                delayed_traces = [
+                    dask.delayed(FrequencyDomainSpikeAnalysisResult.convert_sa_to_np)(sa, chunk_duration_s)
+                    for sa in sas
+                ]
+                traces_list = dask.compute(*delayed_traces)
+                for i, traces in enumerate(traces_list):
+                    data[i, :] = traces
+            case "serial":
+                for i, sa in enumerate(sas):
+                    logging.debug(f"Converting channel {i + 1} of {n_channels}")
+                    data[i, :] = FrequencyDomainSpikeAnalysisResult.convert_sa_to_np(sa, chunk_duration_s)
+
+        channel_names = [str(sa.recording.get_channel_ids().item()) for sa in sas]
+        logging.debug(f"Channel names: {channel_names}")
+        sfreq = sfreqs[0]
+
+        # Extract spike times for each unit and create annotations
+        onset = []
+        description = []
+        for sa in sas:
+            for unit_id in sa.sorting.get_unit_ids():
+                spike_train = sa.sorting.get_unit_spike_train(unit_id)
+                # Convert to seconds and filter to recording duration
+                spike_times = spike_train / sa.sorting.get_sampling_frequency()
+                mask = spike_times < sa.recording.get_duration()
+                spike_times = spike_times[mask]
+
+                # Create annotation for each spike
+                onset.extend(spike_times)
+                description.extend(
+                    [sa.recording.get_channel_ids().item()] * len(spike_times)
+                )  # collapse all units into 1 spike train
+        annotations = mne.Annotations(onset, duration=0, description=description)
+
+        info = mne.create_info(ch_names=channel_names, sfreq=sfreq, ch_types="eeg")
+        raw = mne.io.RawArray(data=data, info=info)
+        raw = raw.set_annotations(annotations)
+        return raw
+
+    @staticmethod
+    def convert_sa_to_np(
+        sa: si.SortingAnalyzer, chunk_duration_s: float = 60,
+        multiprocess_mode: Literal["dask", "serial"] = "serial",
+    ) -> np.ndarray:
+        """Convert a SortingAnalyzer to a numpy array of traces.
+
+        Args:
+            sa (si.SortingAnalyzer): The SortingAnalyzer to convert. Must have only 1 channel.
+            chunk_duration_s (float, optional): Duration in seconds of each chunk
+                read during conversion. Defaults to 60.
+            multiprocess_mode (Literal["dask", "serial"], optional): Whether to use Dask for parallel
+                per-chunk reads. Defaults to "serial". Note: avoid using "dask" when this method is
+                already called from ``convert_sas_to_mne`` in Dask mode, as that parallelizes across
+                channels and nested Dask may not improve performance.
+        Returns:
+            np.ndarray: The converted traces
+        """
+        # Check that SortingAnalyzer only has 1 channel
+        if len(sa.recording.get_channel_ids()) != 1:
+            raise ValueError(
+                f"Expected SortingAnalyzer to have 1 channel, but got {len(sa.recording.get_channel_ids())} channels"
+            )
+
+        rec = sa.recording
+        logging.debug(f"Recording info: {rec}")
+
+        # Calculate total number of frames and chunks
+        total_frames = int(rec.get_duration() * rec.get_sampling_frequency())
+        fs = rec.get_sampling_frequency()
+        frames_per_chunk = max(1, int(round(chunk_duration_s * fs)))
+        n_chunks = max(1, total_frames // frames_per_chunk)
+
+        def _read_chunk(recording, start, end):
+            return recording.get_traces(
+                start_frame=start, end_frame=end, return_scaled=True
+            ).flatten()
+
+        chunk_ranges = []
+        for j in range(n_chunks):
+            start_frame = j * frames_per_chunk
+            end_frame = total_frames if j == n_chunks - 1 else (j + 1) * frames_per_chunk
+            chunk_ranges.append((start_frame, end_frame))
+
+        traces = np.empty(total_frames)
+
+        match multiprocess_mode:
+            case "dask":
+                delayed_chunks = [
+                    dask.delayed(_read_chunk)(rec, start, end)
+                    for start, end in chunk_ranges
+                ]
+                chunk_results = dask.compute(*delayed_chunks)
+                for (start, end), chunk_data in zip(chunk_ranges, chunk_results):
+                    traces[start:end] = chunk_data
+            case "serial":
+                for start, end in chunk_ranges:
+                    traces[start:end] = _read_chunk(rec, start, end)
+
+        traces *= 1e-6  # convert from uV to V
+        return traces
+
+    def __str__(self):
+        """String representation of the result object."""
+        spike_counts = self.get_spike_counts_per_channel()
+        total_spikes = sum(spike_counts)
+
+        return (f"FrequencyDomainSpikeAnalysisResult("
+                f"animal_id={self.animal_id}, "
+                f"genotype={self.genotype}, "
+                f"animal_day={self.animal_day}, "
+                f"channels={len(spike_counts)}, "
+                f"total_spikes={total_spikes})")
+
+    def __repr__(self):
+        return self.__str__()
