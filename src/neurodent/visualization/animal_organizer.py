@@ -20,22 +20,12 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Callable, Literal, Optional, Union
 
-import dask
-import dask.array as da
 import pandas as pd
-from dask import delayed
 from tqdm import tqdm
 
 from .. import constants, core
-from ..core import FragmentAnalyzer
-from ..core.frequency_domain_spike_detection import FrequencyDomainSpikeDetector
 from ..core.utils import resolve_channels, resolve_channel
-from .window_analysis_result import WindowAnalysisResult, _sanitize_feature_request
-
-try:
-    import spikeinterface.preprocessing as spre
-except ImportError:  # pragma: no cover
-    spre = None
+from .pipeline import AnalysisPipeline
 
 
 class AnimalOrganizer:
@@ -1518,61 +1508,19 @@ class AnimalOrganizer:
         self, lof_threshold: float = None, force_recompute: bool = False,
         lof_chunk_duration_s: float = 60,
     ):
-        """Compute bad channels using LOF analysis for all recordings.
-
-        Args:
-            lof_threshold (float, optional): Threshold for determining bad channels from LOF scores.
-                                           If None, only computes/loads scores without setting bad_channel_names.
-            force_recompute (bool): Whether to recompute LOF scores even if they exist.
-            lof_chunk_duration_s (float): Duration in seconds of each chunk used
-                for the pairwise-distance computation in LOF.  Defaults to 60.
-        """
-        logging.info(
-            f"Computing bad channels for {len(self.long_recordings)} recordings with threshold={lof_threshold}"
+        """Delegates to :meth:`AnalysisPipeline.compute_bad_channels`."""
+        return AnalysisPipeline(self).compute_bad_channels(
+            lof_threshold=lof_threshold, force_recompute=force_recompute,
+            lof_chunk_duration_s=lof_chunk_duration_s,
         )
-        for i, lrec in self._iter_valid_recordings():
-            logging.debug(
-                f"Computing bad channels for recording {i}: {self.animaldays[i]}"
-            )
-            lrec.compute_bad_channels(
-                lof_threshold=lof_threshold, force_recompute=force_recompute,
-                lof_chunk_duration_s=lof_chunk_duration_s,
-            )
-            logging.debug(
-                f"Recording {i} LOF scores computed: {hasattr(lrec, 'lof_scores') and lrec.lof_scores is not None}"
-            )
-
-        # Update bad channels dict if threshold was applied
-        if lof_threshold is not None:
-            self.bad_channels_dict = {
-                animalday: lrec.bad_channel_names
-                for animalday, lrec in zip(self.animaldays, self.long_recordings)
-            }
 
     def apply_lof_threshold(self, lof_threshold: float):
-        """Apply threshold to existing LOF scores to determine bad channels for all recordings.
-
-        Args:
-            lof_threshold (float): Threshold for determining bad channels.
-        """
-        for lrec in self.long_recordings:
-            lrec.apply_lof_threshold(lof_threshold)
-
-        self.bad_channels_dict = {
-            animalday: lrec.bad_channel_names
-            for animalday, lrec in zip(self.animaldays, self.long_recordings)
-        }
+        """Delegates to :meth:`AnalysisPipeline.apply_lof_threshold`."""
+        return AnalysisPipeline(self).apply_lof_threshold(lof_threshold)
 
     def get_all_lof_scores(self) -> dict:
-        """Get LOF scores for all recordings.
-
-        Returns:
-            dict: Dictionary mapping animal days to LOF score dictionaries.
-        """
-        return {
-            animalday: lrec.get_lof_scores()
-            for animalday, lrec in zip(self.animaldays, self.long_recordings)
-        }
+        """Delegates to :meth:`AnalysisPipeline.get_all_lof_scores`."""
+        return AnalysisPipeline(self).get_all_lof_scores()
 
     def compute_windowed_analysis(
         self,
@@ -1585,217 +1533,14 @@ class AnimalOrganizer:
         chunk_duration_s: Optional[float] = 3600,
         **kwargs,
     ) -> "WindowAnalysisResult":
-        """Computes windowed analysis of animal recordings. The data is divided into windows (time bins), then features are extracted from each window. The result is
-        formatted to a Dataframe and wrapped into a WindowAnalysisResult object.
-
-        Args:
-            features (list[str]): List of features to compute. See individual ``compute_...()`` functions for output format
-            exclude (list[str], optional): List of features to ignore. Will override the features parameter. Defaults to [].
-            window_s (int, optional): Length of each window in seconds. Note that some features break with very short window times. Defaults to 5.
-            suppress_short_interval_error (bool, optional): If True, suppress ValueError for short intervals between timestamps in resulting WindowAnalysisResult. Useful for aggregated WARs. Defaults to False.
-            apply_notch_filter (bool, optional): Whether to apply notch filtering to remove line noise. Uses constants.LINE_FREQ. Defaults to True.
-            chunk_duration_s (float, optional): Duration in seconds of data to hold
-                in memory at once during the Dask processing path.  Internally
-                converted to a number of fragments via
-                ``int(chunk_duration_s / window_s)``.  When ``None``,
-                all fragments are loaded into a single NumPy array before being
-                written to the intermediate zarr store — the original behavior,
-                which maximizes throughput but requires enough RAM to hold the
-                entire recording at once.  When set to a positive value, only the
-                corresponding number of fragments are buffered at a time, streaming
-                them to zarr incrementally; use a small value (e.g. 250) on
-                memory-constrained machines and a larger value (e.g. 2500+) on
-                high-memory nodes for maximum throughput.  Only has an effect when
-                ``multiprocess_mode="dask"``.  Defaults to 3600.
-
-        Raises:
-            AttributeError: If a feature's ``compute_...()`` function was not implemented, this error will be raised.
-
-        Returns:
-            WindowAnalysisResult: A WindowAnalysisResult object containing extracted features for all recordings
-        """
-        features = _sanitize_feature_request(features, exclude)
-
-        self._validate_sampling_rates()
-
-        dataframes = []
-        for _i, lrec in self._iter_valid_recordings():
-            logging.info(f"Computing windowed analysis for {lrec.display_name}")
-            lan = core.LongRecordingAnalyzer(
-                lrec, fragment_len_s=window_s, apply_notch_filter=apply_notch_filter
-            )
-            if lan.n_fragments == 0:
-                logging.warning(
-                    f"No fragments found for {lrec.display_name}. Skipping."
-                )
-                continue
-
-            logging.debug(f"Processing {lan.n_fragments} fragments")
-            miniters = int(lan.n_fragments / 100)
-            match multiprocess_mode:
-                case "dask":
-                    # The last fragment is not included because it makes the dask array ragged
-                    logging.debug("Converting LongRecording to numpy array")
-
-                    n_fragments_war = max(lan.n_fragments - 1, 1)
-                    n_samples_per_frag = int(window_s * lan.f_s)
-
-                    # Apply notch filter once to the entire recording (lazy SI wrapper)
-                    rec = lrec.LongRecording
-                    if lan.apply_notch_filter:
-                        if spre is not None:
-                            rec = spre.notch_filter(rec, freq=constants.LINE_FREQ)
-                        else:
-                            logging.warning(
-                                "apply_notch_filter=True but spikeinterface.preprocessing "
-                                "is not available; notch filter will be skipped."
-                            )
-
-                    if chunk_duration_s is not None:
-                        # Convert seconds → number of fragments
-                        n_frag_per_chunk = max(1, int(chunk_duration_s / window_s))
-                        # Streaming path: stream recording to zarr in batches,
-                        # keeping only `n_frag_per_chunk` fragments in RAM at a time.
-                        tmppath = core.utils.stream_recording_to_zarr(
-                            rec,
-                            n_fragments_war,
-                            n_samples_per_frag,
-                            n_frag_per_chunk,
-                        )
-                    else:
-                        # Default path: read all traces at once then write to zarr.
-                        # Maximises throughput on high-memory systems.
-                        total_samples = n_fragments_war * n_samples_per_frag
-                        all_traces = rec.get_traces(
-                            start_frame=0,
-                            end_frame=total_samples,
-                            return_scaled=True,
-                        )
-                        np_fragments = all_traces.reshape(
-                            n_fragments_war, n_samples_per_frag, rec.get_num_channels()
-                        )
-                        logging.debug(f"np_fragments.shape: {np_fragments.shape}")
-                        # Cache fragments to zarr
-                        tmppath, _ = core.utils.cache_fragments_to_zarr(
-                            np_fragments, n_fragments_war
-                        )
-                        del all_traces, np_fragments
-
-                    logging.debug("Processing metadata serially")
-                    metadatas = [
-                        self._process_fragment_metadata(idx, lan, window_s)
-                        for idx in range(n_fragments_war)
-                    ]
-                    meta_df = pd.DataFrame(metadatas)
-
-                    logging.debug("Processing features in parallel")
-                    np_fragments_reconstruct = da.from_zarr(
-                        tmppath, chunks=("auto", -1, -1)
-                    )
-                    logging.debug(f"Dask array shape: {np_fragments_reconstruct.shape}")
-                    logging.debug(
-                        f"Dask array chunks: {np_fragments_reconstruct.chunks}"
-                    )
-
-                    # Create delayed tasks for each fragment using efficient dependency resolution
-                    feature_values = [
-                        delayed(FragmentAnalyzer.process_fragment_with_dependencies)(
-                            np_fragments_reconstruct[idx], lan.f_s, features, kwargs
-                        )
-                        for idx in range(n_fragments_war)
-                    ]
-
-                    # Compute features in parallel
-                    feature_values = dask.compute(*feature_values)
-
-                    # Clean up temp directory after processing
-                    logging.debug("Cleaning up temp directory")
-                    try:
-                        import shutil
-
-                        shutil.rmtree(tmppath)
-                    except (OSError, FileNotFoundError) as e:
-                        logging.warning(
-                            f"Failed to remove temporary directory {tmppath}: {e}"
-                        )
-
-                    logging.debug("Combining metadata and feature values")
-                    feat_df = pd.DataFrame(feature_values)
-                    lan_df = pd.concat([meta_df, feat_df], axis=1)
-
-                case _:
-                    logging.debug("Processing serially")
-                    lan_df = []
-                    for idx in tqdm(
-                        range(lan.n_fragments),
-                        desc="Processing rows",
-                        miniters=miniters,
-                    ):
-                        lan_df.append(
-                            self._process_fragment_serial(
-                                idx, features, lan, window_s, kwargs
-                            )
-                        )
-
-            lan_df = pd.DataFrame(lan_df)
-
-            logging.debug("Validating timestamps")
-            core.validate_timestamps(lan_df["timestamp"].tolist())
-            lan_df = lan_df.sort_values("timestamp").reset_index(drop=True)
-
-            self.long_analyzers.append(lan)
-            dataframes.append(lan_df)
-
-        self.features_df = pd.concat(dataframes)
-        self.features_df = self.features_df
-
-        # Collect LOF scores from long recordings
-        lof_scores_dict = {}
-        missing_lof_animaldays = []
-        for animalday, lrec in zip(self.animaldays, self.long_recordings):
-            logging.debug(
-                f"Checking LOF scores for {animalday}: has_attr={hasattr(lrec, 'lof_scores')}, "
-                f"is_not_none={getattr(lrec, 'lof_scores', None) is not None}"
-            )
-            if hasattr(lrec, "lof_scores") and lrec.lof_scores is not None:
-                lof_scores_dict[animalday] = {
-                    "lof_scores": lrec.lof_scores.tolist(),
-                    "channel_names": lrec.channel_names,
-                }
-                logging.info(
-                    f"Added LOF scores for {animalday}: {len(lrec.lof_scores)} channels"
-                )
-            else:
-                missing_lof_animaldays.append(animalday)
-                logging.warning(
-                    f"Missing LOF scores for {animalday}! LOF computation may have failed or "
-                    f"compute_bad_channels() was not called for this LRO."
-                )
-
-        logging.info(f"Total LOF scores collected: {len(lof_scores_dict)} animal days")
-
-        # Warn loudly if any animaldays are missing LOF scores
-        if missing_lof_animaldays:
-            warning_msg = (
-                f"WARNING: {len(missing_lof_animaldays)} animalday(s) are missing LOF scores: {missing_lof_animaldays}. "
-                f"Expected {len(self.animaldays)} but got {len(lof_scores_dict)}. "
-                f"These sessions will be auto-populated with empty placeholders and excluded from LOF-based analysis."
-            )
-            logging.warning(warning_msg)
-            warnings.warn(warning_msg)
-
-        self.window_analysis_result = WindowAnalysisResult(
-            self.features_df,
-            self.animal_id,
-            self.genotype,
-            self.sex,
-            self.channel_names,
-            self.bad_channels_dict,
-            suppress_short_interval_error,
-            lof_scores_dict,
+        """Delegates to :meth:`AnalysisPipeline.compute_windowed_analysis`."""
+        return AnalysisPipeline(self).compute_windowed_analysis(
+            features, exclude=exclude, window_s=window_s,
+            multiprocess_mode=multiprocess_mode,
+            suppress_short_interval_error=suppress_short_interval_error,
+            apply_notch_filter=apply_notch_filter,
+            chunk_duration_s=chunk_duration_s, **kwargs,
         )
-
-        return self.window_analysis_result
 
     def compute_frequency_domain_spike_analysis(
         self,
@@ -1803,83 +1548,12 @@ class AnimalOrganizer:
         chunk_duration_s: float = 3600,
         multiprocess_mode: Literal["dask", "serial"] = "serial",
     ):
-        """
-        Compute frequency-domain spike detection on all long recordings.
-
-        Args:
-            detection_params (dict, optional): Detection parameters. Uses defaults if None.
-            chunk_duration_s (float): Duration in seconds of each
-                processing chunk.  Defaults to 3600 (1 hour).  The full
-                recording is always analysed; this parameter controls peak RAM
-                by processing in overlapping chunks.  ``None`` loads the full
-                recording at once (fastest).
-            multiprocess_mode (Literal["dask", "serial"]): Processing mode
-
-        Returns:
-            list[FrequencyDomainSpikeAnalysisResult]: Results for each recording session
-
-        Raises:
-            ImportError: If SpikeInterface is not available
-        """
-        # Import here to avoid circular imports
-        from .frequency_domain_results import FrequencyDomainSpikeAnalysisResult
-
-        fdsar_list = []
-
-        logging.info(
-            f"Running frequency-domain spike detection on {len(self.long_recordings)} recordings"
+        """Delegates to :meth:`AnalysisPipeline.compute_frequency_domain_spike_analysis`."""
+        return AnalysisPipeline(self).compute_frequency_domain_spike_analysis(
+            detection_params=detection_params,
+            chunk_duration_s=chunk_duration_s,
+            multiprocess_mode=multiprocess_mode,
         )
-        logging.info(f"Detection parameters: {detection_params}")
-
-        for i, lrec in self._iter_valid_recordings():
-            rec = lrec.LongRecording
-
-            try:
-                # Run frequency domain spike detection
-                spike_indices_per_channel = (
-                    FrequencyDomainSpikeDetector.detect_spikes_recording(
-                        rec,
-                        detection_params=detection_params,
-                        chunk_duration_s=chunk_duration_s,
-                        multiprocess_mode=multiprocess_mode,
-                    )
-                )
-
-                # Create FrequencyDomainSpikeAnalysisResult
-                fdsar = FrequencyDomainSpikeAnalysisResult.from_detection_results(
-                    spike_indices_per_channel=spike_indices_per_channel,
-                    recording=rec,
-                    detection_params=detection_params or {},
-                    animal_id=self.animal_id,
-                    genotype=self.genotype,
-                    animal_day=self.animaldays[i],
-                    bin_folder_name=(
-                        getattr(self, "base_folder_names", [None] * len(self.long_recordings))[i]
-                        if hasattr(self, "base_folder_names")
-                        else None
-                    ),
-                    metadata=self.long_recordings[i].meta,
-                )
-
-                fdsar_list.append(fdsar)
-
-                # Log results
-                total_spikes = sum(len(spikes) for spikes in spike_indices_per_channel)
-                logging.info(
-                    f"Recording {i + 1}/{len(self.long_recordings)}: Detected {total_spikes} spikes across {len(spike_indices_per_channel)} channels"
-                )
-
-            except Exception as e:
-                logging.error(f"Error processing recording {i + 1}/{len(self.long_recordings)}: {e}")
-                raise
-
-        # Store results for later access
-        self.frequency_domain_spike_analysis_results = fdsar_list
-
-        logging.info(
-            f"Completed frequency-domain spike detection. Total recordings processed: {len(fdsar_list)}"
-        )
-        return fdsar_list
 
     def _process_fragment_serial(
         self, idx, features, lan: core.LongRecordingAnalyzer, window_s, kwargs: dict
