@@ -1,7 +1,7 @@
 """Windowed feature analysis results.
 
 ``WindowAnalysisResult`` wraps the windowed feature DataFrame produced by
-:meth:`neurodent.visualization.animal_organizer.AnimalOrganizer.compute_windowed_analysis`
+:meth:`neurodent.core.loading.animal_organizer.AnimalOrganizer.compute_windowed_analysis`
 and provides filtering, aggregation, serialization, and LOF utilities.
 
 Split out of the former monolithic ``results.py`` (issue #134).

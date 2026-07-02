@@ -7,10 +7,10 @@ handling everything from raw data loading to feature extraction.
 
 .. code-block:: python
 
-    from neurodent import visualization
+    from neurodent import AnimalOrganizer
 
     # 1. Organize recordings for an animal
-    ao = visualization.AnimalOrganizer(
+    ao = AnimalOrganizer(
         data_path, animal_id, mode="nest",
     )
 

@@ -3,7 +3,7 @@
 ``AnimalOrganizer`` discovers and loads recording files, groups them into
 sessions, manages ``LongRecordingOrganizer`` instances and their timeline, and
 orchestrates windowed feature analysis and spike detection — producing
-:class:`~neurodent.visualization.window_analysis_result.WindowAnalysisResult`
+:class:`~neurodent.core.results.window_analysis_result.WindowAnalysisResult`
 objects.
 
 Split out of the former monolithic ``results.py`` (issue #134).
