@@ -487,7 +487,7 @@ class TestComputeWindowedAnalysisSignature:
                 return_value=[{"rms": 0.0}] * (mock_lan.n_fragments - 1),
             ),
             patch(
-                "neurodent.visualization.pipeline.delayed",
+                "neurodent.core.loading.pipeline.delayed",
                 side_effect=lambda f: lambda *a, **kw: {"rms": 0.0},
             ),
             patch(

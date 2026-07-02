@@ -15,10 +15,11 @@ import pandas as pd
 from dask import delayed
 from tqdm import tqdm
 
-from .. import constants, core
-from ..core import FragmentAnalyzer
-from ..core.frequency_domain_spike_detection import FrequencyDomainSpikeDetector
-from .window_analysis_result import WindowAnalysisResult, _sanitize_feature_request
+from neurodent import constants
+import neurodent.core as core
+from neurodent.core import FragmentAnalyzer
+from neurodent.core.frequency_domain_spike_detection import FrequencyDomainSpikeDetector
+from neurodent.core.results.window_analysis_result import WindowAnalysisResult, _sanitize_feature_request
 
 try:
     import spikeinterface.preprocessing as spre
@@ -340,7 +341,7 @@ class AnalysisPipeline:
             ImportError: If SpikeInterface is not available
         """
         # Import here to avoid circular imports
-        from .frequency_domain_results import FrequencyDomainSpikeAnalysisResult
+        from neurodent.core.results.frequency_domain_results import FrequencyDomainSpikeAnalysisResult
 
         fdsar_list = []
 

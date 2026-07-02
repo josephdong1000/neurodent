@@ -96,8 +96,12 @@ from .zeitgeber import (
 from . import utils
 from . import discovery
 
+# Loading orchestration (imported after backend + results so their names are bound)
+from .loading import AnimalOrganizer
+
 __all__ = [
     # Data loading
+    "AnimalOrganizer",
     "RecordingMetadata",
     "DDFBinaryMetadata",  # Deprecated, kept for backward compatibility
     "convert_ddfcolbin_to_ddfrowbin",
