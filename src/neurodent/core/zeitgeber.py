@@ -9,7 +9,7 @@ import logging
 import pandas as pd
 import numpy as np
 from pathlib import Path
-from .. import constants, visualization
+from .. import constants
 from . import metadata as metadata_module
 from .utils import normalize_value_from_aliases
 
@@ -69,7 +69,11 @@ def _load_war_for_zeitgeber(war_path_info):
     try:
         logger.info(f"Loading {animal_name}")
 
-        war = visualization.WindowAnalysisResult.load_parquet_and_json(
+        # Local import breaks the core->visualization layer edge (a result container
+        # loaded lazily only when this pipeline helper actually runs).
+        from ..visualization import WindowAnalysisResult
+
+        war = WindowAnalysisResult.load_parquet_and_json(
             folder_path=war_parquet_path.parent,
             parquet_name=war_parquet_path.name,
             json_name=war_json_path.name,
