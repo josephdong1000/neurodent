@@ -1,7 +1,7 @@
 ZeitgeberAnalysisResult
 =======================
 
-.. currentmodule:: neurodent.core
+.. currentmodule:: neurodent.results
 
 .. autoclass:: ZeitgeberAnalysisResult
    :members:

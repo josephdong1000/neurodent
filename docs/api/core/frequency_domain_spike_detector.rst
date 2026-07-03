@@ -1,7 +1,7 @@
 FrequencyDomainSpikeDetector
 =============================
 
-.. currentmodule:: neurodent.core
+.. currentmodule:: neurodent.analysis
 
 .. autoclass:: FrequencyDomainSpikeDetector
    :members:

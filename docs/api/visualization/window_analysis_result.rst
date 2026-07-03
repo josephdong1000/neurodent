@@ -1,7 +1,7 @@
 WindowAnalysisResult
 ====================
 
-.. currentmodule:: neurodent.core.results
+.. currentmodule:: neurodent.results
 
 .. autoclass:: WindowAnalysisResult
    :members:

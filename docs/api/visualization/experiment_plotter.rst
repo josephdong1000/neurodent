@@ -1,7 +1,7 @@
 ExperimentPlotter
 =================
 
-.. currentmodule:: neurodent.visualization
+.. currentmodule:: neurodent.plotting
 
 .. autoclass:: ExperimentPlotter
    :members:

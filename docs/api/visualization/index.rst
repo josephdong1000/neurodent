@@ -1,10 +1,10 @@
 Visualization Module
 ====================
 
-.. automodule:: neurodent.visualization
+.. automodule:: neurodent.plotting
    :no-members:
 
-.. currentmodule:: neurodent.visualization
+.. currentmodule:: neurodent.plotting
 
 Classes
 -------

@@ -1,7 +1,7 @@
 RecordingMetadata
 =================
 
-.. currentmodule:: neurodent.core
+.. currentmodule:: neurodent.loading
 
 .. autoclass:: RecordingMetadata
    :members:

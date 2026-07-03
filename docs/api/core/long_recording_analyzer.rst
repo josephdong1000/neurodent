@@ -1,7 +1,7 @@
 LongRecordingAnalyzer
 =====================
 
-.. currentmodule:: neurodent.core
+.. currentmodule:: neurodent.analysis
 
 .. autoclass:: LongRecordingAnalyzer
    :members:

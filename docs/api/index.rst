@@ -19,11 +19,11 @@ Core Module
 Visualization Module
 ~~~~~~~~~~~~~~~~~~~~
 
-.. automodule:: neurodent.visualization
+.. automodule:: neurodent.plotting
    :no-members:
    :no-index:
 
-.. currentmodule:: neurodent.visualization
+.. currentmodule:: neurodent.plotting
 .. include:: visualization/_summary.rst
 
 Constants

@@ -1,7 +1,7 @@
 AnimalOrganizer
 ===============
 
-.. currentmodule:: neurodent.core.loading
+.. currentmodule:: neurodent.loading
 
 .. autoclass:: AnimalOrganizer
    :members:
