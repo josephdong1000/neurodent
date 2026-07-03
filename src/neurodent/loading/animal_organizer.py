@@ -132,7 +132,7 @@ class AnimalOrganizer:
                     stacklevel=2,
                 )
 
-        from neurodent.loading.discovery import FileDiscoverer
+        from .discovery import FileDiscoverer
 
         self.discoverer = FileDiscoverer(pattern)
 
@@ -226,7 +226,7 @@ class AnimalOrganizer:
 
     def _get_item_name(self, item):
         """Helper to get a representative name for an item which could be a string, Path, list of strings, or DiscoveredFile."""
-        from neurodent.loading.discovery import DiscoveredFile
+        from .discovery import DiscoveredFile
 
         if isinstance(item, DiscoveredFile):
             paths = item.get_path_list()
@@ -244,7 +244,7 @@ class AnimalOrganizer:
         this returns the full path, ensuring items with the same filename in different
         session directories get distinct keys.
         """
-        from neurodent.loading.discovery import DiscoveredFile
+        from .discovery import DiscoveredFile
 
         if isinstance(item, DiscoveredFile):
             paths = item.get_path_list()
@@ -285,7 +285,7 @@ class AnimalOrganizer:
 
     def _is_item_file(self, item):
         """Helper to check if an item represents a file(s) rather than a directory."""
-        from neurodent.loading.discovery import DiscoveredFile
+        from .discovery import DiscoveredFile
 
         if isinstance(item, DiscoveredFile):
             paths = item.get_path_list()
@@ -297,7 +297,7 @@ class AnimalOrganizer:
     @staticmethod
     def _get_context_path(item) -> Path:
         """Return a single Path from an item (str, Path, list, or DiscoveredFile)."""
-        from neurodent.loading.discovery import DiscoveredFile
+        from .discovery import DiscoveredFile
 
         if isinstance(item, DiscoveredFile):
             return Path(item.get_path_list()[0])
@@ -402,7 +402,7 @@ class AnimalOrganizer:
 
     def _session_sort_key(self, items):
         """Return sort-key function: use {index} metadata if available, else filename."""
-        from neurodent.loading.discovery import _natural_sort_key
+        from .discovery import _natural_sort_key
 
         if self._items_have_index(items):
             return lambda f: _natural_sort_key(f.metadata["index"])
@@ -435,7 +435,7 @@ class AnimalOrganizer:
             f"starting at {base_datetime}"
         )
 
-        from neurodent.loading.discovery import _natural_sort_key
+        from .discovery import _natural_sort_key
 
         ordered_items = []
         if original_manual_datetimes is not None:
@@ -1513,7 +1513,7 @@ class AnimalOrganizer:
         lof_chunk_duration_s: float = 60,
     ):
         """Delegates to :meth:`AnalysisPipeline.compute_bad_channels`."""
-        from neurodent.analysis.pipeline import AnalysisPipeline
+        from neurodent.analysis import AnalysisPipeline
         return AnalysisPipeline(self).compute_bad_channels(
             lof_threshold=lof_threshold, force_recompute=force_recompute,
             lof_chunk_duration_s=lof_chunk_duration_s,
@@ -1521,12 +1521,12 @@ class AnimalOrganizer:
 
     def apply_lof_threshold(self, lof_threshold: float):
         """Delegates to :meth:`AnalysisPipeline.apply_lof_threshold`."""
-        from neurodent.analysis.pipeline import AnalysisPipeline
+        from neurodent.analysis import AnalysisPipeline
         return AnalysisPipeline(self).apply_lof_threshold(lof_threshold)
 
     def get_all_lof_scores(self) -> dict:
         """Delegates to :meth:`AnalysisPipeline.get_all_lof_scores`."""
-        from neurodent.analysis.pipeline import AnalysisPipeline
+        from neurodent.analysis import AnalysisPipeline
         return AnalysisPipeline(self).get_all_lof_scores()
 
     def compute_windowed_analysis(
@@ -1541,7 +1541,7 @@ class AnimalOrganizer:
         **kwargs,
     ) -> "WindowAnalysisResult":
         """Delegates to :meth:`AnalysisPipeline.compute_windowed_analysis`."""
-        from neurodent.analysis.pipeline import AnalysisPipeline
+        from neurodent.analysis import AnalysisPipeline
         return AnalysisPipeline(self).compute_windowed_analysis(
             features, exclude=exclude, window_s=window_s,
             multiprocess_mode=multiprocess_mode,
@@ -1557,7 +1557,7 @@ class AnimalOrganizer:
         multiprocess_mode: Literal["dask", "serial"] = "serial",
     ):
         """Delegates to :meth:`AnalysisPipeline.compute_frequency_domain_spike_analysis`."""
-        from neurodent.analysis.pipeline import AnalysisPipeline
+        from neurodent.analysis import AnalysisPipeline
         return AnalysisPipeline(self).compute_frequency_domain_spike_analysis(
             detection_params=detection_params,
             chunk_duration_s=chunk_duration_s,
@@ -1577,7 +1577,7 @@ class AnimalOrganizer:
         row = {}
 
         # Build session labels from LRO's DiscoveredFile metadata
-        from neurodent.loading.discovery import DiscoveredFile
+        from .discovery import DiscoveredFile
         from neurodent import constants
 
         lro = lan.LongRecording

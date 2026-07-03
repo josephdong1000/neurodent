@@ -23,7 +23,7 @@ except Exception:  # pragma: no cover
 from scipy.interpolate import Akima1DInterpolator
 
 from .. import constants
-from neurodent.loading.long_recording_organizer import LongRecordingOrganizer
+from neurodent.loading import LongRecordingOrganizer
 from .fragment_analyzer import FragmentAnalyzer
 
 

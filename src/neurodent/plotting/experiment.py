@@ -15,7 +15,7 @@ from statannotations.Annotator import Annotator
 from neurodent.core import utils as core_utils
 from neurodent.results import WindowAnalysisResult
 from neurodent import constants
-from neurodent.results.feature_utils import extract_hist_data, extract_feature, format_channel_data
+from neurodent.results import extract_hist_data, extract_feature, format_channel_data
 
 
 class ExperimentPlotter:

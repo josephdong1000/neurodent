@@ -12,7 +12,7 @@ from scipy.stats import gzscore, linregress, zscore
 from neurodent import constants
 from neurodent.results import WindowAnalysisResult
 from neurodent.core.utils import slugify
-from neurodent.results.feature_utils import (
+from neurodent.results import (
     flatten_feature_for_plotting,
     extract_feature,
 )

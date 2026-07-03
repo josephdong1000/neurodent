@@ -17,7 +17,7 @@ from pathlib import Path
 import matplotlib
 matplotlib.use("Agg")
 
-from neurodent.results.frequency_domain_results import FrequencyDomainSpikeAnalysisResult
+from neurodent.results import FrequencyDomainSpikeAnalysisResult
 from neurodent.workflow import setup_snakemake_logging, apply_samples_config
 
 

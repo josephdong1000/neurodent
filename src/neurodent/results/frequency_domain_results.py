@@ -27,7 +27,7 @@ except ImportError:  # pragma: no cover
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from neurodent.loading.long_recording_organizer import RecordingMetadata
+    from neurodent.loading import RecordingMetadata
 from neurodent.core.utils import resolve_channels, slugify
 
 
@@ -260,7 +260,7 @@ class FrequencyDomainSpikeAnalysisResult:
                 result_mne = FrequencyDomainSpikeAnalysisResult.convert_sas_to_mne(
                     self.result_sas, chunk_duration_s, multiprocess_mode=multiprocess_mode,
                 )
-                from neurodent.analysis.spike_detection import (
+                from neurodent.analysis import (
                     FrequencyDomainSpikeDetector,
                 )
                 FrequencyDomainSpikeDetector._add_spike_annotations(

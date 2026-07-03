@@ -16,12 +16,12 @@ from dask import delayed
 from tqdm import tqdm
 
 from neurodent import constants
-from neurodent.analysis.long_recording_analyzer import LongRecordingAnalyzer
+from .long_recording_analyzer import LongRecordingAnalyzer
 from neurodent.core.utils import validate_timestamps
 from neurodent.core import utils as core_utils
-from neurodent.analysis.fragment_analyzer import FragmentAnalyzer
-from neurodent.analysis.spike_detection import FrequencyDomainSpikeDetector
-from neurodent.results.window_analysis_result import WindowAnalysisResult, _sanitize_feature_request
+from .fragment_analyzer import FragmentAnalyzer
+from .spike_detection import FrequencyDomainSpikeDetector
+from neurodent.results import WindowAnalysisResult, _sanitize_feature_request
 
 try:
     import spikeinterface.preprocessing as spre
@@ -343,7 +343,7 @@ class AnalysisPipeline:
             ImportError: If SpikeInterface is not available
         """
         # Import here to avoid circular imports
-        from neurodent.results.frequency_domain_results import FrequencyDomainSpikeAnalysisResult
+        from neurodent.results import FrequencyDomainSpikeAnalysisResult
 
         fdsar_list = []
 
