@@ -3,8 +3,8 @@ import unittest
 from unittest.mock import MagicMock, patch
 import pandas as pd
 
-from neurodent.visualization.results import AnimalOrganizer
-from neurodent.core import LongRecordingOrganizer
+from neurodent.loading import AnimalOrganizer
+from neurodent.loading import LongRecordingOrganizer
 
 
 class TestAnimalOrganizerInitialization:

@@ -17,7 +17,7 @@ def read_bin_csv_pair(discovered_file, **kwargs):
 
     Parameters
     ----------
-    discovered_file : neurodent.core.discovery.DiscoveredFile
+    discovered_file : neurodent.loading.discovery.DiscoveredFile
         Multi-file discovery result containing one ``.bin`` and one ``.csv``.
     **kwargs
         Forwarded from the pipeline (unused).

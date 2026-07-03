@@ -12,8 +12,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from neurodent.core import LongRecordingOrganizer
-from neurodent.visualization.results import AnimalOrganizer
+from neurodent.loading import LongRecordingOrganizer
+from neurodent.loading import AnimalOrganizer
 
 
 class TestIterValidRecordings:

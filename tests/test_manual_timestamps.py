@@ -4,7 +4,7 @@ Unit tests for manual timestamp functionality in LongRecordingOrganizer.
 import pytest
 from datetime import datetime, timedelta
 
-from neurodent.core.core import LongRecordingOrganizer
+from neurodent.loading.long_recording_organizer import LongRecordingOrganizer
 
 
 class TestManualTimestamps:

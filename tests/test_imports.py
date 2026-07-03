@@ -14,8 +14,9 @@ class TestImportPatterns:
 
     def test_direct_class_imports(self):
         """Test importing specific classes directly."""
-        from neurodent.core import LongRecordingOrganizer, LongRecordingAnalyzer, FragmentAnalyzer
-        from neurodent.core import DDFBinaryMetadata
+        from neurodent.loading import LongRecordingOrganizer
+        from neurodent.analysis import LongRecordingAnalyzer, FragmentAnalyzer
+        from neurodent.loading import DDFBinaryMetadata
 
         assert LongRecordingOrganizer is not None
         assert LongRecordingAnalyzer is not None
@@ -23,8 +24,8 @@ class TestImportPatterns:
         assert DDFBinaryMetadata is not None
 
     def test_direct_function_imports(self):
-        """Test importing utility functions directly."""
-        from neurodent.core import (
+        """Test importing utility functions from the shared helper package."""
+        from neurodent.core.utils import (
             get_temp_directory,
             nanaverage,
             log_transform,
@@ -37,59 +38,60 @@ class TestImportPatterns:
         assert callable(resolve_channel)
 
     def test_module_level_access(self):
-        """Test accessing classes via module namespace."""
-        import neurodent.core
+        """Stage classes live in their stage packages, not in neurodent.core."""
+        import neurodent.loading
+        import neurodent.analysis
 
-        assert hasattr(neurodent.core, "LongRecordingOrganizer")
-        assert hasattr(neurodent.core, "LongRecordingAnalyzer")
-        assert hasattr(neurodent.core, "FragmentAnalyzer")
-        assert hasattr(neurodent.core, "DDFBinaryMetadata")
+        assert hasattr(neurodent.loading, "LongRecordingOrganizer")
+        assert hasattr(neurodent.loading, "DDFBinaryMetadata")
+        assert hasattr(neurodent.analysis, "LongRecordingAnalyzer")
+        assert hasattr(neurodent.analysis, "FragmentAnalyzer")
 
     def test_package_level_access(self):
-        """Test accessing via package import."""
+        """Headline classes are also lazily importable from the top level."""
         import neurodent
-        from neurodent import core
 
-        assert hasattr(core, "LongRecordingOrganizer")
-        assert hasattr(core, "LongRecordingAnalyzer")
-        assert hasattr(core, "FragmentAnalyzer")
+        assert neurodent.LongRecordingOrganizer is not None
+        assert neurodent.LongRecordingAnalyzer is not None
+        assert neurodent.AnimalOrganizer is not None
 
     def test_import_consistency(self):
         """Test that different import patterns return the same objects."""
-        from neurodent.core import LongRecordingOrganizer as direct
-        import neurodent.core as core_module
-        from neurodent import core as package_core
+        from neurodent.loading import LongRecordingOrganizer as direct
+        import neurodent
+        import neurodent.loading as loading_module
 
-        assert direct is core_module.LongRecordingOrganizer
-        assert direct is package_core.LongRecordingOrganizer
-        assert core_module.LongRecordingOrganizer is package_core.LongRecordingOrganizer
+        assert direct is loading_module.LongRecordingOrganizer
+        assert direct is neurodent.LongRecordingOrganizer
 
 
 class TestCircularImports:
     """Test that circular import issues are resolved properly."""
 
     def test_no_circular_import_errors(self):
-        """Test that importing doesn't cause circular import errors."""
-        # Force reload to test clean import
-        if "neurodent.core" in sys.modules:
-            del sys.modules["neurodent.core"]
-        if "neurodent.core.analysis" in sys.modules:
-            del sys.modules["neurodent.core.analysis"]
-        if "neurodent.core.core" in sys.modules:
-            del sys.modules["neurodent.core.core"]
+        """Importing the stage packages in a fresh interpreter raises no circular-import errors.
 
-        # This should not raise any circular import errors
-        import neurodent.core
+        Runs in a subprocess so it never mutates this interpreter's ``sys.modules``
+        (deleting/reloading stage modules here would create duplicate class objects
+        and break ``isinstance`` checks in later tests).
+        """
+        import subprocess
 
-        assert neurodent.core.LongRecordingOrganizer is not None
-        assert neurodent.core.LongRecordingAnalyzer is not None
+        code = (
+            "import neurodent.loading, neurodent.analysis, neurodent.results, neurodent.plotting; "
+            "from neurodent.loading import LongRecordingOrganizer; "
+            "from neurodent.analysis import LongRecordingAnalyzer; "
+            "assert LongRecordingOrganizer is not None and LongRecordingAnalyzer is not None"
+        )
+        result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+        assert result.returncode == 0, f"circular import detected:\n{result.stdout}\n{result.stderr}"
 
     def test_import_order_independence(self):
         """Test that import order doesn't matter."""
         # Test different import orders
-        from neurodent.core import LongRecordingAnalyzer
-        from neurodent.core import LongRecordingOrganizer
-        from neurodent.core import FragmentAnalyzer
+        from neurodent.analysis import LongRecordingAnalyzer
+        from neurodent.loading import LongRecordingOrganizer
+        from neurodent.analysis import FragmentAnalyzer
 
         assert LongRecordingAnalyzer is not None
         assert LongRecordingOrganizer is not None
@@ -101,7 +103,8 @@ class TestIDEFunctionality:
 
     def test_docstring_availability(self):
         """Test that docstrings are immediately accessible."""
-        from neurodent.core import LongRecordingOrganizer, LongRecordingAnalyzer, FragmentAnalyzer
+        from neurodent.loading import LongRecordingOrganizer
+        from neurodent.analysis import LongRecordingAnalyzer, FragmentAnalyzer
 
         # All classes should have docstrings available
         assert hasattr(LongRecordingOrganizer, "__doc__")
@@ -116,7 +119,8 @@ class TestIDEFunctionality:
 
     def test_class_attributes_accessible(self):
         """Test that class attributes are immediately accessible for IDE inspection."""
-        from neurodent.core import LongRecordingOrganizer, LongRecordingAnalyzer
+        from neurodent.loading import LongRecordingOrganizer
+        from neurodent.analysis import LongRecordingAnalyzer
 
         # Check that classes have expected attributes accessible
         assert hasattr(LongRecordingOrganizer, "__init__")
@@ -130,19 +134,18 @@ class TestIDEFunctionality:
 
     def test_module_dir_contents(self):
         """Test that dir() returns expected contents for IDE autocomplete."""
-        import neurodent.core
+        import neurodent.loading
+        import neurodent.analysis
+        import neurodent.core.utils
 
-        dir_contents = dir(neurodent.core)
-        expected_classes = ["LongRecordingOrganizer", "LongRecordingAnalyzer", "FragmentAnalyzer", "RecordingMetadata", "DDFBinaryMetadata"]
-        expected_functions = [
-            "get_temp_directory",
-            "nanaverage",
-            "log_transform",
-            "resolve_channel",
-        ]
+        assert "LongRecordingOrganizer" in dir(neurodent.loading)
+        assert "DDFBinaryMetadata" in dir(neurodent.loading)
+        assert "LongRecordingAnalyzer" in dir(neurodent.analysis)
+        assert "FragmentAnalyzer" in dir(neurodent.analysis)
 
-        for item in expected_classes + expected_functions:
-            assert item in dir_contents, f"{item} not found in dir(neurodent.core)"
+        util_dir = dir(neurodent.core.utils)
+        for item in ["get_temp_directory", "nanaverage", "log_transform", "resolve_channel"]:
+            assert item in util_dir, f"{item} not found in dir(neurodent.core.utils)"
 
 
 class TestImportPerformance:
@@ -153,7 +156,8 @@ class TestImportPerformance:
         import time
 
         start_time = time.time()
-        from neurodent.core import LongRecordingOrganizer, FragmentAnalyzer
+        from neurodent.loading import LongRecordingOrganizer
+        from neurodent.analysis import FragmentAnalyzer
 
         import_time = time.time() - start_time
 
@@ -166,8 +170,8 @@ class TestImportPerformance:
 
     def test_repeated_imports_cached(self):
         """Test that repeated imports return the same object (cached)."""
-        from neurodent.core import LongRecordingOrganizer
-        from neurodent.core import LongRecordingOrganizer as LRO2
+        from neurodent.loading import LongRecordingOrganizer
+        from neurodent.loading import LongRecordingOrganizer as LRO2
 
         # Same object should be returned
         assert LongRecordingOrganizer is LRO2
@@ -175,7 +179,7 @@ class TestImportPerformance:
         # Test multiple imports return same object
         import neurodent.core
 
-        assert LongRecordingOrganizer is neurodent.core.LongRecordingOrganizer
+        assert LongRecordingOrganizer is neurodent.loading.long_recording_organizer.LongRecordingOrganizer
 
 
 class TestImportErrors:
@@ -198,28 +202,22 @@ class TestStandardizedImports:
     """Test that standardized import patterns work correctly."""
 
     def test_core_module_import_pattern(self):
-        """Test that importing core as a module and accessing functions works."""
-        from neurodent import core
+        """Shared helpers come from core.utils; stage classes from stage packages."""
+        from neurodent.core import utils
+        from neurodent.loading import LongRecordingOrganizer
+        from neurodent.analysis import LongRecordingAnalyzer, FragmentAnalyzer
 
-        # Test that all expected functions are accessible via core.function_name()
-        assert hasattr(core, "resolve_channel")
-        assert hasattr(core, "LongRecordingOrganizer")
-        assert hasattr(core, "LongRecordingAnalyzer")
-        assert hasattr(core, "FragmentAnalyzer")
+        assert hasattr(utils, "resolve_channel")
+        assert callable(utils.resolve_channel)
 
-        # Test that functions are callable
-        assert callable(core.resolve_channel)
-
-        # Test that classes are instantiable (basic check)
-        assert core.LongRecordingOrganizer is not None
-        assert core.LongRecordingAnalyzer is not None
-        assert core.FragmentAnalyzer is not None
+        assert LongRecordingOrganizer is not None
+        assert LongRecordingAnalyzer is not None
+        assert FragmentAnalyzer is not None
 
     def test_public_api_accessibility(self):
-        """Test that public API functions are accessible through core module."""
-        from neurodent import core
+        """Test that public helper functions are accessible through core.utils."""
+        from neurodent.core import utils
 
-        # Test public API functions (available directly on core)
         public_functions = [
             "resolve_channel",
             "get_temp_directory",
@@ -230,8 +228,8 @@ class TestStandardizedImports:
         ]
 
         for func_name in public_functions:
-            assert hasattr(core, func_name), f"core.{func_name} should be accessible (public API)"
-            assert callable(getattr(core, func_name)), f"core.{func_name} should be callable"
+            assert hasattr(utils, func_name), f"core.utils.{func_name} should be accessible"
+            assert callable(getattr(utils, func_name)), f"core.utils.{func_name} should be callable"
 
     def test_internal_utils_accessibility(self):
         """Test that internal/advanced utils are accessible through core.utils."""
@@ -258,11 +256,11 @@ class TestStandardizedImports:
 
     def test_both_import_patterns_equivalent(self):
         """Test that both import patterns access the same functions."""
-        from neurodent import core
+        from neurodent.core import utils
         from neurodent.core.utils import resolve_channel
 
         # Both should reference the same function
-        assert core.resolve_channel is resolve_channel
+        assert utils.resolve_channel is resolve_channel
 
 
 class TestVisualizationImports:
@@ -270,12 +268,9 @@ class TestVisualizationImports:
 
     def test_visualization_imports(self):
         """Test that visualization modules import correctly."""
-        from neurodent.visualization import (
-            WindowAnalysisResult,
-            AnimalOrganizer,
-            AnimalPlotter,
-            ExperimentPlotter,
-        )
+        from neurodent.results import WindowAnalysisResult
+        from neurodent.loading import AnimalOrganizer
+        from neurodent.plotting import AnimalPlotter, ExperimentPlotter
 
         assert WindowAnalysisResult is not None
         assert AnimalOrganizer is not None
@@ -284,7 +279,7 @@ class TestVisualizationImports:
 
     def test_plotting_submodule_imports(self):
         """Test plotting submodule imports."""
-        from neurodent.visualization.plotting import AnimalPlotter, ExperimentPlotter
+        from neurodent.plotting import AnimalPlotter, ExperimentPlotter
 
         assert AnimalPlotter is not None
         assert ExperimentPlotter is not None

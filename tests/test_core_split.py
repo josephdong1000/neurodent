@@ -3,16 +3,16 @@ import unittest
 from unittest.mock import MagicMock, patch
 from pathlib import Path
 from datetime import datetime
-from neurodent.core import LongRecordingOrganizer, RecordingMetadata
+from neurodent.loading import LongRecordingOrganizer, RecordingMetadata
 import pytest
 
 class TestLROSplit(unittest.TestCase):
     def setUp(self):
         # Patch dependencies
-        self.si_patcher = patch('neurodent.core.core.si')
+        self.si_patcher = patch('neurodent.loading.long_recording_organizer.si')
         self.mock_si = self.si_patcher.start()
 
-        self.spre_patcher = patch('neurodent.core.core.spre')
+        self.spre_patcher = patch('neurodent.loading.long_recording_organizer.spre')
         self.mock_spre = self.spre_patcher.start()
         # Make spre functions allow pass-through
         self.mock_spre.astype.side_effect = lambda rec, **kwargs: rec

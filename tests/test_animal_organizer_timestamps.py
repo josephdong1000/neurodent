@@ -20,8 +20,9 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from neurodent.visualization import results
-from neurodent import core
+from neurodent.loading import animal_organizer as results
+from neurodent.results import WindowAnalysisResult
+from neurodent.loading import long_recording_organizer as core
 
 
 class TestAnimalOrganizerTimestampHandling:
@@ -112,7 +113,7 @@ class TestAnimalOrganizerTimestampHandling:
             unique_timestamps = set(ao._processed_timestamps.values())
             assert len(unique_timestamps) == 3  # All timestamps should be different
 
-    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    @patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer")
     @patch("glob.glob")
     def test_list_of_datetimes_per_lro_assignment(self, mock_glob, mock_lro_class):
         """Test that a list of datetimes gets assigned to LROs in order."""
@@ -143,7 +144,7 @@ class TestAnimalOrganizerTimestampHandling:
         for folder_name, timestamp in ao._processed_timestamps.items():
             assert timestamp == datetime_list  # Each folder gets the entire list
 
-    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    @patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer")
     @patch("glob.glob")
     def test_user_defined_timestamp_function(self, mock_glob, mock_lro_class):
         """Test that user-defined functions can extract timestamps from folders."""
@@ -188,7 +189,7 @@ class TestAnimalOrganizerTimestampHandling:
         for folder_path, expected_time in expected_times.items():
             assert ao._processed_timestamps[folder_path] == expected_time
 
-    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    @patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer")
     @patch("glob.glob")
     def test_mixed_dictionary_specification(self, mock_glob, mock_lro_class):
         """Test dictionary with mixed function and explicit timestamp specification."""
@@ -243,7 +244,7 @@ class TestAnimalOrganizerTimestampHandling:
             ao._processed_timestamps[str(self.folder3)] == expected_list
         )
 
-    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    @patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer")
     @patch("glob.glob")
     def test_invalid_timestamp_type_error(self, mock_glob, mock_lro_class):
         """Test that invalid timestamp types raise appropriate errors."""
@@ -262,7 +263,7 @@ class TestAnimalOrganizerTimestampHandling:
 
         assert "Invalid timestamp input type" in str(exc_info.value)
 
-    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    @patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer")
     @patch("glob.glob")
     def test_invalid_list_items_error(self, mock_glob, mock_lro_class):
         """Test that lists with bad items raise errors.
@@ -301,7 +302,7 @@ class TestAnimalOrganizerTimestampHandling:
                 },
             )
 
-    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    @patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer")
     @patch("glob.glob")
     def test_invalid_list_items_error(self, mock_glob, mock_lro_class):
         """Test that lists with bad items raise errors.
@@ -340,7 +341,7 @@ class TestAnimalOrganizerTimestampHandling:
                 },
             )
 
-    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    @patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer")
     @patch("glob.glob")
     def test_user_function_failure_error(self, mock_glob, mock_lro_class):
         """Test that user function failures are wrapped with context."""
@@ -363,7 +364,7 @@ class TestAnimalOrganizerTimestampHandling:
         assert "User timestamp function failed" in error_str
         assert "Simulated extraction failure" in error_str
 
-    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    @patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer")
     @patch("glob.glob")
     def test_mixed_config_is_allowed(self, mock_glob, mock_lro_class):
         """Test that dictionary with extra keys (mixed config) is allowed in fallback mode."""
@@ -388,7 +389,7 @@ class TestAnimalOrganizerTimestampHandling:
 
         assert len(ao._processed_timestamps) == 2
 
-    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    @patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer")
     @patch("glob.glob")
     def test_backward_compatibility_no_manual_datetimes(
         self, mock_glob, mock_lro_class
@@ -408,7 +409,7 @@ class TestAnimalOrganizerTimestampHandling:
         assert ao._processed_timestamps is None
         assert len(ao.long_recordings) == 2
 
-    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    @patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer")
     @patch("glob.glob")
     def test_timeline_summary_functionality(self, mock_glob, mock_lro_class):
         """Test that timeline summary functionality works correctly."""
@@ -457,7 +458,7 @@ class TestAnimalOrganizerTimestampHandling:
         assert timeline_df["duration_s"].iloc[0] == 100.0  # Mock duration
         assert timeline_df["n_files"].iloc[0] == 1  # Mock file count
 
-    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    @patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer")
     @patch("glob.glob")
     def test_recursive_function_resolution(self, mock_glob, mock_lro_class):
         """Test that functions returning functions are resolved recursively."""
@@ -596,7 +597,7 @@ class TestAnimalOrganizerTimestampHandling:
                 "✅ Continuous timeline verified: folders are sequential with no gaps or overlaps"
             )
 
-    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    @patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer")
     @patch("glob.glob")
     def test_overlapping_animaldays_with_timestamps(self, mock_glob, mock_lro_class):
         """Test timestamp handling with overlapping animaldays (same day, multiple folders)."""
@@ -800,7 +801,7 @@ class TestAnimalOrganizerTimestampHandling:
             )
 
 
-    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    @patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer")
     @patch("glob.glob")
     def test_multi_item_animalday_passes_per_item_timestamp(
         self, mock_glob, mock_lro_class
@@ -879,7 +880,7 @@ class TestComputeGlobalTimelineNaturalSort:
 
     def test_natural_sort_order_with_numeric_suffixes(self):
         """Verify items are ordered numerically (0,1,...,12) not alphabetically (0,10,11,12,1,...)."""
-        from neurodent.core.discovery import _natural_sort_key
+        from neurodent.loading.discovery import _natural_sort_key
 
         # Simulate 13 item names matching the real-world pattern from the bug report
         item_names = [f"MHET-{i}_ColMajor.bin..." for i in range(13)]
@@ -898,7 +899,7 @@ class TestComputeGlobalTimelineNaturalSort:
         animalday_to_items = {name: [name] for name in item_names}
 
         # Create a minimal mock AnimalOrganizer that supports _compute_global_timeline
-        with patch("neurodent.visualization.results.core.LongRecordingOrganizer") as mock_lro_class:
+        with patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer") as mock_lro_class:
             mock_lro_class.side_effect = lambda item, **kwargs: _make_mock_lro(1800.0)
 
             ao = _make_minimal_ao()
@@ -978,7 +979,7 @@ class TestTimestampCollisionPrevention:
 
     def test_compute_global_timeline_uses_full_path_keys(self):
         """_compute_global_timeline result keys are full paths, not just filenames."""
-        with patch("neurodent.visualization.results.core.LongRecordingOrganizer") as mock_lro_class:
+        with patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer") as mock_lro_class:
             mock_lro_class.side_effect = lambda item, **kw: _make_mock_lro(100.0)
 
             ao = _make_minimal_ao()
@@ -1004,7 +1005,7 @@ class TestTimestampCollisionPrevention:
         Regression test for the bug where out.update(sess_timeline) would
         overwrite session-1's file-0 timestamp with session-2's file-0 timestamp.
         """
-        with patch("neurodent.visualization.results.core.LongRecordingOrganizer") as mock_lro_class:
+        with patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer") as mock_lro_class:
             mock_lro_class.side_effect = lambda item, **kw: _make_mock_lro(100.0)
 
             ao = _make_minimal_ao()
@@ -1077,7 +1078,7 @@ class TestDiagnosticDisplayOffByOne:
 
     def test_first_short_interval_shows_correct_rows(self):
         """When the first interval (row 0->1) is short, diagnostic should show rows 0 and 1, not row -1."""
-        war = results.WindowAnalysisResult.__new__(results.WindowAnalysisResult)
+        war = WindowAnalysisResult.__new__(WindowAnalysisResult)
         war.suppress_short_interval_error = False
         war.animal_id = "test"
 
@@ -1153,7 +1154,7 @@ class TestZeroDurationTimelineFilter:
             "/data/sess1/file-1.bin": 0.0,    # zero-byte file
             "/data/sess1/file-2.bin": 1800.0,
         }
-        with patch("neurodent.visualization.results.core.LongRecordingOrganizer") as mock_cls:
+        with patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer") as mock_cls:
             mock_cls.side_effect = self._make_mock_lro_factory(durations)
 
             ao = _make_minimal_ao()
@@ -1175,7 +1176,7 @@ class TestZeroDurationTimelineFilter:
             "/data/sess1/file-0.bin": 1800.0,
             "/data/sess1/file-1.bin": 0.0,
         }
-        with patch("neurodent.visualization.results.core.LongRecordingOrganizer") as mock_cls:
+        with patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer") as mock_cls:
             mock_cls.side_effect = self._make_mock_lro_factory(durations)
 
             ao = _make_minimal_ao()
@@ -1196,7 +1197,7 @@ class TestZeroDurationTimelineFilter:
             "/data/sess1/file-0.bin": 0.0,
             "/data/sess1/file-1.bin": 0.0,
         }
-        with patch("neurodent.visualization.results.core.LongRecordingOrganizer") as mock_cls:
+        with patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer") as mock_cls:
             mock_cls.side_effect = self._make_mock_lro_factory(durations)
 
             ao = _make_minimal_ao()
@@ -1216,7 +1217,7 @@ class TestZeroDurationTimelineFilter:
             "/data/sess1/file-1.bin": 0.0,
             "/data/sess1/file-2.bin": 1800.0,
         }
-        with patch("neurodent.visualization.results.core.LongRecordingOrganizer") as mock_cls:
+        with patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer") as mock_cls:
             mock_cls.side_effect = self._make_mock_lro_factory(durations)
 
             ao = _make_minimal_ao()
@@ -1240,7 +1241,7 @@ class TestZeroDurationTimelineFilter:
             "/data/sess1/file-1.bin": 0.0,    # skipped
             "/data/sess1/file-2.bin": 3600.0,
         }
-        with patch("neurodent.visualization.results.core.LongRecordingOrganizer") as mock_cls:
+        with patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer") as mock_cls:
             mock_cls.side_effect = self._make_mock_lro_factory(durations)
 
             ao = _make_minimal_ao()
@@ -1265,7 +1266,7 @@ class TestZeroDurationTimelineFilter:
             "/data/sess1/file-3.bin": 0.0,
             "/data/sess1/file-4.bin": 1800.0,
         }
-        with patch("neurodent.visualization.results.core.LongRecordingOrganizer") as mock_cls:
+        with patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer") as mock_cls:
             mock_cls.side_effect = self._make_mock_lro_factory(durations)
 
             ao = _make_minimal_ao()
@@ -1293,7 +1294,7 @@ class TestZeroDurationTimelineFilter:
             "/data/062921/AM5-3.bin": 0.0,    # zero-byte file
             "/data/062921/AM5-4.bin": 1800.0,
         }
-        with patch("neurodent.visualization.results.core.LongRecordingOrganizer") as mock_cls:
+        with patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer") as mock_cls:
             mock_cls.side_effect = self._make_mock_lro_factory(durations)
 
             ao = _make_minimal_ao()
@@ -1353,7 +1354,7 @@ class TestSessionTimestampListLeakPrevention:
             captured_kwargs.append((item, kwargs.copy()))
             return _make_mock_lro(0.0 if "F8-2" in str(item) else 1800.0)
 
-        with patch("neurodent.visualization.results.core.LongRecordingOrganizer") as mock_cls:
+        with patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer") as mock_cls:
             mock_cls.side_effect = capture_lro
             ao._create_long_recordings({"mode": "si"})
 
@@ -1386,7 +1387,7 @@ class TestSessionTimestampListLeakPrevention:
             captured_kwargs.append((item, kwargs.copy()))
             return _make_mock_lro(1800.0)
 
-        with patch("neurodent.visualization.results.core.LongRecordingOrganizer") as mock_cls:
+        with patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer") as mock_cls:
             mock_cls.side_effect = capture_lro
             ao._create_long_recordings({"mode": "si"})
 
@@ -1412,7 +1413,7 @@ class TestSessionTimestampListLeakPrevention:
             captured_kwargs.append((item, kwargs.copy()))
             return _make_mock_lro(1800.0)
 
-        with patch("neurodent.visualization.results.core.LongRecordingOrganizer") as mock_cls:
+        with patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer") as mock_cls:
             mock_cls.side_effect = capture_lro
             ao._create_long_recordings({"mode": "si"})
 
@@ -1436,7 +1437,7 @@ class TestSessionTimestampListLeakPrevention:
             captured_kwargs.append((item, kwargs.copy()))
             return _make_mock_lro(1800.0)
 
-        with patch("neurodent.visualization.results.core.LongRecordingOrganizer") as mock_cls:
+        with patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer") as mock_cls:
             mock_cls.side_effect = capture_lro
             ao._create_long_recordings({
                 "mode": "si",
@@ -1477,7 +1478,7 @@ class TestSessionTimestampListLeakPrevention:
             dur = 0.0 if ("file-2" in str(item) or ("sess2" in str(item) and "file-1" in str(item))) else 1800.0
             return _make_mock_lro(dur)
 
-        with patch("neurodent.visualization.results.core.LongRecordingOrganizer") as mock_cls:
+        with patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer") as mock_cls:
             mock_cls.side_effect = capture_lro
             ao._create_long_recordings({"mode": "si"})
 
@@ -1515,7 +1516,7 @@ class TestZeroBytePipelineEndToEnd:
             "/data/2022-06-17/F8-1.bin": 1800.0,
             "/data/2022-06-17/F8-2.bin": 0.0,
         }
-        with patch("neurodent.visualization.results.core.LongRecordingOrganizer") as mock_cls:
+        with patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer") as mock_cls:
             def factory(item, **kwargs):
                 dur = durations.get(item, 1800.0)
                 return _make_mock_lro(dur)
@@ -1565,7 +1566,7 @@ class TestZeroBytePipelineEndToEnd:
             "/data/062921/AM5-3.bin": 0.0,    # zero-byte
             "/data/062921/AM5-4.bin": 1800.0,
         }
-        with patch("neurodent.visualization.results.core.LongRecordingOrganizer") as mock_cls:
+        with patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer") as mock_cls:
             mock_cls.side_effect = lambda item, **kw: _make_mock_lro(durations.get(item, 1800.0))
 
             ao = _make_minimal_ao()
@@ -1600,7 +1601,7 @@ class TestZeroBytePipelineEndToEnd:
             # Only file-0 has real data
             items[path] = 1800.0 if i == 0 else 0.0
 
-        with patch("neurodent.visualization.results.core.LongRecordingOrganizer") as mock_cls:
+        with patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer") as mock_cls:
             mock_cls.side_effect = lambda item, **kw: _make_mock_lro(items.get(item, 0.0))
 
             ao = _make_minimal_ao()

@@ -13,8 +13,8 @@ import pandas as pd
 import pytest
 
 from neurodent import constants
-from neurodent.visualization import WindowAnalysisResult
-from neurodent.visualization.plotting.animal import AnimalPlotter
+from neurodent.results import WindowAnalysisResult
+from neurodent.plotting.animal import AnimalPlotter
 
 
 # ---------------------------------------------------------------------------
@@ -728,7 +728,7 @@ class TestPlotTemporalHeatmapFeatureShapes:
         assert result.shape == (n_time, n_chan, 1)
 
         # Now test the collapsing logic using collapse_feature_channels
-        from neurodent.visualization.feature_utils import collapse_feature_channels
+        from neurodent.results.feature_utils import collapse_feature_channels
         from neurodent.constants import classify_feature
 
         ftype = classify_feature("rms")

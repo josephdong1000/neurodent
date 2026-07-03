@@ -19,7 +19,7 @@ import numpy as np
 import pytest
 
 from neurodent import constants
-from neurodent.core.core import LongRecordingOrganizer
+from neurodent.loading.long_recording_organizer import LongRecordingOrganizer
 
 
 class TestIntanUnitsFixIntegration:

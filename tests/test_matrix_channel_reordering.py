@@ -15,7 +15,7 @@ import pytest
 import warnings
 from unittest.mock import Mock
 
-from neurodent.visualization.results import WindowAnalysisResult
+from neurodent.results.window_analysis_result import WindowAnalysisResult
 from neurodent import constants
 
 

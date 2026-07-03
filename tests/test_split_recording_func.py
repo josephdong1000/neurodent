@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from neurodent.core.core import split_recording
+from neurodent.loading.long_recording_organizer import split_recording
 
 
 def _patch_lro(mock_lro):
@@ -13,7 +13,7 @@ def _patch_lro(mock_lro):
     split_recording's own globals dict.
 
     This approach is robust even when test_imports.py reloads the
-    neurodent.core.core module (which changes the sys.modules entry but not
+    neurodent.loading.long_recording_organizer module (which changes the sys.modules entry but not
     the ``split_recording.__globals__`` dict that this function already has).
     """
     mock_class = MagicMock(return_value=mock_lro)

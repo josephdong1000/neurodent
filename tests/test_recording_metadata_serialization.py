@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from neurodent.core.core import DDFBinaryMetadata, RecordingMetadata
+from neurodent.loading.long_recording_organizer import DDFBinaryMetadata, RecordingMetadata
 
 
 def _make_meta(**overrides):

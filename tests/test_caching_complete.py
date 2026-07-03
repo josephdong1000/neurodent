@@ -14,6 +14,7 @@ from unittest.mock import Mock, patch, MagicMock
 import numpy as np
 
 from neurodent import core
+from neurodent.loading import long_recording_organizer as _lro_mod
 from neurodent import constants
 
 try:
@@ -43,14 +44,14 @@ class TestUnifiedCachingSystem:
         source_paths = [Path("/fake/source.txt")]
 
         # Test 'force_regenerate' policy
-        result = core.should_use_cache_unified(
+        result = core.utils.should_use_cache_unified(
             cache_path, source_paths, "force_regenerate"
         )
         assert result is False
 
         # Test invalid policy
         with pytest.raises(ValueError, match="Invalid cache_policy"):
-            core.should_use_cache_unified(cache_path, source_paths, "invalid")
+            core.utils.should_use_cache_unified(cache_path, source_paths, "invalid")
 
     def test_cache_policies_with_files(self):
         """Test cache policies with actual files."""
@@ -60,7 +61,7 @@ class TestUnifiedCachingSystem:
             cache_path = Path(tmp_cache.name)
 
             # 'always' should use cache when it exists
-            result = core.should_use_cache_unified(cache_path, source_paths, "always")
+            result = core.utils.should_use_cache_unified(cache_path, source_paths, "always")
             assert result is True
 
         # Cleanup
@@ -68,7 +69,7 @@ class TestUnifiedCachingSystem:
 
         # 'always' should not use cache when it doesn't exist
         cache_path = Path("/nonexistent/cache.edf")
-        result = core.should_use_cache_unified(cache_path, source_paths, "always")
+        result = core.utils.should_use_cache_unified(cache_path, source_paths, "always")
         assert result is False
 
     def test_cache_policies_auto_timestamps(self):
@@ -84,14 +85,14 @@ class TestUnifiedCachingSystem:
             time.sleep(0.1)
             cache_path.touch()
 
-            result = core.should_use_cache_unified(cache_path, [source_path], "auto")
+            result = core.utils.should_use_cache_unified(cache_path, [source_path], "auto")
             assert result is True
 
             # Make source newer
             time.sleep(0.1)
             source_path.touch()
 
-            result = core.should_use_cache_unified(cache_path, [source_path], "auto")
+            result = core.utils.should_use_cache_unified(cache_path, [source_path], "auto")
             assert result is False
 
         # Cleanup
@@ -107,7 +108,7 @@ class TestUnifiedCachingSystem:
             policies = ["auto", "always", "force_regenerate"]
 
             for policy in policies:
-                organizer = core.LongRecordingOrganizer(
+                organizer = _lro_mod.LongRecordingOrganizer(
                     tmpdir_path,
                     mode=None,  # Don't auto-load
                     cache_policy=policy,
@@ -120,12 +121,12 @@ class TestUnifiedCachingSystem:
         import inspect
 
         # Check LongRecordingOrganizer.__init__ signature
-        init_signature = inspect.signature(core.LongRecordingOrganizer.__init__)
+        init_signature = inspect.signature(_lro_mod.LongRecordingOrganizer.__init__)
         assert "cache_policy" in init_signature.parameters
 
         # Check convert_file_with_mne_to_recording signature
         mne_signature = inspect.signature(
-            core.LongRecordingOrganizer.convert_file_with_mne_to_recording
+            _lro_mod.LongRecordingOrganizer.convert_file_with_mne_to_recording
         )
         assert "cache_policy" in mne_signature.parameters
 
@@ -137,10 +138,10 @@ class TestUnifiedCachingSystem:
         """Test cache status message generation."""
         cache_path = Path("/fake/cache.edf")
 
-        message_use = core.get_cache_status_message(cache_path, True)
+        message_use = core.utils.get_cache_status_message(cache_path, True)
         assert "Using cached intermediate: cache.edf" in message_use
 
-        message_regen = core.get_cache_status_message(cache_path, False)
+        message_regen = core.utils.get_cache_status_message(cache_path, False)
         assert "Regenerating intermediate: cache.edf" in message_regen
 
     def test_legacy_function_still_works(self):
@@ -160,10 +161,10 @@ class TestUnifiedCachingSystem:
 
             with patch("glob.glob", return_value=[]):
                 with patch(
-                    "neurodent.core.core.LongRecordingOrganizer._validate_timestamps_for_mode"
+                    "neurodent.loading.long_recording_organizer.LongRecordingOrganizer._validate_timestamps_for_mode"
                 ):
                     # Should work with new unified parameter
-                    organizer = core.LongRecordingOrganizer(
+                    organizer = _lro_mod.LongRecordingOrganizer(
                         tmpdir_path, mode=None, cache_policy="auto"
                     )
 
@@ -187,7 +188,7 @@ class TestCachingPerformance:
             cache_file = tmpdir_path / "cache.bin"
 
             # Test 1: 'force_regenerate' policy
-            result = core.should_use_cache_unified(
+            result = core.utils.should_use_cache_unified(
                 cache_file, [source_file], "force_regenerate"
             )
             assert result is False
@@ -196,19 +197,19 @@ class TestCachingPerformance:
             cache_file.write_text("cached data")
 
             # Test 2: 'always' policy with existing cache
-            result = core.should_use_cache_unified(cache_file, [source_file], "always")
+            result = core.utils.should_use_cache_unified(cache_file, [source_file], "always")
             assert result is True
 
             # Test 3: 'auto' policy - cache is newer
             time.sleep(0.1)  # Ensure cache is newer
             cache_file.touch()
-            result = core.should_use_cache_unified(cache_file, [source_file], "auto")
+            result = core.utils.should_use_cache_unified(cache_file, [source_file], "auto")
             assert result is True
 
             # Test 4: 'auto' policy - source is newer
             time.sleep(0.1)  # Ensure source is newer
             source_file.touch()
-            result = core.should_use_cache_unified(cache_file, [source_file], "auto")
+            result = core.utils.should_use_cache_unified(cache_file, [source_file], "auto")
             assert result is False
 
 
@@ -221,7 +222,7 @@ class TestParameterValidation:
         source_paths = [Path("/fake/source.txt")]
 
         with pytest.raises(ValueError, match="Invalid cache_policy"):
-            core.should_use_cache_unified(cache_path, source_paths, "invalid_policy")
+            core.utils.should_use_cache_unified(cache_path, source_paths, "invalid_policy")
 
     def test_cache_policy_typing(self):
         """Test that cache_policy parameter accepts correct types."""
@@ -232,7 +233,7 @@ class TestParameterValidation:
         valid_policies = ["auto", "always", "force_regenerate"]
         for policy in valid_policies:
             try:
-                core.should_use_cache_unified(cache_path, source_paths, policy)
+                core.utils.should_use_cache_unified(cache_path, source_paths, policy)
             except ValueError as e:
                 if "Invalid cache_policy" in str(e):
                     pytest.fail(f"Valid policy '{policy}' was rejected")
@@ -313,9 +314,9 @@ class TestMNECachingOptimization:
 
             # Mock SpikeInterface read_edf to avoid actual file operations
             with (
-                patch("neurodent.core.core.se.read_edf") as mock_read_edf,
+                patch("neurodent.loading.long_recording_organizer.se.read_edf") as mock_read_edf,
                 patch(
-                    "neurodent.core.core.RecordingMetadata.from_json"
+                    "neurodent.loading.long_recording_organizer.RecordingMetadata.from_json"
                 ) as mock_from_json,
             ):
                 # Mock metadata loading from JSON
@@ -339,7 +340,7 @@ class TestMNECachingOptimization:
                 )
                 mock_read_edf.return_value = mock_recording
 
-                lro = core.LongRecordingOrganizer(
+                lro = _lro_mod.LongRecordingOrganizer(
                     item=source_file,
                     mode="mne",
                     extract_func=mock_func,
@@ -398,8 +399,8 @@ class TestMNECachingOptimization:
 
             # Mock MNE export and SpikeInterface read to avoid actual file operations
             with (
-                patch("neurodent.core.core.mne.export.export_raw", side_effect=_export_creates_file) as mock_export,
-                patch("neurodent.core.core.se.read_edf") as mock_read_edf,
+                patch("neurodent.loading.long_recording_organizer.mne.export.export_raw", side_effect=_export_creates_file) as mock_export,
+                patch("neurodent.loading.long_recording_organizer.se.read_edf") as mock_read_edf,
             ):
                 # Mock the SpikeInterface read_edf to return something reasonable
                 mock_recording = Mock()
@@ -412,7 +413,7 @@ class TestMNECachingOptimization:
                 )
                 mock_read_edf.return_value = mock_recording
 
-                lro = core.LongRecordingOrganizer(
+                lro = _lro_mod.LongRecordingOrganizer(
                     item=tmpdir_path,
                     mode="mne",
                     extract_func=mock_func,
@@ -478,8 +479,8 @@ class TestMNECachingOptimization:
 
             # Mock MNE export and SpikeInterface read to avoid actual file operations
             with (
-                patch("neurodent.core.core.mne.export.export_raw", side_effect=_export_creates_file) as mock_export,
-                patch("neurodent.core.core.se.read_edf") as mock_read_edf,
+                patch("neurodent.loading.long_recording_organizer.mne.export.export_raw", side_effect=_export_creates_file) as mock_export,
+                patch("neurodent.loading.long_recording_organizer.se.read_edf") as mock_read_edf,
             ):
                 # Mock the SpikeInterface read_edf to return something reasonable
                 mock_recording = Mock()
@@ -492,7 +493,7 @@ class TestMNECachingOptimization:
                 )
                 mock_read_edf.return_value = mock_recording
 
-                lro = core.LongRecordingOrganizer(
+                lro = _lro_mod.LongRecordingOrganizer(
                     item=tmpdir_path,
                     mode="mne",
                     extract_func=mock_func,
@@ -532,7 +533,7 @@ class TestMNECachingOptimization:
 
             # Test invalid cache policy
             with pytest.raises(ValueError, match="Invalid cache_policy: foo"):
-                lro = core.LongRecordingOrganizer(
+                lro = _lro_mod.LongRecordingOrganizer(
                     item=tmpdir_path,
                     mode="mne",
                     extract_func=mock_func,
@@ -566,9 +567,9 @@ class TestMNECachingOptimization:
 
             # Mock MNE export and SpikeInterface read to avoid actual file operations
             with (
-                patch("neurodent.core.core.mne.export.export_raw", side_effect=_export_creates_file) as mock_export,
-                patch("neurodent.core.core.se.read_edf") as mock_read_edf,
-                patch("neurodent.core.core.spre.resample") as mock_resample,
+                patch("neurodent.loading.long_recording_organizer.mne.export.export_raw", side_effect=_export_creates_file) as mock_export,
+                patch("neurodent.loading.long_recording_organizer.se.read_edf") as mock_read_edf,
+                patch("neurodent.loading.long_recording_organizer.spre.resample") as mock_resample,
             ):
                 # Mock the SpikeInterface read_edf to return something reasonable
                 mock_recording = Mock()
@@ -584,7 +585,7 @@ class TestMNECachingOptimization:
                 # Mock resample to return the same mock_recording (simulating no resampling needed)
                 mock_resample.return_value = mock_recording
 
-                lro = core.LongRecordingOrganizer(
+                lro = _lro_mod.LongRecordingOrganizer(
                     item=tmpdir_path,
                     mode="mne",
                     extract_func=mock_func,
@@ -660,10 +661,10 @@ class TestMNECachingOptimization:
 
                 # Mock MNE export and SpikeInterface read
                 with (
-                    patch("neurodent.core.core.mne.export.export_raw", side_effect=_export_creates_file) as mock_export,
-                    patch("neurodent.core.core.se.read_edf") as mock_read_edf,
+                    patch("neurodent.loading.long_recording_organizer.mne.export.export_raw", side_effect=_export_creates_file) as mock_export,
+                    patch("neurodent.loading.long_recording_organizer.se.read_edf") as mock_read_edf,
                     patch(
-                        "neurodent.core.core.RecordingMetadata.from_json"
+                        "neurodent.loading.long_recording_organizer.RecordingMetadata.from_json"
                     ) as mock_from_json,
                 ):
                     # Mock metadata loading from JSON
@@ -685,7 +686,7 @@ class TestMNECachingOptimization:
                     )
                     mock_read_edf.return_value = mock_recording
 
-                    lro = core.LongRecordingOrganizer(
+                    lro = _lro_mod.LongRecordingOrganizer(
                         item=source_file,
                         mode="mne",
                         extract_func=mock_func,
@@ -740,8 +741,8 @@ class TestMNECachingOptimization:
             # the metadata sidecar is now written atomically via a temp file +
             # rename, which needs real file I/O; it lands harmlessly in tmpdir.)
             with (
-                patch("neurodent.core.core.mne.export.export_raw", side_effect=_export_creates_file) as mock_export,
-                patch("neurodent.core.core.se.read_edf") as mock_read_edf,
+                patch("neurodent.loading.long_recording_organizer.mne.export.export_raw", side_effect=_export_creates_file) as mock_export,
+                patch("neurodent.loading.long_recording_organizer.se.read_edf") as mock_read_edf,
             ):
                 # Mock recording
                 mock_recording = Mock()
@@ -754,7 +755,7 @@ class TestMNECachingOptimization:
                 )
                 mock_read_edf.return_value = mock_recording
 
-                lro = core.LongRecordingOrganizer(
+                lro = _lro_mod.LongRecordingOrganizer(
                     item=tmpdir_path,
                     mode="mne",
                     extract_func=mock_func,
@@ -787,15 +788,15 @@ class TestSystemIntegration:
             tmpdir_path = Path(tmpdir)
 
             # Test organizer creation with cache policy
-            organizer = core.LongRecordingOrganizer(
+            organizer = _lro_mod.LongRecordingOrganizer(
                 tmpdir_path, mode=None, cache_policy="auto"
             )
 
             # Test that unified function is accessible
-            assert hasattr(core, "should_use_cache_unified")
+            assert hasattr(core.utils, "should_use_cache_unified")
 
             # Test function call
-            result = core.should_use_cache_unified(
+            result = core.utils.should_use_cache_unified(
                 tmpdir_path / "test.edf",
                 [tmpdir_path / "source.txt"],
                 "force_regenerate",

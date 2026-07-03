@@ -13,8 +13,9 @@ import pytest
 import seaborn as sns
 
 from neurodent import constants
-from neurodent.visualization import ExperimentPlotter, WindowAnalysisResult
-from neurodent.visualization.plotting.experiment import df_normalize_baseline
+from neurodent.plotting import ExperimentPlotter
+from neurodent.results import WindowAnalysisResult
+from neurodent.plotting.experiment import df_normalize_baseline
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -477,7 +478,7 @@ class TestPlotCatplot:
         with pytest.raises(ValueError, match="not supported"):
             ep.plot_catplot("rms", groupby=["genotype"], norm_test="Shapiro")
 
-    @patch("neurodent.visualization.plotting.experiment.Annotator")
+    @patch("neurodent.plotting.experiment.Annotator")
     def test_stat_annotations_all(self, mock_annotator_cls):
         """Lines 506-554: statistical annotations with 'all'."""
         mock_annotator = MagicMock()
@@ -491,7 +492,7 @@ class TestPlotCatplot:
         )
         assert isinstance(g, sns.FacetGrid)
 
-    @patch("neurodent.visualization.plotting.experiment.Annotator")
+    @patch("neurodent.plotting.experiment.Annotator")
     def test_stat_annotations_x(self, mock_annotator_cls):
         """Lines 515-526: statistical annotations with 'x'."""
         mock_annotator = MagicMock()
@@ -505,7 +506,7 @@ class TestPlotCatplot:
         )
         assert isinstance(g, sns.FacetGrid)
 
-    @patch("neurodent.visualization.plotting.experiment.Annotator")
+    @patch("neurodent.plotting.experiment.Annotator")
     def test_stat_annotations_hue(self, mock_annotator_cls):
         """Lines 527-538: statistical annotations with 'hue'."""
         mock_annotator = MagicMock()
@@ -519,7 +520,7 @@ class TestPlotCatplot:
         )
         assert isinstance(g, sns.FacetGrid)
 
-    @patch("neurodent.visualization.plotting.experiment.Annotator")
+    @patch("neurodent.plotting.experiment.Annotator")
     def test_stat_annotations_list(self, mock_annotator_cls):
         """Lines 539-540: statistical annotations with explicit list."""
         mock_annotator = MagicMock()
@@ -534,7 +535,7 @@ class TestPlotCatplot:
         )
         assert isinstance(g, sns.FacetGrid)
 
-    @patch("neurodent.visualization.plotting.experiment.Annotator")
+    @patch("neurodent.plotting.experiment.Annotator")
     def test_stat_annotations_unsupported_raises(self, mock_annotator_cls):
         """Line 542: unsupported stat_pairs value."""
         war1 = _make_mock_war(animal_id="A1", genotype="WT", n_rows=10)
@@ -751,7 +752,7 @@ class TestPlotDiffheatmap:
             "pcorr": [np.eye(2).tolist(), np.eye(2).tolist(), (np.eye(2) * 2).tolist(), (np.eye(2) * 2).tolist()],
         })
         with patch.object(ep, "pull_timeseries_dataframe", return_value=df):
-            with patch("neurodent.visualization.plotting.experiment.df_normalize_baseline", side_effect=lambda **kw: kw["df"]):
+            with patch("neurodent.plotting.experiment.df_normalize_baseline", side_effect=lambda **kw: kw["df"]):
                 g = ep.plot_diffheatmap(
                     "pcorr",
                     groupby=["genotype", "sex"],
@@ -797,7 +798,7 @@ class TestPlotDiffheatmapFaceted:
             "sex": ["Male", "Male", "Female", "Female"],
             "pcorr": [np.eye(2).tolist(), np.eye(2).tolist(), (np.eye(2)*2).tolist(), (np.eye(2)*2).tolist()],
         })
-        with patch("neurodent.visualization.plotting.experiment.df_normalize_baseline", side_effect=lambda **kw: kw["df"]):
+        with patch("neurodent.plotting.experiment.df_normalize_baseline", side_effect=lambda **kw: kw["df"]):
             grids = ep.plot_diffheatmap_faceted(
                 "pcorr",
                 groupby=["genotype", "sex"],
@@ -818,7 +819,7 @@ class TestPlotDiffheatmapFaceted:
             "genotype": ["WT", "KO"],
             "pcorr": [np.eye(2).tolist(), (np.eye(2)*2).tolist()],
         })
-        with patch("neurodent.visualization.plotting.experiment.df_normalize_baseline", side_effect=lambda **kw: kw["df"]):
+        with patch("neurodent.plotting.experiment.df_normalize_baseline", side_effect=lambda **kw: kw["df"]):
             grids = ep.plot_diffheatmap_faceted(
                 "pcorr",
                 groupby=["genotype"],
@@ -850,7 +851,7 @@ class TestPlotDiffheatmapFaceted:
             "sex": ["Male", "Male", "Female", "Female"],
             "pcorr": [np.eye(2).tolist(), np.eye(2).tolist(), (np.eye(2)*2).tolist(), (np.eye(2)*2).tolist()],
         })
-        with patch("neurodent.visualization.plotting.experiment.df_normalize_baseline", side_effect=lambda **kw: kw["df"]):
+        with patch("neurodent.plotting.experiment.df_normalize_baseline", side_effect=lambda **kw: kw["df"]):
             grids = ep.plot_diffheatmap_faceted(
                 "pcorr",
                 groupby=["genotype", "sex"],
@@ -870,7 +871,7 @@ class TestPlotDiffheatmapFaceted:
         def _capture_baseline(**kw):
             captured_kwargs.update(kw)
             return kw["df"]
-        with patch("neurodent.visualization.plotting.experiment.df_normalize_baseline", side_effect=_capture_baseline):
+        with patch("neurodent.plotting.experiment.df_normalize_baseline", side_effect=_capture_baseline):
             grids = ep.plot_diffheatmap_faceted(
                 "cohere",
                 groupby=["genotype"],

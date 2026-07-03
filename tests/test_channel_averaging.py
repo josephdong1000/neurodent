@@ -2,7 +2,8 @@
 import numpy as np
 import pandas as pd
 import pytest
-from neurodent import visualization, constants
+from neurodent import constants
+from neurodent.results import WindowAnalysisResult
 
 
 class TestChannelAveraging:
@@ -317,7 +318,7 @@ def mock_war_with_bands():
 
     df = pd.DataFrame(data)
 
-    war = visualization.WindowAnalysisResult(
+    war = WindowAnalysisResult(
         result=df,
         animal_id='A001',
         genotype='WT',
@@ -352,7 +353,7 @@ def mock_war_with_matrices():
 
     df = pd.DataFrame(data)
 
-    war = visualization.WindowAnalysisResult(
+    war = WindowAnalysisResult(
         result=df,
         animal_id='A001',
         genotype='WT',
@@ -379,7 +380,7 @@ def mock_war_with_linear():
 
     df = pd.DataFrame(data)
 
-    war = visualization.WindowAnalysisResult(
+    war = WindowAnalysisResult(
         result=df,
         animal_id='A001',
         genotype='WT',
@@ -406,7 +407,7 @@ def mock_war_with_simple_matrix():
 
     df = pd.DataFrame(data)
 
-    war = visualization.WindowAnalysisResult(
+    war = WindowAnalysisResult(
         result=df,
         animal_id='A001',
         genotype='WT',
@@ -458,7 +459,7 @@ def mock_war_full():
 
     df = pd.DataFrame(data)
 
-    war = visualization.WindowAnalysisResult(
+    war = WindowAnalysisResult(
         result=df,
         animal_id='A001',
         genotype='WT',
@@ -486,7 +487,7 @@ def mock_war_with_linear_lists():
 
     df = pd.DataFrame(data)
 
-    war = visualization.WindowAnalysisResult(
+    war = WindowAnalysisResult(
         result=df,
         animal_id='A001',
         genotype='WT',
@@ -514,7 +515,7 @@ def mock_war_with_matrix_lists():
 
     df = pd.DataFrame(data)
 
-    war = visualization.WindowAnalysisResult(
+    war = WindowAnalysisResult(
         result=df,
         animal_id='A001',
         genotype='WT',
@@ -558,7 +559,7 @@ def mock_war_with_matrix_dict_lists():
 
     df = pd.DataFrame(data)
 
-    war = visualization.WindowAnalysisResult(
+    war = WindowAnalysisResult(
         result=df,
         animal_id='A001',
         genotype='WT',
@@ -586,7 +587,7 @@ def mock_war_with_banded_matrix_as_2d_array():
 
     df = pd.DataFrame(data)
 
-    war = visualization.WindowAnalysisResult(
+    war = WindowAnalysisResult(
         result=df,
         animal_id="A001",
         genotype="WT",
@@ -615,7 +616,7 @@ def mock_war_with_banded_matrix_as_3d_array():
 
     df = pd.DataFrame(data)
 
-    war = visualization.WindowAnalysisResult(
+    war = WindowAnalysisResult(
         result=df,
         animal_id="A001",
         genotype="WT",

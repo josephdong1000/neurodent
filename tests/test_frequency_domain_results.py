@@ -1,5 +1,5 @@
 """
-Unit tests for neurodent.visualization.frequency_domain_results module.
+Unit tests for neurodent.results.frequency_domain_results module.
 """
 
 import json
@@ -20,7 +20,7 @@ except ImportError:
 
 import mne
 
-from neurodent.visualization.frequency_domain_results import FrequencyDomainSpikeAnalysisResult
+from neurodent.results.frequency_domain_results import FrequencyDomainSpikeAnalysisResult
 from neurodent import core
 
 
@@ -345,7 +345,7 @@ class TestFrequencyDomainSpikeAnalysisResult:
         )
 
         # Mock the conversion method
-        with patch("neurodent.visualization.frequency_domain_results.FrequencyDomainSpikeAnalysisResult.convert_sas_to_mne") as mock_convert:
+        with patch("neurodent.results.frequency_domain_results.FrequencyDomainSpikeAnalysisResult.convert_sas_to_mne") as mock_convert:
             mock_mne = MagicMock()
             mock_convert.return_value = mock_mne
 
@@ -618,11 +618,11 @@ class TestFrequencyDomainSpikeAnalysisResultUtils:
         fdsar.channel_names = ["ch1", "ch2"]
 
         # Mock the parse function
-        with patch("neurodent.core.resolve_channel") as mock_parse:
+        with patch("neurodent.core.utils.resolve_channel") as mock_parse:
             mock_parse.return_value = "parsed"
 
             fdsar.channel_abbrevs = [
-                core.resolve_channel(x) for x in fdsar.channel_names
+                core.utils.resolve_channel(x) for x in fdsar.channel_names
             ]
 
             assert len(fdsar.channel_abbrevs) == 2

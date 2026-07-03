@@ -1,10 +1,10 @@
 import pandas as pd
 import numpy as np
 import logging
-from neurodent.core import (
+from neurodent.results import (
     ZeitgeberAnalysisResult,
     transform_time_axis,
-    get_expanded_feature_names
+    get_expanded_feature_names,
 )
 
 # Configure logging
@@ -98,7 +98,7 @@ def test_verify_pipeline():
     logger.info("--- Testing Plotting Logic ---")
 
     # Plotter-side 48h expansion (the data layer stays 24h post-refactor).
-    from neurodent.core.zeitgeber import expand_zt_axis
+    from neurodent.results.zeitgeber import expand_zt_axis
     df_plot = expand_zt_axis(df_agg, n_days=2)
     
     # Verify Metadata Helpers

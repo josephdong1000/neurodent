@@ -1,7 +1,7 @@
 
 import pytest
 from pathlib import Path
-import neurodent.visualization.results as results
+import neurodent.loading.animal_organizer as results
 import neurodent.constants as constants
 
 @pytest.fixture

@@ -10,7 +10,7 @@ labels across cycles.
 
 These were added during the ``total_minutes → zt_minutes`` refactor that
 also pulled the 48h row duplication out of the data layer and into
-:func:`neurodent.core.zeitgeber.expand_zt_axis`.
+:func:`neurodent.results.zeitgeber.expand_zt_axis`.
 """
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from neurodent.core import zeitgeber
+from neurodent.results import zeitgeber
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -334,7 +334,7 @@ class TestNewBaseFeaturesChannelAveraging:
 
     def _make_war_with_new_features(self):
         """Build a minimal WAR carrying all four new features."""
-        from neurodent.visualization import WindowAnalysisResult
+        from neurodent.results import WindowAnalysisResult
 
         rng = np.random.default_rng(0)
         n_windows = 4

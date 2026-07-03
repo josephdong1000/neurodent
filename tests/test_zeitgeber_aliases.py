@@ -1,7 +1,7 @@
 
 import pytest
 import pandas as pd
-from neurodent.core import zeitgeber
+from neurodent.results import zeitgeber
 
 def test_enrich_with_genotype_aliases():
     """

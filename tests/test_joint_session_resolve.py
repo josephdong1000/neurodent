@@ -18,8 +18,8 @@ import pytest
 import spikeinterface.core as si_core
 
 from neurodent import constants, set_channel_map
-from neurodent.core import LongRecordingOrganizer
-from neurodent.visualization.results import WindowAnalysisResult
+from neurodent.loading import LongRecordingOrganizer
+from neurodent.results.window_analysis_result import WindowAnalysisResult
 
 # Both tests reconfigure the channel map via set_channel_map (restored by the autouse
 # conftest fixture); declare the intentional mutation so it isn't flagged.

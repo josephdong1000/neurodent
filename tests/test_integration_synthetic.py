@@ -4,7 +4,7 @@ Integration tests using synthetic data from spikeinterface.
 import datetime
 import numpy as np
 import spikeinterface.core as si
-from neurodent.core import LongRecordingOrganizer
+from neurodent.loading import LongRecordingOrganizer
 from neurodent import constants
 
 
@@ -69,7 +69,7 @@ def test_analysis_pipeline_integration():
     NOTE: Uses single-segment recording since the focus is dtype enforcement,
     not multi-segment handling. Multi-segment tests are covered elsewhere.
     """
-    from neurodent.core import LongRecordingAnalyzer
+    from neurodent.analysis import LongRecordingAnalyzer
     
     # 1. Create single-segment synthetic recording with int16 dtype
     # LRO should convert this to float32 via _apply_resampling
@@ -109,7 +109,7 @@ def test_lro_merge_and_analysis_pipeline():
     This tests the full pipeline: create 2 LROs with synthetic data, merge them,
     then verify the merged LRO works correctly with the analysis pipeline.
     """
-    from neurodent.core import LongRecordingAnalyzer
+    from neurodent.analysis import LongRecordingAnalyzer
     
     # 1. Create first LRO with synthetic data
     traces1 = np.random.randn(3000, 2).astype(np.int16)  # 3s @ 1000Hz

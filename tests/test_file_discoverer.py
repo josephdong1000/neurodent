@@ -2,7 +2,7 @@ import os
 
 import pytest
 from pathlib import Path
-from neurodent.core.discovery import DiscoveredFile, FileDiscoverer
+from neurodent.loading.discovery import DiscoveredFile, FileDiscoverer
 
 
 def test_single_file_discovery(tmp_path):

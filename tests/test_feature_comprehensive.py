@@ -17,7 +17,7 @@ import pytest
 from scipy import signal
 import warnings
 
-from neurodent.core.analyze_frag import FragmentAnalyzer
+from neurodent.analysis.fragment_analyzer import FragmentAnalyzer
 from neurodent import constants
 
 
@@ -742,7 +742,7 @@ class TestMathematicalProperties:
         logampvar = FragmentAnalyzer.compute_logampvar(signal_data)
 
         # Log amplitude variance should equal log transform of amplitude variance
-        from neurodent.core import log_transform
+        from neurodent.core.utils import log_transform
 
         expected_logampvar = log_transform(ampvar)
         np.testing.assert_allclose(logampvar, expected_logampvar, rtol=1e-10)
@@ -765,7 +765,7 @@ class TestMathematicalProperties:
         logpsdband = FragmentAnalyzer.compute_logpsdband(signal_data, self.fs, notch_filter=False)
 
         # Log PSD band should equal log transform of PSD band
-        from neurodent.core import log_transform
+        from neurodent.core.utils import log_transform
 
         for band_name in psdband.keys():
             expected_logpsd = log_transform(psdband[band_name])
@@ -780,7 +780,7 @@ class TestMathematicalProperties:
         logpsdtotal = FragmentAnalyzer.compute_logpsdtotal(signal_data, self.fs, notch_filter=False)
 
         # Log total PSD should equal log transform of total PSD
-        from neurodent.core import log_transform
+        from neurodent.core.utils import log_transform
 
         expected_logpsdtotal = log_transform(psdtotal)
         np.testing.assert_allclose(logpsdtotal, expected_logpsdtotal, rtol=1e-10)
@@ -800,7 +800,7 @@ class TestMathematicalProperties:
         psdband = FragmentAnalyzer.compute_psdband(signal_data, self.fs, notch_filter=False)
         psdtotal = FragmentAnalyzer.compute_psdtotal(signal_data, self.fs, notch_filter=False)
 
-        from neurodent.core import log_transform
+        from neurodent.core.utils import log_transform
 
         for band_name in psdfrac.keys():
             expected_logpsdfrac = log_transform(psdband[band_name] / psdtotal)

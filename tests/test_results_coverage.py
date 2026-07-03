@@ -1,5 +1,5 @@
 """
-Tests targeting uncovered lines in neurodent.visualization.results.
+Tests targeting uncovered lines in neurodent.results.window_analysis_result.
 """
 
 import json
@@ -11,10 +11,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from neurodent.visualization import WindowAnalysisResult
+from neurodent.results import WindowAnalysisResult
 from neurodent import constants
-from neurodent.visualization.feature_utils import average_feature
-from neurodent.visualization.results import _sanitize_feature_request
+from neurodent.results.feature_utils import average_feature
+from neurodent.results.window_analysis_result import _sanitize_feature_request
 
 
 # ---------------------------------------------------------------------------

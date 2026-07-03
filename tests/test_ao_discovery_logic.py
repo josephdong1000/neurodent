@@ -13,8 +13,8 @@ import pytest
 from pathlib import Path
 from datetime import datetime
 from unittest.mock import patch, MagicMock
-import neurodent.visualization.results as results
-import neurodent.core.core as core
+import neurodent.loading.animal_organizer as results
+import neurodent.loading.long_recording_organizer as core
 
 
 @pytest.fixture
@@ -227,7 +227,7 @@ def test_multi_pattern_discovery(multi_file_structure, monkeypatch):
     # Each session should have a DiscoveredFile with 2 files
     for session_files in ao._animalday_folder_groups.values():
         assert len(session_files) == 1
-        from neurodent.core.discovery import DiscoveredFile
+        from neurodent.loading.discovery import DiscoveredFile
         assert isinstance(session_files[0], DiscoveredFile)
         assert session_files[0].is_multi_file
         assert len(session_files[0].paths) == 2
@@ -430,7 +430,7 @@ def test_sort_lros_handles_multifile_discovered_files():
 
         TypeError: Multi-file DiscoveredFile cannot be converted to a single path.
     """
-    from neurodent.core.discovery import DiscoveredFile
+    from neurodent.loading.discovery import DiscoveredFile
 
     ao = MagicMock(spec=results.AnimalOrganizer)
     ao._get_item_name = results.AnimalOrganizer._get_item_name.__get__(ao, results.AnimalOrganizer)
@@ -477,7 +477,7 @@ def test_pattern_with_irrelevant_path_data_and_index_sort(tmp_path, monkeypatch)
     2. Files are sorted by {index} metadata, not by the irrelevant directory names
     3. Timeline computation uses index-based ordering
     """
-    from neurodent.core.discovery import DiscoveredFile
+    from neurodent.loading.discovery import DiscoveredFile
     import pandas as pd
 
     # Create file structure with 10 files where:
@@ -555,7 +555,7 @@ def test_pattern_with_irrelevant_path_data_and_index_sort(tmp_path, monkeypatch)
 
     # Now test that _compute_global_timeline sorts by index, not by directory name or filename
     # Mock LongRecordingOrganizer to avoid file I/O
-    with patch("neurodent.visualization.results.core.LongRecordingOrganizer") as mock_lro_cls:
+    with patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer") as mock_lro_cls:
         def side_effect(*args, **kwargs):
             m = MagicMock()
             m.LongRecording.get_duration.return_value = 3600.0  # 1 hour per file

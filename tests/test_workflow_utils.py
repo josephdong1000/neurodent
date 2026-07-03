@@ -55,7 +55,7 @@ class TestLoadWars:
         mock_war = MagicMock()
         mock_war.animal_id = "test_animal"
 
-        with patch("neurodent.visualization.WindowAnalysisResult") as mock_war_class:
+        with patch("neurodent.results.WindowAnalysisResult") as mock_war_class:
             mock_war_class.load_parquet_and_json.return_value = mock_war
 
             parquet_paths = [tmp_path / "war1.parquet", tmp_path / "war2.parquet"]
@@ -70,7 +70,7 @@ class TestLoadWars:
         """Test loading WARs with auto-detected json paths."""
         mock_war = MagicMock()
 
-        with patch("neurodent.visualization.WindowAnalysisResult") as mock_war_class:
+        with patch("neurodent.results.WindowAnalysisResult") as mock_war_class:
             mock_war_class.load_parquet_and_json.return_value = mock_war
 
             parquet_paths = [tmp_path / "animal1" / "war.parquet"]

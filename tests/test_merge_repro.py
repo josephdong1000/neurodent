@@ -1,7 +1,7 @@
 import datetime
 from datetime import timedelta
 import pytest
-from neurodent.core import LongRecordingOrganizer
+from neurodent.loading import LongRecordingOrganizer
 from neurodent.core.utils import TimestampMapper
 
 def test_reproduce_metadata_mismatch_bug():

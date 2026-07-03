@@ -5,8 +5,8 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from neurodent.visualization import AnimalOrganizer
-from neurodent import core
+from neurodent.loading import AnimalOrganizer
+from neurodent.loading import long_recording_organizer as core
 
 # Mocking the folder structure and LRO creation
 @pytest.fixture

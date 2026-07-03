@@ -11,7 +11,7 @@ import pytest
 import yaml
 
 from neurodent import constants
-from neurodent.visualization.results import WindowAnalysisResult
+from neurodent.results.window_analysis_result import WindowAnalysisResult
 
 
 def _make_linear_war(channel_abbrevs, rms_row):
@@ -133,7 +133,7 @@ class TestReorderKeepsHippocampus:
         in-memory WindowAnalysisResult default and not crash on a None target
         (previously: ``TypeError: 'NoneType' object is not iterable``).
         """
-        from neurodent.visualization.streaming import (
+        from neurodent.results.streaming import (
             LazyWindowAnalysisResult,
             ReorderAndPadChannels,
         )

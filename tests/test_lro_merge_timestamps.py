@@ -1,8 +1,8 @@
 import datetime
 from datetime import timedelta
 import pytest
-from neurodent.core import LongRecordingOrganizer
-from neurodent import core
+from neurodent.loading import LongRecordingOrganizer
+from neurodent.loading import long_recording_organizer as core
 
 def test_lro_merge_preserves_timestamps():
     """

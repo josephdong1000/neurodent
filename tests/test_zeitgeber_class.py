@@ -2,7 +2,7 @@ import pytest
 import pandas as pd
 import numpy as np
 from unittest.mock import MagicMock
-from neurodent.core import zeitgeber
+from neurodent.results import zeitgeber
 
 
 # Mock WindowAnalysisResult

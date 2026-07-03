@@ -2,7 +2,7 @@ import logging
 import warnings
 import pytest
 import numpy as np
-from neurodent.core import LongRecordingOrganizer
+from neurodent.loading import LongRecordingOrganizer
 
 def test_lro_label_merging_success():
     """Test that labels are correctly merged when there are no conflicts."""

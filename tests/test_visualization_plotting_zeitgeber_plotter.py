@@ -2,12 +2,12 @@
 import pytest
 import pandas as pd
 from unittest.mock import MagicMock, patch
-from neurodent.visualization.plotting import ZeitgeberPlotter
+from neurodent.plotting import ZeitgeberPlotter
 from neurodent import constants
 
-@patch("neurodent.visualization.plotting.zeitgeber_plotter.so.Plot")
-@patch("neurodent.visualization.plotting.zeitgeber_plotter.mpl.figure.Figure")
-@patch("neurodent.visualization.plotting.zeitgeber_plotter.plt.close")
+@patch("neurodent.plotting.zeitgeber_plotter.so.Plot")
+@patch("neurodent.plotting.zeitgeber_plotter.mpl.figure.Figure")
+@patch("neurodent.plotting.zeitgeber_plotter.plt.close")
 def test_plot_single_feature(mock_close, mock_fig, mock_plot, tmp_path):
     """Verify plot_feature calls plotting commands correctly."""
     df = pd.DataFrame({
@@ -55,7 +55,7 @@ def test_plot_single_feature(mock_close, mock_fig, mock_plot, tmp_path):
 
 def test_get_feature_label_utility():
     """Test the new get_feature_label utility function directly."""
-    from neurodent.core import get_feature_label
+    from neurodent.core.utils import get_feature_label
     
     # Base features
     assert get_feature_label("rms") == "RMS"
@@ -81,7 +81,7 @@ def test_get_feature_label_utility():
 def test_zeitgeber_plotter_from_zars():
     """Test ZeitgeberPlotter initialization from list of ZARs."""
     from unittest.mock import MagicMock
-    from neurodent.core import zeitgeber
+    from neurodent.results import zeitgeber
     
     # Create mock ZARs
     mock_zar1 = MagicMock()
@@ -140,8 +140,8 @@ def test_no_circular_import_with_transform_time_axis():
     """Test that importing transform_time_axis from zeitgeber_plotter works without circular import."""
     # This test verifies the lazy import pattern works correctly.
     # If there were a circular import, this would fail at import time.
-    from neurodent.visualization.plotting.zeitgeber_plotter import ZeitgeberPlotter
-    from neurodent.core.zeitgeber import transform_time_axis
+    from neurodent.plotting.zeitgeber_plotter import ZeitgeberPlotter
+    from neurodent.results.zeitgeber import transform_time_axis
     
     # Create a simple DF and run the function to ensure it's callable
     df = pd.DataFrame({
