@@ -118,7 +118,7 @@ class ZeitgeberPlotter:
 
         # Lazy import to avoid circular dependency between core.zeitgeber
         # and visualization.plotting.
-        from neurodent.core.zeitgeber import expand_zt_axis
+        from neurodent.results.zeitgeber import expand_zt_axis
         plot_df = expand_zt_axis(self.df, n_days=n_days)
 
         try:

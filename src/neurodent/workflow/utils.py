@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from neurodent.visualization import WindowAnalysisResult
+    from neurodent.results import WindowAnalysisResult
 
 
 def load_samples_config(path: "str | Path") -> dict:
@@ -222,7 +222,7 @@ def load_wars(
             wars = load_wars(parquet_paths=["data/animal1/war.parquet"])
             # Automatically looks for data/animal1/war.json
     """
-    from neurodent import visualization
+    from neurodent.results import WindowAnalysisResult
 
     # If json_paths not provided, derive from parquet_paths
     if json_paths is None:
@@ -243,7 +243,7 @@ def load_wars(
         if parquet_path.suffix == ".pkl":
             parquet_path = parquet_path.with_suffix(".parquet")
 
-        war = visualization.WindowAnalysisResult.load_parquet_and_json(
+        war = WindowAnalysisResult.load_parquet_and_json(
             folder_path=parquet_path.parent,
             parquet_name=parquet_path.name,
             json_name=json_path.name,

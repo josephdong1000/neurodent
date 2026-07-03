@@ -24,7 +24,10 @@ except ImportError:  # pragma: no cover
     si = None
     SPIKEINTERFACE_AVAILABLE = False
 
-import neurodent.core as core
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from neurodent.loading.long_recording_organizer import RecordingMetadata
 from neurodent.core.utils import resolve_channels, slugify
 
 
@@ -46,7 +49,7 @@ class FrequencyDomainSpikeAnalysisResult:
         genotype: str = None,
         animal_day: str = None,
         bin_folder_name: str = None,
-        metadata: core.RecordingMetadata = None,
+        metadata: "RecordingMetadata" = None,
         channel_names: list[str] = None,
     ) -> None:
         """
@@ -61,7 +64,7 @@ class FrequencyDomainSpikeAnalysisResult:
             genotype (str, optional): Genotype of animal
             animal_day (str, optional): Recording day identifier
             bin_folder_name (str, optional): Binary folder name
-            metadata (core.RecordingMetadata, optional): Recording metadata
+            metadata (RecordingMetadata, optional): Recording metadata
             channel_names (list[str], optional): List of channel names
         """
         # Ensure exactly one of result_sas or result_mne is provided (like SpikeAnalysisResult)
@@ -118,7 +121,7 @@ class FrequencyDomainSpikeAnalysisResult:
         genotype: str = None,
         animal_day: str = None,
         bin_folder_name: str = None,
-        metadata: core.RecordingMetadata = None,
+        metadata: "RecordingMetadata" = None,
     ):
         """
         Create FrequencyDomainSpikeAnalysisResult from raw detection outputs.
@@ -257,7 +260,7 @@ class FrequencyDomainSpikeAnalysisResult:
                 result_mne = FrequencyDomainSpikeAnalysisResult.convert_sas_to_mne(
                     self.result_sas, chunk_duration_s, multiprocess_mode=multiprocess_mode,
                 )
-                from neurodent.core.frequency_domain_spike_detection import (
+                from neurodent.analysis.spike_detection import (
                     FrequencyDomainSpikeDetector,
                 )
                 FrequencyDomainSpikeDetector._add_spike_annotations(

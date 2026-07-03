@@ -36,7 +36,7 @@ except (
 from sklearn.neighbors import LocalOutlierFactor
 
 from .. import constants
-from .utils import (
+from neurodent.core.utils import (
     Natural_Neighbor,
     TimestampMapper,
     chunked_channel_distance_matrix,
@@ -450,7 +450,7 @@ def split_recording(
         dict[str, LongRecordingOrganizer]: Dictionary mapping group names to LRO instances.
 
     Example:
-        >>> from neurodent.core import split_recording
+        >>> from neurodent.loading import split_recording
         >>> splits = split_recording(
         ...     "/path/to/session.bin",
         ...     groups={"AnimalA": ["Ch1", "Ch2"], "AnimalB": ["Ch3", "Ch4"]},

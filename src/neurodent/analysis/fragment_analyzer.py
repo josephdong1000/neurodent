@@ -17,7 +17,7 @@ from scipy.signal import butter, decimate, filtfilt, iirnotch, sosfiltfilt, welc
 from scipy.stats import linregress, pearsonr
 
 from .. import constants
-from .utils import log_transform
+from neurodent.core.utils import log_transform
 
 
 class FragmentAnalyzer:

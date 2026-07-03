@@ -1,7 +1,7 @@
 """Windowed feature analysis results.
 
 ``WindowAnalysisResult`` wraps the windowed feature DataFrame produced by
-:meth:`neurodent.core.loading.animal_organizer.AnimalOrganizer.compute_windowed_analysis`
+:meth:`neurodent.loading.animal_organizer.AnimalOrganizer.compute_windowed_analysis`
 and provides filtering, aggregation, serialization, and LOF utilities.
 
 Split out of the former monolithic ``results.py`` (issue #134).
@@ -25,8 +25,7 @@ if TYPE_CHECKING:
     from .frequency_domain_results import FrequencyDomainSpikeAnalysisResult
 
 from neurodent import constants
-import neurodent.core as core
-from neurodent.core.utils import atomic_output_path, atomic_write_json, resolve_channel, slugify
+from neurodent.core.utils import atomic_output_path, atomic_write_json, log_transform, resolve_channel, slugify
 from .feature_utils import extract_linear_array, average_feature
 from .feature_handlers import handler_for
 from .filters import (
@@ -351,7 +350,7 @@ class WindowAnalysisResult:
 
         try:
             self.channel_abbrevs = [
-                core.resolve_channel(x)
+                resolve_channel(x)
                 for x in self.channel_names
             ]
         except (ValueError, KeyError) as e:
@@ -487,7 +486,7 @@ class WindowAnalysisResult:
             - The number of sars must match the number of unique animaldays in self.result
             - Spikes are binned into time windows matching the existing WAR fragments
             - nspike: array of spike counts per channel for each time window
-            - lognspike: log-transformed spike counts using core.log_transform()
+            - lognspike: log-transformed spike counts using log_transform()
 
         Example:
             >>> # After computing WAR and spike detection
@@ -589,7 +588,7 @@ class WindowAnalysisResult:
             - Uses _bin_spike_df() helper to count spikes within each time window
             - Adds two new columns:
                 - 'nspike': array of spike counts per channel for each window
-                - 'lognspike': log-transformed spike counts via core.log_transform()
+                - 'lognspike': log-transformed spike counts via log_transform()
             - Warns if spike count size doesn't match result DataFrame size
         """
         # Each groupby animalday is a recording session
@@ -610,7 +609,7 @@ class WindowAnalysisResult:
         result = self.result.copy()
         result["nspike"] = spike_counts.tolist()
         result["lognspike"] = list(
-            core.log_transform(np.stack(result["nspike"].tolist(), axis=0))
+            log_transform(np.stack(result["nspike"].tolist(), axis=0))
         )
         if inplace:
             self.result = result

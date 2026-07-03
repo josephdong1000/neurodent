@@ -9,10 +9,10 @@ import numpy as np
 import pandas as pd
 from scipy.stats import gzscore, linregress, zscore
 
-from ... import constants
-from ... import visualization as viz
-from ...core.utils import slugify
-from ..feature_utils import (
+from neurodent import constants
+from neurodent.results import WindowAnalysisResult
+from neurodent.core.utils import slugify
+from neurodent.results.feature_utils import (
     flatten_feature_for_plotting,
     extract_feature,
 )
@@ -38,7 +38,7 @@ class AnimalPlotter:
 
     def __init__(
         self,
-        war: viz.WindowAnalysisResult,
+        war: WindowAnalysisResult,
         save_fig: bool = False,
         save_path: Path = None,
     ) -> None:

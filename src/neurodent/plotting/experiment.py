@@ -12,10 +12,10 @@ import statsmodels.api as sm
 from scipy import stats
 from statannotations.Annotator import Annotator
 
-from ... import core
-from ... import visualization as viz
-from ... import constants
-from ..feature_utils import extract_hist_data, extract_feature, format_channel_data
+from neurodent.core import utils as core_utils
+from neurodent.results import WindowAnalysisResult
+from neurodent import constants
+from neurodent.results.feature_utils import extract_hist_data, extract_feature, format_channel_data
 
 
 class ExperimentPlotter:
@@ -68,7 +68,7 @@ class ExperimentPlotter:
 
     def __init__(
         self,
-        wars: viz.WindowAnalysisResult | list[viz.WindowAnalysisResult],
+        wars: WindowAnalysisResult | list[WindowAnalysisResult],
         features: list[str] = None,
         exclude: list[str] = None,
         use_abbreviations: bool = True,
@@ -433,7 +433,7 @@ class ExperimentPlotter:
             groupby_cols = df.columns.drop(feature).tolist()
             logging.debug(f"groupby_cols: {groupby_cols}")
             grouped = df.groupby(groupby_cols, sort=False, dropna=False)
-            df = grouped[feature].apply(core.utils.nanmean_series_of_np).reset_index()
+            df = grouped[feature].apply(core_utils.nanmean_series_of_np).reset_index()
 
         # baseline_means = (df_base
         #                   .groupby(remaining_groupby)[feature]
@@ -442,7 +442,7 @@ class ExperimentPlotter:
         # Validate plot order against the DataFrame that will be sorted
         self.validate_plot_order(df)
 
-        df = core.utils.sort_dataframe_by_plot_order(df, self._plot_order)
+        df = core_utils.sort_dataframe_by_plot_order(df, self._plot_order)
 
         return df
 
@@ -567,14 +567,14 @@ class ExperimentPlotter:
                 ax = g.facet_axis(i, j)
                 match stat_pairs:
                     case "all":
-                        items = core.utils._get_groupby_keys(
+                        items = core_utils._get_groupby_keys(
                             df, [default_params["x"], default_params["hue"]]
                         )
-                        pairs = core.utils._get_pairwise_combinations(items)
+                        pairs = core_utils._get_pairwise_combinations(items)
                     case "x":
-                        items_x = core.utils._get_groupby_keys(df, default_params["x"])
-                        pairs_x = core.utils._get_pairwise_combinations(items_x)
-                        items_hue = core.utils._get_groupby_keys(
+                        items_x = core_utils._get_groupby_keys(df, default_params["x"])
+                        pairs_x = core_utils._get_pairwise_combinations(items_x)
+                        items_hue = core_utils._get_groupby_keys(
                             df, default_params["hue"]
                         )
                         pairs = [
@@ -584,11 +584,11 @@ class ExperimentPlotter:
                         ]
                         logging.debug(f"pairs: {pairs}")
                     case "hue":
-                        items_hue = core.utils._get_groupby_keys(
+                        items_hue = core_utils._get_groupby_keys(
                             df, default_params["hue"]
                         )
-                        pairs_hue = core.utils._get_pairwise_combinations(items_hue)
-                        items_x = core.utils._get_groupby_keys(df, default_params["x"])
+                        pairs_hue = core_utils._get_pairwise_combinations(items_hue)
+                        items_x = core_utils._get_groupby_keys(df, default_params["x"])
                         pairs = [
                             ((x_item, pair[0]), (x_item, pair[1]))
                             for x_item in items_x
@@ -1119,14 +1119,14 @@ def df_normalize_baseline(
 
     if remaining_groupby:
         baseline_means = df_base.groupby(remaining_groupby)[feature].apply(
-            core.utils.nanmean_series_of_np
+            core_utils.nanmean_series_of_np
         )
         df_merge = df.merge(
             baseline_means, how="left", on=remaining_groupby, suffixes=("", "_baseline")
         )
     else:
         baseline_means = df_base.groupby(baseline_groupby)[feature].apply(
-            core.utils.nanmean_series_of_np
+            core_utils.nanmean_series_of_np
         )  # Global baseline
         assert len(baseline_means) == 1
         df_merge = df.assign(

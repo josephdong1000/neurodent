@@ -3,11 +3,13 @@
 ``AnimalOrganizer`` discovers and loads recording files, groups them into
 sessions, manages ``LongRecordingOrganizer`` instances and their timeline, and
 orchestrates windowed feature analysis and spike detection — producing
-:class:`~neurodent.core.results.window_analysis_result.WindowAnalysisResult`
+:class:`~neurodent.results.window_analysis_result.WindowAnalysisResult`
 objects.
 
 Split out of the former monolithic ``results.py`` (issue #134).
 """
+
+from __future__ import annotations
 
 import copy
 import fnmatch
@@ -24,9 +26,12 @@ import pandas as pd
 from tqdm import tqdm
 
 from neurodent import constants
-import neurodent.core as core
-from neurodent.core.utils import resolve_channels, resolve_channel
-from .pipeline import AnalysisPipeline
+from . import long_recording_organizer as _lro
+from neurodent.core.utils import is_day, parse_truncate, resolve_channel, resolve_channels
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from neurodent.analysis import long_recording_analyzer as _lra
 
 
 class AnimalOrganizer:
@@ -88,7 +93,7 @@ class AnimalOrganizer:
         standard __init__ and factory methods like from_lros().
         """
         # Processing lists
-        self.long_analyzers: list[core.LongRecordingAnalyzer] = []
+        self.long_analyzers: list[_lra.LongRecordingAnalyzer] = []
 
         # Output containers
         self.bad_channels_dict = {}
@@ -127,7 +132,7 @@ class AnimalOrganizer:
                     stacklevel=2,
                 )
 
-        from neurodent.core.discovery import FileDiscoverer
+        from neurodent.loading.discovery import FileDiscoverer
 
         self.discoverer = FileDiscoverer(pattern)
 
@@ -164,9 +169,8 @@ class AnimalOrganizer:
             raise ValueError(f"No items discovered for pattern: {pattern}")
 
         if truncate:
-            from neurodent import core
 
-            truncate = core.utils.parse_truncate(truncate)
+            truncate = parse_truncate(truncate)
             warnings.warn(
                 f"AnimalOrganizer will be truncated to the first {truncate} sessions"
             )
@@ -213,9 +217,8 @@ class AnimalOrganizer:
         else:
             self._processed_timestamps = None
 
-        from neurodent import core
 
-        self.long_recordings: list[core.LongRecordingOrganizer] = []
+        self.long_recordings: list[_lro.LongRecordingOrganizer] = []
         self._create_long_recordings(lro_kwargs)
 
         # Set and validate channel_names across all LROs
@@ -223,7 +226,7 @@ class AnimalOrganizer:
 
     def _get_item_name(self, item):
         """Helper to get a representative name for an item which could be a string, Path, list of strings, or DiscoveredFile."""
-        from neurodent.core.discovery import DiscoveredFile
+        from neurodent.loading.discovery import DiscoveredFile
 
         if isinstance(item, DiscoveredFile):
             paths = item.get_path_list()
@@ -241,7 +244,7 @@ class AnimalOrganizer:
         this returns the full path, ensuring items with the same filename in different
         session directories get distinct keys.
         """
-        from neurodent.core.discovery import DiscoveredFile
+        from neurodent.loading.discovery import DiscoveredFile
 
         if isinstance(item, DiscoveredFile):
             paths = item.get_path_list()
@@ -282,7 +285,7 @@ class AnimalOrganizer:
 
     def _is_item_file(self, item):
         """Helper to check if an item represents a file(s) rather than a directory."""
-        from neurodent.core.discovery import DiscoveredFile
+        from neurodent.loading.discovery import DiscoveredFile
 
         if isinstance(item, DiscoveredFile):
             paths = item.get_path_list()
@@ -294,7 +297,7 @@ class AnimalOrganizer:
     @staticmethod
     def _get_context_path(item) -> Path:
         """Return a single Path from an item (str, Path, list, or DiscoveredFile)."""
-        from neurodent.core.discovery import DiscoveredFile
+        from neurodent.loading.discovery import DiscoveredFile
 
         if isinstance(item, DiscoveredFile):
             return Path(item.get_path_list()[0])
@@ -399,7 +402,7 @@ class AnimalOrganizer:
 
     def _session_sort_key(self, items):
         """Return sort-key function: use {index} metadata if available, else filename."""
-        from neurodent.core.discovery import _natural_sort_key
+        from neurodent.loading.discovery import _natural_sort_key
 
         if self._items_have_index(items):
             return lambda f: _natural_sort_key(f.metadata["index"])
@@ -432,7 +435,7 @@ class AnimalOrganizer:
             f"starting at {base_datetime}"
         )
 
-        from neurodent.core.discovery import _natural_sort_key
+        from neurodent.loading.discovery import _natural_sort_key
 
         ordered_items = []
         if original_manual_datetimes is not None:
@@ -456,7 +459,7 @@ class AnimalOrganizer:
                     item_lro_pairs = []
                     for item in items:
                         try:
-                            temp_lro = core.LongRecordingOrganizer(
+                            temp_lro = _lro.LongRecordingOrganizer(
                                 item, **base_lro_kwargs
                             )
                             item_lro_pairs.append((item, temp_lro))
@@ -527,7 +530,7 @@ class AnimalOrganizer:
                 _lro_kwargs["manual_datetimes"] = timestamp
 
                 try:
-                    temp_lro = core.LongRecordingOrganizer(item, **_lro_kwargs)
+                    temp_lro = _lro.LongRecordingOrganizer(item, **_lro_kwargs)
                     duration = (
                         temp_lro.LongRecording.get_duration()
                         if hasattr(temp_lro, "LongRecording") and temp_lro.LongRecording
@@ -547,7 +550,7 @@ class AnimalOrganizer:
                 _lro_kwargs = base_lro_kwargs.copy()
 
                 try:
-                    temp_lro = core.LongRecordingOrganizer(item, **_lro_kwargs)
+                    temp_lro = _lro.LongRecordingOrganizer(item, **_lro_kwargs)
                     duration = (
                         temp_lro.LongRecording.get_duration()
                         if hasattr(temp_lro, "LongRecording") and temp_lro.LongRecording
@@ -672,7 +675,7 @@ class AnimalOrganizer:
         last_start = resolved[-1]
         _kw = base_lro_kwargs.copy()
         _kw["manual_datetimes"] = last_start
-        temp_lro = core.LongRecordingOrganizer(last_item, **_kw)
+        temp_lro = _lro.LongRecordingOrganizer(last_item, **_kw)
         duration = (
             temp_lro.LongRecording.get_duration()
             if hasattr(temp_lro, "LongRecording") and temp_lro.LongRecording
@@ -951,7 +954,7 @@ class AnimalOrganizer:
 
     def _create_long_recordings(self, lro_kwargs: dict):
         """Create LongRecordingOrganizer instances for each unique animalday."""
-        self.long_recordings: list[core.LongRecordingOrganizer] = []
+        self.long_recordings: list[_lro.LongRecordingOrganizer] = []
         skipped_animaldays: list[str] = []
         for animalday, items in self._animalday_folder_groups.items():
             kwargs = lro_kwargs.copy()
@@ -987,7 +990,7 @@ class AnimalOrganizer:
                 ):
                     # LRO handles lists of files directly, but we pass input_type='files'? Wait, LRO handles it natively now
                     pass
-                lro = core.LongRecordingOrganizer(item_to_pass, **kw)
+                lro = _lro.LongRecordingOrganizer(item_to_pass, **kw)
             else:
                 logging.info(
                     f"Creating individual LROs for {len(items)} items for {animalday}"
@@ -1009,7 +1012,7 @@ class AnimalOrganizer:
                                 self._processed_timestamps[item_key]
                             )
                             individual_kwargs["datetimes_are_start"] = True  # _compute_global_timeline always returns start times
-                    individual_lro = core.LongRecordingOrganizer(
+                    individual_lro = _lro.LongRecordingOrganizer(
                         item, **individual_kwargs
                     )
                     item_lro_pairs.append((item, individual_lro))
@@ -1510,6 +1513,7 @@ class AnimalOrganizer:
         lof_chunk_duration_s: float = 60,
     ):
         """Delegates to :meth:`AnalysisPipeline.compute_bad_channels`."""
+        from neurodent.analysis.pipeline import AnalysisPipeline
         return AnalysisPipeline(self).compute_bad_channels(
             lof_threshold=lof_threshold, force_recompute=force_recompute,
             lof_chunk_duration_s=lof_chunk_duration_s,
@@ -1517,10 +1521,12 @@ class AnimalOrganizer:
 
     def apply_lof_threshold(self, lof_threshold: float):
         """Delegates to :meth:`AnalysisPipeline.apply_lof_threshold`."""
+        from neurodent.analysis.pipeline import AnalysisPipeline
         return AnalysisPipeline(self).apply_lof_threshold(lof_threshold)
 
     def get_all_lof_scores(self) -> dict:
         """Delegates to :meth:`AnalysisPipeline.get_all_lof_scores`."""
+        from neurodent.analysis.pipeline import AnalysisPipeline
         return AnalysisPipeline(self).get_all_lof_scores()
 
     def compute_windowed_analysis(
@@ -1535,6 +1541,7 @@ class AnimalOrganizer:
         **kwargs,
     ) -> "WindowAnalysisResult":
         """Delegates to :meth:`AnalysisPipeline.compute_windowed_analysis`."""
+        from neurodent.analysis.pipeline import AnalysisPipeline
         return AnalysisPipeline(self).compute_windowed_analysis(
             features, exclude=exclude, window_s=window_s,
             multiprocess_mode=multiprocess_mode,
@@ -1550,6 +1557,7 @@ class AnimalOrganizer:
         multiprocess_mode: Literal["dask", "serial"] = "serial",
     ):
         """Delegates to :meth:`AnalysisPipeline.compute_frequency_domain_spike_analysis`."""
+        from neurodent.analysis.pipeline import AnalysisPipeline
         return AnalysisPipeline(self).compute_frequency_domain_spike_analysis(
             detection_params=detection_params,
             chunk_duration_s=chunk_duration_s,
@@ -1557,19 +1565,19 @@ class AnimalOrganizer:
         )
 
     def _process_fragment_serial(
-        self, idx, features, lan: core.LongRecordingAnalyzer, window_s, kwargs: dict
+        self, idx, features, lan: _lra.LongRecordingAnalyzer, window_s, kwargs: dict
     ):
         row = self._process_fragment_metadata(idx, lan, window_s)
         row.update(self._process_fragment_features(idx, features, lan, kwargs))
         return row
 
     def _process_fragment_metadata(
-        self, idx, lan: core.LongRecordingAnalyzer, window_s
+        self, idx, lan: _lra.LongRecordingAnalyzer, window_s
     ):
         row = {}
 
         # Build session labels from LRO's DiscoveredFile metadata
-        from neurodent.core.discovery import DiscoveredFile
+        from neurodent.loading.discovery import DiscoveredFile
         from neurodent import constants
 
         lro = lan.LongRecording
@@ -1603,12 +1611,12 @@ class AnimalOrganizer:
 
         frag_dt = lan.LongRecording.get_datetime_fragment(window_s, idx)
         row["timestamp"] = frag_dt
-        row["isday"] = core.utils.is_day(frag_dt)
+        row["isday"] = is_day(frag_dt)
 
         return row
 
     def _process_fragment_features(
-        self, idx, features, lan: core.LongRecordingAnalyzer, kwargs: dict
+        self, idx, features, lan: _lra.LongRecordingAnalyzer, kwargs: dict
     ):
         row = {}
         for feat in features:
@@ -1622,7 +1630,7 @@ class AnimalOrganizer:
     @classmethod
     def from_lros(
         cls,
-        lros: list[core.LongRecordingOrganizer],
+        lros: list[_lro.LongRecordingOrganizer],
         animal_id: str,
         genotype: str = "Unknown",
         sex: str = "Unknown",
@@ -1812,7 +1820,7 @@ class AnimalOrganizer:
         return ao
 
     @staticmethod
-    def _validate_channel_names(lros: list[core.LongRecordingOrganizer]) -> list[str]:
+    def _validate_channel_names(lros: list[_lro.LongRecordingOrganizer]) -> list[str]:
         """
         Validate that all LROs have consistent channel names.
 
@@ -1879,7 +1887,7 @@ class AnimalOrganizer:
 
     @staticmethod
     def _init_factory_defaults(
-        ao: "AnimalOrganizer", animal_id: str, lros: list[core.LongRecordingOrganizer]
+        ao: "AnimalOrganizer", animal_id: str, lros: list[_lro.LongRecordingOrganizer]
     ) -> None:
         """
         Initialize attribute values for factory-created instances.
