@@ -42,12 +42,13 @@ import numpy as np
 import pandas as pd
 import spikeinterface.core as si
 
-from neurodent.core import LongRecordingOrganizer
-from neurodent.core.zeitgeber import (
+from neurodent.loading import LongRecordingOrganizer
+from neurodent.results.zeitgeber import (
     add_zeitgeber_time_columns,
     shift_to_zeitgeber_reference,
 )
-from neurodent.visualization import AnimalOrganizer
+from neurodent.loading import AnimalOrganizer
+from neurodent.plotting import ZeitgeberPlotter
 
 FS = 1000
 WINDOW_S = 60
@@ -161,7 +162,7 @@ def render(df, name, out_dir):
     out_dir.mkdir(parents=True, exist_ok=True)
     png = out_dir / f"{name}.png"
     try:
-        from neurodent.visualization.plotting import ZeitgeberPlotter
+        from neurodent.plotting import ZeitgeberPlotter
         pdf = df[["zt_minutes", "rms"]].copy()
         pdf["genotype"], pdf["sex"] = "WT", "M"
         ZeitgeberPlotter(pdf).plot_feature("rms", png, figsize=[12, 6], n_days=2)

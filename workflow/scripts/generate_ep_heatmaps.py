@@ -19,7 +19,9 @@ matplotlib.use("Agg")  # Non-interactive backend
 
 import matplotlib.colors as colors
 
-from neurodent import visualization, constants
+from neurodent import constants
+from neurodent.results import WindowAnalysisResult
+from neurodent.plotting import ExperimentPlotter
 from neurodent.workflow import (
     setup_snakemake_logging,
     load_wars,
@@ -145,7 +147,7 @@ def generate_difference_heatmaps(wars, features, output_dir, config):
                 sex_wars, "genotype", constants.DF_SORT_ORDER.get("genotype", [])
             )
 
-            ep = visualization.ExperimentPlotter(
+            ep = ExperimentPlotter(
                 wars=sex_wars,
                 plot_order=plot_order,
             )
@@ -251,7 +253,7 @@ def main():
 
     # Create ExperimentPlotter for regular heatmaps
     logger.info("Creating ExperimentPlotter for regular heatmaps")
-    ep = visualization.ExperimentPlotter(
+    ep = ExperimentPlotter(
         wars=wars,
         plot_order=plot_order,
     )

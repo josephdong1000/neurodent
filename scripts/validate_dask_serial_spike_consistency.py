@@ -38,8 +38,8 @@ from pathlib import Path
 import numpy as np
 import yaml
 
-from neurodent.core.frequency_domain_spike_detection import FrequencyDomainSpikeDetector
-from neurodent.core.core import LongRecordingOrganizer
+from neurodent.analysis.spike_detection import FrequencyDomainSpikeDetector
+from neurodent.loading.long_recording_organizer import LongRecordingOrganizer
 
 
 def load_detection_params(config_path=None):

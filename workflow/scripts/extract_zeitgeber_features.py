@@ -17,8 +17,8 @@ from tqdm import tqdm
 import pandas as pd
 
 # Import the new zeitgeber module
-from neurodent.core import get_expanded_feature_names
-from neurodent.core.zeitgeber import _load_war_for_zeitgeber
+from neurodent.results import get_expanded_feature_names
+from neurodent.results.zeitgeber import _load_war_for_zeitgeber
 from neurodent.workflow import setup_snakemake_logging, apply_samples_config
 
 logger = logging.getLogger(__name__)

@@ -18,7 +18,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.metrics import f1_score, precision_score, recall_score
 
-from neurodent import visualization, core, constants
+from neurodent import constants, core
+from neurodent.results import WindowAnalysisResult
 from neurodent.workflow import setup_snakemake_logging, apply_samples_config
 
 
@@ -55,7 +56,7 @@ def evaluate_lof_accuracy_across_animals(
         for animal_name, (parquet_file, json_file) in flattened_wars.items():
             try:
                 # Load the flattened WAR
-                war = visualization.WindowAnalysisResult.load_parquet_and_json(
+                war = WindowAnalysisResult.load_parquet_and_json(
                     folder_path=Path(parquet_file).parent,
                     parquet_name=Path(parquet_file).name,
                     json_name=Path(json_file).name,
@@ -219,7 +220,7 @@ def create_lof_channel_barplot(
     for animal_name, (parquet_file, json_file) in flattened_wars.items():
         try:
             # Load the flattened WAR
-            war = visualization.WindowAnalysisResult.load_parquet_and_json(
+            war = WindowAnalysisResult.load_parquet_and_json(
                 folder_path=Path(parquet_file).parent,
                 parquet_name=Path(parquet_file).name,
                 json_name=Path(json_file).name,
@@ -246,8 +247,8 @@ def create_lof_channel_barplot(
                         # Try direct match first
                         if channel in evaluation_channels:
                             animal_channel_scores[channel].append(scores[i])
-                        elif core.resolve_channel(channel) in evaluation_channels:
-                            animal_channel_scores[core.resolve_channel(channel)].append(
+                        elif core.utils.resolve_channel(channel) in evaluation_channels:
+                            animal_channel_scores[core.utils.resolve_channel(channel)].append(
                                 scores[i]
                             )
 

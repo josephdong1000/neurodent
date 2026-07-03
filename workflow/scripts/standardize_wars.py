@@ -15,7 +15,7 @@ Output: Standardized WARs ready for fragment filtering
 
 from pathlib import Path
 
-from neurodent import visualization
+from neurodent.results import WindowAnalysisResult
 from neurodent.workflow import setup_snakemake_logging, apply_samples_config
 
 
@@ -80,7 +80,7 @@ def main():
         logger.info(
             f"Stream-standardising WAR: {input_war_dir} -> {Path(output_war_parquet).parent}"
         )
-        war = visualization.WindowAnalysisResult.scan_parquet_and_json(
+        war = WindowAnalysisResult.scan_parquet_and_json(
             input_war_dir, filename=src_filename
         )
         war.reorder_and_pad_channels(channel_reorder, use_abbrevs=use_abbrevs)
