@@ -1,7 +1,7 @@
 FragmentAnalyzer
 ================
 
-.. currentmodule:: neurodent.core
+.. currentmodule:: neurodent.analysis
 
 .. autoclass:: FragmentAnalyzer
    :members:

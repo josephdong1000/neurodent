@@ -20,7 +20,9 @@ import seaborn as sns
 from scipy import stats
 from sklearn.metrics import mean_squared_error
 
-from neurodent import visualization, constants
+from neurodent import constants
+from neurodent.results import WindowAnalysisResult
+from neurodent.plotting import ExperimentPlotter
 from neurodent.workflow import setup_snakemake_logging, apply_samples_config
 
 
@@ -32,7 +34,7 @@ def load_wars_from_paths(war_paths, label):
     for path in war_paths:
         try:
             war_dir = Path(path).parent
-            war = visualization.WindowAnalysisResult.load_parquet_and_json(
+            war = WindowAnalysisResult.load_parquet_and_json(
                 folder_path=war_dir, parquet_name="war.parquet", json_name="war.json"
             )
             war.add_unique_hash()
@@ -51,7 +53,7 @@ def load_wars_from_paths(war_paths, label):
 
     if wars:
         logging.info(f"Creating ExperimentPlotter for {label} dataset: {len(wars)} animals")
-        ep = visualization.ExperimentPlotter(wars)
+        ep = ExperimentPlotter(wars)
         # Store the path mapping for later use
         ep.path_to_hash_mapping = path_to_hash_mapping
         return ep

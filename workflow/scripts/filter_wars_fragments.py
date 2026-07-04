@@ -12,7 +12,7 @@ Output: Fragment-filtered WARs (ready for channel filtering)
 
 from pathlib import Path
 
-from neurodent import visualization
+from neurodent.results import WindowAnalysisResult
 from neurodent.workflow import setup_snakemake_logging, apply_samples_config
 
 
@@ -64,7 +64,7 @@ def main():
         logger.info(
             f"Stream-filtering fragments: {input_war_dir} -> {Path(output_war_parquet).parent}"
         )
-        war = visualization.WindowAnalysisResult.scan_parquet_and_json(
+        war = WindowAnalysisResult.scan_parquet_and_json(
             input_war_dir, filename=src_filename
         )
         war.apply_filters(filter_config=fragment_filter_config, min_valid_channels=3)

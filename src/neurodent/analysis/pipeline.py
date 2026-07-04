@@ -16,10 +16,12 @@ from dask import delayed
 from tqdm import tqdm
 
 from neurodent import constants
-import neurodent.core as core
-from neurodent.core import FragmentAnalyzer
-from neurodent.core.frequency_domain_spike_detection import FrequencyDomainSpikeDetector
-from neurodent.core.results.window_analysis_result import WindowAnalysisResult, _sanitize_feature_request
+from .long_recording_analyzer import LongRecordingAnalyzer
+from neurodent.core.utils import validate_timestamps
+from neurodent.core import utils as core_utils
+from .fragment_analyzer import FragmentAnalyzer
+from .spike_detection import FrequencyDomainSpikeDetector
+from neurodent.results import WindowAnalysisResult, _sanitize_feature_request
 
 try:
     import spikeinterface.preprocessing as spre
@@ -140,7 +142,7 @@ class AnalysisPipeline:
         dataframes = []
         for _i, lrec in self.ao._iter_valid_recordings():
             logging.info(f"Computing windowed analysis for {lrec.display_name}")
-            lan = core.LongRecordingAnalyzer(
+            lan = LongRecordingAnalyzer(
                 lrec, fragment_len_s=window_s, apply_notch_filter=apply_notch_filter
             )
             if lan.n_fragments == 0:
@@ -175,7 +177,7 @@ class AnalysisPipeline:
                         n_frag_per_chunk = max(1, int(chunk_duration_s / window_s))
                         # Streaming path: stream recording to zarr in batches,
                         # keeping only `n_frag_per_chunk` fragments in RAM at a time.
-                        tmppath = core.utils.stream_recording_to_zarr(
+                        tmppath = core_utils.stream_recording_to_zarr(
                             rec,
                             n_fragments_war,
                             n_samples_per_frag,
@@ -195,7 +197,7 @@ class AnalysisPipeline:
                         )
                         logging.debug(f"np_fragments.shape: {np_fragments.shape}")
                         # Cache fragments to zarr
-                        tmppath, _ = core.utils.cache_fragments_to_zarr(
+                        tmppath, _ = core_utils.cache_fragments_to_zarr(
                             np_fragments, n_fragments_war
                         )
                         del all_traces, np_fragments
@@ -259,7 +261,7 @@ class AnalysisPipeline:
             lan_df = pd.DataFrame(lan_df)
 
             logging.debug("Validating timestamps")
-            core.validate_timestamps(lan_df["timestamp"].tolist())
+            validate_timestamps(lan_df["timestamp"].tolist())
             lan_df = lan_df.sort_values("timestamp").reset_index(drop=True)
 
             self.ao.long_analyzers.append(lan)
@@ -341,7 +343,7 @@ class AnalysisPipeline:
             ImportError: If SpikeInterface is not available
         """
         # Import here to avoid circular imports
-        from neurodent.core.results.frequency_domain_results import FrequencyDomainSpikeAnalysisResult
+        from neurodent.results import FrequencyDomainSpikeAnalysisResult
 
         fdsar_list = []
 

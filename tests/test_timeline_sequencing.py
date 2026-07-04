@@ -7,8 +7,8 @@ from pathlib import Path
 from datetime import datetime, timedelta
 import pandas as pd
 
-from neurodent.visualization import AnimalOrganizer
-from neurodent.core.discovery import DiscoveredFile
+from neurodent.loading import AnimalOrganizer
+from neurodent.loading.discovery import DiscoveredFile
 
 class TestTimelineSequencing:
     @pytest.fixture
@@ -38,7 +38,7 @@ class TestTimelineSequencing:
 
         return ao
 
-    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    @patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer")
     def test_scalar_string_sequencing(self, mock_lro_cls, ao):
         """
         Test that a single string timestamp results in a sequenced timeline
@@ -84,7 +84,7 @@ class TestTimelineSequencing:
         # Note: _compute_global_timeline sorts by folder name. M1_day1 < M1_day2.
         assert t2 == t1 + timedelta(seconds=3600.0), f"Expected T2 to be T1 + 1h. Got {t2} vs {t1}"
 
-    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    @patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer")
     def test_complex_multiday_sequencing(self, mock_lro_cls, ao):
         """
         Test a scenario mimicking the user's data: 4 consecutive days with varying durations.
@@ -171,7 +171,7 @@ class TestTimelineSequencing:
         assert result["/data/folder1"] == pd.to_datetime("2025-01-01 12:00:00")
         assert result["/data/folder2"] == pd.to_datetime("2025-01-01 14:00:00")
 
-    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    @patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer")
     def test_session_keyed_dict(self, mock_lro_cls, ao):
         """
         Test that a dict keyed by session names (matching animalday_to_items keys)
@@ -217,7 +217,7 @@ class TestTimelineSequencing:
         assert result["/data/010822_files0-12"] == pd.to_datetime("2022-01-08 18:55:02")
         assert result["/data/010822_files13-21"] == pd.to_datetime("2022-01-08 23:25:03")
 
-    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    @patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer")
     def test_session_keyed_dict_multi_item_sessions(self, mock_lro_cls, ao):
         """
         Test session-keyed dict when sessions contain multiple items.
@@ -259,7 +259,7 @@ class TestTimelineSequencing:
         # session2 item: file_c at 14:00
         assert result["/data/sess2/file_c"] == pd.to_datetime("2022-01-08 14:00:00")
 
-    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    @patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer")
     def test_datetimes_are_start_false_sequencing(self, mock_lro_cls, ao):
         """
         Regression test: when datetimes_are_start=False, _compute_global_timeline
@@ -310,7 +310,7 @@ class TestTimelineSequencing:
         gap = result["/data/sess2/folder_b"] - result["/data/sess1/folder_a"]
         assert gap == timedelta(hours=2)
 
-    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    @patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer")
     def test_create_long_recordings_forces_datetimes_are_start_true(
         self, mock_lro_cls, ao
     ):
@@ -382,7 +382,7 @@ class TestTimelineSequencing:
                 manual_datetimes, animalday_to_items, base_lro_kwargs
             )
 
-    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    @patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer")
     def test_index_metadata_sort_scalar_datetime(self, mock_lro_cls, ao):
         """
         When items carry {index} metadata (from DiscoveredFile), sorting within
@@ -422,7 +422,7 @@ class TestTimelineSequencing:
         assert result["/data/day1/rec_B_data.bin"] == pd.to_datetime("2025-01-01 13:00:00")  # index 2
         assert result["/data/day1/rec_C_data.bin"] == pd.to_datetime("2025-01-01 14:00:00")  # index 3
 
-    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    @patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer")
     def test_index_metadata_overrides_filename_sort(self, mock_lro_cls, ao):
         """
         Test that index metadata is used for sorting even when filenames
@@ -465,7 +465,7 @@ class TestTimelineSequencing:
         assert result["/data/irrelevant/aardvark_data.bin"] == pd.to_datetime("2025-01-01 14:00:00") # index 3, third
 
 
-    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    @patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer")
     def test_index_metadata_sort_list_datetime(self, mock_lro_cls, ao):
         """
         When original_manual_datetimes is a list and items carry {index} metadata,
@@ -502,7 +502,7 @@ class TestTimelineSequencing:
         assert result["/data/day1/rec_A.bin"] == pd.to_datetime("2025-01-01 10:00:00")
         assert result["/data/day1/rec_B.bin"] == pd.to_datetime("2025-01-01 10:30:00")
 
-    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    @patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer")
     def test_index_metadata_sort_no_manual_datetimes(self, mock_lro_cls, ao):
         """
         When no manual_datetimes are provided and items carry {index} metadata,
@@ -544,7 +544,7 @@ class TestTimelineSequencing:
         assert result["/data/day1/rec_Z.bin"] == pd.to_datetime("2025-01-01 08:15:00")       # index 2, duration 1800s
         assert result["/data/day1/rec_A.bin"] == pd.to_datetime("2025-01-01 08:45:00")       # index 3, duration 3600s
 
-    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    @patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer")
     def test_no_index_metadata_falls_back_to_filename(self, mock_lro_cls, ao):
         """
         When items don't carry {index} metadata (plain strings/paths), sorting
@@ -575,7 +575,7 @@ class TestTimelineSequencing:
         assert result["/data/day1/file_2"] == pd.to_datetime("2025-01-01 13:00:00")
         assert result["/data/day1/file_10"] == pd.to_datetime("2025-01-01 14:00:00")
 
-    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    @patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer")
     def test_index_metadata_sort_across_sessions(self, mock_lro_cls, ao):
         """
         Verify that index-based sorting is applied independently per session,
@@ -633,7 +633,7 @@ class TestZeroSampleLROFiltering:
         ao._iter_valid_recordings = AnimalOrganizer._iter_valid_recordings.__get__(ao, AnimalOrganizer)
         return ao
 
-    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    @patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer")
     def test_partial_zero_sample_lros_filtered_before_merge(
         self, mock_lro_cls, ao, caplog
     ):
@@ -670,7 +670,7 @@ class TestZeroSampleLROFiltering:
         assert ao.long_recordings[0] is lro_valid
         assert "folder_a" in caplog.text
 
-    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    @patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer")
     def test_all_zero_sample_lros_all_animaldays_raises(self, mock_lro_cls, ao):
         """When every animalday is all-0-sample (nothing loaded), raises RuntimeError."""
         def side_effect(folder, **kwargs):
@@ -693,7 +693,7 @@ class TestZeroSampleLROFiltering:
         with pytest.raises(RuntimeError, match="No recordings were loaded"):
             ao._create_long_recordings({})
 
-    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    @patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer")
     def test_mixed_animaldays_skips_bad_keeps_good(self, mock_lro_cls, ao):
         """One all-0-sample animalday is skipped; a valid animalday still loads."""
         call_count = [0]

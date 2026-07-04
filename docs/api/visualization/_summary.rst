@@ -1,10 +1,10 @@
-.. currentmodule:: neurodent.visualization
+.. currentmodule:: neurodent.plotting
 
 .. autosummary::
    :nosignatures:
 
-   ~neurodent.core.loading.AnimalOrganizer
-   ~neurodent.core.results.WindowAnalysisResult
-   ~neurodent.core.results.FrequencyDomainSpikeAnalysisResult
+   ~neurodent.loading.AnimalOrganizer
+   ~neurodent.results.WindowAnalysisResult
+   ~neurodent.results.FrequencyDomainSpikeAnalysisResult
    AnimalPlotter
    ExperimentPlotter

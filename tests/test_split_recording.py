@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 import spikeinterface.core as si
 
-from neurodent.core import LongRecordingOrganizer, split_recording
+from neurodent.loading import LongRecordingOrganizer, split_recording
 
 
 # Fixtures
@@ -286,8 +286,8 @@ class TestSplitEdgeCases:
         import sys
         
         # Get the current module from sys.modules (handles test_imports.py reimporting)
-        core_module = sys.modules['neurodent.core.core']
-        LRO = sys.modules['neurodent.core.core'].LongRecordingOrganizer
+        core_module = sys.modules['neurodent.loading.long_recording_organizer']
+        LRO = sys.modules['neurodent.loading.long_recording_organizer'].LongRecordingOrganizer
         
         lro = LRO(item='.', mode=None)
         lro.LongRecording = "dummy"
@@ -302,8 +302,8 @@ class TestSplitEdgeCases:
         import sys
 
         # Get the current module from sys.modules (handles test_imports.py reimporting)
-        core_module = sys.modules['neurodent.core.core']
-        LRO = sys.modules['neurodent.core.core'].LongRecordingOrganizer
+        core_module = sys.modules['neurodent.loading.long_recording_organizer']
+        LRO = sys.modules['neurodent.loading.long_recording_organizer'].LongRecordingOrganizer
 
         lro = LRO(item='.', mode=None)
         lro.LongRecording = "dummy"
@@ -318,8 +318,8 @@ class TestSplitEdgeCases:
         import sys
 
         # Get the current module from sys.modules (handles test_imports.py reimporting)
-        core_module = sys.modules['neurodent.core.core']
-        LRO = sys.modules['neurodent.core.core'].LongRecordingOrganizer
+        core_module = sys.modules['neurodent.loading.long_recording_organizer']
+        LRO = sys.modules['neurodent.loading.long_recording_organizer'].LongRecordingOrganizer
 
         lro = LRO(item='.', mode=None)
         lro.LongRecording = "dummy"

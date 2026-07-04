@@ -61,7 +61,7 @@ class TestWindowAnalysisResultBehavior:
 
     def test_war_with_unmatched_channels_raises(self, minimal_war_df):
         """WAR construction parses channel names; unconfigured names raise loudly."""
-        from neurodent.visualization.results import WindowAnalysisResult
+        from neurodent.results.window_analysis_result import WindowAnalysisResult
 
         with pytest.raises(ValueError, match="not in the configured channel map"):
             WindowAnalysisResult(
@@ -73,7 +73,7 @@ class TestWindowAnalysisResultBehavior:
 
     def test_war_with_valid_channels_no_warning(self, minimal_war_df):
         """WAR with canonical channel names constructs without channel warnings."""
-        from neurodent.visualization.results import WindowAnalysisResult
+        from neurodent.results.window_analysis_result import WindowAnalysisResult
 
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")

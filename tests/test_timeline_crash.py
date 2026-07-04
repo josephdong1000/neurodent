@@ -2,10 +2,10 @@
 import pytest
 from unittest.mock import MagicMock, patch
 import pandas as pd
-from neurodent.visualization import AnimalOrganizer
+from neurodent.loading import AnimalOrganizer
 
 class TestTimelineSortingCrash:
-    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
+    @patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer")
     @patch("neurodent.core.utils.parse_str_to_day")
     def test_sort_crash_fix_via_parsing(self, mock_parse, mock_lro_cls):
         """

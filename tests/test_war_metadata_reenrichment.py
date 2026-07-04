@@ -10,7 +10,7 @@ import pandas as pd
 import pytest
 
 from neurodent import constants
-from neurodent.visualization.results import WindowAnalysisResult
+from neurodent.results.window_analysis_result import WindowAnalysisResult
 
 
 def _make_war(animal_id="X1", sex="Unknown", genotype="KO"):

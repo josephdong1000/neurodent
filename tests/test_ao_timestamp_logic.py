@@ -2,7 +2,7 @@
 import pytest
 from pathlib import Path
 from datetime import datetime
-import neurodent.visualization.results as results
+import neurodent.loading.animal_organizer as results
 import neurodent.constants as constants
 
 # Mock data based on logs

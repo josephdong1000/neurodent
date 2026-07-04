@@ -13,7 +13,7 @@ from unittest.mock import Mock, patch, MagicMock
 import tempfile
 import os
 
-from neurodent.visualization.results import AnimalOrganizer
+from neurodent.loading import AnimalOrganizer
 
 
 class TestComputeGlobalTimelineFileDetection:
@@ -174,7 +174,7 @@ class TestComputeGlobalTimelineIntegration:
 
     def test_timeline_computation_with_nwb_files(self, synthetic_nwb_dataset):
         """Test that timeline computation works with file-based discovery."""
-        from neurodent import core
+        from neurodent.loading import long_recording_organizer as core
 
         ds = synthetic_nwb_dataset
         data_root = ds["data_root"]
@@ -210,7 +210,7 @@ class TestComputeGlobalTimelineIntegration:
         """Test that AnimalOrganizer works with manual_datetimes and pattern-based discovery."""
         from neurodent import constants
         from neurodent.workflow import apply_samples_config
-        from neurodent.visualization import AnimalOrganizer
+        from neurodent.loading import AnimalOrganizer
 
         ds = synthetic_nwb_dataset
         base_path = str(ds["data_root"] / ds["session_folder"])

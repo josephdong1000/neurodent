@@ -18,9 +18,9 @@ except ImportError:
     si = None
     SPIKEINTERFACE_AVAILABLE = False
 
-from neurodent import visualization, core
-from neurodent.core.frequency_domain_spike_detection import FrequencyDomainSpikeDetector
-from neurodent.visualization.frequency_domain_results import (
+from neurodent.loading import AnimalOrganizer
+from neurodent.analysis.spike_detection import FrequencyDomainSpikeDetector
+from neurodent.results.frequency_domain_results import (
     FrequencyDomainSpikeAnalysisResult,
 )
 
@@ -63,7 +63,7 @@ class TestFrequencyDomainSpikeDetectionIntegration:
             warnings.filterwarnings("ignore", category=RuntimeWarning)
             warnings.filterwarnings("ignore", category=UserWarning)
 
-            ao = visualization.AnimalOrganizer(
+            ao = AnimalOrganizer(
                 [
                     str(TEST_DATA_BASE / animal_id) + "/{index}_ColMajor.bin",
                     str(TEST_DATA_BASE / animal_id) + "/{index}_Meta.csv",
@@ -308,7 +308,7 @@ class TestFrequencyDomainSpikeDetectorStandalone:
             warnings.filterwarnings("ignore", category=RuntimeWarning)
             warnings.filterwarnings("ignore", category=UserWarning)
 
-            ao = visualization.AnimalOrganizer(
+            ao = AnimalOrganizer(
                 TEST_DATA_BASE,
                 animal_id,
                 lro_kwargs={

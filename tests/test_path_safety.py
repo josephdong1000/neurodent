@@ -21,8 +21,8 @@ import pandas as pd
 matplotlib.use("Agg")  # headless
 
 from neurodent.core.utils import slugify
-from neurodent.visualization import WindowAnalysisResult
-from neurodent.visualization.plotting.animal import AnimalPlotter
+from neurodent.results import WindowAnalysisResult
+from neurodent.plotting.animal import AnimalPlotter
 
 ARXROSA_GENOTYPE = "Arx(F/y); Rosa(+/wt)"
 ARXROSA_ANIMAL_ID = "ArxRosa-1015"
@@ -117,7 +117,7 @@ class TestSlashInGenotypePaths:
     def test_fdsar_path_safe_save_stem_strips_slashes(self):
         """Layer C1: ``FrequencyDomainSpikeAnalysisResult.path_safe_save_stem`` is safe."""
         import mne
-        from neurodent.visualization.frequency_domain_results import (
+        from neurodent.results.frequency_domain_results import (
             FrequencyDomainSpikeAnalysisResult,
         )
 

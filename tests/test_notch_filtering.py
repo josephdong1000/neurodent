@@ -10,9 +10,10 @@ import pytest
 from unittest.mock import patch, Mock
 import warnings
 
-from neurodent.core.analysis import LongRecordingAnalyzer
-from neurodent.core.analyze_frag import FragmentAnalyzer
-from neurodent import constants, core
+from neurodent.analysis.long_recording_analyzer import LongRecordingAnalyzer
+from neurodent.analysis.fragment_analyzer import FragmentAnalyzer
+from neurodent import constants
+from neurodent.loading import LongRecordingOrganizer
 
 try:
     import spikeinterface as si
@@ -63,7 +64,7 @@ class TestNotchFiltering:
             pytest.skip("Real SpikeInterface recording not available")
 
         # Create a mock LongRecordingOrganizer that returns our real recording
-        from neurodent.core.core import LongRecordingOrganizer
+        from neurodent.loading.long_recording_organizer import LongRecordingOrganizer
 
         mock_long_recording = Mock(spec=LongRecordingOrganizer)
         mock_long_recording.get_num_fragments.return_value = 1
@@ -81,7 +82,7 @@ class TestNotchFiltering:
         mock_long_recording.get_fragment.return_value = real_spikeinterface_recording
 
         # Create a real mock that inherits from LongRecordingOrganizer to pass isinstance check
-        class MockLongRecordingOrganizer(core.LongRecordingOrganizer):
+        class MockLongRecordingOrganizer(LongRecordingOrganizer):
             def __init__(self):
                 # Skip parent __init__ to avoid file system dependencies
                 pass
@@ -112,7 +113,7 @@ class TestNotchFiltering:
     @pytest.mark.skipif(not SPIKEINTERFACE_AVAILABLE, reason="SpikeInterface not available")
     def test_notch_filter_disable_flag(self):
         """Test that apply_notch_filter=False properly disables filtering."""
-        from neurodent.core.core import LongRecordingOrganizer
+        from neurodent.loading.long_recording_organizer import LongRecordingOrganizer
 
         mock_long_recording = Mock(spec=LongRecordingOrganizer)
         mock_long_recording.get_num_fragments.return_value = 1
@@ -132,7 +133,7 @@ class TestNotchFiltering:
         mock_long_recording.get_fragment.return_value = mock_recording
 
         # Create a real mock that inherits from LongRecordingOrganizer to pass isinstance check
-        class MockLongRecordingOrganizer(core.LongRecordingOrganizer):
+        class MockLongRecordingOrganizer(LongRecordingOrganizer):
             def __init__(self):
                 # Skip parent __init__ to avoid file system dependencies
                 pass
@@ -154,8 +155,8 @@ class TestNotchFiltering:
         analyzer.apply_notch_filter = False
 
         # This should work without calling notch_filter on the mock
-        # Since SpikeInterface may not be available, patch the spre module in neurodent.core.analysis
-        with patch("neurodent.core.analysis.spre") as mock_spre:
+        # Since SpikeInterface may not be available, patch the spre module in neurodent.analysis.long_recording_analyzer
+        with patch("neurodent.analysis.long_recording_analyzer.spre") as mock_spre:
             mock_spre.notch_filter = Mock()
             fragment_rec = analyzer.get_fragment_rec(0)
             # Verify notch_filter was NOT called
@@ -205,7 +206,7 @@ class TestNotchFiltering:
     @pytest.mark.skipif(not SPIKEINTERFACE_AVAILABLE, reason="SpikeInterface not available")
     def test_notch_filter_parameter_in_analyzer_methods(self):
         """Test that LongRecordingAnalyzer methods respect the notch filter setting."""
-        from neurodent.core.core import LongRecordingOrganizer
+        from neurodent.loading.long_recording_organizer import LongRecordingOrganizer
 
         mock_long_recording = Mock(spec=LongRecordingOrganizer)
         mock_long_recording.get_num_fragments.return_value = 1
@@ -220,7 +221,7 @@ class TestNotchFiltering:
         mock_long_recording.end_relative = [1]
 
         # Create a real mock that inherits from LongRecordingOrganizer to pass isinstance check
-        class MockLongRecordingOrganizer(core.LongRecordingOrganizer):
+        class MockLongRecordingOrganizer(LongRecordingOrganizer):
             def __init__(self):
                 # Skip parent __init__ to avoid file system dependencies
                 pass

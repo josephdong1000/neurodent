@@ -1,7 +1,7 @@
 AnimalPlotter
 =============
 
-.. currentmodule:: neurodent.visualization
+.. currentmodule:: neurodent.plotting
 
 .. autoclass:: AnimalPlotter
    :members:

@@ -38,7 +38,8 @@ from neurodent.workflow import setup_snakemake_logging, apply_samples_config
 from neurodent.core import metadata as metadata_module
 
 from neurodent.constants import OKABE_ITO_COLORS
-from neurodent import visualization, constants
+from neurodent import constants
+from neurodent.results import WindowAnalysisResult
 
 logger = logging.getLogger(__name__)
 
@@ -114,7 +115,7 @@ def extract_feature_from_war(args):
 
     try:
         # Load WAR
-        war = visualization.WindowAnalysisResult.load_parquet_and_json(
+        war = WindowAnalysisResult.load_parquet_and_json(
             folder_path=war_parquet_path.parent,
             parquet_name=war_parquet_path.name,
             json_name=war_json_path.name

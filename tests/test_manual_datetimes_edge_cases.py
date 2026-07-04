@@ -3,7 +3,7 @@ import tempfile
 from pathlib import Path
 from datetime import datetime
 from unittest.mock import Mock, patch
-from neurodent.visualization import results
+from neurodent.loading import animal_organizer as results
 
 
 class TestManualDatetimesEdgeCases:
@@ -41,8 +41,8 @@ class TestManualDatetimesEdgeCases:
         mock_lro.channel_names = ["Ch1", "Ch2", "Ch3"]
         return mock_lro
 
-    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
-    @patch("neurodent.core.discovery.glob.glob")
+    @patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer")
+    @patch("neurodent.loading.discovery.glob.glob")
     def test_mixed_bag_configuration(self, mock_glob, mock_lro_class):
         """
         Test Case 3: The 'Mixed Bag'.
@@ -75,8 +75,8 @@ class TestManualDatetimesEdgeCases:
             2023, 2, 1, 10, 0
         )
 
-    @patch("neurodent.visualization.results.core.LongRecordingOrganizer")
-    @patch("neurodent.core.discovery.glob.glob")
+    @patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer")
+    @patch("neurodent.loading.discovery.glob.glob")
     def test_shadowing_trap_error(self, mock_glob, mock_lro_class):
         """
         Test Case 4: The 'Shadowing Trap'.

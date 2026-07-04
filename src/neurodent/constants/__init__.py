@@ -1,7 +1,7 @@
 """**Constants** used throughout NeuRodent.
 
 This module centralizes all configuration values, feature definitions, and lookup tables
-used by the :mod:`neurodent.core` and :mod:`neurodent.visualization` modules.
+used by the :mod:`neurodent.core` and the stage packages (loading, analysis, results, plotting) modules.
 
 **Quick Reference:**
 

@@ -1,7 +1,7 @@
 LongRecordingOrganizer
 ======================
 
-.. currentmodule:: neurodent.core
+.. currentmodule:: neurodent.loading
 
 .. autoclass:: LongRecordingOrganizer
    :members:

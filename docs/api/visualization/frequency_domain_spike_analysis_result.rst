@@ -1,7 +1,7 @@
 FrequencyDomainSpikeAnalysisResult
 ==================================
 
-.. currentmodule:: neurodent.core.results
+.. currentmodule:: neurodent.results
 
 .. autoclass:: FrequencyDomainSpikeAnalysisResult
    :members:

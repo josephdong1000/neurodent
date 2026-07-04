@@ -22,8 +22,9 @@ except Exception:  # pragma: no cover
     envelope_correlation = None
 from scipy.interpolate import Akima1DInterpolator
 
-from .. import constants, core
-from .analyze_frag import FragmentAnalyzer
+from .. import constants
+from neurodent.loading import LongRecordingOrganizer
+from .fragment_analyzer import FragmentAnalyzer
 
 
 class LongRecordingAnalyzer:
@@ -47,11 +48,11 @@ class LongRecordingAnalyzer:
 
     def __init__(
         self,
-        longrecording: core.LongRecordingOrganizer,
+        longrecording: LongRecordingOrganizer,
         fragment_len_s=10,
         apply_notch_filter=True,
     ) -> None:
-        assert isinstance(longrecording, core.LongRecordingOrganizer)
+        assert isinstance(longrecording, LongRecordingOrganizer)
 
         self.LongRecording = longrecording
         self.fragment_len_s = fragment_len_s

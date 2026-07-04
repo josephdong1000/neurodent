@@ -16,8 +16,8 @@ from pathlib import Path
 import tempfile
 from datetime import datetime, timedelta
 
-from neurodent.visualization import results
-from neurodent import core
+from neurodent.loading import animal_organizer as results
+from neurodent.loading import long_recording_organizer as core
 
 
 class TestOverlappingAnimaldaysBug:
@@ -78,7 +78,7 @@ class TestOverlappingAnimaldaysBug:
                 mock_lros.append(mock_lro)
 
             # Patch glob.glob in the discovery module to return our test files
-            with patch("neurodent.core.discovery.glob.glob") as mock_glob:
+            with patch("neurodent.loading.discovery.glob.glob") as mock_glob:
                 mock_glob.return_value = [
                     str(folder1 / "dummy_ColMajor_001.bin"),
                     str(folder2 / "dummy_ColMajor_001.bin"),
@@ -175,7 +175,7 @@ class TestOverlappingAnimaldaysBug:
                 mock_lro.LongRecording = mock_recording
 
             # Patch glob in the discovery module to return our test files
-            with patch("neurodent.core.discovery.glob.glob") as mock_glob:
+            with patch("neurodent.loading.discovery.glob.glob") as mock_glob:
                 mock_glob.return_value = [
                     str(folder_a / "dummy_ColMajor_001.bin"),
                     str(folder_b / "dummy_ColMajor_001.bin"),
@@ -245,7 +245,7 @@ class TestOverlappingAnimaldaysBug:
                 (folder / "dummy_Meta_001.json").touch()
 
             # Mock glob in the discovery module to return test files
-            with patch("neurodent.core.discovery.glob.glob") as mock_glob:
+            with patch("neurodent.loading.discovery.glob.glob") as mock_glob:
                 mock_glob.return_value = [
                     str(folder1 / "dummy_ColMajor_001.bin"),
                     str(folder2 / "dummy_ColMajor_001.bin"),
@@ -332,7 +332,7 @@ class TestOverlappingAnimaldaysBug:
             lro2.meta = Mock(f_s=1000, n_channels=3)
 
             # Mock si.concatenate_recordings at the module level
-            with patch("neurodent.core.core.si.concatenate_recordings") as mock_concat:
+            with patch("neurodent.loading.long_recording_organizer.si.concatenate_recordings") as mock_concat:
                 mock_concat.return_value = mock_merged_recording
 
                 # Test merge functionality

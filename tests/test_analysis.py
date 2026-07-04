@@ -1,5 +1,5 @@
 """
-Integration tests for neurodent.core.analysis module.
+Integration tests for neurodent.analysis.long_recording_analyzer module.
 
 These tests focus on the LongRecordingAnalyzer class, which serves as an integration
 layer between the core LongRecordingOrganizer and FragmentAnalyzer computational functions.
@@ -18,9 +18,9 @@ import numpy as np
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 
-from neurodent.core import analysis
+from neurodent.analysis import long_recording_analyzer as analysis
 from neurodent import constants
-from neurodent.core.core import LongRecordingOrganizer
+from neurodent.loading.long_recording_organizer import LongRecordingOrganizer
 
 try:
     import spikeinterface
@@ -110,7 +110,7 @@ class TestLongRecordingAnalyzer:
         analyzer.apply_notch_filter = False
 
         # Test integration: does it call FragmentAnalyzer with the right data?
-        with patch("neurodent.core.analysis.FragmentAnalyzer.compute_rms") as mock_compute_rms:
+        with patch("neurodent.analysis.long_recording_analyzer.FragmentAnalyzer.compute_rms") as mock_compute_rms:
             expected_result = np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
             mock_compute_rms.return_value = expected_result
 
@@ -140,7 +140,7 @@ class TestLongRecordingAnalyzer:
         analyzer.apply_notch_filter = False
 
         # Test integration: does it call FragmentAnalyzer with correct parameters?
-        with patch("neurodent.core.analysis.FragmentAnalyzer.compute_psd") as mock_compute_psd:
+        with patch("neurodent.analysis.long_recording_analyzer.FragmentAnalyzer.compute_psd") as mock_compute_psd:
             expected_freqs = np.linspace(0, 50, 100)
             expected_psd = np.ones((100, 8))
             mock_compute_psd.return_value = (expected_freqs, expected_psd)
@@ -173,7 +173,7 @@ class TestLongRecordingAnalyzer:
         analyzer.apply_notch_filter = False
 
         # Test integration: does it call FragmentAnalyzer with correct parameters?
-        with patch("neurodent.core.analysis.FragmentAnalyzer.compute_psdband") as mock_compute_psdband:
+        with patch("neurodent.analysis.long_recording_analyzer.FragmentAnalyzer.compute_psdband") as mock_compute_psdband:
             expected_result = {
                 "delta": np.ones(8),
                 "theta": np.ones(8),
@@ -212,7 +212,7 @@ class TestLongRecordingAnalyzer:
         analyzer.apply_notch_filter = False
 
         # Test integration: does it call FragmentAnalyzer with correct parameters?
-        with patch("neurodent.core.analysis.FragmentAnalyzer.compute_cohere") as mock_compute_cohere:
+        with patch("neurodent.analysis.long_recording_analyzer.FragmentAnalyzer.compute_cohere") as mock_compute_cohere:
             expected_result = {
                 "delta": np.eye(8) * 0.5,  # Mock coherence matrix
                 "theta": np.eye(8) * 0.6,
@@ -256,7 +256,7 @@ class TestLongRecordingAnalyzer:
         analyzer.apply_notch_filter = False
 
         # Test integration: does it call FragmentAnalyzer with correct parameters?
-        with patch("neurodent.core.analysis.FragmentAnalyzer.compute_pcorr") as mock_compute_pcorr:
+        with patch("neurodent.analysis.long_recording_analyzer.FragmentAnalyzer.compute_pcorr") as mock_compute_pcorr:
             expected_result = np.eye(8) * 0.5  # Mock correlation matrix
             mock_compute_pcorr.return_value = expected_result
 
@@ -301,7 +301,7 @@ class TestLongRecordingAnalyzer:
         # Disable notch filtering for this test since we're using mock objects
         analyzer.apply_notch_filter = False
 
-        with patch("neurodent.core.analysis.FragmentAnalyzer.compute_logrms") as mock_compute:
+        with patch("neurodent.analysis.long_recording_analyzer.FragmentAnalyzer.compute_logrms") as mock_compute:
             expected_result = np.log(np.ones(8))  # log of RMS of ones
             mock_compute.return_value = expected_result
 
@@ -326,7 +326,7 @@ class TestLongRecordingAnalyzer:
         # Disable notch filtering for this test since we're using mock objects
         analyzer.apply_notch_filter = False
 
-        with patch("neurodent.core.analysis.FragmentAnalyzer.compute_ampvar") as mock_compute:
+        with patch("neurodent.analysis.long_recording_analyzer.FragmentAnalyzer.compute_ampvar") as mock_compute:
             expected_result = np.zeros(8)  # variance of constant signal is 0
             mock_compute.return_value = expected_result
 
@@ -349,7 +349,7 @@ class TestLongRecordingAnalyzer:
         # Mock get_fragment_np to bypass notch filtering and return numpy data directly
         with (
             patch.object(analyzer, "get_fragment_np", return_value=test_data),
-            patch("neurodent.core.analysis.FragmentAnalyzer.compute_logampvar") as mock_compute,
+            patch("neurodent.analysis.long_recording_analyzer.FragmentAnalyzer.compute_logampvar") as mock_compute,
         ):
             expected_result = np.log(np.ones(8))
             mock_compute.return_value = expected_result
@@ -373,7 +373,7 @@ class TestLongRecordingAnalyzer:
         # Mock get_fragment_np to bypass notch filtering and return numpy data directly
         with (
             patch.object(analyzer, "get_fragment_np", return_value=test_data),
-            patch("neurodent.core.analysis.FragmentAnalyzer.compute_logpsdband") as mock_compute,
+            patch("neurodent.analysis.long_recording_analyzer.FragmentAnalyzer.compute_logpsdband") as mock_compute,
         ):
             expected_result = {
                 "delta": np.log(np.ones(8)),
@@ -408,7 +408,7 @@ class TestLongRecordingAnalyzer:
         # Mock get_fragment_np to bypass notch filtering and return numpy data directly
         with (
             patch.object(analyzer, "get_fragment_np", return_value=test_data),
-            patch("neurodent.core.analysis.FragmentAnalyzer.compute_psdtotal") as mock_compute,
+            patch("neurodent.analysis.long_recording_analyzer.FragmentAnalyzer.compute_psdtotal") as mock_compute,
         ):
             expected_result = np.ones(8) * 5.0  # total power across all bands
             mock_compute.return_value = expected_result
@@ -436,7 +436,7 @@ class TestLongRecordingAnalyzer:
         # Mock get_fragment_np to bypass notch filtering and return numpy data directly
         with (
             patch.object(analyzer, "get_fragment_np", return_value=test_data),
-            patch("neurodent.core.analysis.FragmentAnalyzer.compute_logpsdtotal") as mock_compute,
+            patch("neurodent.analysis.long_recording_analyzer.FragmentAnalyzer.compute_logpsdtotal") as mock_compute,
         ):
             expected_result = np.log(np.ones(8) * 5.0)
             mock_compute.return_value = expected_result
@@ -463,7 +463,7 @@ class TestLongRecordingAnalyzer:
         # Mock get_fragment_np to bypass notch filtering and return numpy data directly
         with (
             patch.object(analyzer, "get_fragment_np", return_value=test_data),
-            patch("neurodent.core.analysis.FragmentAnalyzer.compute_psdfrac") as mock_compute,
+            patch("neurodent.analysis.long_recording_analyzer.FragmentAnalyzer.compute_psdfrac") as mock_compute,
         ):
             expected_result = {
                 "delta": np.ones(8) * 0.2,
@@ -499,7 +499,7 @@ class TestLongRecordingAnalyzer:
         # Mock get_fragment_np to bypass notch filtering and return numpy data directly
         with (
             patch.object(analyzer, "get_fragment_np", return_value=test_data),
-            patch("neurodent.core.analysis.FragmentAnalyzer.compute_logpsdfrac") as mock_compute,
+            patch("neurodent.analysis.long_recording_analyzer.FragmentAnalyzer.compute_logpsdfrac") as mock_compute,
         ):
             expected_result = {
                 "delta": np.log(np.ones(8) * 0.2),
@@ -534,7 +534,7 @@ class TestLongRecordingAnalyzer:
         # Mock get_fragment_np to bypass notch filtering and return numpy data directly
         with (
             patch.object(analyzer, "get_fragment_np", return_value=test_data),
-            patch("neurodent.core.analysis.FragmentAnalyzer.compute_psdslope") as mock_compute,
+            patch("neurodent.analysis.long_recording_analyzer.FragmentAnalyzer.compute_psdslope") as mock_compute,
         ):
             expected_result = np.ones((8, 2)) * [-1.0, 2.0]  # [slope, intercept] per channel
             mock_compute.return_value = expected_result
@@ -562,7 +562,7 @@ class TestLongRecordingAnalyzer:
         # Mock get_fragment_np to bypass notch filtering and return numpy data directly
         with (
             patch.object(analyzer, "get_fragment_np", return_value=test_data),
-            patch("neurodent.core.analysis.FragmentAnalyzer.compute_zcohere") as mock_compute,
+            patch("neurodent.analysis.long_recording_analyzer.FragmentAnalyzer.compute_zcohere") as mock_compute,
         ):
             expected_result = {
                 "delta": np.eye(8) * 0.8,  # z-transformed coherence matrix
@@ -598,7 +598,7 @@ class TestLongRecordingAnalyzer:
         # Mock get_fragment_np to bypass notch filtering and return numpy data directly
         with (
             patch.object(analyzer, "get_fragment_np", return_value=test_data),
-            patch("neurodent.core.analysis.FragmentAnalyzer.compute_zpcorr") as mock_compute,
+            patch("neurodent.analysis.long_recording_analyzer.FragmentAnalyzer.compute_zpcorr") as mock_compute,
         ):
             expected_result = np.eye(8) * 0.5  # z-transformed correlation matrix
             mock_compute.return_value = expected_result
@@ -626,7 +626,7 @@ class TestLongRecordingAnalyzer:
         # Mock get_fragment_np to bypass notch filtering and return numpy data directly
         with (
             patch.object(analyzer, "get_fragment_np", return_value=test_data),
-            patch("neurodent.core.analysis.FragmentAnalyzer.compute_zcohere") as mock_compute,
+            patch("neurodent.analysis.long_recording_analyzer.FragmentAnalyzer.compute_zcohere") as mock_compute,
         ):
             mock_compute.return_value = {"delta": np.eye(8)}
 
@@ -650,7 +650,7 @@ class TestLongRecordingAnalyzer:
         # Mock get_fragment_np to bypass notch filtering and return numpy data directly
         with (
             patch.object(analyzer, "get_fragment_np", return_value=test_data),
-            patch("neurodent.core.analysis.FragmentAnalyzer.compute_zpcorr") as mock_compute,
+            patch("neurodent.analysis.long_recording_analyzer.FragmentAnalyzer.compute_zpcorr") as mock_compute,
         ):
             mock_compute.return_value = np.eye(8)
 
@@ -674,7 +674,7 @@ class TestLongRecordingAnalyzer:
         # Mock get_fragment_np to bypass notch filtering and return numpy data directly
         with (
             patch.object(analyzer, "get_fragment_np", return_value=test_data),
-            patch("neurodent.core.analysis.FragmentAnalyzer.compute_nspike") as mock_compute,
+            patch("neurodent.analysis.long_recording_analyzer.FragmentAnalyzer.compute_nspike") as mock_compute,
         ):
             expected_result = None  # Returns None per implementation
             mock_compute.return_value = expected_result
@@ -700,7 +700,7 @@ class TestLongRecordingAnalyzer:
         # Mock get_fragment_np to bypass notch filtering and return numpy data directly
         with (
             patch.object(analyzer, "get_fragment_np", return_value=test_data),
-            patch("neurodent.core.analysis.FragmentAnalyzer.compute_lognspike") as mock_compute,
+            patch("neurodent.analysis.long_recording_analyzer.FragmentAnalyzer.compute_lognspike") as mock_compute,
         ):
             expected_result = None  # Returns None per implementation
             mock_compute.return_value = expected_result
@@ -830,7 +830,7 @@ class TestLongRecordingAnalyzerParameterPassThrough:
         test_data = np.random.randn(1000, 4)
         with (
             patch.object(analyzer, "get_fragment_np", return_value=test_data),
-            patch("neurodent.core.analysis.FragmentAnalyzer.compute_psd") as mock_compute,
+            patch("neurodent.analysis.long_recording_analyzer.FragmentAnalyzer.compute_psd") as mock_compute,
         ):
             mock_compute.return_value = (np.linspace(0, 50, 100), np.ones((100, 4)))
 
@@ -859,7 +859,7 @@ class TestLongRecordingAnalyzerParameterPassThrough:
         test_data = np.random.randn(1000, 4)
         with (
             patch.object(analyzer, "get_fragment_np", return_value=test_data),
-            patch("neurodent.core.analysis.FragmentAnalyzer.compute_psdband") as mock_compute,
+            patch("neurodent.analysis.long_recording_analyzer.FragmentAnalyzer.compute_psdband") as mock_compute,
         ):
             mock_result = {band: np.ones(4) for band in constants.FREQ_BANDS}
             mock_compute.return_value = mock_result
@@ -897,7 +897,7 @@ class TestLongRecordingAnalyzerParameterPassThrough:
         test_data = np.random.randn(1000, 4)
         with (
             patch.object(analyzer, "get_fragment_np", return_value=test_data),
-            patch("neurodent.core.analysis.FragmentAnalyzer.compute_cohere") as mock_compute,
+            patch("neurodent.analysis.long_recording_analyzer.FragmentAnalyzer.compute_cohere") as mock_compute,
         ):
             mock_result = {band: np.eye(4) for band in constants.FREQ_BANDS}
             mock_compute.return_value = mock_result
@@ -934,7 +934,7 @@ class TestLongRecordingAnalyzerParameterPassThrough:
         test_data = np.random.randn(1000, 4)
         with (
             patch.object(analyzer, "get_fragment_np", return_value=test_data),
-            patch("neurodent.core.analysis.FragmentAnalyzer.compute_pcorr") as mock_compute,
+            patch("neurodent.analysis.long_recording_analyzer.FragmentAnalyzer.compute_pcorr") as mock_compute,
         ):
             mock_compute.return_value = np.eye(4)
 
@@ -1004,7 +1004,7 @@ class TestLongRecordingAnalyzerParameterPassThrough:
         # Mock get_fragment_np globally for all method calls
         with patch.object(analyzer, "get_fragment_np", return_value=test_data):
             for method_name in compute_methods:
-                with patch(f"neurodent.core.analysis.FragmentAnalyzer.{method_name}") as mock_method:
+                with patch(f"neurodent.analysis.long_recording_analyzer.FragmentAnalyzer.{method_name}") as mock_method:
                     # Set up return value based on method type
                     if method_name in [
                         "compute_psdband",
@@ -1084,7 +1084,7 @@ class TestLongRecordingAnalyzerNotchFiltering:
         analyzer = analysis.LongRecordingAnalyzer(mock_long_recording, apply_notch_filter=False)
         assert analyzer.apply_notch_filter == False
 
-    @patch("neurodent.core.analysis.spre")
+    @patch("neurodent.analysis.long_recording_analyzer.spre")
     def test_notch_filter_applied_when_enabled(self, mock_spre, mock_long_recording):
         """Test that notch filter is applied when enabled and spikeinterface is available."""
         # Setup mock
@@ -1103,7 +1103,7 @@ class TestLongRecordingAnalyzerNotchFiltering:
         mock_spre.notch_filter.assert_called_once_with(mock_original_rec, freq=constants.LINE_FREQ)
         assert result == mock_filtered_rec
 
-    @patch("neurodent.core.analysis.spre")
+    @patch("neurodent.analysis.long_recording_analyzer.spre")
     def test_notch_filter_not_applied_when_disabled(self, mock_spre, mock_long_recording):
         """Test that notch filter is not applied when disabled."""
         # Setup mock
@@ -1120,7 +1120,7 @@ class TestLongRecordingAnalyzerNotchFiltering:
         mock_spre.notch_filter.assert_not_called()
         assert result == mock_original_rec
 
-    @patch("neurodent.core.analysis.spre", None)
+    @patch("neurodent.analysis.long_recording_analyzer.spre", None)
     def test_notch_filter_skipped_when_spikeinterface_preprocessing_unavailable(self, mock_long_recording):
         """Test that notch filter is skipped when spikeinterface preprocessing is not available."""
         # Setup mock
@@ -1136,7 +1136,7 @@ class TestLongRecordingAnalyzerNotchFiltering:
         # Verify original recording is returned unchanged
         assert result == mock_original_rec
 
-    @patch("neurodent.core.analysis.spre")
+    @patch("neurodent.analysis.long_recording_analyzer.spre")
     def test_notch_filter_uses_line_freq_constant(self, mock_spre, mock_long_recording):
         """Test that notch filter uses the LINE_FREQ constant."""
         # Setup mock

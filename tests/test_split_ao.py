@@ -17,8 +17,8 @@ try:
 except ImportError:
     SI_AVAILABLE = False
 
-from neurodent.core import LongRecordingOrganizer
-from neurodent.visualization import AnimalOrganizer
+from neurodent.loading import LongRecordingOrganizer
+from neurodent.loading import AnimalOrganizer
 
 
 # =============================================================================

@@ -14,8 +14,8 @@ except ImportError:
     si = None
     spre = None
 
-import neurodent.core.core as core_module
-from neurodent.core.core import LongRecordingOrganizer
+import neurodent.loading.long_recording_organizer as core_module
+from neurodent.loading.long_recording_organizer import LongRecordingOrganizer
 from neurodent import constants
 
 class TestUnsignedConversion(unittest.TestCase):

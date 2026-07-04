@@ -9,10 +9,11 @@ import warnings
 from pathlib import Path
 from unittest.mock import patch, Mock, MagicMock
 
-from neurodent.core import analysis, utils
-from neurodent.visualization import results
+from neurodent.analysis import long_recording_analyzer as analysis
+from neurodent.core import utils
+from neurodent.loading import animal_organizer as results
 from neurodent import constants
-from neurodent.core.core import LongRecordingOrganizer
+from neurodent.loading.long_recording_organizer import LongRecordingOrganizer
 
 
 class TestAnalysisPipeline:
@@ -51,7 +52,7 @@ class TestAnalysisPipeline:
         # Test that analysis integrates with utilities
         with (
             patch.object(analyzer, "get_fragment_np", return_value=test_data),
-            patch("neurodent.core.analysis.FragmentAnalyzer.compute_rms") as mock_rms,
+            patch("neurodent.analysis.long_recording_analyzer.FragmentAnalyzer.compute_rms") as mock_rms,
         ):
             mock_rms.return_value = np.array([1.5, 2.0])
 

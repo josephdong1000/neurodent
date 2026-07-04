@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from neurodent.core.discovery import DiscoveredFile
+from neurodent.loading.discovery import DiscoveredFile
 
 
 # ---------------------------------------------------------------------------
@@ -15,20 +15,20 @@ from neurodent.core.discovery import DiscoveredFile
 
 def _get_item_name(item):
     """Call AnimalOrganizer._get_item_name via a minimal mock instance."""
-    from neurodent.visualization.results import AnimalOrganizer
+    from neurodent.loading import AnimalOrganizer
     # Bypass __init__ entirely
     instance = object.__new__(AnimalOrganizer)
     return instance._get_item_name(item)
 
 
 def _is_item_file(item):
-    from neurodent.visualization.results import AnimalOrganizer
+    from neurodent.loading import AnimalOrganizer
     instance = object.__new__(AnimalOrganizer)
     return instance._is_item_file(item)
 
 
 def _get_context_path(item):
-    from neurodent.visualization.results import AnimalOrganizer
+    from neurodent.loading import AnimalOrganizer
     return AnimalOrganizer._get_context_path(item)
 
 

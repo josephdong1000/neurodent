@@ -56,7 +56,7 @@ site/
 logs/
 results/
 # results/ above targets snakemake output dirs; keep the source package tracked
-!src/neurodent/core/results/
+!src/neurodent/results/
 .snakemake_run_id
 CLAUDE.md
 config/config.local.yaml

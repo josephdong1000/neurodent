@@ -9,7 +9,7 @@ from datetime import datetime
 from unittest.mock import Mock, patch, MagicMock
 import numpy as np
 
-from neurodent import core
+from neurodent.loading import long_recording_organizer as core
 from neurodent import constants
 
 
@@ -19,7 +19,7 @@ class TestTimestampFixes:
     def test_si_mode_with_manual_timestamps_no_default_day(self):
         """Test SI mode doesn't use DEFAULT_DAY when manual timestamps provided."""
         with patch("glob.glob", return_value=["/fake/file.edf"]):
-            with patch("neurodent.core.core.LongRecordingOrganizer._validate_timestamps_for_mode"):
+            with patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer._validate_timestamps_for_mode"):
                 organizer = core.LongRecordingOrganizer("/fake/path", mode=None)
                 organizer.manual_datetimes = datetime(2023, 1, 1, 10, 0, 0)
 
@@ -49,7 +49,7 @@ class TestTimestampFixes:
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir_path = Path(tmpdir)
 
-            with patch("neurodent.core.core.LongRecordingOrganizer._validate_timestamps_for_mode"):
+            with patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer._validate_timestamps_for_mode"):
                 organizer = core.LongRecordingOrganizer(tmpdir_path, mode=None)
                 organizer.manual_datetimes = datetime(2023, 1, 1, 10, 0, 0)
 
@@ -68,10 +68,10 @@ class TestTimestampFixes:
                         # Intermediate is written atomically (temp + rename), so the
                         # mocked exporter must create the file at the path it is given.
                         patch(
-                            "neurodent.core.core.mne.export.export_raw",
+                            "neurodent.loading.long_recording_organizer.mne.export.export_raw",
                             side_effect=lambda path, *a, **k: open(path, "wb").close(),
                         ) as mock_export,
-                        patch("neurodent.core.core.se.read_edf") as mock_read_edf,
+                        patch("neurodent.loading.long_recording_organizer.se.read_edf") as mock_read_edf,
                     ):
                         # Mock the SpikeInterface recording
                         mock_recording = Mock()
@@ -98,7 +98,7 @@ class TestNJobsSimplification:
         """Test that n_jobs defaults to 1 in core functionality."""
         # This is now handled directly in the resampling code without complex detection
         with patch("glob.glob", return_value=["/fake/file.edf"]):
-            with patch("neurodent.core.core.LongRecordingOrganizer._validate_timestamps_for_mode"):
+            with patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer._validate_timestamps_for_mode"):
                 organizer = core.LongRecordingOrganizer("/fake/path", mode=None)
                 # Default n_jobs should be 1, not complex detection
                 assert organizer.n_jobs == 1
@@ -106,6 +106,6 @@ class TestNJobsSimplification:
     def test_n_jobs_user_specified_respected(self):
         """Test that user-specified n_jobs values are respected."""
         with patch("glob.glob", return_value=["/fake/file.edf"]):
-            with patch("neurodent.core.core.LongRecordingOrganizer._validate_timestamps_for_mode"):
+            with patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer._validate_timestamps_for_mode"):
                 organizer = core.LongRecordingOrganizer("/fake/path", mode=None, n_jobs=4)
                 assert organizer.n_jobs == 4

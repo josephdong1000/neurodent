@@ -1,5 +1,5 @@
 """
-Unit tests for neurodent.core.analyze_frag module.
+Unit tests for neurodent.analysis.fragment_analyzer module.
 """
 
 import numpy as np
@@ -8,7 +8,7 @@ import warnings
 from unittest.mock import patch, Mock, MagicMock
 from scipy.integrate import trapezoid
 
-from neurodent.core.analyze_frag import FragmentAnalyzer
+from neurodent.analysis.fragment_analyzer import FragmentAnalyzer
 from neurodent import constants
 
 
@@ -195,7 +195,7 @@ class TestFragmentAnalyzer:
             f"Peak at {f[ch0_peak_idx]} Hz, expected around {target_freq} Hz"
         )
 
-    @patch("neurodent.core.analyze_frag.psd_array_multitaper")
+    @patch("neurodent.analysis.fragment_analyzer.psd_array_multitaper")
     def test_compute_psd_multitaper(self, mock_multitaper, sample_rec_2d):
         """Test compute_psd function with multitaper method."""
         f_s = 1000.0
@@ -697,7 +697,7 @@ class TestFragmentAnalyzer:
             )
 
     # Connectivity Features
-    @patch("neurodent.core.analyze_frag.spectral_connectivity_time")
+    @patch("neurodent.analysis.fragment_analyzer.spectral_connectivity_time")
     def test_compute_cohere(self, mock_connectivity, sample_rec_2d):
         """Test compute_cohere function."""
         f_s = 1000.0
@@ -906,7 +906,7 @@ class TestFragmentAnalyzer:
         """Test memory error handling in compute_cohere."""
         f_s = 1000.0
 
-        with patch("neurodent.core.analyze_frag.spectral_connectivity_epochs") as mock_connectivity:
+        with patch("neurodent.analysis.fragment_analyzer.spectral_connectivity_epochs") as mock_connectivity:
             # Make the connectivity function raise a MemoryError
             mock_connectivity.side_effect = MemoryError("Test memory error")
 
@@ -1165,7 +1165,7 @@ class TestFragmentAnalyzerMathematicalVerification:
         random_data = np.random.randn(n_samples, 2).astype(np.float32)
 
         try:
-            with patch("neurodent.core.analyze_frag.spectral_connectivity_time") as mock_connectivity:
+            with patch("neurodent.analysis.fragment_analyzer.spectral_connectivity_time") as mock_connectivity:
                 # Mock low coherence for random signals
                 mock_con = Mock()
                 n_bands = len(constants.BAND_NAMES)
@@ -1258,8 +1258,8 @@ class TestFragmentAnalyzerMathematicalVerification:
         fa_result = FragmentAnalyzer.compute_pcorr(signals, constants.GLOBAL_SAMPLING_RATE)
 
         # Create LongRecordingAnalyzer setup
-        from neurodent.core.analysis import LongRecordingAnalyzer
-        from neurodent.core import core
+        from neurodent.analysis.long_recording_analyzer import LongRecordingAnalyzer
+        from neurodent.loading import long_recording_organizer as core
 
         mock_long_recording = MagicMock(spec=core.LongRecordingOrganizer)
         mock_long_recording.get_num_fragments.return_value = 1

@@ -15,15 +15,15 @@ from .constants import set_channel_map
 # Stage-based headline classes, resolved lazily on first access (PEP 562) so a
 # bare ``import neurodent`` stays cheap and never eager-loads the plotting stack.
 _LAZY_EXPORTS = {
-    "AnimalOrganizer": "neurodent.core.loading",
-    "LongRecordingOrganizer": "neurodent.core",
-    "LongRecordingAnalyzer": "neurodent.core",
-    "WindowAnalysisResult": "neurodent.core.results",
-    "FrequencyDomainSpikeAnalysisResult": "neurodent.core.results",
-    "ZeitgeberAnalysisResult": "neurodent.core.results",
-    "AnimalPlotter": "neurodent.visualization",
-    "ExperimentPlotter": "neurodent.visualization",
-    "ZeitgeberPlotter": "neurodent.visualization",
+    "AnimalOrganizer": "neurodent.loading",
+    "LongRecordingOrganizer": "neurodent.loading",
+    "LongRecordingAnalyzer": "neurodent.analysis",
+    "WindowAnalysisResult": "neurodent.results",
+    "FrequencyDomainSpikeAnalysisResult": "neurodent.results",
+    "ZeitgeberAnalysisResult": "neurodent.results",
+    "AnimalPlotter": "neurodent.plotting",
+    "ExperimentPlotter": "neurodent.plotting",
+    "ZeitgeberPlotter": "neurodent.plotting",
 }
 
 

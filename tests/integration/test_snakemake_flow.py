@@ -174,7 +174,7 @@ class TestFileDiscoveryWithExampleData:
 
     def test_discovers_all_animals(self, example_pipeline_env):
         """Pattern discovers files for all animals in the dataset."""
-        from neurodent.core.discovery import FileDiscoverer
+        from neurodent.loading.discovery import FileDiscoverer
 
         ds = example_pipeline_env
         cfg = ds["config"]["analysis"]["war_generation"]
@@ -195,7 +195,7 @@ class TestFileDiscoveryWithExampleData:
 
     def test_discovers_sessions_per_animal(self, example_pipeline_env):
         """Pattern discovers multiple sessions for a single animal."""
-        from neurodent.core.discovery import FileDiscoverer
+        from neurodent.loading.discovery import FileDiscoverer
 
         ds = example_pipeline_env
         cfg = ds["config"]["analysis"]["war_generation"]
@@ -213,7 +213,7 @@ class TestFileDiscoveryWithExampleData:
 
     def test_filter_by_animal_id(self, example_pipeline_env):
         """Filtering by animal_id returns only that animal's files."""
-        from neurodent.core.discovery import FileDiscoverer
+        from neurodent.loading.discovery import FileDiscoverer
 
         ds = example_pipeline_env
         cfg = ds["config"]["analysis"]["war_generation"]
@@ -287,7 +287,7 @@ class TestPipelineSteps:
         """AnimalOrganizer successfully loads NWB data for a single animal."""
         from neurodent import constants
         from neurodent.workflow import apply_samples_config
-        from neurodent.visualization import AnimalOrganizer
+        from neurodent.loading import AnimalOrganizer
 
         ds = example_pipeline_env
         cfg = ds["config"]["analysis"]["war_generation"]
@@ -333,7 +333,7 @@ class TestPipelineSteps:
         from dateutil.tz import tzlocal
         from neurodent import constants
         from neurodent.workflow import apply_samples_config
-        from neurodent.visualization import AnimalOrganizer
+        from neurodent.loading import AnimalOrganizer
 
         ds = example_pipeline_env
         cfg = ds["config"]["analysis"]["war_generation"]
@@ -392,7 +392,7 @@ def _build_war(ds):
     """
     from datetime import datetime
     from dateutil.tz import tzlocal
-    from neurodent.visualization import AnimalOrganizer
+    from neurodent.loading import AnimalOrganizer
 
     cfg = ds["config"]["analysis"]["war_generation"]
     base_path = str(ds["data_root"] / ds["session_folder"])
@@ -458,7 +458,7 @@ class TestPipelineContinuation:
 
     def test_animal_plotter_instantiation(self, war_env):
         """AnimalPlotter can be created from the generated WAR."""
-        from neurodent.visualization.plotting import AnimalPlotter
+        from neurodent.plotting import AnimalPlotter
 
         _ao, war, _ds = war_env
         ap = AnimalPlotter(war)
@@ -469,7 +469,7 @@ class TestPipelineContinuation:
 
     def test_experiment_plotter_instantiation(self, war_env):
         """ExperimentPlotter can be created from the generated WAR."""
-        from neurodent.visualization.plotting import ExperimentPlotter
+        from neurodent.plotting import ExperimentPlotter
 
         _ao, war, _ds = war_env
         ep = ExperimentPlotter(war, features=["all"])
@@ -483,7 +483,7 @@ class TestPipelineContinuation:
         """ExperimentPlotter accepts WARs from multiple animals."""
         from neurodent import constants
         from neurodent.workflow import apply_samples_config
-        from neurodent.visualization.plotting import ExperimentPlotter
+        from neurodent.plotting import ExperimentPlotter
 
         ds = example_pipeline_env
         orig_metadata = constants.ANIMAL_METADATA
@@ -495,7 +495,7 @@ class TestPipelineContinuation:
             # Build a second WAR for the other animal
             from datetime import datetime
             from dateutil.tz import tzlocal
-            from neurodent.visualization import AnimalOrganizer
+            from neurodent.loading import AnimalOrganizer
 
             cfg = ds["config"]["analysis"]["war_generation"]
             base_path = str(ds["data_root"] / ds["session_folder"])
@@ -560,7 +560,7 @@ class TestPipelineContinuation:
         import numpy as np
         import pandas as pd
 
-        from neurodent.visualization import WindowAnalysisResult
+        from neurodent.results import WindowAnalysisResult
 
         _ao, war, _ds = war_env
 
@@ -623,7 +623,7 @@ class TestPipelineContinuation:
         from pathlib import Path
 
         from neurodent import constants
-        from neurodent.visualization import WindowAnalysisResult
+        from neurodent.results import WindowAnalysisResult
 
         _ao, war, _ds = war_env
         animal_id = war.animal_id
@@ -662,7 +662,7 @@ class TestPipelineContinuation:
         import numpy as np
         import pandas as pd
 
-        from neurodent.visualization import WindowAnalysisResult
+        from neurodent.results import WindowAnalysisResult
 
         _ao, war, _ds = war_env
 
@@ -755,7 +755,7 @@ class TestBinCsvMultiPatternDiscovery:
 
     def test_discovers_paired_files(self, bin_csv_env):
         """Multi-pattern discovers grouped .bin/.csv pairs."""
-        from neurodent.core.discovery import FileDiscoverer
+        from neurodent.loading.discovery import FileDiscoverer
 
         ds = bin_csv_env
         base_path = str(ds["data_root"] / ds["session_folder"])
@@ -774,7 +774,7 @@ class TestBinCsvMultiPatternDiscovery:
 
     def test_filter_by_animal(self, bin_csv_env):
         """Multi-pattern discovery filters correctly by animal."""
-        from neurodent.core.discovery import FileDiscoverer
+        from neurodent.loading.discovery import FileDiscoverer
 
         ds = bin_csv_env
         base_path = str(ds["data_root"] / ds["session_folder"])
@@ -798,7 +798,7 @@ class TestBinCsvMultiPatternDiscovery:
         """
         from neurodent import constants
         from neurodent.workflow import apply_samples_config
-        from neurodent.visualization import AnimalOrganizer
+        from neurodent.loading import AnimalOrganizer
 
         ds = bin_csv_env
         base_path = str(ds["data_root"] / ds["session_folder"])
@@ -856,7 +856,7 @@ class TestPerAnimalPatternDict:
 
     def test_per_animal_dict_discovery(self, bin_csv_env):
         """Per-animal pattern dict resolves to correct patterns per animal."""
-        from neurodent.core.discovery import FileDiscoverer
+        from neurodent.loading.discovery import FileDiscoverer
 
         ds = bin_csv_env
         base_path = str(ds["data_root"] / ds["session_folder"])
@@ -1022,7 +1022,7 @@ class TestMiniRealDataset:
 
     def test_mini_real_discovery_with_animal_placeholder(self, mini_real_config):
         """FileDiscoverer finds mini real files using {animal}/{index} pattern."""
-        from neurodent.core.discovery import FileDiscoverer
+        from neurodent.loading.discovery import FileDiscoverer
         from neurodent.workflow.utils import resolve_animal_pattern
 
         cfg = mini_real_config
@@ -1048,7 +1048,7 @@ class TestMiniRealDataset:
 
     def test_mini_real_filter_by_animal(self, mini_real_config):
         """FileDiscoverer correctly filters by animal_id."""
-        from neurodent.core.discovery import FileDiscoverer
+        from neurodent.loading.discovery import FileDiscoverer
         from neurodent.workflow.utils import resolve_animal_pattern
 
         cfg = mini_real_config
@@ -1072,7 +1072,7 @@ class TestMiniRealDataset:
         from neurodent import constants
         from neurodent.workflow import apply_samples_config
         from neurodent.workflow.utils import resolve_animal_pattern
-        from neurodent.visualization import AnimalOrganizer
+        from neurodent.loading import AnimalOrganizer
 
         cfg = mini_real_config
         ds = cfg["ds_config"]
@@ -1116,7 +1116,7 @@ class TestMiniRealDataset:
         from neurodent import constants
         from neurodent.workflow import apply_samples_config
         from neurodent.workflow.utils import resolve_animal_pattern
-        from neurodent.visualization import AnimalOrganizer
+        from neurodent.loading import AnimalOrganizer
 
         cfg = mini_real_config
         ds = cfg["ds_config"]
@@ -1155,7 +1155,7 @@ class TestMiniRealDataset:
         from neurodent import constants
         from neurodent.workflow import apply_samples_config
         from neurodent.workflow.utils import resolve_animal_pattern
-        from neurodent.visualization import AnimalOrganizer
+        from neurodent.loading import AnimalOrganizer
 
         cfg = mini_real_config
         ds = cfg["ds_config"]
@@ -1199,7 +1199,7 @@ class TestJointRecordingSplit:
         from neurodent import constants
         from neurodent.workflow import apply_samples_config
         from neurodent.workflow.utils import expand_animals_config
-        from neurodent.visualization import AnimalOrganizer
+        from neurodent.loading import AnimalOrganizer
 
         # Use existing A10 test data but configure it as a joint recording split
         # A10-1 gets channels 0-4, A10-2 gets channels 5-9

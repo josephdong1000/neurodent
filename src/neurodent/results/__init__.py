@@ -3,7 +3,7 @@
 A neutral shared layer: the loading/analysis code and the plotting code both
 depend downward into it. Holds ``WindowAnalysisResult``,
 ``FrequencyDomainSpikeAnalysisResult``, ``ZeitgeberAnalysisResult`` and their
-feature/filter/streaming helpers, so nothing here imports ``neurodent.visualization``.
+feature/filter/streaming helpers, so nothing here imports ``neurodent.plotting``.
 """
 
 from .window_analysis_result import (

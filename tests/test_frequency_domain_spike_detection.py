@@ -1,5 +1,5 @@
 """
-Unit tests for neurodent.core.frequency_domain_spike_detection module.
+Unit tests for neurodent.analysis.spike_detection module.
 """
 
 import os
@@ -20,7 +20,7 @@ except ImportError:
 
 import mne
 
-from neurodent.core.frequency_domain_spike_detection import FrequencyDomainSpikeDetector
+from neurodent.analysis.spike_detection import FrequencyDomainSpikeDetector
 from neurodent import constants
 
 
@@ -967,7 +967,7 @@ class TestDaskModeDispatch:
 
     def test_dask_import_error_when_dask_unavailable(self, mock_recording, params):
         """ImportError is raised in dask mode when dask cannot be imported."""
-        import neurodent.core.frequency_domain_spike_detection as fdsd_mod
+        import neurodent.analysis.spike_detection as fdsd_mod
         original = fdsd_mod.dask
         try:
             fdsd_mod.dask = None

@@ -30,7 +30,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from neurodent.visualization import results
+from neurodent.loading import animal_organizer as results
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -94,7 +94,7 @@ def _patch_lro_durations(durations: dict):
         seconds = durations.get(item, 3600.0)
         return _mock_lro(seconds)
     return patch(
-        "neurodent.visualization.results.core.LongRecordingOrganizer",
+        "neurodent.loading.long_recording_organizer.LongRecordingOrganizer",
         side_effect=_factory,
     )
 
@@ -633,7 +633,7 @@ class TestDictOrderRespectedNotNaturalSort:
         """Same shape but using natural-sort directly would have produced
         the old broken ordering. Demonstrates *why* the fix matters.
         """
-        from neurodent.core.discovery import _natural_sort_key
+        from neurodent.loading.discovery import _natural_sort_key
 
         keys = [" ", "-", " 1 ", " 2 "]
         natural_order = sorted(keys, key=_natural_sort_key)

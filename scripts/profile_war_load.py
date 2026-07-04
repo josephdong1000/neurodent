@@ -35,7 +35,7 @@ from pathlib import Path
 
 import psutil
 
-from neurodent import visualization
+from neurodent.results import WindowAnalysisResult
 from neurodent.workflow.utils import apply_samples_config, load_samples_config, resolve_samples_config
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -78,7 +78,6 @@ def _convert_to_native_subprocess(animal: str, war_root: Path, output_dir: Path)
     """
     script = f"""
 from pathlib import Path
-from neurodent import visualization
 from neurodent.workflow.utils import apply_samples_config, load_samples_config, resolve_samples_config
 
 samples_config = resolve_samples_config(load_samples_config({str(SAMPLES_PATH)!r}))
@@ -88,7 +87,7 @@ src = Path({str(war_root)!r}) / {animal!r}
 dst = Path({str(output_dir)!r})
 dst.mkdir(parents=True, exist_ok=True)
 
-war = visualization.WindowAnalysisResult.load_parquet_and_json(
+war = WindowAnalysisResult.load_parquet_and_json(
     folder_path=src, parquet_name="war.parquet", json_name="war.json"
 )
 war.save_parquet_and_json(dst)
@@ -165,14 +164,14 @@ def main() -> None:
         # the full WAR DataFrame.  This mirrors what standardize_wars.py does.
         with tempfile.TemporaryDirectory(prefix="profile_war_") as tmpdir:
             _report(f"about to stream reorder_and_pad (batch_size={args.batch_size})", t0)
-            war = visualization.WindowAnalysisResult.scan_parquet_and_json(input_war_dir, filename="war")
+            war = WindowAnalysisResult.scan_parquet_and_json(input_war_dir, filename="war")
             war.reorder_and_pad_channels(CHANNEL_REORDER, use_abbrevs=True)
             war.save_parquet_and_json(Path(tmpdir), filename="war", batch_size=args.batch_size)
             _report("stream reorder_and_pad done", t0)
     else:
         # Eager path (current production behavior pre-#3).
         _report("about to load_parquet_and_json", t0)
-        war = visualization.WindowAnalysisResult.load_parquet_and_json(
+        war = WindowAnalysisResult.load_parquet_and_json(
             folder_path=input_war_dir, parquet_name="war.parquet", json_name="war.json"
         )
         _report("loaded WAR", t0)

@@ -17,7 +17,8 @@ from pathlib import Path
 
 from dask.distributed import Client, LocalCluster
 
-from neurodent import constants, core, visualization
+from neurodent import constants, core
+from neurodent.loading import AnimalOrganizer
 from neurodent.workflow import setup_snakemake_logging, apply_samples_config
 from neurodent.workflow.utils import apply_path_overrides, resolve_animal_pattern, get_discovery_animal_filter
 
@@ -46,7 +47,7 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
     data_root = Path(samples_config.get("data_root", samples_config.get("data_parent_folder", "")))
 
     # Set temp directory
-    core.set_temp_directory(config["temp_directory"])
+    core.utils.set_temp_directory(config["temp_directory"])
 
     # Set aliases
     apply_samples_config(samples_config)
@@ -158,7 +159,7 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
 
 
                 # Create AO for this session using pattern-based discovery
-                session_ao = visualization.AnimalOrganizer(
+                session_ao = AnimalOrganizer(
                     discovery_pattern,
                     animal_id=discovery_animal_filter,
                     skip_sessions=session_analysis_config.get("skip_sessions", session_analysis_config.get("skip_days", [])),
@@ -181,7 +182,7 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
             if not all_lros:
                 raise ValueError(f"No recordings found for {animal_id}")
 
-            ao = visualization.AnimalOrganizer.from_lros(
+            ao = AnimalOrganizer.from_lros(
                 all_lros,
                 animal_id=animal_id,
                 genotype=genotype,

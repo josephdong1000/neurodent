@@ -21,8 +21,9 @@ except ImportError:
     si = None
     SPIKEINTERFACE_AVAILABLE = False
 
-from neurodent import visualization, constants
-from neurodent.visualization.frequency_domain_results import FrequencyDomainSpikeAnalysisResult
+from neurodent import constants
+from neurodent.loading import AnimalOrganizer
+from neurodent.results.frequency_domain_results import FrequencyDomainSpikeAnalysisResult
 
 
 # Test data configuration
@@ -80,7 +81,7 @@ class TestWARIntegration:
             warnings.filterwarnings("ignore", category=UserWarning)
             warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-            ao = visualization.AnimalOrganizer(
+            ao = AnimalOrganizer(
                 [
                     str(TEST_DATA_BASE / animal_id) + "/{index}_ColMajor.bin",
                     str(TEST_DATA_BASE / animal_id) + "/{index}_Meta.csv",
@@ -276,7 +277,7 @@ class TestWARIntegration:
 
             # Compute expected log transformation (using core.log_transform if available)
             try:
-                from neurodent.core import log_transform
+                from neurodent.core.utils import log_transform
 
                 expected_lognspike = log_transform(nspike.reshape(1, -1))[0]
                 np.testing.assert_allclose(lognspike, expected_lognspike, rtol=1e-6)

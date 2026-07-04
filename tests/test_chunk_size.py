@@ -422,7 +422,7 @@ class TestComputeWindowedAnalysisSignature:
     def test_chunk_duration_s_in_signature(self):
         """``compute_windowed_analysis`` must accept a ``chunk_duration_s`` kwarg."""
         import inspect
-        from neurodent.visualization.results import AnimalOrganizer
+        from neurodent.loading import AnimalOrganizer
 
         sig = inspect.signature(AnimalOrganizer.compute_windowed_analysis)
         assert "chunk_duration_s" in sig.parameters
@@ -430,7 +430,7 @@ class TestComputeWindowedAnalysisSignature:
     def test_chunk_duration_s_default_is_3600(self):
         """Default value of ``chunk_duration_s`` should be 3600."""
         import inspect
-        from neurodent.visualization.results import AnimalOrganizer
+        from neurodent.loading import AnimalOrganizer
 
         sig = inspect.signature(AnimalOrganizer.compute_windowed_analysis)
         assert sig.parameters["chunk_duration_s"].default == 3600
@@ -440,7 +440,7 @@ class TestComputeWindowedAnalysisSignature:
         chunk_duration_s=...)`` must invoke ``stream_recording_to_zarr``
         inside the dask branch of AO."""
         import pandas as pd
-        from neurodent.visualization.results import AnimalOrganizer
+        from neurodent.loading import AnimalOrganizer
 
         # -- build a minimal AO instance ------------------------------------
         ao = AnimalOrganizer.__new__(AnimalOrganizer)
@@ -473,25 +473,25 @@ class TestComputeWindowedAnalysisSignature:
 
         with (
             patch(
-                "neurodent.visualization.results.core.LongRecordingAnalyzer",
+                "neurodent.analysis.pipeline.LongRecordingAnalyzer",
                 return_value=mock_lan,
             ),
             patch(
-                "neurodent.visualization.results.core.utils.stream_recording_to_zarr",
+                "neurodent.core.utils.stream_recording_to_zarr",
                 return_value=str(tmp_path / "fake.zarr"),
             ) as mock_stream,
-            patch("neurodent.visualization.results.da.from_zarr"),
+            patch("neurodent.analysis.pipeline.da.from_zarr"),
             patch(
-                "neurodent.visualization.results.dask.compute",
+                "neurodent.analysis.pipeline.dask.compute",
                 # n_fragments_war = max(n_fragments - 1, 1) = 4
                 return_value=[{"rms": 0.0}] * (mock_lan.n_fragments - 1),
             ),
             patch(
-                "neurodent.core.loading.pipeline.delayed",
+                "neurodent.analysis.pipeline.delayed",
                 side_effect=lambda f: lambda *a, **kw: {"rms": 0.0},
             ),
             patch(
-                "neurodent.visualization.results.core.validate_timestamps"
+                "neurodent.analysis.pipeline.validate_timestamps"
             ),
         ):
             ao._process_fragment_metadata = MagicMock(
@@ -534,7 +534,7 @@ class TestSaveFifAndJsonChunkDurationS:
     def test_chunk_duration_s_forwarded_to_convert_to_mne(self, tmp_path):
         """``save_fif_and_json`` should call ``convert_to_mne`` with the
         supplied ``chunk_duration_s``."""
-        from neurodent.visualization.frequency_domain_results import (
+        from neurodent.results.frequency_domain_results import (
             FrequencyDomainSpikeAnalysisResult,
         )
 
@@ -567,7 +567,7 @@ class TestSaveFifAndJsonChunkDurationS:
     def test_chunk_duration_s_default_is_60(self):
         """Default ``chunk_duration_s`` in ``save_fif_and_json`` should be 60 s."""
         import inspect
-        from neurodent.visualization.frequency_domain_results import (
+        from neurodent.results.frequency_domain_results import (
             FrequencyDomainSpikeAnalysisResult,
         )
 
@@ -577,7 +577,7 @@ class TestSaveFifAndJsonChunkDurationS:
     def test_chunk_duration_s_in_signature(self):
         """``save_fif_and_json`` must expose a ``chunk_duration_s`` parameter."""
         import inspect
-        from neurodent.visualization.frequency_domain_results import (
+        from neurodent.results.frequency_domain_results import (
             FrequencyDomainSpikeAnalysisResult,
         )
 
@@ -711,7 +711,7 @@ class TestFdsarChunkedDetection:
         except ImportError:
             pytest.skip("SpikeInterface not available")
 
-        from neurodent.core.frequency_domain_spike_detection import (
+        from neurodent.analysis.spike_detection import (
             FrequencyDomainSpikeDetector,
         )
 
@@ -776,7 +776,7 @@ class TestFdsarChunkedDetection:
         except ImportError:
             pytest.skip("SpikeInterface not available")
 
-        from neurodent.core.frequency_domain_spike_detection import (
+        from neurodent.analysis.spike_detection import (
             FrequencyDomainSpikeDetector,
         )
 
@@ -884,7 +884,7 @@ class TestInputValidation:
         except ImportError:
             pytest.skip("spikeinterface not installed")
 
-        from neurodent.core.frequency_domain_spike_detection import (
+        from neurodent.analysis.spike_detection import (
             FrequencyDomainSpikeDetector,
         )
 
@@ -920,7 +920,7 @@ class TestInputValidation:
         except ImportError:
             pytest.skip("spikeinterface not installed")
 
-        from neurodent.core.frequency_domain_spike_detection import (
+        from neurodent.analysis.spike_detection import (
             FrequencyDomainSpikeDetector,
         )
 
@@ -938,7 +938,7 @@ class TestInputValidation:
 
     def test_lof_rejects_zero_chunk_duration(self):
         """lof_chunk_duration_s=0 must raise ValueError."""
-        from neurodent.core.core import LongRecordingOrganizer
+        from neurodent.loading.long_recording_organizer import LongRecordingOrganizer
 
         lro = LongRecordingOrganizer.__new__(LongRecordingOrganizer)
 
@@ -953,7 +953,7 @@ class TestInputValidation:
 
     def test_lof_rejects_negative_chunk_duration(self):
         """lof_chunk_duration_s=-10 must raise ValueError."""
-        from neurodent.core.core import LongRecordingOrganizer
+        from neurodent.loading.long_recording_organizer import LongRecordingOrganizer
 
         lro = LongRecordingOrganizer.__new__(LongRecordingOrganizer)
 

@@ -9,7 +9,7 @@ import pandas as pd
 import pytest
 import copy
 
-from neurodent.visualization import WindowAnalysisResult
+from neurodent.results import WindowAnalysisResult
 
 
 class TestSaveBadChannels:

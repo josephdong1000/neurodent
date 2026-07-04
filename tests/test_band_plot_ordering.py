@@ -32,9 +32,10 @@ import pytest
 import seaborn.objects as so
 
 from neurodent import constants
-from neurodent.visualization import ExperimentPlotter, WindowAnalysisResult
-from neurodent.visualization.plotting.animal import AnimalPlotter
-from neurodent.visualization.feature_utils import extract_band_dict, extract_feature
+from neurodent.plotting import ExperimentPlotter
+from neurodent.results import WindowAnalysisResult
+from neurodent.plotting.animal import AnimalPlotter
+from neurodent.results.feature_utils import extract_band_dict, extract_feature
 
 
 CUSTOM_PLOT_ORDER = {

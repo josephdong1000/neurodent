@@ -23,7 +23,8 @@ import seaborn as sns
 import seaborn.objects as so
 from seaborn import axes_style
 
-from neurodent import visualization, constants
+from neurodent import constants
+from neurodent.plotting import ExperimentPlotter
 from neurodent.workflow import (
     setup_snakemake_logging,
     load_wars,
@@ -179,7 +180,7 @@ def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
                 .add(so.Range(color="k"), so.Est(errorbar="sd"), so.Dodge())
                 .add(so.Dot(), so.Dodge(), so.Jitter(0.75, seed=42))
                 .scale(
-                    x=visualization.ExperimentPlotter.band_scale(plot_lib=so),
+                    x=ExperimentPlotter.band_scale(plot_lib=so),
                     marker=create_sex_marker_scale(df, plot_lib=so),
                 )
                 .theme(
@@ -201,7 +202,7 @@ def create_ep_plots(ep, feature, feature_label, output_dir, data_dir, ep_config)
                 .add(so.Dash(color="k"), so.Agg(), so.Dodge())
                 .add(so.Range(color="k"), so.Est(errorbar="sd"), so.Dodge())
                 .add(so.Dot(), so.Dodge(), so.Jitter(0.75, seed=42))
-                .scale(color=visualization.ExperimentPlotter.band_scale(plot_lib=so))
+                .scale(color=ExperimentPlotter.band_scale(plot_lib=so))
                 .theme(
                     axes_style("ticks")
                     | sns.plotting_context("notebook")
@@ -289,7 +290,7 @@ def main():
 
     # Create ExperimentPlotter
     logger.info("Creating ExperimentPlotter")
-    ep = visualization.ExperimentPlotter(wars=wars, exclude=exclude_features, plot_order=plot_order)
+    ep = ExperimentPlotter(wars=wars, exclude=exclude_features, plot_order=plot_order)
 
     feature_to_label = {
         **constants.FEATURE_LABELS,

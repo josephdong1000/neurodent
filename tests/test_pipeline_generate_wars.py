@@ -126,7 +126,7 @@ class TestPipelineIntegrationWithSyntheticData:
         assert "{index}" in pattern
 
         # Verify FileDiscoverer finds the right files
-        from neurodent.core.discovery import FileDiscoverer
+        from neurodent.loading.discovery import FileDiscoverer
 
         discoverer = FileDiscoverer(pattern)
         all_files = discoverer.discover()
@@ -153,7 +153,7 @@ class TestPipelineIntegrationWithSyntheticData:
         pattern = f"{tmp_path}/{{index}}.rhd"
 
         # Verify FileDiscoverer finds only .rhd files and extracts index
-        from neurodent.core.discovery import FileDiscoverer
+        from neurodent.loading.discovery import FileDiscoverer
 
         discoverer = FileDiscoverer(pattern)
         files = discoverer.discover()
@@ -173,7 +173,7 @@ class TestPipelineIntegrationWithSyntheticData:
         # Build pattern from config template (uses {index} for filename)
         pattern = f"{tmp_path}/{{animal}}/{{session}}/{{index}}.edf"
 
-        from neurodent.core.discovery import FileDiscoverer
+        from neurodent.loading.discovery import FileDiscoverer
 
         discoverer = FileDiscoverer(pattern)
         files = discoverer.discover()
@@ -195,7 +195,7 @@ class TestPipelineIntegrationWithSyntheticData:
             f"{tmp_path}/{{animal}}/{{session}}/{{index}}_Meta.csv",
         ]
 
-        from neurodent.core.discovery import FileDiscoverer
+        from neurodent.loading.discovery import FileDiscoverer
 
         discoverer = FileDiscoverer(patterns)
         groups = discoverer.discover()

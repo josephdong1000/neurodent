@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from unittest.mock import MagicMock
 
-from neurodent.core.core import LongRecordingOrganizer
+from neurodent.loading.long_recording_organizer import LongRecordingOrganizer
 
 
 class TestExtractChannelNames:

@@ -18,12 +18,12 @@ import datetime
 import numpy as np
 import spikeinterface.core as si
 
-from neurodent.core import LongRecordingOrganizer
-from neurodent.core.zeitgeber import (
+from neurodent.loading import LongRecordingOrganizer
+from neurodent.results.zeitgeber import (
     add_zeitgeber_time_columns,
     shift_to_zeitgeber_reference,
 )
-from neurodent.visualization import AnimalOrganizer
+from neurodent.loading import AnimalOrganizer
 
 FS = 1000
 WINDOW_S = 60  # 1-minute windows keep the window count modest

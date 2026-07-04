@@ -25,8 +25,8 @@ import seaborn as sns
 from seaborn import axes_style
 
 # Import neurodent modules
-from neurodent.core import zeitgeber
-from neurodent.visualization.plotting import ZeitgeberPlotter
+from neurodent.results import zeitgeber
+from neurodent.plotting import ZeitgeberPlotter
 from neurodent import constants
 from neurodent.workflow import setup_snakemake_logging, apply_samples_config
 

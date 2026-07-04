@@ -1,6 +1,6 @@
 
 import pytest
-from neurodent.core import LongRecordingOrganizer
+from neurodent.loading import LongRecordingOrganizer
 import datetime
 import numpy as np
 import spikeinterface.core as si

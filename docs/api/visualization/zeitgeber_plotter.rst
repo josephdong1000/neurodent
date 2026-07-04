@@ -1,7 +1,7 @@
 ZeitgeberPlotter
 ================
 
-.. currentmodule:: neurodent.visualization
+.. currentmodule:: neurodent.plotting
 
 .. autoclass:: ZeitgeberPlotter
    :members:

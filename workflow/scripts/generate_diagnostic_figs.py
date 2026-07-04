@@ -17,7 +17,8 @@ import matplotlib
 
 matplotlib.use("Agg")  # Non-interactive backend
 
-from neurodent import visualization
+from neurodent.results import WindowAnalysisResult
+from neurodent.plotting import AnimalPlotter
 from neurodent.workflow import setup_snakemake_logging, apply_samples_config
 
 
@@ -106,7 +107,7 @@ def load_war_and_config():
     war_dir = Path(war_parquet_path).parent
     war_parquet_name = Path(war_parquet_path).name
     war_json_name = Path(war_json_path).name
-    war = visualization.WindowAnalysisResult.load_parquet_and_json(
+    war = WindowAnalysisResult.load_parquet_and_json(
         folder_path=war_dir, parquet_name=war_parquet_name, json_name=war_json_name
     )
 
@@ -121,7 +122,7 @@ def generate_diagnostic_figures_for_animal(war, config, animal_folder, animal_id
     # wildcard already being slugified upstream — defensive per the project
     # path-safety convention.
     save_path_base = output_dir / war.path_safe_animal_id
-    ap = visualization.AnimalPlotter(war, save_fig=True, save_path=str(save_path_base))
+    ap = AnimalPlotter(war, save_fig=True, save_path=str(save_path_base))
     figure_config = config["analysis"]["figures"]
 
     try:

@@ -18,7 +18,7 @@ from unittest.mock import Mock
 import sys
 from pathlib import Path
 
-from neurodent.visualization.results import WindowAnalysisResult
+from neurodent.results.window_analysis_result import WindowAnalysisResult
 
 
 @pytest.mark.mutates_constants
@@ -86,7 +86,7 @@ class TestLOFEvaluationFixes:
     def test_channel_name_mapping_with_abbreviations(self):
         """Test that channel name mapping works between full names and abbreviations"""
 
-        from neurodent.visualization.results import WindowAnalysisResult
+        from neurodent.results.window_analysis_result import WindowAnalysisResult
 
         # Mock data with channel name mismatch
         lof_scores_dict = {
@@ -137,7 +137,7 @@ class TestLOFEvaluationFixes:
     def test_realistic_user_data_scenario(self):
         """Test with realistic user-provided data scenario"""
 
-        from neurodent.visualization.results import WindowAnalysisResult
+        from neurodent.results.window_analysis_result import WindowAnalysisResult
 
         # User-provided realistic test data - only include data that has corresponding LOF scores
         bad_channels_dict = {"M2 MWT Jan-14-2022": ["LHip", "LVis", "RVis", "RHip", "LBar"]}
@@ -193,7 +193,7 @@ class TestLOFEvaluationFixes:
     def test_empty_lof_scores_raises_error(self):
         """Test that missing LOF scores raises appropriate error"""
 
-        from neurodent.visualization.results import WindowAnalysisResult
+        from neurodent.results.window_analysis_result import WindowAnalysisResult
 
         war_mock = Mock()
         war_mock.lof_scores_dict = None
@@ -205,7 +205,7 @@ class TestLOFEvaluationFixes:
     def test_missing_threshold_raises_error(self):
         """Test that missing threshold raises error"""
 
-        from neurodent.visualization.results import WindowAnalysisResult
+        from neurodent.results.window_analysis_result import WindowAnalysisResult
 
         war_mock = Mock()
         war_mock.lof_scores_dict = {"day1": {"lof_scores": [1, 2], "channel_names": ["ch1", "ch2"]}}
@@ -246,7 +246,7 @@ class TestLOFEvaluationFixes:
     def test_threshold_behavior_realistic_range(self):
         """Test that different thresholds produce expected precision-recall tradeoff"""
 
-        from neurodent.visualization.results import WindowAnalysisResult
+        from neurodent.results.window_analysis_result import WindowAnalysisResult
 
         # Create data where some bad channels have high scores, some have low scores
         lof_scores_dict = {

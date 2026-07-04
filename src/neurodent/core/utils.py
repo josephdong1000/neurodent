@@ -1878,9 +1878,9 @@ def slugify(value, allow_unicode=False):
         components.  Any code that constructs a ``Path`` or filename from one of
         these strings **must** route the value through ``slugify(...)`` directly,
         or through one of the ``path_safe_*`` accessors on
-        :class:`~neurodent.core.results.WindowAnalysisResult`,
-        :class:`~neurodent.core.results.streaming.LazyWindowAnalysisResult`, or
-        :class:`~neurodent.core.results.FrequencyDomainSpikeAnalysisResult`.
+        :class:`~neurodent.results.WindowAnalysisResult`,
+        :class:`~neurodent.results.streaming.LazyWindowAnalysisResult`, or
+        :class:`~neurodent.results.FrequencyDomainSpikeAnalysisResult`.
 
         Display strings — which may contain ``/``, ``;``, parens, spaces, etc.
         (e.g. the real arxrosa genotype ``Arx(F/y); Rosa(+/wt)``) — are correct

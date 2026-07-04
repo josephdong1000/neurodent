@@ -1,5 +1,5 @@
 """
-Unit tests for neurodent.visualization module.
+Unit tests for the plotting and results modules.
 
 Legacy ResultsVisualizer and standalone plotting function tests have been removed because their functionality is now handled by AnimalPlotter and ExperimentPlotter.
 """
@@ -14,12 +14,9 @@ import pytest
 import warnings
 from unittest.mock import Mock, patch, MagicMock
 
-from neurodent.visualization import (
-    WindowAnalysisResult,
-    AnimalPlotter,
-    ExperimentPlotter,
-)
-from neurodent.visualization.feature_utils import average_feature
+from neurodent.results import WindowAnalysisResult
+from neurodent.plotting import AnimalPlotter, ExperimentPlotter
+from neurodent.results.feature_utils import average_feature
 from neurodent import constants
 
 
@@ -1861,7 +1858,7 @@ class TestExperimentPlotter:
             )
         )
         with patch(
-            "neurodent.visualization.plotting.experiment.df_normalize_baseline",
+            "neurodent.plotting.experiment.df_normalize_baseline",
             side_effect=lambda **kwargs: kwargs["df"],
         ):
             result = plotter.plot_diffheatmap(feature="cohere", groupby=["genotype", "channel"], baseline_key="WT")
@@ -2203,7 +2200,7 @@ class TestFeatureUtils:
 
     def test_extract_linear_array_1d(self):
         """Test extracting 1-D (scalar per channel) linear feature."""
-        from neurodent.visualization.feature_utils import extract_linear_array
+        from neurodent.results.feature_utils import extract_linear_array
 
         series = pd.Series([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
         result = extract_linear_array(series)
@@ -2213,7 +2210,7 @@ class TestFeatureUtils:
 
     def test_extract_linear_array_2d(self):
         """Test extracting 2-D (multi-component per channel) linear feature."""
-        from neurodent.visualization.feature_utils import extract_linear_array
+        from neurodent.results.feature_utils import extract_linear_array
 
         series = pd.Series([
             [[1.0, 2.0], [3.0, 4.0]],
@@ -2225,7 +2222,7 @@ class TestFeatureUtils:
 
     def test_extract_band_dict(self):
         """Test extracting band-keyed dict feature to array."""
-        from neurodent.visualization.feature_utils import extract_band_dict
+        from neurodent.results.feature_utils import extract_band_dict
 
         series = pd.Series([
             {"delta": [1.0, 2.0], "theta": [3.0, 4.0]},
@@ -2240,7 +2237,7 @@ class TestFeatureUtils:
 
     def test_repack_band_dict(self):
         """Test repacking array back to list of band dicts."""
-        from neurodent.visualization.feature_utils import extract_band_dict, repack_band_dict
+        from neurodent.results.feature_utils import extract_band_dict, repack_band_dict
 
         original = pd.Series([
             {"delta": [1.0, 2.0], "theta": [3.0, 4.0]},
@@ -2255,7 +2252,7 @@ class TestFeatureUtils:
 
     def test_extract_band_dict_round_trip(self):
         """Test that extract → repack round-trips correctly."""
-        from neurodent.visualization.feature_utils import extract_band_dict, repack_band_dict
+        from neurodent.results.feature_utils import extract_band_dict, repack_band_dict
 
         original = pd.Series([
             {"alpha": [0.1, 0.2], "beta": [0.3, 0.4], "gamma": [0.5, 0.6]},
@@ -2271,7 +2268,7 @@ class TestFeatureUtils:
 
     def test_extract_hist_data_tuples(self):
         """Test extracting histogram data from tuple format (pickle origin)."""
-        from neurodent.visualization.feature_utils import extract_hist_data
+        from neurodent.results.feature_utils import extract_hist_data
 
         series = pd.Series([
             (np.array([1.0, 2.0, 3.0]), np.array([10.0, 20.0, 30.0])),
@@ -2286,7 +2283,7 @@ class TestFeatureUtils:
 
     def test_extract_hist_data_lists(self):
         """Test extracting histogram data from list format (parquet origin)."""
-        from neurodent.visualization.feature_utils import extract_hist_data
+        from neurodent.results.feature_utils import extract_hist_data
 
         series = pd.Series([
             [[1.0, 2.0, 3.0], [10.0, 20.0, 30.0]],
@@ -2300,7 +2297,7 @@ class TestFeatureUtils:
 
     def test_extract_hist_data_multichannel(self):
         """Test extracting histogram data where values are 2-D (F, C) per cell."""
-        from neurodent.visualization.feature_utils import extract_hist_data
+        from neurodent.results.feature_utils import extract_hist_data
 
         n_freq, n_chan = 4, 3
         coords_row = np.arange(n_freq, dtype=float)
@@ -2320,7 +2317,7 @@ class TestFeatureUtils:
 
     def test_extract_linear_array_ragged_raises(self):
         """Test that ragged input raises ValueError."""
-        from neurodent.visualization.feature_utils import extract_linear_array
+        from neurodent.results.feature_utils import extract_linear_array
 
         series = pd.Series([[1.0, 2.0, 3.0], [4.0, 5.0]])
         with pytest.raises(ValueError, match="Ragged input"):
@@ -2328,7 +2325,7 @@ class TestFeatureUtils:
 
     def test_extract_band_dict_ragged_raises(self):
         """Test that ragged band values raise ValueError."""
-        from neurodent.visualization.feature_utils import extract_band_dict
+        from neurodent.results.feature_utils import extract_band_dict
 
         series = pd.Series([
             {"delta": [1.0, 2.0], "theta": [3.0, 4.0]},
@@ -2339,7 +2336,7 @@ class TestFeatureUtils:
 
     def test_extract_hist_data_ragged_raises(self):
         """Test that ragged histogram data raises ValueError."""
-        from neurodent.visualization.feature_utils import extract_hist_data
+        from neurodent.results.feature_utils import extract_hist_data
 
         series = pd.Series([
             (np.array([1.0, 2.0, 3.0]), np.array([10.0, 20.0, 30.0])),
@@ -2350,7 +2347,7 @@ class TestFeatureUtils:
 
     def test_extract_linear_array_ftype_validation(self):
         """Test ftype param validates ndim."""
-        from neurodent.visualization.feature_utils import extract_linear_array
+        from neurodent.results.feature_utils import extract_linear_array
         series = pd.Series([[1.0, 2.0], [3.0, 4.0]])
         # Correct ftype should pass
         result = extract_linear_array(series, ftype=constants.FeatureType.LINEAR)
@@ -2361,7 +2358,7 @@ class TestFeatureUtils:
 
     def test_extract_band_dict_ftype_validation(self):
         """Test ftype param validates ndim."""
-        from neurodent.visualization.feature_utils import extract_band_dict
+        from neurodent.results.feature_utils import extract_band_dict
         series = pd.Series([{"delta": [1.0, 2.0], "theta": [3.0, 4.0]}])
         # Correct ftype should pass
         vals, keys = extract_band_dict(series, ftype=constants.FeatureType.BAND)
@@ -2372,7 +2369,7 @@ class TestFeatureUtils:
 
     def test_extract_hist_data_ftype_validation(self):
         """Test ftype param validates feature type."""
-        from neurodent.visualization.feature_utils import extract_hist_data
+        from neurodent.results.feature_utils import extract_hist_data
         series = pd.Series([
             (np.array([1.0, 2.0]), np.array([10.0, 20.0])),
         ])
@@ -2388,21 +2385,21 @@ class TestFlattenFeatureForPlotting:
     """Test flatten_feature_for_plotting utility."""
 
     def test_flatten_linear(self):
-        from neurodent.visualization.feature_utils import flatten_feature_for_plotting
+        from neurodent.results.feature_utils import flatten_feature_for_plotting
         vals = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])  # (2, 3)
         result = flatten_feature_for_plotting(vals, constants.FeatureType.LINEAR)
         assert result.shape == (2, 3, 1)
         np.testing.assert_array_equal(result[:, :, 0], vals)
 
     def test_flatten_linear_2d(self):
-        from neurodent.visualization.feature_utils import flatten_feature_for_plotting
+        from neurodent.results.feature_utils import flatten_feature_for_plotting
         vals = np.array([[[1.0, 2.0], [3.0, 4.0]]])  # (1, 2, 2)
         result = flatten_feature_for_plotting(vals, constants.FeatureType.LINEAR_2D)
         assert result.shape == (1, 2, 2)
         np.testing.assert_array_equal(result, vals)
 
     def test_flatten_band(self):
-        from neurodent.visualization.feature_utils import flatten_feature_for_plotting
+        from neurodent.results.feature_utils import flatten_feature_for_plotting
         vals = np.array([[[10.0, 20.0, 30.0], [40.0, 50.0, 60.0]]])  # (1, 2, 3)
         result = flatten_feature_for_plotting(vals, constants.FeatureType.BAND)
         assert result.shape == (1, 2, 3)
@@ -2411,7 +2408,7 @@ class TestFlattenFeatureForPlotting:
         np.testing.assert_array_equal(result[0, 1], [40.0, 50.0, 60.0])
 
     def test_flatten_simple_matrix_triag(self):
-        from neurodent.visualization.feature_utils import flatten_feature_for_plotting
+        from neurodent.results.feature_utils import flatten_feature_for_plotting
         vals = np.array([[[0.0, 0.1, 0.2],
                           [0.3, 0.0, 0.4],
                           [0.5, 0.6, 0.0]]])  # (1, 3, 3)
@@ -2421,14 +2418,14 @@ class TestFlattenFeatureForPlotting:
         np.testing.assert_array_equal(result[0, :, 0], [0.3, 0.5, 0.6])
 
     def test_flatten_simple_matrix_no_triag(self):
-        from neurodent.visualization.feature_utils import flatten_feature_for_plotting
+        from neurodent.results.feature_utils import flatten_feature_for_plotting
         vals = np.array([[[1.0, 2.0], [3.0, 4.0]]])  # (1, 2, 2)
         result = flatten_feature_for_plotting(vals, constants.FeatureType.SIMPLE_MATRIX, triag=False)
         assert result.shape == (1, 4, 1)
         np.testing.assert_array_equal(result[0, :, 0], [1.0, 2.0, 3.0, 4.0])
 
     def test_flatten_banded_matrix_triag(self):
-        from neurodent.visualization.feature_utils import flatten_feature_for_plotting
+        from neurodent.results.feature_utils import flatten_feature_for_plotting
         vals = np.zeros((1, 3, 3, 2))
         vals[0, 1, 0, 0] = 10.0; vals[0, 1, 0, 1] = 11.0
         vals[0, 2, 0, 0] = 20.0; vals[0, 2, 0, 1] = 21.0
@@ -2441,7 +2438,7 @@ class TestFlattenFeatureForPlotting:
         np.testing.assert_array_equal(result[0, 2], [30.0, 31.0])
 
     def test_flatten_banded_matrix_no_triag(self):
-        from neurodent.visualization.feature_utils import flatten_feature_for_plotting
+        from neurodent.results.feature_utils import flatten_feature_for_plotting
         vals = np.arange(8, dtype=float).reshape(1, 2, 2, 2)
         result = flatten_feature_for_plotting(vals, constants.FeatureType.BANDED_MATRIX, triag=False)
         assert result.shape == (1, 4, 2)
@@ -2451,7 +2448,7 @@ class TestFlattenFeatureForPlotting:
         np.testing.assert_array_equal(result[0, 3], [6.0, 7.0])
 
     def test_flatten_unsupported_raises(self):
-        from neurodent.visualization.feature_utils import flatten_feature_for_plotting
+        from neurodent.results.feature_utils import flatten_feature_for_plotting
         vals = np.array([[1.0, 2.0, 3.0]])
         with pytest.raises(ValueError, match="Unsupported FeatureType"):
             flatten_feature_for_plotting(vals, constants.FeatureType.HIST)
@@ -2461,20 +2458,20 @@ class TestCollapseFeatureChannels:
     """Test collapse_feature_channels utility."""
 
     def test_collapse_linear(self):
-        from neurodent.visualization.feature_utils import collapse_feature_channels
+        from neurodent.results.feature_utils import collapse_feature_channels
         vals = np.array([[1.0, 3.0], [5.0, 7.0]])  # (2 windows, 2 channels)
         result = collapse_feature_channels(vals, constants.FeatureType.LINEAR)
         np.testing.assert_array_equal(result, [2.0, 6.0])
 
     def test_collapse_linear_2d(self):
-        from neurodent.visualization.feature_utils import collapse_feature_channels
+        from neurodent.results.feature_utils import collapse_feature_channels
         vals = np.array([[[1.0, 2.0], [3.0, 4.0]]])  # (1, 2 chan, 2 comp)
         result = collapse_feature_channels(vals, constants.FeatureType.LINEAR_2D)
         assert result.shape == (1, 2)
         np.testing.assert_array_equal(result[0], [2.0, 3.0])
 
     def test_collapse_band(self):
-        from neurodent.visualization.feature_utils import collapse_feature_channels
+        from neurodent.results.feature_utils import collapse_feature_channels
         # Canonical shape: (n_windows, n_channels, n_bands)
         vals = np.array([[[1.0, 5.0], [3.0, 7.0]]])  # (1, 2 chan, 2 bands)
         result = collapse_feature_channels(vals, constants.FeatureType.BAND)
@@ -2482,7 +2479,7 @@ class TestCollapseFeatureChannels:
         np.testing.assert_array_equal(result[0], [2.0, 6.0])
 
     def test_collapse_simple_matrix(self):
-        from neurodent.visualization.feature_utils import collapse_feature_channels
+        from neurodent.results.feature_utils import collapse_feature_channels
         # 2x2 symmetric matrix, tril pair = (1,0) only
         vals = np.array([[[0.0, 0.5], [0.5, 0.0]]])  # (1, 2, 2)
         result = collapse_feature_channels(vals, constants.FeatureType.SIMPLE_MATRIX)
@@ -2490,7 +2487,7 @@ class TestCollapseFeatureChannels:
         np.testing.assert_almost_equal(result[0], 0.5)
 
     def test_collapse_banded_matrix(self):
-        from neurodent.visualization.feature_utils import collapse_feature_channels
+        from neurodent.results.feature_utils import collapse_feature_channels
         # Canonical shape: (n_windows, n_chan, n_chan, n_bands)
         vals = np.zeros((1, 2, 2, 2))
         vals[0, 1, 0, 0] = 0.8  # ch_row=1, ch_col=0, band=0
@@ -2501,7 +2498,7 @@ class TestCollapseFeatureChannels:
         np.testing.assert_almost_equal(result[0, 1], 0.6)
 
     def test_collapse_hist(self):
-        from neurodent.visualization.feature_utils import collapse_feature_channels
+        from neurodent.results.feature_utils import collapse_feature_channels
         vals = np.array([[[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]])  # (1, 2 chan, 3 freq)
         result = collapse_feature_channels(vals, constants.FeatureType.HIST)
         assert result.shape == (1, 3)
@@ -2509,14 +2506,14 @@ class TestCollapseFeatureChannels:
 
     def test_collapse_hist_via_function(self):
         """Verify HIST is supported in collapse_feature_channels."""
-        from neurodent.visualization.feature_utils import collapse_feature_channels
+        from neurodent.results.feature_utils import collapse_feature_channels
         vals = np.array([[[1.0, 2.0], [3.0, 4.0]]])  # (1, 2 chan, 2 freq)
         result = collapse_feature_channels(vals, constants.FeatureType.HIST)
         assert result.shape == (1, 2)
 
     def test_collapse_linear_with_nan(self):
         """NaN values are skipped by nanmean."""
-        from neurodent.visualization.feature_utils import collapse_feature_channels
+        from neurodent.results.feature_utils import collapse_feature_channels
         vals = np.array([[1.0, np.nan, 3.0], [4.0, 5.0, np.nan]])  # (2, 3)
         result = collapse_feature_channels(vals, constants.FeatureType.LINEAR)
         # nanmean([1, nan, 3])=2.0; nanmean([4, 5, nan])=4.5
@@ -2524,7 +2521,7 @@ class TestCollapseFeatureChannels:
 
     def test_collapse_simple_matrix_3x3(self):
         """3x3 matrix: 3 tril pairs averaged."""
-        from neurodent.visualization.feature_utils import collapse_feature_channels
+        from neurodent.results.feature_utils import collapse_feature_channels
         mat = np.array([[[0.0, 0.1, 0.2],
                          [0.3, 0.0, 0.4],
                          [0.5, 0.6, 0.0]]])  # (1, 3, 3)
@@ -2535,7 +2532,7 @@ class TestCollapseFeatureChannels:
 
     def test_collapse_banded_matrix_with_nan(self):
         """NaN in one tril pair is skipped by nanmean."""
-        from neurodent.visualization.feature_utils import collapse_feature_channels
+        from neurodent.results.feature_utils import collapse_feature_channels
         vals = np.zeros((1, 3, 3, 1))
         vals[0, 1, 0, 0] = 0.6
         vals[0, 2, 0, 0] = np.nan
@@ -2547,7 +2544,7 @@ class TestCollapseFeatureChannels:
 
     def test_collapse_linear_single_channel(self):
         """Single channel: mean is identity."""
-        from neurodent.visualization.feature_utils import collapse_feature_channels
+        from neurodent.results.feature_utils import collapse_feature_channels
         vals = np.array([[5.0], [10.0]])  # (2, 1)
         result = collapse_feature_channels(vals, constants.FeatureType.LINEAR)
         np.testing.assert_array_equal(result, [5.0, 10.0])
@@ -2557,7 +2554,7 @@ class TestExtractFeature:
     """Test extract_feature utility."""
 
     def test_extract_linear(self):
-        from neurodent.visualization.feature_utils import extract_feature
+        from neurodent.results.feature_utils import extract_feature
         series = pd.Series([[1.0, 2.0], [3.0, 4.0]])
         vals, keys = extract_feature(series, constants.FeatureType.LINEAR)
         assert vals.shape == (2, 2)
@@ -2566,7 +2563,7 @@ class TestExtractFeature:
         np.testing.assert_array_equal(vals[1], [3.0, 4.0])
 
     def test_extract_linear_2d(self):
-        from neurodent.visualization.feature_utils import extract_feature
+        from neurodent.results.feature_utils import extract_feature
         series = pd.Series([[[1.0, 2.0], [3.0, 4.0]]])
         vals, keys = extract_feature(series, constants.FeatureType.LINEAR_2D)
         assert vals.shape == (1, 2, 2)
@@ -2575,7 +2572,7 @@ class TestExtractFeature:
         np.testing.assert_array_equal(vals[0, 1], [3.0, 4.0])
 
     def test_extract_simple_matrix(self):
-        from neurodent.visualization.feature_utils import extract_feature
+        from neurodent.results.feature_utils import extract_feature
         series = pd.Series([[[0.0, 0.5], [0.5, 0.0]]])
         vals, keys = extract_feature(series, constants.FeatureType.SIMPLE_MATRIX)
         assert vals.shape == (1, 2, 2)
@@ -2583,7 +2580,7 @@ class TestExtractFeature:
         np.testing.assert_array_equal(vals[0], [[0.0, 0.5], [0.5, 0.0]])
 
     def test_extract_band(self):
-        from neurodent.visualization.feature_utils import extract_feature
+        from neurodent.results.feature_utils import extract_feature
         series = pd.Series([{"delta": [1.0, 2.0], "theta": [3.0, 4.0]}])
         vals, keys = extract_feature(series, constants.FeatureType.BAND)
         assert vals.shape == (1, 2, 2)  # (W, C, B)
@@ -2593,7 +2590,7 @@ class TestExtractFeature:
         np.testing.assert_array_equal(vals[0, 1], [2.0, 4.0])
 
     def test_extract_banded_matrix(self):
-        from neurodent.visualization.feature_utils import extract_feature
+        from neurodent.results.feature_utils import extract_feature
         series = pd.Series([{"delta": [[0.0, 0.5], [0.5, 0.0]]}])
         vals, keys = extract_feature(series, constants.FeatureType.BANDED_MATRIX)
         assert vals.shape == (1, 2, 2, 1)  # (W, C, C, B)
@@ -2605,14 +2602,14 @@ class TestFormatChannelData:
     """Test format_channel_data utility with numeric validity."""
 
     def test_format_linear_collapsed(self):
-        from neurodent.visualization.feature_utils import format_channel_data
+        from neurodent.results.feature_utils import format_channel_data
         vals = np.array([[1.0, 3.0], [5.0, 7.0]])  # (2 win, 2 chan)
         result = format_channel_data(vals, constants.FeatureType.LINEAR, collapse_channels=True)
         assert "average" in result
         np.testing.assert_array_almost_equal(result["average"], [2.0, 6.0])
 
     def test_format_linear_per_channel(self):
-        from neurodent.visualization.feature_utils import format_channel_data
+        from neurodent.results.feature_utils import format_channel_data
         vals = np.array([[1.0, 3.0], [5.0, 7.0]])  # (2 win, 2 chan)
         result = format_channel_data(
             vals, constants.FeatureType.LINEAR, collapse_channels=False,
@@ -2623,7 +2620,7 @@ class TestFormatChannelData:
         assert result["RM"] == [3.0, 7.0]
 
     def test_format_band_collapsed(self):
-        from neurodent.visualization.feature_utils import format_channel_data
+        from neurodent.results.feature_utils import format_channel_data
         # Canonical: (W, C, B)
         vals = np.array([[[1.0, 5.0], [3.0, 7.0]]])  # (1, 2 chan, 2 bands)
         result = format_channel_data(vals, constants.FeatureType.BAND, collapse_channels=True)
@@ -2631,7 +2628,7 @@ class TestFormatChannelData:
         np.testing.assert_array_almost_equal(result["average"], [[2.0, 6.0]])
 
     def test_format_band_per_channel(self):
-        from neurodent.visualization.feature_utils import format_channel_data
+        from neurodent.results.feature_utils import format_channel_data
         vals = np.array([[[1.0, 5.0], [3.0, 7.0]]])  # (1, 2 chan, 2 bands)
         result = format_channel_data(
             vals, constants.FeatureType.BAND, collapse_channels=False,
@@ -2641,20 +2638,20 @@ class TestFormatChannelData:
         np.testing.assert_array_almost_equal(result["LM"], [[1.0, 5.0]])
 
     def test_format_simple_matrix_collapsed(self):
-        from neurodent.visualization.feature_utils import format_channel_data
+        from neurodent.results.feature_utils import format_channel_data
         vals = np.array([[[0.0, 0.5], [0.5, 0.0]]])  # (1, 2, 2)
         result = format_channel_data(vals, constants.FeatureType.SIMPLE_MATRIX, collapse_channels=True)
         assert "average" in result
         np.testing.assert_array_almost_equal(result["average"], [0.5])
 
     def test_format_simple_matrix_not_collapsed(self):
-        from neurodent.visualization.feature_utils import format_channel_data
+        from neurodent.results.feature_utils import format_channel_data
         vals = np.array([[[0.0, 0.5], [0.5, 0.0]]])  # (1, 2, 2)
         result = format_channel_data(vals, constants.FeatureType.SIMPLE_MATRIX, collapse_channels=False)
         assert "all" in result
 
     def test_format_banded_matrix_collapsed(self):
-        from neurodent.visualization.feature_utils import format_channel_data
+        from neurodent.results.feature_utils import format_channel_data
         vals = np.zeros((1, 2, 2, 2))
         vals[0, 1, 0, 0] = 0.8
         vals[0, 1, 0, 1] = 0.6
@@ -2663,20 +2660,20 @@ class TestFormatChannelData:
         np.testing.assert_array_almost_equal(result["average"], [[0.8, 0.6]])
 
     def test_format_banded_matrix_not_collapsed(self):
-        from neurodent.visualization.feature_utils import format_channel_data
+        from neurodent.results.feature_utils import format_channel_data
         vals = np.zeros((1, 2, 2, 2))
         result = format_channel_data(vals, constants.FeatureType.BANDED_MATRIX, collapse_channels=False)
         assert "all" in result
 
     def test_format_hist_collapsed(self):
-        from neurodent.visualization.feature_utils import format_channel_data
+        from neurodent.results.feature_utils import format_channel_data
         vals = np.array([[[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]])  # (1, 2 chan, 3 freq)
         result = format_channel_data(vals, constants.FeatureType.HIST, collapse_channels=True)
         assert "average" in result
         np.testing.assert_array_almost_equal(result["average"], [[2.5, 3.5, 4.5]])
 
     def test_format_hist_per_channel(self):
-        from neurodent.visualization.feature_utils import format_channel_data
+        from neurodent.results.feature_utils import format_channel_data
         vals = np.array([[[1.0, 2.0], [3.0, 4.0]]])  # (1, 2 chan, 2 freq)
         result = format_channel_data(
             vals, constants.FeatureType.HIST, collapse_channels=False,
@@ -2687,7 +2684,7 @@ class TestFormatChannelData:
 
     def test_format_channel_subset(self):
         """Only requested channels are included in the result."""
-        from neurodent.visualization.feature_utils import format_channel_data
+        from neurodent.results.feature_utils import format_channel_data
         vals = np.array([[1.0, 3.0, 5.0]])  # (1, 3 chan)
         result = format_channel_data(
             vals, constants.FeatureType.LINEAR, collapse_channels=False,
@@ -2707,7 +2704,7 @@ class TestPipelineComposition:
 
     def test_pipeline_linear(self):
         """LINEAR: extract -> format(collapsed) -> format(per-channel) -> flatten."""
-        from neurodent.visualization.feature_utils import (
+        from neurodent.results.feature_utils import (
             extract_feature, format_channel_data, flatten_feature_for_plotting,
         )
         # 2 windows, 2 channels: ch0=[1, 3], ch1=[2, 4]
@@ -2736,7 +2733,7 @@ class TestPipelineComposition:
 
     def test_pipeline_linear_2d(self):
         """LINEAR_2D: extract -> format(collapsed) -> flatten."""
-        from neurodent.visualization.feature_utils import (
+        from neurodent.results.feature_utils import (
             extract_feature, format_channel_data, flatten_feature_for_plotting,
         )
         # 1 window, 2 channels, 2 components
@@ -2756,7 +2753,7 @@ class TestPipelineComposition:
 
     def test_pipeline_band(self):
         """BAND: extract (with transpose) -> format -> repack round-trip -> flatten."""
-        from neurodent.visualization.feature_utils import (
+        from neurodent.results.feature_utils import (
             extract_feature, format_channel_data, flatten_feature_for_plotting,
             repack_band_dict,
         )
@@ -2793,7 +2790,7 @@ class TestPipelineComposition:
 
     def test_pipeline_simple_matrix(self):
         """SIMPLE_MATRIX: extract -> collapse (tril) -> flatten (tril)."""
-        from neurodent.visualization.feature_utils import (
+        from neurodent.results.feature_utils import (
             extract_feature, format_channel_data, flatten_feature_for_plotting,
         )
         # 1 window, 2x2 symmetric matrix
@@ -2814,7 +2811,7 @@ class TestPipelineComposition:
 
     def test_pipeline_banded_matrix(self):
         """BANDED_MATRIX: extract (transpose) -> collapse -> repack round-trip -> flatten."""
-        from neurodent.visualization.feature_utils import (
+        from neurodent.results.feature_utils import (
             extract_feature, format_channel_data, flatten_feature_for_plotting,
             repack_band_dict,
         )
@@ -2841,7 +2838,7 @@ class TestPipelineComposition:
 
     def test_pipeline_channel_ordering_preserved(self):
         """Verify that channel identity is preserved through the full pipeline."""
-        from neurodent.visualization.feature_utils import (
+        from neurodent.results.feature_utils import (
             extract_feature, format_channel_data, flatten_feature_for_plotting,
         )
         # 3 channels with distinct values so mis-ordering is immediately obvious
@@ -2867,7 +2864,7 @@ class TestPipelineComposition:
 
     def test_channel_ordering_band_round_trip(self):
         """BAND: verify channel identity survives extract -> repack -> format."""
-        from neurodent.visualization.feature_utils import (
+        from neurodent.results.feature_utils import (
             extract_band_dict, repack_band_dict, format_channel_data,
         )
         # ch0=[1,2,3] across 3 bands, ch1=[4,5,6] — distinct per channel
@@ -2895,7 +2892,7 @@ class TestPipelineComposition:
 
     def test_channel_ordering_hist_extract_format(self):
         """HIST: verify channel identity survives the (F,C) -> (W,C,F) transpose."""
-        from neurodent.visualization.feature_utils import (
+        from neurodent.results.feature_utils import (
             extract_hist_data, format_channel_data,
         )
         # 1 window, per-cell values shape (F=3, C=2): col0=ch0, col1=ch1
@@ -2918,7 +2915,7 @@ class TestPipelineComposition:
 
     def test_channel_ordering_banded_matrix_round_trip(self):
         """BANDED_MATRIX: verify (row, col) ordering survives extract -> repack -> flatten."""
-        from neurodent.visualization.feature_utils import (
+        from neurodent.results.feature_utils import (
             extract_band_dict, repack_band_dict, flatten_feature_for_plotting,
         )
         # 3x3 matrix with unique values at each (i,j), 1 band
@@ -2942,29 +2939,29 @@ class TestBinSpikeTimes:
     """Test bin_spike_times and _bin_spike_df numerical correctness."""
 
     def test_bin_spike_times_basic(self):
-        from neurodent.visualization.results import bin_spike_times
+        from neurodent.results.window_analysis_result import bin_spike_times
         counts = bin_spike_times([5.0, 15.0, 25.0], [10.0, 10.0, 10.0])
         assert counts == [1, 1, 1]
 
     def test_bin_spike_times_empty(self):
-        from neurodent.visualization.results import bin_spike_times
+        from neurodent.results.window_analysis_result import bin_spike_times
         counts = bin_spike_times([], [10.0, 10.0])
         assert counts == [0, 0]
 
     def test_bin_spike_times_boundary(self):
-        from neurodent.visualization.results import bin_spike_times
+        from neurodent.results.window_analysis_result import bin_spike_times
         # bin_edges = [0, 10, 20]; np.histogram: bins are [left, right) except last [left, right]
         counts = bin_spike_times([0.0, 10.0, 20.0], [10.0, 10.0])
         # 0.0 in [0,10), 10.0 in [10,20], 20.0 in [10,20]
         assert counts == [1, 2]
 
     def test_bin_spike_times_multiple_per_bin(self):
-        from neurodent.visualization.results import bin_spike_times
+        from neurodent.results.window_analysis_result import bin_spike_times
         counts = bin_spike_times([1.0, 2.0, 3.0, 15.0], [10.0, 10.0])
         assert counts == [3, 1]
 
     def test_bin_spike_df_basic(self):
-        from neurodent.visualization.results import _bin_spike_df
+        from neurodent.results.window_analysis_result import _bin_spike_df
         df = pd.DataFrame({"duration": [10.0, 10.0, 10.0]})
         spikes_channel = [[5.0, 15.0], [25.0]]
         result = _bin_spike_df(df, spikes_channel)
@@ -2973,7 +2970,7 @@ class TestBinSpikeTimes:
         np.testing.assert_array_equal(result[:, 1], [0, 0, 1])
 
     def test_bin_spike_df_empty_channel(self):
-        from neurodent.visualization.results import _bin_spike_df
+        from neurodent.results.window_analysis_result import _bin_spike_df
         df = pd.DataFrame({"duration": [5.0, 5.0]})
         spikes_channel = [[], [1.0, 6.0]]
         result = _bin_spike_df(df, spikes_channel)
@@ -3143,7 +3140,7 @@ class TestDataProcessingForVisualization:
 
     def test_df_normalize_baseline(self):
         """Test baseline normalization function."""
-        from neurodent.visualization.plotting.experiment import df_normalize_baseline
+        from neurodent.plotting.experiment import df_normalize_baseline
 
         df = pd.DataFrame(
             {
@@ -3162,7 +3159,7 @@ class TestDataProcessingForVisualization:
 
     def test_df_normalize_baseline_subtract_values(self):
         """Verify subtracted values are numerically correct."""
-        from neurodent.visualization.plotting.experiment import df_normalize_baseline
+        from neurodent.plotting.experiment import df_normalize_baseline
 
         df = pd.DataFrame({
             "genotype": ["WT", "WT", "KO", "KO"],
@@ -3183,7 +3180,7 @@ class TestDataProcessingForVisualization:
 
     def test_df_normalize_baseline_divide_values(self):
         """Verify divided values are numerically correct."""
-        from neurodent.visualization.plotting.experiment import df_normalize_baseline
+        from neurodent.plotting.experiment import df_normalize_baseline
 
         df = pd.DataFrame({
             "genotype": ["WT", "WT"],
@@ -3200,7 +3197,7 @@ class TestDataProcessingForVisualization:
 
     def test_df_normalize_baseline_remove_baseline(self):
         """Baseline rows removed after normalization."""
-        from neurodent.visualization.plotting.experiment import df_normalize_baseline
+        from neurodent.plotting.experiment import df_normalize_baseline
 
         df = pd.DataFrame({
             "genotype": ["WT", "WT"],
@@ -3218,7 +3215,7 @@ class TestDataProcessingForVisualization:
 
     def test_df_normalize_baseline_per_group(self):
         """Per-genotype baselines via remaining_groupby."""
-        from neurodent.visualization.plotting.experiment import df_normalize_baseline
+        from neurodent.plotting.experiment import df_normalize_baseline
 
         df = pd.DataFrame({
             "genotype": ["WT", "WT", "KO", "KO"],
@@ -5035,7 +5032,7 @@ class TestAnimalOrganizerLOF:
 
     def test_animal_organizer_lof_methods_exist(self):
         """Test that AnimalOrganizer has the expected LOF methods."""
-        from neurodent.visualization.results import AnimalOrganizer
+        from neurodent.loading import AnimalOrganizer
 
         # Check that the methods exist
         assert hasattr(AnimalOrganizer, "compute_bad_channels")
@@ -5059,10 +5056,10 @@ class TestAnimalOrganizerLOF:
         required_params = [p for p in sig.parameters.values() if p.default == p.empty]
         assert len(required_params) == 1  # Only 'self'
 
-    @patch("neurodent.visualization.results.AnimalOrganizer.__init__", return_value=None)
+    @patch("neurodent.loading.animal_organizer.AnimalOrganizer.__init__", return_value=None)
     def test_animal_organizer_war_creation_includes_lof(self, mock_init):
         """Test that WindowAnalysisResult creation includes LOF scores."""
-        from neurodent.visualization.results import AnimalOrganizer
+        from neurodent.loading import AnimalOrganizer
 
         # Create mock AnimalOrganizer with necessary attributes
         ao = AnimalOrganizer.__new__(AnimalOrganizer)
@@ -5114,7 +5111,7 @@ class TestAnimalOrganizerLOF:
         assert lof_scores_dict["day2"]["lof_scores"] == [0.8, 1.2]
 
         # Create WindowAnalysisResult with LOF scores
-        from neurodent.visualization.results import WindowAnalysisResult
+        from neurodent.results.window_analysis_result import WindowAnalysisResult
 
         war = WindowAnalysisResult(
             ao.features_df,
@@ -5137,7 +5134,7 @@ class TestAnimalOrganizerLOF:
 
     def test_get_all_lof_scores_no_overwrites(self):
         """Test that get_all_lof_scores preserves all LOF data with no overwrites."""
-        from neurodent.visualization.results import AnimalOrganizer
+        from neurodent.loading import AnimalOrganizer
         from datetime import datetime
         from unittest.mock import MagicMock
         from pathlib import Path
@@ -5225,10 +5222,10 @@ class TestComputeGlobalTimelineKwargDiscipline:
         (``results.core.LongRecordingOrganizer``) so we stay correct even after
         tests (e.g. test_imports.TestCircularImports) drop ``neurodent.core``
         from ``sys.modules`` and force a re-import, which rebinds
-        ``neurodent.core.LongRecordingOrganizer`` to a new class object.
+        ``neurodent.loading.long_recording_organizer.LongRecordingOrganizer`` to a new class object.
         """
         from unittest.mock import MagicMock
-        from neurodent.visualization import results as _results_mod
+        from neurodent.loading import long_recording_organizer as _results_mod
 
         captured: list[dict] = []
 
@@ -5238,14 +5235,14 @@ class TestComputeGlobalTimelineKwargDiscipline:
             self.LongRecording.get_duration.return_value = 100.0
 
         monkeypatch.setattr(
-            _results_mod.core.LongRecordingOrganizer, "__init__", fake_init
+            _results_mod.LongRecordingOrganizer, "__init__", fake_init
         )
         return captured
 
     def _make_organizer_shell(self):
         """Build an AnimalOrganizer instance bypassing __init__'s discovery so
         we can call _compute_global_timeline in isolation."""
-        from neurodent.visualization.results import AnimalOrganizer
+        from neurodent.loading import AnimalOrganizer
         ao = AnimalOrganizer.__new__(AnimalOrganizer)
         ao.animal_id = "test"
         return ao

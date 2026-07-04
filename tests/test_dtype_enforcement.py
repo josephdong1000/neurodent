@@ -2,7 +2,7 @@
 import numpy as np
 import pytest
 from unittest.mock import MagicMock
-from neurodent.core import LongRecordingOrganizer
+from neurodent.loading import LongRecordingOrganizer
 import neurodent.constants as constants
 try:
     import spikeinterface.core as si
