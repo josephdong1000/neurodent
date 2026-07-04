@@ -18,6 +18,7 @@ _LAZY_EXPORTS = {
     "AnimalOrganizer": "neurodent.loading",
     "LongRecordingOrganizer": "neurodent.loading",
     "LongRecordingAnalyzer": "neurodent.analysis",
+    "AnimalAnalyzer": "neurodent.analysis",
     "WindowAnalysisResult": "neurodent.results",
     "FrequencyDomainSpikeAnalysisResult": "neurodent.results",
     "ZeitgeberAnalysisResult": "neurodent.results",
