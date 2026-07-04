@@ -1,8 +1,13 @@
-"""Analysis orchestration for :class:`AnimalOrganizer` (issue #137).
+"""Analysis stage for a single animal (issue #137).
 
-``AnalysisPipeline`` runs the LOF / windowed-analysis / spike-detection steps on
-an organizer's already-loaded recordings, reading and writing the organizer's
-state. ``AnimalOrganizer``'s ``compute_*`` methods delegate here.
+``AnimalAnalyzer`` runs the LOF / windowed-analysis / spike-detection steps on an
+:class:`~neurodent.loading.animal_organizer.AnimalOrganizer`'s already-loaded
+recordings. It reads the organizer's recordings and metadata and stores the
+results on itself, keeping loading (``AnimalOrganizer``) and analysis separate.
+
+Construct it as ``AnimalAnalyzer(ao)`` and reuse one instance across the
+``compute_*`` calls so intermediate state (e.g. bad channels) is shared, the same
+way you reuse a :class:`~neurodent.analysis.long_recording_analyzer.LongRecordingAnalyzer`.
 """
 
 import logging
@@ -17,7 +22,7 @@ from tqdm import tqdm
 
 from neurodent import constants
 from .long_recording_analyzer import LongRecordingAnalyzer
-from neurodent.core.utils import validate_timestamps
+from neurodent.core.utils import validate_timestamps, is_day
 from neurodent.core import utils as core_utils
 from .fragment_analyzer import FragmentAnalyzer
 from .spike_detection import FrequencyDomainSpikeDetector
@@ -29,11 +34,20 @@ except ImportError:  # pragma: no cover
     spre = None
 
 
-class AnalysisPipeline:
-    """Runs analysis steps on an :class:`AnimalOrganizer`, storing results on it."""
+class AnimalAnalyzer:
+    """Runs analysis on a loaded :class:`AnimalOrganizer`, owning the results.
+
+    Args:
+        ao (AnimalOrganizer): A loaded organizer whose recordings are analyzed.
+    """
 
     def __init__(self, ao):
         self.ao = ao
+        self.long_analyzers: list[LongRecordingAnalyzer] = []
+        self.bad_channels_dict = {}
+        self.features_df = pd.DataFrame()
+        self.window_analysis_result = None
+        self.frequency_domain_spike_analysis_results = None
 
     def compute_bad_channels(
         self, lof_threshold: float = None, force_recompute: bool = False,
@@ -65,7 +79,7 @@ class AnalysisPipeline:
 
         # Update bad channels dict if threshold was applied
         if lof_threshold is not None:
-            self.ao.bad_channels_dict = {
+            self.bad_channels_dict = {
                 animalday: lrec.bad_channel_names
                 for animalday, lrec in zip(self.ao.animaldays, self.ao.long_recordings)
             }
@@ -79,7 +93,7 @@ class AnalysisPipeline:
         for lrec in self.ao.long_recordings:
             lrec.apply_lof_threshold(lof_threshold)
 
-        self.ao.bad_channels_dict = {
+        self.bad_channels_dict = {
             animalday: lrec.bad_channel_names
             for animalday, lrec in zip(self.ao.animaldays, self.ao.long_recordings)
         }
@@ -204,7 +218,7 @@ class AnalysisPipeline:
 
                     logging.debug("Processing metadata serially")
                     metadatas = [
-                        self.ao._process_fragment_metadata(idx, lan, window_s)
+                        self._process_fragment_metadata(idx, lan, window_s)
                         for idx in range(n_fragments_war)
                     ]
                     meta_df = pd.DataFrame(metadatas)
@@ -253,7 +267,7 @@ class AnalysisPipeline:
                         miniters=miniters,
                     ):
                         lan_df.append(
-                            self.ao._process_fragment_serial(
+                            self._process_fragment_serial(
                                 idx, features, lan, window_s, kwargs
                             )
                         )
@@ -264,11 +278,10 @@ class AnalysisPipeline:
             validate_timestamps(lan_df["timestamp"].tolist())
             lan_df = lan_df.sort_values("timestamp").reset_index(drop=True)
 
-            self.ao.long_analyzers.append(lan)
+            self.long_analyzers.append(lan)
             dataframes.append(lan_df)
 
-        self.ao.features_df = pd.concat(dataframes)
-        self.ao.features_df = self.ao.features_df
+        self.features_df = pd.concat(dataframes)
 
         # Collect LOF scores from long recordings
         lof_scores_dict = {}
@@ -305,18 +318,18 @@ class AnalysisPipeline:
             logging.warning(warning_msg)
             warnings.warn(warning_msg)
 
-        self.ao.window_analysis_result = WindowAnalysisResult(
-            self.ao.features_df,
+        self.window_analysis_result = WindowAnalysisResult(
+            self.features_df,
             self.ao.animal_id,
             self.ao.genotype,
             self.ao.sex,
             self.ao.channel_names,
-            self.ao.bad_channels_dict,
+            self.bad_channels_dict,
             suppress_short_interval_error,
             lof_scores_dict,
         )
 
-        return self.ao.window_analysis_result
+        return self.window_analysis_result
 
     def compute_frequency_domain_spike_analysis(
         self,
@@ -395,9 +408,71 @@ class AnalysisPipeline:
                 raise
 
         # Store results for later access
-        self.ao.frequency_domain_spike_analysis_results = fdsar_list
+        self.frequency_domain_spike_analysis_results = fdsar_list
 
         logging.info(
             f"Completed frequency-domain spike detection. Total recordings processed: {len(fdsar_list)}"
         )
         return fdsar_list
+
+    def _process_fragment_serial(
+        self, idx, features, lan: LongRecordingAnalyzer, window_s, kwargs: dict
+    ):
+        row = self._process_fragment_metadata(idx, lan, window_s)
+        row.update(self._process_fragment_features(idx, features, lan, kwargs))
+        return row
+
+    def _process_fragment_metadata(
+        self, idx, lan: LongRecordingAnalyzer, window_s
+    ):
+        row = {}
+
+        # Build session labels from LRO's DiscoveredFile metadata
+        from neurodent.loading import DiscoveredFile
+
+        lro = lan.LongRecording
+        item = getattr(lro, "item", None)
+
+        animal = self.ao.animal_id or "unknown"
+        genotype = self.ao.genotype or "Unknown"
+        sex = self.ao.sex or "Unknown"
+        session = None
+
+        if isinstance(item, DiscoveredFile) and item.metadata:
+            meta = item.metadata
+            animal = meta.get("animal", animal)
+            session = meta.get("session")
+            genotype = constants.ANIMAL_METADATA.get(animal, {}).get("genotype", genotype)
+            sex = constants.ANIMAL_METADATA.get(animal, {}).get("sex", sex)
+
+        if session is None:
+            try:
+                session = lro.get_date_string()
+            except (ValueError, AttributeError):
+                session = "unknown"
+
+        row["animalday"] = f"{animal} {genotype} {session}"
+        row["animal"] = animal
+        row["day"] = session
+        row["genotype"] = genotype
+        row["sex"] = sex
+        row["duration"] = lan.LongRecording.get_dur_fragment(window_s, idx)
+        row["endfile"] = lan.get_file_end(idx)
+
+        frag_dt = lan.LongRecording.get_datetime_fragment(window_s, idx)
+        row["timestamp"] = frag_dt
+        row["isday"] = is_day(frag_dt)
+
+        return row
+
+    def _process_fragment_features(
+        self, idx, features, lan: LongRecordingAnalyzer, kwargs: dict
+    ):
+        row = {}
+        for feat in features:
+            func = getattr(lan, f"compute_{feat}")
+            if callable(func):
+                row[feat] = func(idx, **kwargs)
+            else:
+                raise AttributeError(f"Invalid function {func}")
+        return row

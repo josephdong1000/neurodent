@@ -1,7 +1,7 @@
 """Windowed feature analysis results.
 
 ``WindowAnalysisResult`` wraps the windowed feature DataFrame produced by
-:meth:`neurodent.loading.animal_organizer.AnimalOrganizer.compute_windowed_analysis`
+:meth:`neurodent.analysis.animal_analyzer.AnimalAnalyzer.compute_windowed_analysis`
 and provides filtering, aggregation, serialization, and LOF utilities.
 
 Split out of the former monolithic ``results.py`` (issue #134).
@@ -106,7 +106,7 @@ class WindowAnalysisResult:
     Wrapper for output of windowed analysis. Has useful functions like group-wise and global averaging, filtering, and saving
 
     Args:
-        result (pd.DataFrame): Result comes from AnimalOrganizer.compute_windowed_analysis()
+        result (pd.DataFrame): Result comes from AnimalAnalyzer.compute_windowed_analysis()
         animal_id (str, optional): Identifier for the animal where result was computed from. Defaults to None.
         genotype (str, optional): Genotype of animal. Defaults to None.
         channel_names (list[str], optional): The recording's channel labels (raw names as

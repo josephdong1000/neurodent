@@ -1,10 +1,10 @@
 """Multi-session recording organization for a single animal.
 
-``AnimalOrganizer`` discovers and loads recording files, groups them into
-sessions, manages ``LongRecordingOrganizer`` instances and their timeline, and
-orchestrates windowed feature analysis and spike detection — producing
-:class:`~neurodent.results.window_analysis_result.WindowAnalysisResult`
-objects.
+``AnimalOrganizer`` discovers and loads recording files for a single animal,
+groups them into sessions, and manages ``LongRecordingOrganizer`` instances and
+their timeline. Analysis (LOF, windowed features, spike detection) is a separate
+stage: pass a loaded organizer to
+:class:`~neurodent.analysis.animal_analyzer.AnimalAnalyzer`.
 
 Split out of the former monolithic ``results.py`` (issue #134).
 """
@@ -27,16 +27,12 @@ from tqdm import tqdm
 
 from neurodent import constants
 from . import long_recording_organizer as _lro
-from neurodent.core.utils import is_day, parse_truncate, resolve_channel, resolve_channels
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from neurodent.analysis import long_recording_analyzer as _lra
+from neurodent.core.utils import parse_truncate, resolve_channel, resolve_channels
 
 
 class AnimalOrganizer:
     """
-    Organizes and analyzes recording data from a single animal across multiple sessions.
+    Organizes and loads recording data from a single animal across multiple sessions.
 
     AnimalOrganizer uses flexible pattern-based file discovery to locate recording files,
     groups them by session, and creates LongRecordingOrganizer instances for each session.
@@ -81,29 +77,7 @@ class AnimalOrganizer:
         genotype (str): Genotype of the animal (from ANIMAL_METADATA if available).
         sex (str): Sex of the animal (from ANIMAL_METADATA if available).
         long_recordings (list[LongRecordingOrganizer]): LRO instances, one per session.
-        long_analyzers (list[LongRecordingAnalyzer]): Analysis instances, one per session.
-        features_df (pd.DataFrame): Aggregated feature DataFrame across all sessions.
-        features_avg_df (pd.DataFrame): Average features across sessions.
     """
-
-    def _init_containers(self):
-        """Initialize all output containers and processing lists.
-
-        This method centralizes initialization to ensure consistency between
-        standard __init__ and factory methods like from_lros().
-        """
-        # Processing lists
-        self.long_analyzers: list[_lra.LongRecordingAnalyzer] = []
-
-        # Output containers
-        self.bad_channels_dict = {}
-        self.features_df = pd.DataFrame()
-        self.features_avg_df = pd.DataFrame()
-
-        # Result objects
-        self.spike_analysis_results = None
-        self.frequency_domain_spike_analysis_results = None
-        self.window_analysis_result = None
 
     def __init__(
         self,
@@ -196,8 +170,6 @@ class AnimalOrganizer:
             if self.animal_id
             else "Unknown"
         )
-
-        self._init_containers()
 
         if "manual_datetimes" in lro_kwargs:
             import logging
@@ -1508,125 +1480,6 @@ class AnimalOrganizer:
                 f"Found {len(unique_rates)} different rates: {details}"
             )
 
-    def compute_bad_channels(
-        self, lof_threshold: float = None, force_recompute: bool = False,
-        lof_chunk_duration_s: float = 60,
-    ):
-        """Delegates to :meth:`AnalysisPipeline.compute_bad_channels`."""
-        from neurodent.analysis import AnalysisPipeline
-        return AnalysisPipeline(self).compute_bad_channels(
-            lof_threshold=lof_threshold, force_recompute=force_recompute,
-            lof_chunk_duration_s=lof_chunk_duration_s,
-        )
-
-    def apply_lof_threshold(self, lof_threshold: float):
-        """Delegates to :meth:`AnalysisPipeline.apply_lof_threshold`."""
-        from neurodent.analysis import AnalysisPipeline
-        return AnalysisPipeline(self).apply_lof_threshold(lof_threshold)
-
-    def get_all_lof_scores(self) -> dict:
-        """Delegates to :meth:`AnalysisPipeline.get_all_lof_scores`."""
-        from neurodent.analysis import AnalysisPipeline
-        return AnalysisPipeline(self).get_all_lof_scores()
-
-    def compute_windowed_analysis(
-        self,
-        features: list[str],
-        exclude: list[str] = [],
-        window_s=5,
-        multiprocess_mode: Literal["dask", "serial"] = "serial",
-        suppress_short_interval_error=False,
-        apply_notch_filter=True,
-        chunk_duration_s: Optional[float] = 3600,
-        **kwargs,
-    ) -> "WindowAnalysisResult":
-        """Delegates to :meth:`AnalysisPipeline.compute_windowed_analysis`."""
-        from neurodent.analysis import AnalysisPipeline
-        return AnalysisPipeline(self).compute_windowed_analysis(
-            features, exclude=exclude, window_s=window_s,
-            multiprocess_mode=multiprocess_mode,
-            suppress_short_interval_error=suppress_short_interval_error,
-            apply_notch_filter=apply_notch_filter,
-            chunk_duration_s=chunk_duration_s, **kwargs,
-        )
-
-    def compute_frequency_domain_spike_analysis(
-        self,
-        detection_params: dict = None,
-        chunk_duration_s: float = 3600,
-        multiprocess_mode: Literal["dask", "serial"] = "serial",
-    ):
-        """Delegates to :meth:`AnalysisPipeline.compute_frequency_domain_spike_analysis`."""
-        from neurodent.analysis import AnalysisPipeline
-        return AnalysisPipeline(self).compute_frequency_domain_spike_analysis(
-            detection_params=detection_params,
-            chunk_duration_s=chunk_duration_s,
-            multiprocess_mode=multiprocess_mode,
-        )
-
-    def _process_fragment_serial(
-        self, idx, features, lan: _lra.LongRecordingAnalyzer, window_s, kwargs: dict
-    ):
-        row = self._process_fragment_metadata(idx, lan, window_s)
-        row.update(self._process_fragment_features(idx, features, lan, kwargs))
-        return row
-
-    def _process_fragment_metadata(
-        self, idx, lan: _lra.LongRecordingAnalyzer, window_s
-    ):
-        row = {}
-
-        # Build session labels from LRO's DiscoveredFile metadata
-        from .discovery import DiscoveredFile
-        from neurodent import constants
-
-        lro = lan.LongRecording
-        item = getattr(lro, "item", None)
-
-        animal = self.animal_id or "unknown"
-        genotype = self.genotype or "Unknown"
-        sex = self.sex or "Unknown"
-        session = None
-
-        if isinstance(item, DiscoveredFile) and item.metadata:
-            meta = item.metadata
-            animal = meta.get("animal", animal)
-            session = meta.get("session")
-            genotype = constants.ANIMAL_METADATA.get(animal, {}).get("genotype", genotype)
-            sex = constants.ANIMAL_METADATA.get(animal, {}).get("sex", sex)
-
-        if session is None:
-            try:
-                session = lro.get_date_string()
-            except (ValueError, AttributeError):
-                session = "unknown"
-
-        row["animalday"] = f"{animal} {genotype} {session}"
-        row["animal"] = animal
-        row["day"] = session
-        row["genotype"] = genotype
-        row["sex"] = sex
-        row["duration"] = lan.LongRecording.get_dur_fragment(window_s, idx)
-        row["endfile"] = lan.get_file_end(idx)
-
-        frag_dt = lan.LongRecording.get_datetime_fragment(window_s, idx)
-        row["timestamp"] = frag_dt
-        row["isday"] = is_day(frag_dt)
-
-        return row
-
-    def _process_fragment_features(
-        self, idx, features, lan: _lra.LongRecordingAnalyzer, kwargs: dict
-    ):
-        row = {}
-        for feat in features:
-            func = getattr(lan, f"compute_{feat}")
-            if callable(func):
-                row[feat] = func(idx, **kwargs)
-            else:
-                raise AttributeError(f"Invalid function {func}")
-        return row
-
     @classmethod
     def from_lros(
         cls,
@@ -1910,8 +1763,6 @@ class AnimalOrganizer:
         ao._animalday_folder_groups = {}
         ao._processed_timestamps = None
 
-        ao._init_containers()
-
     def split(
         self,
         groups: dict[str, list[str]],
@@ -1967,8 +1818,8 @@ class AnimalOrganizer:
             ...     groups={"MouseA": ["Ch0", "Ch1"], "MouseB": ["Ch2", "Ch3"]},
             ...     output_base="/output/split_data",
             ... )
-            >>> war_a = splits["MouseA"].compute_windowed_analysis(["all"])
-            >>> war_b = splits["MouseB"].compute_windowed_analysis(["all"])
+            >>> war_a = AnimalAnalyzer(splits["MouseA"]).compute_windowed_analysis(["all"])
+            >>> war_b = AnimalAnalyzer(splits["MouseB"]).compute_windowed_analysis(["all"])
         """
         if not self.long_recordings:
             raise ValueError("No recordings loaded to split")

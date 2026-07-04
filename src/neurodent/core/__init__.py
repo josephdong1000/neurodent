@@ -8,7 +8,7 @@ floor of the package: every stage may import it, and it imports nothing above
 The stage classes live in their own top-level packages:
 
 - :mod:`neurodent.loading` — ``LongRecordingOrganizer``, ``AnimalOrganizer``
-- :mod:`neurodent.analysis` — ``LongRecordingAnalyzer``, ``AnalysisPipeline``, spike detection
+- :mod:`neurodent.analysis` — ``LongRecordingAnalyzer``, ``AnimalAnalyzer``, spike detection
 - :mod:`neurodent.results` — ``WindowAnalysisResult``, ``FrequencyDomainSpikeAnalysisResult``, ``ZeitgeberAnalysisResult``
 - :mod:`neurodent.plotting` — ``AnimalPlotter``, ``ExperimentPlotter``, ``ZeitgeberPlotter``
 
