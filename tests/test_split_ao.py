@@ -19,6 +19,7 @@ except ImportError:
 
 from neurodent.loading import LongRecordingOrganizer
 from neurodent.loading import AnimalOrganizer
+from neurodent.analysis import AnimalAnalyzer
 
 
 # =============================================================================
@@ -149,17 +150,16 @@ class TestFromLros:
         
         assert ao.genotype == "Unknown"
 
-    def test_from_lros_initializes_dataframes(self, mock_lro):
-        """Test that features DataFrames are initialized."""
+    def test_analyzer_initializes_dataframe(self, mock_lro):
+        """Test that AnimalAnalyzer initializes its empty features DataFrame."""
         ao = AnimalOrganizer.from_lros(
             lros=[mock_lro],
             animal_id="TestAnimal",
         )
-        
-        assert hasattr(ao, "features_df")
-        assert hasattr(ao, "features_avg_df")
-        assert ao.features_df.empty
-        assert ao.features_avg_df.empty
+        az = AnimalAnalyzer(ao)
+
+        assert hasattr(az, "features_df")
+        assert az.features_df.empty
 
     def test_from_lros_works_for_in_memory_with_metadata(self):
         """Test animalday generation when LRO has no base_folder_path but has metadata."""

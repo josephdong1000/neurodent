@@ -23,6 +23,7 @@ except ImportError:
 
 from neurodent import constants
 from neurodent.loading import AnimalOrganizer
+from neurodent.analysis import AnimalAnalyzer
 from neurodent.results.frequency_domain_results import FrequencyDomainSpikeAnalysisResult
 
 
@@ -103,7 +104,7 @@ class TestWARIntegration:
         """WAR computed once, shared across tests."""
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=RuntimeWarning)
-            return animal_organizer_with_war.compute_windowed_analysis(
+            return AnimalAnalyzer(animal_organizer_with_war).compute_windowed_analysis(
                 features=["rms", "ampvar", "psdtotal"], window_s=5, multiprocess_mode="auto")
 
     @pytest.fixture(scope="class")
@@ -111,7 +112,7 @@ class TestWARIntegration:
         """Spike detection computed once, shared across tests."""
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=RuntimeWarning)
-            return animal_organizer_with_war.compute_frequency_domain_spike_analysis(
+            return AnimalAnalyzer(animal_organizer_with_war).compute_frequency_domain_spike_analysis(
                 detection_params=TEST_DETECTION_PARAMS, chunk_duration_s=15.0, multiprocess_mode="auto")
 
     @pytest.fixture(scope="class")

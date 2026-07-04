@@ -16,6 +16,7 @@ from unittest.mock import Mock, patch, MagicMock
 
 from neurodent.results import WindowAnalysisResult
 from neurodent.plotting import AnimalPlotter, ExperimentPlotter
+from neurodent.analysis import AnimalAnalyzer
 from neurodent.results.feature_utils import average_feature
 from neurodent import constants
 
@@ -5035,24 +5036,24 @@ class TestAnimalOrganizerLOF:
         from neurodent.loading import AnimalOrganizer
 
         # Check that the methods exist
-        assert hasattr(AnimalOrganizer, "compute_bad_channels")
-        assert hasattr(AnimalOrganizer, "apply_lof_threshold")
-        assert hasattr(AnimalOrganizer, "get_all_lof_scores")
+        assert hasattr(AnimalAnalyzer, "compute_bad_channels")
+        assert hasattr(AnimalAnalyzer, "apply_lof_threshold")
+        assert hasattr(AnimalAnalyzer, "get_all_lof_scores")
 
         # Check method signatures by inspection
         import inspect
 
         # compute_bad_channels should accept lof_threshold and force_recompute
-        sig = inspect.signature(AnimalOrganizer.compute_bad_channels)
+        sig = inspect.signature(AnimalAnalyzer.compute_bad_channels)
         assert "lof_threshold" in sig.parameters
         assert "force_recompute" in sig.parameters
 
         # apply_lof_threshold should accept lof_threshold
-        sig = inspect.signature(AnimalOrganizer.apply_lof_threshold)
+        sig = inspect.signature(AnimalAnalyzer.apply_lof_threshold)
         assert "lof_threshold" in sig.parameters
 
         # get_all_lof_scores should have no required parameters
-        sig = inspect.signature(AnimalOrganizer.get_all_lof_scores)
+        sig = inspect.signature(AnimalAnalyzer.get_all_lof_scores)
         required_params = [p for p in sig.parameters.values() if p.default == p.empty]
         assert len(required_params) == 1  # Only 'self'
 
@@ -5168,7 +5169,7 @@ class TestAnimalOrganizerLOF:
         )
 
         # Get LOF scores
-        lof_dict = ao.get_all_lof_scores()
+        lof_dict = AnimalAnalyzer(ao).get_all_lof_scores()
 
         # Should have exactly 3 entries
         assert len(lof_dict) == 3, \

@@ -16,7 +16,7 @@ from neurodent import constants
 from neurodent.loading.long_recording_organizer import LongRecordingOrganizer
 
 
-class TestAnalysisPipeline:
+class TestAnalysisIntegration:
     """Test complete analysis pipeline integration across multiple modules."""
 
     def test_analysis_to_results_workflow(self):

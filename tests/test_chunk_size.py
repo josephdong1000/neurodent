@@ -422,37 +422,36 @@ class TestComputeWindowedAnalysisSignature:
     def test_chunk_duration_s_in_signature(self):
         """``compute_windowed_analysis`` must accept a ``chunk_duration_s`` kwarg."""
         import inspect
-        from neurodent.loading import AnimalOrganizer
+        from neurodent.analysis import AnimalAnalyzer
 
-        sig = inspect.signature(AnimalOrganizer.compute_windowed_analysis)
+        sig = inspect.signature(AnimalAnalyzer.compute_windowed_analysis)
         assert "chunk_duration_s" in sig.parameters
 
     def test_chunk_duration_s_default_is_3600(self):
         """Default value of ``chunk_duration_s`` should be 3600."""
         import inspect
-        from neurodent.loading import AnimalOrganizer
+        from neurodent.analysis import AnimalAnalyzer
 
-        sig = inspect.signature(AnimalOrganizer.compute_windowed_analysis)
+        sig = inspect.signature(AnimalAnalyzer.compute_windowed_analysis)
         assert sig.parameters["chunk_duration_s"].default == 3600
 
     def test_stream_fragments_to_zarr_called_when_chunk_duration_s_set(self, tmp_path):
-        """Calling ``compute_windowed_analysis(multiprocess_mode="dask",
+        """Calling ``AnimalAnalyzer(ao).compute_windowed_analysis(multiprocess_mode="dask",
         chunk_duration_s=...)`` must invoke ``stream_recording_to_zarr``
-        inside the dask branch of AO."""
+        inside the dask branch."""
         import pandas as pd
         from neurodent.loading import AnimalOrganizer
+        from neurodent.analysis import AnimalAnalyzer
 
-        # -- build a minimal AO instance ------------------------------------
+        # -- build a minimal AO instance (loading inputs the analyzer reads) --
         ao = AnimalOrganizer.__new__(AnimalOrganizer)
         ao._validate_sampling_rates = MagicMock()
-        ao.long_analyzers = []
         ao.long_recordings = []
         ao.animaldays = []
         ao.animal_id = "test"
         ao.genotype = "WT"
         ao.sex = "M"
         ao.channel_names = ["LAud", "RAud"]
-        ao.bad_channels_dict = {}
 
         # -- mock LAN returned by core.LongRecordingAnalyzer ----------------
         mock_lan = MagicMock()
@@ -471,30 +470,32 @@ class TestComputeWindowedAnalysisSignature:
             return_value=iter([(0, mock_lrec)])
         )
 
+        az = AnimalAnalyzer(ao)
+
         with (
             patch(
-                "neurodent.analysis.pipeline.LongRecordingAnalyzer",
+                "neurodent.analysis.animal_analyzer.LongRecordingAnalyzer",
                 return_value=mock_lan,
             ),
             patch(
                 "neurodent.core.utils.stream_recording_to_zarr",
                 return_value=str(tmp_path / "fake.zarr"),
             ) as mock_stream,
-            patch("neurodent.analysis.pipeline.da.from_zarr"),
+            patch("neurodent.analysis.animal_analyzer.da.from_zarr"),
             patch(
-                "neurodent.analysis.pipeline.dask.compute",
+                "neurodent.analysis.animal_analyzer.dask.compute",
                 # n_fragments_war = max(n_fragments - 1, 1) = 4
                 return_value=[{"rms": 0.0}] * (mock_lan.n_fragments - 1),
             ),
             patch(
-                "neurodent.analysis.pipeline.delayed",
+                "neurodent.analysis.animal_analyzer.delayed",
                 side_effect=lambda f: lambda *a, **kw: {"rms": 0.0},
             ),
             patch(
-                "neurodent.analysis.pipeline.validate_timestamps"
+                "neurodent.analysis.animal_analyzer.validate_timestamps"
             ),
         ):
-            ao._process_fragment_metadata = MagicMock(
+            az._process_fragment_metadata = MagicMock(
                 return_value={
                     "animalday": "test WT 2025",
                     "timestamp": 0.0,
@@ -505,7 +506,7 @@ class TestComputeWindowedAnalysisSignature:
                 }
             )
 
-            ao.compute_windowed_analysis(
+            az.compute_windowed_analysis(
                 features=["rms"],
                 multiprocess_mode="dask",
                 chunk_duration_s=600,

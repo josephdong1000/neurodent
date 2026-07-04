@@ -5,6 +5,7 @@ import pandas as pd
 
 from neurodent.loading import AnimalOrganizer
 from neurodent.loading import LongRecordingOrganizer
+from neurodent.analysis import AnimalAnalyzer
 
 
 class TestAnimalOrganizerInitialization:
@@ -30,12 +31,12 @@ class TestAnimalOrganizerInitialization:
                 animal_id="test_animal",
             )
 
-        self._assert_containers_initialized(ao)
+        self._assert_containers_initialized(AnimalAnalyzer(ao))
 
     def test_from_lros_initializes_containers(self, mock_lro):
         """Test that from_lros factory initializes all output containers."""
         ao = AnimalOrganizer.from_lros([mock_lro], animal_id="test_animal")
-        self._assert_containers_initialized(ao)
+        self._assert_containers_initialized(AnimalAnalyzer(ao))
 
     def test_from_lros_uses_metadata_date(self, mock_lro):
         """Test that from_lros uses LRO metadata for date, ignoring folder path."""
@@ -77,32 +78,29 @@ class TestAnimalOrganizerInitialization:
             AnimalOrganizer.from_lros([mock_lro], animal_id="Animal")
 
     def test_containers_are_usable(self, mock_lro):
-        """Test that initialized containers are mutable and usable."""
+        """Test that AnimalAnalyzer's output containers are mutable and usable."""
         ao = AnimalOrganizer.from_lros([mock_lro], animal_id="test_animal")
+        az = AnimalAnalyzer(ao)
 
         # Verify lists, dicts, and dataframes are mutable/usable
-        ao.long_analyzers.append("mock_analyzer")
-        ao.bad_channels_dict["session1"] = ["bad_ch"]
-        ao.features_df = pd.DataFrame({"a": [1, 2]})
+        az.long_analyzers.append("mock_analyzer")
+        az.bad_channels_dict["session1"] = ["bad_ch"]
+        az.features_df = pd.DataFrame({"a": [1, 2]})
 
-        assert ao.long_analyzers[0] == "mock_analyzer"
-        assert ao.bad_channels_dict["session1"] == ["bad_ch"]
-        assert not ao.features_df.empty
+        assert az.long_analyzers[0] == "mock_analyzer"
+        assert az.bad_channels_dict["session1"] == ["bad_ch"]
+        assert not az.features_df.empty
 
-    def _assert_containers_initialized(self, ao):
-        """Helper to assert all expected attributes exist and are in initial state."""
-        assert isinstance(ao.long_analyzers, list)
-        assert len(ao.long_analyzers) == 0
+    def _assert_containers_initialized(self, analyzer):
+        """Helper to assert AnimalAnalyzer output containers are in initial state."""
+        assert isinstance(analyzer.long_analyzers, list)
+        assert len(analyzer.long_analyzers) == 0
 
-        assert isinstance(ao.bad_channels_dict, dict)
-        assert len(ao.bad_channels_dict) == 0
+        assert isinstance(analyzer.bad_channels_dict, dict)
+        assert len(analyzer.bad_channels_dict) == 0
 
-        assert isinstance(ao.features_df, pd.DataFrame)
-        assert ao.features_df.empty
+        assert isinstance(analyzer.features_df, pd.DataFrame)
+        assert analyzer.features_df.empty
 
-        assert isinstance(ao.features_avg_df, pd.DataFrame)
-        assert ao.features_avg_df.empty
-
-        assert ao.spike_analysis_results is None
-        assert ao.frequency_domain_spike_analysis_results is None
-        assert ao.window_analysis_result is None
+        assert analyzer.frequency_domain_spike_analysis_results is None
+        assert analyzer.window_analysis_result is None
