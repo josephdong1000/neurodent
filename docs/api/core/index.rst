@@ -16,7 +16,6 @@ Classes
    :hidden:
 
    recording_metadata
-   ddf_binary_metadata
    long_recording_organizer
    long_recording_analyzer
    animal_analyzer

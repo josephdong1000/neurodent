@@ -35,7 +35,6 @@ from .paths import (
     safe_rmtree,
     atomic_output_path,
     atomic_write_json,
-    convert_colpath_to_rowpath,
     filepath_to_index,
     get_file_stem,
 )
@@ -85,7 +84,6 @@ __all__ = [
     "safe_rmtree",
     "atomic_output_path",
     "atomic_write_json",
-    "convert_colpath_to_rowpath",
     "filepath_to_index",
     "get_file_stem",
     "cache_fragments_to_zarr",

@@ -199,47 +199,6 @@ def atomic_write_json(path: Union[str, Path], obj: Any, *, indent: int = 2) -> N
             json.dump(obj, f, indent=indent)
 
 
-def convert_colpath_to_rowpath(
-    rowdir_path: str | Path, col_path: str | Path, gzip: bool = True, aspath: bool = True
-) -> str | Path:
-    """
-    Convert a ColMajor file path to its corresponding RowMajor file path.
-
-    This function transforms file paths from column-major format to row-major format,
-    which is used when converting between different data storage layouts in NeuRodent.
-
-    Args:
-        rowdir_path (str | Path): Directory path where the RowMajor file should be located.
-        col_path (str | Path): Path to the ColMajor file to be converted. Must contain 'ColMajor' in the path.
-        gzip (bool, optional): If True, append '.npy.gz' extension. If False, append '.bin'. Defaults to True.
-        aspath (bool, optional): If True, return as Path object. If False, return as string. Defaults to True.
-
-    Returns:
-        str | Path: The converted RowMajor file path, either as string or Path object based on aspath parameter.
-
-    Raises:
-        ValueError: If 'ColMajor' is not found in col_path.
-
-    Examples:
-        >>> convert_colpath_to_rowpath("/data/row/", "/data/col/file_ColMajor_001.bin")
-        PosixPath('/data/row/file_RowMajor_001.npy.gz')
-        >>> convert_colpath_to_rowpath("/data/row/", "/data/col/file_ColMajor_001.bin", gzip=False)
-        PosixPath('/data/row/file_RowMajor_001.bin')
-        >>> convert_colpath_to_rowpath("/data/row/", "/data/col/file_ColMajor_001.bin", aspath=False)
-        '/data/row/file_RowMajor_001.npy.gz'
-    """
-    # TODO it would make more sense to not have a rowdir_path aparameter, since this is outside the scope of the function
-    if "ColMajor" not in col_path:
-        raise ValueError(f"Expected 'ColMajor' in col_path: {col_path}")
-
-    out = Path(rowdir_path) / f"{get_file_stem(Path(col_path).name).replace('ColMajor', 'RowMajor')}"
-    if gzip:
-        out = str(out) + ".npy.gz"
-    else:
-        out = str(out) + ".bin"
-    return Path(out) if aspath else out
-
-
 def filepath_to_index(filepath) -> int:
     """
     Extract the index number from a filepath.

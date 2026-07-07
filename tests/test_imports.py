@@ -16,12 +16,10 @@ class TestImportPatterns:
         """Test importing specific classes directly."""
         from neurodent.loading import LongRecordingOrganizer
         from neurodent.analysis import LongRecordingAnalyzer, FragmentAnalyzer
-        from neurodent.loading import DDFBinaryMetadata
 
         assert LongRecordingOrganizer is not None
         assert LongRecordingAnalyzer is not None
         assert FragmentAnalyzer is not None
-        assert DDFBinaryMetadata is not None
 
     def test_direct_function_imports(self):
         """Test importing utility functions from the shared helper package."""
@@ -43,7 +41,6 @@ class TestImportPatterns:
         import neurodent.analysis
 
         assert hasattr(neurodent.loading, "LongRecordingOrganizer")
-        assert hasattr(neurodent.loading, "DDFBinaryMetadata")
         assert hasattr(neurodent.analysis, "LongRecordingAnalyzer")
         assert hasattr(neurodent.analysis, "FragmentAnalyzer")
 
@@ -139,7 +136,6 @@ class TestIDEFunctionality:
         import neurodent.core.utils
 
         assert "LongRecordingOrganizer" in dir(neurodent.loading)
-        assert "DDFBinaryMetadata" in dir(neurodent.loading)
         assert "LongRecordingAnalyzer" in dir(neurodent.analysis)
         assert "FragmentAnalyzer" in dir(neurodent.analysis)
 

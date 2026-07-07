@@ -4,14 +4,10 @@
 in-memory recording) and exposes fragment access, timestamps, quality, persistence,
 and split/merge. Its behavior is composed from the ``lro_*`` mixins in this package;
 this module keeps the base methods (including the name-mangled index helpers and
-their fragment-accessor callers), the class declaration, the DDF conversion helpers,
-and ``split_recording``.
+their fragment-accessor callers), the class declaration, and ``split_recording``.
 """
 
-import gzip
-import logging
 import math
-import os
 import warnings
 from datetime import datetime
 from pathlib import Path
@@ -19,23 +15,9 @@ from typing import Callable, Literal, Union
 
 import mne
 
-import numpy as np
+from neurodent.core.utils import parse_truncate
 
-try:
-    import spikeinterface.extractors as se
-    import spikeinterface.preprocessing as spre
-except Exception:  # pragma: no cover - optional at import time
-    se = None
-    spre = None
-
-from .. import constants
-from neurodent.core.utils import (
-    convert_colpath_to_rowpath,
-    get_temp_directory,
-    parse_truncate,
-)
-
-from .recording_metadata import RecordingMetadata, DDFBinaryMetadata
+from .recording_metadata import RecordingMetadata
 
 from .lro_loading import LroLoadingMixin
 from .lro_timestamps import LroTimestampsMixin
@@ -43,162 +25,6 @@ from .lro_fragments import LroFragmentsMixin
 from .lro_quality import LroQualityMixin
 from .lro_persistence import LroPersistenceMixin
 from .lro_merge import LroMergeMixin
-
-
-def convert_ddfcolbin_to_ddfrowbin(rowdir_path, colbin_path, metadata, save_gzip=True):
-    # TODO consider renaming this function to something more descriptive, like convert_colbin_to_rowbin
-    # Also don't use the rowdir_path parameter, since this is outside the scope of the function. See utils.convert_colpath_to_rowpath
-    assert isinstance(
-        metadata, RecordingMetadata
-    ), "Metadata needs to be of type RecordingMetadata"
-
-    tempbin = np.fromfile(colbin_path, dtype=metadata.precision)
-    tempbin = np.reshape(tempbin, (-1, metadata.n_channels), order="F")
-
-    rowbin_path = convert_colpath_to_rowpath(rowdir_path, colbin_path, gzip=save_gzip)
-
-    if save_gzip:
-        # rowbin_path = str(rowbin_path) + ".npy.gz"
-        with gzip.GzipFile(rowbin_path, "w") as fcomp:
-            np.save(file=fcomp, arr=tempbin)
-    else:
-        # rowbin_path = str(rowbin_path) + ".bin"
-        tempbin.tofile(rowbin_path)
-
-    return rowbin_path
-
-
-def convert_ddfrowbin_to_si(bin_rowmajor_path, metadata):
-    """Convert a row-major binary file to a SpikeInterface recording object.
-
-    Args:
-        bin_rowmajor_path (str): Path to the row-major binary file
-        metadata (RecordingMetadata): Metadata object containing information about the recording
-
-    Returns:
-        tuple: A tuple containing:
-            - se.BaseRecording: The SpikeInterface Recording object.
-            - str or None: Path to temporary file if created, None otherwise.
-    """
-    if se is None:
-        raise ImportError("SpikeInterface is required for convert_ddfrowbin_to_si")
-    assert isinstance(
-        metadata, RecordingMetadata
-    ), "Metadata needs to be of type RecordingMetadata"
-
-    bin_rowmajor_path = Path(bin_rowmajor_path)
-    params = {
-        "sampling_frequency": metadata.f_s,
-        "dtype": metadata.precision,
-        "num_channels": metadata.n_channels,
-        "gain_to_uV": metadata.mult_to_uV,
-        "offset_to_uV": 0,
-        "time_axis": 0,
-        "is_filtered": False,
-    }
-
-    # Read either .npy.gz files or .bin files into the recording object
-    if ".npy.gz" in str(bin_rowmajor_path):
-        temppath = os.path.join(get_temp_directory(), os.urandom(24).hex())
-        try:
-            with open(temppath, "wb") as tmp:
-                try:
-                    fcomp = gzip.GzipFile(bin_rowmajor_path, "r")
-                    bin_rowmajor_decomp = np.load(fcomp)
-                    bin_rowmajor_decomp.tofile(tmp)
-                except (EOFError, OSError) as e:
-                    logging.error(
-                        f"Failed to read .npy.gz file: {bin_rowmajor_path}. Try regenerating row-major files."
-                    )
-                    raise
-
-            rec = se.read_binary(tmp.name, **params)
-        except Exception as e:
-            # Clean up temp file if it exists
-            if os.path.exists(temppath):
-                os.remove(temppath)
-            raise
-    else:
-        rec = se.read_binary(bin_rowmajor_path, **params)
-        temppath = None
-
-    if rec.sampling_frequency != constants.GLOBAL_SAMPLING_RATE:
-        warnings.warn(
-            f"Sampling rate {rec.sampling_frequency} Hz != {constants.GLOBAL_SAMPLING_RATE} Hz. Resampling"
-        )
-        rec = spre.resample(rec, constants.GLOBAL_SAMPLING_RATE)
-        # Update metadata to reflect the new sampling rate
-        metadata.update_sampling_rate(constants.GLOBAL_SAMPLING_RATE)
-
-    rec = spre.astype(rec, dtype=constants.GLOBAL_DTYPE)
-
-    return rec, temppath
-
-
-def _convert_ddfrowbin_to_si_no_resample(bin_rowmajor_path, metadata):
-    """Convert a row-major binary file to a SpikeInterface recording object WITHOUT resampling.
-
-    This is an internal function used by the unified resampling pipeline to avoid
-    resampling individual recordings before concatenation. Resampling is applied
-    once after concatenation for better performance.
-
-    Args:
-        bin_rowmajor_path (str): Path to the row-major binary file
-        metadata (RecordingMetadata): Metadata object containing information about the recording
-
-    Returns:
-        tuple: A tuple containing:
-            - se.BaseRecording: The SpikeInterface Recording object (NOT resampled).
-            - str or None: Path to temporary file if created, None otherwise.
-    """
-    if se is None:
-        raise ImportError(
-            "SpikeInterface is required for _convert_ddfrowbin_to_si_no_resample"
-        )
-    assert isinstance(
-        metadata, RecordingMetadata
-    ), "Metadata needs to be of type RecordingMetadata"
-
-    bin_rowmajor_path = Path(bin_rowmajor_path)
-    params = {
-        "sampling_frequency": metadata.f_s,
-        "dtype": metadata.precision,
-        "num_channels": metadata.n_channels,
-        "gain_to_uV": metadata.mult_to_uV,
-        "offset_to_uV": 0,
-        "time_axis": 0,
-        "is_filtered": False,
-    }
-
-    # Read either .npy.gz files or .bin files into the recording object
-    if ".npy.gz" in str(bin_rowmajor_path):
-        temppath = os.path.join(get_temp_directory(), os.urandom(24).hex())
-        try:
-            with open(temppath, "wb") as tmp:
-                try:
-                    fcomp = gzip.GzipFile(bin_rowmajor_path, "r")
-                    bin_rowmajor_decomp = np.load(fcomp)
-                    bin_rowmajor_decomp.tofile(tmp)
-                except (EOFError, OSError) as e:
-                    logging.error(
-                        f"Failed to read .npy.gz file: {bin_rowmajor_path}. Try regenerating row-major files."
-                    )
-                    raise
-
-            rec = se.read_binary(tmp.name, **params)
-        except Exception as e:
-            # Clean up temp file if it exists
-            if os.path.exists(temppath):
-                os.remove(temppath)
-            raise
-    else:
-        rec = se.read_binary(bin_rowmajor_path, **params)
-        temppath = None
-
-    # NOTE: No resampling applied here - will be handled by unified resampling after concatenation
-    rec = spre.astype(rec, dtype=constants.GLOBAL_DTYPE)
-
-    return rec, temppath
 
 
 def split_recording(

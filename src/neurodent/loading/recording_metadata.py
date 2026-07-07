@@ -201,18 +201,3 @@ class RecordingMetadata:
             f"Updated RecordingMetadata sampling rate from {old_f_s} Hz to {new_f_s} Hz"
         )
 
-
-class DDFBinaryMetadata(RecordingMetadata):
-    """Deprecated: Use RecordingMetadata instead.
-
-    This class is maintained for backward compatibility but will be removed in a future version.
-    The name DDFBinaryMetadata is no longer appropriate as the pipeline moves beyond
-    DDF binary files with metadata sidecars.
-    """
-    def __init__(self, *args, **kwargs):
-        warnings.warn(
-            "DDFBinaryMetadata is deprecated. Use RecordingMetadata instead.",
-            DeprecationWarning,
-            stacklevel=2
-        )
-        super().__init__(*args, **kwargs)

@@ -22,10 +22,7 @@ except ImportError:
 
 from neurodent.loading.long_recording_organizer import (
     RecordingMetadata,
-    DDFBinaryMetadata,
     LongRecordingOrganizer,
-    convert_ddfrowbin_to_si,
-    _convert_ddfrowbin_to_si_no_resample,
 )
 from neurodent import constants
 
@@ -129,56 +126,6 @@ class TestRecordingMetadataEmptyColumn:
         meta.metadata_df = empty_df
         result = meta._RecordingMetadata__getsinglecolval("SampleRate")
         assert result is None
-
-
-# ===================================================================
-# convert_ddfrowbin_to_si  /  _convert_ddfrowbin_to_si_no_resample
-# ===================================================================
-
-
-class TestConvertDdfrowbinImportError:
-    """Lines 289, 359: ImportError when se is None."""
-
-    @patch("neurodent.loading.long_recording_organizer.se", None)
-    def test_convert_ddfrowbin_to_si_import_error(self):
-        meta = RecordingMetadata(
-            None, n_channels=2, f_s=1000, dt_end=None, channel_names=["a", "b"]
-        )
-        with pytest.raises(ImportError, match="SpikeInterface is required"):
-            convert_ddfrowbin_to_si("dummy.bin", meta)
-
-    @patch("neurodent.loading.long_recording_organizer.se", None)
-    def test_convert_no_resample_import_error(self):
-        meta = RecordingMetadata(
-            None, n_channels=2, f_s=1000, dt_end=None, channel_names=["a", "b"]
-        )
-        with pytest.raises(ImportError, match="SpikeInterface is required"):
-            _convert_ddfrowbin_to_si_no_resample("dummy.bin", meta)
-
-
-class TestConvertDdfrowbinNoResamplePaths:
-    """Lines 359-406: .npy.gz and .bin paths in _convert_ddfrowbin_to_si_no_resample."""
-
-    @pytest.mark.skipif(si is None, reason="SpikeInterface not installed")
-    def test_bin_direct_read(self, tmp_path):
-        """Test .bin direct read path (line 399-401)."""
-        n_ch, n_samples = 2, 100
-        data = np.zeros((n_samples, n_ch), dtype="float32")
-        bin_path = tmp_path / "test.bin"
-        data.tofile(str(bin_path))
-        meta = RecordingMetadata(
-            None,
-            n_channels=n_ch,
-            f_s=constants.GLOBAL_SAMPLING_RATE,
-            dt_end=None,
-            channel_names=["a", "b"],
-            V_units="µV",
-            mult_to_uV=1.0,
-        )
-        meta.precision = "float32"
-        rec, temppath = _convert_ddfrowbin_to_si_no_resample(str(bin_path), meta)
-        assert temppath is None
-        assert rec.get_num_channels() == n_ch
 
 
 # ===================================================================

@@ -98,14 +98,8 @@ class TestAnalysisIntegration:
             else:
                 path.touch()
 
-        # Test path conversion utilities
-        col_path = str(test_files["ddf_col"])
-        rowdir_path = str(temp_dir)
-
-        row_path = utils.convert_colpath_to_rowpath(rowdir_path, col_path)
-        assert row_path.exists() or row_path.with_suffix(".npy").exists()
-
         # Test file index extraction
+        col_path = str(test_files["ddf_col"])
         index = utils.filepath_to_index(col_path)
         assert index == 1
 
