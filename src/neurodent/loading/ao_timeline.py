@@ -701,8 +701,6 @@ class AoTimelineMixin:
                         dt for dt in lro.file_end_datetimes if dt is not None
                     )
                     first_duration = lro.file_durations[0]
-                    from datetime import timedelta
-
                     return first_end - timedelta(seconds=first_duration)
                 except StopIteration:
                     pass
@@ -721,8 +719,6 @@ class AoTimelineMixin:
         Get timeline summary as a DataFrame for user inspection and debugging.
         """
         if not getattr(self, "long_recordings", []):
-            import pandas as pd
-
             return pd.DataFrame()
 
         timeline_data = []
@@ -764,8 +760,6 @@ class AoTimelineMixin:
                 import logging
 
                 logging.warning(f"Failed to get timeline metrics for LRO {i}: {e}")
-
-        import pandas as pd
 
         return pd.DataFrame(timeline_data)
 
@@ -866,8 +860,6 @@ class AoTimelineMixin:
 
         # Add detailed logging (only in instance method)
         if len(folder_lro_pairs) > 1:
-            from datetime import datetime
-
             logging.info("LRO temporal sorting details:")
             for i, (folder, lro) in enumerate(sorted_folder_lro_pairs):
                 folder_name = self._get_item_name(folder)

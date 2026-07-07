@@ -6,16 +6,13 @@ import json
 import logging
 import warnings
 from pathlib import Path
-from typing import Any, TYPE_CHECKING
+from typing import Any
 
 import numpy as np
 import pandas as pd
 
 from neurodent import constants
 from neurodent.core.utils import atomic_output_path, atomic_write_json, slugify
-
-if TYPE_CHECKING:
-    from .window_analysis_result import WindowAnalysisResult
 
 
 def _column_needs_encoding(col_name: str) -> bool:
@@ -56,7 +53,6 @@ class WARSerializationMixin:
             slugify_filename (bool, optional): If True, slugify the filename (replace special characters). Defaults to False.
             save_abbrevs (bool, optional): If True, save the channel abbreviations as the channel names in the json file. Defaults to False.
         """
-        import pyarrow as pa
         import pyarrow.parquet as pq
 
         folder = Path(folder)
@@ -329,7 +325,7 @@ class WARSerializationMixin:
         The returned object mirrors the mutator API of ``WindowAnalysisResult``
         (``reorder_and_pad_channels``, ``add_unique_hash``, ``apply_filters``,
         ``aggregate_time_windows``) but records each call as a ``Transform``;
-        :meth:`LazyWARSerializationMixin.save_parquet_and_json` runs the chain
+        :meth:`LazyWindowAnalysisResult.save_parquet_and_json` runs the chain
         against batched parquet reads.
 
         Args:

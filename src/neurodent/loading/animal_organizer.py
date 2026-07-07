@@ -161,8 +161,6 @@ class AnimalOrganizer(
         self.unique_animaldays = processed_animaldays
         self.animaldays = processed_animaldays
 
-        from neurodent import constants
-
         self.genotype = (
             constants.ANIMAL_METADATA.get(self.animal_id, {}).get("genotype", "Unknown")
             if self.animal_id
@@ -176,12 +174,8 @@ class AnimalOrganizer(
         )
 
         if "manual_datetimes" in lro_kwargs:
-            import logging
-
             logging.info("Processing manual_datetimes configuration")
             base_lro_kwargs = lro_kwargs.copy()
-            from datetime import datetime
-
             base_lro_kwargs["manual_datetimes"] = datetime(2000, 1, 1, 0, 0, 0)
 
             self._processed_timestamps = self._process_manual_datetimes(

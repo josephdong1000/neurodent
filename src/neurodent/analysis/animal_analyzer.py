@@ -37,6 +37,13 @@ except ImportError:  # pragma: no cover
 class AnimalAnalyzer:
     """Runs analysis on a loaded :class:`AnimalOrganizer`, owning the results.
 
+    Analysis state (``bad_channels_dict``, ``features_df``, ``window_analysis_result``,
+    ``frequency_domain_spike_analysis_results``) is stored on the instance, so reuse a
+    single ``AnimalAnalyzer(ao)`` across ``compute_bad_channels`` /
+    ``compute_windowed_analysis`` / ``compute_frequency_domain_spike_analysis``. Computing
+    bad channels on one instance and windowed analysis on a separate ``AnimalAnalyzer(ao)``
+    will yield a result with empty bad channels on the second instance.
+
     Args:
         ao (AnimalOrganizer): A loaded organizer whose recordings are analyzed.
     """
@@ -387,11 +394,7 @@ class AnimalAnalyzer:
                     animal_id=self.ao.animal_id,
                     genotype=self.ao.genotype,
                     animal_day=self.ao.animaldays[i],
-                    bin_folder_name=(
-                        getattr(self, "base_folder_names", [None] * len(self.ao.long_recordings))[i]
-                        if hasattr(self, "base_folder_names")
-                        else None
-                    ),
+                    bin_folder_name=None,
                     metadata=self.ao.long_recordings[i].meta,
                 )
 

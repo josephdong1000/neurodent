@@ -3,16 +3,12 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
 
 from neurodent import constants
 from .feature_utils import average_feature, extract_linear_array
-
-if TYPE_CHECKING:
-    from .window_analysis_result import WindowAnalysisResult
 
 
 def _sanitize_feature_request(*args, **kwargs):

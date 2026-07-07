@@ -10,8 +10,6 @@ import warnings
 from pathlib import Path
 from typing import Literal, Union
 
-from tqdm import tqdm
-
 from . import long_recording_organizer as _lro
 from neurodent.core.utils import resolve_channels
 
@@ -177,22 +175,6 @@ class AoBuildMixin:
             )
             logging.error(error_msg)
             raise RuntimeError(error_msg)
-
-    def convert_colbins_to_rowbins(
-        self, overwrite=False, multiprocess_mode: Literal["dask", "serial"] = "serial"
-    ):
-        for lrec in tqdm(
-            self.long_recordings, desc="Converting column bins to row bins"
-        ):
-            lrec.convert_colbins_to_rowbins(
-                overwrite=overwrite, multiprocess_mode=multiprocess_mode
-            )
-
-    def convert_rowbins_to_rec(
-        self, multiprocess_mode: Literal["dask", "serial"] = "serial"
-    ):
-        for lrec in tqdm(self.long_recordings, desc="Converting row bins to recs"):
-            lrec.convert_rowbins_to_rec(multiprocess_mode=multiprocess_mode)
 
     def cleanup_rec(self):
         for lrec in self.long_recordings:
@@ -386,9 +368,9 @@ class AoBuildMixin:
         # __init__ path which raises when nothing is loadable.
         if not merged_lros:
             raise ValueError(
-                f"No non-empty local recording objects (LROs) could be loaded. "
-                f"All date groups were 0-sample. Cannot construct an "
-                f"AnimalOrganizer with no recordings."
+                "No non-empty local recording objects (LROs) could be loaded. "
+                "All date groups were 0-sample. Cannot construct an "
+                "AnimalOrganizer with no recordings."
             )
 
         # Step 4: Set merged LROs and animaldays

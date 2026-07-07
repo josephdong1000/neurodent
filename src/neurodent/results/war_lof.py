@@ -3,14 +3,10 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
 
 import numpy as np
 
 from neurodent.core.utils import resolve_channel
-
-if TYPE_CHECKING:
-    from .window_analysis_result import WindowAnalysisResult
 
 class WARLofMixin:
     """Mixin: see module docstring."""

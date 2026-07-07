@@ -14,7 +14,6 @@ from neurodent.core.utils import log_transform
 
 if TYPE_CHECKING:
     from .frequency_domain_results import FrequencyDomainSpikeAnalysisResult
-    from .window_analysis_result import WindowAnalysisResult
 
 
 def _bin_spike_df(*args, **kwargs):
