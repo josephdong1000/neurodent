@@ -680,8 +680,8 @@ class TestLongRecordingOrganizer:
         organizer.channel_names = ["ch1", "ch2", "ch3", "ch4"]
 
         with (
-            patch("neurodent.loading.long_recording_organizer.Natural_Neighbor") as mock_nn_class,
-            patch("neurodent.loading.long_recording_organizer.LocalOutlierFactor") as mock_lof_class,
+            patch("neurodent.loading.lro_quality.Natural_Neighbor") as mock_nn_class,
+            patch("neurodent.loading.lro_quality.LocalOutlierFactor") as mock_lof_class,
         ):
             # Mock Natural_Neighbor
             mock_nn = Mock()
@@ -740,8 +740,8 @@ class TestLongRecordingOrganizer:
         expected_dists = squareform(pdist(test_data.T, metric="euclidean"))
 
         with (
-            patch("neurodent.loading.long_recording_organizer.Natural_Neighbor") as mock_nn_class,
-            patch("neurodent.loading.long_recording_organizer.LocalOutlierFactor") as mock_lof_class,
+            patch("neurodent.loading.lro_quality.Natural_Neighbor") as mock_nn_class,
+            patch("neurodent.loading.lro_quality.LocalOutlierFactor") as mock_lof_class,
         ):
             mock_nn = Mock()
             mock_nn.algorithm.return_value = 2
@@ -1134,7 +1134,7 @@ class TestLongRecordingOrganizer:
         mock_recording.get_sampling_frequency.return_value = 2000.0
 
         # Mock missing preprocessing module
-        with patch("neurodent.loading.long_recording_organizer.spre", None):
+        with patch("neurodent.loading.lro_loading.spre", None):
             with pytest.raises(
                 ImportError, match="SpikeInterface preprocessing is required"
             ):
@@ -1222,7 +1222,7 @@ class TestLongRecordingOrganizer:
 
         with (
             patch("spikeinterface.preprocessing.resample") as mock_resample,
-            patch("neurodent.loading.long_recording_organizer.logging") as mock_logging,
+            patch("neurodent.loading.lro_loading.logging") as mock_logging,
         ):
             mock_resampled = Mock()
             mock_resample.return_value = mock_resampled
@@ -1242,7 +1242,7 @@ class TestLongRecordingOrganizer:
             constants.GLOBAL_SAMPLING_RATE
         )
 
-        with patch("neurodent.loading.long_recording_organizer.logging") as mock_logging:
+        with patch("neurodent.loading.lro_loading.logging") as mock_logging:
             organizer._apply_resampling(mock_recording)
 
             # Should log that no resampling is needed
@@ -1467,7 +1467,7 @@ class TestExtractFuncFilePathResolution:
         """SI mode resolves file path without logging warnings."""
         func_name = "tests/integration/readers.py:read_bin_csv_pair"
         with (
-            patch("neurodent.loading.long_recording_organizer.logging") as mock_logging,
+            patch("neurodent.loading.lro_loading.logging") as mock_logging,
             patch.object(lro_mode_none, "convert_file_with_si_to_recording"),
         ):
             lro_mode_none.detect_and_load_data(
@@ -1481,7 +1481,7 @@ class TestExtractFuncFilePathResolution:
         """MNE mode resolves file path without logging warnings."""
         func_name = "tests/integration/readers.py:read_bin_csv_pair"
         with (
-            patch("neurodent.loading.long_recording_organizer.logging") as mock_logging,
+            patch("neurodent.loading.lro_loading.logging") as mock_logging,
             patch.object(lro_mode_none, "convert_file_with_mne_to_recording"),
         ):
             lro_mode_none.detect_and_load_data(
@@ -1494,7 +1494,7 @@ class TestExtractFuncFilePathResolution:
     def test_si_builtin_extractor_no_warning(self, lro_mode_none):
         """SI mode does NOT warn when using a built-in SI extractor name."""
         with (
-            patch("neurodent.loading.long_recording_organizer.logging") as mock_logging,
+            patch("neurodent.loading.lro_loading.logging") as mock_logging,
             patch.object(lro_mode_none, "convert_file_with_si_to_recording"),
         ):
             lro_mode_none.detect_and_load_data(
@@ -1823,7 +1823,7 @@ class TestZeroSampleMerge:
             file_durations=[3.0],
         )
 
-        with patch("neurodent.loading.long_recording_organizer.si") as mock_si:
+        with patch("neurodent.loading.lro_merge.si") as mock_si:
             mock_concat = Mock()
             mock_si.concatenate_recordings.return_value = mock_concat
             base_lro.merge(other_lro)
@@ -1872,7 +1872,7 @@ class TestMergeChannelNameAbbreviation:
         renamed_rec = Mock()
         original_other_rec.rename_channels.return_value = renamed_rec
 
-        with patch("neurodent.loading.long_recording_organizer.si") as mock_si:
+        with patch("neurodent.loading.lro_merge.si") as mock_si:
             mock_si.concatenate_recordings.return_value = Mock()
             base_lro.merge(other_lro)
 
@@ -1901,7 +1901,7 @@ class TestMergeChannelNameAbbreviation:
         base_lro = self._make_lro(5000, ["weird_ch1", "weird_ch2"])
         other_lro = self._make_lro(3000, ["weird_ch1", "weird_ch2"])
 
-        with patch("neurodent.loading.long_recording_organizer.si") as mock_si:
+        with patch("neurodent.loading.lro_merge.si") as mock_si:
             mock_si.concatenate_recordings.return_value = Mock()
             base_lro.merge(other_lro)
 

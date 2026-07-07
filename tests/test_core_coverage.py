@@ -234,7 +234,7 @@ class TestResolveFuncPath:
 class TestDetectAndLoadData:
     """Lines 720, 730, 752, 765."""
 
-    @patch("neurodent.loading.long_recording_organizer.si", None)
+    @patch("neurodent.loading.lro_loading.si", None)
     def test_si_mode_import_error(self):
         lro = _make_lro(item="dummy")
         with pytest.raises(ImportError, match="SpikeInterface is required"):
@@ -264,7 +264,7 @@ class TestDetectAndLoadData:
 class TestConvertFileWithSI:
     """Lines 779, 801-805, 815-818, 821, 837-838."""
 
-    @patch("neurodent.loading.long_recording_organizer.si", None)
+    @patch("neurodent.loading.lro_loading.si", None)
     def test_import_error_when_si_none(self):
         lro = _make_lro(item="dummy")
         with pytest.raises(ImportError, match="SpikeInterface is required"):
@@ -276,11 +276,11 @@ class TestConvertFileWithSI:
         rec = _make_mock_recording()
         extract_func = Mock(return_value=rec)
         lro = _make_lro(item=["f1.bin", "f2.bin"])
-        with patch("neurodent.loading.long_recording_organizer.dask") as mock_dask:
+        with patch("neurodent.loading.lro_loading.dask") as mock_dask:
             mock_dask.delayed.return_value = Mock(return_value=rec)
             mock_dask.compute.return_value = [rec, rec]
             # Mock si.concatenate_recordings
-            with patch("neurodent.loading.long_recording_organizer.si") as mock_si:
+            with patch("neurodent.loading.lro_loading.si") as mock_si:
                 concat_rec = _make_mock_recording()
                 mock_si.concatenate_recordings.return_value = concat_rec
                 with patch.object(lro, "_apply_resampling", return_value=concat_rec):
@@ -300,7 +300,7 @@ class TestConvertFileWithSI:
         extract_func = Mock(side_effect=[empty_rec, good_rec])
         lro = _make_lro(item=["f1.bin", "f2.bin"])
         concat_rec = _make_mock_recording()
-        with patch("neurodent.loading.long_recording_organizer.si") as mock_si:
+        with patch("neurodent.loading.lro_loading.si") as mock_si:
             mock_si.concatenate_recordings.return_value = concat_rec
             with patch.object(lro, "_apply_resampling", return_value=concat_rec):
                 with patch.object(lro, "finalize_file_timestamps"):
@@ -317,7 +317,7 @@ class TestConvertFileWithSI:
         empty_rec = _make_mock_recording(total_samples=0)
         extract_func = Mock(return_value=empty_rec)
         lro = _make_lro(item=["f1.bin", "f2.bin"])
-        with patch("neurodent.loading.long_recording_organizer.si"):
+        with patch("neurodent.loading.lro_loading.si"):
             with pytest.raises(ValueError, match="All recordings.*0 samples"):
                 lro.convert_file_with_si_to_recording(extract_func=extract_func)
 
@@ -335,7 +335,7 @@ class TestConvertFileWithSI:
         rec.has_scaleable_traces.return_value = False
         extract_func = Mock(return_value=rec)
         lro = _make_lro(item="single.bin")
-        with patch("neurodent.loading.long_recording_organizer.si"):
+        with patch("neurodent.loading.lro_loading.si"):
             with patch.object(lro, "_apply_resampling", return_value=rec):
                 with patch.object(lro, "finalize_file_timestamps"):
                     with patch.object(lro, "_extract_channel_names", return_value=["a", "b"]):
@@ -377,7 +377,7 @@ class TestLoadAndProcessMneData:
         lro = self._get_lro()
         raw = _make_mock_mne_raw()
         extract_func = Mock(return_value=raw)
-        with patch("neurodent.loading.long_recording_organizer.mne") as mock_mne:
+        with patch("neurodent.loading.lro_loading.mne") as mock_mne:
             mock_mne.concatenate_raws.return_value = raw
             result = lro._load_and_process_mne_data(
                 extract_func,
@@ -425,7 +425,7 @@ class TestLoadMneDataNoResample:
         lro = _make_lro(item=["f1.edf", "f2.edf"])
         raw = _make_mock_mne_raw()
         extract_func = Mock(return_value=raw)
-        with patch("neurodent.loading.long_recording_organizer.mne") as mock_mne:
+        with patch("neurodent.loading.lro_loading.mne") as mock_mne:
             mock_mne.concatenate_raws.return_value = raw
             result = lro._load_mne_data_no_resample(extract_func)
         assert extract_func.call_count == 2
@@ -473,13 +473,13 @@ class TestGetOrCreateIntermediateFile:
         raw = _make_mock_mne_raw()
         extract_func = Mock(return_value=raw)
 
-        with patch("neurodent.loading.long_recording_organizer.should_use_cache_unified", return_value=True):
+        with patch("neurodent.loading.lro_loading.should_use_cache_unified", return_value=True):
             with patch("neurodent.loading.long_recording_organizer.RecordingMetadata.from_json", side_effect=json.JSONDecodeError("bad", "", 0)):
-                with patch("neurodent.loading.long_recording_organizer.extract_mne_unit_info", return_value=("µV", 1.0)):
+                with patch("neurodent.loading.lro_loading.extract_mne_unit_info", return_value=("µV", 1.0)):
                     with patch.object(lro, "_load_mne_data_no_resample", return_value=raw):
-                        with patch("neurodent.loading.long_recording_organizer.se") as mock_se:
+                        with patch("neurodent.loading.lro_loading.se") as mock_se:
                             mock_se.read_edf.return_value = _make_mock_recording()
-                            with patch("neurodent.loading.long_recording_organizer.mne") as mock_mne:
+                            with patch("neurodent.loading.lro_loading.mne") as mock_mne:
                                 mock_mne.export.export_raw.side_effect = _export_creates_file
                                 rec, raw_obj, meta = lro._get_or_create_intermediate_file(
                                     fname=fname,
@@ -500,12 +500,12 @@ class TestGetOrCreateIntermediateFile:
         raw = _make_mock_mne_raw()
         extract_func = Mock(return_value=raw)
 
-        with patch("neurodent.loading.long_recording_organizer.should_use_cache_unified", return_value=False):
-            with patch("neurodent.loading.long_recording_organizer.extract_mne_unit_info", return_value=("µV", 1.0)):
+        with patch("neurodent.loading.lro_loading.should_use_cache_unified", return_value=False):
+            with patch("neurodent.loading.lro_loading.extract_mne_unit_info", return_value=("µV", 1.0)):
                 with patch.object(lro, "_load_mne_data_no_resample", return_value=raw):
-                    with patch("neurodent.loading.long_recording_organizer.se") as mock_se:
+                    with patch("neurodent.loading.lro_loading.se") as mock_se:
                         mock_se.read_edf.return_value = _make_mock_recording()
-                        with patch("neurodent.loading.long_recording_organizer.mne") as mock_mne:
+                        with patch("neurodent.loading.lro_loading.mne") as mock_mne:
                             mock_mne.export.export_raw.side_effect = _export_creates_file
                             rec, raw_obj, meta = lro._get_or_create_intermediate_file(
                                 fname=fname,
@@ -525,8 +525,8 @@ class TestGetOrCreateIntermediateFile:
         raw = _make_mock_mne_raw()
         extract_func = Mock(return_value=raw)
 
-        with patch("neurodent.loading.long_recording_organizer.should_use_cache_unified", return_value=False):
-            with patch("neurodent.loading.long_recording_organizer.extract_mne_unit_info", return_value=("µV", 1.0)):
+        with patch("neurodent.loading.lro_loading.should_use_cache_unified", return_value=False):
+            with patch("neurodent.loading.lro_loading.extract_mne_unit_info", return_value=("µV", 1.0)):
                 with patch.object(lro, "_load_mne_data_no_resample", return_value=raw):
                     with pytest.raises(ValueError, match="Invalid intermediate"):
                         lro._get_or_create_intermediate_file(
@@ -554,13 +554,13 @@ class TestIntanAndEdfExport:
         raw = _make_mock_mne_raw(ch_prefix="intan_ch")
         extract_func = Mock(return_value=raw)
 
-        with patch("neurodent.loading.long_recording_organizer.should_use_cache_unified", return_value=False):
-            with patch("neurodent.loading.long_recording_organizer.extract_mne_unit_info", return_value=("µV", 1.0)):
+        with patch("neurodent.loading.lro_loading.should_use_cache_unified", return_value=False):
+            with patch("neurodent.loading.lro_loading.extract_mne_unit_info", return_value=("µV", 1.0)):
                 with patch.object(lro, "_load_mne_data_no_resample", return_value=raw):
-                    with patch("neurodent.loading.long_recording_organizer.rename_mne_channels") as mock_conv:
-                        with patch("neurodent.loading.long_recording_organizer.se") as mock_se:
+                    with patch("neurodent.loading.lro_loading.rename_mne_channels") as mock_conv:
+                        with patch("neurodent.loading.lro_loading.se") as mock_se:
                             mock_se.read_edf.return_value = _make_mock_recording()
-                            with patch("neurodent.loading.long_recording_organizer.mne") as mock_mne:
+                            with patch("neurodent.loading.lro_loading.mne") as mock_mne:
                                 mock_mne.export.export_raw.side_effect = _export_creates_file
                                 lro._get_or_create_intermediate_file(
                                     fname=fname,
@@ -589,12 +589,12 @@ class TestIntanAndEdfExport:
             # Successful retry: create the file so the atomic rename succeeds.
             Path(path).write_bytes(b"")
 
-        with patch("neurodent.loading.long_recording_organizer.should_use_cache_unified", return_value=False):
-            with patch("neurodent.loading.long_recording_organizer.extract_mne_unit_info", return_value=("µV", 1.0)):
+        with patch("neurodent.loading.lro_loading.should_use_cache_unified", return_value=False):
+            with patch("neurodent.loading.lro_loading.extract_mne_unit_info", return_value=("µV", 1.0)):
                 with patch.object(lro, "_load_mne_data_no_resample", return_value=raw):
-                    with patch("neurodent.loading.long_recording_organizer.se") as mock_se:
+                    with patch("neurodent.loading.lro_loading.se") as mock_se:
                         mock_se.read_edf.return_value = _make_mock_recording()
-                        with patch("neurodent.loading.long_recording_organizer.mne") as mock_mne:
+                        with patch("neurodent.loading.lro_loading.mne") as mock_mne:
                             mock_mne.export.export_raw = Mock(side_effect=side_effect_export)
                             lro._get_or_create_intermediate_file(
                                 fname=fname,
@@ -650,12 +650,12 @@ class TestSelfHealingCorruptCache:
                 raise RuntimeError("the file is not EDF(+) or BDF(+) compliant (Filesize)")
             return _make_mock_recording()
 
-        with patch("neurodent.loading.long_recording_organizer.should_use_cache_unified", return_value=True):
-            with patch("neurodent.loading.long_recording_organizer.extract_mne_unit_info", return_value=("µV", 1.0)):
+        with patch("neurodent.loading.lro_loading.should_use_cache_unified", return_value=True):
+            with patch("neurodent.loading.lro_loading.extract_mne_unit_info", return_value=("µV", 1.0)):
                 with patch.object(lro, "_load_mne_data_no_resample", return_value=raw):
-                    with patch("neurodent.loading.long_recording_organizer.se") as mock_se:
+                    with patch("neurodent.loading.lro_loading.se") as mock_se:
                         mock_se.read_edf.side_effect = read_edf_side_effect
-                        with patch("neurodent.loading.long_recording_organizer.mne") as mock_mne:
+                        with patch("neurodent.loading.lro_loading.mne") as mock_mne:
                             mock_mne.export.export_raw.side_effect = _export_creates_file
                             rec, raw_obj, meta = lro._get_or_create_intermediate_file(
                                 fname=fname,
@@ -689,10 +689,10 @@ class TestSelfHealingCorruptCache:
                 raise ValueError("truncated binary file")
             return _make_mock_recording()
 
-        with patch("neurodent.loading.long_recording_organizer.should_use_cache_unified", return_value=True):
-            with patch("neurodent.loading.long_recording_organizer.extract_mne_unit_info", return_value=("µV", 1.0)):
+        with patch("neurodent.loading.lro_loading.should_use_cache_unified", return_value=True):
+            with patch("neurodent.loading.lro_loading.extract_mne_unit_info", return_value=("µV", 1.0)):
                 with patch.object(lro, "_load_mne_data_no_resample", return_value=raw):
-                    with patch("neurodent.loading.long_recording_organizer.se") as mock_se:
+                    with patch("neurodent.loading.lro_loading.se") as mock_se:
                         mock_se.read_binary.side_effect = read_binary_side_effect
                         rec, raw_obj, meta = lro._get_or_create_intermediate_file(
                             fname=fname,
@@ -717,8 +717,8 @@ class TestSelfHealingCorruptCache:
 
         extract_func = Mock()
 
-        with patch("neurodent.loading.long_recording_organizer.should_use_cache_unified", return_value=True):
-            with patch("neurodent.loading.long_recording_organizer.se") as mock_se:
+        with patch("neurodent.loading.lro_loading.should_use_cache_unified", return_value=True):
+            with patch("neurodent.loading.lro_loading.se") as mock_se:
                 mock_se.read_edf.side_effect = RuntimeError("not EDF(+) compliant")
                 with pytest.raises(RuntimeError, match="not EDF"):
                     lro._get_or_create_intermediate_file(
@@ -741,7 +741,7 @@ class TestSelfHealingCorruptCache:
 class TestConvertFileWithMne:
     """Lines 1210, 1216-1218, 1246-1249, 1273-1287, 1291-1294."""
 
-    @patch("neurodent.loading.long_recording_organizer.se", None)
+    @patch("neurodent.loading.lro_loading.se", None)
     def test_import_error(self):
         lro = _make_lro(item="dummy")
         with pytest.raises(ImportError, match="SpikeInterface is required"):
@@ -779,8 +779,8 @@ class TestConvertFileWithMne:
         raw = _make_mock_mne_raw()
         lro = _make_lro(item="file.edf")
 
-        with patch("neurodent.loading.long_recording_organizer.se") as mock_se:
-            with patch("neurodent.loading.long_recording_organizer.get_temp_directory", side_effect=KeyError("TMPDIR")):
+        with patch("neurodent.loading.lro_loading.se") as mock_se:
+            with patch("neurodent.loading.lro_loading.get_temp_directory", side_effect=KeyError("TMPDIR")):
                 with patch("tempfile.gettempdir", return_value=str(tmp_path)):
                     with patch.object(
                         lro,
@@ -802,8 +802,8 @@ class TestConvertFileWithMne:
         raw = _make_mock_mne_raw()
         lro = _make_lro(item="file.edf")
 
-        with patch("neurodent.loading.long_recording_organizer.se"):
-            with patch("neurodent.loading.long_recording_organizer.get_temp_directory", return_value=tmp_path):
+        with patch("neurodent.loading.lro_loading.se"):
+            with patch("neurodent.loading.lro_loading.get_temp_directory", return_value=tmp_path):
                 with patch.object(
                     lro,
                     "_get_or_create_intermediate_file",
@@ -828,7 +828,7 @@ class TestConvertFileWithMne:
             manual_datetimes=datetime(2023, 1, 1, 12, 0),
         )
 
-        with patch("neurodent.loading.long_recording_organizer.se"):
+        with patch("neurodent.loading.lro_loading.se"):
             with patch.object(
                 lro,
                 "_get_or_create_intermediate_file",
@@ -881,7 +881,7 @@ class TestSaveToEdf:
         with patch.object(lro, "convert_to_mne") as mock_conv:
             mock_raw = MagicMock()
             mock_conv.return_value = mock_raw
-            with patch("neurodent.loading.long_recording_organizer.mne") as mock_mne:
+            with patch("neurodent.loading.lro_fragments.mne") as mock_mne:
                 lro.save_to_edf(out)
                 mock_conv.assert_called_once()
                 mock_mne.export.export_raw.assert_called_once()
@@ -1055,7 +1055,7 @@ class TestApplyResampling:
         rec.get_dtype.return_value = "bogus"
         rec.get_sampling_frequency.return_value = constants.GLOBAL_SAMPLING_RATE
         rec.has_scaleable_traces.return_value = False
-        with patch("neurodent.loading.long_recording_organizer.spre") as mock_spre:
+        with patch("neurodent.loading.lro_loading.spre") as mock_spre:
             mock_spre.astype.return_value = rec
             result = lro._apply_resampling(rec)
         assert result is rec
@@ -1074,7 +1074,7 @@ class TestApplyResampling:
         rec.get_dtype = fake_get_dtype
         rec.get_sampling_frequency.return_value = constants.GLOBAL_SAMPLING_RATE
         rec.has_scaleable_traces.return_value = False
-        with patch("neurodent.loading.long_recording_organizer.spre") as mock_spre:
+        with patch("neurodent.loading.lro_loading.spre") as mock_spre:
             mock_spre.astype.return_value = rec
             result = lro._apply_resampling(rec)
         assert result is rec
@@ -1099,7 +1099,7 @@ class TestApplyResampling:
 class TestMerge:
     """Line 2087."""
 
-    @patch("neurodent.loading.long_recording_organizer.si", None)
+    @patch("neurodent.loading.lro_merge.si", None)
     def test_merge_import_error(self):
         lro = _make_lro(item=None)
         other = _make_lro(item=None)
