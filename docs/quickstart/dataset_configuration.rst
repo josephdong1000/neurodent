@@ -216,12 +216,6 @@ describes all available parameters:
        ``LongRecordingOrganizer``, overriding the global ``lro_kwargs``.
        Useful when an animal's files require different loading parameters
        (e.g. ``{"mode": "si", "extract_func": "read_intan"}``).
-   * - ``day_parse_kwargs``
-     - dict
-     - No
-     - Per-animal keyword arguments for day/date parsing from filenames,
-       overriding the global ``day_parse_kwargs``
-       (e.g. ``{"date_patterns": [["\\d{6}", "%y%m%d"]]}``).
    * - ``exclude``
      - bool
      - No

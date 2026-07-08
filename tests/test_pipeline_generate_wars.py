@@ -247,7 +247,7 @@ class TestPipelineIntegrationWithSyntheticData:
 class TestComputeWindowedAnalysisConfigWiring:
     """Verify that generate_wars.py reads compute_windowed_analysis config and
     passes the correct arguments (including chunk_duration_s) to
-    AnimalOrganizer.compute_windowed_analysis().
+    AnimalAnalyzer.compute_windowed_analysis().
     """
 
     def _build_war_gen_config(self, cwa_overrides=None):

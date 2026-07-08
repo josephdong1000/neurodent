@@ -45,13 +45,13 @@ NeuRodent loads multi-format EEG data (`LongRecordingAnalyzer` → `AnimalOrgani
 from neurodent import (
     LongRecordingOrganizer,
     AnimalOrganizer,
-    WindowAnalysisResult,
+    AnimalAnalyzer,
     ExperimentPlotter,
 )
 
 lro = LongRecordingOrganizer(data_path)
 ao = AnimalOrganizer(lro)
-war = ao.compute_windowed_analysis(features=["rms", "psdband", "cohere"])
+war = AnimalAnalyzer(ao).compute_windowed_analysis(features=["rms", "psdband", "cohere"])
 ep = ExperimentPlotter([war])
 ep.plot_feature("rms", groupby="genotype")
 ```

@@ -19,6 +19,7 @@ except ImportError:
     SPIKEINTERFACE_AVAILABLE = False
 
 from neurodent.loading import AnimalOrganizer
+from neurodent.analysis import AnimalAnalyzer
 from neurodent.analysis.spike_detection import FrequencyDomainSpikeDetector
 from neurodent.results.frequency_domain_results import (
     FrequencyDomainSpikeAnalysisResult,
@@ -89,7 +90,7 @@ class TestFrequencyDomainSpikeDetectionIntegration:
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=RuntimeWarning)
 
-            return animal_organizer.compute_frequency_domain_spike_analysis(
+            return AnimalAnalyzer(animal_organizer).compute_frequency_domain_spike_analysis(
                 detection_params=TEST_DETECTION_PARAMS,
                 chunk_duration_s=30.0,
                 multiprocess_mode="auto",
@@ -148,7 +149,7 @@ class TestFrequencyDomainSpikeDetectionIntegration:
             with warnings.catch_warnings():
                 warnings.filterwarnings("ignore", category=RuntimeWarning)
 
-                fdsar_list = animal_organizer.compute_frequency_domain_spike_analysis(
+                fdsar_list = AnimalAnalyzer(animal_organizer).compute_frequency_domain_spike_analysis(
                     detection_params=params,
                     chunk_duration_s=chunk_duration_s,
                     multiprocess_mode="auto",

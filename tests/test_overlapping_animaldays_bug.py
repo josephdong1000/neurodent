@@ -332,7 +332,7 @@ class TestOverlappingAnimaldaysBug:
             lro2.meta = Mock(f_s=1000, n_channels=3)
 
             # Mock si.concatenate_recordings at the module level
-            with patch("neurodent.loading.long_recording_organizer.si.concatenate_recordings") as mock_concat:
+            with patch("neurodent.loading.lro_merge.si.concatenate_recordings") as mock_concat:
                 mock_concat.return_value = mock_merged_recording
 
                 # Test merge functionality

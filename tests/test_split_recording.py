@@ -286,7 +286,7 @@ class TestSplitEdgeCases:
         import sys
         
         # Get the current module from sys.modules (handles test_imports.py reimporting)
-        core_module = sys.modules['neurodent.loading.long_recording_organizer']
+        core_module = sys.modules['neurodent.loading.lro_merge']
         LRO = sys.modules['neurodent.loading.long_recording_organizer'].LongRecordingOrganizer
         
         lro = LRO(item='.', mode=None)
@@ -302,7 +302,7 @@ class TestSplitEdgeCases:
         import sys
 
         # Get the current module from sys.modules (handles test_imports.py reimporting)
-        core_module = sys.modules['neurodent.loading.long_recording_organizer']
+        core_module = sys.modules['neurodent.loading.lro_persistence']
         LRO = sys.modules['neurodent.loading.long_recording_organizer'].LongRecordingOrganizer
 
         lro = LRO(item='.', mode=None)
@@ -318,7 +318,7 @@ class TestSplitEdgeCases:
         import sys
 
         # Get the current module from sys.modules (handles test_imports.py reimporting)
-        core_module = sys.modules['neurodent.loading.long_recording_organizer']
+        core_module = sys.modules['neurodent.loading.lro_persistence']
         LRO = sys.modules['neurodent.loading.long_recording_organizer'].LongRecordingOrganizer
 
         lro = LRO(item='.', mode=None)

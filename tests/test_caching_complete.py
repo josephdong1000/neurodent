@@ -314,7 +314,7 @@ class TestMNECachingOptimization:
 
             # Mock SpikeInterface read_edf to avoid actual file operations
             with (
-                patch("neurodent.loading.long_recording_organizer.se.read_edf") as mock_read_edf,
+                patch("neurodent.loading.lro_loading.se.read_edf") as mock_read_edf,
                 patch(
                     "neurodent.loading.long_recording_organizer.RecordingMetadata.from_json"
                 ) as mock_from_json,
@@ -399,8 +399,8 @@ class TestMNECachingOptimization:
 
             # Mock MNE export and SpikeInterface read to avoid actual file operations
             with (
-                patch("neurodent.loading.long_recording_organizer.mne.export.export_raw", side_effect=_export_creates_file) as mock_export,
-                patch("neurodent.loading.long_recording_organizer.se.read_edf") as mock_read_edf,
+                patch("neurodent.loading.lro_loading.mne.export.export_raw", side_effect=_export_creates_file) as mock_export,
+                patch("neurodent.loading.lro_loading.se.read_edf") as mock_read_edf,
             ):
                 # Mock the SpikeInterface read_edf to return something reasonable
                 mock_recording = Mock()
@@ -479,8 +479,8 @@ class TestMNECachingOptimization:
 
             # Mock MNE export and SpikeInterface read to avoid actual file operations
             with (
-                patch("neurodent.loading.long_recording_organizer.mne.export.export_raw", side_effect=_export_creates_file) as mock_export,
-                patch("neurodent.loading.long_recording_organizer.se.read_edf") as mock_read_edf,
+                patch("neurodent.loading.lro_loading.mne.export.export_raw", side_effect=_export_creates_file) as mock_export,
+                patch("neurodent.loading.lro_loading.se.read_edf") as mock_read_edf,
             ):
                 # Mock the SpikeInterface read_edf to return something reasonable
                 mock_recording = Mock()
@@ -567,9 +567,9 @@ class TestMNECachingOptimization:
 
             # Mock MNE export and SpikeInterface read to avoid actual file operations
             with (
-                patch("neurodent.loading.long_recording_organizer.mne.export.export_raw", side_effect=_export_creates_file) as mock_export,
-                patch("neurodent.loading.long_recording_organizer.se.read_edf") as mock_read_edf,
-                patch("neurodent.loading.long_recording_organizer.spre.resample") as mock_resample,
+                patch("neurodent.loading.lro_loading.mne.export.export_raw", side_effect=_export_creates_file) as mock_export,
+                patch("neurodent.loading.lro_loading.se.read_edf") as mock_read_edf,
+                patch("neurodent.loading.lro_loading.spre.resample") as mock_resample,
             ):
                 # Mock the SpikeInterface read_edf to return something reasonable
                 mock_recording = Mock()
@@ -661,8 +661,8 @@ class TestMNECachingOptimization:
 
                 # Mock MNE export and SpikeInterface read
                 with (
-                    patch("neurodent.loading.long_recording_organizer.mne.export.export_raw", side_effect=_export_creates_file) as mock_export,
-                    patch("neurodent.loading.long_recording_organizer.se.read_edf") as mock_read_edf,
+                    patch("neurodent.loading.lro_loading.mne.export.export_raw", side_effect=_export_creates_file) as mock_export,
+                    patch("neurodent.loading.lro_loading.se.read_edf") as mock_read_edf,
                     patch(
                         "neurodent.loading.long_recording_organizer.RecordingMetadata.from_json"
                     ) as mock_from_json,
@@ -741,8 +741,8 @@ class TestMNECachingOptimization:
             # the metadata sidecar is now written atomically via a temp file +
             # rename, which needs real file I/O; it lands harmlessly in tmpdir.)
             with (
-                patch("neurodent.loading.long_recording_organizer.mne.export.export_raw", side_effect=_export_creates_file) as mock_export,
-                patch("neurodent.loading.long_recording_organizer.se.read_edf") as mock_read_edf,
+                patch("neurodent.loading.lro_loading.mne.export.export_raw", side_effect=_export_creates_file) as mock_export,
+                patch("neurodent.loading.lro_loading.se.read_edf") as mock_read_edf,
             ):
                 # Mock recording
                 mock_recording = Mock()

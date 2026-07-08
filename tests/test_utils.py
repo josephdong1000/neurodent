@@ -80,62 +80,6 @@ class TestIsDay:
             utils.is_day(None)
 
 
-class TestConvertColpathToRowpath:
-    """Test convert_colpath_to_rowpath function."""
-
-    def test_basic_conversion(self):
-        """Test basic path conversion."""
-        col_path = "/path/to/data_ColMajor_001.bin"
-        rowdir_path = "/output/dir"
-
-        result = utils.convert_colpath_to_rowpath(rowdir_path, col_path)
-        expected = Path(rowdir_path) / "data_RowMajor_001.npy.gz"
-        assert result == expected
-
-    def test_without_gzip(self):
-        """Test conversion without gzip compression."""
-        col_path = "/path/to/data_ColMajor_001.bin"
-        rowdir_path = "/output/dir"
-
-        result = utils.convert_colpath_to_rowpath(rowdir_path, col_path, gzip=False)
-        expected = Path(rowdir_path) / "data_RowMajor_001.bin"
-        assert result == expected
-
-    def test_as_string(self):
-        """Test conversion returning string."""
-        col_path = "/path/to/data_ColMajor_001.bin"
-        rowdir_path = "/output/dir"
-
-        result = utils.convert_colpath_to_rowpath(rowdir_path, col_path, aspath=False)
-        expected = str(Path(rowdir_path) / "data_RowMajor_001.npy.gz")
-        assert result == expected
-
-    def test_without_gzip_as_string(self):
-        """Test conversion without gzip compression returning string."""
-        col_path = "/path/to/data_ColMajor_001.bin"
-        rowdir_path = "/output/dir"
-
-        result = utils.convert_colpath_to_rowpath(rowdir_path, col_path, gzip=False, aspath=False)
-        expected = str(Path(rowdir_path) / "data_RowMajor_001.bin")
-        assert result == expected
-
-    def test_invalid_col_path(self):
-        """Test error handling for col_path without 'ColMajor'."""
-        col_path = "/path/to/data_RowMajor_001.bin"
-        rowdir_path = "/output/dir"
-
-        with pytest.raises(ValueError, match="Expected 'ColMajor' in col_path"):
-            utils.convert_colpath_to_rowpath(rowdir_path, col_path)
-
-    def test_col_path_without_colmajor_string(self):
-        """Test error handling for col_path that doesn't contain 'ColMajor'."""
-        col_path = "/path/to/data_001.bin"
-        rowdir_path = "/output/dir"
-
-        with pytest.raises(ValueError, match="Expected 'ColMajor' in col_path"):
-            utils.convert_colpath_to_rowpath(rowdir_path, col_path)
-
-
 class TestFilepathToIndex:
     """Test filepath_to_index function."""
 

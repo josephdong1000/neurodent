@@ -9,10 +9,10 @@ import pytest
 class TestLROSplit(unittest.TestCase):
     def setUp(self):
         # Patch dependencies
-        self.si_patcher = patch('neurodent.loading.long_recording_organizer.si')
+        self.si_patcher = patch('neurodent.loading.lro_merge.si')
         self.mock_si = self.si_patcher.start()
 
-        self.spre_patcher = patch('neurodent.loading.long_recording_organizer.spre')
+        self.spre_patcher = patch('neurodent.loading.lro_loading.spre')
         self.mock_spre = self.spre_patcher.start()
         # Make spre functions allow pass-through
         self.mock_spre.astype.side_effect = lambda rec, **kwargs: rec

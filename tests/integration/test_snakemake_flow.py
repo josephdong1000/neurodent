@@ -23,6 +23,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from neurodent.analysis import AnimalAnalyzer
 
 
 # ---------------------------------------------------------------------------
@@ -365,7 +366,7 @@ class TestPipelineSteps:
                 if not hasattr(lro, "base_folder_path"):
                     lro.base_folder_path = "synthetic_test"
 
-            war = ao.compute_windowed_analysis(
+            war = AnimalAnalyzer(ao).compute_windowed_analysis(
                 ["all"],
                 multiprocess_mode="serial",
                 window_s=1,  # small windows for tiny data
@@ -413,7 +414,7 @@ def _build_war(ds):
         if not hasattr(lro, "base_folder_path"):
             lro.base_folder_path = "synthetic_test"
 
-    war = ao.compute_windowed_analysis(
+    war = AnimalAnalyzer(ao).compute_windowed_analysis(
         ["all"],
         multiprocess_mode="serial",
         window_s=1,
@@ -513,7 +514,7 @@ class TestPipelineContinuation:
                 if not hasattr(lro, "base_folder_path"):
                     lro.base_folder_path = "synthetic_test"
 
-            war2 = ao2.compute_windowed_analysis(
+            war2 = AnimalAnalyzer(ao2).compute_windowed_analysis(
                 ["all"],
                 multiprocess_mode="serial",
                 window_s=1,
@@ -531,7 +532,7 @@ class TestPipelineContinuation:
         """Frequency-domain spike analysis runs on the same AO data."""
         ao, _war, _ds = war_env
 
-        fdsars = ao.compute_frequency_domain_spike_analysis(
+        fdsars = AnimalAnalyzer(ao).compute_frequency_domain_spike_analysis(
             multiprocess_mode="serial",
         )
 

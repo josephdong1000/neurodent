@@ -3,17 +3,17 @@
 Holds the single-recording analyzer (:class:`LongRecordingAnalyzer`), the
 per-fragment feature computations (:class:`FragmentAnalyzer`), spike detection
 (:class:`FrequencyDomainSpikeDetector`), and the per-animal
-:class:`AnalysisPipeline` that turns an ``AnimalOrganizer`` into result objects.
+:class:`AnimalAnalyzer` that turns an ``AnimalOrganizer`` into result objects.
 """
 
 from .long_recording_analyzer import LongRecordingAnalyzer
 from .fragment_analyzer import FragmentAnalyzer
 from .spike_detection import FrequencyDomainSpikeDetector
-from .pipeline import AnalysisPipeline
+from .animal_analyzer import AnimalAnalyzer
 
 __all__ = [
     "LongRecordingAnalyzer",
     "FragmentAnalyzer",
     "FrequencyDomainSpikeDetector",
-    "AnalysisPipeline",
+    "AnimalAnalyzer",
 ]

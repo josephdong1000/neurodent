@@ -39,6 +39,13 @@ def test_stage_packages_do_not_import_plotting():
         _assert_no_leak(pkg, "neurodent.plotting")
 
 
+def test_loading_does_not_import_analysis():
+    """AnimalOrganizer is loading-only (issue #137): importing neurodent.loading
+    must not pull in neurodent.analysis at import time. Analysis runs through the
+    separate AnimalAnalyzer(ao)."""
+    _assert_no_leak("neurodent.loading", "neurodent.analysis")
+
+
 def test_import_neurodent_is_lazy():
     """A bare `import neurodent` must not eager-load any stage package."""
     code = (
@@ -56,6 +63,7 @@ _HEADLINE_MODULES = {
     "AnimalOrganizer": "neurodent.loading.animal_organizer",
     "LongRecordingOrganizer": "neurodent.loading.long_recording_organizer",
     "LongRecordingAnalyzer": "neurodent.analysis.long_recording_analyzer",
+    "AnimalAnalyzer": "neurodent.analysis.animal_analyzer",
     "WindowAnalysisResult": "neurodent.results.window_analysis_result",
     "FrequencyDomainSpikeAnalysisResult": "neurodent.results.frequency_domain_results",
     "ZeitgeberAnalysisResult": "neurodent.results.zeitgeber",

@@ -68,10 +68,10 @@ class TestTimestampFixes:
                         # Intermediate is written atomically (temp + rename), so the
                         # mocked exporter must create the file at the path it is given.
                         patch(
-                            "neurodent.loading.long_recording_organizer.mne.export.export_raw",
+                            "neurodent.loading.lro_loading.mne.export.export_raw",
                             side_effect=lambda path, *a, **k: open(path, "wb").close(),
                         ) as mock_export,
-                        patch("neurodent.loading.long_recording_organizer.se.read_edf") as mock_read_edf,
+                        patch("neurodent.loading.lro_loading.se.read_edf") as mock_read_edf,
                     ):
                         # Mock the SpikeInterface recording
                         mock_recording = Mock()

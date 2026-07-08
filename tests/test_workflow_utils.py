@@ -309,7 +309,6 @@ class TestExpandAnimalsConfig:
                     "pattern": "custom/{index}.nwb",
                     "lro_kwargs": {"mode": "si"},
                     "manual_datetime": "2025-01-01 10:00:00",
-                    "day_parse_kwargs": {"date_patterns": []},
                 },
             ],
         }
@@ -318,7 +317,6 @@ class TestExpandAnimalsConfig:
         assert "pattern" not in meta
         assert "lro_kwargs" not in meta
         assert "manual_datetime" not in meta
-        assert "day_parse_kwargs" not in meta
         assert meta["id"] == "X1"
         assert meta["genotype"] == "WT"
 
@@ -403,7 +401,6 @@ class TestExpandAnimalsConfig:
                     "id": "X1", "genotype": "WT", "sex": "M",
                     "pattern": "{data_root}/custom/{animal}_{index}.rhd",
                     "lro_kwargs": {"mode": "si"},
-                    "day_parse_kwargs": {"date_patterns": [["\\d{6}", "%y%m%d"]]},
                 },
                 {"id": "A10", "genotype": "WT", "sex": "M"},
             ],

@@ -1,19 +1,8 @@
-"""
-Workflow utility functions.
-
-This module provides utilities that reduce boilerplate in Snakemake workflow scripts.
-"""
+"""Samples-config lifecycle and config-dict helpers for Snakemake workflows."""
 
 import copy
 import json
-import logging
-import os
-import sys
 from pathlib import Path
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from neurodent.results import WindowAnalysisResult
 
 
 def load_samples_config(path: "str | Path") -> dict:
@@ -81,63 +70,6 @@ def resolve_samples_config(config: dict) -> dict:
     )
 
 
-def setup_snakemake_logging(snakemake) -> logging.Logger:
-    """Configure logging to write to the Snakemake log file.
-
-    This replaces the common boilerplate pattern in workflow scripts that
-    redirects stdout/stderr to the log file specified in the Snakemake rule.
-
-    Args:
-        snakemake: The global snakemake object injected by Snakemake.
-            Must have a ``log`` attribute containing the log file path.
-
-    Returns:
-        logging.Logger: A configured logger instance.
-
-    Example:
-        In a Snakemake script::
-
-            from neurodent.workflow import setup_snakemake_logging
-
-            def main():
-                logger = setup_snakemake_logging(snakemake)
-                logger.info("Starting processing...")
-
-            if __name__ == "__main__":
-                main()
-
-    Note:
-        The log file path is determined by the ``log:`` directive in your
-        Snakemake rule. Log files use ``.out`` and ``.err`` extensions and
-        are organized under ``logs/<rule_group>/``. For example::
-
-            rule my_rule:
-                log:
-                    stdout="logs/my_rule/{animal}.out",
-                    stderr="logs/my_rule/{animal}.err",
-                script: "scripts/my_script.py"
-
-        The logger will write to ``logs/my_rule/{animal}.out``.
-    """
-    log_path = snakemake.log[0]
-    os.makedirs(os.path.dirname(log_path), exist_ok=True)
-    log_file = open(log_path, "w")
-
-    # Redirect stdout and stderr to the log file
-    sys.stdout = log_file
-    sys.stderr = log_file
-
-    # Configure logging to use the redirected stdout
-    logging.basicConfig(
-        format="%(asctime)s - %(levelname)s - %(message)s",
-        level=logging.INFO,
-        stream=sys.stdout,
-        force=True,
-    )
-
-    return logging.getLogger(__name__)
-
-
 def apply_samples_config(samples_config: dict):
     """Apply a samples config to the global ``neurodent.constants`` (pipeline front door).
 
@@ -180,80 +112,6 @@ def apply_samples_config(samples_config: dict):
     # New: ANIMAL_METADATA for sex/genotype enrichment (required)
     if "ANIMAL_METADATA" in samples_config:
         constants.ANIMAL_METADATA = metadata_module.load_animal_metadata(samples_config)
-
-
-def load_wars(
-    parquet_paths: list[str | Path],
-    json_paths: list[str | Path] | None = None,
-) -> list["WindowAnalysisResult"]:
-    """Load multiple WindowAnalysisResult objects from parquet/json file pairs.
-
-    General-purpose utility for loading WAR files. Works with any list of paths,
-    not tied to Snakemake.
-
-    Args:
-        parquet_paths: Paths to .parquet files containing WindowAnalysisResult data.
-            For backward compatibility, legacy .pkl paths are also accepted — the
-            loader will resolve the corresponding .parquet file next to them and
-            fall back to the pickle only if the parquet is missing.
-        json_paths: Optional paths to corresponding .json metadata files.
-            If None, assumes json files are in the same directory as the parquet
-            files with the same basename but .json extension.
-
-    Returns:
-        List of loaded WindowAnalysisResult objects.
-
-    Raises:
-        FileNotFoundError: If a parquet or json file does not exist.
-        RuntimeError: If no WARs could be loaded.
-
-    Example:
-        Load WARs from explicit paths::
-
-            from neurodent.workflow import load_wars
-
-            wars = load_wars(
-                parquet_paths=["data/animal1/war.parquet", "data/animal2/war.parquet"],
-                json_paths=["data/animal1/war.json", "data/animal2/war.json"],
-            )
-
-        Load WARs with auto-detected json paths::
-
-            wars = load_wars(parquet_paths=["data/animal1/war.parquet"])
-            # Automatically looks for data/animal1/war.json
-    """
-    from neurodent.results import WindowAnalysisResult
-
-    # If json_paths not provided, derive from parquet_paths
-    if json_paths is None:
-        json_paths = [Path(p).with_suffix(".json") for p in parquet_paths]
-
-    if len(parquet_paths) != len(json_paths):
-        raise ValueError(
-            f"parquet_paths ({len(parquet_paths)}) and json_paths ({len(json_paths)}) "
-            "must have the same length"
-        )
-
-    wars = []
-    for parquet_path, json_path in zip(parquet_paths, json_paths):
-        parquet_path = Path(parquet_path)
-        json_path = Path(json_path)
-
-        # Accept legacy .pkl input by swapping the suffix
-        if parquet_path.suffix == ".pkl":
-            parquet_path = parquet_path.with_suffix(".parquet")
-
-        war = WindowAnalysisResult.load_parquet_and_json(
-            folder_path=parquet_path.parent,
-            parquet_name=parquet_path.name,
-            json_name=json_path.name,
-        )
-        wars.append(war)
-
-    if not wars:
-        raise RuntimeError("No WARs were successfully loaded")
-
-    return wars
 
 
 def deep_merge_dict(base: dict, override: dict) -> dict:
@@ -336,7 +194,7 @@ def expand_animals_config(samples_config: dict) -> dict:
     * ``bad_channels`` – animal_id → {session → [channels]} mapping
       (built from per-animal ``bad_channels`` entries)
     * ``_animal_overrides`` – animal_id → per-animal overrides dict (pattern,
-      lro_kwargs, day_parse_kwargs)
+      lro_kwargs)
     * ``_animal_channel_subsets`` – animal_id → channel list mapping (for joint sessions)
     * ``_animal_groups`` – animal_id → group string mapping (for joint sessions)
 
@@ -453,7 +311,7 @@ def expand_animals_config(samples_config: dict) -> dict:
     result["animals"] = animals_list
 
     # Keys that are per-animal overrides (not core metadata)
-    _OVERRIDE_KEYS = {"pattern", "lro_kwargs", "day_parse_kwargs", "manual_datetime", "datetimes_are_start", "bad_channels", "exclude", "channel_subset", "group"}
+    _OVERRIDE_KEYS = {"pattern", "lro_kwargs", "manual_datetime", "datetimes_are_start", "bad_channels", "exclude", "channel_subset", "group"}
     _METADATA_SKIP = _OVERRIDE_KEYS  # excluded from ANIMAL_METADATA entries
 
     # --- Build ANIMAL_METADATA ---
@@ -533,7 +391,7 @@ def expand_animals_config(samples_config: dict) -> dict:
     overrides: dict[str, dict] = {}
     for animal in animals_list:
         animal_overrides = {}
-        for key in ("pattern", "lro_kwargs", "day_parse_kwargs"):
+        for key in ("pattern", "lro_kwargs"):
             if key in animal:
                 animal_overrides[key] = animal[key]
         # Propagate datetimes_are_start into lro_kwargs override
@@ -546,142 +404,6 @@ def expand_animals_config(samples_config: dict) -> dict:
         result["_animal_overrides"] = overrides
 
     return result
-
-
-def get_discovery_animal_filter(
-    source_animal_id: str,
-    is_joint: bool,
-    animal_groups: dict[str, str],
-) -> str:
-    """Determine the animal filter value for discovery.
-
-    For joint sessions with 'group', use the group name for {animal} placeholder.
-    For joint sessions without 'group', use the animal id.
-    For non-joint sessions, use the animal id as usual.
-
-    Parameters
-    ----------
-    source_animal_id : str
-        The animal ID from the configuration
-    is_joint : bool
-        Whether this is a joint session
-    animal_groups : dict[str, str]
-        Mapping of animal_id to group name
-
-    Returns
-    -------
-    str
-        The value to use for {animal} placeholder in discovery pattern
-
-    Examples
-    --------
-    Regular non-joint animal::
-
-        >>> get_discovery_animal_filter("A10", False, {})
-        'A10'
-
-    Joint session with group (e.g., arx_rosa)::
-
-        >>> groups = {"ArxRosa-1017": "Arx Rosa 1017 1015", "ArxRosa-1015": "Arx Rosa 1017 1015"}
-        >>> get_discovery_animal_filter("ArxRosa-1017", True, groups)
-        'Arx Rosa 1017 1015'
-
-    Joint session without group (e.g., jess_rhd where folders contain animal IDs)::
-
-        >>> get_discovery_animal_filter("AP3B2het-207-M", True, {})
-        'AP3B2het-207-M'
-    """
-    if is_joint and source_animal_id in animal_groups:
-        # Use group name for discovery (folder contains group name, not individual animal ID)
-        return animal_groups[source_animal_id]
-    else:
-        # Joint session without group OR regular non-joint session: use animal ID
-        return source_animal_id
-
-
-def resolve_animal_pattern(
-    pattern_config,
-    animal_id: str,
-    data_root: str,
-) -> "str | list[str]":
-    """Resolve a discovery pattern for a specific animal.
-
-    Substitutes ``{data_root}`` in patterns with the actual data root path.
-
-    Supports two formats for ``pattern_config``:
-
-    * **Shared** (``str`` or ``list[str]``): every animal uses the same pattern(s).
-    * **Per-animal** (``dict[str, str | list[str]]``): each animal has its own
-      pattern(s), enabling heterogeneous file structures in a single dataset.
-
-    Parameters
-    ----------
-    pattern_config : str | list[str] | dict[str, str | list[str]]
-        Either a shared pattern (string or list), or a dict mapping
-        ``animal_id → pattern(s)``.  Patterns may contain ``{data_root}``
-        which will be replaced with the *data_root* value.
-    animal_id : str
-        The animal to resolve the pattern for.
-    data_root : str
-        Absolute path to the data root directory, substituted for
-        ``{data_root}`` in patterns.
-
-    Returns
-    -------
-    str | list[str]
-        Absolute discovery pattern(s) for the given animal.
-
-    Raises
-    ------
-    KeyError
-        If ``pattern_config`` is a dict and ``animal_id`` is not found.
-
-    Examples
-    --------
-    Pattern with ``{data_root}``::
-
-        >>> resolve_animal_pattern(
-        ...     "{data_root}/session1/{animal}/{index}.nwb", "A10", "/data"
-        ... )
-        '/data/session1/{animal}/{index}.nwb'
-
-    List of patterns::
-
-        >>> resolve_animal_pattern(
-        ...     ["{data_root}/{animal}/{index}.bin", "{data_root}/{animal}/{index}.csv"],
-        ...     "A10",
-        ...     "/data",
-        ... )
-        ['/data/{animal}/{index}.bin', '/data/{animal}/{index}.csv']
-
-    Per-animal pattern dict::
-
-        >>> resolve_animal_pattern(
-        ...     {"A10": "{data_root}/{animal}/{index}.rhd"},
-        ...     "A10",
-        ...     "/data",
-        ... )
-        '/data/{animal}/{index}.rhd'
-    """
-    # Per-animal patterns: dict mapping animal_id → pattern(s)
-    if isinstance(pattern_config, dict):
-        if animal_id not in pattern_config:
-            raise KeyError(
-                f"Animal '{animal_id}' not found in per-animal pattern config. "
-                f"Available animals: {list(pattern_config.keys())}"
-            )
-        pattern = pattern_config[animal_id]
-    else:
-        # Shared pattern (string or list)
-        pattern = pattern_config
-
-    def _resolve(p: str) -> str:
-        return p.replace("{data_root}", data_root)
-
-    if isinstance(pattern, list):
-        return [_resolve(p) for p in pattern]
-    else:
-        return _resolve(pattern)
 
 
 def apply_path_overrides(base_config: dict, overrides: dict) -> dict:
@@ -776,13 +498,6 @@ def apply_path_overrides(base_config: dict, overrides: dict) -> dict:
     return result
 
 
-# ---------------------------------------------------------------------------
-# Snakefile helpers
-# ---------------------------------------------------------------------------
-# These pure helpers are used by the Snakefile but live here so they can be
-# imported and unit-tested without requiring the Snakemake runtime.
-
-
 def format_config_value(value, indent=4):
     """Format a config value for display (handles nested dicts, lists, etc.)."""
     spaces = " " * indent
@@ -808,109 +523,3 @@ def format_config_value(value, indent=4):
         return "null"
     else:
         return str(value)
-
-
-def increment_memory(base_memory):
-    """Return a callable ``mem(wildcards, attempt)`` that doubles on each retry.
-
-    Used by Snakemake rules to exponentially increase memory on retries::
-
-        resources:
-            mem_mb=increment_memory(4000),
-    """
-    def mem(wildcards, attempt):
-        return base_memory * (2 ** (attempt - 1))
-    return mem
-
-
-def extend_plot_order_from_attr(wars, attr: str, base_order):
-    """Extend a plot-order list with the values of *attr* observed on *wars*.
-
-    Mirrors the dynamic-extension pattern used in EP plotting scripts:
-    start from a base order (typically ``constants.DF_SORT_ORDER[attr]``)
-    and append any values seen on the loaded WARs that aren't already in
-    that base.  This keeps strict plot-order validation happy for datasets
-    with non-default category values (e.g. arxrosa, where every animal has
-    ``sex='Unknown'``).
-
-    Args:
-        wars: Iterable of objects exposing ``attr`` (typically
-            :class:`WindowAnalysisResult` instances).
-        attr: The attribute / column name to extend (``"genotype"``,
-            ``"sex"``, ...).
-        base_order: Starting list of category values; not mutated.
-
-    Returns:
-        list: ``list(base_order)`` with any newly-observed truthy values of
-            ``getattr(war, attr)`` appended, preserving insertion order
-            relative to *base_order*.
-
-    Example::
-
-        >>> from neurodent import constants
-        >>> base = constants.DF_SORT_ORDER["sex"]   # ["Male", "Female"]
-        >>> class W: pass
-        >>> w1, w2 = W(), W()
-        >>> w1.sex, w2.sex = "Male", "Unknown"
-        >>> extend_plot_order_from_attr([w1, w2], "sex", base)
-        ['Male', 'Female', 'Unknown']
-    """
-    order = list(base_order)
-    seen = set(order)
-    for war in wars:
-        v = getattr(war, attr, None)
-        if not v or v in seen:
-            continue
-        logging.info(f"Adding unknown {attr} '{v}' to plot order")
-        order.append(v)
-        seen.add(v)
-    return order
-
-
-def create_sex_marker_scale(df, plot_lib=None):
-    """Build a seaborn-objects marker scale for the sex column of *df*.
-
-    Preserves the canonical Female=circle (``"o"``), Male=square (``"s"``)
-    mapping when those values are present, and assigns a diamond (``"D"``)
-    fallback marker for any non-canonical sex value (e.g. arxrosa's
-    ``"Unknown"``).
-
-    Why this exists: ep_figures plots use ``so.Plot(..., marker="sex")``
-    with a static ``so.Nominal(["o", "s"], order=["Female", "Male"])``
-    scale. seaborn-objects **silently drops** any row whose sex value
-    isn't listed in ``order``. Datasets with non-canonical sex (arxrosa)
-    therefore produce blank plots with no error. This helper makes the
-    scale's order/markers track what's actually in ``df``.
-
-    Args:
-        df: DataFrame with a ``"sex"`` column.
-        plot_lib: Optional reference to ``seaborn.objects``. If ``None``,
-            it's imported lazily so this util doesn't require seaborn at
-            module-load time (useful for tests that don't render plots).
-
-    Returns:
-        A ``seaborn.objects.Nominal`` scale instance.
-
-    Example::
-
-        >>> import pandas as pd
-        >>> df = pd.DataFrame({"sex": ["Female", "Male", "Female"]})
-        >>> scale = create_sex_marker_scale(df)
-        >>> scale.order
-        ['Female', 'Male']
-        >>> scale.values
-        ['o', 's']
-    """
-    if plot_lib is None:
-        import seaborn.objects as so
-        plot_lib = so
-
-    sex_marker_map = {"Female": "o", "Male": "s"}
-    fallback_marker = "D"
-    observed = list(df["sex"].dropna().unique())
-    # Preserve canonical Female/Male ordering when present; append the rest.
-    order = [s for s in ["Female", "Male"] if s in observed] + [
-        s for s in observed if s not in ("Female", "Male")
-    ]
-    markers = [sex_marker_map.get(s, fallback_marker) for s in order]
-    return plot_lib.Nominal(markers, order=order)

@@ -48,6 +48,7 @@ from neurodent.results.zeitgeber import (
     shift_to_zeitgeber_reference,
 )
 from neurodent.loading import AnimalOrganizer
+from neurodent.analysis import AnimalAnalyzer
 from neurodent.plotting import ZeitgeberPlotter
 
 FS = 1000
@@ -113,7 +114,7 @@ def make_zt_df(rec, manual_datetimes, file_durations, shift_hours):
     lro.datetimes_are_start = True
     lro.finalize_file_timestamps()
     ao = AnimalOrganizer.from_lros([lro], animal_id="SYN", genotype="WT")
-    war = ao.compute_windowed_analysis(
+    war = AnimalAnalyzer(ao).compute_windowed_analysis(
         ["rms"], window_s=WINDOW_S, multiprocess_mode="serial"
     )
     df = war.result.copy()

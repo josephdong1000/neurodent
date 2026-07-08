@@ -1,14 +1,13 @@
 """Tests for RecordingMetadata serialization methods: to_dict, from_dict, to_json,
-from_json, update_sampling_rate, and DDFBinaryMetadata deprecation."""
+from_json, and update_sampling_rate."""
 
 import json
-import warnings
 from datetime import datetime
 from pathlib import Path
 
 import pytest
 
-from neurodent.loading.long_recording_organizer import DDFBinaryMetadata, RecordingMetadata
+from neurodent.loading.long_recording_organizer import RecordingMetadata
 
 
 def _make_meta(**overrides):
@@ -167,28 +166,3 @@ class TestRecordingMetadataUpdateSamplingRate:
         assert meta.f_s != 1000.0
         assert meta.f_s == 250.0
 
-
-class TestDDFBinaryMetadataDeprecation:
-    def test_raises_deprecation_warning(self):
-        with pytest.warns(DeprecationWarning, match="DDFBinaryMetadata is deprecated"):
-            DDFBinaryMetadata(
-                None,
-                n_channels=2,
-                f_s=1000.0,
-                dt_end=None,
-                channel_names=["a", "b"],
-            )
-
-    def test_is_instance_of_recording_metadata(self):
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", DeprecationWarning)
-            obj = DDFBinaryMetadata(
-                None,
-                n_channels=2,
-                f_s=1000.0,
-                dt_end=None,
-                channel_names=["a", "b"],
-            )
-        assert isinstance(obj, RecordingMetadata)
-        assert obj.n_channels == 2
-        assert obj.f_s == 1000.0

@@ -19,6 +19,7 @@ from dask.distributed import Client, LocalCluster
 
 from neurodent import constants, core
 from neurodent.loading import AnimalOrganizer
+from neurodent.analysis import AnimalAnalyzer
 from neurodent.workflow import setup_snakemake_logging, apply_samples_config
 from neurodent.workflow.utils import apply_path_overrides, resolve_animal_pattern, get_discovery_animal_filter
 
@@ -188,13 +189,14 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
                 genotype=genotype,
                 sex=sex,
             )
+            az = AnimalAnalyzer(ao)
 
             # Compute bad channels
             logger.info(f"Computing bad channels for {animal_key}")
             lof_config = config["analysis"]["channel_filter_config"]["lof"]
             lof_threshold = lof_config.get("reject_lof_threshold")
             lof_chunk_duration_s = lof_config.get("lof_chunk_duration_s", 60)
-            ao.compute_bad_channels(
+            az.compute_bad_channels(
                 lof_threshold=lof_threshold,
                 lof_chunk_duration_s=lof_chunk_duration_s,
             )
@@ -211,7 +213,7 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
                     message=".*fmin=.*Spectrum estimate will be unreliable.*",
                     category=RuntimeWarning,
                 )
-                war = ao.compute_windowed_analysis(
+                war = az.compute_windowed_analysis(
                     cwa_features,
                     multiprocess_mode=cwa_multiprocess_mode,
                     chunk_duration_s=cwa_chunk_duration_s,
@@ -224,7 +226,7 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
             multiprocess_mode = fdsar_config.get("multiprocess_mode", "serial")
             fdsar_chunk_duration_s = fdsar_config.get("chunk_duration_s", 3600)
 
-            fdsar_list = ao.compute_frequency_domain_spike_analysis(
+            fdsar_list = az.compute_frequency_domain_spike_analysis(
                 detection_params=detection_params, multiprocess_mode=multiprocess_mode,
                 chunk_duration_s=fdsar_chunk_duration_s,
             )

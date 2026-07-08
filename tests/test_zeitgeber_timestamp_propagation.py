@@ -24,6 +24,7 @@ from neurodent.results.zeitgeber import (
     shift_to_zeitgeber_reference,
 )
 from neurodent.loading import AnimalOrganizer
+from neurodent.analysis import AnimalAnalyzer
 
 FS = 1000
 WINDOW_S = 60  # 1-minute windows keep the window count modest
@@ -54,7 +55,7 @@ def _war_from_recording(rec, manual_datetimes, file_durations):
     lro.datetimes_are_start = True
     lro.finalize_file_timestamps()
     ao = AnimalOrganizer.from_lros([lro], animal_id="T", genotype="WT")
-    war = ao.compute_windowed_analysis(
+    war = AnimalAnalyzer(ao).compute_windowed_analysis(
         ["rms"], window_s=WINDOW_S, multiprocess_mode="serial"
     )
     df = war.result.sort_values("timestamp").reset_index(drop=True)
@@ -137,7 +138,7 @@ def test_multiday_recording_folds_across_days():
         lros.append(lro)
 
     ao = AnimalOrganizer.from_lros(lros, animal_id="T", genotype="WT")
-    war = ao.compute_windowed_analysis(
+    war = AnimalAnalyzer(ao).compute_windowed_analysis(
         ["rms"], window_s=WINDOW_S, multiprocess_mode="serial"
     )
     df = war.result.sort_values("timestamp").reset_index(drop=True)

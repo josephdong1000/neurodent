@@ -14,7 +14,7 @@ except ImportError:
     si = None
     spre = None
 
-import neurodent.loading.long_recording_organizer as core_module
+import neurodent.loading.lro_loading as core_module
 from neurodent.loading.long_recording_organizer import LongRecordingOrganizer
 from neurodent import constants
 
