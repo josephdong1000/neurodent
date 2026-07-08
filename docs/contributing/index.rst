@@ -15,8 +15,4 @@ Related governance files:
 
 .. note::
 
-   If this docs page does not automatically move you, follow the link above.
-
-.. raw:: html
-
-   <meta http-equiv="refresh" content="0; url=https://github.com/josephdong1000/neurodent/blob/main/CONTRIBUTING.md">
+   Follow the link above for the full contributor guide.
