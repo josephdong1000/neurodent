@@ -1,7 +1,7 @@
 # Contributing to NeuRodent
 
 `CONTRIBUTING.md` is the canonical contributor guide for this repository.
-Documentation pages in `docs/contributing/` redirect here.
+Documentation pages in `docs/contributing/` link here.
 
 ## Prerequisites
 
@@ -63,6 +63,42 @@ Issue templates:
   https://github.com/josephdong1000/neurodent/issues/new?template=02-bug-report.md
 - Feature request:
   https://github.com/josephdong1000/neurodent/issues/new?template=01-feature-request.md
+
+## Releasing
+
+Publishing to PyPI is automated by `.github/workflows/publish.yml`. Publishing a GitHub
+Release (not just pushing a tag) builds the package and uploads it via PyPI trusted
+publishing (OIDC), so no token is needed. The `pypi` environment pauses for a maintainer to
+approve the deployment before it uploads.
+
+The version is a static string in `pyproject.toml` (`__init__.py` reads it from installed
+metadata). PyPI version numbers cannot be reused, so pick a new one. The workflow checks the
+tag against that string at the tagged commit, so the bump must be committed before the tag
+exists.
+
+1. Bump the version with `uv version X.Y.Z` (or `uv version --bump minor`). This also
+   updates `uv.lock`.
+2. Commit the bump (pyproject.toml and uv.lock) to `main` and push. This must land before
+   the tag, or the version check fails.
+3. Create the release, which creates the `vX.Y.Z` tag from `main` and triggers publishing:
+   `gh release create vX.Y.Z --generate-notes`.
+4. Approve the `pypi` deployment when the run pauses, then confirm at
+   https://pypi.org/project/neurodent/.
+
+### conda-forge
+
+conda-forge builds from the PyPI release, so there is nothing to publish separately. For a
+code-only release the autotick bot opens a version-bump PR on `neurodent-feedstock` within a
+few hours; merge it to ship the conda build.
+
+Adding or changing a runtime dependency needs a manual feedstock edit, because the bot bumps
+only the version and sha256, not the dependency list. The bot's PR will fail its `pip check`
+test when a new dependency is missing from the recipe. Edit `recipe/meta.yaml` on that PR,
+add the dependency under `requirements: run:` using its conda-forge package name (not always
+the PyPI name: matplotlib is matplotlib-base, dask is dask-core) and mirror the version pin
+(e.g. `foobar >=1.2`). The dependency must already exist on conda-forge; if it is PyPI-only
+it cannot be added until it has its own feedstock. `grayskull pypi neurodent` regenerates the
+recipe from PyPI to check names.
 
 ## Running Tests
 
