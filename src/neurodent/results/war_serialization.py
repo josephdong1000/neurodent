@@ -1,4 +1,4 @@
-"""Parquet/JSON serialization for :class:`WindowAnalysisResult` (issue #134)."""
+"""Parquet/JSON serialization for :class:`WindowAnalysisResult`."""
 
 from __future__ import annotations
 

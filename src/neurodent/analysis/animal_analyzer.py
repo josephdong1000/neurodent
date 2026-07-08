@@ -1,4 +1,4 @@
-"""Analysis stage for a single animal (issue #137).
+"""Analysis stage for a single animal.
 
 ``AnimalAnalyzer`` runs the LOF / windowed-analysis / spike-detection steps on an
 :class:`~neurodent.loading.animal_organizer.AnimalOrganizer`'s already-loaded

@@ -1,4 +1,4 @@
-"""LOF outlier utilities for :class:`WindowAnalysisResult` (issue #134)."""
+"""LOF outlier utilities for :class:`WindowAnalysisResult`."""
 
 from __future__ import annotations
 

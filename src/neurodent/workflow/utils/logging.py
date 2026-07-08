@@ -1,7 +1,4 @@
-"""Snakemake runtime glue: log-file setup and memory-retry resources.
-
-Split from the former ``workflow/utils.py`` module.
-"""
+"""Snakemake runtime glue: log-file setup and memory-retry resources."""
 
 import logging
 import os

@@ -1,10 +1,4 @@
-"""Shared low-level utilities (issue #69).
-
-``core.utils`` was split from a single 1900-line module into cohesive
-submodules. These names are re-exported here for internal convenience so
-``from neurodent.core.utils import X`` keeps working; this is package-internal
-convenience, not a back-compat shim.
-"""
+"""Shared low-level utility functions."""
 
 from .units import (
     convert_units_to_multiplier,

@@ -1,7 +1,4 @@
-"""WAR loading and plot-order/marker helpers for workflow figure scripts.
-
-Split from the former ``workflow/utils.py`` module.
-"""
+"""WAR loading and plot-order/marker helpers for workflow figure scripts."""
 
 import logging
 from pathlib import Path

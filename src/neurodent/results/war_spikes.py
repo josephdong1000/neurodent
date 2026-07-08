@@ -1,4 +1,4 @@
-"""Spike ingestion for :class:`WindowAnalysisResult` (issue #134)."""
+"""Spike ingestion for :class:`WindowAnalysisResult`."""
 
 from __future__ import annotations
 

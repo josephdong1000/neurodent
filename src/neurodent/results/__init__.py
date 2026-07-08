@@ -1,4 +1,4 @@
-"""Result containers and their support utilities (issue #110).
+"""Result containers and their support utilities.
 
 A neutral shared layer: the loading/analysis code and the plotting code both
 depend downward into it. Holds ``WindowAnalysisResult``,

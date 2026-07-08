@@ -1,4 +1,4 @@
-"""Windowed feature analysis results (issue #134).
+"""Windowed feature analysis results.
 
 ``WindowAnalysisResult`` wraps the windowed feature DataFrame produced by
 :meth:`neurodent.analysis.animal_analyzer.AnimalAnalyzer.compute_windowed_analysis`.

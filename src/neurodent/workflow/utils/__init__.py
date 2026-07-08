@@ -1,9 +1,4 @@
-"""neurodent.workflow.utils - workflow utility functions.
-
-Split from a single 916-line module into cohesive submodules. All 14 public
-names are re-exported here so ``from neurodent.workflow.utils import X`` keeps
-working for every consumer; package-internal convenience, not a back-compat shim.
-"""
+"""Workflow utility functions."""
 
 from .config import (
     load_samples_config,

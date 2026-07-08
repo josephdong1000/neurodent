@@ -1,7 +1,4 @@
-"""Discovery pattern/filter resolution for the Snakemake pipeline.
-
-Split from the former ``workflow/utils.py`` module.
-"""
+"""Discovery pattern/filter resolution for the Snakemake pipeline."""
 
 
 def get_discovery_animal_filter(

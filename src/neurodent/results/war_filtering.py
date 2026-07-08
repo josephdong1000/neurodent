@@ -1,4 +1,4 @@
-"""Filtering for :class:`WindowAnalysisResult` (issue #134)."""
+"""Filtering for :class:`WindowAnalysisResult`."""
 
 from __future__ import annotations
 

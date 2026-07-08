@@ -1,8 +1,4 @@
-"""Recording metadata (channels, sampling rate, units, timestamps) for the loading stage.
-
-Split out of ``long_recording_organizer`` (issue: LRO decomposition); re-exported from
-there so ``neurodent.loading.long_recording_organizer.RecordingMetadata`` still resolves.
-"""
+"""Recording metadata (channels, sampling rate, units, timestamps) for the loading stage."""
 
 import json
 import logging

@@ -1,7 +1,4 @@
-"""Samples-config lifecycle and config-dict helpers for Snakemake workflows.
-
-Split from the former ``workflow/utils.py`` module.
-"""
+"""Samples-config lifecycle and config-dict helpers for Snakemake workflows."""
 
 import copy
 import json

@@ -5,8 +5,6 @@ groups them into sessions, and manages ``LongRecordingOrganizer`` instances and
 their timeline. Analysis (LOF, windowed features, spike detection) is a separate
 stage: pass a loaded organizer to
 :class:`~neurodent.analysis.animal_analyzer.AnimalAnalyzer`.
-
-Split out of the former monolithic ``results.py`` (issue #134).
 """
 
 from __future__ import annotations

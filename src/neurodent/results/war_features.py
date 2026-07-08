@@ -1,4 +1,4 @@
-"""Feature extraction and averaging for :class:`WindowAnalysisResult` (issue #134)."""
+"""Feature extraction and averaging for :class:`WindowAnalysisResult`."""
 
 from __future__ import annotations
 
