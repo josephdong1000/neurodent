@@ -78,8 +78,9 @@ exists.
 
 1. Bump the version with `uv version X.Y.Z` (or `uv version --bump minor`). This also
    updates `uv.lock`.
-2. Commit the bump (pyproject.toml and uv.lock) to `main` and push. This must land before
-   the tag, or the version check fails.
+2. Commit the bump (pyproject.toml and uv.lock) on a `release/vX.Y.Z` branch and merge to
+   `main` via PR, as past releases have. It must land on `main` before the tag, or the
+   version check fails.
 3. Create the release, which creates the `vX.Y.Z` tag from `main` and triggers publishing:
    `gh release create vX.Y.Z --generate-notes`.
 4. Approve the `pypi` deployment when the run pauses, then confirm at
