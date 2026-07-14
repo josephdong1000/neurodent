@@ -1,10 +1,11 @@
-"""End-to-end units guarantee: known amplitude in, microvolts out, for every loading path.
+"""End-to-end units check: known amplitude in, microvolts out, for every loading path.
 
-`get_fragment_np` promises uV, and filter thresholds, WAR features, plot scales and human artifact
-labels all believe it. A 1e6 slip corrupts them at once while still producing plausible output.
+`get_fragment_np` promises uV and everything downstream believes it, so a 1e6 slip corrupts filters,
+features and plots at once while still producing plausible output.
 
-Reasoning across five formats and two intermediates is how that gets missed, so the guarantee is
-empirical and per-path: push a KNOWN amplitude through the real loader and assert what comes out.
+The units are established differently per format (SpikeInterface gain, EDF physical dimension, or the
+binary intermediate's gain), so each path is checked empirically rather than by inspection: push a
+known amplitude through the real loader and assert what comes out.
 """
 from datetime import datetime
 from pathlib import Path

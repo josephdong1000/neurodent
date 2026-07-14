@@ -11,27 +11,26 @@ except Exception:  # pragma: no cover - optional at import time
     FIFF = None
 
 
-# Bounds on the median absolute amplitude of a recording claiming to be in µV. Real data (animal 443)
-# has per-channel medians of 17..369 µV. Nothing physiological lands outside the HARD bounds, so they
-# cannot false-alarm while still catching a 1e6 volts-as-µV slip. The SOFT bounds would catch a 1e3
-# slip (mV/nV) but a loud animal can exceed them, so crossing those only warns.
+# Bounds on the median absolute amplitude of a recording claiming to be in µV. Real per-channel
+# medians run 17..369 µV. HARD bounds are wide enough that no physiological recording can cross them,
+# but narrow enough to catch a 1e6 volts-as-µV slip. SOFT bounds would catch a 1e3 slip (mV/nV), but a
+# loud recording can legitimately cross them, so those only warn.
 UV_HARD_MIN, UV_HARD_MAX = 1e-2, 1e5
 UV_SOFT_MIN, UV_SOFT_MAX = 1e0, 1e3
 
 
 def assert_microvolts(data, context: str = "recording") -> float | None:
-    """Raise if ``data`` cannot plausibly be in microvolts.
+    """Raise if ``data`` cannot plausibly be in microvolts. Does not rescale.
 
-    Never rescales: guessing at units is how the error gets baked in. The statistic is the median
-    absolute amplitude over finite, non-zero samples; zeros are excluded so a dead channel does not
-    drag it to 0 and trip the floor.
+    Tests the median absolute amplitude over finite, non-zero samples. Zeros are excluded so a dead
+    channel does not drag the median to 0 and trip the floor.
 
     Args:
         data: voltages claimed to be in µV.
         context (str): what is being checked, for the error message.
 
     Returns:
-        float | None: the median absolute amplitude in µV, or None if the data was empty or all-zero.
+        float | None: the median absolute amplitude in µV, or None if data was empty or all-zero.
 
     Raises:
         ValueError: if the median lies outside the hard bounds.

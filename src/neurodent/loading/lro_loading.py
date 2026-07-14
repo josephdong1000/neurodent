@@ -42,8 +42,8 @@ from .recording_metadata import RecordingMetadata
 def _gain_to_uV(metadata: RecordingMetadata) -> float:
     """SpikeInterface ``gain_to_uV`` for a binary intermediate.
 
-    The bin holds the source's native units (volts, for MNE), so the gain is the source's uV factor:
-    ``mult_to_uV``. Falls back to 1.0 when the units are unknown, rather than inventing a scale.
+    The bin holds the source's native units (volts, for MNE), so the gain is ``mult_to_uV``. Falls
+    back to 1.0 when the source units are unknown.
     """
     mult = getattr(metadata, "mult_to_uV", None)
     if mult is None or not np.isfinite(mult) or mult <= 0:
@@ -58,25 +58,21 @@ class LroLoadingMixin:
     """Mixin: see module docstring."""
 
     def _validate_units_uV(self, recording, n_frames: int = 100_000) -> None:
-        """Raise if a freshly-constructed recording is not plausibly in µV.
+        """Raise if a newly-constructed recording is not plausibly in µV.
 
-        Everything downstream takes ``get_traces(return_scaled=True)`` at its word, so a unit slip
-        corrupts filters, features and labels alike while still looking plausible. Samples the head
-        rather than reading the whole recording; a recording that cannot be sampled (a test double)
-        is skipped rather than failed.
+        Filters, features and plots all take ``get_traces(return_scaled=True)`` at its word, so a unit
+        slip corrupts them while still looking plausible. Samples the head rather than reading the
+        whole recording. Non-recordings are skipped by type check, not by catching their errors.
         """
-        try:
-            traces = recording.get_traces(
-                start_frame=0, end_frame=n_frames, return_scaled=True
-            )
-            arr = np.asarray(traces, dtype=float)
-        except ValueError:
-            raise
-        except Exception as e:  # not a readable recording; nothing to validate
-            logging.debug("Skipping unit validation (could not sample traces): %s", e)
-            return
+        base = getattr(si, "BaseRecording", None)
+        if not isinstance(base, type) or not isinstance(recording, base):
+            return  # SpikeInterface absent, or not a real recording (a test double)
 
-        assert_microvolts(arr, context=f"{type(self).__name__} recording")
+        kwargs = {"segment_index": 0} if recording.get_num_segments() > 1 else {}
+        traces = recording.get_traces(
+            start_frame=0, end_frame=n_frames, return_scaled=True, **kwargs
+        )
+        assert_microvolts(np.asarray(traces, dtype=float), context=f"{type(self).__name__} recording")
 
     @staticmethod
     def _extract_channel_names(recording: "si.BaseRecording") -> list[str]:
@@ -109,6 +105,7 @@ class LroLoadingMixin:
         """Initialize LRO from an existing SpikeInterface recording object (in-memory)."""
         # Enforce global dtype and resampling
         self.LongRecording = self._apply_resampling(recording)
+        self._validate_units_uV(self.LongRecording)
         recording = self.LongRecording
 
         self._is_in_memory = True
@@ -564,6 +561,22 @@ class LroLoadingMixin:
             # interrupted by a killed job) can still reach here. Guard the read and
             # self-heal under non-'always' policies by deleting the bad cache and
             # falling through to regeneration.
+            # Built OUTSIDE the try below, which treats any exception as "the cache file is corrupt"
+            # and deletes it. A bad unit scale or a metadata schema change is not a corrupt cache, and
+            # laundering it into one would delete good files and hide the real fault.
+            params = None
+            if intermediate == "bin":
+                params = {
+                    "sampling_frequency": metadata.f_s,
+                    "num_channels": metadata.n_channels,
+                    "dtype": "float64",  # We standardize on float64 for cached binary files
+                    "gain_to_uV": _gain_to_uV(metadata),
+                    "offset_to_uV": 0,
+                    "time_axis": 0,
+                    "is_filtered": False,
+                    "channel_ids": metadata.channel_names,
+                }
+
             try:
                 if intermediate == "edf":
                     logging.info("Reading cached edf file")
@@ -571,18 +584,6 @@ class LroLoadingMixin:
                     return rec, None, metadata  # No raw object when using cache
 
                 elif intermediate == "bin":
-                    # Use metadata to reconstruct SpikeInterface parameters
-                    params = {
-                        "sampling_frequency": metadata.f_s,
-                        "num_channels": metadata.n_channels,
-                        "dtype": "float64",  # We standardize on float64 for cached binary files
-                        "gain_to_uV": _gain_to_uV(metadata),
-                        "offset_to_uV": 0,
-                        "time_axis": 0,
-                        "is_filtered": False,
-                        "channel_ids": metadata.channel_names,
-                    }
-
                     logging.info(f"Reading from cached binary file {fname}")
                     rec = se.read_binary(fname, **params)
                     return rec, None, metadata  # No raw object when using cache
