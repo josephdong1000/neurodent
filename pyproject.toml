@@ -99,6 +99,7 @@ dev = [
     "nbstripout>=0.8.2",
     "memray>=1.19.2; sys_platform == 'linux'",
     "bokeh>=3.9.0",
+    "playwright>=1.61.0",
 ]
 
 [project.urls]
@@ -118,6 +119,7 @@ python_functions = ["test_*"]
 addopts = ["--strict-markers", "--strict-config", "--tb=short"]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "browser: marks tests that need a real browser (playwright + chromium)",
     "integration: marks tests as integration tests",
     "unit: marks tests as unit tests",
     "eeg_data: marks tests that require EEG data files",
