@@ -301,8 +301,11 @@ class TestFrequencyDomainSpikeDetectorStandalone:
         except ImportError:
             mne = None
 
+        # MNE holds EEG in VOLTS, so a bare randn() declares ~0.67 V of brain activity. Scale to a
+        # realistic 50 µV so the dummy recording is physically coherent (and so the µV contract the
+        # loader now enforces is not violated by the test data itself).
         dummy_extract = lambda x, **kw: mne.io.RawArray(
-            np.random.randn(64, 10000), mne.create_info(64, 1000., "eeg")
+            np.random.randn(64, 10000) * 50e-6, mne.create_info(64, 1000., "eeg")
         ) if mne else None
 
         with warnings.catch_warnings():
@@ -318,6 +321,11 @@ class TestFrequencyDomainSpikeDetectorStandalone:
                     "multiprocess_mode": "serial",
                     "overwrite_rowbins": False,
                     "intermediate": "bin",
+                    # The traces come from `dummy_extract`, not from the file on disk, but the
+                    # intermediate cache is keyed on the SOURCE file's mtime -- so changing the
+                    # generator never invalidates it and the test silently reads a stale binary from
+                    # a previous run. Always regenerate.
+                    "cache_policy": "force_regenerate",
                 },
             )
 

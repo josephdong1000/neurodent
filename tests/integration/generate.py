@@ -127,6 +127,12 @@ def _write_nwb_file(
         data=data,
         electrodes=electrode_region,
         rate=float(sampling_rate),
+        # `data` above is written at a µV scale, but NWB defines ElectricalSeries.data as VOLTS,
+        # recovered as `data * conversion`. Leaving conversion at its default of 1.0 therefore
+        # declared this file to hold ~50 VOLT samples, and SpikeInterface faithfully scaled it to
+        # 5e7 µV -- so the whole integration pipeline was running on data 1e6 too large, silently.
+        # Declare the real scale instead.
+        conversion=1e-6,
     )
     nwbfile.add_acquisition(es)
 

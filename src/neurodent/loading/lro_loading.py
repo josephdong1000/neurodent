@@ -27,6 +27,7 @@ except Exception:  # pragma: no cover - optional at import time
 
 from .. import constants
 from neurodent.core.utils import (
+    assert_microvolts,
     extract_mne_unit_info,
     get_temp_directory,
     should_use_cache_unified,
@@ -38,8 +39,44 @@ from neurodent.core.utils import (
 from .recording_metadata import RecordingMetadata
 
 
+def _gain_to_uV(metadata: RecordingMetadata) -> float:
+    """SpikeInterface ``gain_to_uV`` for a binary intermediate.
+
+    The bin holds the source's native units (volts, for MNE), so the gain is the source's uV factor:
+    ``mult_to_uV``. Falls back to 1.0 when the units are unknown, rather than inventing a scale.
+    """
+    mult = getattr(metadata, "mult_to_uV", None)
+    if mult is None or not np.isfinite(mult) or mult <= 0:
+        logging.warning(
+            "No usable mult_to_uV (got %r); assuming the binary intermediate is already in uV.", mult
+        )
+        return 1.0
+    return float(mult)
+
+
 class LroLoadingMixin:
     """Mixin: see module docstring."""
+
+    def _validate_units_uV(self, recording, n_frames: int = 100_000) -> None:
+        """Raise if a freshly-constructed recording is not plausibly in µV.
+
+        Everything downstream takes ``get_traces(return_scaled=True)`` at its word, so a unit slip
+        corrupts filters, features and labels alike while still looking plausible. Samples the head
+        rather than reading the whole recording; a recording that cannot be sampled (a test double)
+        is skipped rather than failed.
+        """
+        try:
+            traces = recording.get_traces(
+                start_frame=0, end_frame=n_frames, return_scaled=True
+            )
+            arr = np.asarray(traces, dtype=float)
+        except ValueError:
+            raise
+        except Exception as e:  # not a readable recording; nothing to validate
+            logging.debug("Skipping unit validation (could not sample traces): %s", e)
+            return
+
+        assert_microvolts(arr, context=f"{type(self).__name__} recording")
 
     @staticmethod
     def _extract_channel_names(recording: "si.BaseRecording") -> list[str]:
@@ -313,6 +350,7 @@ class LroLoadingMixin:
 
         self._n_processed_files = n_processed_files
         self.LongRecording = self._apply_resampling(rec)
+        self._validate_units_uV(self.LongRecording)
 
         dt_end = None
         channel_names = self._extract_channel_names(self.LongRecording)
@@ -538,7 +576,7 @@ class LroLoadingMixin:
                         "sampling_frequency": metadata.f_s,
                         "num_channels": metadata.n_channels,
                         "dtype": "float64",  # We standardize on float64 for cached binary files
-                        "gain_to_uV": 1,
+                        "gain_to_uV": _gain_to_uV(metadata),
                         "offset_to_uV": 0,
                         "time_axis": 0,
                         "is_filtered": False,
@@ -665,7 +703,9 @@ class LroLoadingMixin:
                 params = {
                     "sampling_frequency": raw_info["sfreq"],
                     "num_channels": raw_info["nchan"],
-                    "gain_to_uV": 1,
+                    # raw.get_data() writes MNE's native units (volts) to disk, so the gain must
+                    # convert them, not be 1.
+                    "gain_to_uV": _gain_to_uV(metadata),
                     "offset_to_uV": 0,
                     "time_axis": 0,
                     "is_filtered": False,
@@ -764,6 +804,7 @@ class LroLoadingMixin:
             self.meta = metadata
             self.channel_names = self.meta.channel_names
             self.LongRecording = self._apply_resampling(rec)
+            self._validate_units_uV(self.LongRecording)
         finally:
             # Clean up intermediate files if using temp directory with force_regenerate policy
             # This integrates cleanup with cache policy: files are only kept when caching is intended
