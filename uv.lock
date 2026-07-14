@@ -179,6 +179,25 @@ wheels = [
 ]
 
 [[package]]
+name = "autoreject"
+version = "0.4.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "joblib" },
+    { name = "matplotlib" },
+    { name = "mne", extra = ["hdf5"] },
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "numpy", version = "2.3.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "scikit-learn" },
+    { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "scipy", version = "1.16.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e1/e3/dcbc7421175654de7bfb12e1820578259617932b2dc1022bd8e7247a34a8/autoreject-0.4.4.tar.gz", hash = "sha256:2154a93d7d5a297ad10e8e34b849bb922b7a6d09383ddf8ab396224dfcacf4f3", size = 27411, upload-time = "2026-06-08T22:18:24.245Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/26/7b/c8a64de4574bcfd08d89e02214da3bacd9150859065a6dc73d610e839027/autoreject-0.4.4-py3-none-any.whl", hash = "sha256:234a768b2c9ebd6ea91ef61b50c5b40be9cefb17f9d65887b3d7f228e9f46072", size = 29718, upload-time = "2026-06-08T22:18:23.256Z" },
+]
+
+[[package]]
 name = "babel"
 version = "2.17.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1241,6 +1260,20 @@ wheels = [
 ]
 
 [[package]]
+name = "h5io"
+version = "0.2.5"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "h5py" },
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "numpy", version = "2.3.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/78/17/3789c0c72e64d59ca2433237ec325b19f283b13c61b0ecfc0671afaf609b/h5io-0.2.5.tar.gz", hash = "sha256:265bc9c24508b30575e8a8806b19cd4440643ff26f8b82b51d0280444807eed8", size = 21000, upload-time = "2025-04-14T16:41:12.159Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/81/3c/e7260dcdbdb166a8e85b72929066f33a2892930eb81bd9080682f97c4855/h5io-0.2.5-py3-none-any.whl", hash = "sha256:657f85ecd0d0f307ccd2e13dc7af1c0aa546b1598065229aedab8a6afcacb8ee", size = 17663, upload-time = "2025-04-14T16:41:09.186Z" },
+]
+
+[[package]]
 name = "h5py"
 version = "3.15.1"
 source = { registry = "https://pypi.org/simple" }
@@ -2251,6 +2284,12 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/c0/68/c2419631e0436b8b4d9155d13f1760e700b4e340e0cbfb1ed175c84e231b/mne-1.10.2-py3-none-any.whl", hash = "sha256:9d5ec2b7a4b127114bf8987e5f16577f4fca236e7fc24bf164cfe8ca8dad453e", size = 7416812, upload-time = "2025-10-14T00:16:20.963Z" },
 ]
 
+[package.optional-dependencies]
+hdf5 = [
+    { name = "h5io" },
+    { name = "pymatreader" },
+]
+
 [[package]]
 name = "mne-connectivity"
 version = "0.7.0"
@@ -2502,6 +2541,7 @@ version = "0.4.0"
 source = { editable = "." }
 dependencies = [
     { name = "appnope" },
+    { name = "autoreject" },
     { name = "dask", extra = ["distributed"] },
     { name = "dask-jobqueue" },
     { name = "matplotlib" },
@@ -2581,6 +2621,7 @@ readers = [
 [package.metadata]
 requires-dist = [
     { name = "appnope" },
+    { name = "autoreject", specifier = ">=0.4.4" },
     { name = "bokeh", marker = "extra == 'dev'", specifier = ">=3.9.0" },
     { name = "dask", extras = ["distributed"] },
     { name = "dask-jobqueue" },
@@ -3554,6 +3595,23 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/b0/77/a5b8c569bf593b0140bde72ea885a803b82086995367bf2037de0159d924/pygments-2.19.2.tar.gz", hash = "sha256:636cb2477cec7f8952536970bc533bc43743542f70392ae026374600add5b887", size = 4968631, upload-time = "2025-06-21T13:39:12.283Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c7/21/705964c7812476f378728bdf590ca4b771ec72385c533964653c68e86bdc/pygments-2.19.2-py3-none-any.whl", hash = "sha256:86540386c03d588bb81d44bc3928634ff26449851e99741617ecb9037ee5ec0b", size = 1225217, upload-time = "2025-06-21T13:39:07.939Z" },
+]
+
+[[package]]
+name = "pymatreader"
+version = "1.2.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "h5py" },
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "numpy", version = "2.3.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "scipy", version = "1.16.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "xmltodict" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e5/e2/139030b6fe90bc8935d9d5fe0f14b96ed292b40b234f39e37b4fa9bb5cf1/pymatreader-1.2.3.tar.gz", hash = "sha256:c64cf87b534a6a44389da061dc7af702dec38ef0423c325fc4208d4c81570baa", size = 37111181, upload-time = "2026-05-04T08:34:14.192Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/00/32/a1e51875e6e8570148062e578569c13723e79cef96fe60b2fbbd7c822c8e/pymatreader-1.2.3-py3-none-any.whl", hash = "sha256:c429e586fd32b97811a0d265c775bba3840304464b68d107b24175db6a48a692", size = 10299, upload-time = "2026-05-04T08:34:16.35Z" },
 ]
 
 [[package]]
@@ -5476,6 +5534,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/7b/ce/f5dd613ddd0b3f839c59e6c2fa20c62469bf671bf4c92a12b09dc0972326/xarray-2025.10.1.tar.gz", hash = "sha256:3c2b5ad7389825bd624ada5ff26b01ac54b1aae72e2fe0d724d81d40a2bf5785", size = 3058736, upload-time = "2025-10-07T20:25:56.708Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c3/78/4d6d68555a92cb97b4c192759c4ab585c5cb23490f64d4ddf12c66a3b051/xarray-2025.10.1-py3-none-any.whl", hash = "sha256:a4e699433b87a7fac340951bc36648645eeef72bdd915ff055ac2fd99865a73d", size = 1365202, upload-time = "2025-10-07T20:25:54.964Z" },
+]
+
+[[package]]
+name = "xmltodict"
+version = "1.0.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/19/70/80f3b7c10d2630aa66414bf23d210386700aa390547278c789afa994fd7e/xmltodict-1.0.4.tar.gz", hash = "sha256:6d94c9f834dd9e44514162799d344d815a3a4faec913717a9ecbfa5be1bb8e61", size = 26124, upload-time = "2026-02-22T02:21:22.074Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/38/34/98a2f52245f4d47be93b580dae5f9861ef58977d73a79eb47c58f1ad1f3a/xmltodict-1.0.4-py3-none-any.whl", hash = "sha256:a4a00d300b0e1c59fc2bfccb53d7b2e88c32f200df138a0dd2229f842497026a", size = 13580, upload-time = "2026-02-22T02:21:21.039Z" },
 ]
 
 [[package]]
