@@ -619,10 +619,14 @@ class TestSelfHealingCorruptCache:
         assert fname.exists()  # regenerated
 
     def test_corrupt_bin_cache_regenerates_auto(self, tmp_path):
+        """Corruption that the READER detects (it raises), as opposed to corruption it silently
+        tolerates. The bytes are a whole number of frames (4 channels x float64 = 32 B) so they get
+        past the size check in `_bin_is_intact` and actually reach `read_binary`; a misaligned or
+        empty file is covered separately in tests/test_cache_corruption.py."""
         lro = _make_lro(item="dummy.bin")
         fname = tmp_path / "cached.bin"
         meta_fname = fname.with_suffix(fname.suffix + ".meta.json")
-        fname.write_bytes(b"corrupt")
+        fname.write_bytes(b"x" * 32)
         _write_valid_meta(meta_fname)
 
         raw = _make_mock_mne_raw()

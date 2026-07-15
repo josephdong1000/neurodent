@@ -513,8 +513,7 @@ class FrequencyDomainSpikeAnalysisResult:
                     plt.close(fig[0])
                     logging.info(f"Saved spike-averaged plot: {fig_path}")
             except Exception as e:
-                logging.error(f"Failed to create plot for {event_name}: {e}")
-                raise e
+                raise RuntimeError(f"Failed to create plot for {event_name}") from e
 
         return event_counts
 

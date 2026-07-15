@@ -97,11 +97,8 @@ class AoTimelineMixin:
                 # Recursively process the result (functions can return datetime or list)
                 return self._resolve_timestamp_input(result, folder_path)
             except Exception as e:
-                logging.error(
-                    f"User timestamp function failed on folder '{folder_path}': {e}"
-                )
-                raise Exception(
-                    f"User timestamp function failed on folder '{folder_path}': {e}"
+                raise RuntimeError(
+                    f"User timestamp function failed on folder '{folder_path}'"
                 ) from e
 
         else:

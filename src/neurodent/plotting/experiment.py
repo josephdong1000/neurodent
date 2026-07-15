@@ -132,7 +132,7 @@ class ExperimentPlotter:
                 logging.error(
                     f"Features missing in {war}. Exclude the missing features during ExperimentPlotter init, or recompute WARs with missing features."
                 )
-                raise e
+                raise
 
         self.df_wars: list[pd.DataFrame] = df_wars
         self.concat_df_wars: pd.DataFrame = pd.concat(
