@@ -77,6 +77,28 @@ def test_majority_vote_and_all_unsure_drops_out(tmp_path):
     assert interrater(long)["metric"] == "fleiss"
 
 
+def test_consensus_rules_unanimous_majority_any(tmp_path):
+    """The three ground-truth definitions a detector is reported against (docket: robust to
+    unanimous / majority / any-says-bad)."""
+    def y(cells_per_rater, rule):
+        ps = {}
+        for i, tok in enumerate(cells_per_rater):
+            ps[f"r{i}"] = str(tmp_path / f"r{i}.csv")
+            _write_labels(ps[f"r{i}"], "A", {(0, "ch0"): tok})
+        c = consensus(ingest(ps), rule=rule).set_index(["window", "channel"])
+        return int(c.loc[(0, "ch0"), "y_true"])
+
+    two_bad = ["bad", "bad", "clean"]                    # 2/3 bad
+    assert (y(two_bad, "majority"), y(two_bad, "unanimous"), y(two_bad, "any")) == (1, 0, 1)
+    one_bad = ["bad", "clean", "clean"]                  # 1/3 bad
+    assert (y(one_bad, "majority"), y(one_bad, "unanimous"), y(one_bad, "any")) == (0, 0, 1)
+    all_bad = ["bad", "bad", "bad"]
+    assert (y(all_bad, "majority"), y(all_bad, "unanimous"), y(all_bad, "any")) == (1, 1, 1)
+
+    with pytest.raises(ValueError, match="rule must be"):
+        consensus(ingest({"r0": str(tmp_path / "r0.csv")}), rule="plurality")
+
+
 def test_tie_rejects(tmp_path):
     """Conservative: keeping a suspect window pollutes analysis, dropping a clean one only costs data."""
     ps = {}
