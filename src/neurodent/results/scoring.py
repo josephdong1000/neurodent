@@ -42,48 +42,62 @@ def ingest(rater_manifests, label_map=LABEL_MAP):
         ValueError: on any unrecognised label token, which would otherwise drop that cell from
             consensus and silently shrink the truth set.
     """
-    rows, unknown = [], {}
+    y_of = {t: v[0] for t, v in label_map.items()}
+    cat_of = {t: v[1] for t, v in label_map.items()}
+    parts, unknown = [], {}
     for rater, path in rater_manifests.items():
         df = pd.read_csv(path)
         label_cols = [c for c in df.columns if c.startswith(LABEL_COL_PREFIX)]
         if not label_cols:
             raise ValueError(f"{path}: no {LABEL_COL_PREFIX}<channel> columns found")
-        has_t = "t_start_s" in df.columns
-        for _, r in df.iterrows():
-            t_start = float(r["t_start_s"]) if has_t and not pd.isna(r["t_start_s"]) else np.nan
-            for lc in label_cols:
-                tok = "" if pd.isna(r[lc]) else str(r[lc]).strip().lower()
-                if tok not in label_map:
-                    unknown.setdefault(tok, []).append(rater)
-                    continue
-                y, cat = label_map[tok]
-                rows.append({"recording": r["recording"], "window": int(r["window"]),
-                             "t_start_s": t_start, "channel": lc[len(LABEL_COL_PREFIX):],
-                             "rater": rater, "y": y, "category": cat})
+        long = df.melt(id_vars=["recording", "window", "t_start_s"], value_vars=label_cols,
+                       var_name="channel", value_name="tok")
+        long["channel"] = long["channel"].str[len(LABEL_COL_PREFIX):]
+        long["tok"] = long["tok"].where(long["tok"].notna(), "").astype(str).str.strip().str.lower()
+        long["rater"] = rater
+        for t in long.loc[~long["tok"].isin(y_of), "tok"].unique():   # collect, do not silently drop
+            unknown.setdefault(t, set()).add(rater)
+        parts.append(long)
     if unknown:
         raise ValueError(
             "unrecognised label tokens: "
-            + "; ".join(f"{t!r} x{len(rs)} (raters: {sorted(set(rs))})" for t, rs in unknown.items())
+            + "; ".join(f"{t!r} (raters: {sorted(rs)})" for t, rs in unknown.items())
             + f"\nExpected one of {sorted(k for k in label_map if k)} (or blank for unlabelled)."
         )
-    return pd.DataFrame(rows)
+    out = pd.concat(parts, ignore_index=True)
+    out["window"] = out["window"].astype(int)
+    out["y"] = out["tok"].map(y_of)
+    out["category"] = out["tok"].map(cat_of)
+    return out[["recording", "window", "t_start_s", "channel", "rater", "y", "category"]]
 
 
-def consensus(long_df, tie="reject"):
-    """Majority vote per (recording, window, channel) over raters who gave that cell a verdict.
+def consensus(long_df, rule="majority"):
+    """Combine raters into one ground-truth label per (recording, window, channel).
 
-    All-`unsure` cells drop out rather than being guessed at. Ties default to `reject`, since keeping
-    a suspect window costs more than dropping a clean one.
+    A rater "votes" on a cell only if their label is not unsure/blank (non-NaN ``y``); cells where
+    everyone abstained drop out rather than being guessed at. Report a detector under all three rules
+    to show robustness:
+
+    - ``"majority"``: at least half the voting raters call it bad (ties -> reject).
+    - ``"unanimous"``: every voting rater calls it bad (strict; high-precision truth).
+    - ``"any"``: any voting rater calls it bad (loose; high-recall truth).
     """
-    out = []
-    for key, g in long_df.dropna(subset=["y"]).groupby(["recording", "window", "channel"]):
-        frac = g["y"].mean()
-        yv = (1 if tie == "reject" else 0) if frac == 0.5 else int(frac > 0.5)
-        t_start = float(g["t_start_s"].iloc[0]) if "t_start_s" in g else np.nan
-        out.append({"recording": key[0], "window": int(key[1]), "channel": key[2],
-                    "t_start_s": t_start, "y_true": yv, "n_raters": len(g),
-                    "any_event": bool((g["category"] == "event").any())})
-    return pd.DataFrame(out)
+    d = long_df.dropna(subset=["y"]).copy()
+    d["is_event"] = d["category"] == "event"
+    res = (d.groupby(["recording", "window", "channel"], sort=False)
+             .agg(frac=("y", "mean"), n_raters=("y", "size"),
+                  any_event=("is_event", "any"), t_start_s=("t_start_s", "first"))
+             .reset_index())
+    if rule == "majority":
+        yv = res["frac"] >= 0.5                          # tie -> reject
+    elif rule == "unanimous":
+        yv = res["frac"] == 1.0
+    elif rule == "any":
+        yv = res["frac"] > 0.0
+    else:
+        raise ValueError(f"rule must be 'majority', 'unanimous', or 'any'; got {rule!r}")
+    res["y_true"] = yv.astype(int)
+    return res.drop(columns="frac")
 
 
 def interrater(long_df):

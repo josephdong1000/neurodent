@@ -192,14 +192,9 @@ const shortName = (() => {
   return c => c.slice(p, c.length - s) || c;
 })();
 
-// Where channel `ch` sits, as fractions of image height. Falls back to an even split if a rendered
-// set has no geometry.json.
-function rowBox(recording, ch, i){
-  const g = GEOM[recording];
-  const r = g && g.rows.find(r => r.channel === ch);
-  if (r) return r;
-  const n = CHANNELS.length;
-  return {top: i / n, bottom: (i + 1) / n};
+// Where channel `ch` sits, as fractions of image height (from geometry.json, required at build).
+function rowBox(recording, ch){
+  return GEOM[recording].rows.find(r => r.channel === ch);
 }
 
 const KEY = "eegrate:" + BUNDLE;
@@ -312,8 +307,8 @@ function render(){
   const bands = document.getElementById("bands"), ctrls = document.getElementById("ctrls");
   bands.innerHTML = ""; ctrls.innerHTML = "";
 
-  CHANNELS.forEach((ch, i) => {
-    const box = rowBox(w.recording, ch, i);
+  CHANNELS.forEach((ch) => {
+    const box = rowBox(w.recording, ch);
 
     const band = document.createElement("div");            // highlight over that channel's trace
     band.className = "band";
@@ -430,8 +425,7 @@ document.getElementById("impFile").onchange = ev => {
       const k = v[iRec] + "|" + parseInt(v[iWin], 10);
       const lab = {};
       CHANNELS.forEach(c => { const i = head.indexOf(LABEL_PREFIX + c); if (i >= 0 && v[i]) lab[c] = v[i]; });
-      // seen from the column if present, else inferred from having any label (old CSVs)
-      const wasSeen = iSeen >= 0 ? (v[iSeen] === "1" || v[iSeen] === "true") : (Object.keys(lab).length > 0);
+      const wasSeen = v[iSeen] === "1" || v[iSeen] === "true";
       if (wasSeen) {
         seen[k] = 1;
         state[k] = Object.keys(lab).length ? lab : (() => { const o = {}; CHANNELS.forEach(c => o[c] = DEFAULT); return o; })();
@@ -478,15 +472,14 @@ def build(rendered_dir, out_zip=None, name=None):
     shared_name = lambda img: img.replace(".png", "__shared.png")
     has_shared = all((img_dir / shared_name(w["image"])).exists() for w in windows)
 
-    # Where each channel's trace landed, so the page can put that channel's buttons level with it.
+    # Where each channel's trace landed, so the page puts that channel's buttons level with it.
     gpath = rendered_dir / "geometry.json"
-    geometry = json.loads(gpath.read_text()) if gpath.exists() else {}
-    if not geometry:
-        print("warning: no geometry.json; buttons will use an even split, not true row positions")
-    else:
-        ungeom = sorted({w["recording"] for w in windows} - set(geometry))
-        if ungeom:
-            print(f"warning: no geometry for {len(ungeom)} recording(s), e.g. {ungeom[:3]}")
+    if not gpath.exists():
+        raise SystemExit(f"no geometry.json in {rendered_dir}; re-run render_context.py")
+    geometry = json.loads(gpath.read_text())
+    ungeom = sorted({w["recording"] for w in windows} - set(geometry))
+    if ungeom:
+        raise SystemExit(f"geometry.json is missing recording(s): {ungeom}")
 
     name = name or rendered_dir.name
     html = (HTML
