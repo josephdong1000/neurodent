@@ -11,6 +11,58 @@ except Exception:  # pragma: no cover - optional at import time
     FIFF = None
 
 
+# Bounds on the median absolute amplitude of a recording claiming to be in µV. Real per-channel
+# medians run 17..369 µV. HARD bounds are wide enough that no physiological recording can cross them,
+# but narrow enough to catch a 1e6 volts-as-µV slip. SOFT bounds would catch a 1e3 slip (mV/nV), but a
+# loud recording can legitimately cross them, so those only warn.
+UV_HARD_MIN, UV_HARD_MAX = 1e-2, 1e5
+UV_SOFT_MIN, UV_SOFT_MAX = 1e0, 1e3
+
+
+def assert_microvolts(data, context: str = "recording") -> float | None:
+    """Raise if ``data`` cannot plausibly be in microvolts. Does not rescale.
+
+    Tests the median absolute amplitude over finite, non-zero samples. Zeros are excluded so a dead
+    channel does not drag the median to 0 and trip the floor.
+
+    Args:
+        data: voltages claimed to be in µV.
+        context (str): what is being checked, for the error message.
+
+    Returns:
+        float | None: the median absolute amplitude in µV, or None if data was empty or all-zero.
+
+    Raises:
+        ValueError: if the median lies outside the hard bounds.
+    """
+    arr = np.asarray(data, dtype=float)
+    finite = arr[np.isfinite(arr)]
+    nonzero = np.abs(finite[finite != 0])
+    if nonzero.size == 0:
+        return None
+
+    med = float(np.median(nonzero))
+
+    if not (UV_HARD_MIN <= med <= UV_HARD_MAX):
+        likely = "volts mistaken for µV (a factor of 1e6)" if med < UV_HARD_MIN else (
+            "nanovolts mistaken for µV (a factor of 1e3)"
+        )
+        raise ValueError(
+            f"{context}: data claims to be in µV but its median amplitude is {med:.3g} µV, outside "
+            f"the physiologically possible range [{UV_HARD_MIN:g}, {UV_HARD_MAX:g}] µV. "
+            f"Most likely cause: {likely}. Fix the unit handling at the source; this will not "
+            f"rescale for you."
+        )
+
+    if not (UV_SOFT_MIN <= med <= UV_SOFT_MAX):
+        logging.warning(
+            "%s: median amplitude is %.3g µV, outside the usual [%g, %g] µV. Possible for an unusually "
+            "quiet or loud recording, but also what a 1e3 unit slip (mV/nV) looks like.",
+            context, med, UV_SOFT_MIN, UV_SOFT_MAX,
+        )
+    return med
+
+
 def convert_units_to_multiplier(current_units: str, target_units: str = "µV") -> float:
     """
     Convert between different voltage units and return the multiplication factor.

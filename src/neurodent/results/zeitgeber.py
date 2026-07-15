@@ -88,8 +88,7 @@ def _load_war_for_zeitgeber(war_path_info):
         return df
 
     except Exception as e:
-        logger.error(f"Failed to process {animal_name}: {str(e)}")
-        raise
+        raise RuntimeError(f"Failed to process animal {animal_name}") from e
 
 
 def _compute_daynight(zt_minutes):

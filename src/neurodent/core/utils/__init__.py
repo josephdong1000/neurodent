@@ -1,6 +1,7 @@
 """Shared low-level utility functions."""
 
 from .units import (
+    assert_microvolts,
     convert_units_to_multiplier,
     extract_mne_unit_info,
     log_transform,
@@ -57,6 +58,7 @@ from .misc import (
 )
 
 __all__ = [
+    "assert_microvolts",
     "convert_units_to_multiplier",
     "extract_mne_unit_info",
     "log_transform",

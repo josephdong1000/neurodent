@@ -41,16 +41,13 @@ class LroQualityMixin:
         ):
             logging.info("Using existing LOF scores")
         else:
-            # Compute new LOF scores
-            try:
-                scores = self._compute_lof_scores(
-                    lof_chunk_duration_s=lof_chunk_duration_s,
-                )
-                self.lof_scores = scores
-                logging.info(f"Computed LOF scores for {len(scores)} channels")
-            except Exception as e:
-                logging.error(f"Failed to compute LOF scores for recording: {e}")
-                raise
+            # Compute new LOF scores. _compute_lof_scores contextualises its own failures, so no
+            # wrapping handler here.
+            scores = self._compute_lof_scores(
+                lof_chunk_duration_s=lof_chunk_duration_s,
+            )
+            self.lof_scores = scores
+            logging.info(f"Computed LOF scores for {len(scores)} channels")
 
         # Apply threshold if provided
         if lof_threshold is not None:
@@ -71,6 +68,13 @@ class LroQualityMixin:
         Returns:
             np.ndarray: LOF scores for each channel.
         """
+        # Input validation before the compute-guard, so it propagates as ValueError rather than
+        # being wrapped as a computation failure.
+        if lof_chunk_duration_s <= 0:
+            raise ValueError(
+                f"lof_chunk_duration_s must be positive, got {lof_chunk_duration_s}."
+            )
+
         try:
             rec = self.LongRecording
             n_channels = rec.get_num_channels()
@@ -83,11 +87,6 @@ class LroQualityMixin:
             )
 
             # --- Chunked pairwise-distance computation ---
-            if lof_chunk_duration_s <= 0:
-                raise ValueError(
-                    f"lof_chunk_duration_s must be positive, got {lof_chunk_duration_s}."
-                )
-
             chunk_samples_raw = lof_chunk_duration_s * fs
             chunk_samples = max(1, int(round(chunk_samples_raw)))
             distance_matrix = chunked_channel_distance_matrix(
@@ -118,12 +117,10 @@ class LroQualityMixin:
             return scores
 
         except Exception as e:
-            logging.error(f"Failed to compute LOF scores: {e}")
-            logging.error(
-                f"Recording info: channels={getattr(self, 'channel_names', 'unknown')}, "
-                f"duration={getattr(rec, 'duration', 'unknown') if 'rec' in locals() else 'unknown'}"
-            )
-            raise
+            raise RuntimeError(
+                f"Failed to compute LOF scores "
+                f"(channels={getattr(self, 'channel_names', 'unknown')})"
+            ) from e
 
     def apply_lof_threshold(self, lof_threshold: float):
         """Apply threshold to existing LOF scores to determine bad channels.
