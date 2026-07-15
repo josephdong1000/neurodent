@@ -407,8 +407,9 @@ class AnimalAnalyzer:
                 )
 
             except Exception as e:
-                logging.error(f"Error processing recording {i + 1}/{len(self.ao.long_recordings)}: {e}")
-                raise
+                raise RuntimeError(
+                    f"Failed processing recording {i + 1}/{len(self.ao.long_recordings)}"
+                ) from e
 
         # Store results for later access
         self.frequency_domain_spike_analysis_results = fdsar_list

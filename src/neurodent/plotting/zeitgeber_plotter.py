@@ -155,5 +155,4 @@ class ZeitgeberPlotter:
             logger.info(f"Successfully created zeitgeber plot for {feature}")
             
         except Exception as e:
-            logger.error(f"Failed to create zeitgeber plot for {feature}: {str(e)}")
-            raise
+            raise RuntimeError(f"Failed to create zeitgeber plot for {feature}") from e

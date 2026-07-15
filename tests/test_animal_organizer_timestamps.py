@@ -360,9 +360,9 @@ class TestAnimalOrganizerTimestampHandling:
                 lro_kwargs={"manual_datetimes": failing_function},
             )
 
-        error_str = str(exc_info.value)
-        assert "User timestamp function failed" in error_str
-        assert "Simulated extraction failure" in error_str
+        # The wrapper says WHERE it failed; the original cause is chained via `raise ... from e`.
+        assert "User timestamp function failed" in str(exc_info.value)
+        assert "Simulated extraction failure" in str(exc_info.value.__cause__)
 
     @patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer")
     @patch("glob.glob")
