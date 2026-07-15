@@ -2009,6 +2009,22 @@ wheels = [
 ]
 
 [[package]]
+name = "lpsd"
+version = "1.0.6"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "numpy", version = "2.3.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "pandas" },
+    { name = "scipy", version = "1.15.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "scipy", version = "1.16.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/58/6d/0218bdc4e4cc57be016a7622499ef29858b5234698ae4509b16c3d1f991e/lpsd-1.0.6.tar.gz", hash = "sha256:6e52c5dbda6d08f553f8071fde1a0499a7277d02109ba0de73b55e33f1af700c", size = 115474, upload-time = "2025-11-07T13:07:15.926Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/18/07/32ad5d65ce273bcfa50816666e9d162146d26fc2d9bd01b37d1da3331de9/lpsd-1.0.6-cp311-cp311-manylinux_2_36_x86_64.whl", hash = "sha256:df017049a7a65adac96d1a488ca0c6801da349c803fb9cb5a8d2ceeab58abd97", size = 116079, upload-time = "2025-11-07T13:07:14.592Z" },
+]
+
+[[package]]
 name = "markdown-it-py"
 version = "3.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2549,6 +2565,7 @@ dependencies = [
     { name = "autoreject" },
     { name = "dask", extra = ["distributed"] },
     { name = "dask-jobqueue" },
+    { name = "lpsd" },
     { name = "matplotlib" },
     { name = "mne" },
     { name = "mne-connectivity" },
@@ -2637,6 +2654,7 @@ requires-dist = [
     { name = "ipykernel", marker = "extra == 'dev'", specifier = ">=6.0.0" },
     { name = "jupyterlab", marker = "extra == 'dev'", specifier = ">=4.4.10" },
     { name = "jupytext", marker = "extra == 'dev'", specifier = ">=1.18.1" },
+    { name = "lpsd", specifier = ">=1.0.6" },
     { name = "matplotlib" },
     { name = "memray", marker = "sys_platform == 'linux' and extra == 'dev'", specifier = ">=1.19.2" },
     { name = "mne" },
