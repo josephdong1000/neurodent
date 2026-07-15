@@ -5,6 +5,7 @@ broadly there means any bug in the read path -- a bad unit scale, a metadata sch
 laundered into "the cache was corrupt", which deletes good data and hides the fault permanently: the
 regenerated file hits the same bug next run.
 """
+import gc
 import json
 from datetime import datetime
 from pathlib import Path
@@ -51,6 +52,11 @@ def test_truncated_cache_is_detected_and_regenerated(source_fif, tmp_path):
     cache = tmp_path / "c"
     lro = _load(source_fif, cache)
     n_full = lro.LongRecording.get_num_frames()
+    # SpikeInterface's binary reader keeps a file handle open on the cache. On Windows an open
+    # handle blocks delete/replace, so a live recording would make the self-healing reload fail
+    # with WinError 5/32. Self-heal models a fresh load whose handle is long closed; drop it here.
+    del lro
+    gc.collect()
 
     binf, _ = _cache_files(cache)
     intact = binf.read_bytes()
@@ -64,6 +70,10 @@ def test_empty_cache_is_detected_and_regenerated(source_fif, tmp_path):
     cache = tmp_path / "c"
     lro = _load(source_fif, cache)
     n_full = lro.LongRecording.get_num_frames()
+    # See truncated-cache test: release the open read handle so the Windows self-heal can
+    # delete/replace the cache file instead of failing with WinError 5/32.
+    del lro
+    gc.collect()
 
     binf, _ = _cache_files(cache)
     binf.write_bytes(b"")
