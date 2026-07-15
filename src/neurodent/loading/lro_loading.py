@@ -3,6 +3,7 @@
 Mixin for :class:`~neurodent.loading.long_recording_organizer.LongRecordingOrganizer`.
 """
 
+import json
 import logging
 from pathlib import Path
 from typing import Callable, Literal, Union
@@ -37,6 +38,31 @@ from neurodent.core.utils import (
     safe_unlink,
 )
 from .recording_metadata import RecordingMetadata
+
+# What an unreadable cache actually raises. The readers do not share an exception hierarchy, so this
+# is measured, not assumed:
+#   se.read_edf    -> RuntimeError ("not EDF(+) compliant"), OSError (garbage/empty), FileNotFoundError
+#   se.read_binary -> ValueError ("truncated binary file"), FileNotFoundError; and it silently returns
+#                     a SHORT recording for some truncations -- see _bin_is_intact
+#   from_json      -> JSONDecodeError (malformed), FileNotFoundError, KeyError (stale schema)
+#
+# The point of listing them is not brevity but exclusion: TypeError, AttributeError and NameError --
+# the signatures of a bug in OUR code -- are absent, so they propagate instead of being laundered into
+# "the cache was corrupt, regenerating", which deletes good files and hides the fault forever (the
+# regenerated file hits the same bug on the next run).
+CACHE_DATA_ERRORS = (OSError, ValueError, RuntimeError)
+CACHE_METADATA_ERRORS = (OSError, json.JSONDecodeError, KeyError)
+
+
+def _bin_is_intact(fname: Path, metadata: RecordingMetadata, itemsize: int = 8) -> bool:
+    """Whether a cached binary looks complete.
+
+    ``se.read_binary`` is memmap-backed and does not raise on a truncated or empty file: it simply
+    reports fewer frames. So corruption there cannot be caught by a ``try``, and has to be measured.
+    """
+    n_bytes = fname.stat().st_size
+    frame_bytes = metadata.n_channels * itemsize
+    return n_bytes > 0 and frame_bytes > 0 and n_bytes % frame_bytes == 0
 
 
 def _gain_to_uV(metadata: RecordingMetadata) -> float:
@@ -538,32 +564,29 @@ class LroLoadingMixin:
                     logging.info(
                         f"Loaded cached metadata: {metadata.n_channels} channels, {metadata.f_s} Hz"
                     )
-                except Exception as e:
+                except CACHE_METADATA_ERRORS as e:
                     if cache_policy == "always":
-                        # 'always' policy: raise error if metadata invalid
                         logging.error(
                             f"Cache policy 'always' requires valid metadata, but failed to load {meta_fname}: {e}"
                         )
                         raise
-                    elif cache_policy == "auto":
-                        # 'auto' policy: log and regenerate if metadata invalid
-                        logging.info(
-                            f"Failed to load cached metadata from {meta_fname}: {e}"
-                        )
-                        logging.info(
-                            "Regenerating intermediate files due to invalid metadata"
-                        )
-                        use_cache = False
+                    # Unconditional, not `elif policy == "auto"`: with no else branch, any other
+                    # policy left use_cache True and metadata unbound, for an UnboundLocalError below.
+                    logging.warning(
+                        f"Cached metadata {meta_fname} is unreadable ({type(e).__name__}: {e}); "
+                        f"regenerating the intermediate files"
+                    )
+                    use_cache = False
 
         if use_cache:
-            # Load cached data file. The cache is validated only by existence +
-            # mtime, not integrity, so a truncated/corrupt file (e.g. from a write
-            # interrupted by a killed job) can still reach here. Guard the read and
-            # self-heal under non-'always' policies by deleting the bad cache and
-            # falling through to regeneration.
-            # Built OUTSIDE the try below, which treats any exception as "the cache file is corrupt"
-            # and deletes it. A bad unit scale or a metadata schema change is not a corrupt cache, and
-            # laundering it into one would delete good files and hide the real fault.
+            # The cache is validated only by existence + mtime, not integrity, so a truncated file
+            # (from a write interrupted by a killed job) can reach here. Self-heal by deleting it and
+            # regenerating -- but only for a genuinely unreadable FILE. Anything else raised below is a
+            # bug in our code, and laundering it into "the cache was corrupt" would delete good data
+            # and hide the fault.
+            #
+            # Built outside the try for that reason: a bad unit scale or a metadata schema change is
+            # not a corrupt cache.
             params = None
             if intermediate == "bin":
                 params = {
@@ -576,6 +599,8 @@ class LroLoadingMixin:
                     "is_filtered": False,
                     "channel_ids": metadata.channel_names,
                 }
+            elif intermediate != "edf":
+                raise ValueError(f"Invalid intermediate: {intermediate}")
 
             try:
                 if intermediate == "edf":
@@ -583,11 +608,17 @@ class LroLoadingMixin:
                     rec = se.read_edf(fname)
                     return rec, None, metadata  # No raw object when using cache
 
-                elif intermediate == "bin":
-                    logging.info(f"Reading from cached binary file {fname}")
-                    rec = se.read_binary(fname, **params)
-                    return rec, None, metadata  # No raw object when using cache
-            except Exception as e:
+                # read_binary is memmap-backed and returns a SHORTER recording rather than raising on
+                # a truncated file, so that corruption has to be measured, not caught.
+                if not _bin_is_intact(fname, metadata):
+                    raise OSError(
+                        f"cached binary {fname} is empty or truncated mid-frame "
+                        f"({fname.stat().st_size} bytes, {metadata.n_channels} channels)"
+                    )
+                logging.info(f"Reading from cached binary file {fname}")
+                rec = se.read_binary(fname, **params)
+                return rec, None, metadata  # No raw object when using cache
+            except CACHE_DATA_ERRORS as e:
                 if cache_policy == "always":
                     logging.error(
                         f"Cache policy 'always' requires a readable cached file, "
