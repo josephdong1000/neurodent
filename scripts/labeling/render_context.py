@@ -32,8 +32,6 @@ FRAG_S = 5.0
 CONTEXT_S = 15.0        # flank on each side of the target window (the zoom panels)
 OVERVIEW_S = 60.0       # flank for the compact all-channel overview strip; None to disable
 FMIN, FMAX = 1.0, 200.0
-N_STRETCH = 2           # random contiguous stretches (pilot default)
-STRETCH_N = 8           # windows per stretch
 YLIM_FLOOR_UV = 10.0        # so a dead channel gets a panel, not a zero-height axis
 PSD_DYNAMIC_RANGE_DB = 80   # so a dead channel cannot stretch the shared axis into uselessness
 AMP_FLAG_MULT = 4.0         # flag a channel (red label) when its scale exceeds this x the median channel
@@ -85,13 +83,22 @@ def load_fif(fif, crop_s=7200, notch=60.0):
     return raw
 
 
-def select_stretches(n_windows, n_stretch, stretch_n, seed=0):
-    """Random, detector-independent, non-overlapping contiguous stretches of window indices."""
+def select_random(n_windows, n_select, seed=0):
+    """Random, detector-independent, distinct single windows drawn across the whole recording.
+
+    Adjacent 5 s windows are autocorrelated, so contiguous stretches oversample a few moments;
+    independent draws across the full span give a representative ground-truth sample. A context-flank
+    margin is reserved at both ends so every drawn window keeps its full +/- context on screen.
+    """
     rng = np.random.RandomState(seed)
-    flank = OVERVIEW_S if OVERVIEW_S else CONTEXT_S
-    span = stretch_n + int(np.ceil(flank / FRAG_S))              # room for the widest context flank
-    starts = rng.choice(range(span, n_windows - span), size=n_stretch, replace=False)
-    return [list(range(int(s), int(s) + stretch_n)) for s in sorted(starts)]
+    flank = int(np.ceil(max(CONTEXT_S, OVERVIEW_S or 0) / FRAG_S))   # widest context reaches this far
+    pool = range(flank, n_windows - flank)
+    if len(pool) < n_select:
+        raise ValueError(
+            f"cannot draw {n_select} distinct windows: only {len(pool)} eligible "
+            f"({n_windows} windows, {flank} reserved as flank at each end)"
+        )
+    return sorted(int(w) for w in rng.choice(pool, size=n_select, replace=False))
 
 
 def render_windows(data, fs, ch_names, out, windows, recording, dpi=110, append=False,
@@ -238,6 +245,8 @@ def render_windows(data, fs, ch_names, out, windows, recording, dpi=110, append=
         for ch, a0 in trace_axes:
             a0.set_ylim(-sh, sh)
             a0.set_ylabel(f"{ch}\n+/-{sh:.0f}uV", fontsize=7, rotation=0, ha="right", va="center")
+        fig.suptitle("shaded = the window to label   •   time scales are SHARED across channels (one "
+                     "global amplitude)   •   the PSD axis is shared", fontsize=10)
         fig.savefig(img_dir / name.replace(".png", "__shared.png"), dpi=dpi)
         plt.close(fig)
 
@@ -282,11 +291,13 @@ def lro_scales(lan, n_probe=24):
     return trace_ylim(probe), psd_limits(probe, fs, int(FRAG_S * fs))
 
 
-def render_lro(lrec, out, windows, recording, append=False, dpi=110, notch=True, scales=None):
+def render_lro(lrec, out, windows=None, recording=None, append=False, dpi=110, notch=True,
+               scales=None, n_select=None, seed=0):
     """Render from a LongRecording, i.e. any format the loader reads (rhd/EDF/NWB/bin).
 
     The loader knows each format's import parameters, so this is how a real campaign renders; nothing
-    needs converting to fif.
+    needs converting to fif. Pass explicit `windows` (e.g. a cross-animal draw) or let it draw random
+    windows across this recording.
 
     Units: get_fragment_np gives (n_samples, n_channels) in uV, render_windows wants
     (n_channels, n_samples) in volts. Notch is applied per fragment by LongRecordingAnalyzer, so the
@@ -294,9 +305,13 @@ def render_lro(lrec, out, windows, recording, append=False, dpi=110, notch=True,
     """
     from neurodent.analysis.long_recording_analyzer import LongRecordingAnalyzer
 
+    if windows is None and n_select is None:
+        raise ValueError("pass windows=[...] or n_select=<how many windows to draw at random>")
     lan = LongRecordingAnalyzer(lrec, fragment_len_s=FRAG_S, apply_notch_filter=notch)
     fs = int(lan.f_s)
     win = int(FRAG_S * fs)
+    if windows is None:
+        windows = select_random(lan.n_fragments, n_select, seed=seed)
     ylim, psd_lim = scales if scales is not None else lro_scales(lan)
 
     # The context flanks reach beyond the target window, so one fragment is not enough.
@@ -314,19 +329,23 @@ def render_lro(lrec, out, windows, recording, append=False, dpi=110, notch=True,
     return rows
 
 
-def render_fif(fif, out, windows=None, n_stretch=N_STRETCH, stretch_n=STRETCH_N,
+def render_fif(fif, out, windows=None, n_select=None,
                crop_s=7200, seed=0, append=False, recording=None):
-    """Render one .fif. Pass explicit `windows` (your own selection) or let it draw random stretches."""
+    """Render one .fif. Pass explicit `windows` (your own selection) or `n_select` to draw at random."""
+    if windows is None and n_select is None:
+        raise ValueError("pass windows=[...] or n_select=<how many windows to draw at random>")
     raw = load_fif(fif, crop_s=crop_s)
     fs = int(raw.info["sfreq"])
     data = raw.get_data()
     if windows is None:
         n_win = int(data.shape[1] // (FRAG_S * fs))
-        windows = [w for st in select_stretches(n_win, n_stretch, stretch_n, seed=seed) for w in st]
+        windows = select_random(n_win, n_select, seed=seed)
     rec = recording or Path(fif).stem
     return render_windows(data, fs, raw.ch_names, out, windows, rec, append=append)
 
 
 if __name__ == "__main__":
-    rows = render_fif("443-wt-443-wt-jul-18-2012-raw-1.fif", "results/labeling_pilot")
+    # 16 is just a quick local pilot count; a real round sizes n_select by how many labelled cells
+    # the prevalence/agreement estimate needs, so it is chosen per campaign, not defaulted in the API.
+    rows = render_fif("443-wt-443-wt-jul-18-2012-raw-1.fif", "results/labeling_pilot", n_select=16)
     print(f"rendered {len(rows)} window images to results/labeling_pilot/images/ ({MANIFEST})")
