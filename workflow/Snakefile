@@ -18,7 +18,7 @@ import sys
 import glob
 
 # Import workflow utilities
-from neurodent.workflow.utils import deep_merge_dict, expand_animals_config, format_config_value, increment_memory, load_samples_config, resolve_samples_config
+from neurodent.workflow.utils import deep_merge_dict, merge_dataset_config, expand_animals_config, format_config_value, increment_memory, load_samples_config, resolve_samples_config
 
 
 # Load configuration
@@ -38,14 +38,9 @@ active_dataset = os.environ.get("NEURODENT_DATASET", config.get("active_dataset"
 dataset_config_file = f"config/datasets/{active_dataset}.yaml"
 
 if os.path.exists(dataset_config_file):
-    # Load dataset-specific config from file
-    import yaml
-    with open(dataset_config_file, 'r') as f:
-        dataset_config = yaml.safe_load(f) or {}
-
-    # Deep merge dataset config into main config
-    # This allows datasets to override ANY configuration, not just specific keys
-    config = deep_merge_dict(config, dataset_config)
+    # Deep-merge the dataset config into the main config. Shared with standalone
+    # tools via merge_dataset_config so they never drift on how datasets apply.
+    config, dataset_config = merge_dataset_config(config, active_dataset)
 
     print(f"[ok] Using dataset: {active_dataset}")
     print(f"  Config file: {dataset_config_file}")
