@@ -345,6 +345,30 @@ def test_export_import_export_is_idempotent(tmp_path):
     assert k2 == k1, "export -> import -> export is not a fixed point (labels/seen drifted)"
 
 
+# --------------------------------------------------------------------------- window selection
+
+def test_select_random_spans_recording_no_dupes_margins_respected():
+    """Ground truth is only representative if windows are drawn across the whole recording, not from a
+    couple of autocorrelated stretches. The margin keeps every window's context on screen."""
+    n_win = 1440                                             # 7200 s / 5 s
+    flank = int(np.ceil(max(R.CONTEXT_S, R.OVERVIEW_S or 0) / R.FRAG_S))
+    sel = R.select_random(n_win, 50, seed=0)
+
+    assert len(sel) == 50 == len(set(sel))                  # distinct, right count
+    assert sel == sorted(sel)
+    assert min(sel) >= flank and max(sel) <= n_win - flank - 1   # context never runs off either end
+    assert min(sel) < n_win * 0.25 and max(sel) > n_win * 0.75   # actually spans, not one clump
+    assert sel == R.select_random(n_win, 50, seed=0)        # deterministic
+    assert sel != R.select_random(n_win, 50, seed=1)        # and the seed matters
+
+
+def test_select_random_refuses_an_impossible_draw():
+    """Asking for more distinct windows than the margin leaves must raise, not silently return fewer:
+    a short bundle is a biased bundle."""
+    with pytest.raises(ValueError, match="cannot draw"):
+        R.select_random(30, 50)
+
+
 # --------------------------------------------------------------------------- render via the loader
 
 def test_render_lro_uses_absolute_windows_and_correct_units(tmp_path):
