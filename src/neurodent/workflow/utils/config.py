@@ -183,6 +183,118 @@ def deep_merge_dict(base: dict, override: dict) -> dict:
     return result
 
 
+def merge_dataset_config(config: dict, dataset: str, datasets_dir="config/datasets"):
+    """Deep-merge a dataset's config file into a base pipeline config.
+
+    Resolves ``{datasets_dir}/{dataset}.yaml``, parses it, and deep-merges it into
+    ``config`` (dataset values win). Shared by the Snakemake workflow and
+    standalone tools so the two never drift on how a dataset config is applied.
+
+    Args:
+        config (dict): Base pipeline config (already loaded, e.g. from config.yaml
+            + config.local.yaml).
+        dataset (str): Dataset name (the ``config/datasets/{name}.yaml`` stem).
+        datasets_dir (str | Path): Directory holding dataset config files.
+
+    Returns:
+        tuple[dict, dict]: ``(merged_config, dataset_config)`` where
+        ``dataset_config`` is the raw parsed dataset file (useful for logging the
+        overrides that were applied).
+
+    Raises:
+        FileNotFoundError: If the dataset config file does not exist; the message
+            lists the available datasets.
+    """
+    import yaml
+
+    datasets_dir = Path(datasets_dir)
+    dataset_config_file = datasets_dir / f"{dataset}.yaml"
+    if not dataset_config_file.exists():
+        available = sorted(p.stem for p in datasets_dir.glob("*.yaml")) if datasets_dir.is_dir() else []
+        raise FileNotFoundError(
+            f"Dataset config file not found: {dataset_config_file}\n"
+            f"Available datasets: {', '.join(available) if available else 'None'}"
+        )
+    with open(dataset_config_file, "r") as f:
+        dataset_config = yaml.safe_load(f) or {}
+    return deep_merge_dict(config, dataset_config), dataset_config
+
+
+def load_dataset_config(
+    dataset: str,
+    config_path="config/config.yaml",
+    local_path="config/config.local.yaml",
+    datasets_dir="config/datasets",
+) -> dict:
+    """Assemble the merged pipeline config for a dataset, outside Snakemake.
+
+    Reproduces the Snakefile's config assembly for standalone scripts: load the
+    base ``config.yaml``, deep-merge ``config.local.yaml`` when it parses to a
+    dict, then deep-merge ``config/datasets/{dataset}.yaml`` (via
+    :func:`merge_dataset_config`). Uses the same :func:`deep_merge_dict` as the
+    workflow so a standalone tool and the pipeline resolve identical config.
+
+    Note: unlike the Snakefile, this does not run the ``config.schema.yaml``
+    validation (which requires Snakemake); callers that need strict validation
+    should validate separately.
+
+    Args:
+        dataset (str): Dataset name (``config/datasets/{name}.yaml`` stem).
+        config_path (str | Path): Base config file.
+        local_path (str | Path): Optional local-override file; ignored if missing
+            or not a mapping.
+        datasets_dir (str | Path): Directory holding dataset config files.
+
+    Returns:
+        dict: The merged pipeline config.
+
+    Raises:
+        FileNotFoundError: If ``config_path`` or the dataset config is missing.
+    """
+    import yaml
+
+    config_path = Path(config_path)
+    if not config_path.exists():
+        raise FileNotFoundError(f"Base config not found: {config_path}")
+    with open(config_path, "r") as f:
+        config = yaml.safe_load(f) or {}
+
+    local_path = Path(local_path)
+    if local_path.exists():
+        with open(local_path, "r") as f:
+            local_config = yaml.safe_load(f)
+        if isinstance(local_config, dict):
+            config = deep_merge_dict(config, local_config)
+
+    merged, _ = merge_dataset_config(config, dataset, datasets_dir=datasets_dir)
+    return merged
+
+
+def enumerate_cohort(samples_config: dict) -> list:
+    """Return the ordered, de-duplicated list of animal ids in a samples config.
+
+    Mirrors the Snakefile's cohort enumeration: read ids from the unified
+    ``animals`` list. Shared with standalone tools (e.g. the labeling cohort
+    bundler) so they iterate the same animals as the pipeline.
+
+    Args:
+        samples_config (dict): Samples config (expanded or not) containing an
+            ``animals`` list of ``{"id": ...}`` dicts.
+
+    Returns:
+        list[str]: Animal ids, order-preserving, duplicates removed.
+
+    Raises:
+        KeyError: If the samples config has no ``animals`` list.
+    """
+    if "animals" not in samples_config:
+        raise KeyError("Samples config must contain an 'animals' list")
+    ids = {}
+    for entry in samples_config["animals"]:
+        ids.setdefault(entry["id"], None)
+    return list(ids)
+
+
 def expand_animals_config(samples_config: dict) -> dict:
     """Expand the unified ``animals`` list into pipeline keys.
 

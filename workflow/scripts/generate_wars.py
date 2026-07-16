@@ -17,11 +17,10 @@ from pathlib import Path
 
 from dask.distributed import Client, LocalCluster
 
-from neurodent import constants, core
-from neurodent.loading import AnimalOrganizer
+from neurodent import core
 from neurodent.analysis import AnimalAnalyzer
 from neurodent.workflow import setup_snakemake_logging, apply_samples_config
-from neurodent.workflow.utils import apply_path_overrides, resolve_animal_pattern, get_discovery_animal_filter
+from neurodent.workflow.utils import load_animal_recordings
 
 
 def load_samples_and_config():
@@ -43,9 +42,6 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
         animal_folders: List of (folder_path, source_animal_id, session_key) tuples.
         channel_subset: Global channel subset for this animal if it is part of a joint session.
     """
-
-    # Set up paths and parameters
-    data_root = Path(samples_config.get("data_root", samples_config.get("data_parent_folder", "")))
 
     # Set temp directory
     core.utils.set_temp_directory(config["temp_directory"])
@@ -70,124 +66,9 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
             
             logger.info(f"Processing {animal_id} across {len(animal_folders)} sessions")
             
-            all_lros = []
-            analysis_config = config["analysis"]["war_generation"]
-
-            # Resolve genotype from metadata (Metadata-First)
-            if animal_id not in constants.ANIMAL_METADATA:
-                 raise KeyError(
-                     f"Animal '{animal_id}' (from {animal_folders[0][0]}) not found in ANIMAL_METADATA. "
-                     "All animals in the pipeline must be defined in the metadata for reliable processing."
-                 )
-            
-            meta = constants.ANIMAL_METADATA[animal_id]
-            genotype = meta.get("genotype", "Unknown")
-            sex = meta.get("sex", "Unknown")
-            logger.info(f"Resolved genotype '{genotype}' and sex '{sex}' for {animal_id} from ANIMAL_METADATA")
-
-            # Load data from all source folders
-            for folder_info in animal_folders:
-                # Unpack tuple from Snakefile
-                folder_path, source_animal_id, session_key = folder_info
-
-                logger.info(f"Loading session: {folder_path} (ID in metadata: {source_animal_id})")
-
-                # Check if this animal has channels defined (indicates joint session)
-                is_joint = source_animal_id in samples_config.get("_animal_channel_subsets", {})
-
-                # Apply session-specific overrides from dataset config
-                session_analysis_config = analysis_config.copy()
-
-                if "overrides" in config and "by_session" in config["overrides"]:
-                    session_overrides = config["overrides"]["by_session"].get(session_key, {})
-                    if session_overrides:
-                        logger.info(f"  -> Applying session overrides: {list(session_overrides.keys())}")
-                        # Apply path-based overrides to the full config
-                        overridden_config = apply_path_overrides(config, session_overrides)
-                        session_analysis_config = overridden_config["analysis"]["war_generation"]
-
-                # Prepare kwargs for this specific session
-                session_lro_kwargs = dict(session_analysis_config.get("lro_kwargs", {}))
-
-                # Propagate datetimes_are_start from war_generation config into lro_kwargs
-                # (it lives at the war_generation level, not inside lro_kwargs)
-                if "datetimes_are_start" in session_analysis_config:
-                    session_lro_kwargs.setdefault("datetimes_are_start", session_analysis_config["datetimes_are_start"])
-
-                # Apply per-animal overrides from unified animals config
-                animal_overrides = samples_config.get("_animal_overrides", {}).get(animal_id, {})
-                if animal_overrides:
-                    logger.info(f"  -> Applying per-animal overrides: {list(animal_overrides.keys())}")
-                    if "lro_kwargs" in animal_overrides:
-                        session_lro_kwargs.update(animal_overrides["lro_kwargs"])
-
-                # Resolve manual_datetimes for this session. The per-animal value may be a
-                # scalar (one start time), a dict (keyed per session/file), or a list (per-recording
-                # order, possibly nested); AnimalOrganizer distributes it across discovered sessions.
-                if "manual_datetimes" in samples_config:
-                    all_manual_dts = samples_config["manual_datetimes"]
-                    if animal_id in all_manual_dts:
-                        session_lro_kwargs["manual_datetimes"] = all_manual_dts[animal_id]
-                        logger.info(f"  -> Using manual datetimes for {animal_id}")
-
-                # Build absolute discovery pattern from the config's relative pattern
-                # Per-animal pattern override takes precedence over session/default config
-                effective_pattern = animal_overrides.get("pattern", session_analysis_config.get("pattern"))
-                if effective_pattern is None:
-                    raise KeyError(
-                        f"Missing 'pattern' key in war_generation config for session '{session_key}'. "
-                        "Each dataset config must specify 'pattern' (e.g. '{{animal}}/{{session}}/{{index}}.nwb' "
-                        "or '{{index}}.rhd')."
-                    )
-
-                logger.info(f"  -> File pattern: {effective_pattern}")
-                discovery_pattern = resolve_animal_pattern(
-                    effective_pattern,
-                    source_animal_id,
-                    data_root=str(data_root),
-                )
-                logger.info(f"  -> Discovery pattern: {discovery_pattern}")
-
-                # Determine the animal filter value for discovery
-                animal_groups = samples_config.get("_animal_groups", {})
-                discovery_animal_filter = get_discovery_animal_filter(
-                    source_animal_id, is_joint, animal_groups
-                )
-                if is_joint and source_animal_id in animal_groups:
-                    logger.info(f"  -> Using group '{discovery_animal_filter}' for {{animal}} placeholder in discovery")
-                elif is_joint:
-                    logger.info(f"  -> Using animal ID '{discovery_animal_filter}' for discovery (joint session without group)")
-
-
-                # Create AO for this session using pattern-based discovery
-                session_ao = AnimalOrganizer(
-                    discovery_pattern,
-                    animal_id=discovery_animal_filter,
-                    skip_sessions=session_analysis_config.get("skip_sessions", session_analysis_config.get("skip_days", [])),
-                    lro_kwargs=session_lro_kwargs,
-                )
-
-
-                if is_joint and channel_subset is not None:
-                     logger.info(f"  -> Joint session detected. Filtering to channels: {channel_subset}")
-                     # Split to only the channels assigned to this animal
-                     # source_animal_id is the key in the splits dict
-                     splits = session_ao.split(groups={source_animal_id: channel_subset})
-                     session_ao = splits[source_animal_id]
-
-                # Collect LROs
-                all_lros.extend(session_ao.long_recordings)
-            
-            # Consolidate into single AnimalOrganizer
-            logger.info(f"Consolidating {len(all_lros)} recordings into single AnimalOrganizer for {animal_id}")
-            if not all_lros:
-                raise ValueError(f"No recordings found for {animal_id}")
-
-            ao = AnimalOrganizer.from_lros(
-                all_lros,
-                animal_id=animal_id,
-                genotype=genotype,
-                sex=sex,
+            ao = load_animal_recordings(
+                samples_config, config, animal_folders, animal_id,
+                channel_subset=channel_subset, logger=logger,
             )
             az = AnimalAnalyzer(ao)
 
@@ -203,7 +84,7 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
 
             # Generate WAR using Dask
             logger.info(f"Computing windowed analysis for {animal_key}")
-            cwa_config = analysis_config.get("compute_windowed_analysis", {})
+            cwa_config = config["analysis"]["war_generation"].get("compute_windowed_analysis", {})
             cwa_features = cwa_config.get("features", ["all"])
             cwa_multiprocess_mode = cwa_config.get("multiprocess_mode", "dask")
             cwa_chunk_duration_s = cwa_config.get("chunk_duration_s", 3600)
@@ -238,7 +119,7 @@ def generate_war_for_animal(samples_config, config, animal_folders, animal_id, c
             # Release AnimalOrganizer to free memmap-backed recording references.
             # war is self-contained (DataFrame + metadata), fdsar_list SAs still
             # hold per-channel recording refs needed for .fif export.
-            del ao, all_lros
+            del ao
 
         return war, fdsar_list
     except Exception as e:
