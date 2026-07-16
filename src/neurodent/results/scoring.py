@@ -71,6 +71,49 @@ def ingest(rater_manifests, label_map=LABEL_MAP):
     return out[["recording", "window", "t_start_s", "channel", "rater", "y", "category"]]
 
 
+def unblind(long_df, keymap):
+    """Replace blinded neutral channel slots with their true channel names.
+
+    A labeling bundle can be *blinded* — channels shuffled per recording and shown
+    as neutral slots (``Ch A``, ``Ch B``, ...) so anatomy cannot bias the rater
+    (see ``scripts/labeling/render_context.py`` ``blind_channels``). The rater CSVs,
+    and therefore :func:`ingest`'s output, then key on the slot rather than the true
+    channel. ``unblind`` restores the true channel per ``(recording, slot)`` using
+    the experimenter-side keymap, so downstream :func:`consensus` / scoring key on
+    real channels and cross-recording aggregation lines up. Call it between
+    :func:`ingest` and :func:`consensus`; skip it for unblinded bundles.
+
+    Args:
+        long_df (pd.DataFrame): Output of :func:`ingest`; its ``channel`` column
+            holds the neutral slot.
+        keymap (pd.DataFrame): De-scramble key with columns ``recording``, ``slot``,
+            and ``channel`` (the true channel name). This is the ``keymap.csv`` the
+            cohort bundler writes OUTSIDE the rater bundle.
+
+    Returns:
+        pd.DataFrame: ``long_df`` with ``channel`` replaced by the true channel and
+        the neutral slot preserved in a new ``slot`` column.
+
+    Raises:
+        ValueError: If a labelled ``(recording, slot)`` has no keymap entry — an
+            unmapped slot would silently drop from the truth set.
+    """
+    km = keymap[["recording", "slot", "channel"]].rename(columns={"channel": "true_channel"})
+    merged = long_df.merge(
+        km, how="left", left_on=["recording", "channel"], right_on=["recording", "slot"]
+    )
+    missing = merged["true_channel"].isna()
+    if missing.any():
+        bad = list(merged.loc[missing, ["recording", "channel"]].drop_duplicates().itertuples(index=False))
+        raise ValueError(
+            "unblind: no keymap entry for cells: "
+            + "; ".join(f"{r.recording}/{r.channel}" for r in bad[:5])
+            + ". The keymap must cover every (recording, slot) that was labelled."
+        )
+    merged["channel"] = merged["true_channel"]
+    return merged.drop(columns="true_channel")
+
+
 def consensus(long_df, rule="majority"):
     """Combine raters into one ground-truth label per (recording, window, channel).
 
