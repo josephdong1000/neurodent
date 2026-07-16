@@ -15,8 +15,10 @@ manifest row cover all channels.
 Call render_windows once per recording with append=True to accumulate many animals into one bundle.
 """
 import csv
+import hashlib
 import json
 import re
+import string
 from pathlib import Path
 
 import numpy as np
@@ -291,8 +293,55 @@ def lro_scales(lan, n_probe=24):
     return trace_ylim(probe), psd_limits(probe, fs, int(FRAG_S * fs))
 
 
+def neutral_labels(n):
+    """Neutral channel display names (``Ch A``, ``Ch B``, ...), which blind anatomy.
+
+    Raters must not be able to read a channel's anatomy off its label (a montage
+    aid becomes a bias), so trace rows are named by opaque slot. Falls back to
+    two-letter slots (``Ch AA``) past 26 channels.
+    """
+    out = []
+    for i in range(n):
+        s, j = "", i
+        while True:
+            s = string.ascii_uppercase[j % 26] + s
+            j = j // 26 - 1
+            if j < 0:
+                break
+        out.append(f"Ch {s}")
+    return out
+
+
+def blind_channels(channel_names, seed_key):
+    """Deterministic per-recording channel blinding.
+
+    Draws a permutation of the channel axis from a seed derived from ``seed_key``
+    (use ``f"{blind_seed}:{recording}"`` so every recording scrambles differently
+    but reproducibly), and names the permuted slots with :func:`neutral_labels`.
+
+    Args:
+        channel_names (list[str]): True channel names, in recording order.
+        seed_key: Any value; hashed to seed the permutation deterministically.
+
+    Returns:
+        tuple[np.ndarray, list[str], list[dict]]: ``(perm, display_names, keymap)``
+        where ``perm`` reorders the channel axis (row ``i`` shows
+        ``channel_names[perm[i]]``), ``display_names`` are the neutral labels for
+        the permuted order, and ``keymap`` is the de-scramble record — one
+        ``{"slot": <neutral>, "channel": <true name>}`` per slot. Keep the keymap
+        OUT of the rater bundle; it is how labels are put back in order on return.
+    """
+    n = len(channel_names)
+    digest = hashlib.sha256(str(seed_key).encode()).digest()
+    rng = np.random.RandomState(int.from_bytes(digest[:4], "big"))
+    perm = rng.permutation(n)
+    names = neutral_labels(n)
+    keymap = [{"slot": names[i], "channel": channel_names[int(perm[i])]} for i in range(n)]
+    return perm, names, keymap
+
+
 def render_lro(lrec, out, windows=None, recording=None, append=False, dpi=110, notch=True,
-               scales=None, n_select=None, seed=0):
+               scales=None, n_select=None, seed=0, channel_perm=None, display_names=None):
     """Render from a LongRecording, i.e. any format the loader reads (rhd/EDF/NWB/bin).
 
     The loader knows each format's import parameters, so this is how a real campaign renders; nothing
@@ -302,6 +351,13 @@ def render_lro(lrec, out, windows=None, recording=None, append=False, dpi=110, n
     Units: get_fragment_np gives (n_samples, n_channels) in uV, render_windows wants
     (n_channels, n_samples) in volts. Notch is applied per fragment by LongRecordingAnalyzer, so the
     rater and the detector see the same signal as the WAR features.
+
+    Channel blinding: pass ``channel_perm`` (and usually ``display_names``), e.g. from
+    :func:`blind_channels`, to shuffle the channel rows and label them with neutral slots so anatomy
+    cannot bias the rater. ``channel_perm`` reorders both the traces and their per-channel y-scales;
+    ``display_names`` (length = n_channels) replaces the channel names written into the
+    images/manifest/geometry. The caller keeps the matching keymap to unblind the returned labels.
+    Both default to ``None`` (unblinded, true channel names).
     """
     from neurodent.analysis.long_recording_analyzer import LongRecordingAnalyzer
 
@@ -314,6 +370,14 @@ def render_lro(lrec, out, windows=None, recording=None, append=False, dpi=110, n
         windows = select_random(lan.n_fragments, n_select, seed=seed)
     ylim, psd_lim = scales if scales is not None else lro_scales(lan)
 
+    # Channel blinding: reorder traces + y-scales and relabel rows with neutral slots.
+    ch_names = list(lan.channel_names)
+    perm = None
+    if channel_perm is not None:
+        perm = np.asarray(channel_perm)
+        ylim = np.asarray(ylim)[perm]
+        ch_names = list(display_names) if display_names is not None else [ch_names[int(perm[i])] for i in range(len(perm))]
+
     # The context flanks reach beyond the target window, so one fragment is not enough.
     flank_frags = int(np.ceil(max(CONTEXT_S, OVERVIEW_S or 0) / FRAG_S))
 
@@ -323,7 +387,9 @@ def render_lro(lrec, out, windows=None, recording=None, append=False, dpi=110, n
         f1 = min(lan.n_fragments, run[-1] + 1 + flank_frags)
         span = np.concatenate([lan.get_fragment_np(int(i)) for i in range(f0, f1)], axis=0)
         data = span.T * 1e-6                                    # (C, N) µV -> volts
-        rows += render_windows(data, fs, list(lan.channel_names), out, run, recording,
+        if perm is not None:
+            data = data[perm]
+        rows += render_windows(data, fs, ch_names, out, run, recording,
                                dpi=dpi, append=append or bool(rows), sample0=f0 * win,
                                ylim=ylim, psd_lim=psd_lim)
     return rows
