@@ -9,24 +9,10 @@ Tests the fix that allows _compute_global_timeline to handle both:
 import pytest
 from pathlib import Path
 from datetime import datetime
-from unittest.mock import Mock, patch, MagicMock
-import tempfile
-import os
-
-from neurodent.loading import AnimalOrganizer
 
 
 class TestComputeGlobalTimelineFileDetection:
     """Test that _compute_global_timeline correctly detects files vs folders."""
-
-    @pytest.fixture
-    def mock_ao(self):
-        """Create a minimal AnimalOrganizer mock for testing."""
-        ao = Mock(spec=AnimalOrganizer)
-        ao.animal_id = "test_animal"
-        ao.animal_param = ["test_animal"]
-        ao.read_mode = "concat"
-        return ao
 
     def test_detects_file_path_and_adjusts_input_type(self, tmp_path):
         """When path is a file, input_type should be changed to 'file'."""
