@@ -8,7 +8,6 @@ analysis:
     pattern: "{data_root}/*{animal}*standardEEG {session}/{index}.rhd"
     lro_kwargs:
       extract_func: "read_intan"  # spikeinterface.extractors.read_intan
-      input_type: "files"  # Multiple RHD files in folder get concatenated
       mode: "si"
       stream_id: "0"  # Select amplifier channels (not auxiliary)
 
