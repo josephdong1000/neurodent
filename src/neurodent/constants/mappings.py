@@ -9,8 +9,6 @@ channels — the canonical order (:data:`CHANNEL_ABBREVS`), the DataFrame sort o
 There is no separate region/hemisphere model; left/right is part of the channel identity.
 """
 
-from datetime import datetime
-
 DEFAULT_GENOTYPE_MAP = {}
 """Module default for :data:`GENOTYPE_MAP` (empty = passthrough). ``apply_samples_config``
 resets the live map to this when a dataset omits a ``GENOTYPE_MAP`` block, so applying one
@@ -80,17 +78,6 @@ DF_SORT_ORDER = {
 }
 """Defines categorical sort orders for DataFrame columns. The ``channel`` entry is
 **derived** from :data:`CHANNEL_ABBREVS`."""
-
-DATEPARSER_PATTERNS_TO_REMOVE = [
-    r"[A-Z]+\d+",
-    r"\([0-9]+\)",
-    r"(?:\b\d\s){1,}(\d\b)?",
-    r"\s\d$",
-]
-"""Regex patterns to strip from filenames before date parsing."""
-
-DEFAULT_DAY = datetime(2000, 1, 1)
-"""Fallback date when parsing fails."""
 
 FEATURE_LABELS = {
     # Linear features

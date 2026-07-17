@@ -13,11 +13,11 @@ from neurodent.loading import long_recording_organizer as core
 from neurodent import constants
 
 
-class TestTimestampFixes:
-    """Test DEFAULT_DAY fixes in SI/MNE modes."""
+class TestManualTimestamps:
+    """Test manual timestamp handling in SI/MNE modes."""
 
-    def test_si_mode_with_manual_timestamps_no_default_day(self):
-        """Test SI mode doesn't use DEFAULT_DAY when manual timestamps provided."""
+    def test_si_mode_with_manual_timestamps(self):
+        """SI mode uses manual timestamps when provided."""
         with patch("glob.glob", return_value=["/fake/file.edf"]):
             with patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer._validate_timestamps_for_mode"):
                 organizer = core.LongRecordingOrganizer("/fake/path", mode=None)
@@ -33,16 +33,14 @@ class TestTimestampFixes:
                 mock_rec.get_duration.return_value = 10.0
                 mock_extract_func.return_value = mock_rec
 
-                # Use the correct SI method, not rowbins conversion
                 organizer.convert_file_with_si_to_recording(
                     extract_func=mock_extract_func, input_type="file", file_pattern="*.edf"
                 )
 
-                # Should succeed without DEFAULT_DAY errors
                 assert organizer.LongRecording is not None
 
-    def test_mne_mode_with_manual_timestamps_no_default_day(self):
-        """Test MNE mode doesn't use DEFAULT_DAY when manual timestamps provided."""
+    def test_mne_mode_with_manual_timestamps(self):
+        """MNE mode uses manual timestamps when provided."""
         import tempfile
         from pathlib import Path
 
@@ -87,7 +85,6 @@ class TestTimestampFixes:
                             extract_func=mock_extract_func, input_type="file", file_pattern="*.edf"
                         )
 
-                    # Should succeed without DEFAULT_DAY errors
                     assert organizer.LongRecording is not None
 
 

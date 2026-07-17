@@ -281,7 +281,7 @@ Each operation has a single canonical verb, matched to an established precedent.
 | Canonicalize one identifier value | `resolve_` | E.g. `resolve_channel()` (raw name -> canonical abbrev). |
 | Rename labels on an object, in place | `rename_` | MNE `rename_channels`. E.g. `rename_mne_channels`. |
 | Format / dtype conversion | `convert_` | Strictly format/type changes, never identifier mapping (that is `resolve_`). |
-| String -> identifier extraction | `parse_` | E.g. `parse_str_to_animal`. Not a disk-I/O verb. |
+| String -> identifier extraction | `parse_` | Not a disk-I/O verb. |
 | Spelling | US `normalize` | NumPy/SciPy/sklearn spelling. Never `normalise`. |
 
 `get_` / `compute_` / `extract_` are already well-partitioned across the codebase; the

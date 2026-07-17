@@ -6,15 +6,13 @@ from neurodent.loading import AnimalOrganizer
 
 class TestTimelineSortingCrash:
     @patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer")
-    @patch("neurodent.core.utils.parse_str_to_day")
-    def test_sort_crash_fix_via_parsing(self, mock_parse, mock_lro_cls):
+    def test_manual_datetimes_passed_to_lro(self, mock_lro_cls):
         """
-        Verify that _compute_global_timeline extracts date from filename
-        and passes it to LRO, preventing the crash.
+        Verify that _compute_global_timeline forwards manual timestamps to
+        LRO, preventing the crash.
         """
         ao = MagicMock(spec=AnimalOrganizer)
         ao.animal_id = "M1"
-        ao.day_sep = None
         # Bind the real valid methods we want to test
         ao._compute_global_timeline = AnimalOrganizer._compute_global_timeline.__get__(ao, AnimalOrganizer)
         ao._sort_lros_by_median_time = AnimalOrganizer._sort_lros_by_median_time.__get__(ao, AnimalOrganizer)
@@ -29,9 +27,6 @@ class TestTimelineSortingCrash:
         animalday_to_folders = {
             "Day1": ["/data/filename_20250101.rhd", "/data/filename_20250102.rhd"]
         }
-        
-        # Mock date parsing to return success
-        mock_parse.return_value = pd.to_datetime("2025-01-01")
 
         # Mock LRO to succeed (simulating valid init because manual_datetimes provided)
         mock_instance = MagicMock()

@@ -53,8 +53,6 @@ from .mappings import (
     CHANNEL_ABBREVS,
     CHANNEL_ABBREV_BY_RAW,
     DF_SORT_ORDER,
-    DATEPARSER_PATTERNS_TO_REMOVE,
-    DEFAULT_DAY,
     FEATURE_LABELS,
 )
 
@@ -162,8 +160,6 @@ __all__ = [
     "CHANNEL_ABBREV_BY_RAW",
     "set_channel_map",
     "DF_SORT_ORDER",
-    "DATEPARSER_PATTERNS_TO_REMOVE",
-    "DEFAULT_DAY",
     "FEATURE_LABELS",
     # Feature Typing
     "FeatureType",

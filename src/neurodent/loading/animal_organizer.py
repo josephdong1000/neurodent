@@ -92,9 +92,6 @@ class AnimalOrganizer(
     ) -> None:
         self.pattern = pattern
         self.animal_id = animal_id
-        self.animal_file_match_pattern = [animal_id] if animal_id else []
-        self.day_sep = None
-        self.read_mode = "pattern"  # Legacy compat; new pattern-based discovery
         self._normalize_session = normalize_session
 
         # Warn if pattern(s) don't contain placeholders — metadata extraction won't work

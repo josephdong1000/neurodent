@@ -404,7 +404,7 @@ class AoBuildMixin:
         )
 
         # Step 7: Initialize default attributes for factory-created instances
-        cls._init_factory_defaults(ao, animal_id, merged_lros)
+        cls._init_factory_defaults(ao)
 
         logging.info(
             f"Created AnimalOrganizer from {len(lros)} input LROs "
@@ -480,27 +480,13 @@ class AoBuildMixin:
         return first_names
 
     @staticmethod
-    def _init_factory_defaults(
-        ao: "AnimalOrganizer", animal_id: str, lros: list[_lro.LongRecordingOrganizer]
-    ) -> None:
+    def _init_factory_defaults(ao: "AnimalOrganizer") -> None:
         """
-        Initialize attribute values for factory-created instances.
-
-        Derives values from the provided LROs where possible instead of
-        leaving attributes empty.
+        Initialize internal caches for factory-created instances.
 
         Args:
             ao: The AnimalOrganizer instance to initialize.
-            animal_id: The animal identifier.
-            lros: The LROs to derive metadata from.
         """
-        # Standard attributes
-        ao.animal_file_match_pattern = [animal_id]
-        ao.day_sep = None
-        ao.read_mode = "base"
-
-        # Internal cache - not derivable, but private
-        ao._animalday_dicts = []
         ao._animalday_folder_groups = {}
         ao._processed_timestamps = None
 
