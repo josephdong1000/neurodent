@@ -1,7 +1,7 @@
 import os
 import re
 import glob
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Union, Dict, List, Tuple, Optional
 import warnings
 
@@ -127,6 +127,15 @@ class FileDiscoverer:
         # Normalize path separators to forward slashes for consistent regex matching internally
         # We'll also normalize the actual paths when matching.
         pattern = pattern.replace("\\", "/")
+
+        # Normalize redundant separators the way the filesystem does, so the glob and the regex built
+        # below agree. glob (and POSIX) treat "a//b" as "a/b", but the regex would otherwise demand two
+        # literal slashes and match zero real (single-slash) paths -- so e.g. a data_root written with a
+        # trailing slash silently found nothing. PurePosixPath is the stdlib's canonical POSIX
+        # normalizer: it collapses redundant "/" and "./", PRESERVES a leading "//" (which POSIX leaves
+        # implementation-defined), and -- unlike os.path.normpath -- does NOT resolve ".." (unsafe across
+        # symlinks). Placeholders ({animal}) and glob wildcards (*, **) pass through untouched.
+        pattern = str(PurePosixPath(pattern))
 
         placeholders = re.findall(r"\{([^}]+)\}", pattern)
         glob_pattern = re.sub(r"\{[^}]+\}", "*", pattern)
