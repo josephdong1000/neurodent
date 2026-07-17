@@ -34,6 +34,22 @@ def test_single_file_discovery(tmp_path):
     assert all(r["animal"] == "A10" for r in results_filtered)
 
 
+def test_redundant_slashes_in_pattern_still_match(tmp_path):
+    """A base dir with a trailing slash yields 'base//...'; glob collapses '//' but the discovery
+    regex must too, or it silently matches zero files. Regression for the ap3b2_rhd 0-files bug."""
+    (tmp_path / "PortA-A10-PortB-B20").mkdir(parents=True)
+    (tmp_path / "PortA-A10-PortB-B20" / "rec_1.rhd").touch()
+    (tmp_path / "PortA-A10-PortB-B20" / "rec_2.rhd").touch()
+
+    base = str(tmp_path).rstrip("/") + "/"            # base WITH a trailing slash (idiomatic)
+    pattern = f"{base}/*{{animal}}*/{{index}}.rhd"    # -> 'base//*{animal}*/...' (double slash)
+
+    fd = FileDiscoverer(pattern)
+    results = fd.discover(animal="A10")
+    assert len(results) == 2, f"double slash in pattern matched {len(results)} files, expected 2"
+    assert all(r["index"].startswith("rec_") for r in results)
+
+
 def test_multiple_file_discovery(tmp_path):
     (tmp_path / "A10" / "sess1").mkdir(parents=True)
     (tmp_path / "A10" / "sess1" / "data.bin").touch()

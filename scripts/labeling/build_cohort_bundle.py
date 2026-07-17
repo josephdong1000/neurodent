@@ -23,6 +23,7 @@ Run from the REPO ROOT (dataset ``extract_func`` paths resolve relative to the C
 """
 import argparse
 import csv
+import fnmatch
 import hashlib
 import json
 import logging
@@ -105,14 +106,27 @@ def _discovery_for(samples_config, config, animal_id):
 
 def dryrun_animal(samples_config, config, animal_id):
     """Discovery-only report for one animal; never raises (captures errors into ``note``)."""
-    rec = {"animal": animal_id, "n_files": 0, "n_sessions": 0, "is_joint": False,
-           "channels_ok": None, "note": ""}
+    rec = {"animal": animal_id, "n_files": 0, "n_sessions": 0, "n_datetimes": None,
+           "is_joint": False, "channels_ok": None, "dt_ok": True, "note": ""}
+    # A per-animal manual_datetime must line up with the discovered sessions, or loading raises: a LIST
+    # by count, a session-keyed DICT by exact keys.
+    dts = samples_config.get("manual_datetimes", {}).get(animal_id)
+    rec["n_datetimes"] = len(dts) if isinstance(dts, (list, dict)) else None
     try:
         pattern, filt, is_joint = _discovery_for(samples_config, config, animal_id)
         rec["is_joint"] = is_joint
         items = FileDiscoverer(pattern).discover(animal=filt)
+        # Honor skip_sessions (dataset-level + per-animal) the same way load_animal_recordings does,
+        # so counts match what a real load sees.
+        skip = list(config["analysis"]["war_generation"].get(
+            "skip_sessions", config["analysis"]["war_generation"].get("skip_days", [])))
+        skip += list(samples_config.get("_animal_overrides", {}).get(animal_id, {}).get("skip_sessions", []))
+        if skip:
+            items = [it for it in items
+                     if not any(fnmatch.fnmatch(it.metadata.get("session", "unknown"), p) for p in skip)]
         rec["n_files"] = len(items)
-        rec["n_sessions"] = len({it.metadata.get("session", "unknown") for it in items})
+        sessions = {it.metadata.get("session", "unknown") for it in items}
+        rec["n_sessions"] = len(sessions)
         if is_joint:  # only joint animals carry an explicit channel subset we can check without loading
             subset = samples_config["_animal_channel_subsets"][animal_id]
             try:
@@ -122,18 +136,29 @@ def dryrun_animal(samples_config, config, animal_id):
             except ValueError as e:
                 rec["channels_ok"] = False
                 rec["note"] = f"channel does not resolve: {e}"
+        if isinstance(dts, list) and rec["n_sessions"] and len(dts) != rec["n_sessions"]:
+            rec["dt_ok"] = False
+            rec["note"] = (f"sessions({rec['n_sessions']}) != datetimes({len(dts)}) "
+                           f"[loading will raise]; " + rec["note"]).strip("; ")
+        elif isinstance(dts, dict) and rec["n_sessions"]:
+            missing, extra = sorted(sessions - set(dts)), sorted(set(dts) - sessions)
+            if missing or extra:
+                rec["dt_ok"] = False
+                rec["note"] = (f"datetime-dict keys != sessions (missing={missing[:2]}, extra={extra[:2]}) "
+                               f"[loading will raise]; " + rec["note"]).strip("; ")
     except Exception as e:  # discovery / pattern errors -> report, do not crash the whole cohort
         rec["note"] = f"{type(e).__name__}: {e}"
     return rec
 
 
 def _print_dryrun(reports):
-    hdr = f"{'animal':<16} {'files':>6} {'sess':>5} {'joint':>6} {'chans':>6}  note"
+    hdr = f"{'animal':<16} {'files':>6} {'sess':>5} {'dates':>6} {'joint':>6} {'chans':>6}  note"
     print(hdr)
     print("-" * len(hdr))
     for r in reports:
         chans = "-" if r["channels_ok"] is None else ("ok" if r["channels_ok"] else "BAD")
-        print(f"{r['animal']:<16} {r['n_files']:>6} {r['n_sessions']:>5} "
+        dates = "-" if r["n_datetimes"] is None else str(r["n_datetimes"])
+        print(f"{r['animal']:<16} {r['n_files']:>6} {r['n_sessions']:>5} {dates:>6} "
               f"{'yes' if r['is_joint'] else 'no':>6} {chans:>6}  {r['note']}")
 
 
@@ -204,10 +229,10 @@ def build_cohort(dataset, out_root, *, animal=None, n_per_animal=40, seed=0, bli
     if dry_run:
         reports = [dryrun_animal(samples_config, config, a) for a in animals]
         _print_dryrun(reports)
-        bad = [r for r in reports if r["n_files"] == 0 or r["channels_ok"] is False]
+        bad = [r for r in reports if r["n_files"] == 0 or r["channels_ok"] is False or not r["dt_ok"]]
         if bad:
-            print(f"\n{len(bad)} animal(s) look broken (0 files or unresolved channels): "
-                  f"{[r['animal'] for r in bad]}")
+            print(f"\n{len(bad)} animal(s) look broken (0 files, unresolved channels, or "
+                  f"session/datetime mismatch): {[r['animal'] for r in bad]}")
         return 1 if bad else 0
 
     out_root = Path(out_root)

@@ -411,6 +411,22 @@ class TestExpandAnimalsConfig:
         assert result["_animal_overrides"]["X1"]["lro_kwargs"] == {"mode": "si"}
         assert "A10" not in result["_animal_overrides"]
 
+    def test_builds_animal_overrides_skip_sessions(self):
+        """Per-animal skip_sessions is threaded into _animal_overrides and kept out of ANIMAL_METADATA."""
+        cfg = {
+            "data_root": "/data",
+            "animals": [
+                {"id": "X1", "genotype": "WT", "sex": "M", "skip_sessions": ["11-25-25*"]},
+                {"id": "A10", "genotype": "WT", "sex": "M"},
+            ],
+        }
+        result = expand_animals_config(cfg)
+        assert result["_animal_overrides"]["X1"]["skip_sessions"] == ["11-25-25*"]
+        assert "A10" not in result["_animal_overrides"]
+        # skip_sessions is an override key, so it must not leak into the animal's metadata entry
+        meta = {m["id"]: m for m in result["ANIMAL_METADATA"]}
+        assert "skip_sessions" not in meta["X1"]
+
     def test_no_animal_overrides_when_none_specified(self):
         """_animal_overrides is absent when no animals have overrides."""
         cfg = {
@@ -781,6 +797,34 @@ class TestGetDiscoveryAnimalFilter:
         animal_groups = {"OtherAnimal": "SomeGroup"}
         result = get_discovery_animal_filter("A10", is_joint=True, animal_groups=animal_groups)
         assert result == "A10"
+
+
+class TestResolveAnimalPattern:
+    """Tests for ``resolve_animal_pattern`` data_root substitution (normalization is FileDiscoverer's job)."""
+
+    def test_substitutes_data_root(self):
+        from neurodent.workflow.utils import resolve_animal_pattern
+
+        out = resolve_animal_pattern("{data_root}/*{animal}*/{index}.rhd", "A10", "/data/root")
+        assert out == "/data/root/*{animal}*/{index}.rhd"
+
+    def test_trailing_slash_passes_through_for_filediscoverer_to_normalize(self):
+        """resolve substitutes {data_root} verbatim; a trailing slash yields '//', which is collapsed
+        centrally by FileDiscoverer (PurePosixPath), not here. See tests/test_file_discoverer.py."""
+        from neurodent.workflow.utils import resolve_animal_pattern
+
+        out = resolve_animal_pattern("{data_root}/*{animal}*/{index}.rhd", "A10", "/data/root/")
+        assert out == "/data/root//*{animal}*/{index}.rhd"
+
+    def test_substitutes_list_and_dict_patterns(self):
+        from neurodent.workflow.utils import resolve_animal_pattern
+
+        lst = resolve_animal_pattern(
+            ["{data_root}/{animal}/{index}.bin", "{data_root}/{animal}/{index}.csv"], "A10", "/root"
+        )
+        assert lst == ["/root/{animal}/{index}.bin", "/root/{animal}/{index}.csv"]
+        dct = resolve_animal_pattern({"A10": "{data_root}/{animal}/{index}.rhd"}, "A10", "/root")
+        assert dct == "/root/{animal}/{index}.rhd"
 
 
 class TestBuildSexMarkerScale:

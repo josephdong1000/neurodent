@@ -127,6 +127,11 @@ def load_animal_recordings(
             if "lro_kwargs" in animal_overrides:
                 session_lro_kwargs.update(animal_overrides["lro_kwargs"])
 
+        # Sessions to skip: dataset-level plus any per-animal override (e.g. a setup/test stub that
+        # a single animal has but isn't a real recording day). Both are fnmatch patterns on {session}.
+        skip_sessions = list(session_analysis_config.get("skip_sessions", session_analysis_config.get("skip_days", [])))
+        skip_sessions += list(animal_overrides.get("skip_sessions", []))
+
         # Resolve manual_datetimes for this session. The per-animal value may be a
         # scalar (one start time), a dict (keyed per session/file), or a list (per-recording
         # order, possibly nested); AnimalOrganizer distributes it across discovered sessions.
@@ -168,7 +173,7 @@ def load_animal_recordings(
         session_ao = AnimalOrganizer(
             discovery_pattern,
             animal_id=discovery_animal_filter,
-            skip_sessions=session_analysis_config.get("skip_sessions", session_analysis_config.get("skip_days", [])),
+            skip_sessions=skip_sessions,
             lro_kwargs=session_lro_kwargs,
         )
 

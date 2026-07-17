@@ -4,7 +4,8 @@
 
 analysis:
   war_generation:
-    pattern: "{data_root}/*{animal}*/{index}.rhd"  # RHD files in folders matching animal pattern
+    # {session} = the per-day folder (the "<date>_<stamp>" after "standardEEG "); {index} = time-chunk file.
+    pattern: "{data_root}/*{animal}*standardEEG {session}/{index}.rhd"
     lro_kwargs:
       extract_func: "read_intan"  # spikeinterface.extractors.read_intan
       input_type: "files"  # Multiple RHD files in folder get concatenated
@@ -13,7 +14,7 @@ analysis:
 
 # --- Data inventory (channels + per-animal entries) ---
 samples_data:
-  data_root: /mnt/isilon/marsh_single_unit/PythonEEG Data/AP3B2/Intan recordings/
+  data_root: /mnt/isilon/marsh_single_unit/PythonEEG Data/AP3B2/Intan recordings
   channels:
     LMot:
     - A-015
@@ -182,6 +183,8 @@ samples_data:
   - id: AP3B2homo-240-M
     genotype: HOMO
     sex: Male
+    skip_sessions:            # ~3-min setup/test stub (16 MB vs 145 MB) the afternoon before recording began
+    - "11-25-25*"
     channel_subset:
     - A-009
     - A-010
@@ -200,6 +203,8 @@ samples_data:
   - id: AP3B2wt-241-M
     genotype: WT
     sex: Male
+    skip_sessions:            # ~3-min setup/test stub (16 MB vs 145 MB) the afternoon before recording began
+    - "11-25-25*"
     channel_subset:
     - B-009
     - B-010
@@ -310,12 +315,12 @@ samples_data:
     - A-021
     - A-022
     manual_datetime:
-    - '2025-12-11 11:32:48'
-    - '2025-12-11 14:46:48'
-    - '2025-12-12 12:34:40'
-    - '2025-12-13 14:08:42'
-    - '2025-12-15 12:22:03'
-    - '2025-12-16 14:34:20'
+      "12-11-25_251211_113248": '2025-12-11 11:32:48'    # session-keyed: dict insertion order = timeline
+      "12-11-25_2_251211_144648": '2025-12-11 14:46:48'  # (folder-name sort would misplace this _2_ re-record)
+      "12-12-25_251212_123440": '2025-12-12 12:34:40'
+      "12-13-25_251213_140842": '2025-12-13 14:08:42'
+      "12-15-25_251215_122203": '2025-12-15 12:22:03'
+      "12-16-25_251216_143420": '2025-12-16 14:34:20'
   - id: AP3B2homo-203-F
     genotype: HOMO
     sex: Female
@@ -331,12 +336,12 @@ samples_data:
     - B-021
     - B-022
     manual_datetime:
-    - '2025-12-11 11:32:48'
-    - '2025-12-11 14:46:48'
-    - '2025-12-12 12:34:40'
-    - '2025-12-13 14:08:42'
-    - '2025-12-15 12:22:03'
-    - '2025-12-16 14:34:20'
+      "12-11-25_251211_113248": '2025-12-11 11:32:48'    # session-keyed: dict insertion order = timeline
+      "12-11-25_2_251211_144648": '2025-12-11 14:46:48'  # (folder-name sort would misplace this _2_ re-record)
+      "12-12-25_251212_123440": '2025-12-12 12:34:40'
+      "12-13-25_251213_140842": '2025-12-13 14:08:42'
+      "12-15-25_251215_122203": '2025-12-15 12:22:03'
+      "12-16-25_251216_143420": '2025-12-16 14:34:20'
   - id: AP3B2het-237-F
     genotype: HET
     sex: Female
@@ -352,12 +357,12 @@ samples_data:
     - C-021
     - C-022
     manual_datetime:
-    - '2025-12-11 11:32:48'
-    - '2025-12-11 14:46:48'
-    - '2025-12-12 12:34:40'
-    - '2025-12-13 14:08:42'
-    - '2025-12-15 12:22:03'
-    - '2025-12-16 14:34:20'
+      "12-11-25_251211_113248": '2025-12-11 11:32:48'    # session-keyed: dict insertion order = timeline
+      "12-11-25_2_251211_144648": '2025-12-11 14:46:48'  # (folder-name sort would misplace this _2_ re-record)
+      "12-12-25_251212_123440": '2025-12-12 12:34:40'
+      "12-13-25_251213_140842": '2025-12-13 14:08:42'
+      "12-15-25_251215_122203": '2025-12-15 12:22:03'
+      "12-16-25_251216_143420": '2025-12-16 14:34:20'
   - id: AP3B2het-239-F
     genotype: HET
     sex: Female
@@ -373,11 +378,11 @@ samples_data:
     - D-021
     - D-022
     manual_datetime:
-    - '2025-12-11 11:32:48'
-    - '2025-12-11 14:46:48'
-    - '2025-12-12 12:34:40'
-    - '2025-12-13 14:08:42'
-    - '2025-12-15 12:22:03'
+      "12-11-25_251211_113248": '2025-12-11 11:32:48'    # session-keyed: dict insertion order = timeline
+      "12-11-25_2_251211_144648": '2025-12-11 14:46:48'  # (folder-name sort would misplace this _2_ re-record)
+      "12-12-25_251212_123440": '2025-12-12 12:34:40'
+      "12-13-25_251213_140842": '2025-12-13 14:08:42'
+      "12-15-25_251215_122203": '2025-12-15 12:22:03'
   - id: AP3B2het-280-F
     genotype: HET
     sex: Female
