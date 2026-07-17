@@ -115,11 +115,9 @@ class TestDeepMergeDict:
             },
             "analysis": {
                 "war_generation": {
-                    "day_sep": None,
-                    "skip_days": ["bad"],
+                    "skip_sessions": ["*bad*"],
                     "lro_kwargs": {
                         "multiprocess_mode": "dask",
-                        "overwrite_rowbins": False,
                     },
                 }
             },
@@ -151,8 +149,7 @@ class TestDeepMergeDict:
             result["samples"]["quality_filter"]["exclude_unknown_genotypes"] is True
         )  # preserved
         assert result["analysis"]["war_generation"]["pattern"] == "{index}.rhd"  # from override
-        assert result["analysis"]["war_generation"]["day_sep"] is None  # preserved
-        assert result["analysis"]["war_generation"]["skip_days"] == ["bad"]  # preserved
+        assert result["analysis"]["war_generation"]["skip_sessions"] == ["*bad*"]  # preserved
         assert (
             result["analysis"]["war_generation"]["lro_kwargs"]["multiprocess_mode"]
             == "dask"
