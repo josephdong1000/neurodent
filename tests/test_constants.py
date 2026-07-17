@@ -3,7 +3,6 @@ Unit tests for neurodent.constants module.
 """
 
 import pytest
-from datetime import datetime
 import numpy as np
 
 from neurodent import constants
@@ -45,20 +44,6 @@ class TestConstants:
             assert key in constants.DF_SORT_ORDER
             assert isinstance(constants.DF_SORT_ORDER[key], list)
         assert constants.DF_SORT_ORDER["channel"] == ["average", "all", *constants.CHANNEL_ABBREVS]
-
-    def test_dateparser_patterns(self):
-        """Test DATEPARSER_PATTERNS_TO_REMOVE."""
-        assert isinstance(constants.DATEPARSER_PATTERNS_TO_REMOVE, list)
-        assert len(constants.DATEPARSER_PATTERNS_TO_REMOVE) > 0
-        for pattern in constants.DATEPARSER_PATTERNS_TO_REMOVE:
-            assert isinstance(pattern, str)
-
-    def test_default_day(self):
-        """Test DEFAULT_DAY constant."""
-        assert isinstance(constants.DEFAULT_DAY, datetime)
-        assert constants.DEFAULT_DAY.year == 2000
-        assert constants.DEFAULT_DAY.month == 1
-        assert constants.DEFAULT_DAY.day == 1
 
     def test_global_constants(self):
         """Test global constants."""

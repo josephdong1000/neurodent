@@ -8,15 +8,12 @@ from .units import (
 )
 from .time import (
     is_day,
-    parse_str_to_day,
-    _clean_str_for_date,
     TimestampMapper,
     validate_timestamps,
 )
 from .naming import (
     resolve_channel,
     resolve_channels,
-    parse_str_to_animal,
     normalize_value_from_aliases,
     rename_mne_channels,
     slugify,
@@ -63,12 +60,10 @@ __all__ = [
     "extract_mne_unit_info",
     "log_transform",
     "is_day",
-    "parse_str_to_day",
     "TimestampMapper",
     "validate_timestamps",
     "resolve_channel",
     "resolve_channels",
-    "parse_str_to_animal",
     "normalize_value_from_aliases",
     "rename_mne_channels",
     "slugify",

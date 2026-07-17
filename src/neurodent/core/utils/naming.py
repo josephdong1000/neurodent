@@ -75,67 +75,6 @@ def resolve_channels(names: list[str]) -> list[str]:
     return result
 
 
-def parse_str_to_animal(string: str, animal_param: tuple[int, str] | str | list[str] = (0, None)) -> str:
-    """
-    DEPRECATED: Use FileDiscoverer with {animal} placeholder in pattern instead.
-
-    Parses the filename of a binfolder to get the animal id.
-
-    Args:
-        string (str): String to parse.
-        animal_param: Parameter specifying how to parse the animal ID:
-            tuple[int, str]: (index, separator) for simple split and index. Not recommended for inconsistent naming conventions.
-            str: regex pattern to extract ID. Most general use case. If multiple matches are found, returns the first match.
-            list[str]: list of possible animal IDs to match against. Returns first match in list order, case-sensitive, ignoring empty strings.
-
-    Returns:
-        str: Animal id.
-
-    Examples:
-        # Tuple format: (index, separator)
-        >>> parse_str_to_animal("WT_A10_2023-01-01_data.bin", (1, "_"))
-        'A10'
-        >>> parse_str_to_animal("A10_WT_recording.bin", (0, "_"))
-        'A10'
-
-        # Regex pattern format
-        >>> parse_str_to_animal("WT_A10_2023-01-01_data.bin", r"A\\\\d+")
-        'A10'
-        >>> parse_str_to_animal("subject_123_data.bin", r"\\\\d+")
-        '123'
-
-        # List format: possible IDs to match
-        >>> parse_str_to_animal("WT_A10_2023-01-01_data.bin", ["A10", "A11", "A12"])
-        'A10'
-        >>> parse_str_to_animal("WT_A10_data.bin", ["B15", "C20"])  # No match
-        ValueError: No matching ID found in WT_A10_data.bin from possible IDs: ['B15', 'C20']
-    """
-    warnings.warn(
-        "parse_str_to_animal is deprecated. Use FileDiscoverer with {animal} placeholder in pattern instead.",
-        DeprecationWarning,
-        stacklevel=2
-    )
-    if isinstance(animal_param, tuple):
-        index, sep = animal_param
-        animid = string.split(sep)
-        return animid[index]
-    elif isinstance(animal_param, str):
-        pattern = animal_param
-        match = re.search(pattern, string)
-        if match:
-            return match.group()
-        raise ValueError(f"No match found for pattern {pattern} in string {string}")
-    elif isinstance(animal_param, list):
-        possible_ids = animal_param
-        for id in possible_ids:
-            # Skip empty or whitespace-only strings
-            if id and id.strip() and id in string:
-                return id
-        raise ValueError(f"No matching ID found in {string} from possible IDs: {possible_ids}")
-    else:
-        raise ValueError(f"Invalid animal_param type: {type(animal_param)}")
-
-
 def normalize_value_from_aliases(
     value: str,
     alias_dict: dict[str, list[str]],

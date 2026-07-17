@@ -169,18 +169,6 @@ class TestCoreModuleIntegration:
             log_data = utils.log_transform(test_data)
         assert log_data.shape == test_data.shape
 
-        # Test data processing utilities
-        # Create test metadata
-        metadata = {"animal": "A10", "genotype": "WT", "day": "Jan-01-2023"}
-
-        # Test metadata parsing utilities
-        animal = utils.parse_str_to_animal("WT_A10_Jan01_2023", animal_param=(1, "_"))
-        assert animal == "A10"
-
-        # Test day parsing
-        day = utils.parse_str_to_day("WT_A10_Jan01_2023")
-        assert day.year == 2023
-
         # Test channel name parsing (exact lookup against the canonical labels)
         ch_name = utils.resolve_channel("LAud")
         assert ch_name == "LAud"
@@ -211,10 +199,6 @@ class TestErrorHandlingIntegration:
         # Test invalid unit conversion
         with pytest.raises(AssertionError):
             utils.convert_units_to_multiplier("invalid", "µV")
-
-        # Test invalid animal parameter
-        with pytest.raises(ValueError):
-            utils.parse_str_to_animal("test", animal_param=123)
 
 
 class TestPerformanceIntegration:
