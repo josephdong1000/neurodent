@@ -18,6 +18,7 @@ issue body; ``--recipe PATH`` reads a local recipe instead of fetching.
 """
 import argparse
 import re
+import ssl
 import sys
 import urllib.error
 import urllib.request
@@ -27,6 +28,14 @@ try:
     import tomllib  # Python 3.11+
 except ModuleNotFoundError:
     import tomli as tomllib  # Python 3.10 (tomli is in the dev extra)
+
+try:
+    # Verify TLS against certifi's CA bundle; Python on macOS often ships without
+    # a usable system trust store (SSL: CERTIFICATE_VERIFY_FAILED otherwise).
+    import certifi
+    _SSL_CONTEXT = ssl.create_default_context(cafile=certifi.where())
+except ModuleNotFoundError:
+    _SSL_CONTEXT = None
 
 RECIPE_URL = "https://raw.githubusercontent.com/conda-forge/neurodent-feedstock/main/recipe/meta.yaml"
 
@@ -97,7 +106,7 @@ def parse_recipe_run(text):
 
 
 def fetch_recipe(url):
-    with urllib.request.urlopen(url) as resp:
+    with urllib.request.urlopen(url, context=_SSL_CONTEXT) as resp:
         return resp.read().decode()
 
 
