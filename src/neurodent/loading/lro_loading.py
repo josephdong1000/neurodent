@@ -101,31 +101,41 @@ class LroLoadingMixin:
         assert_microvolts(np.asarray(traces, dtype=float), context=f"{type(self).__name__} recording")
 
     @staticmethod
-    def _extract_channel_names(recording: "si.BaseRecording") -> list[str]:
-        """Extract human-readable channel names from a SpikeInterface recording.
+    def _extract_channel_identities(
+        recording: "si.BaseRecording",
+    ) -> tuple[list[str], list[str]]:
+        """Return ``(channel_ids, channel_names)`` for a SpikeInterface recording.
 
-        Prefers the ``channel_name`` property (set by extractors like
-        ``read_edf``) over raw channel IDs, which are often opaque
-        integer indices.
+        These are two *distinct* things the pipeline must not conflate:
+
+        - ``channel_ids`` — the recording's stable identifiers (``get_channel_ids()``),
+          which is what a dataset's ``channels`` map / ``channel_subset`` are keyed on
+          (e.g. Intan hardware ports ``D-009``). This is the identity.
+        - ``channel_names`` — human display labels: the ``channel_name`` property when a
+          reader sets one (e.g. ``read_edf`` labels, or an experimenter's anatomical tag
+          typed in an Intan GUI, which may be **non-unique**), otherwise the IDs.
+
+        Config-driven matching/resolution must prefer the IDs and only defer to the names
+        (see ``resolve_channels(names, ids=...)`` and ``split``); the names are for display.
 
         Args:
             recording: A SpikeInterface recording.
 
         Returns:
-            List of channel name strings.
+            ``(channel_ids, channel_names)`` — two same-length lists of strings.
         """
-        try:
-            prop_keys = recording.get_property_keys()
-            if "channel_name" in prop_keys:
-                names = recording.get_property("channel_name")
-                return [str(n) for n in names]
-        except (AttributeError, TypeError):
-            pass
-
         raw_ids = recording.get_channel_ids()
         if len(raw_ids) > 0 and isinstance(raw_ids[0], (int, np.integer)):
             logging.warning("Channel IDs are integers. Converting to strings.")
-        return [str(ch) for ch in raw_ids]
+        channel_ids = [str(ch) for ch in raw_ids]
+
+        channel_names = channel_ids
+        try:
+            if "channel_name" in recording.get_property_keys():
+                channel_names = [str(n) for n in recording.get_property("channel_name")]
+        except (AttributeError, TypeError):
+            pass
+        return channel_ids, channel_names
 
     def _init_from_recording(self, recording: "si.BaseRecording"):
         """Initialize LRO from an existing SpikeInterface recording object (in-memory)."""
@@ -136,8 +146,8 @@ class LroLoadingMixin:
 
         self._is_in_memory = True
 
-        # Extract metadata from recording
-        self.channel_names = self._extract_channel_names(recording)
+        # Extract metadata from recording (identity vs display kept distinct)
+        self.channel_ids, self.channel_names = self._extract_channel_identities(recording)
 
         self.meta = RecordingMetadata(
             None,
@@ -145,6 +155,7 @@ class LroLoadingMixin:
             f_s=recording.get_sampling_frequency(),
             dt_end=None,  # In-memory recordings don't have timestamps until persisted
             channel_names=self.channel_names,
+            channel_ids=self.channel_ids,
         )
 
         # Compute file duration from recording
@@ -376,7 +387,7 @@ class LroLoadingMixin:
         self._validate_units_uV(self.LongRecording)
 
         dt_end = None
-        channel_names = self._extract_channel_names(self.LongRecording)
+        channel_ids, channel_names = self._extract_channel_identities(self.LongRecording)
 
         self.meta = RecordingMetadata(
             None,
@@ -384,10 +395,12 @@ class LroLoadingMixin:
             f_s=self.LongRecording.get_sampling_frequency(),
             dt_end=dt_end,
             channel_names=channel_names,
+            channel_ids=channel_ids,
             V_units="µV",
             mult_to_uV=1.0,
         )
         self.channel_names = self.meta.channel_names
+        self.channel_ids = self.meta.channel_ids
 
         if not hasattr(self, "file_durations") or not self.file_durations:
             if hasattr(self, "_n_processed_files") and self._n_processed_files > 1:
@@ -835,6 +848,7 @@ class LroLoadingMixin:
 
             self.meta = metadata
             self.channel_names = self.meta.channel_names
+            self.channel_ids = self.meta.channel_ids
             self.LongRecording = self._apply_resampling(rec)
             self._validate_units_uV(self.LongRecording)
         finally:

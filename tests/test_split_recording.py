@@ -465,6 +465,34 @@ class TestSaveRecordingFormats:
 class TestChannelNameInheritance:
     """Test channel name handling in split operations."""
 
+    def test_split_matches_on_ids_when_display_names_differ(self):
+        """A recording whose ``channel_name`` property differs from (and is non-unique vs)
+        its IDs: split must match ``channel_subset`` on the stable IDs — the display names
+        could never disambiguate — and the child is identified by the requested tokens.
+
+        This is the ap3b2 case in miniature (Intan hardware ports vs repeated anatomical
+        labels) that the identity/display separation fixes.
+        """
+        rng = np.random.RandomState(0)
+        traces = (50 * rng.randn(1000, 4)).astype(np.float32)
+        rec = si.NumpyRecording(
+            traces_list=[traces], sampling_frequency=1000.0,
+            channel_ids=["A-015", "B-015", "C-015", "D-015"],
+        )
+        rec.set_property("channel_name", ["LeftMtx", "LeftMtx", "LeftMtx", "LeftMtx"])
+
+        lro = LongRecordingOrganizer(item=None, recording=rec)
+        # Identity vs display kept distinct at load.
+        assert lro.channel_ids == ["A-015", "B-015", "C-015", "D-015"]
+        assert lro.channel_names == ["LeftMtx", "LeftMtx", "LeftMtx", "LeftMtx"]
+
+        # The non-unique display names could not pick out one channel; the ID must.
+        splits = lro.split({"PortD": ["D-015"]})
+        child = splits["PortD"]
+        assert child.LongRecording.get_num_channels() == 1
+        assert child.channel_ids == ["D-015"]
+        assert child.channel_names == ["D-015"]  # child identified by the config token
+
     def test_split_with_renamed_channels(self, tmp_path):
         """Test split works when parent has custom channel names."""
         traces = np.random.randn(2000, 4).astype(np.float32)

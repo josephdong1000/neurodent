@@ -193,6 +193,7 @@ class LroPersistenceMixin:
             "neurodent_sidecar_version": 1,
             "format": format,
             "channel_names": list(self.channel_names) if self.channel_names else [],
+            "channel_ids": list(self.channel_ids) if getattr(self, "channel_ids", None) else [],
             "bad_channel_names": list(self.bad_channel_names),
             "labels": dict(self.labels),
             "n_truncate": self.n_truncate,
@@ -213,6 +214,7 @@ class LroPersistenceMixin:
             data (dict): Sidecar contents produced by :meth:`_create_sidecar_payload`.
         """
         self.channel_names = data["channel_names"]
+        self.channel_ids = data.get("channel_ids") or data["channel_names"]
         self.bad_channel_names = list(data.get("bad_channel_names", []))
         self.labels = dict(data.get("labels", {}))
         self.n_truncate = data.get("n_truncate", 0)

@@ -443,14 +443,18 @@ class AoBuildMixin:
         if not first_names:
             return []
 
-        reference_abbrevs = resolve_channels(first_names)
+        ref_ids = getattr(lros[0], "channel_ids", None)
+        reference_abbrevs = resolve_channels(
+            first_names, ids=ref_ids if isinstance(ref_ids, (list, tuple)) else None)
         reference_set = set(reference_abbrevs)
         # Map abbreviation -> canonical raw name from first LRO
         abbrev_to_raw = dict(zip(reference_abbrevs, first_names))
 
         for i, lro in enumerate(lros[1:], start=1):
             current_names = lro.channel_names if lro.channel_names else []
-            current_abbrevs = resolve_channels(current_names)
+            cur_ids = getattr(lro, "channel_ids", None)
+            current_abbrevs = resolve_channels(
+                current_names, ids=cur_ids if isinstance(cur_ids, (list, tuple)) else None)
             current_set = set(current_abbrevs)
 
             if current_set != reference_set:

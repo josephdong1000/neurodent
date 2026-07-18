@@ -48,30 +48,49 @@ def resolve_channel(channel_name: str) -> str:
     )
 
 
-def resolve_channels(names: list[str]) -> list[str]:
-    """Abbreviate a list of raw channel names via exact lookup.
+def resolve_channels(names: list[str], ids: list[str] | None = None) -> list[str]:
+    """Abbreviate a list of channels via exact lookup.
 
-    Unmappable names are **warned about loudly** (and kept as-is so callers comparing
-    channel sets still get a value) rather than silently swallowed.
+    A channel carries two identifiers the pipeline must not conflate: its stable **ID**
+    (``get_channel_ids()`` — what a dataset's ``channels`` map is keyed on, e.g. an Intan
+    hardware port ``D-009``) and its **display name** (the ``channel_name`` property — an
+    experimenter's label, possibly non-unique). When *ids* is given, resolution is
+    **ID-first**: each channel maps by its ID, deferring to its display name only when the ID
+    is not in the configured map. That one rule lets datasets that key on IDs and those that
+    key on labels both resolve, with no per-dataset flag. When *ids* is omitted (readers with
+    no separate ID space), it is a plain per-name lookup — the historical behaviour.
+
+    Unmappable channels are **warned about loudly** (and kept as their ID/name so callers
+    comparing channel sets still get a value) rather than silently swallowed.
 
     Args:
-        names: List of raw channel name strings.
+        names: Display channel name strings.
+        ids: Stable channel IDs, same length/order as *names*. Defaults to *names*.
 
     Returns:
-        List of canonical abbreviations (same length as input); an unmappable entry is
-        returned unchanged after a warning.
+        List of canonical abbreviations (same length as input).
     """
+    if ids is None:
+        ids = names
     result = []
-    for name in names:
+    for cid, cname in zip(ids, names):
         try:
-            result.append(resolve_channel(name))
+            result.append(resolve_channel(cid))
+            continue
         except (ValueError, KeyError, AttributeError) as e:
-            warnings.warn(
-                f"Channel name {name!r} could not be mapped to a canonical abbreviation: {e}",
-                UserWarning,
-                stacklevel=2,
-            )
-            result.append(name)
+            err = e
+        if cname != cid:
+            try:
+                result.append(resolve_channel(cname))
+                continue
+            except (ValueError, KeyError, AttributeError) as e:
+                err = e
+        warnings.warn(
+            f"Channel {cid!r} could not be mapped to a canonical abbreviation: {err}",
+            UserWarning,
+            stacklevel=2,
+        )
+        result.append(cid)
     return result
 
 
