@@ -104,7 +104,7 @@ def select_random(n_windows, n_select, seed=0):
 
 
 def render_windows(data, fs, ch_names, out, windows, recording, dpi=110, append=False,
-                   sample0=0, ylim=None, psd_lim=None):
+                   sample0=0, ylim=None, psd_lim=None, all_channels=None):
     """data: (C, n_samples) volts for ONE recording. windows: flat list of window indices.
 
     Writes one PNG per window into out/images/ and appends rows to out/manifest.csv.
@@ -116,6 +116,11 @@ def render_windows(data, fs, ch_names, out, windows, recording, dpi=110, append=
             must be the true one, not an index into whatever slice was loaded.
         ylim, psd_lim: precomputed scales. Pass these when rendering one recording over several calls,
             so the scale a rater calibrates against does not shift between stretches.
+        all_channels: the manifest label-column set (a superset of this recording's ``ch_names``). Lets
+            ONE mixed bundle hold recordings with DIFFERENT channel counts (e.g. 8- and 10-channel
+            montages): every manifest row carries the same columns, and a shorter recording leaves the
+            extra slots blank. Its geometry still lists only its own channels, so the rater page shows
+            only the buttons that recording has. Defaults to this recording's own channels.
     """
     out = Path(out)
     img_dir = out / "images"
@@ -127,9 +132,17 @@ def render_windows(data, fs, ch_names, out, windows, recording, dpi=110, append=
     ylim = trace_ylim(data) if ylim is None else np.asarray(ylim)
     psd_lim = psd_limits(data, fs, win) if psd_lim is None else tuple(psd_lim)
 
-    # Appending a recording with different channels would write its labels under the first
-    # recording's column names: labels attributed to the wrong channels, across animals, silently.
-    fields = ["image", "recording", "window", "t_start_s"] + [f"{LABEL_COL_PREFIX}{c}" for c in ch_names]
+    # Manifest label columns. `all_channels` (a superset of this recording's ch_names) lets a mixed
+    # bundle share ONE column set across recordings with different channel counts; a shorter recording
+    # leaves the extra slots blank. Defaults to this recording's own channels.
+    label_channels = list(all_channels) if all_channels is not None else list(ch_names)
+    missing = [c for c in ch_names if c not in label_channels]
+    if missing:
+        raise ValueError(f"render_windows: channels {missing} of {recording!r} not in all_channels={label_channels}")
+
+    # Appending a recording with different columns would write its labels under the first recording's
+    # column names: labels attributed to the wrong channels, across animals, silently.
+    fields = ["image", "recording", "window", "t_start_s"] + [f"{LABEL_COL_PREFIX}{c}" for c in label_channels]
     path = out / MANIFEST
     if append and path.exists():
         with open(path) as fh:
@@ -253,7 +266,7 @@ def render_windows(data, fs, ch_names, out, windows, recording, dpi=110, append=
         plt.close(fig)
 
         row = {"image": name, "recording": recording, "window": int(w), "t_start_s": round(ts0, 1)}
-        row.update({f"{LABEL_COL_PREFIX}{ch}": "" for ch in ch_names})
+        row.update({f"{LABEL_COL_PREFIX}{c}": "" for c in label_channels})
         rows.append(row)
 
     write_header = not (append and path.exists())
@@ -341,7 +354,8 @@ def blind_channels(channel_names, seed_key):
 
 
 def render_lro(lrec, out, windows=None, recording=None, append=False, dpi=110, notch=True,
-               scales=None, n_select=None, seed=0, channel_perm=None, display_names=None):
+               scales=None, n_select=None, seed=0, channel_perm=None, display_names=None,
+               all_channels=None):
     """Render from a LongRecording, i.e. any format the loader reads (rhd/EDF/NWB/bin).
 
     The loader knows each format's import parameters, so this is how a real campaign renders; nothing
@@ -391,7 +405,7 @@ def render_lro(lrec, out, windows=None, recording=None, append=False, dpi=110, n
             data = data[perm]
         rows += render_windows(data, fs, ch_names, out, run, recording,
                                dpi=dpi, append=append or bool(rows), sample0=f0 * win,
-                               ylim=ylim, psd_lim=psd_lim)
+                               ylim=ylim, psd_lim=psd_lim, all_channels=all_channels)
     return rows
 
 

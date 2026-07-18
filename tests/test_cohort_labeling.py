@@ -10,15 +10,18 @@ Two layers:
   tested). Marked ``integration`` + ``slow`` since they load recordings via SpikeInterface.
 """
 import csv
+import json
 import sys
 import zipfile
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts" / "labeling"))
 import build_cohort_bundle as C  # noqa: E402
+import build_rater_bundle as B  # noqa: E402
 import render_context as R  # noqa: E402
 
 from neurodent.results.scoring import ingest, unblind  # noqa: E402
@@ -68,6 +71,61 @@ def test_unblind_round_trip_and_missing_raises():
         unblind(orphan, keymap)
 
 
+def test_mixed_bundle_union_columns_and_unblind(tmp_path):
+    """One mixed bundle holding an 8-channel and a 10-channel recording: the manifest shares a UNION of
+    neutral slots, geometry stays per-recording, and ingest -> unblind drops the blank padding while
+    recovering true channels (and still raises on a LABELLED unmapped cell)."""
+    fs = 250
+    N = 200 * fs                                   # long enough for a mid-recording window + context flanks
+    rng = np.random.RandomState(0)
+    union = R.neutral_labels(10)                   # Ch A .. Ch J
+    win = 16
+
+    # 8-channel recording, then a 10-channel one, appended into ONE manifest sharing the 10-slot union.
+    R.render_windows((50e-6 * rng.randn(8, N)).astype("float32"), fs, R.neutral_labels(8),
+                     tmp_path, [win], "rec8", dpi=50, all_channels=union, append=False)
+    R.render_windows((50e-6 * rng.randn(10, N)).astype("float32"), fs, union,
+                     tmp_path, [win], "rec10", dpi=50, all_channels=union, append=True)
+
+    # Manifest header is the union; geometry lists only each recording's real channels.
+    with open(tmp_path / "manifest.csv") as fh:
+        header = next(csv.reader(fh))
+    assert [c[len("label_"):] for c in header if c.startswith("label_")] == union
+    geom = json.loads((tmp_path / "geometry.json").read_text())
+    assert [r["channel"] for r in geom["rec8"]["rows"]] == R.neutral_labels(8)
+    assert [r["channel"] for r in geom["rec10"]["rows"]] == union
+
+    # build() -> one zip that opens and bakes the union channel set.
+    zpath = B.build(tmp_path, name="mixed")
+    with zipfile.ZipFile(zpath) as zf:
+        html = zf.read("index.html").decode()
+    assert '"Ch J"' in html                        # the 10th union slot is present in the baked CHANNELS
+
+    # Simulate a rater: label each recording's REAL slots, blank the padding (as the HTML export does).
+    filled = pd.read_csv(tmp_path / "manifest.csv", dtype=str).fillna("")
+    for i, r in filled.iterrows():
+        real = set(R.neutral_labels(8) if r["recording"] == "rec8" else union)
+        for c in union:
+            filled.at[i, "label_" + c] = "bad" if c in real else ""
+    rater_csv = tmp_path / "r1.csv"
+    filled.to_csv(rater_csv, index=False)
+
+    km = pd.DataFrame(
+        [{"recording": "rec8", "slot": s, "channel": "T8_" + s[-1]} for s in R.neutral_labels(8)]
+        + [{"recording": "rec10", "slot": s, "channel": "T10_" + s[-1]} for s in union])
+    long_df = ingest({"r1": rater_csv})
+    out = unblind(long_df, km)
+    assert not out["channel"].str.startswith("Ch ").any(), "every kept cell mapped to a true channel"
+    assert set(out.loc[out["recording"] == "rec8", "slot"]) == set(R.neutral_labels(8))   # padding dropped
+    assert set(out.loc[out["recording"] == "rec10", "slot"]) == set(union)
+
+    # A LABELLED cell in a padding slot the recording lacks is a real mismatch -> must raise.
+    bad = long_df.copy()
+    bad.loc[(bad["recording"] == "rec8") & (bad["channel"] == "Ch I"), "y"] = 1
+    with pytest.raises(ValueError, match="keymap entry"):
+        unblind(bad, km)
+
+
 # --------------------------------------------------------------------------- integration on mini_real
 
 @pytest.fixture
@@ -104,7 +162,7 @@ def test_build_cohort_blinded_bundle_mini_real(_at_repo_root, tmp_path):
     """
     pytest.importorskip("spikeinterface")
 
-    rc = C.build_cohort("mini_real", tmp_path, n_per_animal=1, seed=0, blind_seed=1)
+    rc = C.build_cohort(["mini_real"], tmp_path, n_per_animal=1, seed=0, blind_seed=1)
     assert rc == 0, "no animal should have failed"
 
     # Keymap lives OUTSIDE any bundle dir and maps neutral slots to canonical channels.

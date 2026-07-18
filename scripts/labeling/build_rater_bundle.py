@@ -196,6 +196,12 @@ const shortName = (() => {
 function rowBox(recording, ch){
   return GEOM[recording].rows.find(r => r.channel === ch);
 }
+// The channels THIS recording actually has (from its geometry). A mixed bundle spans recordings with
+// different channel counts, so per-window logic keys on this -- NOT the global (union) CHANNELS list,
+// which may include slots a given recording doesn't have.
+function channelsOf(recording){
+  return GEOM[recording].rows.map(r => r.channel);
+}
 
 const KEY = "eegrate:" + BUNDLE;
 let rater = localStorage.getItem(KEY + ":rater") || "";
@@ -219,7 +225,7 @@ let dirty = localStorage.getItem(KEY + ":dirty") === "1";
 let pos   = parseInt(localStorage.getItem(KEY + ":pos") || "0", 10) || 0;
 let shownAt = Date.now();
 
-const isFlagged = w => { const l = state[wkey(w)]; return !!l && CHANNELS.some(c => l[c] && l[c] !== "clean"); };
+const isFlagged = w => { const l = state[wkey(w)]; return !!l && channelsOf(w.recording).some(c => l[c] && l[c] !== "clean"); };
 const firstUnseenPos = () => { for (let dp = 0; dp < order.length; dp++) if (!seen[wkey(WINDOWS[order[dp]])]) return dp; return -1; };
 // A window is "seen" only when the rater ENGAGES it (advances away, or labels it) -- NOT merely by
 // being rendered. Otherwise landing on the resume window (import / reload) would fabricate an
@@ -247,7 +253,7 @@ function setLabel(ch, cat){                             // in-place row update; 
 
 function labelsFor(w){
   const k = wkey(w);
-  if (!state[k]) { state[k] = {}; CHANNELS.forEach(c => state[k][c] = DEFAULT); }
+  if (!state[k]) { state[k] = {}; channelsOf(w.recording).forEach(c => state[k][c] = DEFAULT); }
   return state[k];
 }
 function save(){
@@ -307,7 +313,7 @@ function render(){
   const bands = document.getElementById("bands"), ctrls = document.getElementById("ctrls");
   bands.innerHTML = ""; ctrls.innerHTML = "";
 
-  CHANNELS.forEach((ch) => {
+  channelsOf(w.recording).forEach((ch) => {               // only THIS window's real channels (mixed bundle)
     const box = rowBox(w.recording, ch);
 
     const band = document.createElement("div");            // highlight over that channel's trace
@@ -348,8 +354,9 @@ document.getElementById("jumpUnseen").onclick = () => {
 
 document.querySelectorAll("[data-all]").forEach(b => b.onclick = () => {
   markSeen();
-  const lab = labelsFor(WINDOWS[order[pos]]);
-  CHANNELS.forEach(c => lab[c] = b.dataset.all);
+  const w = WINDOWS[order[pos]];
+  const lab = labelsFor(w);
+  channelsOf(w.recording).forEach(c => lab[c] = b.dataset.all);   // only this window's real channels
   dirty = true; save(); render();
 });
 document.getElementById("prev").onclick = () => go(-1);
@@ -396,7 +403,9 @@ function exportCsv(){
   const lines = [HEAD.join(",")];
   WINDOWS.forEach((w, wi) => {                          // EVERY window, so nothing is ambiguous
     const k = wkey(w), sv = seen[k] ? 1 : 0, lab = state[k];
-    const labels = CHANNELS.map(c => (sv && lab) ? (lab[c] || "") : "");   // blank = not seen (!= clean)
+    const has = new Set(channelsOf(w.recording));        // slots this window's recording actually has
+    // blank = not seen (!= clean); also blank for union slots this window doesn't have (mixed bundle)
+    const labels = CHANNELS.map(c => (sv && lab && has.has(c)) ? (lab[c] || "") : "");
     const row = [w.image, w.recording, w.window, w.t_start_s, dispPos[wi]]
       .concat(labels)
       .concat([sv, rater, secs[k] || 0, now]);
