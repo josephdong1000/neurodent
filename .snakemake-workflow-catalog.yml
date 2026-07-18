@@ -1,9 +1,4 @@
 usage:
-  software-stack-deployment:
-    conda: true
-  mandatory-flags:
-    desc: "Required flags for running the workflow"
-    flags: "--use-conda"
   configfile:
     desc: "Path to the configuration file"
     path: "config/config.yaml"
