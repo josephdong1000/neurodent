@@ -383,9 +383,16 @@ class AoTimelineMixin:
         return timeline, anchor_end_dt
 
     def _process_manual_datetimes(
-        self, manual_datetimes, animalday_to_items: dict, base_lro_kwargs: dict
+        self, manual_datetimes, animalday_to_items: dict, base_lro_kwargs: dict,
+        validate_only: bool = False,
     ) -> dict:
         """Resolve ``manual_datetimes`` into a per-item ``{item_key: start_datetime}`` map.
+
+        When ``validate_only=True`` the key/shape validation runs exactly as normal (raising
+        identically on any session/item/length mismatch), but the function returns ``{}`` right
+        after — skipping the timeline computation, which reads every file's duration. This is
+        what makes the dry-run's single checkpoint cheap while staying byte-for-byte the same
+        validation the real load performs.
 
         Supported forms (per animal):
 
@@ -428,6 +435,8 @@ class AoTimelineMixin:
                     raise ValueError(
                         f"Missing entries in manual_datetimes for items: {missing}."
                     )
+                if validate_only:
+                    return {}
                 out = {}
                 for item in animal_items:
                     fname = self._get_item_name(item)
@@ -496,6 +505,9 @@ class AoTimelineMixin:
                         f"lists are only supported when timestamps are "
                         f"interpreted as start times."
                     )
+
+                if validate_only:
+                    return {}
 
                 # Find the first explicit anchor — used to backfill any
                 # null sessions BEFORE it (working backward, assuming
@@ -620,6 +632,9 @@ class AoTimelineMixin:
                 )
                 context_path = self._get_context_path(first_item)
                 start_dt = self._resolve_timestamp_input(manual_datetimes, context_path)
+
+            if validate_only:
+                return {}
 
             from pandas import Timestamp
 

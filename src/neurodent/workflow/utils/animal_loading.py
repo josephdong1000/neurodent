@@ -29,6 +29,7 @@ def load_animal_recordings(
     animal_id,
     channel_subset=None,
     logger=None,
+    validate_only=False,
 ):
     """Discover, load, and consolidate one animal's recordings into an ``AnimalOrganizer``.
 
@@ -63,7 +64,11 @@ def load_animal_recordings(
 
     Returns:
         AnimalOrganizer: Consolidated organizer with ``genotype``/``sex`` set and
-        ``long_recordings`` populated.
+        ``long_recordings`` populated. When ``validate_only=True`` no data is loaded and a
+        summary ``dict`` (``{"n_sessions", "n_files", "sessions"}``) is returned instead —
+        this runs the *same* discovery + skip + ``manual_datetimes`` validation the real load
+        does (raising identically on any mismatch), so it is the single pre-flight checkpoint
+        the dry-run reuses.
 
     Raises:
         KeyError: If ``animal_id`` is not in ``constants.ANIMAL_METADATA`` or a
@@ -77,6 +82,7 @@ def load_animal_recordings(
     data_root = Path(samples_config.get("data_root", samples_config.get("data_parent_folder", "")))
 
     all_lros = []
+    val_sessions, val_files = set(), 0   # validate_only accounting (no data load)
     analysis_config = config["analysis"]["war_generation"]
 
     # Resolve genotype from metadata (Metadata-First)
@@ -175,7 +181,17 @@ def load_animal_recordings(
             animal_id=discovery_animal_filter,
             skip_sessions=skip_sessions,
             lro_kwargs=session_lro_kwargs,
+            validate_only=validate_only,
         )
+
+        if validate_only:
+            # Discovery + skip_sessions + the real manual_datetime validation ran above
+            # (raising on any mismatch) with NO per-file load. Record what would load and
+            # move on — no channel split, no consolidation.
+            groups = session_ao._animalday_folder_groups
+            val_sessions.update(groups.keys())
+            val_files += sum(len(v) for v in groups.values())
+            continue
 
         if is_joint and channel_subset is not None:
             logger.info(f"  -> Joint session detected. Filtering to channels: {channel_subset}")
@@ -186,6 +202,10 @@ def load_animal_recordings(
 
         # Collect LROs
         all_lros.extend(session_ao.long_recordings)
+
+    if validate_only:
+        return {"n_sessions": len(val_sessions), "n_files": val_files,
+                "sessions": sorted(val_sessions)}
 
     # Consolidate into single AnimalOrganizer
     logger.info(f"Consolidating {len(all_lros)} recordings into single AnimalOrganizer for {animal_id}")
