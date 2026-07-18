@@ -1,0 +1,62 @@
+name: Feedstock Sync Check
+
+# Watches for drift between pyproject.toml [project.dependencies] and the live
+# conda-forge/neurodent-feedstock recipe, and keeps a single tracking issue in
+# sync. Read-only against the feedstock; never edits it.
+
+on:
+  release:
+    types: [published]
+  pull_request:
+    paths: [pyproject.toml]
+  schedule:
+    - cron: "0 6 * * 1"  # Mondays 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  feedstock-drift:
+    name: Feedstock Drift
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v7
+      with:
+        python-version: '3.10'
+
+    - name: Diff recipe against pyproject and update tracking issue
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        TITLE="conda-forge recipe out of sync"
+        set +e
+        BODY=$(uv run python scripts/feedstock_diff.py --format markdown)
+        CODE=$?
+        set -e
+        echo "$BODY"
+        if [ "$CODE" != "0" ] && [ "$CODE" != "3" ]; then
+          echo "::error::feedstock_diff.py failed (exit $CODE)"
+          exit "$CODE"
+        fi
+        # On PRs, just surface the check status; do not touch issues.
+        if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+          exit "$CODE"
+        fi
+        NUM=$(gh issue list --state open --limit 100 --json number,title \
+              --jq "map(select(.title==\"$TITLE\")) | .[0].number // empty")
+        if [ "$CODE" = "3" ]; then
+          if [ -n "$NUM" ]; then
+            gh issue edit "$NUM" --body "$BODY"
+          else
+            gh issue create --title "$TITLE" --body "$BODY"
+          fi
+        elif [ -n "$NUM" ]; then
+          gh issue close "$NUM" --comment "Recipe back in sync with pyproject.toml."
+        fi

@@ -1,4 +1,4 @@
-.PHONY: setup test docs docs-live docs-linkcheck clean requirements
+.PHONY: setup test docs docs-live docs-linkcheck clean requirements feedstock-diff
 
 # Development setup - run this after cloning
 setup:
@@ -33,3 +33,7 @@ clean:
 requirements:
 	uv export --frozen --format requirements-txt --no-emit-local --extra all -o requirements.txt >/dev/null
 	uv export --frozen --format requirements-txt --no-emit-local --all-extras -o requirements-dev.txt >/dev/null
+
+# Diff pyproject runtime deps against the conda-forge feedstock recipe
+feedstock-diff:
+	uv run python scripts/feedstock_diff.py
