@@ -24,9 +24,9 @@ Run from the REPO ROOT (dataset ``extract_func`` paths resolve relative to the C
 """
 import argparse
 import csv
-import fnmatch
 import json
 import logging
+import random
 import sys
 from pathlib import Path
 
@@ -37,15 +37,12 @@ import build_rater_bundle as B  # noqa: E402
 
 from neurodent import constants  # noqa: E402
 from neurodent.core.utils import set_temp_directory, resolve_channel, resolve_channels  # noqa: E402
-from neurodent.loading.discovery import FileDiscoverer  # noqa: E402
 from neurodent.workflow.utils import (  # noqa: E402
     apply_samples_config,
     enumerate_cohort,
     expand_animals_config,
-    get_discovery_animal_filter,
     load_animal_recordings,
     load_dataset_config,
-    resolve_animal_pattern,
     resolve_samples_config,
 )
 
@@ -76,69 +73,49 @@ def _prepare(dataset):
     return config, samples_config
 
 
-def _discovery_for(samples_config, config, animal_id):
-    """Resolve ``(discovery_pattern, discovery_filter, is_joint)`` for one animal.
-
-    The cheap half of :func:`load_animal_recordings` (no LRO construction / no MNE intermediate); it
-    reuses the same ``resolve_animal_pattern`` / ``get_discovery_animal_filter`` the loader uses, so the
-    dry-run discovers exactly what the real run would.
-    """
-    data_root = samples_config.get("data_root", samples_config.get("data_parent_folder", ""))
-    analysis_config = config["analysis"]["war_generation"]
-    overrides = samples_config.get("_animal_overrides", {}).get(animal_id, {})
-    pattern = overrides.get("pattern", analysis_config.get("pattern"))
-    if pattern is None:
-        raise KeyError("no 'pattern' configured for war_generation")
-    is_joint = animal_id in samples_config.get("_animal_channel_subsets", {})
-    discovery_pattern = resolve_animal_pattern(pattern, animal_id, data_root=str(data_root))
-    filt = get_discovery_animal_filter(animal_id, is_joint, samples_config.get("_animal_groups", {}))
-    return discovery_pattern, filt, is_joint
-
-
 def dryrun_animal(samples_config, config, animal_id):
-    """Discovery-only report for one animal; never raises (captures errors into ``note``)."""
+    """Pre-flight report for one animal; never raises (captures errors into ``note``).
+
+    Uses the loader's OWN validation via ``load_animal_recordings(..., validate_only=True)`` —
+    the same discovery + skip_sessions + ``manual_datetimes`` checks the real load runs (which
+    raise on any mismatch), WITHOUT loading data. So a clean report guarantees a clean load;
+    the dry-run can no longer disagree with the real loader. A cheap config-only
+    channel-resolvability check is added for joint animals (channel *presence* in the recording
+    needs a load and is left to the real run).
+    """
     rec = {"animal": animal_id, "n_files": 0, "n_sessions": 0, "n_datetimes": None,
            "is_joint": False, "channels_ok": None, "dt_ok": True, "note": ""}
-    # A per-animal manual_datetime must line up with the discovered sessions, or loading raises: a LIST
-    # by count, a session-keyed DICT by exact keys.
     dts = samples_config.get("manual_datetimes", {}).get(animal_id)
     rec["n_datetimes"] = len(dts) if isinstance(dts, (list, dict)) else None
+    rec["is_joint"] = animal_id in samples_config.get("_animal_channel_subsets", {})
+
+    # Cheap config-only check: do this animal's channel_subset tokens resolve to canonical
+    # abbrevs via the configured channel map?
+    if rec["is_joint"]:
+        subset = samples_config["_animal_channel_subsets"][animal_id]
+        try:
+            for c in subset:
+                resolve_channel(c)
+            rec["channels_ok"] = True
+        except ValueError as e:
+            rec["channels_ok"] = False
+            rec["note"] = f"channel does not resolve: {e}"
+
+    # THE single checkpoint: the real loader's discovery + datetime validation, no data load.
+    root = logging.getLogger()
+    prev_level = root.level
+    root.setLevel(logging.WARNING)   # quiet the loader's per-file INFO chatter for the table
     try:
-        pattern, filt, is_joint = _discovery_for(samples_config, config, animal_id)
-        rec["is_joint"] = is_joint
-        items = FileDiscoverer(pattern).discover(animal=filt)
-        # Honor skip_sessions (dataset-level + per-animal) the same way load_animal_recordings does,
-        # so counts match what a real load sees.
-        skip = list(config["analysis"]["war_generation"].get(
-            "skip_sessions", config["analysis"]["war_generation"].get("skip_days", [])))
-        skip += list(samples_config.get("_animal_overrides", {}).get(animal_id, {}).get("skip_sessions", []))
-        if skip:
-            items = [it for it in items
-                     if not any(fnmatch.fnmatch(it.metadata.get("session", "unknown"), p) for p in skip)]
-        rec["n_files"] = len(items)
-        sessions = {it.metadata.get("session", "unknown") for it in items}
-        rec["n_sessions"] = len(sessions)
-        if is_joint:  # only joint animals carry an explicit channel subset we can check without loading
-            subset = samples_config["_animal_channel_subsets"][animal_id]
-            try:
-                for c in subset:
-                    resolve_channel(c)
-                rec["channels_ok"] = True
-            except ValueError as e:
-                rec["channels_ok"] = False
-                rec["note"] = f"channel does not resolve: {e}"
-        if isinstance(dts, list) and rec["n_sessions"] and len(dts) != rec["n_sessions"]:
-            rec["dt_ok"] = False
-            rec["note"] = (f"sessions({rec['n_sessions']}) != datetimes({len(dts)}) "
-                           f"[loading will raise]; " + rec["note"]).strip("; ")
-        elif isinstance(dts, dict) and rec["n_sessions"]:
-            missing, extra = sorted(sessions - set(dts)), sorted(set(dts) - sessions)
-            if missing or extra:
-                rec["dt_ok"] = False
-                rec["note"] = (f"datetime-dict keys != sessions (missing={missing[:2]}, extra={extra[:2]}) "
-                               f"[loading will raise]; " + rec["note"]).strip("; ")
-    except Exception as e:  # discovery / pattern errors -> report, do not crash the whole cohort
-        rec["note"] = f"{type(e).__name__}: {e}"
+        summary = load_animal_recordings(
+            samples_config, config, [("", animal_id, "")], animal_id, validate_only=True,
+        )
+        rec["n_sessions"] = summary["n_sessions"]
+        rec["n_files"] = summary["n_files"]
+    except Exception as e:  # exactly what the real load would raise
+        rec["dt_ok"] = False
+        rec["note"] = (f"{type(e).__name__}: {e} [loading will raise]; " + rec["note"]).strip("; ")
+    finally:
+        root.setLevel(prev_level)
     return rec
 
 
@@ -211,8 +188,20 @@ def _dataset_channel_count(dataset):
     return len(resolve_samples_config(load_dataset_config(dataset)).get("channels", {}))
 
 
+def _select_animals(samples_config, animal, limit_per_dataset, seed):
+    """This dataset's cohort, optionally capped to a seeded random subset.
+
+    ``limit_per_dataset`` is a DEV/dogfood convenience (e.g. 1 animal per strain for a fast
+    mixed smoke-test); a real run leaves it ``None`` and loads every animal.
+    """
+    animals = [animal] if animal else enumerate_cohort(samples_config)
+    if limit_per_dataset and not animal and len(animals) > limit_per_dataset:
+        animals = sorted(random.Random(seed).sample(animals, limit_per_dataset))
+    return animals
+
+
 def build_cohort(datasets, out_root, *, animal=None, n_per_animal=40, seed=0, blind_seed=0,
-                 dry_run=False, make_bundle=True):
+                 dry_run=False, make_bundle=True, limit_per_dataset=None):
     """Render one or more datasets' animals into ONE blinded mixed bundle.
 
     Recordings of different channel counts (e.g. 8- and 10-channel strains) share the bundle via a
@@ -226,7 +215,7 @@ def build_cohort(datasets, out_root, *, animal=None, n_per_animal=40, seed=0, bl
         rc = 0
         for ds in datasets:
             config, samples_config = _prepare(ds)
-            animals = [animal] if animal else enumerate_cohort(samples_config)
+            animals = _select_animals(samples_config, animal, limit_per_dataset, seed)
             print(f"\n## {ds}  ({len(animals)} animals)")
             reports = [dryrun_animal(samples_config, config, a) for a in animals]
             _print_dryrun(reports)
@@ -260,7 +249,7 @@ def build_cohort(datasets, out_root, *, animal=None, n_per_animal=40, seed=0, bl
     all_keymap, failures, rendered = [], [], []
     for ds in datasets:
         config, samples_config = _prepare(ds)   # installs THIS dataset's channel map / ANIMAL_METADATA
-        animals = [animal] if animal else enumerate_cohort(samples_config)
+        animals = _select_animals(samples_config, animal, limit_per_dataset, seed)
         log.info(f"-- {ds}: {len(animals)} animals")
         for a in animals:
             try:
@@ -305,6 +294,9 @@ def main(argv=None):
     p.add_argument("--out", default=None, help="output root (default: results/labeling/<dataset>, or .../mixed)")
     p.add_argument("--dry-run", action="store_true", help="discovery-only check; no data load, no render")
     p.add_argument("--no-bundle", action="store_true", help="render + keymap but do not build the zip")
+    p.add_argument("--limit-per-dataset", type=int, default=None,
+                   help="DEV/dogfood only: cap each dataset to a seeded random N animals (e.g. 1 per "
+                        "strain for a fast smoke test). Omit for a real run (loads every animal).")
     args = p.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -318,7 +310,7 @@ def main(argv=None):
     return build_cohort(
         datasets, out_root, animal=args.animal, n_per_animal=args.n_per_animal,
         seed=args.seed, blind_seed=args.blind_seed, dry_run=args.dry_run,
-        make_bundle=not args.no_bundle,
+        make_bundle=not args.no_bundle, limit_per_dataset=args.limit_per_dataset,
     )
 
 
