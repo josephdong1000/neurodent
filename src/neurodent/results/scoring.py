@@ -103,13 +103,18 @@ def unblind(long_df, keymap):
         km, how="left", left_on=["recording", "channel"], right_on=["recording", "slot"]
     )
     missing = merged["true_channel"].isna()
-    if missing.any():
-        bad = list(merged.loc[missing, ["recording", "channel"]].drop_duplicates().itertuples(index=False))
+    # A LABELLED cell with no keymap entry is a real mismatch and must raise. An unlabelled one is just
+    # a blank padding slot a shorter recording doesn't have in a MIXED bundle (consensus drops nan-y
+    # rows anyway) — drop it quietly rather than fail the whole unblind.
+    labelled_missing = missing & merged["y"].notna()
+    if labelled_missing.any():
+        bad = list(merged.loc[labelled_missing, ["recording", "channel"]].drop_duplicates().itertuples(index=False))
         raise ValueError(
-            "unblind: no keymap entry for cells: "
+            "unblind: a labelled cell has no keymap entry: "
             + "; ".join(f"{r.recording}/{r.channel}" for r in bad[:5])
-            + ". The keymap must cover every (recording, slot) that was labelled."
+            + ". The keymap must cover every (recording, slot) that carries a label."
         )
+    merged = merged[~missing].copy()
     merged["channel"] = merged["true_channel"]
     return merged.drop(columns="true_channel")
 

@@ -115,9 +115,9 @@ samples_data:
       011422_WT_cohort4_group3_files15-39: '2022-01-14 11:52:36'
       011422_WT_cohort4_group3_files40-64: '2022-01-14 23:18:51'
       011522_WT_cohort4_group3_file65-89: '2022-01-15 11:48:54'
+      011522_WT_cohort4_group3_files90-112: '2022-01-15 23:19:08'
       011522_WT_cohort4_group3_files113-129: '2022-01-16 07:49:09'
       011522_WT_cohort4_group3_files130-139: '2022-01-16 12:33:03'
-      011522_WT_cohort4_group3_files90-112: '2022-01-15 23:19:08'
     bad_channels:
       M4 MWT Jan-13-2022:
       - LHip
@@ -273,7 +273,6 @@ samples_data:
       012122_MMUT_cohort4_group5_files0-24: '2022-01-21 22:37:58'
       012222_MMUT_cohort4_group5_files25-50: '2022-01-22 11:37:41'
       012222_MMUT_cohort4_group5_files51-63: '2022-01-22 15:07:42'
-      bad days: '2022-01-22 18:07:44'
     bad_channels:
       MMUT MMut Jan-21-2022:
       - LHip
@@ -291,9 +290,9 @@ samples_data:
       012422_cohort4_group6_FMUT_files52-66: '2022-01-24 23:06:03'
       012522_cohort4_group6_FMUT_files67-91: '2022-01-25 11:36:06'
       012522_cohort4_group6_FMUT_files92-114: '2022-01-25 23:06:09'
-      012622_cohort4_group6_FMUT_files0-19: '2022-01-26 23:06:14'
       012622_cohort4_group6_FMUT_files115-131: '2022-01-26 07:36:11'
       012622_cohort4_group6_FMUT_files132-142: '2022-01-26 13:09:41'
+      012622_cohort4_group6_FMUT_files0-19: '2022-01-26 23:06:14'
       012722_cohort4_group6_FMUT_files20-42: '2022-01-27 10:21:16'
     bad_channels:
       FMUT FMut Jan-23-2022:
@@ -337,10 +336,10 @@ samples_data:
       012322_cohort4_group6_MMUT_files0-16: '2022-01-23 23:11:52'
       012422_cohort4_group6_MMUT_files17-40: '2022-01-24 11:11:54'
       012422_cohort4_group6_MMUT_files41-63: '2022-01-24 22:36:05'
-      012522_cohort4_group6_MMUT_files101-129: '2022-01-26 07:36:13'
-      012522_cohort4_group6_MMUT_files130-141: '2022-01-26 13:09:42'
       012522_cohort4_group6_MMUT_files64-82: '2022-01-25 08:06:07'
       012522_cohort4_group6_MMUT_files83-100: '2022-01-25 17:06:09'
+      012522_cohort4_group6_MMUT_files101-129: '2022-01-26 07:36:13'
+      012522_cohort4_group6_MMUT_files130-141: '2022-01-26 13:09:42'
       012622_cohort4_group6_MMUT_files0-18: '2022-01-26 23:06:25'
       012722_cohort4_group6_MMUT_files19-41: '2022-01-27 10:21:18'
   - id: FHET(1)_cohort4_group7
@@ -348,12 +347,12 @@ samples_data:
     genotype: Het
     manual_datetime:
       013122_cohort4_group7_FHET(1)_files0-18: '2022-01-31 23:28:29'
-      020122_cohort4_group7_FHET(1)_files115-128: '2022-02-03 07:58:49'
-      020122_cohort4_group7_FHET(1)_files129-140: '2022-02-03 12:24:59'
       020122_cohort4_group7_FHET(1)_files19-42: '2022-02-01 11:28:33'
       020122_cohort4_group7_FHET(1)_files43-66: '2022-02-01 23:28:37'
       020122_cohort4_group7_FHET(1)_files67-90: '2022-02-02 11:28:42'
       020122_cohort4_group7_FHET(1)_files91-114: '2022-02-02 23:28:46'
+      020122_cohort4_group7_FHET(1)_files115-128: '2022-02-03 07:58:49'
+      020122_cohort4_group7_FHET(1)_files129-140: '2022-02-03 12:24:59'
     bad_channels:
       FHET(1) FHet Feb-01-2022:
       - LHip
@@ -369,10 +368,10 @@ samples_data:
       013122_cohort4_group7_FHET(2)_files0-17: '2022-01-31 23:28:30'
       020122_cohort4_group7_FHET(2)_files18-40: '2022-02-01 10:58:32'
       020122_cohort4_group7_FHET(2)_files41-65: '2022-02-01 23:28:38'
-      020222_cohort4_group7_FHET(2)_files114-130: '2022-02-03 07:58:50'
-      020222_cohort4_group7_FHET(2)_files131-139: '2022-02-03 12:25:00'
       020222_cohort4_group7_FHET(2)_files66-90: '2022-02-02 11:58:43'
       020222_cohort4_group7_FHET(2)_files91-113: '2022-02-02 23:28:47'
+      020222_cohort4_group7_FHET(2)_files114-130: '2022-02-03 07:58:50'
+      020222_cohort4_group7_FHET(2)_files131-139: '2022-02-03 12:25:00'
   - id: 'cohort 2 goup 4 mouse #8 Cage 3A'
     sex: Male
     genotype: Unknown
@@ -382,7 +381,6 @@ samples_data:
       031121 (2): '2021-03-11 23:57:15'
       '031221': '2021-03-12 05:57:16'
       031221 (2): '2021-03-12 15:27:18'
-      bad files: '2021-03-12 15:39:36'
     bad_channels:
       '#8 Cage 3A MMut Mar-10-2021': []
       '#8 Cage 3A MMut Mar-11-2021': []
@@ -397,7 +395,6 @@ samples_data:
       '031121': '2021-03-11 10:27:11'
       031121 (2): '2021-03-11 23:57:13'
       '031221': '2021-03-12 15:27:17'
-      bad files: '2021-03-12 15:39:35'
     bad_channels:
       '#8 Cage 1A FHet Mar-10-2021':
       - LAud
@@ -412,7 +409,6 @@ samples_data:
       '031121': '2021-03-11 11:57:11'
       031121 (2): '2021-03-11 23:57:14'
       '031221': '2021-03-12 15:27:17'
-      bad files: '2021-03-12 15:39:36'
   - id: 'cohort 2 group 4 mouse #3 Cage 4A'
     sex: Male
     genotype: Unknown
@@ -421,7 +417,6 @@ samples_data:
       '031121': '2021-03-11 10:57:12'
       031121 (2): '2021-03-11 23:57:15'
       '031221': '2021-03-12 15:27:19'
-      bad files: '2021-03-12 15:39:36'
   - id: F4_FHET_cohort5_group1
     sex: Female
     genotype: Het
@@ -511,7 +506,6 @@ samples_data:
       031821: '2021-03-18 12:16:42'
       031821 (2): '2021-03-18 23:46:42'
       031921: '2021-03-19 13:15:19'
-      bad files: '2021-03-17 12:37:27'
   - id: cohort 2 group 2 mouse F6 cage 2A
     sex: Female
     genotype: Unknown
@@ -522,7 +516,6 @@ samples_data:
       031821: '2021-03-18 12:46:42'
       031821 (2): '2021-03-18 23:46:43'
       031921: '2021-03-19 13:15:19'
-      bad files: '2021-03-17 12:37:28'
     bad_channels:
       F6 FHet Mar-16-2021:
       - LAud
@@ -542,7 +535,6 @@ samples_data:
       031821: '2021-03-18 12:46:42'
       031821 (2): '2021-03-18 23:46:43'
       031921: '2021-03-19 13:15:20'
-      bad files: '2021-03-17 12:37:28'
   - id: cohort 2 group 5 mouse M2 cage 3A
     sex: Male
     genotype: Mut
@@ -553,7 +545,6 @@ samples_data:
       031821: '2021-03-18 12:46:42'
       031821 (2): '2021-03-18 23:46:43'
       031921: '2021-03-19 13:15:20'
-      bad files: '2021-03-17 12:37:28'
   - id: M7_MWT_cohort6_group1
     sex: Male
     genotype: WT
@@ -621,7 +612,6 @@ samples_data:
       '032121': '2021-03-21 12:24:15'
       032121 (2): '2021-03-21 23:54:16'
       '032221': '2021-03-22 11:24:17'
-      bad files: '2021-03-22 11:30:01'
   - id: cohort 2 group 5 mouse M5 cage2A
     sex: Male
     genotype: Mut
@@ -632,7 +622,6 @@ samples_data:
       '032121': '2021-03-21 12:54:16'
       032121 (2): '2021-03-21 23:54:16'
       '032221': '2021-03-22 11:24:18'
-      bad files: '2021-03-22 11:30:01'
   - id: cohort 2 group 6 mouse M3 cage3A
     sex: Male
     genotype: Het
@@ -643,7 +632,6 @@ samples_data:
       '032121': '2021-03-21 12:54:16'
       032121 (2): '2021-03-21 23:54:17'
       '032221': '2021-03-22 11:24:18'
-      bad files: '2021-03-22 11:30:02'
   - id: cohort 2 group 6 mouse M5 cage4A
     sex: Male
     genotype: Mut
@@ -653,7 +641,6 @@ samples_data:
       032021 (2): '2021-03-20 23:54:16'
       '032121': '2021-03-21 12:24:16'
       032121 (2): '2021-03-21 19:54:17'
-      bad files: '2021-03-22 11:30:02'
   - id: 032221_cohort 2, Group 3, Mouse 6 Cage 2A Re-Recording
     sex: Female
     genotype: Het
@@ -667,7 +654,6 @@ samples_data:
       '032421': '2021-03-24 12:07:57'
       032421 (2): '2021-03-24 23:37:58'
       '032521': '2021-03-25 16:34:22'
-      bad files: '2021-03-22 16:37:54'
   - id: 040221_Group 1 Mouse 9 Recording
     sex: Female
     genotype: Mut
