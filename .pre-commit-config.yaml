@@ -5,3 +5,13 @@ repos:
     hooks:
       - id: nbstripout
         exclude: ^notebooks/
+
+  # Keep hash-pinned requirements in sync with uv.lock (pyproject.toml is the source of truth)
+  - repo: local
+    hooks:
+      - id: uv-export-requirements
+        name: Export requirements*.txt from uv.lock
+        entry: bash -c 'uv export --frozen --format requirements-txt --no-emit-local --extra all -o requirements.txt >/dev/null && uv export --frozen --format requirements-txt --no-emit-local --all-extras -o requirements-dev.txt >/dev/null'
+        language: system
+        pass_filenames: false
+        files: ^(pyproject\.toml|uv\.lock)$

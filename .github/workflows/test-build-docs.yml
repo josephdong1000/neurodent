@@ -65,6 +65,25 @@ jobs:
         fail_ci_if_error: true
         verbose: true
 
+  requirements-guard:
+    name: Requirements Sync Guard
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v6
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v7
+      with:
+        python-version: '3.10'
+
+    - name: Regenerate requirements from uv.lock and check for drift
+      run: |
+        uv export --frozen --format requirements-txt --no-emit-local --extra all -o requirements.txt >/dev/null
+        uv export --frozen --format requirements-txt --no-emit-local --all-extras -o requirements-dev.txt >/dev/null
+        git diff --exit-code -- requirements.txt requirements-dev.txt
+
   build-package:
     name: Build Package
     runs-on: ubuntu-latest
