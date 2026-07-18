@@ -89,6 +89,7 @@ class AnimalOrganizer(
         truncate: bool | int = False,
         lro_kwargs: dict = {},
         normalize_session: Optional[Callable[[str], str]] = None,
+        validate_only: bool = False,
     ) -> None:
         self.pattern = pattern
         self.animal_id = animal_id
@@ -177,13 +178,23 @@ class AnimalOrganizer(
                 lro_kwargs["manual_datetimes"],
                 self._animalday_folder_groups,
                 base_lro_kwargs,
+                validate_only=validate_only,
             )
             lro_kwargs = base_lro_kwargs
         else:
             self._processed_timestamps = None
 
-
         self.long_recordings: list[_lro.LongRecordingOrganizer] = []
+
+        if validate_only:
+            # Cheap pre-flight checkpoint: discovery + skip_sessions + the REAL
+            # _process_manual_datetimes validation have already run above (they raise on any
+            # session/datetime mismatch) — WITHOUT the expensive per-file load/resample. The
+            # dry-run reuses THIS single checkpoint, so "dry-run OK" can never disagree with
+            # "it loads" (they run the identical validation code).
+            self.channel_names = None
+            return
+
         self._create_long_recordings(lro_kwargs)
 
         # Set and validate channel_names across all LROs
