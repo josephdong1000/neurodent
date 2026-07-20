@@ -73,6 +73,38 @@ def _prepare(dataset):
     return config, samples_config
 
 
+def load_cohort_animal(samples_config, config, animal_id, logger=log):
+    """Load one animal's recordings EXACTLY as the bundle builder (and WAR generation) do.
+
+    The SINGLE definition of the cohort load path — the config ``channel_subset`` lookup plus
+    ``load_animal_recordings`` — so any downstream consumer (rendering, detector scoring) reconstructs
+    the same recordings, in the same channel identity/order, that the rater saw. Returns the
+    ``AnimalOrganizer`` (its ``.long_recordings`` / ``.animaldays`` are index-aligned to the
+    ``"{animal}__{i}"`` recording naming used across the bundle).
+    """
+    channel_subset = samples_config.get("_animal_channel_subsets", {}).get(animal_id)
+    return load_animal_recordings(
+        samples_config, config, [("", animal_id, "")], animal_id,
+        channel_subset=channel_subset, logger=logger,
+    )
+
+
+def iter_cohort_animals(datasets, *, animal=None, limit_per_dataset=None, seed=0):
+    """Yield ``(dataset, samples_config, config, animal_id)`` for every animal in the cohort.
+
+    Prepares each dataset's config/channel-map globals exactly once (via :func:`_prepare`) and applies
+    the same seeded ``--limit-per-dataset`` selection (via :func:`_select_animals`). Shared by the
+    bundle builder and the detector scorer so both walk the IDENTICAL cohort in the identical order —
+    the loader cannot drift between "what was rendered" and "what is scored".
+    """
+    for ds in datasets:
+        config, samples_config = _prepare(ds)   # installs THIS dataset's channel map / ANIMAL_METADATA
+        animals = _select_animals(samples_config, animal, limit_per_dataset, seed)
+        log.info(f"-- {ds}: {len(animals)} animals")
+        for a in animals:
+            yield ds, samples_config, config, a
+
+
 def dryrun_animal(samples_config, config, animal_id):
     """Pre-flight report for one animal; never raises (captures errors into ``note``).
 
@@ -139,11 +171,7 @@ def render_animal(samples_config, config, animal_id, bundle_dir, *, n_per_animal
     rest blank. Append is driven by whether the shared manifest already exists.
     """
     genotype = constants.ANIMAL_METADATA.get(animal_id, {}).get("genotype", "Unknown")
-    channel_subset = samples_config.get("_animal_channel_subsets", {}).get(animal_id)
-    ao = load_animal_recordings(
-        samples_config, config, [("", animal_id, "")], animal_id,
-        channel_subset=channel_subset, logger=log,
-    )
+    ao = load_cohort_animal(samples_config, config, animal_id)
     lros = ao.long_recordings
     if not lros:
         log.warning(f"{animal_id}: no recordings, skipped")
@@ -249,21 +277,19 @@ def build_cohort(datasets, out_root, *, animal=None, n_per_animal=40, seed=0, bl
     log.info(f"writing fresh bundle dir: {bundle_dir}  (keymap -> {unblind_dir})")
 
     all_keymap, failures, rendered = [], [], []
-    for ds in datasets:
-        config, samples_config = _prepare(ds)   # installs THIS dataset's channel map / ANIMAL_METADATA
-        animals = _select_animals(samples_config, animal, limit_per_dataset, seed)
-        log.info(f"-- {ds}: {len(animals)} animals")
-        for a in animals:
-            try:
-                kr = render_animal(samples_config, config, a, bundle_dir,
-                                   n_per_animal=n_per_animal, seed=seed, blind_seed=blind_seed,
-                                   all_channels=all_channels)
-                all_keymap += kr
-                if kr:
-                    rendered.append(a)
-            except Exception as e:  # one stale animal must not sink the cohort
-                log.error(f"{a}: FAILED -- {type(e).__name__}: {e}")
-                failures.append({"dataset": ds, "animal": a, "error": f"{type(e).__name__}: {e}"})
+    for ds, samples_config, config, a in iter_cohort_animals(
+        datasets, animal=animal, limit_per_dataset=limit_per_dataset, seed=seed
+    ):
+        try:
+            kr = render_animal(samples_config, config, a, bundle_dir,
+                               n_per_animal=n_per_animal, seed=seed, blind_seed=blind_seed,
+                               all_channels=all_channels)
+            all_keymap += kr
+            if kr:
+                rendered.append(a)
+        except Exception as e:  # one stale animal must not sink the cohort
+            log.error(f"{a}: FAILED -- {type(e).__name__}: {e}")
+            failures.append({"dataset": ds, "animal": a, "error": f"{type(e).__name__}: {e}"})
 
     # Keymap + cohort manifest live OUTSIDE the bundle dir (in the paired _unblind sister) so build()
     # never ships them to raters.
