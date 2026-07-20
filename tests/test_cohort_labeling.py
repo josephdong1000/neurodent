@@ -23,6 +23,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts" / "labeli
 import build_cohort_bundle as C  # noqa: E402
 import build_rater_bundle as B  # noqa: E402
 import render_context as R  # noqa: E402
+import score_detectors as SD  # noqa: E402
 
 from neurodent.results.scoring import ingest, unblind  # noqa: E402
 
@@ -215,3 +216,52 @@ def test_build_cohort_blinded_bundle_mini_real(_at_repo_root, tmp_path):
     check = restored.merge(km, left_on=["recording", "slot"], right_on=["recording", "slot"],
                            suffixes=("", "_km"))
     assert (check["channel"] == check["channel_km"]).all()
+
+
+@pytest.mark.integration
+@pytest.mark.slow
+@pytest.mark.mutates_constants
+def test_score_detectors_mini_real(_at_repo_root, tmp_path):
+    """End-to-end DETECTOR scoring on real (tiny) data, proving no drift between the bundle builder and
+    the scorer: build the blinded bundle, fake a rater, then score the fragment detectors via the SHARED
+    ``load_cohort_animal`` seam + the WAR feature path. The key assertion is ``n_uncovered == 0`` -- every
+    labelled window matched a 5 s detector fragment, i.e. the scorer's ``window_s=FRAG_S`` re-extraction
+    lines up 1:1 with what the rater labelled.
+    """
+    pytest.importorskip("spikeinterface")
+    from neurodent.analysis import AnimalAnalyzer
+
+    rc = C.build_cohort(["mini_real"], tmp_path, n_per_animal=1, seed=0, blind_seed=1)
+    assert rc == 0
+    keymap_csv = tmp_path / "_unblind" / "keymap.csv"
+    manifest = next(tmp_path.rglob("manifest.csv"))
+
+    # Fake a rater: label every real slot "bad" so there are reject cells (recall is then defined).
+    filled = pd.read_csv(manifest)
+    for c in [c for c in filled.columns if c.startswith("label_")]:
+        filled[c] = "bad"
+    rater_csv = tmp_path / "r1.csv"
+    filled.to_csv(rater_csv, index=False)
+
+    # Consensus via the exact score_bundle round-trip the scorer reuses.
+    cons = SD.build_consensus({"r1": rater_csv}, keymap_csv, "majority")
+    assert not cons.empty
+
+    # Score every labelled animal through the SHARED loader + WAR-gen feature path (window_s=FRAG_S).
+    config, samples_config = C._prepare("mini_real")
+    animals = {r.rsplit("__", 1)[0] for r in cons["recording"].unique()}
+    rows = []
+    for animal_id in sorted(animals):
+        ao = C.load_cohort_animal(samples_config, config, animal_id)
+        war = AnimalAnalyzer(ao).compute_windowed_analysis(
+            SD.FEATURES, window_s=R.FRAG_S, apply_notch_filter=True, multiprocess_mode="serial")
+        rows += SD.score_animal(war, ao, animal_id, cons)
+    assert rows, "expected per-(recording, detector) scores"
+
+    df = pd.DataFrame(rows)
+    assert set(df["detector"]) == set(SD.FRAGMENT_DETECTORS), "every fragment detector scored"
+    assert df["n_uncovered"].fillna(0).sum() == 0, "every labelled window aligned to a 5 s detector fragment"
+    assert df["n"].fillna(0).sum() > 0, "some labelled cells were scored"
+    scored = df[df["n"].fillna(0) > 0]
+    for metric in ("precision", "recall", "f1"):
+        assert scored[metric].between(0.0, 1.0).all(), f"{metric} out of [0,1]"
