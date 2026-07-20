@@ -60,7 +60,8 @@ def test_unblind_round_trip_and_missing_raises():
         "category": ["clean", "artifact"],
     })
     keymap = pd.DataFrame({
-        "recording": ["A10__0", "A10__0"], "slot": ["Ch A", "Ch B"], "channel": ["LHip", "RMot"],
+        "recording": ["A10__0", "A10__0"], "window": [12, 12], "slot": ["Ch A", "Ch B"],
+        "channel": ["LHip", "RMot"],
     })
     out = unblind(long_df, keymap)
     assert out["channel"].tolist() == ["LHip", "RMot"], "slots resolve to true channels"
@@ -72,22 +73,26 @@ def test_unblind_round_trip_and_missing_raises():
 
 
 def test_mixed_bundle_union_columns_and_unblind(tmp_path):
-    """One mixed bundle holding an 8-channel and a 10-channel recording: the manifest shares a UNION of
-    neutral slots, geometry stays per-recording, and ingest -> unblind drops the blank padding while
+    """One mixed bundle holding an 8-channel and a 10-channel recording, PER-WINDOW blinded: the manifest
+    shares a UNION of neutral slots, geometry stays per-recording (neutral), each window scrambles
+    independently, and ingest -> unblind (keyed on recording, window, slot) drops the blank padding while
     recovering true channels (and still raises on a LABELLED unmapped cell)."""
     fs = 250
-    N = 200 * fs                                   # long enough for a mid-recording window + context flanks
+    N = 200 * fs                                   # long enough for mid-recording windows + context flanks
     rng = np.random.RandomState(0)
     union = R.neutral_labels(10)                   # Ch A .. Ch J
-    win = 16
+    wins = [16, 30]                                # TWO windows (both fit the 200s span), for per-window scramble
+    true8 = ["T8_" + c for c in "ABCDEFGH"]
+    true10 = ["T10_" + c for c in "ABCDEFGHIJ"]
 
-    # 8-channel recording, then a 10-channel one, appended into ONE manifest sharing the 10-slot union.
-    R.render_windows((50e-6 * rng.randn(8, N)).astype("float32"), fs, R.neutral_labels(8),
-                     tmp_path, [win], "rec8", dpi=50, all_channels=union, append=False)
-    R.render_windows((50e-6 * rng.randn(10, N)).astype("float32"), fs, union,
-                     tmp_path, [win], "rec10", dpi=50, all_channels=union, append=True)
+    # 8-channel then 10-channel, PER-WINDOW blinded, appended into ONE manifest sharing the 10-slot union.
+    _, km8 = R.render_windows((50e-6 * rng.randn(8, N)).astype("float32"), fs, true8,
+                              tmp_path, wins, "rec8", dpi=50, all_channels=union, append=False, blind_seed=1)
+    _, km10 = R.render_windows((50e-6 * rng.randn(10, N)).astype("float32"), fs, true10,
+                               tmp_path, wins, "rec10", dpi=50, all_channels=union, append=True, blind_seed=1)
+    km = pd.DataFrame(km8 + km10)                  # columns: recording, window, slot, channel
 
-    # Manifest header is the union; geometry lists only each recording's real channels.
+    # Manifest header is the union; geometry lists each recording's NEUTRAL slots (no true names).
     with open(tmp_path / "manifest.csv") as fh:
         header = next(csv.reader(fh))
     assert [c[len("label_"):] for c in header if c.startswith("label_")] == union
@@ -95,11 +100,17 @@ def test_mixed_bundle_union_columns_and_unblind(tmp_path):
     assert [r["channel"] for r in geom["rec8"]["rows"]] == R.neutral_labels(8)
     assert [r["channel"] for r in geom["rec10"]["rows"]] == union
 
-    # build() -> one zip that opens and bakes the union channel set.
+    # PER-WINDOW: rec10's two windows must have DIFFERENT slot->true maps.
+    m = {(k["window"], k["slot"]): k["channel"] for k in km10}
+    assert any(m[(wins[0], s)] != m[(wins[1], s)] for s in union), "windows must scramble independently"
+
+    # build() -> one zip that opens, bakes the union, and leaks no true channel name.
     zpath = B.build(tmp_path, name="mixed")
     with zipfile.ZipFile(zpath) as zf:
-        html = zf.read("index.html").decode()
-    assert '"Ch J"' in html                        # the 10th union slot is present in the baked CHANNELS
+        blob = b"".join(zf.read(n) for n in zf.namelist())
+    assert b'"Ch J"' in blob                        # the 10th union slot is present in the baked CHANNELS
+    for t in true8 + true10:
+        assert t.encode() not in blob, f"true channel {t!r} leaked into the bundle"
 
     # Simulate a rater: label each recording's REAL slots, blank the padding (as the HTML export does).
     filled = pd.read_csv(tmp_path / "manifest.csv", dtype=str).fillna("")
@@ -110,14 +121,11 @@ def test_mixed_bundle_union_columns_and_unblind(tmp_path):
     rater_csv = tmp_path / "r1.csv"
     filled.to_csv(rater_csv, index=False)
 
-    km = pd.DataFrame(
-        [{"recording": "rec8", "slot": s, "channel": "T8_" + s[-1]} for s in R.neutral_labels(8)]
-        + [{"recording": "rec10", "slot": s, "channel": "T10_" + s[-1]} for s in union])
     long_df = ingest({"r1": rater_csv})
     out = unblind(long_df, km)
     assert not out["channel"].str.startswith("Ch ").any(), "every kept cell mapped to a true channel"
-    assert set(out.loc[out["recording"] == "rec8", "slot"]) == set(R.neutral_labels(8))   # padding dropped
-    assert set(out.loc[out["recording"] == "rec10", "slot"]) == set(union)
+    assert set(out.loc[out["recording"] == "rec8", "channel"]) == set(true8)     # padding dropped, true recovered
+    assert set(out.loc[out["recording"] == "rec10", "channel"]) == set(true10)
 
     # A LABELLED cell in a padding slot the recording lacks is a real mismatch -> must raise.
     bad = long_df.copy()

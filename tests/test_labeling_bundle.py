@@ -399,7 +399,7 @@ def test_render_lro_uses_absolute_windows_and_correct_units(tmp_path):
     )
 
     windows = [30, 31, 32]                                   # deep in the recording, so sample0 != 0
-    rows = R.render_lro(lro, tmp_path / "out", windows, "A", dpi=60)
+    rows, _ = R.render_lro(lro, tmp_path / "out", windows, "A", dpi=60)
 
     assert [r["window"] for r in rows] == windows            # absolute, not 0,1,2
     got_t = [r["t_start_s"] for r in rows]
