@@ -196,7 +196,8 @@ class LongRecordingOrganizer(
         self.labels = {}
 
         self.meta = None
-        self.channel_names = None
+        self.channel_names = None   # display labels
+        self.channel_ids = None     # stable identity (what configs key on); see _extract_channel_identities
         self.LongRecording = None
         self.temppaths = []
         self.file_durations = []

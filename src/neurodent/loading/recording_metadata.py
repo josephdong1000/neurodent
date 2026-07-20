@@ -32,7 +32,11 @@ class RecordingMetadata:
         mult_to_uV (float | None): Multiplication factor to convert to microvolts
         precision (str | None): Data precision/dtype (e.g., 'float32', 'int16')
         dt_end (datetime | None): End datetime of recording
-        channel_names (list[str]): List of channel names
+        channel_ids (list[str]): Stable channel identifiers (``get_channel_ids()`` — what the
+            dataset ``channels`` map/``channel_subset`` are keyed on). Falls back to
+            ``channel_names`` when a reader exposes no separate ID space.
+        channel_names (list[str]): Human display channel names (an experimenter's labels when
+            present, else the IDs). Not an identity — may be non-unique.
 
     Examples:
         From parameters:
@@ -57,6 +61,7 @@ class RecordingMetadata:
         channel_names: list[str] | None = None,
         V_units: str | None = None,
         mult_to_uV: float | None = None,
+        channel_ids: list[str] | None = None,
     ) -> None:
         """Initialize RecordingMetadata either from a file path or direct parameters.
 
@@ -77,7 +82,7 @@ class RecordingMetadata:
             self._init_from_path(metadata_path)
         else:
             self._init_from_params(
-                n_channels, f_s, dt_end, channel_names, V_units, mult_to_uV
+                n_channels, f_s, dt_end, channel_names, V_units, mult_to_uV, channel_ids
             )
 
     def _init_from_path(self, metadata_path):
@@ -103,9 +108,12 @@ class RecordingMetadata:
             )
 
         self.channel_names = self.metadata_df["ProbeInfo"].tolist()
+        # DDF/bin metadata has a single channel-name space; IDs == names.
+        self.channel_ids = list(self.channel_names)
 
     def _init_from_params(
-        self, n_channels, f_s, dt_end, channel_names, V_units=None, mult_to_uV=None
+        self, n_channels, f_s, dt_end, channel_names, V_units=None, mult_to_uV=None,
+        channel_ids=None,
     ):
         if None in (n_channels, f_s, channel_names):
             raise ValueError(
@@ -125,6 +133,9 @@ class RecordingMetadata:
             raise ValueError("channel_names must be a list")
 
         self.channel_names = channel_names
+        # Stable identity for config-driven matching/resolution. Defaults to the display
+        # names when a reader exposes no separate ID space (they are then identical).
+        self.channel_ids = list(channel_ids) if channel_ids is not None else list(channel_names)
 
     def __getsinglecolval(self, colname):
         vals = self.metadata_df.loc[:, colname]
@@ -145,6 +156,7 @@ class RecordingMetadata:
             "precision": self.precision,
             "dt_end": self.dt_end.isoformat() if self.dt_end else None,
             "channel_names": self.channel_names,
+            "channel_ids": self.channel_ids,
         }
 
     @classmethod
@@ -160,6 +172,7 @@ class RecordingMetadata:
             channel_names=data["channel_names"],
             V_units=data.get("V_units"),
             mult_to_uV=data.get("mult_to_uV"),
+            channel_ids=data.get("channel_ids"),
         )
 
     def to_json(self, file_path: Path) -> None:

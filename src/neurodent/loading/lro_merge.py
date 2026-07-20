@@ -51,30 +51,31 @@ class LroMergeMixin:
         if not hasattr(self, "LongRecording") or self.LongRecording is None:
             raise ValueError("No recording loaded to split")
 
-        # Build channel name to ID mapping
-        if not self.channel_names:
-            lro_names = [str(x) for x in self.LongRecording.get_channel_ids()]
-        else:
-            lro_names = self.channel_names
-
+        # Build a config-token -> recording-channel-id lookup, ID-FIRST.
+        # A dataset's `channel_subset` is keyed on the stable channel IDs (get_channel_ids(),
+        # e.g. Intan hardware ports); the display `channel_names` are only a fallback for
+        # readers whose config keys on labels. IDs therefore take priority on any collision.
         rec_channel_ids = self.LongRecording.get_channel_ids()
-        name_to_id = {}
-        if len(lro_names) == len(rec_channel_ids):
-            for name, ch_id in zip(lro_names, rec_channel_ids):
-                name_to_id[name] = ch_id
+        all_ids = [str(x) for x in rec_channel_ids]
+        display_names = self.channel_names if self.channel_names else all_ids
+
+        token_to_id = {}
+        if len(display_names) == len(rec_channel_ids):
+            for name, ch_id in zip(display_names, rec_channel_ids):
+                token_to_id.setdefault(str(name), ch_id)   # display name: fallback key
         else:
             logging.warning(
-                "LRO channel_names length mismatch. Falling back to str(id)."
+                "LRO channel_names length mismatch. Falling back to channel ids."
             )
-            for ch_id in rec_channel_ids:
-                name_to_id[str(ch_id)] = ch_id
+        for ch_id in rec_channel_ids:
+            token_to_id[str(ch_id)] = ch_id                # stable ID: priority key
 
         # Track which channels are used for validation warning
         all_requested_channels = set()
         for channel_list in groups.values():
             all_requested_channels.update(channel_list)
 
-        unused_channels = [ch for ch in lro_names if ch not in all_requested_channels]
+        unused_channels = [cid for cid in all_ids if cid not in all_requested_channels]
         if unused_channels:
             logging.warning(
                 f"{len(unused_channels)} channels not included in any group: "
@@ -93,8 +94,8 @@ class LroMergeMixin:
             missing = []
 
             for name in channel_subset:
-                if name in name_to_id:
-                    target_ids.append(name_to_id[name])
+                if name in token_to_id:
+                    target_ids.append(token_to_id[name])
                     valid_names.append(name)
                 else:
                     missing.append(name)
@@ -136,11 +137,19 @@ class LroMergeMixin:
                     ch for ch in self.bad_channel_names if ch in valid_names
                 ]
 
-            # Inherit complete metadata (preserving units, scaling, etc.)
+            # Inherit complete metadata (preserving units, scaling, etc.). After the rename
+            # above the child recording's IDs ARE the requested tokens, so identity == display
+            # for the split child.
             if self.meta:
                 child_lro.meta = copy.deepcopy(self.meta)
                 child_lro.meta.n_channels = len(valid_names)
                 child_lro.meta.channel_names = valid_names
+                child_lro.meta.channel_ids = valid_names
+            # After the rename the child's IDs ARE the requested config tokens; a split child
+            # is thus identified by those tokens (identity == display), consistent with every
+            # dataset whose config raw-names resolve to canonical abbrevs.
+            child_lro.channel_ids = valid_names
+            child_lro.channel_names = valid_names
 
             # Inherit labels (as a copy)
             if hasattr(self, "labels") and self.labels:
@@ -198,6 +207,7 @@ class LroMergeMixin:
                 new_channel_ids=self.channel_names
             )
             other_lro.channel_names = list(self.channel_names)
+            other_lro.channel_ids = list(self.channel_ids) if self.channel_ids else list(self.channel_names)
 
         self.LongRecording = si.concatenate_recordings(
             [self.LongRecording, other_rec]
@@ -220,8 +230,8 @@ class LroMergeMixin:
         # Check channel names — compare by abbreviation to tolerate naming
         # variants (e.g. "L Barrel" vs "L Barrel Ctx" both → "LBar").
         # Unparseable names pass through as-is for exact comparison.
-        self_abbrevs = resolve_channels(self.channel_names)
-        other_abbrevs = resolve_channels(other_lro.channel_names)
+        self_abbrevs = resolve_channels(self.channel_names, ids=self.channel_ids)
+        other_abbrevs = resolve_channels(other_lro.channel_names, ids=other_lro.channel_ids)
         if self_abbrevs != other_abbrevs:
             raise ValueError(
                 f"Channel names mismatch: this LRO has {self.channel_names} "

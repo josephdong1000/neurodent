@@ -373,40 +373,46 @@ class TestLongRecordingOrganizer:
             dist_mat = mock_nn.read_distance_matrix.call_args[0][0]
             np.testing.assert_allclose(dist_mat, expected_dists, atol=1e-5)
 
-    def test_extract_channel_names_prefers_channel_name_property(self):
-        """Test _extract_channel_names uses channel_name property when available."""
+    def test_extract_channel_identities_ids_and_display_names(self):
+        """channel_ids come from get_channel_ids(); channel_names prefer the (possibly
+        non-unique) channel_name display property."""
         mock_recording = Mock()
+        mock_recording.get_channel_ids.return_value = np.array(["A-009", "B-009", "C-009"])
         mock_recording.get_property_keys.return_value = ["channel_name", "gain_to_uV"]
-        mock_recording.get_property.return_value = np.array(["C-009", "C-010", "C-012"])
+        mock_recording.get_property.return_value = np.array(["LeftAud", "LeftAud", "LeftAud"])
 
-        names = LongRecordingOrganizer._extract_channel_names(mock_recording)
-        assert names == ["C-009", "C-010", "C-012"]
+        ids, names = LongRecordingOrganizer._extract_channel_identities(mock_recording)
+        assert ids == ["A-009", "B-009", "C-009"]           # stable identity
+        assert names == ["LeftAud", "LeftAud", "LeftAud"]   # display (non-unique is fine)
 
-    def test_extract_channel_names_falls_back_to_channel_ids(self):
-        """Test _extract_channel_names falls back to get_channel_ids when no channel_name property."""
+    def test_extract_channel_identities_names_default_to_ids(self):
+        """With no channel_name property, display names fall back to the ids."""
         mock_recording = Mock()
         mock_recording.get_property_keys.return_value = ["gain_to_uV"]
         mock_recording.get_channel_ids.return_value = np.array(["ch1", "ch2"])
 
-        names = LongRecordingOrganizer._extract_channel_names(mock_recording)
+        ids, names = LongRecordingOrganizer._extract_channel_identities(mock_recording)
+        assert ids == ["ch1", "ch2"]
         assert names == ["ch1", "ch2"]
 
-    def test_extract_channel_names_handles_mock_without_properties(self):
-        """Test _extract_channel_names handles recordings without get_property_keys."""
+    def test_extract_channel_identities_handles_mock_without_properties(self):
+        """A recording whose get_property_keys isn't iterable yields ids==names from ids."""
         mock_recording = Mock()
         # Mock's get_property_keys returns a Mock (not iterable)
         mock_recording.get_channel_ids.return_value = np.array(["a", "b"])
 
-        names = LongRecordingOrganizer._extract_channel_names(mock_recording)
+        ids, names = LongRecordingOrganizer._extract_channel_identities(mock_recording)
+        assert ids == ["a", "b"]
         assert names == ["a", "b"]
 
-    def test_extract_channel_names_with_integer_ids(self):
-        """Test _extract_channel_names converts integer IDs to strings."""
+    def test_extract_channel_identities_with_integer_ids(self):
+        """Integer channel IDs are stringified for both ids and names."""
         mock_recording = Mock()
         mock_recording.get_property_keys.return_value = []
         mock_recording.get_channel_ids.return_value = np.array([0, 1, 2])
 
-        names = LongRecordingOrganizer._extract_channel_names(mock_recording)
+        ids, names = LongRecordingOrganizer._extract_channel_identities(mock_recording)
+        assert ids == ["0", "1", "2"]
         assert names == ["0", "1", "2"]
 
     def test_convert_file_with_si_to_recording_folder_mode(self, temp_dir):
@@ -1369,6 +1375,7 @@ class TestZeroSampleMerge:
         """Create a mock LRO with the given properties."""
         lro = LongRecordingOrganizer(None, mode=None)
         lro.channel_names = channel_names
+        lro.channel_ids = list(channel_names)  # display-only LRO: identity == display
 
         mock_rec = Mock()
         mock_rec.get_total_samples.return_value = total_samples
@@ -1457,6 +1464,7 @@ class TestMergeChannelNameAbbreviation:
         """Create a mock LRO with the given properties."""
         lro = LongRecordingOrganizer(None, mode=None)
         lro.channel_names = channel_names
+        lro.channel_ids = list(channel_names)  # display-only LRO: identity == display
 
         mock_rec = Mock()
         mock_rec.get_total_samples.return_value = total_samples

@@ -232,7 +232,7 @@ class TestConvertFileWithSI:
                 mock_si.concatenate_recordings.return_value = concat_rec
                 with patch.object(lro, "_apply_resampling", return_value=concat_rec):
                     with patch.object(lro, "finalize_file_timestamps"):
-                        with patch.object(lro, "_extract_channel_names", return_value=_DEFAULT_CH_NAMES):
+                        with patch.object(lro, "_extract_channel_identities", return_value=(_DEFAULT_CH_NAMES, _DEFAULT_CH_NAMES)):
                             lro.convert_file_with_si_to_recording(
                                 extract_func=extract_func,
                                 multiprocess_mode="dask",
@@ -251,7 +251,7 @@ class TestConvertFileWithSI:
             mock_si.concatenate_recordings.return_value = concat_rec
             with patch.object(lro, "_apply_resampling", return_value=concat_rec):
                 with patch.object(lro, "finalize_file_timestamps"):
-                    with patch.object(lro, "_extract_channel_names", return_value=_DEFAULT_CH_NAMES):
+                    with patch.object(lro, "_extract_channel_identities", return_value=(_DEFAULT_CH_NAMES, _DEFAULT_CH_NAMES)):
                         lro.convert_file_with_si_to_recording(
                             extract_func=extract_func
                         )
@@ -285,7 +285,7 @@ class TestConvertFileWithSI:
         with patch("neurodent.loading.lro_loading.si"):
             with patch.object(lro, "_apply_resampling", return_value=rec):
                 with patch.object(lro, "finalize_file_timestamps"):
-                    with patch.object(lro, "_extract_channel_names", return_value=["a", "b"]):
+                    with patch.object(lro, "_extract_channel_identities", return_value=(["a", "b"], ["a", "b"])):
                         lro.convert_file_with_si_to_recording(extract_func=extract_func)
         assert lro.LongRecording is rec
 
