@@ -85,6 +85,8 @@ exists.
    `gh release create vX.Y.Z --generate-notes`.
 4. Approve the `pypi` deployment when the run pauses, then confirm at
    https://pypi.org/project/neurodent/.
+5. If runtime dependencies changed, resolve the "conda-forge recipe out of sync" issue (see
+   below) on the autotick bot's feedstock PR before merging it.
 
 ### conda-forge
 
@@ -92,14 +94,16 @@ conda-forge builds from the PyPI release, so there is nothing to publish separat
 code-only release the autotick bot opens a version-bump PR on `neurodent-feedstock` within a
 few hours; merge it to ship the conda build.
 
-Adding or changing a runtime dependency needs a manual feedstock edit, because the bot bumps
-only the version and sha256, not the dependency list. The bot's PR will fail its `pip check`
-test when a new dependency is missing from the recipe. Edit `recipe/meta.yaml` on that PR,
-add the dependency under `requirements: run:` using its conda-forge package name (not always
-the PyPI name: matplotlib is matplotlib-base, dask is dask-core) and mirror the version pin
-(e.g. `foobar >=1.2`). The dependency must already exist on conda-forge; if it is PyPI-only
-it cannot be added until it has its own feedstock. `grayskull pypi neurodent` regenerates the
-recipe from PyPI to check names.
+Runtime dependency changes need a manual feedstock edit, because the bot bumps only the
+version and sha256, not the dependency list. The `feedstock-sync-check` workflow watches for
+this: when `pyproject.toml`'s `[project.dependencies]` diverge from the recipe it opens (or
+updates) a "conda-forge recipe out of sync" issue listing the exact `requirements: run:`
+adds, removes, and pin changes, with conda names already mapped (matplotlib is
+matplotlib-base, dask is dask-core plus distributed). Apply that diff on the bot's PR. Run
+`make feedstock-diff` any time to see the same report locally. Adds are also caught by the
+recipe's `pip check` test (red CI on the bot's PR); removes are not, which is why the issue
+exists. A dependency must already exist on conda-forge; a PyPI-only one cannot be added until
+it has its own feedstock.
 
 ## Running Tests
 

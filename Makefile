@@ -1,4 +1,4 @@
-.PHONY: setup test docs docs-live docs-linkcheck clean
+.PHONY: setup test docs docs-live docs-linkcheck clean requirements feedstock-diff
 
 # Development setup - run this after cloning
 setup:
@@ -28,3 +28,12 @@ clean:
 	rm -rf docs/_build
 	rm -rf .pytest_cache
 	rm -rf **/__pycache__
+
+# Regenerate hash-pinned requirements from uv.lock (pyproject.toml is the source of truth)
+requirements:
+	uv export --frozen --format requirements-txt --no-emit-local --extra all -o requirements.txt >/dev/null
+	uv export --frozen --format requirements-txt --no-emit-local --all-extras -o requirements-dev.txt >/dev/null
+
+# Diff pyproject runtime deps against the conda-forge feedstock recipe
+feedstock-diff:
+	uv run python scripts/feedstock_diff.py
