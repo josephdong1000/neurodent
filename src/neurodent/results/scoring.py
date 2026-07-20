@@ -78,7 +78,8 @@ def unblind(long_df, keymap):
     as neutral slots (``Ch A``, ``Ch B``, ...) so anatomy cannot bias the rater
     (see ``scripts/labeling/render_context.py`` ``blind_channels``). The rater CSVs,
     and therefore :func:`ingest`'s output, then key on the slot rather than the true
-    channel. ``unblind`` restores the true channel per ``(recording, slot)`` using
+    channel. Blinding is per WINDOW (each window's channels are permuted independently), so
+    ``unblind`` restores the true channel per ``(recording, window, slot)`` using
     the experimenter-side keymap, so downstream :func:`consensus` / scoring key on
     real channels and cross-recording aggregation lines up. Call it between
     :func:`ingest` and :func:`consensus`; skip it for unblinded bundles.
@@ -86,8 +87,8 @@ def unblind(long_df, keymap):
     Args:
         long_df (pd.DataFrame): Output of :func:`ingest`; its ``channel`` column
             holds the neutral slot.
-        keymap (pd.DataFrame): De-scramble key with columns ``recording``, ``slot``,
-            and ``channel`` (the true channel name). This is the ``keymap.csv`` the
+        keymap (pd.DataFrame): De-scramble key with columns ``recording``, ``window``,
+            ``slot``, and ``channel`` (the true channel name). This is the ``keymap.csv`` the
             cohort bundler writes OUTSIDE the rater bundle.
 
     Returns:
@@ -95,12 +96,14 @@ def unblind(long_df, keymap):
         the neutral slot preserved in a new ``slot`` column.
 
     Raises:
-        ValueError: If a labelled ``(recording, slot)`` has no keymap entry — an
+        ValueError: If a labelled ``(recording, window, slot)`` has no keymap entry — an
             unmapped slot would silently drop from the truth set.
     """
-    km = keymap[["recording", "slot", "channel"]].rename(columns={"channel": "true_channel"})
+    km = keymap[["recording", "window", "slot", "channel"]].rename(columns={"channel": "true_channel"})
+    km["window"] = km["window"].astype(int)
     merged = long_df.merge(
-        km, how="left", left_on=["recording", "channel"], right_on=["recording", "slot"]
+        km, how="left",
+        left_on=["recording", "window", "channel"], right_on=["recording", "window", "slot"],
     )
     missing = merged["true_channel"].isna()
     # A LABELLED cell with no keymap entry is a real mismatch and must raise. An unlabelled one is just
@@ -108,11 +111,11 @@ def unblind(long_df, keymap):
     # rows anyway) — drop it quietly rather than fail the whole unblind.
     labelled_missing = missing & merged["y"].notna()
     if labelled_missing.any():
-        bad = list(merged.loc[labelled_missing, ["recording", "channel"]].drop_duplicates().itertuples(index=False))
+        bad = list(merged.loc[labelled_missing, ["recording", "window", "channel"]].drop_duplicates().itertuples(index=False))
         raise ValueError(
             "unblind: a labelled cell has no keymap entry: "
-            + "; ".join(f"{r.recording}/{r.channel}" for r in bad[:5])
-            + ". The keymap must cover every (recording, slot) that carries a label."
+            + "; ".join(f"{r.recording}/w{r.window}/{r.channel}" for r in bad[:5])
+            + ". The keymap must cover every (recording, window, slot) that carries a label."
         )
     merged = merged[~missing].copy()
     merged["channel"] = merged["true_channel"]

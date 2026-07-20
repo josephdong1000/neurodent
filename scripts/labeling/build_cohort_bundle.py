@@ -157,26 +157,28 @@ def render_animal(samples_config, config, animal_id, bundle_dir, *, n_per_animal
             continue
         true_names = resolve_channels(list(lro.channel_names))
         recording = f"{animal_id}__{i}"
-        perm, display_names, keymap = R.blind_channels(true_names, f"{blind_seed}:{recording}")
         try:
-            rows = R.render_lro(
+            # blind_seed makes render_windows blind EACH window independently and return a
+            # per-(recording, window, slot) keymap — no display slot can be learned to a true channel
+            # across this recording's windows.
+            rows, keymap = R.render_lro(
                 lro, bundle_dir, n_select=count, recording=recording,
                 append=(bundle_dir / R.MANIFEST).exists(), seed=seed,
-                channel_perm=perm, display_names=display_names, all_channels=all_channels,
+                blind_seed=blind_seed, true_names=true_names, all_channels=all_channels,
             )
         except ValueError as e:  # e.g. select_random cannot draw enough distinct windows in this session
             log.warning(f"{recording}: skipped ({e})")
             continue
         for k in keymap:
-            keymap_rows.append({"recording": recording, "slot": k["slot"], "channel": k["channel"],
-                                "animal": animal_id, "genotype": genotype})
+            keymap_rows.append({"recording": recording, "window": int(k["window"]), "slot": k["slot"],
+                                "channel": k["channel"], "animal": animal_id, "genotype": genotype})
         log.info(f"{recording}: rendered {len(rows)} window(s), {len(true_names)} ch")
     return keymap_rows
 
 
 def _write_keymap(path, rows):
     path.parent.mkdir(parents=True, exist_ok=True)
-    fields = ["recording", "slot", "channel", "animal", "genotype"]
+    fields = ["recording", "window", "slot", "channel", "animal", "genotype"]
     with open(path, "w", newline="") as fh:
         w = csv.DictWriter(fh, fieldnames=fields)
         w.writeheader()

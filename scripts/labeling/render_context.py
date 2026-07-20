@@ -104,8 +104,8 @@ def select_random(n_windows, n_select, seed=0):
 
 
 def render_windows(data, fs, ch_names, out, windows, recording, dpi=110, append=False,
-                   sample0=0, ylim=None, psd_lim=None, all_channels=None):
-    """data: (C, n_samples) volts for ONE recording. windows: flat list of window indices.
+                   sample0=0, ylim=None, psd_lim=None, all_channels=None, blind_seed=None):
+    """data: (C, n_samples) volts for ONE recording, in TRUE channel order. windows: flat list.
 
     Writes one PNG per window into out/images/ and appends rows to out/manifest.csv.
     Image names are prefixed with the recording slug so multiple recordings never collide.
@@ -114,13 +114,21 @@ def render_windows(data, fs, ch_names, out, windows, recording, dpi=110, append=
         sample0: absolute sample index of ``data[:, 0]``, non-zero when ``data`` is only a span of the
             recording. Window numbers stay absolute: the number a rater sees and the scorer keys on
             must be the true one, not an index into whatever slice was loaded.
-        ylim, psd_lim: precomputed scales. Pass these when rendering one recording over several calls,
-            so the scale a rater calibrates against does not shift between stretches.
-        all_channels: the manifest label-column set (a superset of this recording's ``ch_names``). Lets
-            ONE mixed bundle hold recordings with DIFFERENT channel counts (e.g. 8- and 10-channel
-            montages): every manifest row carries the same columns, and a shorter recording leaves the
-            extra slots blank. Its geometry still lists only its own channels, so the rater page shows
-            only the buttons that recording has. Defaults to this recording's own channels.
+        ylim, psd_lim: OPTIONAL fixed scales. When omitted (the default) the amplitude scale is computed
+            PER WINDOW from that window's visible +/- CONTEXT_S zoom context, so a blow-out ELSEWHERE in
+            the recording cannot crush an otherwise-normal window. Pass explicit scales only to force one
+            fixed scale across windows.
+        all_channels: the manifest label-column set (a superset of this recording's display channels).
+            Lets ONE mixed bundle hold recordings with DIFFERENT channel counts; a shorter recording
+            leaves the extra slots blank. Defaults to this recording's own display channels.
+        blind_seed: when not None, EACH window is INDEPENDENTLY channel-blinded — its traces are permuted
+            by a seed derived from ``(blind_seed, recording, window)``, rows are shown under neutral slots
+            (``Ch A`` ...), and a per-``(recording, window, slot)`` keymap is returned. ``ch_names`` is
+            then the TRUE channel names. When None, channels render in order (no keymap).
+
+    Returns:
+        tuple[list[dict], list[dict]]: ``(manifest_rows, keymap)``. ``keymap`` is empty unless blinding;
+        each entry is ``{"recording", "window", "slot", "channel"}``.
     """
     out = Path(out)
     img_dir = out / "images"
@@ -129,14 +137,19 @@ def render_windows(data, fs, ch_names, out, windows, recording, dpi=110, append=
     win = int(FRAG_S * fs)
     rec = slug(recording)
 
-    ylim = trace_ylim(data) if ylim is None else np.asarray(ylim)
-    psd_lim = psd_limits(data, fs, win) if psd_lim is None else tuple(psd_lim)
+    # Identity vs display: when blinding, the passed ``ch_names`` are the TRUE channels and rows are
+    # shown under neutral slots; the true<->slot mapping is recorded PER WINDOW in the keymap.
+    blinding = blind_seed is not None
+    true_names = list(ch_names)
+    display = neutral_labels(C) if blinding else list(ch_names)
+    fixed_ylim = None if ylim is None else np.asarray(ylim)
+    fixed_psd = None if psd_lim is None else tuple(psd_lim)
 
-    # Manifest label columns. `all_channels` (a superset of this recording's ch_names) lets a mixed
-    # bundle share ONE column set across recordings with different channel counts; a shorter recording
-    # leaves the extra slots blank. Defaults to this recording's own channels.
-    label_channels = list(all_channels) if all_channels is not None else list(ch_names)
-    missing = [c for c in ch_names if c not in label_channels]
+    # Manifest label columns use the DISPLAY names. `all_channels` (a superset) lets a mixed bundle share
+    # ONE column set across recordings with different channel counts; a shorter recording leaves the
+    # extra slots blank. Defaults to this recording's own display channels.
+    label_channels = list(all_channels) if all_channels is not None else list(display)
+    missing = [c for c in display if c not in label_channels]
     if missing:
         raise ValueError(f"render_windows: channels {missing} of {recording!r} not in all_channels={label_channels}")
 
@@ -151,9 +164,10 @@ def render_windows(data, fs, ch_names, out, windows, recording, dpi=110, append=
             raise ValueError(
                 f"cannot append {recording!r}: its channels do not match the existing manifest.\n"
                 f"  manifest: {[c[len(LABEL_COL_PREFIX):] for c in existing if c.startswith(LABEL_COL_PREFIX)]}\n"
-                f"  this one: {list(ch_names)}\n"
+                f"  this one: {list(display)}\n"
                 "Bundle recordings with identical channel sets, or render them separately.")
 
+    keymap = []
     rows, geom_rows = [], None
     for w in windows:
         # `w` is absolute; `data` may only be a span starting at sample0.
@@ -169,6 +183,20 @@ def render_windows(data, fs, ch_names, out, windows, recording, dpi=110, append=
         # absolute time-of-day (which could bias) and the figure stays blind. Identity lives in the CSV.
         tt = (np.arange(c0, c1) + sample0) / fs - ts0
         wlo, whi = 0.0, ts1 - ts0                             # the labelled window, in relative seconds
+
+        # Per-WINDOW channel blinding: a fresh permutation per (recording, window), so no display slot
+        # can be learned to a true channel across a recording's windows. Row i shows true_names[perm[i]].
+        perm = _channel_perm(f"{blind_seed}:{recording}:{w}", C) if blinding else np.arange(C)
+        wdata = data[perm]                                    # (C, N): row i is channel perm[i]
+        if blinding:
+            keymap += [{"recording": recording, "window": int(w), "slot": display[i],
+                        "channel": true_names[int(perm[i])]} for i in range(C)]
+
+        # Per-window amplitude scale from the VISIBLE +/- CONTEXT_S zoom context (not the whole
+        # recording), reordered to the blinded rows: a distant blow-out no longer crushes this window,
+        # while an in-window hot channel still scales high and still trips the red flag below.
+        ylim = (fixed_ylim if fixed_ylim is not None else trace_ylim(data[:, c0:c1]))[perm]
+        psd_lim = fixed_psd if fixed_psd is not None else psd_limits(data[:, c0:c1], fs, win)
 
         # 16:9 so the figure fits one screen; a rater who scrolls every window is spending attention
         # on the scrollbar instead of the trace.
@@ -188,13 +216,13 @@ def render_windows(data, fs, ch_names, out, windows, recording, dpi=110, append=
             ker = np.ones(k) / k
             ax = fig.add_subplot(gs[0, :])
             for ci in range(C):
-                env = np.convolve(np.abs(data[ci, o0:o1]) * 1e6, ker, mode="same") / ylim[ci]
+                env = np.convolve(np.abs(wdata[ci, o0:o1]) * 1e6, ker, mode="same") / ylim[ci]
                 step = max(1, len(env) // 3000)
                 ax.fill_between((np.arange(o0, o1)[::step] + sample0) / fs - ts0, (C - 1 - ci),
                                 (C - 1 - ci) + 3.0 * env[::step], lw=0, color="0.35")
             ax.axvspan(wlo, whi, color="orange", alpha=0.35)
             ax.set_yticks(np.arange(C) + 0.25)
-            ax.set_yticklabels(list(reversed(ch_names)), fontsize=7)
+            ax.set_yticklabels(list(reversed(display)), fontsize=7)
             ax.set_ylim(-0.2, C + 0.2)
             ax.set_xlim((o0 + sample0) / fs - ts0, (o1 + sample0) / fs - ts0)
             ax.tick_params(labelsize=7, pad=1)
@@ -204,11 +232,11 @@ def render_windows(data, fs, ch_names, out, windows, recording, dpi=110, append=
         med_scale = np.median(ylim)                          # a hot channel's per-channel scale (which
         hot = ylim > AMP_FLAG_MULT * med_scale               # hides its amplitude) shows up red-flagged
         trace_axes = []
-        for ci, ch in enumerate(ch_names):
+        for ci, ch in enumerate(display):
             a0 = fig.add_subplot(gs[ci + n_extra, 0])
             a1 = fig.add_subplot(gs[ci + n_extra, 1])
             trace_axes.append((ch, a0))
-            a0.plot(tt, data[ci, c0:c1] * 1e6, lw=0.3, color="0.15")
+            a0.plot(tt, wdata[ci, c0:c1] * 1e6, lw=0.3, color="0.15")
             a0.axvspan(wlo, whi, color="orange", alpha=0.25)
             a0.set_ylim(-ylim[ci], ylim[ci])
             lbl = f"{ch}\n+/-{ylim[ci]:.0f}uV" + (f"  {ylim[ci]/med_scale:.0f}x" if hot[ci] else "")
@@ -217,7 +245,7 @@ def render_windows(data, fs, ch_names, out, windows, recording, dpi=110, append=
             a0.tick_params(labelsize=7, pad=1)
             if ci < C - 1:
                 a0.set_xticklabels([])
-            f, p = welch(data[ci, t0:t1], fs=fs, nperseg=min(win, 2000))
+            f, p = welch(wdata[ci, t0:t1], fs=fs, nperseg=min(win, 2000))
             m = (f >= FMIN) & (f <= FMAX)
             a1.semilogx(f[m], 10 * np.log10(p[m] + 1e-20), lw=0.9, color="C0")
             a1.set_ylim(*psd_lim)                     # SHARED across channels: height = absolute power
@@ -280,7 +308,7 @@ def render_windows(data, fs, ch_names, out, windows, recording, dpi=110, append=
     geom = json.loads(gpath.read_text()) if (append and gpath.exists()) else {}
     geom[recording] = {"rows": geom_rows}
     gpath.write_text(json.dumps(geom, indent=1))
-    return rows
+    return rows, keymap
 
 
 def _contiguous_runs(windows):
@@ -325,12 +353,25 @@ def neutral_labels(n):
     return out
 
 
-def blind_channels(channel_names, seed_key):
-    """Deterministic per-recording channel blinding.
+def _channel_perm(seed_key, n):
+    """Deterministic permutation of ``n`` channel rows from a hashed ``seed_key``.
 
-    Draws a permutation of the channel axis from a seed derived from ``seed_key``
-    (use ``f"{blind_seed}:{recording}"`` so every recording scrambles differently
-    but reproducibly), and names the permuted slots with :func:`neutral_labels`.
+    Used both for the (legacy) per-recording :func:`blind_channels` and — keyed on
+    ``f"{blind_seed}:{recording}:{window}"`` — for the per-WINDOW blinding in
+    :func:`render_windows`, so no display slot can be learned to a true channel across a
+    recording's windows.
+    """
+    digest = hashlib.sha256(str(seed_key).encode()).digest()
+    rng = np.random.RandomState(int.from_bytes(digest[:4], "big"))
+    return rng.permutation(n)
+
+
+def blind_channels(channel_names, seed_key):
+    """Deterministic channel blinding for a single ``seed_key`` (one permutation).
+
+    Draws a permutation of the channel axis from a seed derived from ``seed_key`` and names the
+    permuted slots with :func:`neutral_labels`. (The cohort bundler now blinds per WINDOW inside
+    :func:`render_windows`; this remains the single-permutation primitive/utility.)
 
     Args:
         channel_names (list[str]): True channel names, in recording order.
@@ -338,24 +379,19 @@ def blind_channels(channel_names, seed_key):
 
     Returns:
         tuple[np.ndarray, list[str], list[dict]]: ``(perm, display_names, keymap)``
-        where ``perm`` reorders the channel axis (row ``i`` shows
-        ``channel_names[perm[i]]``), ``display_names`` are the neutral labels for
-        the permuted order, and ``keymap`` is the de-scramble record — one
-        ``{"slot": <neutral>, "channel": <true name>}`` per slot. Keep the keymap
-        OUT of the rater bundle; it is how labels are put back in order on return.
+        where ``perm`` reorders the channel axis (row ``i`` shows ``channel_names[perm[i]]``),
+        ``display_names`` are the neutral labels, and ``keymap`` is the de-scramble record —
+        one ``{"slot": <neutral>, "channel": <true name>}`` per slot.
     """
     n = len(channel_names)
-    digest = hashlib.sha256(str(seed_key).encode()).digest()
-    rng = np.random.RandomState(int.from_bytes(digest[:4], "big"))
-    perm = rng.permutation(n)
+    perm = _channel_perm(seed_key, n)
     names = neutral_labels(n)
     keymap = [{"slot": names[i], "channel": channel_names[int(perm[i])]} for i in range(n)]
     return perm, names, keymap
 
 
 def render_lro(lrec, out, windows=None, recording=None, append=False, dpi=110, notch=True,
-               scales=None, n_select=None, seed=0, channel_perm=None, display_names=None,
-               all_channels=None):
+               n_select=None, seed=0, blind_seed=None, all_channels=None, true_names=None):
     """Render from a LongRecording, i.e. any format the loader reads (rhd/EDF/NWB/bin).
 
     The loader knows each format's import parameters, so this is how a real campaign renders; nothing
@@ -366,12 +402,14 @@ def render_lro(lrec, out, windows=None, recording=None, append=False, dpi=110, n
     (n_channels, n_samples) in volts. Notch is applied per fragment by LongRecordingAnalyzer, so the
     rater and the detector see the same signal as the WAR features.
 
-    Channel blinding: pass ``channel_perm`` (and usually ``display_names``), e.g. from
-    :func:`blind_channels`, to shuffle the channel rows and label them with neutral slots so anatomy
-    cannot bias the rater. ``channel_perm`` reorders both the traces and their per-channel y-scales;
-    ``display_names`` (length = n_channels) replaces the channel names written into the
-    images/manifest/geometry. The caller keeps the matching keymap to unblind the returned labels.
-    Both default to ``None`` (unblinded, true channel names).
+    Channel blinding: pass ``blind_seed`` to blind each window INDEPENDENTLY (see
+    :func:`render_windows`) — traces permuted per ``(recording, window)``, rows shown under neutral
+    slots so anatomy cannot bias the rater, and a per-``(recording, window, slot)`` keymap returned for
+    the caller to unblind the labels. Default ``None`` renders true channels in order. Amplitude scale is
+    computed per window over its visible +/- CONTEXT_S context.
+
+    Returns:
+        tuple[list[dict], list[dict]]: ``(manifest_rows, keymap)`` (keymap empty when not blinding).
     """
     from neurodent.analysis.long_recording_analyzer import LongRecordingAnalyzer
 
@@ -382,31 +420,27 @@ def render_lro(lrec, out, windows=None, recording=None, append=False, dpi=110, n
     win = int(FRAG_S * fs)
     if windows is None:
         windows = select_random(lan.n_fragments, n_select, seed=seed)
-    ylim, psd_lim = scales if scales is not None else lro_scales(lan)
-
-    # Channel blinding: reorder traces + y-scales and relabel rows with neutral slots.
-    ch_names = list(lan.channel_names)
-    perm = None
-    if channel_perm is not None:
-        perm = np.asarray(channel_perm)
-        ylim = np.asarray(ylim)[perm]
-        ch_names = list(display_names) if display_names is not None else [ch_names[int(perm[i])] for i in range(len(perm))]
+    # TRUE channel names for the keymap/labels. Callers pass canonical abbrevs (resolve_channels) so the
+    # de-scramble key stores anatomy, not raw ids; default to the recording's own channel names.
+    ch_names = list(true_names) if true_names is not None else list(lan.channel_names)
+    if len(ch_names) != len(lan.channel_names):
+        raise ValueError(f"true_names has {len(ch_names)} entries, recording has {len(lan.channel_names)} channels")
 
     # The context flanks reach beyond the target window, so one fragment is not enough.
     flank_frags = int(np.ceil(max(CONTEXT_S, OVERVIEW_S or 0) / FRAG_S))
 
-    rows = []
+    rows, keymap = [], []
     for run in _contiguous_runs(windows):
         f0 = max(0, run[0] - flank_frags)
         f1 = min(lan.n_fragments, run[-1] + 1 + flank_frags)
         span = np.concatenate([lan.get_fragment_np(int(i)) for i in range(f0, f1)], axis=0)
-        data = span.T * 1e-6                                    # (C, N) µV -> volts
-        if perm is not None:
-            data = data[perm]
-        rows += render_windows(data, fs, ch_names, out, run, recording,
-                               dpi=dpi, append=append or bool(rows), sample0=f0 * win,
-                               ylim=ylim, psd_lim=psd_lim, all_channels=all_channels)
-    return rows
+        data = span.T * 1e-6                                    # (C, N) µV -> volts, TRUE channel order
+        r, k = render_windows(data, fs, ch_names, out, run, recording,
+                              dpi=dpi, append=append or bool(rows), sample0=f0 * win,
+                              all_channels=all_channels, blind_seed=blind_seed)
+        rows += r
+        keymap += k
+    return rows, keymap
 
 
 def render_fif(fif, out, windows=None, n_select=None,
@@ -421,7 +455,8 @@ def render_fif(fif, out, windows=None, n_select=None,
         n_win = int(data.shape[1] // (FRAG_S * fs))
         windows = select_random(n_win, n_select, seed=seed)
     rec = recording or Path(fif).stem
-    return render_windows(data, fs, raw.ch_names, out, windows, rec, append=append)
+    rows, _ = render_windows(data, fs, raw.ch_names, out, windows, rec, append=append)
+    return rows
 
 
 if __name__ == "__main__":
