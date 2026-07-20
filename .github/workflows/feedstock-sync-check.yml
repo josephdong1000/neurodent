@@ -29,7 +29,7 @@ jobs:
     - name: Install uv
       uses: astral-sh/setup-uv@v7
       with:
-        python-version: '3.10'
+        python-version: '3.12'
 
     - name: Diff recipe against pyproject and update tracking issue
       env:
@@ -37,7 +37,7 @@ jobs:
       run: |
         TITLE="conda-forge recipe out of sync"
         set +e
-        BODY=$(uv run python scripts/feedstock_diff.py --format markdown)
+        BODY=$(uv run --no-project --python 3.12 python scripts/feedstock_diff.py --format markdown)
         CODE=$?
         set -e
         echo "$BODY"
