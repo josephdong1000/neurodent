@@ -250,12 +250,14 @@ def test_score_detectors_mini_real(_at_repo_root, tmp_path):
     # Score every labelled animal through the SHARED loader + WAR-gen feature path (window_s=FRAG_S).
     config, samples_config = C._prepare("mini_real")
     animals = {r.rsplit("__", 1)[0] for r in cons["recording"].unique()}
-    rows = []
+    rows, ar_rows = [], []
     for animal_id in sorted(animals):
         ao = C.load_cohort_animal(samples_config, config, animal_id)
         war = AnimalAnalyzer(ao).compute_windowed_analysis(
             SD.FEATURES, window_s=R.FRAG_S, apply_notch_filter=True, multiprocess_mode="serial")
         rows += SD.score_animal(war, ao, animal_id, cons)
+        # autoreject: the 6 adapted arms, fit per-LRO on the whole (tiny) recording, scored via score_mask.
+        ar_rows += SD.score_animal_autoreject(ao, animal_id, cons, max_fit_fragments=None, seed=0)
     assert rows, "expected per-(recording, detector) scores"
 
     df = pd.DataFrame(rows)
@@ -265,3 +267,12 @@ def test_score_detectors_mini_real(_at_repo_root, tmp_path):
     scored = df[df["n"].fillna(0) > 0]
     for metric in ("precision", "recall", "f1"):
         assert scored[metric].between(0.0, 1.0).all(), f"{metric} out of [0,1]"
+
+    # Autoreject arms: all 6 configs scored, aligned (n_uncovered==0), metrics well-formed.
+    adf = pd.DataFrame(ar_rows)
+    from neurodent.results import autoreject_detector as adr
+    assert set(adf["detector"]) == set(adr.CONFIG_NAMES), "all 6 autoreject arms scored"
+    assert adf["n_uncovered"].fillna(0).sum() == 0, "autoreject grids aligned to the labelled 5 s fragments"
+    ascored = adf[adf["n"].fillna(0) > 0]
+    for metric in ("precision", "recall", "f1"):
+        assert ascored[metric].between(0.0, 1.0).all(), f"autoreject {metric} out of [0,1]"
