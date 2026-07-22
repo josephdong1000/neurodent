@@ -32,11 +32,13 @@ Heavy load (feature extraction over full recordings) -> run on the cluster::
 """
 import argparse
 import logging
+import os
 import sys
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from dask.distributed import Client, LocalCluster
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import build_cohort_bundle as C  # noqa: E402  (shared cohort load seam: no drift vs the bundle)
@@ -44,7 +46,10 @@ import render_context as R  # noqa: E402  (FRAG_S — single source of the windo
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 from neurodent.analysis import AnimalAnalyzer  # noqa: E402
-from neurodent.results.scoring import consensus, ingest, unblind, score_keep_mask  # noqa: E402
+from neurodent.analysis.long_recording_analyzer import LongRecordingAnalyzer  # noqa: E402
+from neurodent.core.utils import resolve_channels  # noqa: E402
+from neurodent.results import autoreject_detector as adr  # noqa: E402
+from neurodent.results.scoring import consensus, ingest, score_keep_mask, score_mask, unblind  # noqa: E402
 
 log = logging.getLogger("score_detectors")
 
@@ -102,6 +107,69 @@ def score_animal(war, ao, animal_id, consensus_df, detectors=FRAGMENT_DETECTORS)
     return rows
 
 
+def autoreject_grids(lro, needed_windows=None, *, max_fit_fragments=5000, seed=0, parallel=True):
+    """Run the 6 adapted-autoreject arms on ONE recording (LRO).
+
+    Builds 5 s epochs from the LRO's own fragments (the SAME ``LongRecordingAnalyzer(fragment_len_s=FRAG_S,
+    apply_notch_filter=True)`` the labeling used → identical signal), then fits+applies the leak-free CV per
+    :mod:`neurodent.results.autoreject_detector`. Returns ``({config: (n_pool, C) REJECT grid}, ch_names,
+    grid_times)`` aligned by ``grid_times`` so :func:`score_mask` picks the labelled fragments.
+
+    Fit pool = the labelled fragments (always included) + a capped random subsample of the rest
+    (``max_fit_fragments``, default 5000) — the CV threshold needs only a representative, mostly-clean pool,
+    so this bounds memory/compute on 24 h recordings (~17k fragments). Pass ``max_fit_fragments=None`` to fit
+    on the whole recording.
+    """
+    lan = LongRecordingAnalyzer(lro, fragment_len_s=R.FRAG_S, apply_notch_filter=True)
+    idxs = adr.fit_pool_indices(lan.n_fragments, needed_windows, max_fit_fragments, seed)
+    # (n_pool, C, T) volts; get_fragment_np is (n_samples, C) µV. The last fragment is usually ragged
+    # (recording length not an exact multiple of FRAG_S); skip any non-full fragment so the stack and the
+    # LPSD bin count stay uniform. Labelled windows are never edge fragments (the labeler reserves flanks).
+    win = int(round(R.FRAG_S * lan.f_s))
+    frags, keep = [], []
+    for i in idxs:
+        f = lan.get_fragment_np(int(i))                     # (n_samples, C) µV
+        if f.shape[0] != win:
+            continue
+        frags.append(f.T * 1e-6)
+        keep.append(int(i))
+    if not frags:
+        raise ValueError(f"no full-length fragments (win={win} samples) to fit on")
+    X = np.stack(frags, axis=0)
+    idxs = np.array(keep, dtype=int)
+    ch_names = resolve_channels(list(lan.channel_names))
+    grids = adr.compute_masks(X, int(lan.f_s), parallel=parallel)   # {config: (n_pool, C) True=REJECT}
+    grid_times = idxs.astype(float) * R.FRAG_S
+    return grids, ch_names, grid_times
+
+
+def score_animal_autoreject(ao, animal_id, consensus_df, *, max_fit_fragments=5000, seed=0):
+    """Score the 6 autoreject arms per recording (per LRO) against the consensus via ``score_mask``.
+
+    Autoreject is naturally PER-LRO (fit on that recording's fragments), so unlike the WAR filters it does
+    not slice a whole-animal mask; each LRO yields its own reject grids. The grids are ``True = REJECT`` so
+    they go through :func:`score_mask` directly (not ``score_keep_mask``).
+    """
+    recs = set(consensus_df["recording"])
+    rows = []
+    for i, lro in enumerate(ao.long_recordings):
+        recording = f"{animal_id}__{i}"
+        if recording not in recs:
+            continue
+        needed = consensus_df.loc[consensus_df["recording"] == recording, "window"].unique()
+        try:
+            grids, ch_names, grid_times = autoreject_grids(
+                lro, needed, max_fit_fragments=max_fit_fragments, seed=seed)
+        except Exception as e:
+            log.error(f"{recording}: autoreject FAILED -- {type(e).__name__}: {e}")
+            continue
+        for name, grid in grids.items():
+            res = score_mask(grid, ch_names, consensus_df, recording,
+                             grid_times=grid_times, frag_s=R.FRAG_S, strict=False)
+            rows.append({"recording": recording, "detector": name, **res})
+    return rows
+
+
 def build_consensus(manifests, keymap_path, rule):
     """rater CSVs + keymap -> consensus ground truth (the score_bundle.py round-trip)."""
     long_df = ingest(manifests)
@@ -122,9 +190,22 @@ def main(argv=None):
     ap.add_argument("--lof", action="store_true",
                     help="also score the LOF bad-channel detector (needs compute_bad_channels; slower)")
     ap.add_argument("--lof-threshold", type=float, default=2.5)
+    ap.add_argument("--autoreject", action="store_true",
+                    help="also score the 6 adapted-autoreject arms (amp/v2/v3 x +/-CMR); builds raw epochs "
+                         "per recording + LPSD (slower)")
+    ap.add_argument("--ar-fit-max-fragments", type=int, default=5000,
+                    help="cap on the autoreject fit pool per recording (labelled fragments always included; "
+                         "0/negative -> fit on the whole recording)")
     ap.add_argument("--limit-per-dataset", type=int, default=None,
                     help="match the bundle's --limit-per-dataset so the same animals are loaded")
     ap.add_argument("--seed", type=int, default=0, help="match the bundle's --seed for --limit selection")
+    ap.add_argument("--workers", type=int, default=None,
+                    help="dask process workers for feature extraction (default: all cores allocated to "
+                         "the job). Feature extraction over a full recording is the cost -- give this job "
+                         "many cores.")
+    ap.add_argument("--chunk-duration-s", type=float, default=3600,
+                    help="seconds of data buffered per chunk during dask extraction (matches the pipeline; "
+                         "raise on a high-memory node for throughput)")
     ap.add_argument("--out", type=Path, default=None, help="write per-(recording, detector) rows to CSV")
     args = ap.parse_args(argv)
 
@@ -154,29 +235,52 @@ def main(argv=None):
 
     detectors = dict(FRAGMENT_DETECTORS)
 
+    # Feature extraction over full recordings is the cost (a big recording is O(10k) fragments). Serial is
+    # hopelessly slow (~1.6 s/fragment -> hours per animal); the pipeline parallelizes with dask, so we do
+    # the same. Dashboard is off: we care that the analysis RUNS, not about scheduler introspection.
+    n_workers = args.workers or len(os.sched_getaffinity(0))
+    log.info(f"starting dask LocalCluster with {n_workers} process workers (dashboard off)")
+
     all_rows = []
-    for ds, samples_config, config, animal_id in C.iter_cohort_animals(
-        datasets, limit_per_dataset=args.limit_per_dataset, seed=args.seed
-    ):
-        if animal_id not in animals_wanted:
-            continue
+    with LocalCluster(n_workers=n_workers, threads_per_worker=1, processes=True,
+                      dashboard_address=None) as cluster, Client(cluster) as client:
+        # Workers are subprocesses that each import spikeinterface/neurodent (~15 s), so they register
+        # gradually. Block for the full pool before any compute, else the first animal's dask.compute
+        # fans out across only however few had registered at that instant.
         try:
-            ao = C.load_cohort_animal(samples_config, config, animal_id)
-            az = AnimalAnalyzer(ao)
-            if args.lof:
-                az.compute_bad_channels(lof_threshold=args.lof_threshold, lof_chunk_duration_s=60)
-            # window_s pinned to the labeling FRAG_S; notch on -> identical signal to the rendered windows.
-            war = az.compute_windowed_analysis(FEATURES, window_s=R.FRAG_S,
-                                               apply_notch_filter=True, multiprocess_mode="serial")
-            if args.lof:
-                lof_dict = war.get_bad_channels_by_lof_threshold(args.lof_threshold)
-                detectors = {**FRAGMENT_DETECTORS,
-                             "lof": ("get_filter_reject_channels_by_recording_session",
-                                     {"bad_channels_dict": lof_dict})}
-            all_rows += score_animal(war, ao, animal_id, cons, detectors)
-            log.info(f"{animal_id}: scored {len(ao.animaldays)} recording(s)")
+            client.wait_for_workers(n_workers, timeout=180)
         except Exception as e:
-            log.error(f"{animal_id}: FAILED -- {type(e).__name__}: {e}")
+            log.warning(f"only {len(client.scheduler_info()['workers'])}/{n_workers} workers up after "
+                        f"180 s ({type(e).__name__}); proceeding with what registered")
+        log.info(f"dask cluster up: {len(client.scheduler_info()['workers'])} workers")
+        for ds, samples_config, config, animal_id in C.iter_cohort_animals(
+            datasets, limit_per_dataset=args.limit_per_dataset, seed=args.seed
+        ):
+            if animal_id not in animals_wanted:
+                continue
+            try:
+                ao = C.load_cohort_animal(samples_config, config, animal_id)
+                az = AnimalAnalyzer(ao)
+                if args.lof:
+                    az.compute_bad_channels(lof_threshold=args.lof_threshold, lof_chunk_duration_s=60)
+                # window_s pinned to the labeling FRAG_S; notch on -> identical signal to the rendered
+                # windows; dask parallelizes the per-fragment feature extraction across the cluster.
+                war = az.compute_windowed_analysis(
+                    FEATURES, window_s=R.FRAG_S, apply_notch_filter=True,
+                    multiprocess_mode="dask", chunk_duration_s=args.chunk_duration_s)
+                if args.lof:
+                    lof_dict = war.get_bad_channels_by_lof_threshold(args.lof_threshold)
+                    detectors = {**FRAGMENT_DETECTORS,
+                                 "lof": ("get_filter_reject_channels_by_recording_session",
+                                         {"bad_channels_dict": lof_dict})}
+                all_rows += score_animal(war, ao, animal_id, cons, detectors)
+                if args.autoreject:
+                    cap = args.ar_fit_max_fragments if args.ar_fit_max_fragments > 0 else None
+                    all_rows += score_animal_autoreject(ao, animal_id, cons,
+                                                        max_fit_fragments=cap, seed=args.seed)
+                log.info(f"{animal_id}: scored {len(ao.animaldays)} recording(s)")
+            except Exception as e:
+                log.error(f"{animal_id}: FAILED -- {type(e).__name__}: {e}")
 
     if not all_rows:
         print("no recordings scored (no overlap between the cohort and the consensus recordings).")
@@ -188,9 +292,12 @@ def main(argv=None):
         print(f"wrote per-recording rows -> {args.out}")
 
     # Pooled per-detector metrics from summed confusions (a cell counts once, regardless of recording).
-    print(f"\n{'detector':<16}{'n':>7}{'uncov':>7}{'prec':>8}{'recall':>8}{'f1':>8}   confusion[tn fp / fn tp]")
-    print("-" * 78)
-    for name in detectors:
+    order = list(FRAGMENT_DETECTORS) + (["lof"] if args.lof else []) + \
+        (adr.CONFIG_NAMES if args.autoreject else [])
+    present = [n for n in order if (df["detector"] == n).any()]
+    print(f"\n{'detector':<22}{'n':>7}{'uncov':>7}{'prec':>8}{'recall':>8}{'f1':>8}   confusion[tn fp / fn tp]")
+    print("-" * 84)
+    for name in present:
         sub = df[df["detector"] == name]
         conf = np.zeros((2, 2), dtype=int)
         for c in sub["confusion"].dropna():
@@ -199,7 +306,7 @@ def main(argv=None):
         p, r, f1 = _prf(tn, fp, fn, tp)
         n = int(sub["n"].fillna(0).sum())
         uncov = int(sub["n_uncovered"].fillna(0).sum())
-        print(f"{name:<16}{n:>7}{uncov:>7}{p:>8.3f}{r:>8.3f}{f1:>8.3f}   [{tn} {fp} / {fn} {tp}]")
+        print(f"{name:<22}{n:>7}{uncov:>7}{p:>8.3f}{r:>8.3f}{f1:>8.3f}   [{tn} {fp} / {fn} {tp}]")
     print("\nSingle-rater dogfood: no interrater kappa ceiling yet — smoke read, not calibration.")
     return 0
 
