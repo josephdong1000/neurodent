@@ -162,6 +162,30 @@ def test_load_animal_recordings_mini_real(_at_repo_root):
 @pytest.mark.integration
 @pytest.mark.slow
 @pytest.mark.mutates_constants
+def test_animalday_single_source_mini_real(_at_repo_root):
+    """The animalday is a SINGLE SOURCE OF TRUTH: ``from_lros`` stamps ``lro.animalday`` and the WAR reads
+    it, so ``ao.animaldays == war.result['animalday']`` exactly. Previously the WAR re-derived it from the
+    raw folder session while the AO used the parsed date — they diverged for any dataset whose folder
+    session isn't a date (e.g. sox5's "062921" vs "Jul-01-2021"), silently dropping those sessions from
+    LOF filtering and from detector scoring. Guards against that regressing."""
+    pytest.importorskip("spikeinterface")
+    from neurodent.analysis import AnimalAnalyzer
+
+    config, samples_config = C._prepare("mini_real")
+    for animal_id in ("A10", "F22"):
+        ao = C.load_cohort_animal(samples_config, config, animal_id)
+        stamps = [getattr(lro, "animalday", None) for lro in ao.long_recordings]
+        assert all(stamps), "every LRO must be stamped with its canonical animalday"
+        assert stamps == list(ao.animaldays), "ao.animaldays must mirror lro.animalday"
+        war = AnimalAnalyzer(ao).compute_windowed_analysis(
+            ["rms"], window_s=5, apply_notch_filter=True, multiprocess_mode="serial")
+        assert set(ao.animaldays) == set(war.result["animalday"].unique()), \
+            "the WAR animalday column must equal ao.animaldays so every AO<->WAR join lines up"
+
+
+@pytest.mark.integration
+@pytest.mark.slow
+@pytest.mark.mutates_constants
 def test_build_cohort_blinded_bundle_mini_real(_at_repo_root, tmp_path):
     """End-to-end: build a blinded cohort bundle, prove blinding holds, and round-trip the labels.
 
