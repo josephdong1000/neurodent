@@ -43,6 +43,7 @@ notebooks/tests/test_all_functions_Yong.ipynb
 *.gz
 .DS_Store
 *.dat
+!config/labeling/keymap.csv
 
 # Example data for integration testing (after *.bin, *.csv so negations take effect)
 !tests/integration/generate.py

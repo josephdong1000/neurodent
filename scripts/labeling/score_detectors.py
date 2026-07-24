@@ -27,8 +27,7 @@ the current thresholds track one human's labels, NOT calibration. Multi-rater ca
 Heavy load (feature extraction over full recordings) -> run on the cluster::
 
     uv run python scripts/labeling/score_detectors.py \
-        --all --keymap results/labeling/mixed/_unblind/keymap.csv \
-        JD=labels_cohort4strains_JD.csv
+        --all JD=labels_cohort4strains_JD.csv   # --keymap defaults to config/labeling/keymap.csv
 """
 import argparse
 import logging
@@ -50,6 +49,8 @@ from neurodent.analysis.long_recording_analyzer import LongRecordingAnalyzer  # 
 from neurodent.core.utils import resolve_channels  # noqa: E402
 from neurodent.results import autoreject_detector as adr  # noqa: E402
 from neurodent.results.scoring import consensus, ingest, score_keep_mask, score_mask, unblind  # noqa: E402
+
+CONFIG_KEYMAP = Path(__file__).resolve().parents[2] / "config/labeling/keymap.csv"  # committed + permanent (results/ is disposable)
 
 log = logging.getLogger("score_detectors")
 
@@ -181,7 +182,8 @@ def build_consensus(manifests, keymap_path, rule):
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("raters", nargs="+", metavar="rater=csv", help="one or more rater_id=exported_csv")
-    ap.add_argument("--keymap", type=Path, required=True, help="path to _unblind/keymap.csv")
+    ap.add_argument("--keymap", type=Path, default=CONFIG_KEYMAP,
+                    help="slot->channel unblinding key (default: committed config/labeling/keymap.csv)")
     ap.add_argument("--dataset", nargs="+", default=None,
                     help="dataset name(s) whose animals to score (config/datasets/<name>.yaml)")
     ap.add_argument("--all", action="store_true",
