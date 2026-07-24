@@ -5,8 +5,7 @@ The rater labels windows in the blinded HTML bundle and clicks **Export**, which
 ``labels_<bundle>_<rater>.csv`` to their machine. Copy those CSVs onto the cluster, then::
 
     python scripts/labeling/score_bundle.py \
-        --keymap results/labeling/mixed/_unblind/keymap.csv \
-        joseph=~/labels_mixed_joseph.csv [alice=... bob=...]
+        joseph=~/labels_mixed_joseph.csv [alice=... bob=...]   # --keymap auto-found, else config/labeling/keymap.csv
 
 Each positional argument is ``rater_id=path``. The script runs the exact library round-trip —
 :func:`ingest` (melt ``label_*`` slot columns to long form) -> :func:`unblind` (neutral slot ->
@@ -28,19 +27,23 @@ from pathlib import Path
 
 import pandas as pd
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+REPO = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO / "src"))
 from neurodent.results.scoring import consensus, ingest, interrater, unblind  # noqa: E402
+
+CONFIG_KEYMAP = REPO / "config/labeling/keymap.csv"  # committed + permanent (results/ is disposable)
 
 
 def _default_keymap(rater_csvs):
-    """Best-effort: the keymap sits at ``<bundle_parent>/_unblind/keymap.csv``. Given a rater CSV in,
-    or near, a bundle tree, walk up looking for it so ``--keymap`` can usually be omitted."""
+    """Best-effort keymap discovery: first walk up from each rater CSV for a fresh build's paired
+    ``<bundle_parent>/_unblind/keymap.csv``; then fall back to the committed ``config/labeling/keymap.csv``.
+    So ``--keymap`` can usually be omitted, and scoring still works after ``results/`` is cleared."""
     for p in rater_csvs:
         for anc in Path(p).resolve().parents:
             cand = anc / "_unblind" / "keymap.csv"
             if cand.exists():
                 return cand
-    return None
+    return CONFIG_KEYMAP if CONFIG_KEYMAP.exists() else None
 
 
 def main(argv=None):
@@ -48,7 +51,8 @@ def main(argv=None):
     ap.add_argument("raters", nargs="+", metavar="rater=csv",
                     help="one or more rater_id=path_to_exported_csv")
     ap.add_argument("--keymap", type=Path, default=None,
-                    help="path to _unblind/keymap.csv (default: auto-discover next to a rater CSV)")
+                    help="slot->channel unblinding key (default: auto-discover next to a rater CSV, "
+                         "else committed config/labeling/keymap.csv)")
     ap.add_argument("--rule", default="majority", choices=["majority", "unanimous", "any"],
                     help="consensus rule (default: majority)")
     ap.add_argument("--out", type=Path, default=None,
@@ -67,8 +71,9 @@ def main(argv=None):
 
     keymap_path = args.keymap or _default_keymap(manifests.values())
     if keymap_path is None or not Path(keymap_path).exists():
-        ap.error("could not find keymap.csv; pass it with --keymap "
-                 "(it lives at <bundle>/_unblind/keymap.csv, OUTSIDE the shipped zip)")
+        ap.error("could not find keymap.csv; pass it with --keymap (a fresh build writes it to "
+                 "<bundle>/_unblind/keymap.csv OUTSIDE the shipped zip; the shipped key is committed at "
+                 "config/labeling/keymap.csv)")
     keymap = pd.read_csv(keymap_path)
 
     print(f"keymap : {keymap_path}  ({len(keymap)} rows, "

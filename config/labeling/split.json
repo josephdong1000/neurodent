@@ -1,0 +1,46 @@
+{
+  "rule": "strain-stratified random; each strain >=1; seed-fixed; NO label/prevalence peeking; NO re-rolls",
+  "seed": 0,
+  "n_test": 6,
+  "test": [
+    "32",
+    "AP3B2wt-241-M",
+    "AP3B2wt-247-F",
+    "ArxRosa-1201",
+    "ArxRosa-1211",
+    "MMUT(2)_cohort6_group1"
+  ],
+  "dev": [
+    "356",
+    "385",
+    "399",
+    "432",
+    "AM2",
+    "AP3B2het-207-M",
+    "AP3B2het-221-M",
+    "AP3B2wt236-F",
+    "ArxRosa-1015",
+    "ArxRosa-1017",
+    "ArxRosa-2064",
+    "FHET_cohort4_group6",
+    "M3_MT_cohort4_group3",
+    "cohort 2 group 6 mouse M3 cage3A"
+  ],
+  "test_by_strain": {
+    "arx_parv": [
+      "32"
+    ],
+    "arx_rosa": [
+      "ArxRosa-1201",
+      "ArxRosa-1211"
+    ],
+    "sox5": [
+      "MMUT(2)_cohort6_group1"
+    ],
+    "ap3b2": [
+      "AP3B2wt-241-M",
+      "AP3B2wt-247-F"
+    ]
+  },
+  "locked_utc": "2026-07-24T19:56:04+00:00"
+}

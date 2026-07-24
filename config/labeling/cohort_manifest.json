@@ -1,0 +1,35 @@
+{
+  "datasets": [
+    "arx_parv",
+    "arx_rosa",
+    "sox5_bin",
+    "ap3b2_rhd"
+  ],
+  "seed": 42,
+  "blind_seed": 0,
+  "n_per_animal": 25,
+  "n_slots": 10,
+  "rendered_animals": [
+    "32",
+    "356",
+    "385",
+    "399",
+    "432",
+    "ArxRosa-1015",
+    "ArxRosa-1017",
+    "ArxRosa-1201",
+    "ArxRosa-1211",
+    "ArxRosa-2064",
+    "AM2",
+    "FHET_cohort4_group6",
+    "M3_MT_cohort4_group3",
+    "MMUT(2)_cohort6_group1",
+    "cohort 2 group 6 mouse M3 cage3A",
+    "AP3B2het-207-M",
+    "AP3B2het-221-M",
+    "AP3B2wt-241-M",
+    "AP3B2wt-247-F",
+    "AP3B2wt236-F"
+  ],
+  "failures": []
+}
