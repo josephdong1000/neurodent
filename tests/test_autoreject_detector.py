@@ -111,3 +111,21 @@ def test_fit_pool_indices_always_includes_labelled_and_caps():
     # uncapped (or pool <= cap) -> the whole recording
     assert adr.fit_pool_indices(20, np.array([1, 2, 3]), max_fit_fragments=None).tolist() == list(range(20))
     assert adr.fit_pool_indices(20, np.array([1, 2, 3]), max_fit_fragments=100).tolist() == list(range(20))
+
+
+def test_psd_batch_parallel_matches_serial():
+    """The dask-parallel psd_batch (one delayed task per fragment) must return the exact spectra the serial
+    fallback returns, for both representations. Every other test calls psd_batch with parallel=False, so this
+    is the only coverage of the ``_dask.compute(delayed(...))`` branch the real run uses. It runs on dask's
+    default scheduler (no cluster needed), so it is deterministic and cheap; we keep the fragment count tiny
+    since it is a correctness check, not a benchmark."""
+    pytest.importorskip("dask")
+    fs, frag = 250, 5
+    F, C, T = 6, 3, fs * frag
+    X = (50e-6 * np.random.RandomState(7).randn(F, C, T)).astype(float)
+
+    for rep in ("lpsd", "welch"):
+        f_par, p_par = adr.psd_batch(X, fs, representation=rep, parallel=True)    # delayed on the default scheduler
+        f_ser, p_ser = adr.psd_batch(X, fs, representation=rep, parallel=False)
+        np.testing.assert_allclose(f_par, f_ser, rtol=1e-10, err_msg=f"{rep} freqs differ (parallel vs serial)")
+        np.testing.assert_allclose(p_par, p_ser, rtol=1e-10, err_msg=f"{rep} psd differs (parallel vs serial)")

@@ -44,6 +44,7 @@ reference ``lpsd`` package (a hand-rolled estimator invented a spurious ~110 Hz 
 from __future__ import annotations
 
 import warnings
+from typing import NamedTuple
 
 import numpy as np
 import pandas as pd
@@ -87,19 +88,45 @@ def _lpsd_inband(sig: np.ndarray, fs: float, n_frequencies: int, n_averages: int
     return rf[band], np.real(r["psd"].to_numpy())[band]
 
 
-def psd_batch(X: np.ndarray, fs: float, *, fmin=FMIN, fmax=FMAX, n_frequencies=N_FREQ_DES,
-              n_averages=N_AVG_DES, parallel=True):
-    """``(F, C, T)`` volts → ``(freqs (P,), psd (F, C, P))`` in V²/Hz.
+def _welch_inband(sig: np.ndarray, fs: float, n_frequencies: int, n_averages: int,
+                  fmin: float, fmax: float):
+    """One channel-fragment → (freqs, psd) sliced to [fmin, fmax] via ``scipy.signal.welch``.
 
-    LPSD is the per-fragment cost of the spectral arms, so the per-fragment work is fanned across dask
-    (one task per fragment computes all its channels) when dask is available and ``parallel`` is set —
-    reusing whatever :class:`~dask.distributed.Client` the caller has active. Falls back to a serial loop
-    otherwise. The amplitude arm never calls this.
+    LPSD's ``(n_frequencies, n_averages)`` have no exact Welch analogue, so they are mapped *monotonically*
+    onto Welch's ``(nperseg, noverlap)``: ``nperseg`` is chosen so ~``n_frequencies`` *linear* bins land
+    in-band, and ``noverlap`` so ~``n_averages`` segments are averaged, inverting ``K = (N - noverlap) /
+    (nperseg - noverlap)``, both clamped to what a short (5 s) fragment supports. The two estimators' knobs
+    therefore mean different things, so the grid explores the ``(n_freq, n_avg)`` optimum per-representation.
+    """
+    from scipy.signal import welch
+
+    N = int(sig.shape[-1])
+    nperseg = int(np.clip(round(n_frequencies * fs / (fmax - fmin)), 16, N))
+    K = max(2, int(n_averages))                                              # target #segments to average
+    noverlap = int(np.clip((K * nperseg - N) // (K - 1), 0, nperseg - 1))    # invert K; clamp to [0, nperseg)
+    f, p = welch(sig, fs=fs, nperseg=nperseg, noverlap=noverlap, detrend="constant")
+    band = (f >= fmin) & (f <= fmax)
+    return f[band], np.real(p)[band]
+
+
+def psd_batch(X: np.ndarray, fs: float, *, representation="lpsd", fmin=FMIN, fmax=FMAX,
+              n_frequencies=N_FREQ_DES, n_averages=N_AVG_DES, parallel=True):
+    """``(F, C, T)`` volts → ``(freqs (P,), psd (F, C, P))`` in V²/Hz via ``representation`` ∈ {lpsd, welch}.
+
+    The per-fragment spectral estimate is the cost of the spectral arms, so the per-fragment work is fanned
+    across dask (one delayed task per fragment computes all its channels) when dask is available and
+    ``parallel`` is set, running on whatever :class:`~dask.distributed.Client` the caller has active. The
+    fragment lives in the task graph (not a scattered future), so a worker death is transparently recomputed
+    rather than cancelling the job with "lost dependencies" — the robustness that matters for the long,
+    resume-less grid run. Falls back to a serial loop otherwise. The amplitude arm never calls this.
     """
     Fn, Cn, _ = X.shape
+    inband = {"lpsd": _lpsd_inband, "welch": _welch_inband}.get(representation)
+    if inband is None:
+        raise ValueError(f"unknown representation {representation!r}; use 'lpsd' or 'welch'")
 
     def _frag(xf):  # xf: (C, T) -> (freqs, (C, P))
-        rows = [_lpsd_inband(xf[c], fs, n_frequencies, n_averages, fmin, fmax) for c in range(xf.shape[0])]
+        rows = [inband(xf[c], fs, n_frequencies, n_averages, fmin, fmax) for c in range(xf.shape[0])]
         return rows[0][0], np.stack([p for _, p in rows], axis=0)
 
     if parallel and _dask is not None and Fn > 1:
@@ -216,6 +243,56 @@ def fit_pool_indices(n_fragments: int, needed_windows=None, max_fit_fragments=No
     return np.sort(np.concatenate([needed, extra]).astype(int))
 
 
+class FitEpochs(NamedTuple):
+    """One recording's autoreject fit-pool epochs (the return of :func:`build_fit_epochs`).
+
+    Fields (callers may still unpack positionally): ``X`` ``(n_pool, C, T)`` float volts; ``channels`` the
+    canonical channel abbrevs aligned to ``X``'s columns; ``fs`` the integer sampling rate; ``grid_times`` the
+    kept fragments' start seconds.
+    """
+    X: np.ndarray
+    channels: list
+    fs: int
+    grid_times: np.ndarray
+
+
+def build_fit_epochs(lro, needed_windows=None, *, fragment_len_s=5.0, apply_notch_filter=True,
+                     max_fit_fragments=5000, seed=0) -> "FitEpochs":
+    """One recording's autoreject fit-pool epochs --> a :class:`FitEpochs` ``(X, channels, fs, grid_times)``.
+
+    Builds ``fragment_len_s``-second fragments from a LongRecording via :class:`LongRecordingAnalyzer`, keeps
+    the labelled ``needed_windows`` always (:func:`fit_pool_indices`) plus a capped random subsample of the
+    rest (``max_fit_fragments``; ``None`` = whole recording), skips ragged final fragments so the stack and
+    spectral bin counts stay uniform, and returns canonical channel abbrevs aligned to ``X``'s columns.
+    ``grid_times`` are the kept fragments' start seconds (``index * fragment_len_s``). Leak-free: the labelled
+    windows are always in the pool, but the threshold is not overfit to them (the rest is a random subsample).
+
+    A general building block for any autoreject workflow (fit on your own recordings with the validation
+    windows locked into the pool); also the shared no-drift seam so a labeling harness's scorer and its
+    feature-exporter fit on identical epochs.
+    """
+    # lazy imports: neurodent.analysis imports neurodent.results, so a top-level import here would be circular.
+    from neurodent.analysis.long_recording_analyzer import LongRecordingAnalyzer
+    from neurodent.core.utils import resolve_channels
+
+    lan = LongRecordingAnalyzer(lro, fragment_len_s=fragment_len_s, apply_notch_filter=apply_notch_filter)
+    idxs = fit_pool_indices(lan.n_fragments, needed_windows, max_fit_fragments, seed)
+    win = int(round(fragment_len_s * lan.f_s))
+    frags, keep = [], []
+    for i in idxs:
+        f = lan.get_fragment_np(int(i))                     # (n_samples, C) µV
+        if f.shape[0] != win:                               # skip ragged final fragment (labelled ones never edge)
+            continue
+        frags.append(f.T * 1e-6)                            # -> (C, T) volts
+        keep.append(int(i))
+    if not frags:
+        raise ValueError(f"no full-length fragments (win={win} samples) to fit on")
+    X = np.stack(frags, axis=0)                             # (n_pool, C, T) volts
+    ch_names = resolve_channels(list(lan.channel_names))
+    grid_times = np.array(keep, dtype=float) * fragment_len_s
+    return FitEpochs(X, ch_names, int(lan.f_s), grid_times)
+
+
 # --------------------------------------------------------------------------- the 6 configs
 
 # name -> (ref_kind, feat_fn, baseline_fn, cmr):  ref_kind selects waveform (amp) vs dB-spectrum (spec);
@@ -236,12 +313,13 @@ def _cmr_wave(X: np.ndarray, c: int) -> np.ndarray:
     return np.median(np.delete(X, c, axis=1), axis=1)
 
 
-def compute_masks(X: np.ndarray, fs: float, *, configs=CONFIG_NAMES, n_folds=N_FOLDS, n_cand=N_CAND,
-                  seed=0, fmin=FMIN, fmax=FMAX, n_frequencies=N_FREQ_DES, n_averages=N_AVG_DES,
-                  parallel=True) -> dict[str, np.ndarray]:
-    """Run the requested configs on ``X`` ``(F, C, T)`` float **volts**.
+def compute_masks(X: np.ndarray, fs: float, *, configs=CONFIG_NAMES, representation="lpsd", n_folds=N_FOLDS,
+                  n_cand=N_CAND, seed=0, fmin=FMIN, fmax=FMAX, n_frequencies=N_FREQ_DES,
+                  n_averages=N_AVG_DES, parallel=True) -> dict[str, np.ndarray]:
+    """Run the requested configs on ``X`` ``(F, C, T)`` float **volts**, using spectral ``representation`` ∈
+    {lpsd, welch} for the spectral arms (ignored by the amplitude arm).
 
-    Returns ``{config_name: (F, C) bool}`` with True = REJECT. LPSD spectra (and their all-but-one CMR
+    Returns ``{config_name: (F, C) bool}`` with True = REJECT. The spectra (and their all-but-one CMR
     reconstructions) are computed once, only if a spectral config is requested. Each config runs an
     independent per-channel leak-free CV (:func:`learn_threshold`).
     """
@@ -254,8 +332,8 @@ def compute_masks(X: np.ndarray, fs: float, *, configs=CONFIG_NAMES, n_folds=N_F
     need_spec = any(_CONFIGS[n][0] == "spec" for n in configs)
     S = recon_spec = None
     if need_spec:
-        _, psd = psd_batch(X, fs, fmin=fmin, fmax=fmax, n_frequencies=n_frequencies,
-                           n_averages=n_averages, parallel=parallel)
+        _, psd = psd_batch(X, fs, representation=representation, fmin=fmin, fmax=fmax,
+                           n_frequencies=n_frequencies, n_averages=n_averages, parallel=parallel)
         S = 10 * np.log10(psd + 1e-20)                                              # (F, C, P) dB
         recon_spec = np.stack([np.median(np.delete(S, c, axis=1), axis=1) for c in range(C)], axis=1)
 
@@ -274,4 +352,52 @@ def compute_masks(X: np.ndarray, fs: float, *, configs=CONFIG_NAMES, n_folds=N_F
             _, mask[:, c] = learn_threshold(ref_all[:, c, :], feat_fn, baseline_fn=baseline_fn,
                                             aug_ref=aug, n_folds=n_folds, n_cand=n_cand, seed=seed)
         masks[name] = mask
+    return masks
+
+
+# --------------------------------------------------------------------------- the pre-registered full grid
+
+# The amplitude arms are representation/resolution-free (no FFT) → run ONCE. The spectral arms are swept over
+# representation × (n_freq, n_avg); baseline (v2=median, v3=mean) and CMR are already the 4 _SPEC_CONFIGS.
+# To add an autoreject arm to the leaderboard, extend a tuple below (a new representation / n_freq / n_avg) —
+# grid_config_names + compute_masks_grid pick it up, and select_detectors auto-discovers the new mask columns.
+GRID_REPRESENTATIONS = ("lpsd", "welch")
+GRID_NFREQ = (20, 40, 80)
+GRID_NAVG = (50, 100, 200)
+_AMP_CONFIGS = ["autoreject/self", "autoreject/self+CMR"]           # representation-free
+_SPEC_CONFIGS = ["v2/self", "v2/self+CMR", "v3/self", "v3/self+CMR"]  # baseline {median,mean} × CMR {off,on}
+
+
+def grid_config_names(*, representations=GRID_REPRESENTATIONS, n_freqs=GRID_NFREQ, n_avgs=GRID_NAVG):
+    """The full grid's config names, in the exact order :func:`compute_masks_grid` emits them (amplitude arms
+    first, then ``{rep}/{spec base}@nf{n_freq}_na{n_avg}``). Pure — no compute; for pre-registration/export."""
+    names = list(_AMP_CONFIGS)
+    for rep in representations:
+        for nf in n_freqs:
+            for na in n_avgs:
+                names += [f"{rep}/{base}@nf{nf}_na{na}" for base in _SPEC_CONFIGS]
+    return names
+
+
+def compute_masks_grid(X: np.ndarray, fs: float, *, representations=GRID_REPRESENTATIONS, n_freqs=GRID_NFREQ,
+                       n_avgs=GRID_NAVG, n_folds=N_FOLDS, n_cand=N_CAND, seed=0,
+                       parallel=True) -> dict[str, np.ndarray]:
+    """The full pre-registered autoreject grid on ``X`` ``(F, C, T)`` volts → ``{config_name: (F, C) bool}``,
+    True = reject. Names match :func:`grid_config_names`.
+
+    The amplitude arms are FFT-free, so they run once (``autoreject/self``, ``autoreject/self+CMR``). The
+    spectral arms run for every ``(representation, n_freq, n_avg)``; within one such call
+    :func:`compute_masks` computes the spectrum + its CMR reconstruction **once** and shares it across the 4
+    baseline/CMR configs, so the expensive cost is one spectral transform per ``(representation, n_freq,
+    n_avg)`` (``len(reps) × len(n_freqs) × len(n_avgs)`` per recording), not per config.
+    """
+    masks = dict(compute_masks(X, fs, configs=_AMP_CONFIGS, n_folds=n_folds, n_cand=n_cand, seed=seed,
+                               parallel=parallel))
+    for rep in representations:
+        for nf in n_freqs:
+            for na in n_avgs:
+                spec = compute_masks(X, fs, configs=_SPEC_CONFIGS, representation=rep, n_frequencies=nf,
+                                     n_averages=na, n_folds=n_folds, n_cand=n_cand, seed=seed, parallel=parallel)
+                for base, m in spec.items():
+                    masks[f"{rep}/{base}@nf{nf}_na{na}"] = m
     return masks
