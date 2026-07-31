@@ -4,7 +4,7 @@
 Structural leak prevention: dev/selection work only ever loads the _dev file, so a test animal cannot be
 scored by accident. Re-run on each new rater's CSV as it arrives (the split.json animal list never changes).
 
-    uv run python scripts/labeling/partition_labels.py labels_cohort4strains_JD*.csv
+    uv run python scripts/labeling/partition_labels.py scripts/labeling/labels/labels_cohort4strains_JD*.csv
 """
 import csv
 import json
