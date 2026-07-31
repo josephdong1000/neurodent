@@ -152,9 +152,27 @@ def test_append_with_same_channels_accumulates(tmp_path):
 
 # --------------------------------------------------------------------------- end-to-end
 
+@pytest.fixture(scope="session")
+def chromium():
+    """Playwright's ``sync_api`` for the browser round-trip tests, SKIPPING when no chromium is launchable.
+
+    ``importorskip`` alone is not enough: the ``playwright`` package can be installed without a browser
+    binary (``playwright install`` never run), and then ``launch()`` raises 'Executable doesn't exist'. We
+    probe a launch once per session and skip (not fail) if it is unavailable — so a plain ``uv run pytest``
+    on a machine without the browser shows SKIPs.
+    """
+    pw = pytest.importorskip("playwright.sync_api")
+    try:
+        with pw.sync_playwright() as p:
+            p.chromium.launch().close()
+    except Exception as e:  # no browser binary, sandbox issue, etc. -> skip, don't fail
+        pytest.skip(f"playwright chromium unavailable ({type(e).__name__}); run `playwright install chromium`")
+    return pw
+
+
 @pytest.mark.slow
 @pytest.mark.browser
-def test_end_to_end_known_artifacts_survive_the_round_trip(tmp_path):
+def test_end_to_end_known_artifacts_survive_the_round_trip(tmp_path, chromium):
     """Inject artifacts at known (window, channel) cells, render, bundle, drive the real page, click
     exactly those cells, export, ingest, score.
 
@@ -162,7 +180,7 @@ def test_end_to_end_known_artifacts_survive_the_round_trip(tmp_path):
     image -> manifest -> bundle -> shuffled display -> CSV -> consensus -> score. A perfect detector
     must come back at F1 = 1.0; less means the plumbing moved a label.
     """
-    pw = pytest.importorskip("playwright.sync_api")
+    pw = chromium
 
     windows = [10, 11, 12, 13]
     truth = {(11, "ch2"), (13, "ch0"), (13, "ch1")}      # the cells we will call `bad`
@@ -230,12 +248,12 @@ def test_end_to_end_known_artifacts_survive_the_round_trip(tmp_path):
 
 @pytest.mark.slow
 @pytest.mark.browser
-def test_seen_tracking_and_portable_resume(tmp_path):
+def test_seen_tracking_and_portable_resume(tmp_path, chromium):
     """The CSV is a complete record and the rater never loses their place: every window is exported
     with a `seen` flag (unseen rows blank, so 'judged clean' != 'never seen'); importing on a fresh
     machine restores labels and resumes at the first unseen window."""
     import csv as _csv
-    pw = pytest.importorskip("playwright.sync_api")
+    pw = chromium
 
     R.render_windows(synth(secs=200, seed=5), FS, CHS, tmp_path, [10, 11, 12, 13, 14, 15], "A", dpi=70)
     zip_path = B.build(tmp_path, name="resume")
@@ -295,13 +313,13 @@ def test_seen_tracking_and_portable_resume(tmp_path):
 
 @pytest.mark.slow
 @pytest.mark.browser
-def test_export_import_export_is_idempotent(tmp_path):
+def test_export_import_export_is_idempotent(tmp_path, chromium):
     """Import must not fabricate a judgment. The airtightness fuzz caught that rendering the resume
     window marked it seen + all-clean, so export->import->export drifted (an unreviewed window became
     a 'clean' reviewed one, polluting ground truth). A window is 'seen' only when the rater ENGAGES it.
     """
     import csv as _csv
-    pw = pytest.importorskip("playwright.sync_api")
+    pw = chromium
 
     R.render_windows(synth(secs=200, seed=9), FS, CHS, tmp_path, [10, 11, 12, 13, 14, 15], "A", dpi=70)
     zip_path = B.build(tmp_path, name="idem")
