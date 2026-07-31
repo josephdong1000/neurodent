@@ -27,7 +27,7 @@ the current thresholds track one human's labels, NOT calibration. Multi-rater ca
 Heavy load (feature extraction over full recordings) -> run on the cluster::
 
     uv run python scripts/labeling/score_detectors.py \
-        --all JD=labels_cohort4strains_JD.csv   # --keymap defaults to config/labeling/keymap.csv
+        --all JD=scripts/labeling/labels/labels_cohort4strains_JD.csv   # --keymap defaults to config/labeling/keymap.csv
 """
 import argparse
 import logging
@@ -45,9 +45,7 @@ import render_context as R  # noqa: E402  (FRAG_S — single source of the windo
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 from neurodent.analysis import AnimalAnalyzer  # noqa: E402
-from neurodent.analysis.long_recording_analyzer import LongRecordingAnalyzer  # noqa: E402
-from neurodent.core.utils import resolve_channels  # noqa: E402
-from neurodent.results import autoreject_detector as adr  # noqa: E402
+from neurodent.results import autoreject_detector as adr  # noqa: E402  (hosts build_fit_epochs now)
 from neurodent.results.scoring import consensus, ingest, score_keep_mask, score_mask, unblind  # noqa: E402
 
 CONFIG_KEYMAP = Path(__file__).resolve().parents[2] / "config/labeling/keymap.csv"  # committed + permanent (results/ is disposable)
@@ -109,38 +107,14 @@ def score_animal(war, ao, animal_id, consensus_df, detectors=FRAGMENT_DETECTORS)
 
 
 def autoreject_grids(lro, needed_windows=None, *, max_fit_fragments=5000, seed=0, parallel=True):
-    """Run the 6 adapted-autoreject arms on ONE recording (LRO).
-
-    Builds 5 s epochs from the LRO's own fragments (the SAME ``LongRecordingAnalyzer(fragment_len_s=FRAG_S,
-    apply_notch_filter=True)`` the labeling used → identical signal), then fits+applies the leak-free CV per
-    :mod:`neurodent.results.autoreject_detector`. Returns ``({config: (n_pool, C) REJECT grid}, ch_names,
-    grid_times)`` aligned by ``grid_times`` so :func:`score_mask` picks the labelled fragments.
-
-    Fit pool = the labelled fragments (always included) + a capped random subsample of the rest
-    (``max_fit_fragments``, default 5000) — the CV threshold needs only a representative, mostly-clean pool,
-    so this bounds memory/compute on 24 h recordings (~17k fragments). Pass ``max_fit_fragments=None`` to fit
-    on the whole recording.
+    """Run the 6 adapted-autoreject arms on ONE recording (LRO). Returns ``({config: (n_pool, C) REJECT
+    grid}, ch_names, grid_times)`` aligned by ``grid_times`` so :func:`score_mask` picks the labelled
+    fragments. Epochs come from ``adr.build_fit_epochs`` (now in the package; shared with the leaderboard
+    extract, so both fit on IDENTICAL epochs — pass ``fragment_len_s=R.FRAG_S`` to pin the window size).
     """
-    lan = LongRecordingAnalyzer(lro, fragment_len_s=R.FRAG_S, apply_notch_filter=True)
-    idxs = adr.fit_pool_indices(lan.n_fragments, needed_windows, max_fit_fragments, seed)
-    # (n_pool, C, T) volts; get_fragment_np is (n_samples, C) µV. The last fragment is usually ragged
-    # (recording length not an exact multiple of FRAG_S); skip any non-full fragment so the stack and the
-    # LPSD bin count stay uniform. Labelled windows are never edge fragments (the labeler reserves flanks).
-    win = int(round(R.FRAG_S * lan.f_s))
-    frags, keep = [], []
-    for i in idxs:
-        f = lan.get_fragment_np(int(i))                     # (n_samples, C) µV
-        if f.shape[0] != win:
-            continue
-        frags.append(f.T * 1e-6)
-        keep.append(int(i))
-    if not frags:
-        raise ValueError(f"no full-length fragments (win={win} samples) to fit on")
-    X = np.stack(frags, axis=0)
-    idxs = np.array(keep, dtype=int)
-    ch_names = resolve_channels(list(lan.channel_names))
-    grids = adr.compute_masks(X, int(lan.f_s), parallel=parallel)   # {config: (n_pool, C) True=REJECT}
-    grid_times = idxs.astype(float) * R.FRAG_S
+    X, ch_names, fs, grid_times = adr.build_fit_epochs(
+        lro, needed_windows, fragment_len_s=R.FRAG_S, max_fit_fragments=max_fit_fragments, seed=seed)
+    grids = adr.compute_masks(X, fs, parallel=parallel)   # {config: (n_pool, C) True=REJECT}
     return grids, ch_names, grid_times
 
 
