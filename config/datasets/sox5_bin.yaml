@@ -17,14 +17,23 @@ analysis:
 samples_data:
   data_root: /mnt/isilon/marsh_single_unit/PythonEEG Data Bins/Sox5/Dr. Lefebvre Project
   channels:
+    # Four regions appear in the data under two spellings, with and without the "Ctx"
+    # suffix. Both must be listed: resolve_channel matches exactly, with no substring
+    # fallback, so a missing spelling is a hard failure rather than a warning. The
+    # suffixless form occurs in 689 of the 9700 non-empty Meta.csv under data_root
+    # (2756 rows), reached by 8 of the animals configured below.
     LMot:
     - L Motor Ctx
+    - L Motor
     RMot:
     - R Motor Ctx
+    - R Motor
     LBar:
     - L Barrel Ctx
+    - L Barrel
     RBar:
     - R Barrel Ctx
+    - R Barrel
     LHip:
     - L Hipp
     RHip:
