@@ -118,6 +118,11 @@ class AnimalOrganizer(
 
         self._animalday_folder_groups = {}
         processed_animaldays = []
+        # _animalday_folder_groups is keyed by the BARE session, while unique_animaldays
+        # entries are "{animal}_{session}". Consumers that need to translate one to the
+        # other (e.g. skipping a session whose files all failed to load) must go through
+        # this map rather than comparing the two key spaces directly.
+        self._session_to_animalday = {}
 
         for item in discovered_items:
             # All items are now DiscoveredFile objects with unified interface
@@ -134,7 +139,9 @@ class AnimalOrganizer(
 
             if session not in self._animalday_folder_groups:
                 self._animalday_folder_groups[session] = []
-                processed_animaldays.append(f"{animal_val}_{session}")
+                animalday = f"{animal_val}_{session}"
+                processed_animaldays.append(animalday)
+                self._session_to_animalday[session] = animalday
 
             if path_val:
                 self._animalday_folder_groups[session].append(path_val)
@@ -153,6 +160,9 @@ class AnimalOrganizer(
                 k: self._animalday_folder_groups[k] for k in truncated_keys
             }
             processed_animaldays = processed_animaldays[:truncate]
+            self._session_to_animalday = {
+                k: self._session_to_animalday[k] for k in truncated_keys
+            }
 
         self.unique_animaldays = processed_animaldays
         self.animaldays = processed_animaldays

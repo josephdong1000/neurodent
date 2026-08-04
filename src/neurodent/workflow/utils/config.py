@@ -295,6 +295,56 @@ def enumerate_cohort(samples_config: dict) -> list:
     return list(ids)
 
 
+def _validate_unique_animal_ids(animals_list: list) -> None:
+    """Raise if two animal entries share an id, or slugify to the same id.
+
+    Duplicate ids parse today and corrupt silently. The first entry wins identity while
+    the last wins behaviour, so one animal's pattern is applied under another's metadata,
+    and the Snakefile emits one folder tuple per entry while de-duplicating its animal
+    list, so the surviving animal loads the same files twice. Nothing downstream notices:
+    the config schema declares ``samples_data`` as a bare object, and the post-merge
+    duplicate-animalday check passes because the merge has already collapsed them.
+
+    Slug collisions matter for the same reason. ``results/wars/{animal}`` is keyed on the
+    slug, so ``IQ-118`` and ``IQ 118`` are distinct ids that overwrite each other's output.
+
+    Args:
+        animals_list: Animal entries AFTER the exclude filter. Excluded entries are
+            documentation only and may legitimately repeat an active id.
+
+    Raises:
+        ValueError: If any id or slug appears more than once.
+    """
+    from neurodent.core.utils import slugify
+
+    seen_ids = {}
+    seen_slugs = {}
+    for index, animal in enumerate(animals_list):
+        animal_id = animal.get("id")
+        if animal_id is None:
+            raise ValueError(f"Animal entry at position {index} has no 'id'")
+
+        if animal_id in seen_ids:
+            raise ValueError(
+                f"Duplicate animal id {animal_id!r} at positions {seen_ids[animal_id]} and "
+                f"{index}. Two entries sharing an id do not merge: the first supplies the "
+                f"metadata and the last supplies the pattern and lro_kwargs, and the animal "
+                f"then loads one source twice while the other is silently dropped. Give each "
+                f"entry a distinct id, or mark one 'exclude: true'."
+            )
+        seen_ids[animal_id] = index
+
+        slug = slugify(animal_id, allow_unicode=True)
+        if slug in seen_slugs:
+            other = animals_list[seen_slugs[slug]]["id"]
+            raise ValueError(
+                f"Animal ids {other!r} and {animal_id!r} both slugify to {slug!r}. Output "
+                f"paths are keyed on the slug, so these two animals would overwrite each "
+                f"other's results. Give them ids that differ by more than punctuation or case."
+            )
+        seen_slugs[slug] = index
+
+
 def expand_animals_config(samples_config: dict) -> dict:
     """Expand the unified ``animals`` list into pipeline keys.
 
@@ -421,6 +471,7 @@ def expand_animals_config(samples_config: dict) -> dict:
     # The excluded entries are preserved in the on-disk samples.json for documentation.
     animals_list = [a for a in result["animals"] if not a.get("exclude", False)]
     result["animals"] = animals_list
+    _validate_unique_animal_ids(animals_list)
 
     # Keys that are per-animal overrides (not core metadata)
     _OVERRIDE_KEYS = {"pattern", "lro_kwargs", "skip_sessions", "manual_datetime", "datetimes_are_start", "bad_channels", "exclude", "channel_subset", "group"}

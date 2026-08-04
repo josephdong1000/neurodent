@@ -19,8 +19,12 @@ class AoBuildMixin:
     def _create_long_recordings(self, lro_kwargs: dict):
         """Create LongRecordingOrganizer instances for each unique animalday."""
         self.long_recordings: list[_lro.LongRecordingOrganizer] = []
-        skipped_animaldays: list[str] = []
-        for animalday, items in self._animalday_folder_groups.items():
+        # Keyed by the BARE session, matching _animalday_folder_groups. Translate through
+        # _session_to_animalday before comparing against unique_animaldays, whose entries
+        # are "{animal}_{session}"; comparing the two key spaces directly is a silent no-op.
+        skipped_sessions: list[str] = []
+        skip_details: dict[str, tuple[int, list[str]]] = {}
+        for session, items in self._animalday_folder_groups.items():
             kwargs = lro_kwargs.copy()
             if getattr(self, "_processed_timestamps", None) is not None:
                 # _processed_timestamps is keyed by full item path, not animalday
@@ -43,7 +47,7 @@ class AoBuildMixin:
                         kwargs["manual_datetimes"] = item_timestamps
                         kwargs["datetimes_are_start"] = True  # _compute_global_timeline always returns start times
                         logging.debug(
-                            f"Using processed timestamps for {animalday}: {item_timestamps}"
+                            f"Using processed timestamps for {session}: {item_timestamps}"
                         )
 
             if len(items) == 1:
@@ -55,9 +59,24 @@ class AoBuildMixin:
                     # LRO handles lists of files directly, but we pass input_type='files'? Wait, LRO handles it natively now
                     pass
                 lro = _lro.LongRecordingOrganizer(item_to_pass, **kw)
+                # A single-item session never reaches the multi-item filter below, so a
+                # lone dead file would otherwise propagate a 0-sample LRO downstream with
+                # no error. Apply the same check here.
+                valid_pairs, skipped_names = self._filter_zero_sample_lros(
+                    [(item_to_pass, lro)], self._get_item_name
+                )
+                if not valid_pairs:
+                    logging.error(
+                        f"Skipping session '{session}' entirely: its only file produced a "
+                        f"0-sample recording. The per-file cause is in the warnings above. "
+                        f"File: {skipped_names}"
+                    )
+                    skipped_sessions.append(session)
+                    skip_details[session] = (1, list(skipped_names))
+                    continue
             else:
                 logging.info(
-                    f"Creating individual LROs for {len(items)} items for {animalday}"
+                    f"Creating individual LROs for {len(items)} items for {session}"
                 )
                 item_lro_pairs = []
                 for item in items:
@@ -90,16 +109,20 @@ class AoBuildMixin:
                 if skipped_names:
                     logging.warning(
                         f"Skipping {len(skipped_names)} 0-sample LRO(s) for "
-                        f"'{animalday}' before merge: {skipped_names}"
+                        f"'{session}' before merge: {skipped_names}"
                     )
                 if not valid_pairs:
+                    shown = list(skipped_names)[:3]
+                    more = len(skipped_names) - len(shown)
                     logging.error(
-                        f"Skipping animalday '{animalday}' entirely: all {len(item_lro_pairs)} "
-                        f"file(s) produced 0-sample LROs. Each file may have been corrupt, "
-                        f"empty, or failed during loading (check earlier warnings above for "
-                        f"root causes per file). Skipped files: {skipped_names}"
+                        f"Animal '{self.animal_id}', session '{session}': every one of "
+                        f"{len(item_lro_pairs)} discovered file(s) failed to load "
+                        f"(0 samples each). Skipping this session. Files: "
+                        f"{', '.join(shown)}{f' (+{more} more)' if more > 0 else ''}. "
+                        f"The per-file cause is in the warnings logged above."
                     )
-                    skipped_animaldays.append(animalday)
+                    skipped_sessions.append(session)
+                    skip_details[session] = (len(item_lro_pairs), list(skipped_names))
                     continue
                 item_lro_pairs = valid_pairs
 
@@ -131,7 +154,7 @@ class AoBuildMixin:
 
                 lro = merged_lro
                 logging.info(
-                    f"Successfully merged {len(sorted_folder_lro_pairs)} LROs for {animalday}"
+                    f"Successfully merged {len(sorted_folder_lro_pairs)} LROs for {session}"
                 )
 
             # Single source of truth: stamp the canonical animalday (see from_lros). Guarded because
@@ -144,20 +167,37 @@ class AoBuildMixin:
 
             self.long_recordings.append(lro)
 
-        if skipped_animaldays:
+        if skipped_sessions:
+            # Translate bare session keys into the "{animal}_{session}" labels that
+            # unique_animaldays uses. Filtering one key space with the other silently
+            # matches nothing, leaving a count mismatch that surfaces far downstream as
+            # an unhelpful "Created N LROs but found N+1 unique animaldays".
+            mapping = getattr(self, "_session_to_animalday", {})
+            skipped_labels = {mapping.get(s, s) for s in skipped_sessions}
             self.unique_animaldays = [
-                ad for ad in self.unique_animaldays if ad not in skipped_animaldays
+                ad for ad in self.unique_animaldays if ad not in skipped_labels
             ]
             self.animaldays = self.unique_animaldays
 
         if not self.long_recordings:
+            mapping = getattr(self, "_session_to_animalday", {})
+            lines = []
+            for s in skipped_sessions:
+                n_files, names = skip_details.get(s, (0, []))
+                first = names[0] if names else "unknown"
+                lines.append(
+                    f"  session '{s}' (animalday '{mapping.get(s, s)}'): "
+                    f"0 of {n_files} file(s) loaded, first file {first}"
+                )
             raise RuntimeError(
-                f"No recordings were loaded for this animal. "
-                f"All {len(skipped_animaldays)} animalday(s) were skipped because every "
-                f"file produced a 0-sample LRO. This usually indicates a misconfiguration "
-                f"(wrong file pattern, wrong data root, or corrupt data). "
-                f"Skipped animaldays: {skipped_animaldays}. "
-                f"Check the warnings above for per-file root causes."
+                f"No usable recordings for animal '{self.animal_id}': all "
+                f"{len(skipped_sessions)} of {len(skipped_sessions)} discovered session(s) "
+                f"failed to load. Every file in every session produced a 0-sample "
+                f"recording:\n" + "\n".join(lines) + "\n"
+                "Nothing was read from any file, so this is a loading failure rather than "
+                "a data-quality failure: check that lro_kwargs mode and extract_func match "
+                "the file format, that the data root is correct, and that the files are "
+                "readable and non-empty. Per-file causes are in the warnings above."
             )
 
         # It is possible for long_recordings to contain only 0-sample placeholder LROs.
@@ -177,8 +217,13 @@ class AoBuildMixin:
 
         if len(self.long_recordings) != len(self.unique_animaldays):
             error_msg = (
-                f"Mismatch: Created {len(self.long_recordings)} LROs "
-                f"but found {len(self.unique_animaldays)} unique animaldays. "
+                f"Animal '{self.animal_id}': built {len(self.long_recordings)} recording(s) "
+                f"but {len(self.unique_animaldays)} animalday label(s) remain, which must "
+                f"match one to one. Labels: {self.unique_animaldays}. "
+                f"Skipped sessions: {skipped_sessions or 'none'}. "
+                f"If sessions were skipped, their labels should have been removed above; a "
+                f"leftover label means a skipped session did not translate through "
+                f"_session_to_animalday."
             )
             logging.error(error_msg)
             raise RuntimeError(error_msg)
@@ -503,6 +548,9 @@ class AoBuildMixin:
         """
         ao._animalday_folder_groups = {}
         ao._processed_timestamps = None
+        # Parallel to _animalday_folder_groups; empty here because a factory-created
+        # instance never runs discovery, but present so consumers can getattr it safely.
+        ao._session_to_animalday = {}
 
     def split(
         self,

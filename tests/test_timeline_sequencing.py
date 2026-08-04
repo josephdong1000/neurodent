@@ -31,6 +31,9 @@ class TestTimelineSequencing:
         ao._session_sort_key = AnimalOrganizer._session_sort_key.__get__(ao, AnimalOrganizer)
         # Bind _iter_valid_recordings so the post-load guard in _create_long_recordings works
         ao._iter_valid_recordings = AnimalOrganizer._iter_valid_recordings.__get__(ao, AnimalOrganizer)
+        # _create_long_recordings now filters 0-sample LROs on the single-item path as well
+        # as the multi-item one, so this must be the real method rather than a MagicMock.
+        ao._filter_zero_sample_lros = AnimalOrganizer._filter_zero_sample_lros
 
         # Mock dependencies
         ao._resolve_timestamp_input = MagicMock(side_effect=lambda x, y: pd.to_datetime(x))
@@ -687,10 +690,11 @@ class TestZeroSampleLROFiltering:
         ao._animalday_folder_groups = {
             "session1": ["/data/folder_a", "/data/folder_b"]
         }
-        ao.unique_animaldays = ["session1"]
+        ao.unique_animaldays = ["M1_session1"]
+        ao._session_to_animalday = {"session1": "M1_session1"}
         ao._processed_timestamps = None
 
-        with pytest.raises(RuntimeError, match="No recordings were loaded"):
+        with pytest.raises(RuntimeError, match="No usable recordings for animal"):
             ao._create_long_recordings({})
 
     @patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer")
@@ -717,11 +721,16 @@ class TestZeroSampleLROFiltering:
             "session1": ["/data/folder_a", "/data/folder_b"],
             "session2": ["/data/folder_c"],
         }
-        ao.unique_animaldays = ["session1", "session2"]
+        ao.unique_animaldays = ["M1_session1", "M1_session2"]
+        ao._session_to_animalday = {"session1": "M1_session1", "session2": "M1_session2"}
         ao._processed_timestamps = None
 
         ao._create_long_recordings({})
 
         assert len(ao.long_recordings) == 1
-        assert "session1" not in ao.unique_animaldays
-        assert "session2" in ao.unique_animaldays
+        # The skipped session must be dropped by its ANIMALDAY label, not its bare session
+        # key. Filtering one key space with the other matches nothing, which left a stale
+        # label behind and surfaced later as an unrelated LRO-count mismatch.
+        assert "M1_session1" not in ao.unique_animaldays
+        assert "M1_session2" in ao.unique_animaldays
+        assert len(ao.long_recordings) == len(ao.unique_animaldays)
