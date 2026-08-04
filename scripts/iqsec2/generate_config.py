@@ -98,6 +98,47 @@ def _sessions_under(cohort, subdir):
 ASSUMED_METADATA = {"3": {"genotype": "x/x", "sex": "Female"}}
 
 
+def _died_date(row):
+    """Return the animal's death date as YYYY-MM-DD, or None if it has none.
+
+    The sheet's Died/Euth column is free text: a real date, or a note like
+    "9/27/19-headcap", or "perfused 6/9/20". Only an unambiguous date is used.
+    """
+    import re
+    from datetime import datetime
+
+    raw = (row or {}).get("died")
+    if not raw:
+        return None
+    iso = re.search(r"(\d{4})-(\d{2})-(\d{2})", raw)
+    if iso:
+        return iso.group(0)
+    us = re.search(r"(\d{1,2})/(\d{1,2})/(\d{2,4})", raw)
+    if us:
+        month, day, year = us.groups()
+        year = int(year) + 2000 if len(year) == 2 else int(year)
+        try:
+            return datetime(year, int(month), int(day)).strftime("%Y-%m-%d")
+        except ValueError:
+            return None
+    return None
+
+
+def _sessions_before_death(sessions, died):
+    """Drop sessions starting strictly AFTER the animal died.
+
+    A session ON the death date is kept: these animals were perfused at the end of
+    recording, so the last session and the death share a date. A session after it is
+    the rig still running on an empty headstage, which enters analysis as EEG and is
+    indistinguishable from signal once it reaches the feature extractor.
+    """
+    if not died:
+        return sessions, []
+    keep = {k: v for k, v in sessions.items() if v[:10] <= died}
+    dropped = sorted(set(sessions) - set(keep))
+    return keep, dropped
+
+
 def q(value):
     """Quote a YAML scalar when it would otherwise be misparsed."""
     text = str(value)
@@ -192,9 +233,9 @@ def main():
 
     for cohort in RHD_COHORTS:
         info = cohorts[cohort]
-        sessions = info["sessions"]
+        sessions_all = info["sessions"]
         note = EXCLUSIONS.get(cohort)
-        w(f"  # --- {cohort}: {info['n_files']} files, {len(sessions)} sessions, "
+        w(f"  # --- {cohort}: {info['n_files']} files, {len(sessions_all)} sessions, "
           f"{ports_seen[cohort]['n_channels']} amp channels on "
           f"{','.join(ports_seen[cohort]['ports'])}")
         if note:
@@ -214,6 +255,17 @@ def main():
 
         for animal_id, port in RHD_COHORTS[cohort].items():
             row = ref.get(animal_id, {})
+            died = _died_date(row)
+            sessions, dropped = _sessions_before_death(sessions_all, died)
+            if dropped:
+                for line in _wrap(
+                    f"Animal {animal_id} died {died} per the reference sheet. "
+                    f"{len(dropped)} session(s) starting after that date are excluded: the rig "
+                    f"kept recording other animals, so this port is an empty headstage there. "
+                    f"Dropped: {', '.join(dropped)}",
+                    84,
+                ):
+                    w(f"  #   {line}")
             assumed = ASSUMED_METADATA.get(animal_id, {})
             genotype = assumed.get("genotype") or row.get("allele") or "Unknown"
             sex = assumed.get("sex") or row.get("sex") or "Unknown"
@@ -221,6 +273,12 @@ def main():
             w(f"    genotype: {q(genotype)}")
             w(f"    sex: {q(sex)}")
             w(f"    channel_subset: *port_{port.lower()}")
+            if dropped:
+                # Removing the datetime is not enough: discovery still finds the files and
+                # then requires a datetime for every session it found. Skip at discovery.
+                w("    skip_sessions:")
+                for key in dropped:
+                    w(f"    - {q(key)}")
             extra = NESTED_SUBDIRS.get(cohort)
             if extra:
                 # This cohort's files sit at two depths, which no single glob can span:

@@ -275,10 +275,16 @@ samples_data:
       011520_IQSEC2_1B_80_2B_81_3B_82_4B_83_IntanRecording_200115: '2020-01-15 16:22:12'
       011520_IQSEC2_1B_80_2B_81_3B_82_4B_83_IntanRecording_200116: '2020-01-16 00:22:13'
       011520_IQSEC2_1B_80_2B_81_3B_82_4B_83_IntanRecording_200117: '2020-01-17 00:22:15'
+  #   Animal 81 died 2020-01-16 per the reference sheet. 1 session(s) starting after that
+  #   date are excluded: the rig kept recording other animals, so this port is an empty
+  #   headstage there. Dropped:
+  #   011520_IQSEC2_1B_80_2B_81_3B_82_4B_83_IntanRecording_200117
   - id: IQSEC2_81
     genotype: +/y
     sex: Male
     channel_subset: *port_b
+    skip_sessions:
+    - 011520_IQSEC2_1B_80_2B_81_3B_82_4B_83_IntanRecording_200117
     pattern: "{data_root}/PythonEEG Data/IQSEC2/011320 IQSEC2_80_81_82_83/{session}_{index}.rhd"
     lro_kwargs:
       extract_func: "read_intan"
@@ -290,7 +296,6 @@ samples_data:
       011320_IQSEC2_80_cage1B_81_cage2B_82_cage3B_83_cage4B_Intan_Recording_200115: '2020-01-15 00:08:19'
       011520_IQSEC2_1B_80_2B_81_3B_82_4B_83_IntanRecording_200115: '2020-01-15 16:22:12'
       011520_IQSEC2_1B_80_2B_81_3B_82_4B_83_IntanRecording_200116: '2020-01-16 00:22:13'
-      011520_IQSEC2_1B_80_2B_81_3B_82_4B_83_IntanRecording_200117: '2020-01-17 00:22:15'
   - id: IQSEC2_82
     genotype: +/y
     sex: Male
