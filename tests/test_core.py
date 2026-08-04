@@ -1306,7 +1306,7 @@ class TestReadBinCsvPair:
         open(bin_path, "wb").close()  # empty file
         with open(csv_path, "w") as f:
             f.write("Entity,BinColumn,Label,ProbeInfo,SampleRate,Units,Precision,LastEdit\n")
-            f.write("0,0,LMot,,1000.0,uV,float32,2022-01-01\n")
+            f.write("0,0,LMot,Intan Input (1)/PortA LMot,1000.0,uV,float32,2022-01-01\n")
 
         df = DiscoveredFile(paths=(bin_path, csv_path), metadata={"session": "s1"})
         with pytest.raises(ValueError, match="Binary file is empty"):
@@ -1340,7 +1340,7 @@ class TestReadBinCsvPair:
         with open(csv_path, "w") as f:
             f.write("Entity,BinColumn,Label,ProbeInfo,SampleRate,Units,Precision,LastEdit\n")
             for ch in range(n_channels):
-                f.write(f"{ch},{ch},Ch{ch},,{fs},uV,float32,2022-01-01\n")
+                f.write(f"{ch},{ch},Ch{ch},Intan Input (1)/PortA Ch{ch},{fs},uV,float32,2022-01-01\n")
 
         df = DiscoveredFile(paths=(bin_path, csv_path), metadata={"session": "s1"})
         rec = read_bin_csv_pair(df)

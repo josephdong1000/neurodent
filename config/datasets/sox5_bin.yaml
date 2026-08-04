@@ -17,34 +17,80 @@ analysis:
 samples_data:
   data_root: /mnt/isilon/marsh_single_unit/PythonEEG Data Bins/Sox5/Dr. Lefebvre Project
   channels:
-    # Four regions appear in the data under two spellings, with and without the "Ctx"
-    # suffix. Both must be listed: resolve_channel matches exactly, with no substring
-    # fallback, so a missing spelling is a hard failure rather than a warning. The
-    # suffixless form occurs in 689 of the 9700 non-empty Meta.csv under data_root
-    # (2756 rows), reached by 8 of the animals configured below.
+    # read_bin_csv_pair keys channel identity on the Meta.csv ProbeInfo column, which is
+    # port-qualified, so the 44 port-qualified spellings are the ones the loader actually
+    # presents. The 14 bare Label spellings are kept as aliases: they cost nothing (all 58
+    # are unique), they keep any Label-keyed reader working, and four regions appear under
+    # two spellings each, with and without the "Ctx" suffix. resolve_channel matches
+    # exactly with no substring fallback, so every spelling the data uses must be listed.
+    # Generated from the data rather than hand-written; regenerate if the export changes.
     LMot:
-    - L Motor Ctx
+    - Intan Input (1)/PortA L Motor
+    - Intan Input (1)/PortA L Motor Ctx
+    - Intan Input (1)/PortB L Motor Ctx
+    - Intan Input (1)/PortC L Motor Ctx
+    - Intan Input (1)/PortD L Motor Ctx
     - L Motor
+    - L Motor Ctx
     RMot:
-    - R Motor Ctx
+    - Intan Input (1)/PortA R Motor
+    - Intan Input (1)/PortA R Motor Ctx
+    - Intan Input (1)/PortB R Motor Ctx
+    - Intan Input (1)/PortC R Motor Ctx
+    - Intan Input (1)/PortD R Motor Ctx
     - R Motor
+    - R Motor Ctx
     LBar:
-    - L Barrel Ctx
+    - Intan Input (1)/PortA L Barrel
+    - Intan Input (1)/PortA L Barrel Ctx
+    - Intan Input (1)/PortB L Barrel Ctx
+    - Intan Input (1)/PortC L Barrel Ctx
+    - Intan Input (1)/PortD L Barrel Ctx
     - L Barrel
+    - L Barrel Ctx
     RBar:
-    - R Barrel Ctx
+    - Intan Input (1)/PortA R Barrel
+    - Intan Input (1)/PortA R Barrel Ctx
+    - Intan Input (1)/PortB R Barrel Ctx
+    - Intan Input (1)/PortC R Barrel Ctx
+    - Intan Input (1)/PortD R Barrel Ctx
     - R Barrel
+    - R Barrel Ctx
     LHip:
+    - Intan Input (1)/PortA L Hipp
+    - Intan Input (1)/PortB L Hipp
+    - Intan Input (1)/PortC L Hipp
+    - Intan Input (1)/PortD L Hipp
     - L Hipp
     RHip:
+    - Intan Input (1)/PortA R Hipp
+    - Intan Input (1)/PortB R Hipp
+    - Intan Input (1)/PortC R Hipp
+    - Intan Input (1)/PortD R Hipp
     - R Hipp
     LAud:
+    - Intan Input (1)/PortA L Aud Ctx
+    - Intan Input (1)/PortB L Aud Ctx
+    - Intan Input (1)/PortC L Aud Ctx
+    - Intan Input (1)/PortD L Aud Ctx
     - L Aud Ctx
     RAud:
+    - Intan Input (1)/PortA R Aud Ctx
+    - Intan Input (1)/PortB R Aud Ctx
+    - Intan Input (1)/PortC R Aud Ctx
+    - Intan Input (1)/PortD R Aud Ctx
     - R Aud Ctx
     LVis:
+    - Intan Input (1)/PortA L Vis Ctx
+    - Intan Input (1)/PortB L Vis Ctx
+    - Intan Input (1)/PortC L Vis Ctx
+    - Intan Input (1)/PortD L Vis Ctx
     - L Vis Ctx
     RVis:
+    - Intan Input (1)/PortA R Vis Ctx
+    - Intan Input (1)/PortB R Vis Ctx
+    - Intan Input (1)/PortC R Vis Ctx
+    - Intan Input (1)/PortD R Vis Ctx
     - R Vis Ctx
   animals:
   - id: M3_MHET_cohort4_group2
