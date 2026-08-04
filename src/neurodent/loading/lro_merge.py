@@ -207,6 +207,67 @@ class LroMergeMixin:
 
         logging.info("Successfully merged LRO recordings")
 
+    def merge_many(self, other_lros):
+        """Merge several LROs into this one with a single flat concatenation.
+
+        Equivalent to calling :meth:`merge` for each entry, but the recordings are
+        concatenated once at the end instead of once per step, so the result is one
+        level deep rather than N-1.
+
+        Why that matters: ``si.concatenate_recordings`` does not flatten, and ``merge``
+        passes its own output back in as the first operand, so folding N files nests N-1
+        deep. Sample lookup then walks the nesting, making a full pass O(N^2) (measured
+        2.75x slower at N=500), and past roughly 1000 files ``get_traces`` raises
+        RecursionError against Python's default limit. Pickling fails far earlier, at
+        about N=125, which breaks any recording sent to a dask worker. The fold also
+        leans left, putting the OLDEST file deepest, and analysis reads from frame 0
+        first, so the wall is hit immediately rather than partway through.
+
+        Per-step validation, channel renaming, 0-sample handling and metadata
+        accumulation are all preserved; only the concatenation is deferred.
+
+        Args:
+            other_lros (list[LongRecordingOrganizer]): LROs to merge, in temporal order.
+
+        Raises:
+            ValueError: If any LRO is incompatible with this one.
+            ImportError: If SpikeInterface is not available.
+        """
+        if si is None:
+            raise ImportError("SpikeInterface is required for LRO merging")
+
+        recordings = [self.LongRecording]
+        for other_lro in other_lros:
+            self._validate_merge_compatibility(other_lro)
+
+            # A 0-sample tail contributes no samples but its metadata still matters, so
+            # keep it out of the concatenation and fold its metadata in, as merge() does.
+            if other_lro.LongRecording.get_total_samples() == 0:
+                logging.warning(
+                    f"Skipping recording concatenation of {getattr(other_lro, 'item', 'unknown')}: "
+                    "0 samples. Updating metadata only."
+                )
+                self._update_metadata_after_merge(other_lro)
+                continue
+
+            other_rec = other_lro.LongRecording
+            if self.channel_names != other_lro.channel_names:
+                logging.info(
+                    f"Renaming channels {other_lro.channel_names} -> {self.channel_names} "
+                    "for merge compatibility"
+                )
+                other_rec = other_rec.rename_channels(new_channel_ids=self.channel_names)
+                other_lro.channel_names = list(self.channel_names)
+
+            recordings.append(other_rec)
+            self._update_metadata_after_merge(other_lro)
+
+        if len(recordings) > 1:
+            self.LongRecording = si.concatenate_recordings(recordings)
+            logging.info(
+                f"Concatenated {len(recordings)} recordings in one flat call (depth 1)"
+            )
+
     def _validate_merge_compatibility(self, other_lro):
         """Validate that two LROs can be safely merged.
 

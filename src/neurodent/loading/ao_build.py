@@ -147,10 +147,11 @@ class AoBuildMixin:
                     f"Base LRO: {self._get_item_name(sorted_folder_lro_pairs[0][0])}"
                 )
 
-                for i, (item, lro) in enumerate(sorted_folder_lro_pairs[1:], 1):
-                    item_name = self._get_item_name(item)
-                    logging.info(f"Merging LRO {i}: {item_name} into base LRO")
-                    merged_lro.merge(lro)
+                for i, (item, _) in enumerate(sorted_folder_lro_pairs[1:], 1):
+                    logging.info(f"Merging LRO {i}: {self._get_item_name(item)} into base LRO")
+                # One flat concatenation rather than a fold, so the result is depth 1
+                # instead of N-1. See LroMergeMixin.merge_many.
+                merged_lro.merge_many([lro for _, lro in sorted_folder_lro_pairs[1:]])
 
                 lro = merged_lro
                 logging.info(
@@ -395,17 +396,19 @@ class AoBuildMixin:
                 base_tag = sorted_pairs[0][0]
                 logging.info(f"Base LRO: {base_tag}")
 
-                for i, (_, lro) in enumerate(sorted_pairs[1:], 1):
-                    try:
-                        logging.info(f"Merging LRO {i} into base LRO for {animalday}")
-                        base_lro.merge(lro)
-                    except ValueError as e:
-                        # Provide detailed error for incompatible LROs
-                        raise ValueError(
-                            f"Cannot merge LROs for {animalday}: {e}\n"
-                            f"All LROs with the same date must have compatible metadata "
-                            f"(same channels, sampling rate, etc.)."
-                        ) from e
+                try:
+                    logging.info(
+                        f"Merging {len(sorted_pairs) - 1} LRO(s) into base LRO for {animalday}"
+                    )
+                    # Flat concatenation rather than a fold; see LroMergeMixin.merge_many.
+                    base_lro.merge_many([lro for _, lro in sorted_pairs[1:]])
+                except ValueError as e:
+                    # Provide detailed error for incompatible LROs
+                    raise ValueError(
+                        f"Cannot merge LROs for {animalday}: {e}\n"
+                        f"All LROs with the same date must have compatible metadata "
+                        f"(same channels, sampling rate, etc.)."
+                    ) from e
 
                 merged_lros.append(base_lro)
                 merged_animaldays.append(animalday)

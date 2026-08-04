@@ -255,6 +255,7 @@ class TestFromLros:
 
             # Mock merge method
             lro.merge = MagicMock()
+            lro.merge_many = MagicMock()
 
             lros.append(lro)
 
@@ -284,7 +285,7 @@ class TestFromLros:
         )
 
         # Verify merge was called for Jan-01 LROs
-        assert lros[0].merge.called or lros[1].merge.called, \
+        assert lros[0].merge_many.called or lros[1].merge_many.called, \
             "merge() should be called for duplicate date LROs"
 
         # Verify only 3 unique dates in final result
@@ -323,7 +324,7 @@ class TestFromLros:
         lro2.base_folder_path = Path("/mock/session1/day1")
 
         # Mock merge to raise ValueError (mimicking real validation)
-        lro1.merge = MagicMock(
+        lro1.merge_many = MagicMock(
             side_effect=ValueError("Channel names mismatch")
         )
 
@@ -360,6 +361,7 @@ class TestFromLros:
         lro.file_durations = [3600.0]
         lro.base_folder_path = Path("/mock/session1/day1")
         lro.merge = MagicMock()
+        lro.merge_many = MagicMock()
         session1_lros.append(lro)
 
         # Session 1, Day 2 (Jan-02)
@@ -379,6 +381,7 @@ class TestFromLros:
         lro.file_durations = [3600.0]
         lro.base_folder_path = Path("/mock/session2/day1")
         lro.merge = MagicMock()
+        lro.merge_many = MagicMock()
         session2_lros.append(lro)
 
         # Session 2, Day 2 (Jan-03)
@@ -407,7 +410,7 @@ class TestFromLros:
         # Verify Jan-01 LROs were merged
         # (Check that merge was called on at least one of the Jan-01 LROs)
         jan01_lros = [session1_lros[0], session2_lros[0]]
-        merge_called = any(lro.merge.called for lro in jan01_lros)
+        merge_called = any(lro.merge_many.called for lro in jan01_lros)
         assert merge_called, "Jan-01 LROs should have been merged"
 
         # Verify animaldays
