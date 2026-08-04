@@ -129,7 +129,7 @@ def resolve_animal_pattern(
         pattern = pattern_config
 
     def _resolve(p: str) -> str:
-        return p.replace("{data_root}", data_root)
+        return p.replace("{data_root}", str(data_root))
 
     if isinstance(pattern, list):
         return [_resolve(p) for p in pattern]

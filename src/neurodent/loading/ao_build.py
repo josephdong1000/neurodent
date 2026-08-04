@@ -135,6 +135,14 @@ class AoBuildMixin:
                     f"Successfully merged {len(sorted_folder_lro_pairs)} LROs for {animalday}"
                 )
 
+            # Single source of truth: stamp the canonical animalday (see from_lros). Guarded because
+            # get_date_string() can raise before timestamps resolve; unstamped LROs fall back to the
+            # legacy derivation downstream.
+            try:
+                lro.animalday = f"{self.animal_id} {self.genotype} {lro.get_date_string()}"
+            except (ValueError, AttributeError):
+                pass
+
             self.long_recordings.append(lro)
 
         if skipped_animaldays:
@@ -379,6 +387,13 @@ class AoBuildMixin:
         ao.animaldays = (
             merged_animaldays.copy()
         )  # Create separate list for compatibility
+
+        # Single source of truth: stamp the canonical animalday onto each LRO so the WAR
+        # (analysis) and the LOF/bad-channel dicts read the SAME string as ``ao.animaldays``,
+        # instead of re-deriving it from the raw folder session (e.g. "062921" vs the parsed
+        # "Jul-01-2021" — the mismatch that silently dropped sox5 sessions from filtering & scoring).
+        for lro, animalday in zip(merged_lros, merged_animaldays):
+            lro.animalday = animalday
 
         # Step 5: Validate and reconcile channel names across all merged LROs
         ao.channel_names = cls._validate_channel_names(merged_lros)

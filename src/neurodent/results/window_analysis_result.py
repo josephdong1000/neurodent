@@ -329,28 +329,26 @@ class WindowAnalysisResult(
         ]
         self.animaldays = self.result.loc[:, "animalday"].unique()
 
-        # Ensure bad_channels_dict and lof_scores_dict have entries for all animaldays
-        # This fixes the issue where windowed analysis creates per-date animaldays
-        # but bad_channels_dict only has LRO-level (per-folder) entries
+        # Back-fill empty entries for any WAR animalday absent from these dicts. This is now purely a
+        # robustness guard for LEGITIMATELY-missing sessions (a WAR constructed directly with an
+        # incomplete dict, or a session where LOF was not computed / has no bad channels). It NO LONGER
+        # masks the old animalday-format mismatch (WAR raw folder session vs dict parsed date): the
+        # animalday is a single source of truth now — stamped on each LRO in ao_build and read by both
+        # the WAR column and the LOF/bad-channel dicts — so real sessions carry their real LOF data
+        # here and are actually filtered (previously they were silently back-filled empty = no-op).
         for animalday in self.animaldays:
             if animalday not in self.bad_channels_dict:
-                # Add missing animalday with empty bad channels list
                 self.bad_channels_dict[animalday] = []
-                logging.info(
-                    f"Added missing animalday to bad_channels_dict: {animalday}"
-                )
 
             if animalday not in self.lof_scores_dict:
-                # Add missing animalday with empty LOF scores
-                # NOTE: Both lof_scores AND channel_names must be empty to maintain invariant!
+                # NOTE: Both lof_scores AND channel_names must be empty to maintain the invariant.
                 self.lof_scores_dict[animalday] = {
                     "lof_scores": [],
-                    "channel_names": [],  # Must be empty to match empty lof_scores!
+                    "channel_names": [],
                 }
                 logging.warning(
-                    f"Added missing animalday to lof_scores_dict: {animalday}. "
-                    f"This indicates LOF scores were not computed for this session. "
-                    f"It will be excluded from LOF-based analysis."
+                    f"Added missing animalday to lof_scores_dict: {animalday}. LOF scores were not "
+                    f"computed for this session; it will be excluded from LOF-based analysis."
                 )
 
         try:

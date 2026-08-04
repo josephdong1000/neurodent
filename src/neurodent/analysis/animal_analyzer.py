@@ -87,7 +87,7 @@ class AnimalAnalyzer:
         # Update bad channels dict if threshold was applied
         if lof_threshold is not None:
             self.bad_channels_dict = {
-                animalday: lrec.bad_channel_names
+                (getattr(lrec, "animalday", None) or animalday): lrec.bad_channel_names
                 for animalday, lrec in zip(self.ao.animaldays, self.ao.long_recordings)
             }
 
@@ -101,7 +101,7 @@ class AnimalAnalyzer:
             lrec.apply_lof_threshold(lof_threshold)
 
         self.bad_channels_dict = {
-            animalday: lrec.bad_channel_names
+            (getattr(lrec, "animalday", None) or animalday): lrec.bad_channel_names
             for animalday, lrec in zip(self.ao.animaldays, self.ao.long_recordings)
         }
 
@@ -294,6 +294,7 @@ class AnimalAnalyzer:
         lof_scores_dict = {}
         missing_lof_animaldays = []
         for animalday, lrec in zip(self.ao.animaldays, self.ao.long_recordings):
+            animalday = getattr(lrec, "animalday", None) or animalday  # canonical single-source key
             logging.debug(
                 f"Checking LOF scores for {animalday}: has_attr={hasattr(lrec, 'lof_scores')}, "
                 f"is_not_none={getattr(lrec, 'lof_scores', None) is not None}"
@@ -455,7 +456,10 @@ class AnimalAnalyzer:
             except (ValueError, AttributeError):
                 session = "unknown"
 
-        row["animalday"] = f"{animal} {genotype} {session}"
+        # Single source of truth: read the canonical animalday stamped on the LRO (in ao_build's
+        # from_lros / _create_long_recordings) so the WAR column matches ``ao.animaldays`` and the
+        # LOF/bad-channel dicts exactly. Fall back to the legacy derivation only for unstamped LROs.
+        row["animalday"] = getattr(lro, "animalday", None) or f"{animal} {genotype} {session}"
         row["animal"] = animal
         row["day"] = session
         row["genotype"] = genotype
