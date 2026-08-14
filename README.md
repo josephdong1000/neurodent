@@ -39,21 +39,23 @@ For pipeline support, development setup, and other installation options, check o
 
 ## Overview
 
-NeuRodent loads multi-format EEG data (`LongRecordingAnalyzer` → `AnimalOrganizer`) and computes features over windows (`WindowAnalysisResult`) and population spiking (`FrequencyDomainSpikeAnalysisResult`). Results feed into `AnimalPlotter` and `ExperimentPlotter` for multi-animal comparison by genotype, session, or circadian cycle.
+NeuRodent loads multi-format EEG data (`LongRecordingOrganizer` → `AnimalOrganizer`) and computes features over windows (`WindowAnalysisResult`) and population spiking (`FrequencyDomainSpikeAnalysisResult`). Results feed into `AnimalPlotter` and `ExperimentPlotter` for multi-animal comparison by genotype, session, or circadian cycle.
 
 ```python
-from neurodent import (
-    LongRecordingOrganizer,
-    AnimalOrganizer,
-    AnimalAnalyzer,
-    ExperimentPlotter,
-)
+from neurodent import AnimalOrganizer, AnimalAnalyzer, ExperimentPlotter
 
-lro = LongRecordingOrganizer(data_path)
-ao = AnimalOrganizer(lro)
-war = AnimalAnalyzer(ao).compute_windowed_analysis(features=["rms", "psdband", "cohere"])
-ep = ExperimentPlotter([war])
-ep.plot_feature("rms", groupby="genotype")
+features = ["rms", "psdband", "cohere"]
+
+# AnimalOrganizer discovers recordings from a placeholder pattern
+ao = AnimalOrganizer(
+    pattern="data/{animal}/*.edf",
+    animal_id="A10",
+    lro_kwargs={"mode": "si", "extract_func": "read_edf"},
+)
+war = AnimalAnalyzer(ao).compute_windowed_analysis(features=features)
+
+ep = ExperimentPlotter([war], features=features)
+ep.plot_catplot("rms", groupby="genotype")
 ```
 
 A companion [Snakemake workflow](https://josephdong1000.github.io/neurodent/main/tutorials/index.html) automates the full pipeline with cluster support.

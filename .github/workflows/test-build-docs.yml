@@ -167,6 +167,22 @@ jobs:
         echo "=== Remote refs ==="
         git ls-remote --tags --heads origin
 
+    # sphinx-multiversion only builds refs matching smv_branch_whitelist / smv_tag_whitelist.
+    # On a pull_request event the checkout is a detached HEAD, so no branch matches and only
+    # tags get built -- the branch's own docs are never rendered. Build this ref explicitly so
+    # notebook execution reports for the changed docs land in the uploaded artifact.
+    - name: Build documentation for this ref
+      run: |
+        echo "Building single-version documentation for the checked-out ref..."
+        uv run sphinx-build -b html docs build/html-ref
+        echo ""
+        echo "=== Notebook execution reports (if any cells failed) ==="
+        if [ -d build/html-ref/reports ]; then
+          find build/html-ref/reports -name '*.err.log' -print -exec tail -n 40 {} \;
+        else
+          echo "No reports/ directory: every notebook executed cleanly."
+        fi
+
     - name: Build multi-version documentation
       run: |
         echo "Building multi-version documentation with sphinx-multiversion..."
@@ -198,6 +214,14 @@ jobs:
       with:
         name: documentation
         path: build/html/
+        retention-days: 30
+        include-hidden-files: true
+
+    - name: Upload this-ref documentation artifacts
+      uses: actions/upload-artifact@v6
+      with:
+        name: documentation-ref
+        path: build/html-ref/
         retention-days: 30
         include-hidden-files: true
 
