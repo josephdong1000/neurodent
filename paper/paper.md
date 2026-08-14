@@ -14,10 +14,10 @@ authors:
   orcid: 0000-0002-1723-0553
   affiliation: 1
 - name: Yastika Singh
-  orchid: 0009-0006-2319-5877
+  orcid: 0009-0006-2319-5877
   affiliation: "1, 2"
 - name: Yifan Wei
-  orchid: 0009-0002-6391-0071
+  orcid: 0009-0002-6391-0071
   affiliation: "1, 2"
 - name: Eric D. Marsh
   orcid: 0000-0003-3264-0902
