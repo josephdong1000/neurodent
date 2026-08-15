@@ -3,6 +3,34 @@
 `CONTRIBUTING.md` is the canonical contributor guide for this repository.
 Documentation pages in `docs/contributing/` link here.
 
+## Contributing, Reporting Issues, and Getting Support
+
+### Contribute code or documentation
+
+Set up an environment with [Quick Start](#quick-start), then follow the
+[Pull Request Process](#pull-request-process). [Code Style](#code-style) and
+[Naming Conventions](#naming-conventions) describe what review will check.
+
+### Report a bug or a problem
+
+Open a [bug report](https://github.com/josephdong1000/neurodent/issues/new?template=02-bug-report.md).
+Include the NeuRodent version, Python version, operating system, a minimal example, and the full
+traceback. To request a feature instead, use the
+[feature request template](https://github.com/josephdong1000/neurodent/issues/new?template=01-feature-request.md).
+
+### Seek support
+
+Check the [documentation](https://josephdong1000.github.io/neurodent/) and search
+[existing issues](https://github.com/josephdong1000/neurodent/issues) first. If your question is
+unanswered, open an issue. [SUPPORT.md](./SUPPORT.md) lists every support channel and is the
+canonical support policy.
+
+Security vulnerabilities and private conduct concerns should not go in a public issue. Contact the
+maintainers directly, as described in [SUPPORT.md](./SUPPORT.md) and
+[CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md).
+
+Maintainers triage issues and pull requests on a best-effort basis.
+
 ## Prerequisites
 
 - Python 3.10+
@@ -57,12 +85,8 @@ pre-commit install
 3. Ensure tests pass and documentation builds successfully.
 4. Open a pull request with a clear description of the change.
 
-Issue templates:
-
-- Bug report:
-  https://github.com/josephdong1000/neurodent/issues/new?template=02-bug-report.md
-- Feature request:
-  https://github.com/josephdong1000/neurodent/issues/new?template=01-feature-request.md
+Issue templates are linked in
+[Contributing, Reporting Issues, and Getting Support](#contributing-reporting-issues-and-getting-support).
 
 ## Releasing
 
@@ -345,14 +369,9 @@ stable), so already-saved results keep loading.
 
 ## Questions and Support
 
-For contributor questions, open an issue:
-
-- https://github.com/josephdong1000/neurodent/issues
-
-For private or sensitive concerns, see:
-
-- Support policy: ./SUPPORT.md
-- Code of Conduct: ./CODE_OF_CONDUCT.md
+See [Contributing, Reporting Issues, and Getting Support](#contributing-reporting-issues-and-getting-support)
+at the top of this file. [SUPPORT.md](./SUPPORT.md) is the full support policy, and
+[CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) covers conduct concerns.
 
 ## Citation
 

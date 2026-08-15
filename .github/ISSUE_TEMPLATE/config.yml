@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Usage questions and support
+    url: https://github.com/josephdong1000/neurodent/blob/main/SUPPORT.md
+    about: Where to get help, and how to report security or conduct concerns privately.
+  - name: Documentation and tutorials
+    url: https://josephdong1000.github.io/neurodent/
+    about: Installation guides, tutorials, and the API reference.
+  - name: Contributing guide
+    url: https://github.com/josephdong1000/neurodent/blob/main/CONTRIBUTING.md
+    about: Development setup, pull request process, and code style.
