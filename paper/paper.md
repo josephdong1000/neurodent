@@ -33,6 +33,12 @@ date: 31 March 2026
 bibliography: paper.bib
 ---
 
+# Summary
+
+`NeuRodent` is a Python package for the quantitative analysis of rodent electroencephalography (EEG) and local field potential (LFP) recordings, which measure voltage from electrodes placed on or in the brain. It loads EEG/LFP recordings and computes features across recording channels and time. Features include signal amplitude, power in standard brainwave frequency bands, power spectrum slope, coherence/correlation between pairs of channels, and voltage spikes that occur when many neurons are activated at once. Results are saved as tables and can be visualized for single animal or multiple animal recordings, enabling comparison across experimental groups.
+
+Small analyses can be run from a script or a Jupyter notebook. Larger studies may use the accompanying `Snakemake` pipeline, which speeds up the same analyses for a full set of animal recordings by using a computing cluster. `NeuRodent` is intended for rodent EEG researchers who need reproducible and standardized signal analyses across their studies.
+
 # Statement of Need
 
 Electroencephalography (EEG) and its invasive counterpart, local field potential (LFP) recording, are cornerstone neuroscience techniques to measure cortical brain activity across species from humans to rodents. EEG has had over a century of use in clinical settings [@Tudor:2005] and is widely used today to diagnose and localize epilepsy, as well as in animal models to validate and develop mechanistic understandings of neurological diseases [@Marshall:2021]. Historically, EEG interpretation has been qualitative and “expert” based, but quantitative analysis approaches have gained acceptance over the last 30 years [@LivintPopa:2020; @Maheshwari:2020]. Most laboratories have developed quantitative methods independently and several free and commercial software packages exist for rodent EEG analysis. However, a significant lack of interoperability remains between these tools in handling variability in data type, experimental design, and statistical analysis. This fragmentation forces researchers to expend excessive time and productivity on technical troubleshooting rather than scientific discovery.
@@ -41,7 +47,7 @@ Electroencephalography (EEG) and its invasive counterpart, local field potential
 
 - **Modular Architecture**: A generalized framework for feature calculation allows contributors to easily extend the library of available metrics.
 - **Data organization**: A dedicated scheme designed for rodent study analysis, including genotype and experimental day, rather than individual subject sessions.
-- **High Interoperability**: Integration with `SpikeInterface` and `MNE-Python` ensures support for a wide array of neuroscience file formats with syntax frequently used in the field.
+- **High Interoperability**: Integration with `SpikeInterface` and `MNE-Python` ensures support for a wide array of electrophysiology file formats with syntax frequently used in the field.
 - **Scalability**: To address the challenge of analyzing large EEG datasets efficiently, the package integrates dataset caching and uses `Dask` [@DaskDevelopmentTeam:2016] and `Snakemake` [@Molder:2021] to parallelize computations across high-performance computing clusters.
 - **Reproducibility**: Development follows Continuous Integration (CI) practices, and intermediate results are saved to prevent redundant computations following pipeline errors.
 
@@ -55,9 +61,11 @@ The current landscape of electrophysiology and neuroimaging software includes se
 
 ![`NeuRodent` `Snakemake` pipeline flowchart showing data flow from raw EEG data to outputs (boxed).\label{fig:figure2}](./2026-05-15%20Neurodent%20JOSS%20paper%20figure%202%20cropped.png){width="75%"}
 
-`NeuRodent` is organized as two independently installable components: a core Python analysis library (\autoref{fig:figure1}), and a `Snakemake` pipeline that orchestrates the library over large datasets (\autoref{fig:figure2}). This layered design balances ease of adoption with scalable deployment: per-session or per-animal analyses can use the core library alone and call it from scripts or notebooks, while multi-animal and multi-session processing can use the `Snakemake` pipeline to gain cluster-level orchestration using SLURM or Kubernetes. The two components are decoupled, ensuring that changes to the pipeline logic do not force changes on users of the core library, and vice versa.
+`NeuRodent` is organized as two components: a core Python analysis library (\autoref{fig:figure1}), and a `Snakemake` pipeline that orchestrates the library over large datasets (\autoref{fig:figure2}). This layered design balances ease of adoption with scalable deployment: per-session or per-animal analyses can use the core library alone and call it from scripts or notebooks, while multi-animal and multi-session processing can use the `Snakemake` pipeline to gain cluster-level orchestration using SLURM. The two components are decoupled, ensuring that changes to the pipeline logic do not force changes on users of the core library, and vice versa.
 
-Rather than implementing its own file readers, `NeuRodent` delegates data loading to `SpikeInterface` and `MNE-Python` [@Buccino:2020b; @Gramfort:2013], which together cover most electrophysiology formats in use. Users may also supply a custom reader function for novel formats. This deferred approach avoids duplicating format-support effort that is already well maintained by those communities and ensures that `NeuRodent` inherits new format support automatically.
+Rather than implementing its own file readers, `NeuRodent` delegates data loading to `SpikeInterface` and `MNE-Python` [@Buccino:2020b; @Gramfort:2013], which together cover a wide range of electrophysiology formats. These libraries are used for the `spikeinterface.extractors` and `mne.io` file reader functions; users may also supply a custom reader function for novel formats. This deferred approach avoids duplicating format-support effort that is already well maintained by those communities and ensures that `NeuRodent` inherits new format support automatically.
+
+Both libraries are also used as analysis primitives which `NeuRodent` builds on. From `SpikeInterface`, `NeuRodent` uses the `BaseRecording` abstraction, which enables lazy data loading and data streaming to reduce memory pressure, along with recording concatenation and several preprocessing steps for notch filtering, resampling, and scaling; no spike sorting or curation functionality is used. From `MNE-Python`, `NeuRodent` uses `EDF` and `FIF` exporting for file persistence and format conversion, and annotation for spike labeling for users who would like to process or visualize their recordings further with `MNE-Python`. Coherence features are computed with `mne-connectivity` [@MNE-Connectivity], while spectral power, correlation, and spike detection are implemented on `SciPy` [@2020SciPy-NMeth].
 
 Within the core library, computation is structured around a hierarchy of organizer classes that mirror the stages of a rodent EEG experiment (\autoref{fig:figure1}):
 
@@ -69,7 +77,7 @@ Within the core library, computation is structured around a hierarchy of organiz
 
 Each of these classes naturally encapsulates a specific scope of rodent EEG/LFP analysis. A nested class hierarchy was chosen over a flat library to make the hierarchy of EEG analysis explicit, with lower level objects composing higher level ones. A practical consequence of this design is that analysis can be parallelized by processing each channel and time window independently. `NeuRodent` uses `Dask` to enable configurable parallel processing of channels and windows, either locally or on a distributed cluster. Adjustable in-memory chunk sizes let users trade throughput for RAM, an important consideration given that EEG recordings can span days or weeks.
 
-`NeuRodent` enables contributors to add new features to compute in windowed analyses by discovering feature computation functions at runtime. This greatly reduces the barrier to contribution for domain scientists who may not be familiar with the broader structure of `NeuRodent`. Artifact rejection is done in a similar fashion, where users can write additional filters and apply them with minimal changes. All computed features are outputted as `pandas` DataFrames saved in Parquet files, which enables downstream workflows in Excel, R, or other analysis tools to interoperate with `NeuRodent` outputs without needing format conversion.
+`NeuRodent` enables contributors to add new features to compute in windowed analyses by discovering feature computation functions at runtime. This greatly reduces the barrier to contribution for domain scientists who may not be familiar with the broader structure of `NeuRodent`. Artifact rejection is done in a similar fashion, where users can write additional filters and apply them with minimal changes. All computed features are outputted as `pandas` DataFrames [@pandas:2020; @mckinney-proc-scipy-2010] saved in Parquet files, which enables downstream workflows in Excel, R, or other analysis tools to interoperate with `NeuRodent` outputs without needing format conversion.
 
 Data visualization is provided through the Plotter classes. For individual animals, these include channel coherence and correlation matrices, power spectral density histograms, frequency spectrograms, feature time-series, and feature heatmaps. For experiment-wide groups of animals, these include categorical plots, coherence and correlation matrices, Q–Q plots, and 24-hour feature timecourses.
 
@@ -77,7 +85,7 @@ Data visualization is provided through the Plotter classes. For individual anima
 
 # Research Impact Statement
 
-Originally designed for EEG analyses for the lead developer, `NeuRodent` is being developed by a team of six code contributors using data across laboratories. The package has been used in a publication characterizing a novel developmental mouse model [@Ferrari:2026a] and presented at the US Research Software Engineering conference under the name `PyEEG` [@Dong:2025]. `NeuRodent` and its accompanying `Snakemake` pipeline will be of great use to neuroscientists performing intracranial LFP analyses on large recorded datasets and distributing analyses across laboratories.
+Originally designed for EEG analyses for the lead developer, `NeuRodent` is being developed by a team of six code contributors using data across laboratories. The package has been used in a publication characterizing a novel developmental mouse model [@Ferrari:2026a] and presented at the US Research Software Engineering conference under the name `PyEEG` [@Dong:2025]. Use beyond the developing laboratories is not yet documented, and the authors intend to run hands-on and recorded departmental workshops to demonstrate the package once the analysis workflow is stable. To lower the barrier to adoption, every tagged release is archived on Zenodo so that a specific analysis version can be cited reproducibly. `NeuRodent` and its accompanying `Snakemake` pipeline will be of great use to neuroscientists performing intracranial LFP analyses on large recorded datasets and distributing analyses across laboratories.
 
 # AI Usage Disclosure
 
@@ -85,6 +93,6 @@ No generative AI was used for architectural decisions and scientific interpretat
 
 # Acknowledgements
 
-We acknowledge contributions from Jessica Lahr and Ananya Madhira.  This project benefited from insights and best practices described in Peter K. G. Williams’s *One Good Tutorial*. This work was supported by the Eunice Kennedy Shriver National Institute of Child Health and Human Development (NICHD), National Institutes of Health [P50HD105354]; and by generous donations toward the Marsh Refractory Epilepsy Research Program.
+We acknowledge contributions from Jessica Lahr and Ananya Madhira. This project benefited from insights and best practices described in Peter K. G. Williams’s *One Good Tutorial*. This work was supported by the Eunice Kennedy Shriver National Institute of Child Health and Human Development (NICHD), National Institutes of Health [P50HD105354]; and by generous donations toward the Marsh Refractory Epilepsy Research Program.
 
 # References
