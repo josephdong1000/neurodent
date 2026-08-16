@@ -12,6 +12,30 @@ A Python package for standardizing rodent EEG analysis and figure generation. Va
 
 > Presented at [USRSE'25](https://doi.org/10.5281/zenodo.17274681)!
 
+### What it does
+
+NeuRodent loads EEG/LFP recordings and computes features across recording channels and time. Features include signal amplitude, power in standard brainwave frequency bands, power spectrum slope, coherence/correlation between pairs of channels, and voltage spikes that occur when many neurons are activated at once. Results are saved as tables and can be visualized for single animal or multiple animal recordings, enabling comparison across experimental groups.
+
+### Why NeuRodent
+
+Most laboratories have developed quantitative methods independently, and several free and commercial software packages exist for rodent EEG analysis. However, a significant lack of interoperability remains between these tools in handling variability in data type, experimental design, and statistical analysis. This fragmentation forces researchers to expend excessive time and productivity on technical troubleshooting rather than scientific discovery. NeuRodent addresses this by providing a modular, scalable, and interoperable Python-based framework for neuroscience researchers working with large-scale rodent cohorts, so that analyses can be compared and shared across laboratories.
+
+### Design
+
+NeuRodent is organized as two components: a core Python analysis library, and a Snakemake pipeline that orchestrates the library over large datasets and is installed with the `neurodent[pipeline]` extra. Per-session or per-animal analyses can use the core library alone from scripts or notebooks, while multi-animal and multi-session processing can use the pipeline for cluster-level orchestration on SLURM. Within the library, computation is structured around a hierarchy of organizer classes that mirror the stages of a rodent EEG experiment:
+
+- `LongRecordingOrganizer`: one recording session, many channels
+- `AnimalOrganizer`: one animal, many recording sessions
+- `WindowAnalysisResult`, `FrequencyDomainSpikeAnalysisResult`, `ZeitgeberAnalysisResult`: analysis results of one animal
+- `AnimalPlotter`: plots from one animal
+- `ExperimentPlotter`, `ZeitgeberPlotter`: plots from many animals
+
+Rather than implementing its own file readers, NeuRodent delegates data loading to SpikeInterface and MNE-Python, and a custom reader function can be supplied for novel formats.
+
+### Who it is for
+
+Rodent EEG researchers who need reproducible and standardized signal analyses across their studies, whether that is a handful of pilot recordings on a laptop or a cohort recorded over months on a cluster.
+
 ## Installation
 
 NeuRodent can be installed via `pip` or `conda`:
