@@ -12,7 +12,7 @@ Deep dive into specific features and analysis workflows.
    * - :doc:`windowed_analysis`
      - Extract features from continuous EEG data, filter artifacts, and aggregate results
    * - :doc:`spike_analysis`
-     - Analyze spike-sorted neural data, compute peri-event analyses, and integrate with EEG features
+     - Detect population spikes in the frequency domain, analyze the EEG around them, and fold counts into a WAR
    * - :doc:`visualization`
      - Create publication-quality plots with AnimalPlotter and ExperimentPlotter
    * - :doc:`snakemake_pipeline`

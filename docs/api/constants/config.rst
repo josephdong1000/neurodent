@@ -3,7 +3,7 @@ Configuration Constants
 
 .. currentmodule:: neurodent.constants.config
 
-Global settings for sampling rates, spike sorting, and waveform processing.
+Global settings for sampling rates, spike detection, and waveform processing.
 
 .. automodule:: neurodent.constants.config
    :members:
