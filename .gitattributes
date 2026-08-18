@@ -15,6 +15,7 @@
 *.h5    binary
 *.hdf5  binary
 *.nwb   binary
+*.edf   binary
 *.parquet binary
 *.pkl   binary
 *.pickle binary

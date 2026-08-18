@@ -10,7 +10,7 @@ analysis:
       - "{data_root}/{animal}/{index}_Meta.csv"
     lro_kwargs:
       mode: "si"
-      extract_func: "tests/integration/readers.py:read_bin_csv_pair"
+      extract_func: "neurodent.readers:read_bin_csv_pair"
       multiprocess_mode: "serial"
 
 cluster:

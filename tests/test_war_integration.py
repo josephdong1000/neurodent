@@ -74,7 +74,7 @@ class TestWARIntegration:
     def animal_organizer_with_war(self):
         """Create AnimalOrganizer — shared across all tests in the class."""
         from datetime import datetime as dt
-        from tests.integration.readers import read_bin_csv_pair
+        from neurodent.readers import read_bin_csv_pair
         animal_id = TEST_ANIMALS[0]
 
         with warnings.catch_warnings():

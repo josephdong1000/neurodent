@@ -1,15 +1,15 @@
-"""Custom reader functions for test datasets.
+"""Custom reader functions for formats SpikeInterface and MNE do not cover.
 
-These readers are referenced by file path in dataset config files
-(e.g. ``extract_func: "tests/integration/readers.py:read_bin_csv_pair"``).
-They are **not** part of the neurodent package; they exist solely to
-support pipeline testing with committed mini recordings.
+Readers here are usable either by import or by the ``extract_func`` string form,
+e.g. ``extract_func="neurodent.readers:read_bin_csv_pair"``.
 """
 
 import csv
 import os
 
 import numpy as np
+
+__all__ = ["read_bin_csv_pair"]
 
 
 def read_bin_csv_pair(discovered_file, **kwargs):

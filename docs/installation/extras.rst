@@ -24,8 +24,10 @@ Available Extras
      - Description
    * - ``[pipeline]``
      - Snakemake and dependencies for running automated analysis workflows
+   * - ``[readers]``
+     - Readers for EDF and NWB files (``edfio``, ``pyedflib``, ``pynwb``)
    * - ``[dev]``
-     - Development tools plus all pipeline dependencies (for contributors)
+     - Development tools plus the pipeline and readers extras (for contributors)
    * - ``[all]``
      - Installs all optional runtime dependencies
 
@@ -39,6 +41,16 @@ The pipeline extra includes Snakemake and related dependencies for running the a
    pip install neurodent[pipeline]
 
 See :doc:`pipeline` for SLURM cluster configuration.
+
+``[readers]`` Extra
+^^^^^^^^^^^^^^^^^^^
+
+Readers for formats not covered by the core dependencies. ``.edf`` and ``.nwb`` files need this
+extra; the documentation tutorials use it for their single-file loading example.
+
+.. code-block:: bash
+
+   pip install neurodent[readers]
 
 ``[dev]`` Extra
 ^^^^^^^^^^^^^^^
@@ -56,7 +68,7 @@ for development setup instructions.
 ``[all]`` Extra
 ^^^^^^^^^^^^^^^
 
-Installs all optional runtime dependencies (currently equivalent to ``[pipeline]``).
+Installs ``[pipeline]`` and ``[readers]`` together.
 
 .. code-block:: bash
 

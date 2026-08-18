@@ -154,12 +154,14 @@ class LroLoadingMixin:
 
     @staticmethod
     def _resolve_func_path(path_str: str) -> Callable:
-        """Import and return a callable from a ``"file.py:function"`` path.
+        """Import and return a callable from a ``"file.py:function"`` or
+        ``"package.module:function"`` path.
 
         Parameters
         ----------
         path_str : str
-            ``"path/to/readers.py:read_bin_csv"`` format string.
+            ``"path/to/readers.py:read_bin_csv"`` or
+            ``"neurodent.readers:read_bin_csv_pair"`` format string.
 
         Returns
         -------
@@ -169,22 +171,37 @@ class LroLoadingMixin:
         Raises
         ------
         ImportError
-            If the file cannot be loaded or no ``:`` separator is found.
+            If the file or module cannot be loaded, or no ``:`` separator is found.
         AttributeError
             If the attribute does not exist in the module.
         """
         if ":" not in path_str:
             raise ImportError(
                 f"Cannot resolve '{path_str}': expected "
-                "'path/to/file.py:func_name' format"
+                "'path/to/file.py:func_name' or 'package.module:func_name' format"
             )
 
+        import importlib
         import importlib.util
 
-        file_path, _, attr_name = path_str.rpartition(":")
-        spec = importlib.util.spec_from_file_location("_user_module", file_path)
+        target, _, attr_name = path_str.rpartition(":")
+
+        # An importable module name is tried first so the string form works for an
+        # installed package, where no source file path is available to the caller.
+        # find_spec distinguishes "no such module" from "the module exists but failed
+        # to import", so a broken dependency inside a user's reader surfaces as its own
+        # error instead of being retried as a file path and reported as a missing file.
+        if not target.endswith(".py"):
+            try:
+                found = importlib.util.find_spec(target)
+            except (ImportError, ValueError):
+                found = None
+            if found is not None:
+                return getattr(importlib.import_module(target), attr_name)
+
+        spec = importlib.util.spec_from_file_location("_user_module", target)
         if spec is None or spec.loader is None:
-            raise ImportError(f"Cannot load module from file: {file_path}")
+            raise ImportError(f"Cannot load module from file: {target}")
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         return getattr(module, attr_name)
@@ -216,9 +233,11 @@ class LroLoadingMixin:
             1. **Short name** — looked up in ``spikeinterface.extractors`` /
                ``spikeinterface`` (for ``mode="si"``) or ``mne.io``
                (for ``mode="mne"``).  Example: ``"read_intan"``.
-            2. **File path** (contains ``:``) — loads a function directly from
-               a Python file.  The ``.py`` extension is required.
-               Example: ``"tests/integration/readers.py:read_bin_csv_pair"`` or
+            2. **Module path** (contains ``:``) — imports a function from an
+               installed module.  Example:
+               ``"neurodent.readers:read_bin_csv_pair"``.
+            3. **File path** (contains ``:``, ends in ``.py``) — loads a function
+               directly from a Python file.  Example:
                ``"/absolute/path/to/readers.py:my_func"``.
         **kwargs
             Forwarded to the backend loading method.

@@ -109,6 +109,9 @@ Repository = "https://github.com/josephdong1000/neurodent"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+"neurodent.data" = ["sample/**/*.bin", "sample/**/*.csv", "sample/**/*.edf", "sample/**/*.md"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests", ".tests"]
 python_files = ["test_*.py", "*_test.py"]

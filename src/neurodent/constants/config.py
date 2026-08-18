@@ -1,6 +1,6 @@
 """Global configuration constants for neurodent.
 
-Includes sampling rates, data types, and spike sorting parameters.
+Includes sampling rates, data types, and spike detection parameters.
 """
 
 import numpy as np

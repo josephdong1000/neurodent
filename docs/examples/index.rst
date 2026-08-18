@@ -12,7 +12,7 @@ Coming Soon
 Example figures from the following workflows:
 
 - Windowed analysis results (WAR) for EEG feature extraction
-- Spike analysis results (SAR) for spike-sorted data
+- Frequency-domain spike analysis results (FDSAR)
 - Multi-animal comparative analysis plots
 - Frequency domain analysis visualizations
 - Channel coherence and connectivity plots
