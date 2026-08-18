@@ -1046,7 +1046,7 @@ class TestResolveFuncPath:
     def test_resolves_file_path(self):
         """File path to the mini-real reader resolves correctly."""
         func = LongRecordingOrganizer._resolve_func_path(
-            "tests/integration/readers.py:read_bin_csv_pair"
+            "src/neurodent/readers.py:read_bin_csv_pair"
         )
         assert callable(func)
         assert func.__name__ == "read_bin_csv_pair"
@@ -1062,7 +1062,7 @@ class TestResolveFuncPath:
         """Valid file but missing attribute raises AttributeError."""
         with pytest.raises(AttributeError):
             LongRecordingOrganizer._resolve_func_path(
-                "tests/integration/readers.py:nonexistent_function_xyz"
+                "src/neurodent/readers.py:nonexistent_function_xyz"
             )
 
     def test_raises_on_bare_name(self):
@@ -1081,7 +1081,7 @@ class TestExtractFuncFilePathResolution:
 
     def test_si_file_path_resolves_silently(self, lro_mode_none):
         """SI mode resolves file path without logging warnings."""
-        func_name = "tests/integration/readers.py:read_bin_csv_pair"
+        func_name = "src/neurodent/readers.py:read_bin_csv_pair"
         with (
             patch("neurodent.loading.lro_loading.logging") as mock_logging,
             patch.object(lro_mode_none, "convert_file_with_si_to_recording"),
@@ -1095,7 +1095,7 @@ class TestExtractFuncFilePathResolution:
 
     def test_mne_file_path_resolves_silently(self, lro_mode_none):
         """MNE mode resolves file path without logging warnings."""
-        func_name = "tests/integration/readers.py:read_bin_csv_pair"
+        func_name = "src/neurodent/readers.py:read_bin_csv_pair"
         with (
             patch("neurodent.loading.lro_loading.logging") as mock_logging,
             patch.object(lro_mode_none, "convert_file_with_mne_to_recording"),
@@ -1281,7 +1281,7 @@ class TestReadBinCsvPair:
 
     def test_empty_csv_raises(self, temp_dir):
         """header-only CSV (no data rows) raises ValueError with clear message."""
-        from tests.integration.readers import read_bin_csv_pair
+        from neurodent.readers import read_bin_csv_pair
         from neurodent.loading.discovery import DiscoveredFile
 
         bin_path = str(temp_dir / "test.bin")
@@ -1297,7 +1297,7 @@ class TestReadBinCsvPair:
 
     def test_empty_bin_raises(self, temp_dir):
         """Zero-byte .bin file raises ValueError with clear message."""
-        from tests.integration.readers import read_bin_csv_pair
+        from neurodent.readers import read_bin_csv_pair
         from neurodent.loading.discovery import DiscoveredFile
 
         bin_path = str(temp_dir / "test.bin")
@@ -1320,7 +1320,7 @@ class TestReadBinCsvPair:
         Verifies that read_bin_csv_pair returns each channel with its
         expected value — a C-order reader would garble the channels.
         """
-        from tests.integration.readers import read_bin_csv_pair
+        from neurodent.readers import read_bin_csv_pair
         from neurodent.loading.discovery import DiscoveredFile
 
         n_channels = 3

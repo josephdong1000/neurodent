@@ -57,7 +57,7 @@ class TestFrequencyDomainSpikeDetectionIntegration:
     def animal_organizer(self, request):
         """Create AnimalOrganizer for test animals — shared across tests per animal."""
         from datetime import datetime as dt
-        from tests.integration.readers import read_bin_csv_pair
+        from neurodent.readers import read_bin_csv_pair
         animal_id = request.param
 
         with warnings.catch_warnings():

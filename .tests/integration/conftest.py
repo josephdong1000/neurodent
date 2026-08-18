@@ -24,7 +24,6 @@ _READ_ONLY_TOP_LEVEL = (
     "config",
     "src",
     ".tests",
-    "tests",       # snakemake config references `tests/integration/readers.py`
     "scripts",
     "pyproject.toml",
     "uv.lock",

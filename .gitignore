@@ -46,8 +46,10 @@ notebooks/tests/test_all_functions_Yong.ipynb
 
 # Example data for integration testing (after *.bin, *.csv so negations take effect)
 !tests/integration/generate.py
-!tests/integration/readers.py
 !.tests/integration/data/**
+
+# Sample recordings shipped inside the package
+!src/neurodent/data/sample/**
 .coverage
 .coverage.*
 coverage.xml
