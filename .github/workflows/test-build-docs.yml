@@ -107,7 +107,42 @@ jobs:
         unzip -l dist/*.whl | head -20
         echo "Package contents (tar.gz):"
         tar -tzf dist/*.tar.gz | head -20
-        
+
+    # The test matrix installs editable, where importlib.resources resolves to the
+    # source tree, so a broken package-data glob passes every test. The built
+    # artifacts are the only place that regression is visible.
+    - name: Verify bundled sample data ships
+      run: |
+        set -euo pipefail
+        # List each archive once. Piping into `grep -q` under pipefail makes the
+        # lister die of SIGPIPE when grep exits early, which fails spuriously.
+        unzip -l dist/*.whl > wheel.list
+        tar -tzf dist/*.tar.gz > sdist.list
+        missing=0
+        for f in \
+          "neurodent/data/sample/A10/Cage 2 A10-0_ColMajor.bin" \
+          "neurodent/data/sample/A10/Cage 2 A10-0_Meta.csv" \
+          "neurodent/data/sample/F22/Cage 3 F22-0_ColMajor.bin" \
+          "neurodent/data/sample/F22/Cage 3 F22-0_Meta.csv"; do
+          if grep -qF "$f" wheel.list; then
+            echo "ok (wheel): $f"
+          else
+            echo "MISSING from wheel: $f"; missing=1
+          fi
+          if grep -qF "src/$f" sdist.list; then
+            echo "ok (sdist): $f"
+          else
+            echo "MISSING from sdist: $f"; missing=1
+          fi
+        done
+        rm -f wheel.list sdist.list
+        if [ "$missing" -ne 0 ]; then
+          echo "Sample recordings are absent from the distribution. Check"
+          echo "[tool.setuptools.package-data] in pyproject.toml and the"
+          echo "!src/neurodent/data/sample/** negation in .gitignore."
+          exit 1
+        fi
+
     - name: Upload build artifacts
       uses: actions/upload-artifact@v6
       with:
@@ -177,8 +212,14 @@ jobs:
         uv run sphinx-build -b html docs build/html-ref
         echo ""
         echo "=== Notebook execution reports (if any cells failed) ==="
+        # myst-nb reports a failed notebook as a warning and sphinx-build still exits 0,
+        # so the job status alone says nothing about whether the tutorials ran. The
+        # reports directory is the real signal; treat its presence as a failure.
         if [ -d build/html-ref/reports ]; then
           find build/html-ref/reports -name '*.err.log' -print -exec tail -n 40 {} \;
+          echo ""
+          echo "One or more notebooks failed to execute. See the tracebacks above."
+          exit 1
         else
           echo "No reports/ directory: every notebook executed cleanly."
         fi
