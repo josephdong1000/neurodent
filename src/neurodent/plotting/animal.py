@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Literal
 import warnings
 import logging
 
@@ -10,6 +11,12 @@ import pandas as pd
 from scipy.stats import gzscore, linregress, zscore
 
 from neurodent import constants
+from neurodent.constants import (
+    BandFeatureName,
+    LinearFeatureName,
+    MatrixFeatureName,
+    PlottableFeatureName,
+)
 from neurodent.results import WindowAnalysisResult
 from neurodent.core.utils import slugify
 from neurodent.results import (
@@ -164,13 +171,28 @@ class AnimalPlotter:
     def plot_linear_temporal(
         self,
         multiindex=["animalday", "animal", "genotype"],
-        features: list[str] = None,
+        features: list[Literal[LinearFeatureName, BandFeatureName]] | None = None,
         channels: list[int] = None,
         figsize=None,
         score_type="z",
         show_endfile=False,
         **kwargs,
     ):
+        """Plot linear and band features over time, one subplot per feature.
+
+        Args:
+            multiindex (list[str], optional): Index levels identifying each recording session.
+            features: Linear or band feature names to plot, see
+                :data:`neurodent.constants.analysis.LINEAR_FEATURES` and
+                :data:`neurodent.constants.analysis.BAND_FEATURES`. Defaults to the
+                non-log linear and band features.
+            channels (list[int], optional): Channel indices to plot. Defaults to all.
+            figsize (tuple, optional): Figure size (width, height). Defaults to None.
+            score_type (str, optional): Standardization applied per channel. One of "z",
+                "zall", "gz", "modz", "center", or "none". Defaults to "z".
+            show_endfile (bool, optional): Draw vertical lines at recording file boundaries.
+                Defaults to False.
+        """
         # REVIEW this breaks for plotting psdslope, which contains both slope and intercept values.
         # Perhaps split apart psdslope more cleanly into psdslope + psdintercept when computing WAR
         if features is None:
@@ -348,7 +370,7 @@ class AnimalPlotter:
     def plot_coherecorr_spectral(
         self,
         multiindex=["animalday", "animal", "genotype"],
-        features: list[str] = None,
+        features: list[MatrixFeatureName] | None = None,
         figsize=None,
         score_type="z",
         cmap="bwr",
@@ -358,6 +380,25 @@ class AnimalPlotter:
         endfile_name="endfile",
         **kwargs,
     ):
+        """Plot connectivity matrix features over time as per-band heatmaps.
+
+        Args:
+            multiindex (list[str], optional): Index levels identifying each recording session.
+            features: Matrix feature names to plot, see
+                :data:`neurodent.constants.analysis.MATRIX_FEATURES`. Defaults to
+                ``["zcohere", "zpcorr"]``.
+            figsize (tuple, optional): Figure size (width, height). Defaults to None.
+            score_type (str, optional): Standardization applied per channel pair. One of
+                "z", "zall", "gz", "modz", "center", or "none". Defaults to "z".
+            cmap (str, optional): Colormap. Defaults to "bwr".
+            triag (bool, optional): Use only the upper triangle of each matrix. Defaults to True.
+            show_endfile (bool, optional): Draw vertical lines at recording file boundaries.
+                Defaults to False.
+            duration_name (str, optional): Column holding each row's duration. Defaults to
+                "duration".
+            endfile_name (str, optional): Column holding each row's end-of-file marker.
+                Defaults to "endfile".
+        """
         if features is None:
             features = ["zcohere", "zpcorr"]
         # Use consolidated height ratios from constants (matrix features for spectral heatmaps)
@@ -593,7 +634,7 @@ class AnimalPlotter:
 
     def plot_temporal_heatmap(
         self,
-        features: list[str] | str = None,
+        features: list[PlottableFeatureName] | PlottableFeatureName | None = None,
         figsize=None,
         cmap="viridis",
         score_type=None,
@@ -609,30 +650,24 @@ class AnimalPlotter:
         - Y-axis: Days
         - Color: Feature values (flattened across channels)
 
-        Parameters
-        ----------
-        features : list[str], optional
-            List of features to plot. If None, uses non-band linear features.
-        figsize : tuple, optional
-            Figure size (width, height)
-        cmap : str, optional
-            Colormap for the heatmap
-        score_type : str, optional
-            Standardization method for feature values
-        norm : matplotlib.colors.Normalize, optional
-            Normalization object for the colormap. If None, uses default normalization.
-            Common options:
-            - matplotlib.colors.Normalize(vmin=0, vmax=1)  # Fixed range
-            - matplotlib.colors.CenteredNorm(vcenter=0)  # Auto-detect range around 0
-            - matplotlib.colors.LogNorm()  # Logarithmic scale
-        component_norms : dict[str, matplotlib.colors.Normalize], optional
-            Per-component color norms keyed by semantic label (e.g. "slope" /
-            "intercept" for psdslope, or band names). A component listed here
-            overrides ``norm`` for that component's heatmap; components not
-            listed fall back to ``norm``. Useful when a multi-component feature's
-            components live on different scales (e.g. psdslope slope vs intercept).
-        \\**kwargs
-            Additional arguments passed to matplotlib
+        Args:
+            features: Feature names to plot. Histogram features are not supported, see
+                :data:`neurodent.constants.analysis.FEATURES`. Defaults to the linear
+                features.
+            figsize (tuple, optional): Figure size (width, height).
+            cmap (str, optional): Colormap for the heatmap.
+            score_type (str, optional): Standardization applied to feature values. One of
+                "z", "zall", "gz", "modz", "center", or "none". Defaults to None.
+            norm (matplotlib.colors.Normalize, optional): Normalization for the colormap.
+                If None, uses default normalization. Common options are
+                ``Normalize(vmin=0, vmax=1)`` for a fixed range, ``CenteredNorm(vcenter=0)``
+                to auto-detect a range around 0, and ``LogNorm()`` for a log scale.
+            component_norms (dict[str, matplotlib.colors.Normalize], optional): Per-component
+                color norms keyed by semantic label (e.g. "slope" / "intercept" for psdslope,
+                or band names). A component listed here overrides ``norm`` for that
+                component's heatmap; components not listed fall back to ``norm``. Useful when
+                a multi-component feature's components live on different scales.
+            **kwargs: Additional arguments passed to matplotlib.
         """
         if features is None:
             # Use non-band linear features for temporal analysis

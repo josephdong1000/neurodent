@@ -15,6 +15,7 @@ from statannotations.Annotator import Annotator
 from neurodent.core import utils as core_utils
 from neurodent.results import WindowAnalysisResult
 from neurodent import constants
+from neurodent.constants import FeatureName, MatrixFeatureName, PlottableFeatureName
 from neurodent.results import extract_hist_data, extract_feature, format_channel_data
 
 
@@ -215,7 +216,7 @@ class ExperimentPlotter:
 
     def pull_timeseries_dataframe(
         self,
-        feature: str,
+        feature: FeatureName,
         groupby: str | list[str],
         channels: str | list[str] = "all",
         collapse_channels: bool = False,
@@ -225,26 +226,18 @@ class ExperimentPlotter:
         """
         Process feature data for plotting.
 
-        Parameters
-        ----------
-        feature : str
-            The feature to get.
-        groupby : str or list[str]
-            The variable(s) to group by.
-        channels : str or list[str], optional
-            The channels to get. If 'all', all channels are used.
-        collapse_channels : bool, optional
-            Whether to average the channels to one value.
-        average_groupby : bool, optional
-            Whether to average the groupby variable(s).
-        strict_groupby : bool, optional
-            If True, raise an exception when groupby columns contain NaN values.
-            If False (default), only issue a warning.
+        Args:
+            feature: The feature to get.
+            groupby (str | list[str]): The variable(s) to group by.
+            channels (str | list[str], optional): The channels to get. If 'all', all
+                channels are used.
+            collapse_channels (bool, optional): Whether to average the channels to one value.
+            average_groupby (bool, optional): Whether to average the groupby variable(s).
+            strict_groupby (bool, optional): If True, raise an exception when groupby columns
+                contain NaN values. If False (default), only issue a warning.
 
-        Returns
-        -------
-        df : pd.DataFrame
-            A DataFrame with the feature data.
+        Returns:
+            pd.DataFrame: A DataFrame with the feature data.
         """
         if "band" in groupby or groupby == "band":
             raise ValueError(
@@ -448,7 +441,7 @@ class ExperimentPlotter:
 
     def plot_catplot(
         self,
-        feature: str,
+        feature: PlottableFeatureName,
         groupby: str | list[str],
         df: pd.DataFrame = None,
         x: str = None,
@@ -618,7 +611,7 @@ class ExperimentPlotter:
 
     def plot_heatmap(
         self,
-        feature: str,
+        feature: MatrixFeatureName,
         groupby: str | list[str],
         df: pd.DataFrame = None,
         col: str = None,
@@ -704,7 +697,7 @@ class ExperimentPlotter:
 
     def plot_heatmap_faceted(
         self,
-        feature: str,
+        feature: MatrixFeatureName,
         groupby: str | list[str],
         facet_vars: list[str] | str,
         df: pd.DataFrame = None,
@@ -778,7 +771,7 @@ class ExperimentPlotter:
 
     def plot_diffheatmap(
         self,
-        feature: str,
+        feature: MatrixFeatureName,
         groupby: str | list[str],
         baseline_key: str | bool | tuple[str, ...],
         baseline_groupby: str | list[str] = None,
@@ -873,7 +866,7 @@ class ExperimentPlotter:
 
     def plot_diffheatmap_faceted(
         self,
-        feature: str,
+        feature: MatrixFeatureName,
         groupby: str | list[str],
         facet_vars: str | list[str],
         baseline_key: (
@@ -947,7 +940,7 @@ class ExperimentPlotter:
 
     def plot_qqplot(
         self,
-        feature: str,
+        feature: PlottableFeatureName,
         groupby: str | list[str],
         df: pd.DataFrame = None,
         col: str = None,
