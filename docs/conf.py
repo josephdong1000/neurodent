@@ -96,6 +96,7 @@ autodoc_default_options = {
     "exclude-members": "__weakref__",
 }
 autodoc_typehints = "signature"
+python_maximum_signature_line_length = 88
 # autodoc_typehints = "description"
 autosummary_generate = True
 

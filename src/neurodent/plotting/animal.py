@@ -406,10 +406,13 @@ class AnimalPlotter:
         df_rowgroup = self.window_result.get_grouprows_result(
             features, multiindex=multiindex
         )
-        for feature in features:
-            if feature not in df_rowgroup.columns:
-                warnings.warn(f"Feature {feature} not found in dataframe")
-                features.remove(feature)
+        missing = [f for f in features if f not in df_rowgroup.columns]
+        for f in missing:
+            warnings.warn(f"Feature {f} not found in dataframe")
+        features = [f for f in features if f not in missing]
+
+        if not features:
+            raise ValueError("No valid features found for coherecorr spectral plot")
 
         for i, df_row in df_rowgroup.groupby(level=0):
             fig, ax = plt.subplots(
@@ -682,10 +685,10 @@ class AnimalPlotter:
             include=["duration", "endfile", "timestamp", "animalday"],
         )
 
-        for feature in features:
-            if feature not in df_rowgroup.columns:
-                warnings.warn(f"Feature {feature} not found in dataframe")
-                features.remove(feature)
+        missing = [f for f in features if f not in df_rowgroup.columns]
+        for f in missing:
+            warnings.warn(f"Feature {f} not found in dataframe")
+        features = [f for f in features if f not in missing]
 
         if not features:
             raise ValueError("No valid features found for temporal heatmap")
