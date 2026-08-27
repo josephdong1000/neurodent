@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 import logging
 
 import numpy as np
@@ -20,8 +22,8 @@ class WARFeatureMixin:
 
     def get_result(
         self,
-        features: list[str] | str | None = None,
-        exclude: list[str] | str = [],
+        features: Sequence[str] | str | None = None,
+        exclude: Sequence[str] | str = [],
         allow_missing=False,
     ):
         """Get windowed analysis result dataframe, with helpful filters
@@ -44,8 +46,8 @@ class WARFeatureMixin:
 
     def get_groupavg_result(
         self,
-        features: list[str] | str | None = None,
-        exclude: list[str] | str = [],
+        features: Sequence[str] | str | None = None,
+        exclude: Sequence[str] | str = [],
         df: pd.DataFrame = None,
         groupby="animalday",
     ):
@@ -82,8 +84,8 @@ class WARFeatureMixin:
 
     def __get_groups(
         self,
-        features: list[str] | str | None = None,
-        exclude: list[str] | str = [],
+        features: Sequence[str] | str | None = None,
+        exclude: Sequence[str] | str = [],
         df: pd.DataFrame = None,
         groupby="animalday",
     ):
@@ -93,8 +95,8 @@ class WARFeatureMixin:
 
     def get_grouprows_result(
         self,
-        features: list[str] | str | None = None,
-        exclude: list[str] | str = [],
+        features: Sequence[str] | str | None = None,
+        exclude: Sequence[str] | str = [],
         df: pd.DataFrame = None,
         multiindex=["animalday", "animal", "genotype"],
         include=["duration", "endfile"],
@@ -106,8 +108,8 @@ class WARFeatureMixin:
 
     def get_channel_averaged_result(
         self,
-        features: list[str] | str | None = None,
-        exclude: list[str] | str = [],
+        features: Sequence[str] | str | None = None,
+        exclude: Sequence[str] | str = [],
         df: pd.DataFrame = None,
     ) -> pd.DataFrame:
         """Get windowed analysis result with features averaged across channels.

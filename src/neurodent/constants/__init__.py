@@ -116,6 +116,15 @@ def set_channel_map(channels: dict) -> None:
 
 from .analysis import (
     FeatureType,
+    LinearFeatureName,
+    Linear2DFeatureName,
+    BandFeatureName,
+    BandedMatrixFeatureName,
+    SimpleMatrixFeatureName,
+    MatrixFeatureName,
+    HistFeatureName,
+    PlottableFeatureName,
+    FeatureName,
     FEATURE_SHAPES,
     LINEAR_FEATURES,
     LINEAR_2D_FEATURES,
@@ -161,6 +170,16 @@ __all__ = [
     "set_channel_map",
     "DF_SORT_ORDER",
     "FEATURE_LABELS",
+    # Feature Name Vocabulary
+    "LinearFeatureName",
+    "Linear2DFeatureName",
+    "BandFeatureName",
+    "BandedMatrixFeatureName",
+    "SimpleMatrixFeatureName",
+    "MatrixFeatureName",
+    "HistFeatureName",
+    "PlottableFeatureName",
+    "FeatureName",
     # Feature Typing
     "FeatureType",
     "FEATURE_SHAPES",

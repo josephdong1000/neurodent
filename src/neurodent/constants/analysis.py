@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import Literal, get_args
 
 
 class FeatureType(Enum):
@@ -163,7 +164,7 @@ Semantic dimensions (bands, components, freq bins) are trailing.
 """
 
 
-LINEAR_FEATURES = [
+LinearFeatureName = Literal[
     "rms",
     "ampvar",
     "psdtotal",
@@ -173,26 +174,66 @@ LINEAR_FEATURES = [
     "logpsdtotal",
     "lognspike",
 ]
+"""Valid names for linear (scalar) features."""
+
+LINEAR_FEATURES = list(get_args(LinearFeatureName))
 """List of linear (scalar) feature names computed per channel."""
 
-LINEAR_2D_FEATURES = ["psdslope"]
+Linear2DFeatureName = Literal["psdslope"]
+"""Valid names for multi-component linear features."""
+
+LINEAR_2D_FEATURES = list(get_args(Linear2DFeatureName))
 """List of multi-component linear features (stored as 2-D arrays per channel)."""
 
-BAND_FEATURES = ["psdband", "psdfrac"] + ["logpsdband", "logpsdfrac"]
+BandFeatureName = Literal["psdband", "psdfrac", "logpsdband", "logpsdfrac"]
+"""Valid names for frequency-band features."""
+
+BAND_FEATURES = list(get_args(BandFeatureName))
 """List of frequency-band feature names (one value per band)."""
 
-MATRIX_FEATURES = ["cohere", "zcohere", "imcoh", "zimcoh", "pcorr", "zpcorr"]
-"""List of connectivity/matrix feature names (channel pairs)."""
+BandedMatrixFeatureName = Literal["cohere", "zcohere", "imcoh", "zimcoh"]
+"""Valid names for matrix features with a frequency band dimension."""
 
-BANDED_MATRIX_FEATURES = ["cohere", "zcohere", "imcoh", "zimcoh"]
+BANDED_MATRIX_FEATURES = list(get_args(BandedMatrixFeatureName))
 """Matrix features with frequency band dimension (stored as dict with band keys)."""
 
-SIMPLE_MATRIX_FEATURES = ["pcorr", "zpcorr"]
+SimpleMatrixFeatureName = Literal["pcorr", "zpcorr"]
+"""Valid names for matrix features without a frequency band dimension."""
+
+SIMPLE_MATRIX_FEATURES = list(get_args(SimpleMatrixFeatureName))
 """Matrix features without frequency bands (single 2D correlation matrix)."""
 
+MatrixFeatureName = Literal[BandedMatrixFeatureName, SimpleMatrixFeatureName]
+"""Valid names for connectivity/matrix features."""
 
-HIST_FEATURES = ["psd"]
+MATRIX_FEATURES = list(get_args(MatrixFeatureName))
+"""List of connectivity/matrix feature names (channel pairs)."""
+
+HistFeatureName = Literal["psd"]
+"""Valid names for histogram/spectral features."""
+
+HIST_FEATURES = list(get_args(HistFeatureName))
 """List of histogram/spectral feature names."""
+
+PlottableFeatureName = Literal[
+    LinearFeatureName,
+    Linear2DFeatureName,
+    BandFeatureName,
+    MatrixFeatureName,
+]
+"""Feature names the general-purpose plot functions accept.
+
+Excludes the histogram features, whose ``freq_bins`` axis holds around a hundred values
+where every other semantic axis holds two to five. They are plotted by the dedicated
+:meth:`~neurodent.plotting.AnimalPlotter.plot_psd_histogram` and
+:meth:`~neurodent.plotting.AnimalPlotter.plot_psd_spectrogram` instead.
+"""
+
+FeatureName = Literal[
+    PlottableFeatureName,
+    HistFeatureName,
+]
+"""Every valid feature name. Annotate feature parameters with this."""
 
 FEATURES = LINEAR_FEATURES + LINEAR_2D_FEATURES + BAND_FEATURES + MATRIX_FEATURES + HIST_FEATURES
 """Complete list of all available features."""
