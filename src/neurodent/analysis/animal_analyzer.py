@@ -134,6 +134,9 @@ class AnimalAnalyzer:
             features (list[str]): List of features to compute. See individual ``compute_...()`` functions for output format
             exclude (list[str], optional): List of features to ignore. Will override the features parameter. Defaults to [].
             window_s (int, optional): Length of each window in seconds. Note that some features break with very short window times. Defaults to 5.
+            multiprocess_mode (Literal["dask", "serial"], optional): Whether to compute windows in parallel with Dask, one task per window, or serially.
+                Process-level parallelism requires an active ``dask.distributed`` Client. The Dask path drops the last fragment unconditionally, even when it is a
+                full window, so it yields one fewer window than "serial". Defaults to "serial".
             suppress_short_interval_error (bool, optional): If True, suppress ValueError for short intervals between timestamps in resulting WindowAnalysisResult. Useful for aggregated WARs. Defaults to False.
             apply_notch_filter (bool, optional): Whether to apply notch filtering to remove line noise. Uses constants.LINE_FREQ. Defaults to True.
             chunk_duration_s (float, optional): Duration in seconds of data to hold
@@ -355,7 +358,8 @@ class AnimalAnalyzer:
                 recording is always analysed; this parameter controls peak RAM
                 by processing in overlapping chunks.  ``None`` loads the full
                 recording at once (fastest).
-            multiprocess_mode (Literal["dask", "serial"]): Processing mode
+            multiprocess_mode (Literal["dask", "serial"]): Whether to detect spikes in
+                parallel with Dask or serially. Defaults to "serial".
 
         Returns:
             list[FrequencyDomainSpikeAnalysisResult]: Results for each recording session

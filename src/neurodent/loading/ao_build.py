@@ -6,7 +6,6 @@ Mixin for :class:`~neurodent.loading.animal_organizer.AnimalOrganizer`.
 from __future__ import annotations
 
 import logging
-import warnings
 from pathlib import Path
 from typing import Literal, Union
 
@@ -511,7 +510,6 @@ class AoBuildMixin:
         output_base: Union[str, Path] = None,
         format: Literal["zarr", "binary"] = "zarr",
         overwrite: bool = False,
-        persist_base: Union[str, Path] = None,
     ) -> dict[str, "AnimalOrganizer"]:
         """
         Split this multi-animal AnimalOrganizer into per-animal AnimalOrganizers.
@@ -543,9 +541,6 @@ class AoBuildMixin:
             overwrite (bool, optional): Passed to
                 :meth:`LongRecordingOrganizer.save_recording`; if True, replace an
                 existing (recognized) recording folder. Defaults to False.
-            persist_base (Union[str, Path], optional): Deprecated alias for
-                ``output_base``. If provided (not None), it is used as ``output_base``
-                and emits a :class:`DeprecationWarning`.
 
         Returns:
             dict[str, AnimalOrganizer]: Dictionary mapping group names to new
@@ -565,16 +560,6 @@ class AoBuildMixin:
         """
         if not self.long_recordings:
             raise ValueError("No recordings loaded to split")
-
-        if persist_base is not None:
-            warnings.warn(
-                "The 'persist_base' argument of AnimalOrganizer.split() is deprecated; "
-                "use 'output_base'.",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            if output_base is None:
-                output_base = persist_base
 
         if output_base is not None:
             output_base = Path(output_base)

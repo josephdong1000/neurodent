@@ -132,35 +132,6 @@ class TestSaveRecording:
         assert actual_path.exists()
 
 
-class TestPersistDeprecated:
-    """Test the deprecated persist() alias."""
-
-    def test_persist_warns_and_delegates(self, dummy_long_recording, tmp_path):
-        """persist() emits a DeprecationWarning and still writes the folder."""
-        groups = {"GroupA": ["Ch0", "Ch1"]}
-        splits = dummy_long_recording.split(groups)
-
-        output_dir = tmp_path / "output" / "GroupA"
-        with pytest.warns(DeprecationWarning, match="persist"):
-            actual_path = splits["GroupA"].persist(output_dir, format="zarr")
-
-        assert actual_path.exists()
-        assert splits["GroupA"]._is_in_memory is False
-
-    def test_persist_overwrites_by_default(self, dummy_long_recording, tmp_path):
-        """persist() preserves historical clobbering behavior (overwrite=True)."""
-        groups = {"GroupA": ["Ch0", "Ch1"]}
-        splits = dummy_long_recording.split(groups)
-
-        output_dir = tmp_path / "output" / "GroupA"
-        with pytest.warns(DeprecationWarning):
-            splits["GroupA"].persist(output_dir, format="zarr")
-            # Second call must not raise FileExistsError (unlike save_recording default)
-            actual_path = splits["GroupA"].persist(output_dir, format="zarr")
-
-        assert actual_path.exists()
-
-
 # Standalone Function Tests
 
 class TestSplitRecordingFunction:
@@ -210,27 +181,6 @@ class TestSplitRecordingFunction:
         assert "AnimalA" in splits
         assert splits["AnimalA"]._is_in_memory is True
 
-    def test_split_recording_persist_false_deprecated(self, tmp_path):
-        """Test split_recording() still honors the deprecated persist=False alias."""
-        traces = np.random.randn(2000, 4).astype(np.float32)
-        recording = si.NumpyRecording(traces_list=[traces], sampling_frequency=1000.0)
-        input_folder = tmp_path / "input"
-        recording.save(folder=input_folder, format="binary")
-
-        groups = {"AnimalA": ["0", "1"]}
-
-        with pytest.warns(DeprecationWarning, match="persist"):
-            splits = split_recording(
-                input_path=input_folder,
-                groups=groups,
-                persist=False,
-                manual_datetimes=datetime.now(),
-            )
-
-        assert "AnimalA" in splits
-        assert splits["AnimalA"]._is_in_memory is True
-
-
 # Edge Cases and Error Handling
 
 class TestSplitEdgeCases:
@@ -266,13 +216,6 @@ class TestSplitEdgeCases:
 
         with pytest.raises(ValueError, match="No recording to save"):
             lro.save_recording(tmp_path / "output")
-
-    def test_persist_no_recording_raises_error(self, tmp_path):
-        """Test that the deprecated persist() raises error when no recording is loaded."""
-        lro = LongRecordingOrganizer(item=None)
-
-        with pytest.raises(ValueError, match="No recording to persist"):
-            lro.persist(tmp_path / "output")
 
     def test_split_no_recording_raises_error(self):
         """Test that split() raises error when no recording is loaded."""
@@ -312,23 +255,6 @@ class TestSplitEdgeCases:
 
         with pytest.raises(ImportError, match="SpikeInterface is required for save_recording"):
             lro.save_recording(tmp_path / "output")
-
-    def test_persist_si_import_error(self, monkeypatch, tmp_path):
-        """Test that the deprecated persist raises ImportError when SI is not available."""
-        import sys
-
-        # Get the current module from sys.modules (handles test_imports.py reimporting)
-        core_module = sys.modules['neurodent.loading.lro_persistence']
-        LRO = sys.modules['neurodent.loading.long_recording_organizer'].LongRecordingOrganizer
-
-        lro = LRO(item='.', mode=None)
-        lro.LongRecording = "dummy"
-
-        monkeypatch.setattr(core_module, 'si', None)
-
-        with pytest.raises(ImportError, match="SpikeInterface is required for persist"):
-            lro.persist(tmp_path / "output")
-
 
 # In-Memory Initialization Tests
 

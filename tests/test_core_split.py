@@ -49,7 +49,6 @@ class TestLROSplit(unittest.TestCase):
         instance.item = kwargs.get('item', args[0] if args else None)
         instance.manual_datetimes = kwargs.get('manual_datetimes', None)
         instance.datetimes_are_start = kwargs.get('datetimes_are_start', True)
-        instance.n_jobs = kwargs.get('n_jobs', 1)
         instance.n_truncate = kwargs.get('truncate', None)
         instance.truncate = bool(instance.n_truncate)
 
@@ -160,7 +159,6 @@ class TestLROSplit(unittest.TestCase):
         lro.channel_names = ["ch1", "ch2"]
         lro.manual_datetimes = manual_dt
         lro.datetimes_are_start = False
-        lro.n_jobs = 4
         lro.file_end_datetimes = file_end_dt
         lro.file_durations = [3600.0]
         lro.cumulative_file_durations = [3600.0]
@@ -173,7 +171,6 @@ class TestLROSplit(unittest.TestCase):
         # Constructor params should be passed via constructor
         self.assertEqual(child.manual_datetimes, manual_dt)
         self.assertEqual(child.datetimes_are_start, False)
-        self.assertEqual(child.n_jobs, 4)
 
         # File-level attributes should be assigned post-instantiation
         self.assertEqual(child.file_end_datetimes, file_end_dt)

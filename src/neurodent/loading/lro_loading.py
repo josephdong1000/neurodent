@@ -285,7 +285,6 @@ class LroLoadingMixin:
             self.convert_file_with_mne_to_recording(
                 extract_func=extract_func,
                 cache_policy=cache_policy,
-                n_jobs=self.n_jobs,
                 **kwargs,
             )
         elif mode is None:
@@ -421,68 +420,6 @@ class LroLoadingMixin:
         self.finalize_file_timestamps()
         logging.debug(f"LongRecording created via SI: {self}")
 
-    def _load_and_process_mne_data(
-        self,
-        extract_func,
-        input_type,
-        datafolder,
-        datafile,
-        datafiles,
-        n_jobs,
-        metadata_to_update=None,
-        **kwargs,
-    ) -> mne.io.Raw:
-        """Helper method to load and process MNE data from various input types."""
-        # Load data based on input type
-        if input_type == "folder":
-            raw: mne.io.Raw = extract_func(datafolder, **kwargs)
-        elif input_type == "file":
-            raw: mne.io.Raw = extract_func(datafile, **kwargs)
-        elif input_type == "files":
-            logging.info(f"Running extract_func on {len(datafiles)} files")
-            raws: list[mne.io.Raw] = [extract_func(x, **kwargs) for x in datafiles]
-            logging.info(f"Concatenating {len(raws)} raws")
-            raw: mne.io.Raw = mne.concatenate_raws(raws)
-            del raws
-        else:
-            raise ValueError(f"Invalid input_type: {input_type}")
-
-        logging.info(f"raw.info: {raw.info}")
-
-        # Use user-specified n_jobs for MNE resampling, or default to 1
-        effective_n_jobs = n_jobs if n_jobs is not None else self.n_jobs
-        logging.info(
-            f"Using n_jobs={effective_n_jobs} for MNE resampling (method param: {n_jobs}, instance: {self.n_jobs})"
-        )
-
-        # Ensure data is preloaded for parallel processing
-        if not raw.preload:
-            logging.info("Preloading data")
-            raw.load_data()
-
-        # Use optimal resampling method with power-of-2 padding for speed
-        original_sfreq = raw.info["sfreq"]
-        if original_sfreq != constants.GLOBAL_SAMPLING_RATE:
-            logging.info(
-                f"Resampling from {original_sfreq} to {constants.GLOBAL_SAMPLING_RATE}"
-            )
-            raw = raw.resample(
-                constants.GLOBAL_SAMPLING_RATE,
-                n_jobs=effective_n_jobs,
-                npad="auto",
-                method="fft",
-            )
-
-            # Update metadata to reflect the new sampling rate
-            if metadata_to_update is not None:
-                metadata_to_update.update_sampling_rate(constants.GLOBAL_SAMPLING_RATE)
-        else:
-            logging.info(
-                f"Sampling frequency already matches {constants.GLOBAL_SAMPLING_RATE} Hz, no resampling needed"
-            )
-
-        return raw
-
     def _load_mne_data_no_resample(self, extract_func, **kwargs) -> "mne.io.Raw":
         """Load MNE data without resampling for unified resampling pipeline.
 
@@ -519,7 +456,6 @@ class LroLoadingMixin:
         cache_policy,
         intermediate,
         extract_func,
-        n_jobs,
         **kwargs,
     ):
         """Get cached intermediate file or create it if needed.
@@ -792,8 +728,6 @@ class LroLoadingMixin:
         intermediate_name=None,
         intermediate_dir=None,
         cache_policy: Literal["auto", "always", "force_regenerate"] = "auto",
-        multiprocess_mode: Literal["dask", "serial"] = "serial",
-        n_jobs: int = None,
         **kwargs,
     ):
         if se is None:
@@ -848,7 +782,6 @@ class LroLoadingMixin:
                 cache_policy=cache_policy,
                 intermediate=intermediate,
                 extract_func=extract_func,
-                n_jobs=n_jobs,
                 **kwargs,
             )
 
