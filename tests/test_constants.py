@@ -101,6 +101,15 @@ class TestConstants:
         for feature in linear_features + matrix_features:
             assert feature in constants.FEATURE_PLOT_HEIGHT_RATIOS, f"Missing feature: {feature}"
 
+        # Every name a plot function will now autocomplete must have a ratio, or
+        # animal.py indexes this dict and raises KeyError.
+        plottable = (
+            set(get_args(constants.LinearFeatureName))
+            | set(get_args(constants.BandFeatureName))
+            | set(get_args(constants.MatrixFeatureName))
+        )
+        assert plottable <= set(constants.FEATURE_PLOT_HEIGHT_RATIOS)
+
     def test_freq_bands(self):
         """Test FREQ_BANDS structure."""
         expected_bands = ["delta", "theta", "alpha", "beta", "gamma"]
