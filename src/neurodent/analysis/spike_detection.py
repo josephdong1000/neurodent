@@ -81,7 +81,8 @@ class FrequencyDomainSpikeDetector:
             chunk_duration_s (float): Duration in seconds of each processing
                 chunk.  Defaults to 3600 (1 hour).  Set to ``None`` to load
                 the full recording into memory at once (fastest, highest RAM).
-            multiprocess_mode (Literal["dask", "serial"]): Processing mode
+            multiprocess_mode (Literal["dask", "serial"]): Whether to detect spikes in
+                parallel with Dask or serially. Defaults to "serial".
 
         Returns:
             list[np.ndarray]: Spike sample indices per channel.

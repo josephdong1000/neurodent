@@ -117,7 +117,6 @@ class LroMergeMixin:
                 recording=sub_rec,
                 manual_datetimes=self.manual_datetimes,
                 datetimes_are_start=self.datetimes_are_start,
-                n_jobs=self.n_jobs,
                 truncate=self.n_truncate if self.truncate else False,
             )
 

@@ -5,7 +5,6 @@ Mixin for :class:`~neurodent.loading.long_recording_organizer.LongRecordingOrgan
 
 import json
 import logging
-import warnings
 from datetime import datetime
 from pathlib import Path
 from typing import Literal, Union
@@ -64,7 +63,9 @@ class LroPersistenceMixin:
                 first — but **only** when it is a recognized SpikeInterface/NeuRodent
                 recording folder; an unrecognized directory is never deleted (raises
                 :class:`ValueError`). Defaults to False.
-            n_jobs (int, optional): Number of parallel jobs. Defaults to 1.
+            n_jobs (int, optional): Workers for SpikeInterface's chunked disk write.
+                Controls the write only. Feature computation is parallelized separately,
+                by ``multiprocess_mode`` on the analysis functions. Defaults to 1.
             chunk_duration (str, optional): Chunk duration for processing. Defaults to "1s".
             progress_bar (bool, optional): Show progress bar. Defaults to True.
             **kwargs: Additional arguments passed to SI's save().
@@ -135,46 +136,6 @@ class LroPersistenceMixin:
         logging.info(f"Saved recording to {actual_output_dir} (format={format})")
 
         return actual_output_dir
-
-    def persist(
-        self,
-        output_dir: Union[str, Path],
-        format: Literal["zarr", "binary"] = "zarr",
-        n_jobs: int = 1,
-        chunk_duration: str = "1s",
-        progress_bar: bool = True,
-        **kwargs,
-    ) -> Path:
-        """Deprecated alias for :meth:`save_recording`.
-
-        Retained for backward compatibility. Delegates to :meth:`save_recording` with
-        ``overwrite=True`` to preserve the historical clobbering behavior. New code
-        should call :meth:`save_recording`, which defaults to ``overwrite=False``.
-
-        Returns:
-            Path: The output directory where the recording was saved.
-        """
-        # Preserve the exact guard messages the historical API raised.
-        if si is None:
-            raise ImportError("SpikeInterface is required for persist()")
-        if self.LongRecording is None:
-            raise ValueError("No recording to persist")
-
-        warnings.warn(
-            "LongRecordingOrganizer.persist() is deprecated; use save_recording(). "
-            "Note that save_recording() defaults to overwrite=False.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return self.save_recording(
-            output_dir,
-            format=format,
-            overwrite=True,
-            n_jobs=n_jobs,
-            chunk_duration=chunk_duration,
-            progress_bar=progress_bar,
-            **kwargs,
-        )
 
     def _create_sidecar_payload(self, format: str) -> dict:
         """Build the JSON-serializable LRO metadata sidecar payload.
