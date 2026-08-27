@@ -26,7 +26,6 @@ from .lro_quality import LroQualityMixin
 from .lro_persistence import LroPersistenceMixin
 from .lro_merge import LroMergeMixin
 
-
 def split_recording(
     input_path: Union[str, Path],
     groups: dict[str, list[str]],
@@ -35,7 +34,6 @@ def split_recording(
     format: Literal["zarr", "binary"] = "zarr",
     save: bool = True,
     overwrite: bool = False,
-    persist: Union[bool, None] = None,
     **lro_kwargs,
 ) -> dict[str, "LongRecordingOrganizer"]:
     """
@@ -55,8 +53,6 @@ def split_recording(
             :meth:`LongRecordingOrganizer.save_recording`. Defaults to True.
         overwrite (bool, optional): Passed to ``save_recording``; if True, replace an
             existing (recognized) recording folder. Defaults to False.
-        persist (bool, optional): Deprecated alias for ``save``. If provided (not None),
-            it overrides ``save`` and emits a :class:`DeprecationWarning`.
         **lro_kwargs: Additional arguments passed to LongRecordingOrganizer.
 
     Returns:
@@ -70,13 +66,10 @@ def split_recording(
         ...     output_base="/path/to/output",
         ... )
     """
-    if persist is not None:
-        warnings.warn(
-            "The 'persist' argument of split_recording() is deprecated; use 'save'.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        save = persist
+    # `persist` was renamed to `save`. Reject it rather than let **lro_kwargs carry it
+    # down to extract_func, where it would be swallowed and `save` would silently win.
+    if "persist" in lro_kwargs:
+        raise TypeError("split_recording() no longer accepts 'persist'; use 'save'.")
 
     # Load the input recording
     lro = LongRecordingOrganizer(input_path, mode=mode, **lro_kwargs)
@@ -123,15 +116,15 @@ class LongRecordingOrganizer(
             If an integer, truncate to first n files. Defaults to False.
         cache_policy (Literal['auto', 'always', 'force_regenerate'], optional):
             Cache policy for intermediate files. Defaults to 'auto'.
-        multiprocess_mode (Literal['dask', 'serial'], optional): Processing mode for
-            parallel operations when loading multiple files. Defaults to 'serial'.
+        multiprocess_mode (Literal['dask', 'serial'], optional): Whether to load files
+            in parallel with Dask. Only has an effect with ``mode='si'`` and an ``item``
+            that is a list of paths. ``mode='mne'`` loads a list serially. Defaults to 'serial'.
         extract_func (Callable | str, optional): Function to extract data.
             - If str: name of SpikeInterface or MNE extractor (e.g., 'read_intan', 'read_raw_edf')
             - If Callable: custom extraction function
             - If None: defaults to si.load for SI mode
         manual_datetimes (datetime | list[datetime], optional): Manually provided timestamps.
         datetimes_are_start (bool, optional): If True (default), manual_datetimes are start times.
-        n_jobs (int, optional): Number of parallel jobs for MNE resampling. Defaults to 1.
         recording (si.BaseRecording, optional): Existing SpikeInterface recording object
             for in-memory initialization. Use this when creating LRO wrappers around split recordings.
         **kwargs: Additional arguments passed to the data loading functions.
@@ -163,7 +156,6 @@ class LongRecordingOrganizer(
         ] = None,
         manual_datetimes: datetime | list[datetime] = None,
         datetimes_are_start: bool = True,
-        n_jobs: int = 1,
         recording: "si.BaseRecording" = None,
         **kwargs,
     ):
@@ -192,7 +184,6 @@ class LongRecordingOrganizer(
 
         self.manual_datetimes = manual_datetimes
         self.datetimes_are_start = datetimes_are_start
-        self.n_jobs = n_jobs
         self.labels = {}
 
         self.meta = None

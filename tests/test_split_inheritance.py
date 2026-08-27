@@ -34,7 +34,6 @@ def test_split_inherits_all_critical_metadata():
     ]
     lro.manual_datetimes = [datetime.datetime(2023, 1, 1, 10, 0, 0)] # e.g. start time provided manually
     lro.datetimes_are_start = True
-    lro.n_jobs = 4
     lro.bad_channel_names = ["Ch1", "Ch3"] 
     lro.n_truncate = 5
     lro.truncate = True
@@ -65,7 +64,6 @@ def test_split_inherits_all_critical_metadata():
     # B. Manual timing usage
     assert child.manual_datetimes == lro.manual_datetimes
     assert child.datetimes_are_start == lro.datetimes_are_start
-    assert child.n_jobs == lro.n_jobs
     
     # C. Truncate
     assert child.n_truncate == lro.n_truncate
@@ -113,7 +111,6 @@ def test_split_handles_empty_metadata_gracefully():
     lro.cumulative_file_durations = [10.0]
     lro.truncate = 100
     lro.n_truncate = 5
-    lro.n_jobs = 4
     lro.bad_channel_names = ["Ch1"]
     
     # Mock metadata object

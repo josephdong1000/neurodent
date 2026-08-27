@@ -23,6 +23,20 @@ def _patch_lro(mock_lro):
 class TestSplitRecordingFunction:
     """Tests for split_recording() that mock LongRecordingOrganizer to avoid I/O."""
 
+    def test_persist_kwarg_is_rejected(self, tmp_path):
+        """`persist` was renamed to `save`. It must raise, not be swallowed by **lro_kwargs.
+
+        Without the guard it reaches extract_func, which discards it, leaving save=True.
+        The call would then write to disk after being told not to.
+        """
+        with pytest.raises(TypeError, match="no longer accepts 'persist'"):
+            split_recording(
+                tmp_path / "in.bin",
+                groups={"A": ["0"]},
+                output_base=tmp_path / "out",
+                persist=False,
+            )
+
     def _make_mock_lro(self, splits=None):
         """Return a mock LRO whose .split() returns a dict of mock child LROs."""
         if splits is None:
@@ -75,21 +89,4 @@ class TestSplitRecordingFunction:
             expected_dir = tmp_path / group_name
             child_lro.save_recording.assert_called_once_with(
                 expected_dir, format="zarr", overwrite=False
-            )
-
-    def test_persist_alias_is_deprecated_but_works(self, tmp_path):
-        """The deprecated persist= alias still drives save_recording() with a warning."""
-        mock_lro, splits = self._make_mock_lro()
-        with _patch_lro(mock_lro):
-            with pytest.warns(DeprecationWarning, match="persist"):
-                split_recording(
-                    "/fake/path",
-                    groups={"AnimalA": ["ch1"]},
-                    output_base=tmp_path,
-                    persist=True,
-                    format="zarr",
-                )
-        for group_name, child_lro in splits.items():
-            child_lro.save_recording.assert_called_once_with(
-                tmp_path / group_name, format="zarr", overwrite=False
             )

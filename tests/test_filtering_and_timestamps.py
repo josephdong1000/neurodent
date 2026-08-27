@@ -2,6 +2,7 @@
 Tests for filtering utilities and timestamp fixes in SI/MNE modes.
 """
 
+import inspect
 import os
 import pytest
 import warnings
@@ -88,21 +89,15 @@ class TestManualTimestamps:
                     assert organizer.LongRecording is not None
 
 
-class TestNJobsSimplification:
-    """Test that n_jobs handling is now simplified."""
+class TestRemovedNJobsKwarg:
+    """``n_jobs`` was removed from the constructor; only ``save_recording`` still takes one."""
 
-    def test_n_jobs_defaults_to_one(self):
-        """Test that n_jobs defaults to 1 in core functionality."""
-        # This is now handled directly in the resampling code without complex detection
-        with patch("glob.glob", return_value=["/fake/file.edf"]):
-            with patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer._validate_timestamps_for_mode"):
-                organizer = core.LongRecordingOrganizer("/fake/path", mode=None)
-                # Default n_jobs should be 1, not complex detection
-                assert organizer.n_jobs == 1
+    def test_constructor_has_no_n_jobs_parameter(self):
+        """The parameter is gone from the signature, so the docs page cannot advertise it."""
+        params = inspect.signature(core.LongRecordingOrganizer.__init__).parameters
+        assert "n_jobs" not in params
 
-    def test_n_jobs_user_specified_respected(self):
-        """Test that user-specified n_jobs values are respected."""
-        with patch("glob.glob", return_value=["/fake/file.edf"]):
-            with patch("neurodent.loading.long_recording_organizer.LongRecordingOrganizer._validate_timestamps_for_mode"):
-                organizer = core.LongRecordingOrganizer("/fake/path", mode=None, n_jobs=4)
-                assert organizer.n_jobs == 4
+    def test_save_recording_still_takes_n_jobs(self):
+        """SpikeInterface's chunked write is the one place n_jobs has an effect."""
+        params = inspect.signature(core.LongRecordingOrganizer.save_recording).parameters
+        assert "n_jobs" in params

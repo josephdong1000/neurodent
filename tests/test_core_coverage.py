@@ -291,76 +291,6 @@ class TestConvertFileWithSI:
 
 
 # ===================================================================
-# _load_and_process_mne_data
-# ===================================================================
-
-
-class TestLoadAndProcessMneData:
-    """Lines 883-930: all input_types, preload, resampling."""
-
-    def _get_lro(self):
-        return _make_lro(item="dummy")
-
-    def test_folder_input_type(self):
-        lro = self._get_lro()
-        raw = _make_mock_mne_raw()
-        extract_func = Mock(return_value=raw)
-        result = lro._load_and_process_mne_data(
-            extract_func, "folder", "/data/folder", None, None, n_jobs=1
-        )
-        extract_func.assert_called_once_with("/data/folder")
-        assert result is raw
-
-    def test_file_input_type(self):
-        lro = self._get_lro()
-        raw = _make_mock_mne_raw()
-        extract_func = Mock(return_value=raw)
-        result = lro._load_and_process_mne_data(
-            extract_func, "file", None, "/data/file.edf", None, n_jobs=1
-        )
-        extract_func.assert_called_once_with("/data/file.edf")
-
-    def test_files_input_type(self):
-        lro = self._get_lro()
-        raw = _make_mock_mne_raw()
-        extract_func = Mock(return_value=raw)
-        with patch("neurodent.loading.lro_loading.mne") as mock_mne:
-            mock_mne.concatenate_raws.return_value = raw
-            result = lro._load_and_process_mne_data(
-                extract_func,
-                "files",
-                None,
-                None,
-                ["/f1.edf", "/f2.edf"],
-                n_jobs=1,
-            )
-        assert extract_func.call_count == 2
-
-    def test_invalid_input_type(self):
-        lro = self._get_lro()
-        with pytest.raises(ValueError, match="Invalid input_type"):
-            lro._load_and_process_mne_data(Mock(), "bogus", None, None, None, 1)
-
-    def test_preload_triggers_load_data(self):
-        lro = self._get_lro()
-        raw = _make_mock_mne_raw(preload=False)
-        extract_func = Mock(return_value=raw)
-        lro._load_and_process_mne_data(
-            extract_func, "file", None, "f.edf", None, n_jobs=1
-        )
-        raw.load_data.assert_called_once()
-
-    def test_resampling_when_sfreq_differs(self):
-        lro = self._get_lro()
-        raw = _make_mock_mne_raw(sfreq=500.0)
-        extract_func = Mock(return_value=raw)
-        lro._load_and_process_mne_data(
-            extract_func, "file", None, "f.edf", None, n_jobs=2
-        )
-        raw.resample.assert_called_once()
-
-
-# ===================================================================
 # _load_mne_data_no_resample
 # ===================================================================
 
@@ -405,7 +335,6 @@ class TestGetOrCreateIntermediateFile:
                 cache_policy="always",
                 intermediate="edf",
                 extract_func=Mock(),
-                n_jobs=1,
             )
 
     def test_corrupted_metadata_json_auto(self, tmp_path):
@@ -434,7 +363,6 @@ class TestGetOrCreateIntermediateFile:
                                     cache_policy="auto",
                                     intermediate="edf",
                                     extract_func=extract_func,
-                                    n_jobs=1,
                                 )
         # Verify regeneration happened (extract_func called to rebuild metadata)
         assert extract_func.called
@@ -460,7 +388,6 @@ class TestGetOrCreateIntermediateFile:
                                 cache_policy="auto",
                                 intermediate="edf",
                                 extract_func=extract_func,
-                                n_jobs=1,
                             )
         # First call to extract_func is with item[0]
         assert extract_func.call_args_list[0].args[0] == "f1.edf"
@@ -482,7 +409,6 @@ class TestGetOrCreateIntermediateFile:
                             cache_policy="auto",
                             intermediate="xyz",
                             extract_func=extract_func,
-                            n_jobs=1,
                         )
 
 
@@ -515,7 +441,6 @@ class TestIntanAndEdfExport:
                                     cache_policy="auto",
                                     intermediate="edf",
                                     extract_func=extract_func,
-                                    n_jobs=1,
                                 )
                         mock_conv.assert_called_once_with(raw)
 
@@ -549,7 +474,6 @@ class TestIntanAndEdfExport:
                                 cache_policy="auto",
                                 intermediate="edf",
                                 extract_func=extract_func,
-                                n_jobs=1,
                             )
                             assert mock_mne.export.export_raw.call_count == 2
                             # Verify second call used physical_range kwarg (robust retry)
@@ -610,7 +534,6 @@ class TestSelfHealingCorruptCache:
                                 cache_policy="auto",
                                 intermediate="edf",
                                 extract_func=extract_func,
-                                n_jobs=1,
                             )
         # The corrupt cache was read once (failed), then regenerated and re-read.
         assert reads["n"] == 2
@@ -651,7 +574,6 @@ class TestSelfHealingCorruptCache:
                             cache_policy="auto",
                             intermediate="bin",
                             extract_func=extract_func,
-                            n_jobs=1,
                         )
         assert reads["n"] == 2
         assert extract_func.called
@@ -678,7 +600,6 @@ class TestSelfHealingCorruptCache:
                         cache_policy="always",
                         intermediate="edf",
                         extract_func=extract_func,
-                        n_jobs=1,
                     )
         # No regeneration attempted under 'always'.
         assert not extract_func.called

@@ -492,23 +492,6 @@ class TestSplit:
         for child_lro in splits["AnimalA"].long_recordings:
             child_lro.save_recording.assert_called_once()
 
-    def test_split_with_persist_base_deprecated(self, mock_multi_day_lros, tmp_path):
-        """Test that the deprecated persist_base alias still triggers save_recording()."""
-        parent_ao = AnimalOrganizer.from_lros(
-            lros=mock_multi_day_lros,
-            animal_id="Combined",
-        )
-
-        with pytest.warns(DeprecationWarning, match="persist_base"):
-            splits = parent_ao.split(
-                groups={"AnimalA": ["Ch0", "Ch1"]},
-                persist_base=tmp_path,
-            )
-
-        # Verify save_recording was called on each child LRO
-        for child_lro in splits["AnimalA"].long_recordings:
-            child_lro.save_recording.assert_called_once()
-
     def test_split_no_recordings_raises_error(self):
         """Test that split raises error when no recordings loaded."""
         ao = AnimalOrganizer.from_lros(
