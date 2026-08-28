@@ -3,6 +3,11 @@
 Includes color palettes and figure layout settings.
 """
 
+from typing import Literal
+
+ScoreTypeName = Literal["z", "zall", "gz", "modz", "center", "none"]
+"""How to rescale a feature before plotting. ``None`` means the same as ``"none"``."""
+
 FEATURE_PLOT_HEIGHT_RATIOS = {
     "rms": 1,
     "ampvar": 1,

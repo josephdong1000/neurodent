@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from enum import Enum
 from typing import Literal, get_args
 
@@ -221,12 +222,9 @@ PlottableFeatureName = Literal[
     BandFeatureName,
     MatrixFeatureName,
 ]
-"""Feature names the general-purpose plot functions accept.
-
-Excludes the histogram features, whose ``freq_bins`` axis holds around a hundred values
-where every other semantic axis holds two to five. They are plotted by the dedicated
-:meth:`~neurodent.plotting.AnimalPlotter.plot_psd_histogram` and
-:meth:`~neurodent.plotting.AnimalPlotter.plot_psd_spectrogram` instead.
+"""Every feature except ``psd``, which needs its own plot:
+:meth:`~neurodent.plotting.AnimalPlotter.plot_psd_histogram` or
+:meth:`~neurodent.plotting.AnimalPlotter.plot_psd_spectrogram`.
 """
 
 FeatureName = Literal[
@@ -234,6 +232,12 @@ FeatureName = Literal[
     HistFeatureName,
 ]
 """Every valid feature name. Annotate feature parameters with this."""
+
+FeatureNames = Sequence[FeatureName] | FeatureName | None
+"""One feature name or a list of them. Names not present are skipped."""
+
+FeatureRequest = Sequence[FeatureName | Literal["all"]] | FeatureName | Literal["all"] | None
+"""One feature name, a list of them, or ``"all"``. ``None`` means all."""
 
 FEATURES = LINEAR_FEATURES + LINEAR_2D_FEATURES + BAND_FEATURES + MATRIX_FEATURES + HIST_FEATURES
 """Complete list of all available features."""

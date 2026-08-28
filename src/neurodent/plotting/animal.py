@@ -5,6 +5,7 @@ import logging
 
 import matplotlib
 import matplotlib.axes
+from matplotlib import colors
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -13,6 +14,8 @@ from scipy.stats import gzscore, linregress, zscore
 from neurodent import constants
 from neurodent.constants import (
     BandFeatureName,
+    ScoreTypeName,
+    Linear2DFeatureName,
     LinearFeatureName,
     MatrixFeatureName,
     PlottableFeatureName,
@@ -58,8 +61,22 @@ class AnimalPlotter:
         self.save_path: Path = save_path
 
     def plot_coherecorr_matrix(
-        self, groupby="animalday", bands=None, figsize=None, cmap="viridis", **kwargs
-    ):
+        self,
+        groupby: str = "animalday",
+        bands: list[str] | str | None = None,
+        figsize: tuple[float, float] | None = None,
+        cmap: str = "viridis",
+        **kwargs,
+    ) -> None:
+        """Plot group-averaged connectivity matrices, one column per band.
+
+        Args:
+            groupby: Column to average over before plotting. Defaults to "animalday".
+            bands: Band names to plot, plus "pcorr" or "zpcorr" for the correlation
+                matrices. Defaults to every band plus "pcorr".
+            figsize (tuple, optional): Figure size (width, height). Defaults to None.
+            cmap (str, optional): Colormap. Defaults to "viridis".
+        """
         avg_result = self.__get_groupavg_coherecorr(groupby, **kwargs)
 
         if bands is None:
@@ -92,8 +109,22 @@ class AnimalPlotter:
         self._handle_figure(fig, title="coherecorr_matrix")
 
     def plot_coherecorr_diff(
-        self, groupby="isday", bands=None, figsize=None, cmap="bwr", **kwargs
-    ):
+        self,
+        groupby: str = "isday",
+        bands: list[str] | str | None = None,
+        figsize: tuple[float, float] | None = None,
+        cmap: str = "bwr",
+        **kwargs,
+    ) -> None:
+        """Plot the difference in connectivity matrices between exactly two groups.
+
+        Args:
+            groupby: Column to split on. Must yield exactly two rows. Defaults to "isday".
+            bands: Band names to plot, plus "pcorr" or "zpcorr" for the correlation
+                matrices. Defaults to every band plus "pcorr".
+            figsize (tuple, optional): Figure size (width, height). Defaults to None.
+            cmap (str, optional): Diverging colormap. Defaults to "bwr".
+        """
         avg_result = self.__get_groupavg_coherecorr(groupby, **kwargs)
         avg_result = avg_result.drop("cohere", axis=1, errors="ignore")
         if len(avg_result.index) != 2:
@@ -170,14 +201,16 @@ class AnimalPlotter:
 
     def plot_linear_temporal(
         self,
-        multiindex=["animalday", "animal", "genotype"],
-        features: list[Literal[LinearFeatureName, BandFeatureName]] | None = None,
-        channels: list[int] = None,
-        figsize=None,
-        score_type="z",
-        show_endfile=False,
+        multiindex: list[str] = ["animalday", "animal", "genotype"],
+        features: (
+            list[Literal[LinearFeatureName, Linear2DFeatureName, BandFeatureName]] | None
+        ) = None,
+        channels: list[int] | None = None,
+        figsize: tuple[float, float] | None = None,
+        score_type: ScoreTypeName | None = "z",
+        show_endfile: bool = False,
         **kwargs,
-    ):
+    ) -> None:
         """Plot linear and band features over time, one subplot per feature.
 
         Args:
@@ -193,8 +226,6 @@ class AnimalPlotter:
             show_endfile (bool, optional): Draw vertical lines at recording file boundaries.
                 Defaults to False.
         """
-        # REVIEW this breaks for plotting psdslope, which contains both slope and intercept values.
-        # Perhaps split apart psdslope more cleanly into psdslope + psdintercept when computing WAR
         if features is None:
             features = constants.LINEAR_FEATURES.copy() + constants.BAND_FEATURES.copy()
             features = [x for x in features if x and not x.startswith("log")]
@@ -240,7 +271,7 @@ class AnimalPlotter:
         feature: str,
         ax: matplotlib.axes.Axes,
         channels: list[int] = None,
-        score_type: str = "z",
+        score_type: ScoreTypeName | None = "z",
         duration_name="duration",
         channel_y_offset=10,
         feature_y_offset=10,
@@ -305,7 +336,11 @@ class AnimalPlotter:
             )
 
     def __get_linear_feature(
-        self, group: pd.DataFrame, feature: str, score_type="z", triag=True
+        self,
+        group: pd.DataFrame,
+        feature: PlottableFeatureName,
+        score_type: ScoreTypeName | None = "z",
+        triag=True,
     ):
         ftype = constants.classify_feature(feature)
 
@@ -369,17 +404,17 @@ class AnimalPlotter:
 
     def plot_coherecorr_spectral(
         self,
-        multiindex=["animalday", "animal", "genotype"],
+        multiindex: list[str] = ["animalday", "animal", "genotype"],
         features: list[MatrixFeatureName] | None = None,
-        figsize=None,
-        score_type="z",
-        cmap="bwr",
-        triag=True,
-        show_endfile=False,
-        duration_name="duration",
-        endfile_name="endfile",
+        figsize: tuple[float, float] | None = None,
+        score_type: ScoreTypeName | None = "z",
+        cmap: str = "bwr",
+        triag: bool = True,
+        show_endfile: bool = False,
+        duration_name: str = "duration",
+        endfile_name: str = "endfile",
         **kwargs,
-    ):
+    ) -> None:
         """Plot connectivity matrix features over time as per-band heatmaps.
 
         Args:
@@ -450,7 +485,7 @@ class AnimalPlotter:
         feature: str,
         ax: matplotlib.axes.Axes,
         center_cmap=True,
-        score_type="z",
+        score_type: ScoreTypeName | None = "z",
         norm_list=None,
         show_featurename=True,
         show_endfile=False,
@@ -514,14 +549,25 @@ class AnimalPlotter:
 
     def plot_psd_histogram(
         self,
-        groupby="animalday",
-        figsize=None,
-        avg_channels=False,
-        plot_type="loglog",
+        groupby: str = "animalday",
+        figsize: tuple[float, float] | None = None,
+        avg_channels: bool = False,
+        plot_type: Literal["loglog", "semilogy", "semilogx", "linear"] = "loglog",
         plot_slope=True,
-        xlim=None,
+        xlim: tuple[float, float] | None = None,
         **kwargs,
-    ):
+    ) -> None:
+        """Plot the power spectrum per channel on log-log axes with a fitted slope.
+
+        Args:
+            groupby: Column to average over before plotting. Defaults to "animalday".
+            figsize (tuple, optional): Figure size (width, height). Defaults to None.
+            avg_channels (bool, optional): Average across channels into one trace.
+                Defaults to False.
+            plot_type: Matplotlib scaling to use. Defaults to "loglog".
+            plot_slope: Currently unused.
+            xlim (tuple, optional): Frequency axis limits. Defaults to None.
+        """
         avg_result = self.window_result.get_groupavg_result(["psd"], groupby=groupby)
 
         n_col = avg_result.index.size
@@ -575,14 +621,25 @@ class AnimalPlotter:
 
     def plot_psd_spectrogram(
         self,
-        multiindex=["animalday", "animal", "genotype"],
-        freq_range=(1, 50),
-        center_stat="mean",
-        mode="z",
-        figsize=None,
-        cmap="magma",
+        multiindex: list[str] = ["animalday", "animal", "genotype"],
+        freq_range: tuple[float, float] = (1, 50),
+        center_stat: Literal["mean", "median"] = "mean",
+        mode: ScoreTypeName | None = "z",
+        figsize: tuple[float, float] | None = None,
+        cmap: str = "magma",
         **kwargs,
-    ):
+    ) -> None:
+        """Plot the power spectrum over time as a per-channel spectrogram.
+
+        Args:
+            multiindex: Index levels identifying each recording session.
+            freq_range (tuple, optional): Frequency bounds in Hz. Defaults to (1, 50).
+            center_stat: Statistic used to collapse windows. Defaults to "mean".
+            mode: Standardization applied to the spectrogram, the same vocabulary as
+                ``score_type`` on the other methods. Defaults to "z".
+            figsize (tuple, optional): Figure size (width, height). Defaults to None.
+            cmap (str, optional): Colormap. Defaults to "magma".
+        """
         df_rowgroup = self.window_result.get_grouprows_result(
             ["psd"], multiindex=multiindex
         )
@@ -638,13 +695,13 @@ class AnimalPlotter:
     def plot_temporal_heatmap(
         self,
         features: list[PlottableFeatureName] | PlottableFeatureName | None = None,
-        figsize=None,
-        cmap="viridis",
-        score_type=None,
-        norm=None,
-        component_norms=None,
+        figsize: tuple[float, float] | None = None,
+        cmap: str = "viridis",
+        score_type: ScoreTypeName | None = None,
+        norm: colors.Normalize | None = None,
+        component_norms: dict[str, colors.Normalize] | None = None,
         **kwargs,
-    ):
+    ) -> None:
         """
         Create temporal heatmap showing feature patterns over time.
 
@@ -713,7 +770,7 @@ class AnimalPlotter:
         n_bins=24 * 60,
         figsize=None,
         cmap="viridis",
-        score_type="z",
+        score_type: ScoreTypeName | None = "z",
         norm=None,
         component_norms=None,
         **kwargs,

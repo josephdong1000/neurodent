@@ -15,7 +15,13 @@ from statannotations.Annotator import Annotator
 from neurodent.core import utils as core_utils
 from neurodent.results import WindowAnalysisResult
 from neurodent import constants
-from neurodent.constants import FeatureName, MatrixFeatureName, PlottableFeatureName
+from neurodent.constants import (
+    FeatureName,
+    FeatureNames,
+    FeatureRequest,
+    MatrixFeatureName,
+    PlottableFeatureName,
+)
 from neurodent.results import extract_hist_data, extract_feature, format_channel_data
 
 
@@ -70,8 +76,8 @@ class ExperimentPlotter:
     def __init__(
         self,
         wars: WindowAnalysisResult | list[WindowAnalysisResult],
-        features: list[str] = None,
-        exclude: list[str] = None,
+        features: FeatureRequest = None,
+        exclude: FeatureNames = None,
         use_abbreviations: bool = True,
         plot_order: dict = None,
     ):
@@ -222,7 +228,7 @@ class ExperimentPlotter:
         collapse_channels: bool = False,
         average_groupby: bool = False,
         strict_groupby: bool = False,
-    ):
+    ) -> pd.DataFrame:
         """
         Process feature data for plotting.
 
@@ -456,7 +462,7 @@ class ExperimentPlotter:
         average_groupby: bool = False,
         title: str = None,
         cmap: str = None,
-        stat_pairs: list[tuple[str, str]] | Literal["all", "x", "hue"] = None,
+        stat_pairs: list[tuple[str, str]] | Literal["all", "x", "hue"] | None = None,
         stat_test: str = "Mann-Whitney",
         norm_test: Literal[None, "D-Agostino", "log-D-Agostino", "K-S"] = None,
     ) -> sns.FacetGrid:
@@ -625,7 +631,7 @@ class ExperimentPlotter:
         norm: colors.Normalize | None = None,
         height: float = 3,
         aspect: float = 1,
-    ):
+    ) -> sns.FacetGrid:
         """
         Create a 2D feature plot.
 
@@ -702,7 +708,7 @@ class ExperimentPlotter:
         facet_vars: list[str] | str,
         df: pd.DataFrame = None,
         **kwargs,
-    ):
+    ) -> list[sns.FacetGrid]:
         if isinstance(groupby, str):
             groupby = [groupby]
 
@@ -787,7 +793,7 @@ class ExperimentPlotter:
         norm: colors.Normalize | None = None,
         height: float = 3,
         aspect: float = 1,
-    ):
+    ) -> sns.FacetGrid:
         """
         Create a 2D feature plot of differences between groups. Baseline is subtracted from other groups.
 
@@ -879,7 +885,7 @@ class ExperimentPlotter:
         cmap: str = "RdBu_r",
         norm: colors.Normalize | None = None,
         **kwargs,
-    ):
+    ) -> list[sns.FacetGrid]:
         if isinstance(groupby, str):
             groupby = [groupby]
 
@@ -951,7 +957,7 @@ class ExperimentPlotter:
         height: float = 3,
         aspect: float = 1,
         **kwargs,
-    ):
+    ) -> sns.FacetGrid:
         """
         Create a QQ plot of the feature data.
         """
