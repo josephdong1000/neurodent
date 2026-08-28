@@ -1831,6 +1831,8 @@ class TestExperimentPlotter:
     @patch("seaborn.FacetGrid")
     def test_plot_heatmap(self, mock_facetgrid, plotter):
         mock_grid = Mock()
+        # FacetGrid is mocked out, so give the empty-facet check something iterable.
+        mock_grid.facet_data.return_value = []
         mock_facetgrid.return_value = mock_grid
         # Patch pull_timeseries_dataframe to return a DataFrame with matrix features
         plotter.pull_timeseries_dataframe = Mock(

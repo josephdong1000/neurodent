@@ -632,9 +632,13 @@ class ExperimentPlotter:
         norm: colors.Normalize | None = None,
         height: float = 3,
         aspect: float = 1,
+        hide_empty: bool = True,
     ):
         """
         Create a 2D feature plot.
+
+        Facets whose row/column combination matched no rows are hidden. Pass
+        ``hide_empty=False`` to keep them as empty panels.
 
         Parameters:
         -----------
@@ -688,6 +692,9 @@ class ExperimentPlotter:
         g.map_dataframe(
             self._plot_matrix, feature=feature, color_palette=cmap, norm=norm
         )
+
+        if hide_empty:
+            _hide_empty_facets(g)
 
         # Adjust layout
         plt.tight_layout()
@@ -1153,3 +1160,50 @@ def df_normalize_baseline(
         raise ValueError(f"Invalid operation: {operation}")
 
     return df_merge
+
+
+def _hide_empty_facets(g: sns.FacetGrid) -> sns.FacetGrid:
+    """Hide facets that received no rows, and restore the labels they carried.
+
+    Seaborn sizes a grid from the marginal levels of its col and row variables, so a
+    combination no row satisfies still gets an axes and draws as an empty panel. Seaborn
+    also draws shared tick labels only on the bottom row and left column, so hiding an
+    empty edge facet strips them from the panels that remain. Those are re-exposed on the
+    new edges.
+
+    Hiding does not reclaim the slot. Emptiness is judged from ``g.facet_data()``, so
+    artists added to an empty facet are hidden with it. Safe to call more than once.
+
+    Args:
+        g (sns.FacetGrid): Grid to modify in place.
+
+    Returns:
+        sns.FacetGrid: The same grid.
+    """
+    counts = {}
+    for (i, j, _), subset in g.facet_data():
+        counts[(i, j)] = counts.get((i, j), 0) + len(subset)
+    if all(counts.values()) or not any(counts.values()):
+        return g
+
+    drawn = {}
+    for key, n_rows in counts.items():
+        ax = g.facet_axis(*key, modify_state=False)
+        # A colorbar nests the parent subplotspec, so read through to the top one.
+        spec = ax.get_subplotspec().get_topmost_subplotspec()
+        position = (spec.rowspan.start, spec.colspan.start)
+        if n_rows:
+            drawn[position] = ax
+        else:
+            ax.set_visible(False)
+
+    for col in {c for _, c in drawn}:
+        ax = drawn[(max(r for r, c in drawn if c == col), col)]
+        ax.tick_params(labelbottom=True)
+        ax.xaxis.label.set_visible(True)
+    for row in {r for r, _ in drawn}:
+        ax = drawn[(row, min(c for r, c in drawn if r == row))]
+        ax.tick_params(labelleft=True)
+        ax.yaxis.label.set_visible(True)
+
+    return g
