@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+
 import logging
 
 import numpy as np
 import pandas as pd
 
 from neurodent import constants
+from neurodent.constants import FeatureNames, FeatureRequest
 from .feature_utils import average_feature, extract_linear_array
 
 
@@ -20,16 +22,16 @@ class WARFeatureMixin:
 
     def get_result(
         self,
-        features: list[str] | str | None = None,
-        exclude: list[str] | str = [],
+        features: FeatureRequest = None,
+        exclude: FeatureNames = [],
         allow_missing=False,
     ):
         """Get windowed analysis result dataframe, with helpful filters
 
         Args:
-            features (list[str] | str | None, optional): Feature name, list of feature names,
+            features: Feature name, list of feature names,
                 or None to return all features. Defaults to None (all features).
-            exclude (list[str] | str, optional): Feature name or list of feature names to
+            exclude: Feature name or list of feature names to
                 exclude from result; will override the features parameter. Defaults to [].
             allow_missing (bool, optional): If True, will return all requested features as columns regardless if they exist in result. Defaults to False.
 
@@ -44,17 +46,17 @@ class WARFeatureMixin:
 
     def get_groupavg_result(
         self,
-        features: list[str] | str | None = None,
-        exclude: list[str] | str = [],
+        features: FeatureRequest = None,
+        exclude: FeatureNames = [],
         df: pd.DataFrame = None,
         groupby="animalday",
     ):
         """Group result and average within groups. Preserves data structure and shape for each feature.
 
         Args:
-            features (list[str] | str | None, optional): Feature name, list of feature names,
+            features: Feature name, list of feature names,
                 or None to return all features. Defaults to None (all features).
-            exclude (list[str] | str, optional): Feature name or list of feature names to
+            exclude: Feature name or list of feature names to
                 exclude from result. Will override the features parameter. Defaults to [].
             df (pd.DataFrame, optional): If not None, this function will use this dataframe instead of self.result. Defaults to None.
             groupby (str, optional): Feature or list of features to group by before averaging. Passed to the `by` parameter in pd.DataFrame.groupby(). Defaults to "animalday".
@@ -82,8 +84,8 @@ class WARFeatureMixin:
 
     def __get_groups(
         self,
-        features: list[str] | str | None = None,
-        exclude: list[str] | str = [],
+        features: FeatureRequest = None,
+        exclude: FeatureNames = [],
         df: pd.DataFrame = None,
         groupby="animalday",
     ):
@@ -93,8 +95,8 @@ class WARFeatureMixin:
 
     def get_grouprows_result(
         self,
-        features: list[str] | str | None = None,
-        exclude: list[str] | str = [],
+        features: FeatureRequest = None,
+        exclude: FeatureNames = [],
         df: pd.DataFrame = None,
         multiindex=["animalday", "animal", "genotype"],
         include=["duration", "endfile"],
@@ -106,8 +108,8 @@ class WARFeatureMixin:
 
     def get_channel_averaged_result(
         self,
-        features: list[str] | str | None = None,
-        exclude: list[str] | str = [],
+        features: FeatureRequest = None,
+        exclude: FeatureNames = [],
         df: pd.DataFrame = None,
     ) -> pd.DataFrame:
         """Get windowed analysis result with features averaged across channels.
@@ -125,10 +127,10 @@ class WARFeatureMixin:
            (excluding diagonal). Creates columns like: zcohere_delta, zcohere_theta, etc.
 
         Args:
-            features (list[str] | str | None, optional): Feature name, list of feature names,
+            features: Feature name, list of feature names,
                 or None to return all features. Can include any combination of linear, band,
                 or matrix features. Defaults to None (all features).
-            exclude (list[str] | str, optional): Feature name or list of feature names to
+            exclude: Feature name or list of feature names to
                 exclude. Defaults to [].
             df (pd.DataFrame, optional): If provided, use this dataframe instead of
                 self.result. Defaults to None.

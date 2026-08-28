@@ -2575,6 +2575,14 @@ rich==14.3.3 ; sys_platform == 'linux' \
     # via
     #   memray
     #   textual
+roman-numerals==4.1.0 ; python_full_version >= '3.11' \
+    --hash=sha256:1af8b147eb1405d5839e78aeb93131690495fe9da5c91856cb33ad55a7f1e5b2 \
+    --hash=sha256:647ba99caddc2cc1e55a51e4360689115551bf4476d90e8162cf8c345fe233c7
+    # via roman-numerals-py
+roman-numerals-py==4.1.0 ; python_full_version >= '3.11' \
+    --hash=sha256:553114c1167141c1283a51743759723ecd05604a1b6b507225e91dc1a6df0780 \
+    --hash=sha256:f5d7b2b4ca52dd855ef7ab8eb3590f428c0b1ea480736ce32b01fef2a5f8daf9
+    # via sphinx
 rpds-py==0.28.0 \
     --hash=sha256:03065002fd2e287725d95fbc69688e0c6daf6c6314ba38bdbaa3895418e09296 \
     --hash=sha256:04c1b207ab8b581108801528d59ad80aa83bb170b35b0ddffb29c20e411acdc1 \
@@ -2939,9 +2947,20 @@ soupsieve==2.8 \
     --hash=sha256:0cc76456a30e20f5d7f2e14a98a4ae2ee4e5abdc7c5ea0aafe795f344bc7984c \
     --hash=sha256:e2dd4a40a628cb5f28f6d4b0db8800b8f581b65bb380b97de22ba5ca8d72572f
     # via beautifulsoup4
-sphinx==8.1.3 \
+sphinx==8.1.3 ; python_full_version < '3.11' \
     --hash=sha256:09719015511837b76bf6e03e42eb7595ac8c2e41eeb9c29c5b755c6b677992a2 \
     --hash=sha256:43c1911eecb0d3e161ad78611bc905d1ad0e523e4ddc202a58a821773dc4c927
+    # via
+    #   myst-nb
+    #   myst-parser
+    #   neurodent
+    #   pydata-sphinx-theme
+    #   sphinx-autobuild
+    #   sphinx-design
+    #   sphinx-multiversion
+sphinx==8.2.3 ; python_full_version >= '3.11' \
+    --hash=sha256:398ad29dee7f63a75888314e9424d40f52ce5a6a87ae88e7071e80af296ec348 \
+    --hash=sha256:4405915165f13521d875a8c29c8970800a0141c14cc5416a38feca4ea5d9b9c3
     # via
     #   myst-nb
     #   myst-parser

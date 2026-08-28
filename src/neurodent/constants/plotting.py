@@ -3,6 +3,11 @@
 Includes color palettes and figure layout settings.
 """
 
+from typing import Literal
+
+ScoreTypeName = Literal["z", "zall", "gz", "modz", "center", "none"]
+"""How to rescale a feature before plotting. ``None`` means the same as ``"none"``."""
+
 FEATURE_PLOT_HEIGHT_RATIOS = {
     "rms": 1,
     "ampvar": 1,
@@ -11,6 +16,12 @@ FEATURE_PLOT_HEIGHT_RATIOS = {
     "psdband": 5,
     "psdfrac": 5,
     "nspike": 1,
+    "logrms": 1,
+    "logampvar": 1,
+    "logpsdtotal": 1,
+    "lognspike": 1,
+    "logpsdband": 5,
+    "logpsdfrac": 5,
     "cohere": 5,
     "zcohere": 5,
     "imcoh": 5,

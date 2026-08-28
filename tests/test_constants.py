@@ -2,6 +2,8 @@
 Unit tests for neurodent.constants module.
 """
 
+from typing import get_args
+
 import pytest
 import numpy as np
 
@@ -98,6 +100,15 @@ class TestConstants:
 
         for feature in linear_features + matrix_features:
             assert feature in constants.FEATURE_PLOT_HEIGHT_RATIOS, f"Missing feature: {feature}"
+
+        # Every name a plot function will now autocomplete must have a ratio, or
+        # animal.py indexes this dict and raises KeyError.
+        plottable = (
+            set(get_args(constants.LinearFeatureName))
+            | set(get_args(constants.BandFeatureName))
+            | set(get_args(constants.MatrixFeatureName))
+        )
+        assert plottable <= set(constants.FEATURE_PLOT_HEIGHT_RATIOS)
 
     def test_freq_bands(self):
         """Test FREQ_BANDS structure."""
@@ -398,3 +409,63 @@ class TestOkabeItoColors:
         assert constants.OKABE_ITO_COLORS["red"] == "#D55E00"
         assert constants.OKABE_ITO_COLORS["purple"] == "#CC79A7"
 
+
+EXPECTED_FEATURES = [
+    "rms",
+    "ampvar",
+    "psdtotal",
+    "nspike",
+    "logrms",
+    "logampvar",
+    "logpsdtotal",
+    "lognspike",
+    "psdslope",
+    "psdband",
+    "psdfrac",
+    "logpsdband",
+    "logpsdfrac",
+    "cohere",
+    "zcohere",
+    "imcoh",
+    "zimcoh",
+    "pcorr",
+    "zpcorr",
+    "psd",
+]
+
+
+class TestFeatureNameVocabulary:
+    """The Literal aliases and the runtime lists must not drift apart."""
+
+    def test_feature_vocabulary_is_stable(self):
+        """Spelled independently of src/ so a typo inside a Literal fails loudly."""
+        assert constants.FEATURES == EXPECTED_FEATURES
+        assert list(get_args(constants.FeatureName)) == constants.FEATURES
+
+    def test_lists_are_derived_from_aliases(self):
+        """Each runtime list is exactly the args of its alias, in order."""
+        pairs = [
+            (constants.LinearFeatureName, constants.LINEAR_FEATURES),
+            (constants.Linear2DFeatureName, constants.LINEAR_2D_FEATURES),
+            (constants.BandFeatureName, constants.BAND_FEATURES),
+            (constants.BandedMatrixFeatureName, constants.BANDED_MATRIX_FEATURES),
+            (constants.SimpleMatrixFeatureName, constants.SIMPLE_MATRIX_FEATURES),
+            (constants.MatrixFeatureName, constants.MATRIX_FEATURES),
+            (constants.HistFeatureName, constants.HIST_FEATURES),
+        ]
+        for alias, names in pairs:
+            assert list(get_args(alias)) == names
+            assert isinstance(names, list)
+            assert all(type(n) is str for n in names)
+
+    def test_plottable_excludes_exactly_the_histogram_features(self):
+        """The general-purpose plot functions reject histogram features, so the type must too."""
+        assert set(get_args(constants.FeatureName)) - set(
+            get_args(constants.PlottableFeatureName)
+        ) == set(get_args(constants.HistFeatureName))
+
+    def test_every_feature_is_computable(self):
+        """A name in FEATURES with no compute_ method would break dynamic dispatch."""
+        from neurodent.analysis.fragment_analyzer import FragmentAnalyzer
+
+        assert not [f for f in constants.FEATURES if not hasattr(FragmentAnalyzer, f"compute_{f}")]
