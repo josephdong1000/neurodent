@@ -83,7 +83,7 @@ dev = [
     "factory-boy>=3.2.0",
     "faker>=18.0.0",
     # Documentation
-    "sphinx>=7.0.0",
+    "sphinx>=7.1.0",
     "ipykernel>=6.0.0",
     "pandoc>=2.0.0",
     "sphinx-autobuild>=2024.10.3",
@@ -110,6 +110,7 @@ Repository = "https://github.com/josephdong1000/neurodent"
 where = ["src"]
 
 [tool.setuptools.package-data]
+"neurodent" = ["py.typed"]
 "neurodent.data" = ["sample/**/*.bin", "sample/**/*.csv", "sample/**/*.edf", "sample/**/*.md"]
 
 [tool.pytest.ini_options]

@@ -15,6 +15,13 @@ from statannotations.Annotator import Annotator
 from neurodent.core import utils as core_utils
 from neurodent.results import WindowAnalysisResult
 from neurodent import constants
+from neurodent.constants import (
+    FeatureName,
+    FeatureNames,
+    FeatureRequest,
+    MatrixFeatureName,
+    PlottableFeatureName,
+)
 from neurodent.results import extract_hist_data, extract_feature, format_channel_data
 
 
@@ -69,8 +76,8 @@ class ExperimentPlotter:
     def __init__(
         self,
         wars: WindowAnalysisResult | list[WindowAnalysisResult],
-        features: list[str] = None,
-        exclude: list[str] = None,
+        features: FeatureRequest = None,
+        exclude: FeatureNames = None,
         use_abbreviations: bool = True,
         plot_order: dict = None,
     ):
@@ -215,36 +222,28 @@ class ExperimentPlotter:
 
     def pull_timeseries_dataframe(
         self,
-        feature: str,
+        feature: FeatureName,
         groupby: str | list[str],
         channels: str | list[str] = "all",
         collapse_channels: bool = False,
         average_groupby: bool = False,
         strict_groupby: bool = False,
-    ):
+    ) -> pd.DataFrame:
         """
         Process feature data for plotting.
 
-        Parameters
-        ----------
-        feature : str
-            The feature to get.
-        groupby : str or list[str]
-            The variable(s) to group by.
-        channels : str or list[str], optional
-            The channels to get. If 'all', all channels are used.
-        collapse_channels : bool, optional
-            Whether to average the channels to one value.
-        average_groupby : bool, optional
-            Whether to average the groupby variable(s).
-        strict_groupby : bool, optional
-            If True, raise an exception when groupby columns contain NaN values.
-            If False (default), only issue a warning.
+        Args:
+            feature: The feature to get.
+            groupby (str | list[str]): The variable(s) to group by.
+            channels (str | list[str], optional): The channels to get. If 'all', all
+                channels are used.
+            collapse_channels (bool, optional): Whether to average the channels to one value.
+            average_groupby (bool, optional): Whether to average the groupby variable(s).
+            strict_groupby (bool, optional): If True, raise an exception when groupby columns
+                contain NaN values. If False (default), only issue a warning.
 
-        Returns
-        -------
-        df : pd.DataFrame
-            A DataFrame with the feature data.
+        Returns:
+            pd.DataFrame: A DataFrame with the feature data.
         """
         if "band" in groupby or groupby == "band":
             raise ValueError(
@@ -448,7 +447,7 @@ class ExperimentPlotter:
 
     def plot_catplot(
         self,
-        feature: str,
+        feature: PlottableFeatureName,
         groupby: str | list[str],
         df: pd.DataFrame = None,
         x: str = None,
@@ -463,7 +462,7 @@ class ExperimentPlotter:
         average_groupby: bool = False,
         title: str = None,
         cmap: str = None,
-        stat_pairs: list[tuple[str, str]] | Literal["all", "x", "hue"] = None,
+        stat_pairs: list[tuple[str, str]] | Literal["all", "x", "hue"] | None = None,
         stat_test: str = "Mann-Whitney",
         norm_test: Literal[None, "D-Agostino", "log-D-Agostino", "K-S"] = None,
     ) -> sns.FacetGrid:
@@ -618,7 +617,7 @@ class ExperimentPlotter:
 
     def plot_heatmap(
         self,
-        feature: str,
+        feature: MatrixFeatureName,
         groupby: str | list[str],
         df: pd.DataFrame = None,
         col: str = None,
@@ -632,7 +631,7 @@ class ExperimentPlotter:
         norm: colors.Normalize | None = None,
         height: float = 3,
         aspect: float = 1,
-    ):
+    ) -> sns.FacetGrid:
         """
         Create a 2D feature plot.
 
@@ -704,12 +703,12 @@ class ExperimentPlotter:
 
     def plot_heatmap_faceted(
         self,
-        feature: str,
+        feature: MatrixFeatureName,
         groupby: str | list[str],
         facet_vars: list[str] | str,
         df: pd.DataFrame = None,
         **kwargs,
-    ):
+    ) -> list[sns.FacetGrid]:
         if isinstance(groupby, str):
             groupby = [groupby]
 
@@ -778,7 +777,7 @@ class ExperimentPlotter:
 
     def plot_diffheatmap(
         self,
-        feature: str,
+        feature: MatrixFeatureName,
         groupby: str | list[str],
         baseline_key: str | bool | tuple[str, ...],
         baseline_groupby: str | list[str] = None,
@@ -794,7 +793,7 @@ class ExperimentPlotter:
         norm: colors.Normalize | None = None,
         height: float = 3,
         aspect: float = 1,
-    ):
+    ) -> sns.FacetGrid:
         """
         Create a 2D feature plot of differences between groups. Baseline is subtracted from other groups.
 
@@ -873,7 +872,7 @@ class ExperimentPlotter:
 
     def plot_diffheatmap_faceted(
         self,
-        feature: str,
+        feature: MatrixFeatureName,
         groupby: str | list[str],
         facet_vars: str | list[str],
         baseline_key: (
@@ -886,7 +885,7 @@ class ExperimentPlotter:
         cmap: str = "RdBu_r",
         norm: colors.Normalize | None = None,
         **kwargs,
-    ):
+    ) -> list[sns.FacetGrid]:
         if isinstance(groupby, str):
             groupby = [groupby]
 
@@ -947,7 +946,7 @@ class ExperimentPlotter:
 
     def plot_qqplot(
         self,
-        feature: str,
+        feature: PlottableFeatureName,
         groupby: str | list[str],
         df: pd.DataFrame = None,
         col: str = None,
@@ -958,7 +957,7 @@ class ExperimentPlotter:
         height: float = 3,
         aspect: float = 1,
         **kwargs,
-    ):
+    ) -> sns.FacetGrid:
         """
         Create a QQ plot of the feature data.
         """

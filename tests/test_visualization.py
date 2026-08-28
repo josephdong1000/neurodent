@@ -1475,6 +1475,26 @@ class TestApplyFilter:
 class TestAnimalPlotter:
     """Test AnimalPlotter class."""
 
+    def test_missing_features_all_dropped(self):
+        """Every missing feature is dropped, not every other one.
+
+        The filter used to call features.remove() while iterating the same list, which
+        skips alternate elements and leaves missing names in place to KeyError later.
+        """
+        war = MagicMock(spec=WindowAnalysisResult)
+        war.channel_names = ["LMot", "RMot"]
+        war.result = pd.DataFrame({"animalday": ["a"]})
+        war.get_grouprows_result.return_value = pd.DataFrame(
+            {"duration": [1.0], "endfile": [0], "timestamp": [0], "animalday": ["a"]}
+        )
+        ap = AnimalPlotter.__new__(AnimalPlotter)
+        ap.window_result = war
+        ap.n_channels = 2
+
+        # All four are absent from the returned frame, so all four must be dropped.
+        with pytest.warns(UserWarning), pytest.raises(ValueError, match="No valid features"):
+            ap.plot_temporal_heatmap(features=["rms", "ampvar", "psdtotal", "psdband"])
+
     @pytest.fixture
     def mock_war(self):
         """Create a mock WindowAnalysisResult."""

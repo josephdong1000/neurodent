@@ -15,6 +15,7 @@ import seaborn.objects as so
 import seaborn as sns
 from seaborn import axes_style
 
+from neurodent.constants import FeatureName
 from neurodent import constants
 from neurodent.core.utils import get_feature_label
 
@@ -47,7 +48,7 @@ class ZeitgeberPlotter:
     def __init__(
         self, 
         data,
-        features: list[str] = None,
+        features: list[FeatureName] | None = None,
         aggregate_config: dict = None
     ):
         if isinstance(data, pd.DataFrame):
